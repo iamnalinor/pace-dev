@@ -10,7 +10,7 @@ describe("createMemoryEventStore", () => {
   it("appends idempotently by id and lists everything", async () => {
     const store = createMemoryEventStore();
     await store.append([a, b]);
-    await store.append([{ ...a, payload: { language: "en" } }]);
+    await store.append([settingsEvent(a.id, at(9), { language: "en" })]);
     await expect(store.listAll()).resolves.toEqual([a, b]);
   });
 

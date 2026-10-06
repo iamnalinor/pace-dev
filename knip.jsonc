@@ -19,9 +19,7 @@
       "ignoreDependencies": ["@stryker-mutator/command-runner"]
     },
     "packages/client": {
-      "project": ["src/**/*.ts"],
-      // Pre-declared for the client store tests (foundation phase B); drop from this list when used.
-      "ignoreDependencies": ["fast-check"]
+      "project": ["src/**/*.ts"]
     },
     "apps/api": {
       "entry": [

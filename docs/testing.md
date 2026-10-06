@@ -1,86 +1,107 @@
 # Testing
 
-A test pyramid in which **every level tests what the others cannot**, and nothing is
-tested twice for the sake of numbers.
+Every level tests what the others cannot. Behaviour changes start with a failing test
+(see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
 | Level | Tool | Runs against | Where | Command |
 |---|---|---|---|---|
-| Unit | `bun test`, fast-check | pure functions, use cases with fakes | `apps/api/src/**/*.test.ts` | `bun test:unit` |
-| Component | Vitest, React Testing Library | components with logic, jsdom | `apps/web/src/**/*.test.tsx` | `bun test:unit` |
-| Integration | `bun test`, Testcontainers | real HTTP server + real PostgreSQL + real migrations, via the Eden client | `apps/api/tests/integration/` | `bun test:integration` |
-| End-to-end | Playwright, axe | production web build + API + PostgreSQL in Chromium | `e2e/` | `bun test:e2e` |
-| Mutation | Stryker | the component tests themselves | — | `bun test:mutation` |
+| Core unit | Vitest, fast-check | pure functions: schemas, materializer, reducers, i18n, tokens | `packages/core/src/**/*.test.ts` | `bun test:unit` |
+| Client unit | Vitest | the API client with a fake `fetch` | `packages/client/src/**/*.test.ts` | `bun test:unit` |
+| Web component | Vitest, React Testing Library, jsdom | components with logic | `apps/web/src/**/*.test.{ts,tsx}` | `bun test:unit` |
+| API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
+| App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |
+| End-to-end | Playwright + axe | the production web build against `wrangler dev` in Chromium | `e2e/*.e2e.ts` | `bun test:e2e` |
+| Mutation | Stryker | the core and web tests themselves | `packages/core`, `apps/web` | `bun test:mutation` (weekly in CI) |
+| LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
-## Unit tests: only the non-trivial
+`bun test` runs unit → api → app → e2e. CI runs them as separate jobs (`ci.yml`).
 
-Unit-test logic with real branches or tricky inputs; do **not** unit-test glue.
+## Unit tests (core, client)
 
-Tested here:
-- `example-feed-cursor` — property-based (fast-check): `decode(encode(x)) = x` for any
-  cursor; arbitrary strings never throw.
-- `example-post` validation — Unicode: an emoji is one character (not two UTF-16 units),
-  NFC normalization, whitespace-only bodies.
-- use cases with real branching — delete by a non-author is `forbidden`, a missing post
-  is `not-found` (not `forbidden`, which would leak existence); feed pagination's
-  "one extra row" logic.
-- `safeRedirectPath` — open-redirect protection (`//evil.com`, `/\evil.com`, `javascript:`).
+`vitest run --coverage` in each package with thresholds (core: 90% lines/statements/
+functions, 85% branches; client: 80% branches). Test only non-trivial logic; glue is
+covered by the API and e2e levels.
 
-Deliberately **not** unit-tested: DTO mappers, Drizzle queries, route wiring, shadcn/ui
-components, pages that only compose other components. Integration and e2e tests cover
-them in their real environment, where mocks cannot lie.
+What is tested in core today: `parseEvent` round-trips and rejections (unknown type,
+bad id, missing `dueTz`), `sortEvents`, the materializer (corrections, revoked
+revocations, amendments that would break the schema, `materializeAt`,
+`shouldRematerialize`), the settings reducer, `t`/`plural`/`formatDuration`/
+`formatRelativeDay`, catalog parity (`en` and `ru` have the same keys, placeholders and
+no empty strings), palette contrast ratios, time-zone helpers, deterministic ids.
+Order-insensitivity and similar invariants use **fast-check** properties.
 
-## Component tests (React Testing Library)
+## Web component tests
 
-RTL renders a component in a simulated DOM (jsdom) and interacts with it **the way a
-user would** — by role and label, not by CSS classes or internal state. Use it for
-components with behaviour: the composer's character counter and validation, the
-optimistic like with rollback, the sign-in redirect. Network calls are replaced by
-mocking the Eden client module (`vi.mock("#web/shared/api/api-client.ts", ...)`).
+React Testing Library in jsdom, by role and label. `src/test/render.tsx` renders with the
+providers; `src/test/setup.ts` registers jest-dom. Thresholds: 90% lines/statements, 85%
+functions, 75% branches — measured on logic only: `main.tsx`, `router.tsx`, pages,
+layouts, `shared/ui/**` and `platform/**` are excluded because Playwright covers them.
 
-`renderWithProviders()` (`src/test/render.tsx`) gives each test a fresh QueryClient and
-a memory router.
+## API tests (workerd)
 
-## Integration tests (the API for real)
+`apps/api/vitest.config.ts` uses `cloudflareTest` with `wrangler.jsonc`, so the tests run
+in the real runtime with real bindings: D1 (`DB`), KV (`OAUTH_KV`) and the `UserStore`
+Durable Object. Nothing is mocked except the outside world:
 
-`tests/integration/preload.ts` runs once per test run:
+- `tests/setup.ts` runs before every test file and applies the committed D1 migrations
+  (`readD1Migrations("drizzle/d1")` in the config → `applyD1Migrations(env.DB, …)`), so
+  each file starts from an empty, fully migrated database. The Durable Object migrates
+  itself in its constructor.
+- The config injects test bindings: `ENVIRONMENT=test` (so `/api/auth/dev` exists),
+  whitelist `1001,1002`, a fake `TELEGRAM_BOT_TOKEN` the widget tests sign their own
+  payloads with, `TELEGRAM_WEBHOOK_SECRET`, `BOT_INFO`, and
+  `TELEGRAM_API_ROOT=https://telegram.test` so outgoing bot calls are intercepted with
+  `fetchMock` instead of reaching Telegram.
+- `tests/helpers.ts`: `call(path, { body, token })` sends a request to the Worker through
+  `exports.default.fetch` (the Worker calls itself), `json()` parses, `loginAsDev(id)`
+  returns a bearer.
+- Unit-sized tests next to the code (`src/auth/*.test.ts`, `src/user-store/*.test.ts`)
+  run in the same runtime, so they can use D1 directly where it is cheaper than HTTP.
 
-1. starts PostgreSQL in a container (Testcontainers, `postgres:17-alpine`) — or, if
-   `TEST_DATABASE_URL` is set, creates a fresh uniquely named database on that server
-   (useful without Docker);
-2. applies the real migrations.
+Covered today: health and the JSON 404; widget signature (valid vector, tampered,
+wrong bot, stale); whitelist; nonce lifecycle (pending → ready once, expiry, double
+bind); sessions (token never stored, revoke, hourly touch); dev login 404 in production;
+webhook secret check, login deep link, "Not allowed", expired link; sync push/pull
+ordering, idempotent re-push, paging, `recordedAt` clamping, partial rejection, user
+isolation; observations idempotency.
 
-Each test file starts the real app on a random port (`startTestApp()`) and calls it
-**over HTTP through the same Eden client the web app uses**, so the SDK is tested too.
-`beforeEach(app.truncate)` isolates tests. They cover what only a real database can
-show: keyset pagination with identical timestamps, 10 concurrent likes, cascades,
-constraint/validation agreement, sessions and cookies, 500s that do not leak SQL.
+## App tests (jest-expo)
 
-`openapi.int.test.ts` snapshots the OpenAPI document — any change to the public API
-shows up in review; after an **intended** change run
-`bun test:integration --update-snapshots` — and asserts at compile time that the Eden
-client is precisely typed (not `any`).
+`bun run --cwd apps/app test` runs `jest` with the `jest-expo` preset (Jest 29, since
+Vitest cannot render React Native). It runs under Node through the binary's shebang —
+never with `bun --bun`. `jest.setup.ts` registers the RNTL matchers; `.bun` is in
+`transformIgnorePatterns` so workspace packages are transformed. Native modules are
+mocked at the Expo module boundary; the pure logic they drive lives in `@pace/client`
+and is tested there.
 
-## End-to-end tests
+## End-to-end
 
-`playwright.config.ts` starts the API (migrating a dedicated `template_e2e` database)
-and `vite preview` of the production build with the `/api` proxy — the same topology
-as docker compose. Tests create a unique user each, so they run in parallel on a shared
-database. Every page gets an axe scan (no serious or critical WCAG 2.2 AA violations).
+`playwright.config.ts` starts two servers unless `E2E_BASE_URL` is set:
 
-Against an already running stack (skips starting servers):
-`E2E_BASE_URL=http://localhost:8080 bun test:e2e` — CI does this against the docker
-compose stack, so nginx, its CSP and headers are exercised in a real browser too.
+1. the API: `bun run --cwd apps/api dev -- --env dev --var ENVIRONMENT:test --var
+   WEB_ORIGIN:<web url>` (wrangler dev, port 8787, local D1/KV/DO, dev login enabled);
+2. the web: `bun run --cwd apps/web build && bun run --cwd apps/web preview` (port 4173)
+   with `VITE_API_URL=http://localhost:8787`.
 
-Locally: `docker compose up -d db` first. In a sandbox without Playwright's own browser
-build, point `PLAYWRIGHT_CHROMIUM_EXECUTABLE` at an installed Chromium.
+Tests are in `e2e/*.e2e.ts`; `e2e/support/fixtures.ts` adds `expectNoA11yViolations`
+(axe, WCAG 2.2 AA, fails on serious/critical). Every page gets a scan. Failures keep a
+trace and a screenshot; CI uploads `playwright-report/`.
 
-## Coverage and mutation testing
+- Browser: `bunx playwright install --with-deps chromium`, or set
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium` to use an installed one (sandboxes).
+- `E2E_BASE_URL=https://pace.nalinor.dev bun test:e2e` runs the suite against a deployed
+  stack without starting anything.
+- Locally the servers are reused if already running (`reuseExistingServer`), so `bun dev`
+  plus `bun test:e2e` works — but note `bun dev` serves Vite, not the production preview.
 
-- API (`bun run --cwd apps/api test:coverage`, unit + integration): ≥ 90% of lines
-  **per file** (Bun enforces thresholds per file).
-- Web (`vitest --coverage`): ≥ 90% lines/statements, 85% functions, 75% branches —
-  measured on **logic** only (components, hooks, helpers). Pages, layout, route guards
-  and client setup are excluded because Playwright covers them.
-- Coverage shows what ran, not what was checked. **Stryker** (`bun test:mutation`)
-  mutates the web code and verifies the tests notice. It is slow, so CI runs it
-  weekly (`.github/workflows/mutation.yml`), not on every push.
+## Mutation testing
+
+Coverage shows what ran, not what was checked. Stryker (`stryker.config.json` in
+`packages/core` and `apps/web`) mutates the code and expects the tests to fail. It is
+slow, so `mutation.yml` runs it weekly and on demand; reports land in `reports/`.
+
+## LLM regression (planned)
+
+Stage 2 adds `packages/core/src/parse/regression/` with cases and `run.ts`;
+`bun test:llm` will run them against Groq and Gemini and write `docs/llm.md`.
+`llm-regression.yml` already exists for it (weekly, with the provider secrets).

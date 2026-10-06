@@ -1,133 +1,210 @@
 # Architecture
 
-## The big picture
+## Layers
 
 ```
-Browser ──► web (React SPA) ──/api──► api (Elysia) ──► PostgreSQL
-              │                         │
-              └── Eden client ◄── type App (import type only)
+apps/app (Expo) ─┐
+apps/web (Vite) ─┼─► packages/client ─► packages/core
+apps/api (Worker)┴──────────────────► packages/core
 ```
 
-- **One origin.** The browser only ever talks to the origin that served the page. In
-  development Vite proxies `/api`, in production nginx does. There is no CORS config
-  and the session cookie is a plain `HttpOnly; SameSite=Lax` first-party cookie.
-- **One contract.** The web app imports `type App` from `@template/api` and builds a
-  typed client with Eden. Changing a route's schema in the API is a compile error in
-  the web app until it is updated. Only `import type` is allowed across that boundary
-  (dependency-cruiser rule `web-imports-api-types-only`), so no server code ever
-  ships to the browser.
+| Layer | Package | Holds | May import |
+|---|---|---|---|
+| core | `@pace/core` | pure, immutable TypeScript: event schemas, sorting, materializer, reducers, settings, i18n, design tokens, time helpers, `Result`, the zod API contract | its npm deps only (zod, ulidx, date-fns) |
+| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`); in stage 1 the local-first store, outbox/sync loop and view-models; `@pace/client/react` re-exports zustand's `useStore` | core |
+| api | `@pace/api` | the Cloudflare Worker: Hono app, auth, bot, sync routes, the `UserStore` Durable Object, D1 schema | core |
+| web | `@pace/web` | React SPA (Vite, Tailwind v4, PWA), deployed as the `pace-web` assets Worker | client, core |
+| app | `@pace/app` | Expo / React Native (expo-router, NativeWind) | client, core |
 
-## API: Clean Architecture per feature
+dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
+a boundary: core imports no workspace, client never imports an app or the API, the UIs
+never import the API (the contract is in core), apps never import each other, API feature
+folders (`auth/`, `bot/`, `sync/`, `user-store/`) only reach each other through
+`src/shared/` or by composition in `app.ts`. `packages/core/src/**` and
+`packages/client/src/view-models/**` additionally run eslint-plugin-functional: no `let`,
+no mutation, no classes, no `throw`.
 
-Each feature is a folder with four layers. Dependencies point **inward only**:
+## The event model
 
-```
-features/example-posts/
-  domain/           business rules: pure functions and types. No I/O, no frameworks.
-  application/      use cases + ports (interfaces they need, e.g. a repository).
-  infrastructure/   adapters implementing the ports: Drizzle tables and repository.
-  http/             Elysia routes: validate input, call a use case, map the result.
-  example-posts-feature.ts   composition root of the feature (the only file that knows all layers)
-```
+Everything the user does is an append-only event. State is never stored as the truth on
+the client; it is **materialized** from the log.
 
-| Layer | May import | Enforced by |
+### Envelope
+
+`packages/core/src/events/event-schema.ts` (zod discriminated union on `type`):
+
+| Field | Type | Meaning |
 |---|---|---|
-| domain | its own domain, `shared/result` | depcruise `domain-is-pure` |
-| application | domain, `shared/{result,clock}`, `auth/current-user` | depcruise `application-depends-on-domain-only` |
-| infrastructure | application (ports), domain, `shared/db` — never `http` | depcruise `infrastructure-does-not-know-http` |
-| http | application, domain, auth macro, shared — never `infrastructure` | depcruise `http-does-not-know-infrastructure` |
-| any feature | never another feature | depcruise `features-are-isolated` |
+| `id` | ULID, or a deterministic system id | unique; ULIDs sort by creation time |
+| `type` | one of `EVENT_TYPES` | `task.created`, `task.closed`, `project.created`, `preset.updated`, `settings.updated`, `focus.started`, `event.amended`, … |
+| `occurredAt` | UTC ISO instant | when it happened — editable by the user (retro entries) |
+| `recordedAt` | UTC ISO instant | when the device recorded it — system time, never edited |
+| `deviceId` | string | which client wrote it |
+| `precision` | `exact` \| `approx` | how sure the user was about `occurredAt` |
+| `source` | `app` \| `web` \| `bot` \| `mcp` \| `system` | which channel produced it |
+| `payload` | per-type zod object (`payloads.ts`) | e.g. `{ taskId, title, presetId, dueAt?, dueTz?, subtasks[] }` |
 
-`domain/` and `application/` are additionally **functional**: no `let`, no mutation, no
-classes, no `throw` (eslint-plugin-functional).
+Instants are UTC strings so string order equals time order. Every absolute time a person
+sets carries the IANA zone it was set in (`dueAt` + `dueTz`, `startAt` + `startTz`);
+`parseEvent(raw)` returns `Result<Event, string>` and is the only way in.
 
-### Errors are values
+`EventInput` is what a caller dispatches: the store fills `id`, `recordedAt` and
+`deviceId`.
 
-Use cases return `Result<T, E>` (`shared/result.ts`), where `E` is a union of string
-literals such as `"example-post/not-found" | "example-post/forbidden"`. The HTTP layer
-maps each one to a status with a `switch` that has **no `default`**: adding a new error
-to the union without handling it fails `switch-exhaustiveness-check`. Exceptions are
-reserved for the truly unexpected; they become a generic `500` (never leaking a stack
-or SQL) and are logged by the global `onError` in `app.ts`.
+### Corrections
 
-### Dependency injection without a container
+Events are never edited or deleted. Two correction events do the job:
 
-Use cases are factories: `makeCreateExamplePost({ repository, clock })` returns the
-function that does the work. Tests pass fakes (`*.fake.ts`), production passes
-Drizzle adapters. The wiring is plain code in `*-feature.ts` and `app.ts`; `main.ts`
-reads the configuration, runs migrations and starts the server.
+- `event.amended { targetId, patch }` — shallow-merges `patch` into the target's payload.
+  An amendment that would make the target invalid is ignored.
+- `event.revoked { targetId, reason? }` — removes the target from the effective log.
 
-### Auth
+Corrections are themselves revocable (revoking a revocation restores the original; a
+cycle counts as inactive) and apply regardless of their own `occurredAt`. `effectiveEvents`
+in `materializer.ts` implements this; corrections never appear in its output.
 
-better-auth owns `/api/auth/*` (sign-up, sign-in, sign-out, sessions). Sessions live in
-the database (revocable, unlike JWTs) and the browser holds only an `HttpOnly` cookie.
-A route opts into authentication with `{ auth: true }` (an Elysia macro in
-`auth/auth-plugin.ts`) and receives `user: CurrentUser`. The application layer only
-knows `CurrentUser`, never better-auth. `GET /api/me` (`auth/me-routes.ts`) is the
-smallest protected route and part of the base template.
+### Deterministic ids
 
-better-auth's generated tables use `timestamp` **without** time zone, and the Postgres
-driver interprets those in the process time zone. Every script and the Docker image
-therefore run the API with `TZ=UTC`; keep it that way (or session expiry shifts by
-your UTC offset).
+`ids.ts`: `newId()` is a monotonic ULID factory (shared per process, because the Workers
+clock is frozen within a request). System-generated events use deterministic ids so that
+every device and the server produce the same event once:
 
-To add email verification or password reset, configure an email sender in
-`auth/auth.ts` ([docs](https://www.better-auth.com/docs/authentication/email-password)).
-Other better-auth plugins (OAuth, 2FA, …) may add tables: regenerate
-`auth/auth-schema.ts` with `bunx auth@<version> generate` and then `bun db:generate`.
+- `instanceId(presetId, isoWeek)` → `hw:<presetId>:<isoWeek>` (recurring homework)
+- `autoOutcomeId(taskId, kind)` → `auto:<taskId>:missed|skipped` (automatic outcomes)
 
-### Elysia pitfalls this template already handles
+`EventIdSchema` accepts a ULID or `^(?:hw|auto):[^\s:]+:[^\s:]+$`; the log stores an id
+once (`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op.
 
-- **Route options must not be shared objects.** Elysia mutates a route's options object
-  (it stores resolved macro hooks on it). Two app instances sharing a module-level
-  `const options = {...}` means the second runs the first one's hooks. Use a factory
-  (`const listRouteOptions = () => ({...})`).
-- **Keep route definitions chained** (`new Elysia().get(...).post(...)`): Eden infers
-  the client from the chained type.
-- **Eden `parseDate: false`.** By default Eden turns *any* date-looking string into a
-  `Date` — including user content — while the type still says `string`.
+### Materialization rules
 
-## Web
+`packages/core/src/materialize/materializer.ts`:
+
+- `sortEvents`: canonical order is `occurredAt`, then `id`.
+- `materialize(events, reducer, initial)`: full rebuild — apply corrections, sort, fold.
+- `materializeAt(events, atIso, …)`: the board at a past date — only events with
+  `occurredAt ≤ atIso`, but **every** correction applies.
+- `apply(state, event, reducer)`: the incremental path for an event that arrives in
+  order; a correction is a no-op here (it needs a rebuild).
+- `shouldRematerialize(lastAppliedOccurredAt, incoming)`: true when `incoming` is a
+  correction or occurred before the last applied event. Clients and the server use the
+  same rule: rebuild only when a retro edit makes it necessary.
+
+Reducers are `(state, event) => state` and pure. `settings-reducer.ts` is the first one
+(`settings.updated` patches `language`, `timezone`, `digestWindows`, `quietHours` on top
+of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
+
+High-volume phone facts (app usage, calendar entries, sleep candidates) are **not**
+events. They are *observations* (`kind`, `key`, `at`, `payload`), stored once per
+`kind+key`; only derived decisions become events.
+
+## API contract
+
+One description of every endpoint, shared by the Worker and the clients:
 
 ```
-src/
-  main.tsx            providers (TanStack Query, router, toasts)
-  router.tsx          routes; guards RequireAuth / GuestOnly
-  features/<name>/    pages, components, queries (TanStack Query over Eden), tests
-  shared/
-    api/              Eden client, `unwrap` (Eden result → value or ApiError), query client
-    auth/             better-auth client
-    ui/               shadcn/ui components (vendored, generated by `shadcn add`)
+packages/core/src/api/endpoint.ts      endpoint() helper, EndpointShape, EndpointInput/Output, buildPath
+packages/core/src/api/endpoints.ts     the contract: endpoints.{health, me, auth.*, sync.*}
+packages/core/src/api/schemas/*.ts     zod bodies, params, queries, outputs
+apps/api/src/shared/mount.ts           mount(app, endpoint, handler) for Hono
+packages/client/src/api-client.ts      createApiClient({ baseUrl, token, fetch? }).call(endpoint, input)
 ```
 
-- Server state lives in TanStack Query, never copied into component state.
-- `unwrap()` is the single bridge from Eden's `{ data, error }` to TanStack Query's
-  value-or-throw.
-- Mutations with visible latency are optimistic with rollback (see `useToggleExampleLike`).
-- Web features do not import each other either (`web-features-are-isolated`).
-- Imports inside the web app use the `#web/*` alias (package.json `imports`), not
-  tsconfig `paths`: the web project also type-checks API sources for Eden, and a
-  `paths` alias would leak into them.
+An endpoint declares `method`, `path` (Hono `:param` syntax), `auth`, optional `params`,
+`query`, `body` schemas and the `output` schema. `mount()` adds the bearer guard when
+`auth` is true, validates each declared part (422 `validation` on mismatch, with the
+offending path in the message) and serialises the handler's `Result<Output, Problem>`:
+`ok` → JSON 200, `err` → `{ code, message }` with the problem's status. The client builds
+the URL from the same definition, sends the bearer, throws `ApiError { status, code }` on
+non-2xx and parses the response with the `output` schema — so a server change that
+breaks the contract fails at the client boundary, not deep in the UI.
 
-## How to add a feature
+Every error body has the shape `{ code, message }`: `not-found` (404), `validation`
+(422), `internal` (500, never a stack or SQL), `auth/unauthorized` (401),
+`auth/not-allowed` (403), `auth/not-configured` (503), `auth/invalid-hash`,
+`auth/expired` (401), `auth/nonce-not-found` (404), `bot/not-configured` (503).
 
-The example feature is the reference. For a feature `bookmarks`:
+The Worker reads bindings per request (`c.env`), never at module scope, so tests and
+`wrangler dev` can supply different ones. `src/shared/config.ts` validates vars and
+secrets with zod once per request and stores the result on the context.
 
-1. **Domain** — `apps/api/src/features/bookmarks/domain/`: types, validation and rules as
-   pure functions returning `Result`. Unit-test what is non-trivial.
-2. **Application** — `application/`: the repository port (a `type` with the operations
-   you need) and one file per use case (`make<UseCase>(deps) => (input) => Result`).
-   Unit-test branching logic against a `*.fake.ts` repository.
-3. **Infrastructure** — `infrastructure/`: Drizzle tables (`bookmarks-table.ts`) and the
-   repository implementing the port. Export the tables from `shared/db/schema.ts`, then
-   `bun db:generate --name=bookmarks` and review the SQL.
-4. **HTTP** — `http/`: TypeBox schemas for params/query/body **and every response
-   status**, routes with `{ auth: true }` where needed, exhaustive error mapping.
-5. **Wire it** — `bookmarks-feature.ts` builds repository → use cases → routes;
-   `app.ts` adds `.use(createBookmarksFeature(...))` inside the `/api` group.
-6. **Integration tests** — `apps/api/tests/integration/bookmarks.int.test.ts` through
-   the Eden client: happy path, validation, authorization, races if any.
-7. **Web** — `apps/web/src/features/bookmarks/`: queries (`unwrap(api.bookmarks.get())`),
-   components, a page; add the route in `router.tsx`. Component tests for logic only.
-8. **E2E** — one Playwright scenario for the main user journey, with an axe check.
-9. `bun lint && bun test`.
+## Auth and sessions
+
+- **Identity** is a Telegram user id; `ALLOWED_TELEGRAM_IDS` (wrangler var) is the
+  whitelist. `auth/whitelist.ts` is checked before any user row is created.
+- **Web**: `POST /api/auth/telegram` with the Login Widget payload.
+  `auth/telegram-widget.ts` builds the sorted `key=value\n` check string, derives the key
+  as SHA-256 of the bot token, verifies HMAC-SHA-256 with a constant-time compare and
+  rejects `auth_date` older than five minutes.
+- **Android**: `POST /api/auth/nonce` → `{ nonce, deepLink }` (24 random bytes,
+  base64url, 5-minute TTL, stored in D1 `login_nonces`). The bot's `/start login_<nonce>`
+  handler upserts the Telegram user and binds the nonce (`bot-login.ts`; a nonce binds
+  once). `GET /api/auth/nonce/:nonce` answers `pending` until then, then `ready` with a
+  session exactly once (the row is marked consumed).
+- **Sessions** (`auth/sessions.ts`): 32 random bytes as the bearer token, SHA-256 in D1
+  `sessions` with a label (`web`, `android`, `dev`), 90-day expiry, `lastSeenAt` touched at
+  most hourly. `requireAuth` middleware resolves the bearer to `CurrentUser`; handlers
+  read it with `requireUser(c)`.
+- **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
+
+D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`. They are
+global; everything per user lives in the Durable Object.
+
+## Sync protocol
+
+Clients keep their own log and an outbox; the server keeps the authoritative sequence.
+
+| Call | Request | Response | Rules |
+|---|---|---|---|
+| `POST /api/sync/push` | `{ events: Event[] }` (≤ 500) | `{ accepted: id[], rejected: { id, reason }[], seq }` | each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
+| `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again |
+| `POST /api/sync/observations` | `{ observations }` (≤ 1000) | `{ accepted: n }` | append-only, idempotent by `kind+key` |
+
+The transport validates only the envelope (`SyncEventSchema`); the per-type payload is
+checked by the Durable Object. `seq` is a server-assigned integer, so a client that
+pulls from its last `seq` gets exactly what it missed, in any order of `occurredAt`; the
+materialization rule above decides whether an incremental apply is enough.
+
+## Durable Object per user
+
+`apps/api/src/user-store/user-store.ts`: `class UserStore extends DurableObject`, one
+instance per user (`USER_STORE.idFromName(user.id)`). Storage is the DO's SQLite through
+drizzle (`drizzle-orm/durable-sqlite`); migrations (`drizzle/do`, bundled as
+`migrations.js`) run in the constructor inside `blockConcurrencyWhile`, so no request
+sees a half-migrated store. Tables (`user-store/schema.ts`): `events` (`seq` primary key,
+`id` unique, indexed by `occurredAt`), `observations`, `decisions` (every automatic
+decision with its inputs, for "why?"), `meta` (cursors, budgets). Methods today:
+`append`, `list`, `appendObservations`, `countEvents`. Projections, alarms (digests,
+automatic outcomes) and the MCP tools will run inside the same object in later stages,
+so heavy recomputes never cross a network boundary.
+
+## How to add an endpoint
+
+1. **Schemas** — add the body/query/params/output zod objects to
+   `packages/core/src/api/schemas/<area>.ts` (new file for a new area).
+2. **Contract** — add the entry to `endpoints` in `packages/core/src/api/endpoints.ts`
+   under `/api/...` with `auth` set; extend `endpoints.test.ts` (paths unique and under
+   `/api`, protected vs public). Export new schemas and types from `src/core.ts`.
+3. **Handler** — in `apps/api/src/<feature>/<feature>-routes.ts` write a
+   `Handler<typeof endpoints.x.y>` returning `ok(value)` or `err({ status, code, message })`
+   and register it with `mount(app, endpoints.x.y, handler)`; call the mount function
+   from `createApp` in `app.ts`. Error codes are string literals handled by an exhaustive
+   `switch` (no `default`).
+4. **Test** — a file in `apps/api/tests/*.int.test.ts` through `call()` / `loginAsDev()`
+   from `tests/helpers.ts`: happy path, validation (422), auth (401/403).
+5. **Call it** — `client.call(endpoints.x.y, { body, params, query })` from
+   `@pace/client`; the input and output types follow from the contract.
+
+## How to add an event type
+
+1. **Payload** — a zod object in `packages/core/src/events/payloads.ts` (reuse
+   `InstantSchema`, `TimeZoneSchema` and the `zonePaired` refinement for zoned times).
+2. **Type** — append the name to `EVENT_TYPES` and an `event("…", Payload)` entry to
+   `EventSchema` in `event-schema.ts`. Round-trip it in `event-schema.test.ts`.
+3. **Reducer** — handle it in the reducer that owns the state (pure; unknown types leave
+   the state untouched). Property-test order-insensitivity when the reducer is not
+   trivially commutative.
+4. **System events** — if the system emits it, give it a deterministic id in `ids.ts`
+   so every device produces the same one.
+5. Nothing changes on the server: the Durable Object validates with `parseEvent` from
+   core, so the new type is accepted as soon as the package is rebuilt. If the UI shows
+   it, add the strings to `i18n/en.ts` **and** `ru.ts` (a test asserts the same keys).

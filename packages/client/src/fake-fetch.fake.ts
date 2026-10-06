@@ -1,10 +1,7 @@
 import type { Event } from "@pace/core";
 
 /** One fake route: returns a JSON body (or a full `Response`) for `METHOD /path`. */
-export type FakeRoute = (request: {
-  readonly body: unknown;
-  readonly url: URL;
-}) => Promise<Response | unknown> | Response | unknown;
+export type FakeRoute = (request: { readonly body: unknown; readonly url: URL }) => unknown;
 
 export type FakeCall = { readonly body: unknown; readonly method: string; readonly path: string };
 
@@ -42,9 +39,8 @@ export const settingsEvent = (
   id: string,
   occurredAt: string,
   payload: { readonly language?: "en" | "ru"; readonly timezone?: string },
-  deviceId = "remote",
 ): Event => ({
-  deviceId,
+  deviceId: "remote",
   id,
   occurredAt,
   payload,

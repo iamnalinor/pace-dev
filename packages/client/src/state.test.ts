@@ -11,7 +11,10 @@ const NOW = "2026-10-06T12:00:00.000Z";
 
 const setup = async (
   seed: readonly Event[] = [],
-): Promise<{ readonly state: AppStateHandle; readonly store: ReturnType<typeof createMemoryEventStore> }> => {
+): Promise<{
+  readonly state: AppStateHandle;
+  readonly store: ReturnType<typeof createMemoryEventStore>;
+}> => {
   const store = createMemoryEventStore();
   await store.append(seed);
   await store.markSynced(seed.map((event) => event.id));
@@ -77,7 +80,7 @@ describe("createAppState dispatch", () => {
   it("re-materializes when a retro event arrives", async () => {
     const { state } = await setup();
     await state.dispatch(languageInput(at(10), "ru"));
-    const retro = await state.dispatch({ ...languageInput(at(9), "en"), timezone: "UTC" });
+    const retro = await state.dispatch(languageInput(at(9), "en"));
     expect(retro.ok).toBe(true);
     const snapshot = state.store.getState();
     expect(snapshot.settings.language).toBe("ru");
