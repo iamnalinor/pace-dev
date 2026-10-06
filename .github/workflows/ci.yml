@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # claude/** are the agent working branches: run the pipeline on them too (no deploy).
+    branches: [main, "claude/**"]
   workflow_dispatch:
 
 # Least privilege by default; jobs ask for more only when needed.
