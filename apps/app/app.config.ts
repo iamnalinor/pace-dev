@@ -24,6 +24,8 @@ const config: ExpoConfig = {
   userInterfaceStyle: "automatic",
   backgroundColor: "#0b0b0c",
   icon: "./assets/icon.png",
+  // iOS is not a target; expo-share-intent's config plugin still expects a bundle identifier.
+  ios: { bundleIdentifier: "dev.nalinor.pace" },
   android: {
     package: "dev.nalinor.pace",
     versionCode,
