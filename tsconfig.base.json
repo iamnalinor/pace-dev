@@ -1,0 +1,32 @@
+{
+  "$schema": "https://www.schemastore.org/tsconfig",
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    // Plain, erasable TypeScript: no enums, namespaces or parameter properties.
+    // Bun and Vite strip types without transforming code.
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+
+    // On top of @tsconfig/strictest.
+    "useUnknownInCatchVariables": true,
+    "noUncheckedSideEffectImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "checkJs": true,
+
+    // The only concession: third-party .d.ts files are not ours to fix.
+    "skipLibCheck": true,
+
+    // TS 6 defaults `types` to []: every project lists what it needs.
+    "types": []
+  }
+}

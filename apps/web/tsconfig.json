@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    // `bun` is here only because `import type { App }` pulls the API sources into this program.
+    // Web code itself must not use Bun APIs: enforced by ESLint (no-restricted-globals).
+    "types": ["vite/client", "bun"]
+  },
+  "include": ["src", "*.ts"]
+}

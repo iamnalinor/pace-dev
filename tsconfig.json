@@ -1,0 +1,8 @@
+{
+  // Root config files (eslint, playwright, knip, ...). Apps and e2e have their own tsconfig.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun"]
+  },
+  "include": ["*.ts", "*.config.*", ".dependency-cruiser.mjs"]
+}

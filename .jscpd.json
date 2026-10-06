@@ -1,0 +1,19 @@
+{
+  "path": ["apps", "e2e"],
+  "format": ["typescript", "tsx", "css"],
+  "minTokens": 50,
+  "threshold": 0,
+  "absolute": true,
+  "gitignore": true,
+  "reporters": ["console"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/drizzle/**",
+    "**/shared/ui/**",
+    "**/auth/auth-schema.ts",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/tests/**",
+    "e2e/**"
+  ]
+}

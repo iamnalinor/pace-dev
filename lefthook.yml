@@ -1,0 +1,13 @@
+# Git hooks (installed by `bun install` via the `prepare` script).
+# Same checks as CI, so problems surface before a push, not after.
+pre-commit:
+  jobs:
+    - name: lint
+      run: bun lint
+      # `bun lint` auto-fixes (formatting, sortable imports): stage those fixes.
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: unit tests
+      run: bun test:unit

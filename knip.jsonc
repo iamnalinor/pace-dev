@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  // Vendored shadcn/ui components export every sub-component (CardAction, ...);
+  // we keep them close to upstream instead of trimming exports we don't use yet.
+  "ignoreIssues": { "apps/web/src/shared/ui/**": ["exports", "types"] },
+  "workspaces": {
+    ".": {
+      "entry": ["*.config.ts", "e2e/**/*.ts"]
+    },
+    "apps/api": {
+      "entry": ["src/scripts/*.ts", "src/**/*.test.ts", "tests/**/*.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
+    "apps/web": {
+      // Stryker's command runner is built into @stryker-mutator/core.
+      "ignoreDependencies": ["@stryker-mutator/command-runner"],
+      "entry": ["src/**/*.test.tsx", "src/test/*.ts"],
+      "project": ["src/**/*.{ts,tsx,css}"]
+    }
+  }
+}

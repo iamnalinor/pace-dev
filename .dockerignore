@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/coverage
+**/.stryker-tmp
+.git
+.cache
+.env
+.env.*
+test-results
+playwright-report
+docs
+e2e

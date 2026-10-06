@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # Eden requires identical Elysia versions on client and server: update together.
+      elysia:
+        patterns: ["elysia", "@elysiajs/*"]
+      lint:
+        patterns: ["eslint*", "@eslint*", "typescript-eslint", "@typescript-eslint/*", "@biomejs/*", "knip", "jscpd", "dependency-cruiser"]
+      test:
+        patterns: ["vitest", "@vitest/*", "@testing-library/*", "@playwright/test", "@axe-core/*", "fast-check", "@stryker-mutator/*", "@testcontainers/*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directories: ["/apps/api", "/apps/web"]
+    schedule:
+      interval: weekly

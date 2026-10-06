@@ -1,0 +1,3 @@
+[install]
+# Exact versions in package.json: upgrades are explicit, reviewed changes.
+exact = true
