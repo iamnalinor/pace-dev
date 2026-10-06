@@ -1,0 +1,84 @@
+import type { UserFromGetMe } from "grammy/types";
+
+import { Bot, type Context } from "grammy";
+
+import type { TelegramTransport } from "./telegram-api.ts";
+
+/** Who opened the bot, as the login flow needs them. */
+export type BotUser = {
+  readonly telegramId: string;
+  readonly name: string;
+  readonly username: null | string;
+};
+
+export type LoginOutcome = "already-bound" | "not-found" | "ok";
+
+export type BotDeps = {
+  readonly token: string;
+  /** From `getMe`; when given, grammY never calls Telegram on cold start. */
+  readonly botInfo?: undefined | UserFromGetMe;
+  readonly apiRoot?: string | undefined;
+  readonly fetch: TelegramTransport;
+  readonly isAllowed: (telegramId: string) => boolean;
+  /** Binds the login nonce from the deep link to the user who opened it. */
+  readonly bindLogin: (user: BotUser, nonce: string) => Promise<LoginOutcome>;
+};
+
+const LOGIN_PREFIX = "login_";
+
+export const REPLIES = {
+  loggedIn: "Logged in — return to Pace",
+  notAllowed: "Not allowed",
+  linkExpired: "This login link has expired. Open Pace and try again.",
+  welcome: "Hi! This is the Pace bot. Log in from the app to connect it.",
+} as const;
+
+const toBotUser = (from: NonNullable<Context["from"]>): BotUser => ({
+  telegramId: String(from.id),
+  name: [from.first_name, from.last_name].filter(Boolean).join(" "),
+  username: from.username ?? null,
+});
+
+const loginReply = (outcome: LoginOutcome): string => {
+  switch (outcome) {
+    case "ok": {
+      return REPLIES.loggedIn;
+    }
+    case "already-bound":
+    case "not-found": {
+      return REPLIES.linkExpired;
+    }
+  }
+};
+
+/** A grammY bot built per request (Workers have no long-lived state). */
+export const createBot = (deps: BotDeps): Bot => {
+  const bot = new Bot(deps.token, {
+    ...(deps.botInfo !== undefined && { botInfo: deps.botInfo }),
+    client: {
+      ...(deps.apiRoot !== undefined && { apiRoot: deps.apiRoot }),
+      // grammY types the option as the platform's global fetch (Bun's adds `preconnect`); it only ever calls it.
+      fetch: deps.fetch as typeof fetch,
+    },
+  });
+  bot.use(async (ctx, next) => {
+    if (ctx.from === undefined) {
+      return;
+    }
+    if (!deps.isAllowed(String(ctx.from.id))) {
+      await ctx.reply(REPLIES.notAllowed);
+      return;
+    }
+    await next();
+  });
+  bot.command("start", async (ctx) => {
+    if (ctx.from === undefined || !ctx.match.startsWith(LOGIN_PREFIX)) {
+      await ctx.reply(REPLIES.welcome);
+      return;
+    }
+    const nonce = ctx.match.slice(LOGIN_PREFIX.length);
+    const outcome = await deps.bindLogin(toBotUser(ctx.from), nonce);
+    await ctx.reply(loginReply(outcome));
+  });
+  return bot;
+};

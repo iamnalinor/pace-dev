@@ -1,4 +1,4 @@
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { autoOutcomeId, createIdFactory, instanceId, isUlid, newId } from "./ids.ts";
@@ -11,7 +11,7 @@ describe("newId", () => {
   it("is monotonic within the same millisecond", () => {
     const make = createIdFactory();
     const ids = Array.from({ length: 50 }, () => make(1_700_000_000_000));
-    const sorted = [...ids].sort((a, b) => a.localeCompare(b));
+    const sorted = ids.toSorted((a, b) => a.localeCompare(b));
     expect(ids).toEqual(sorted);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -23,10 +23,12 @@ describe("newId", () => {
   });
 });
 
+const seedArb = fc.integer({ max: 2_000_000_000_000, min: 0 });
+
 describe("isUlid", () => {
   it("accepts generated ids", () => {
     fc.assert(
-      fc.property(fc.integer({ max: 2_000_000_000_000, min: 0 }), (seed) => {
+      fc.property(seedArb, (seed) => {
         expect(isUlid(newId(seed))).toBe(true);
       }),
     );

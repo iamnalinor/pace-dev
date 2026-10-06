@@ -6,6 +6,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "routes": [{ "pattern": "pace-api.nalinor.dev", "custom_domain": true }],
   "observability": { "enabled": true },
+  // Secrets (set with `wrangler secret put`, never here): TELEGRAM_BOT_TOKEN (from @BotFather),
+  // TELEGRAM_WEBHOOK_SECRET (random string echoed by Telegram on every webhook call).
+  // Optional vars set at deploy time: BOT_INFO (JSON of getMe), TELEGRAM_API_ROOT (tests only).
+  // All are typed in src/shared/env.d.ts and parsed by src/shared/config.ts.
   "vars": {
     "ENVIRONMENT": "production",
     // Telegram user ids allowed to sign in (comma separated). Other deployments edit this.

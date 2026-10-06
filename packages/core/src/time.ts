@@ -19,7 +19,7 @@ export type ZonedInstant = {
   readonly tz: string;
 };
 
-const toIso = (date: Date): string => new Date(date.getTime()).toISOString();
+const toIso = (date: Date): string => new Date(date).toISOString();
 
 /** Last millisecond of the calendar day containing `atIso` in `zone`, as a UTC instant. */
 export const endOfDayIn = (atIso: string, zone: string): string =>
@@ -53,6 +53,7 @@ export const formatInZone = (atIso: string, zone: string, pattern: string): stri
   format(atIso, pattern, { in: tz(zone) });
 
 /** True when the two zones have different UTC offsets at their instants. */
+// eslint-disable-next-line unicorn/consistent-boolean-name -- name fixed by the plan; reads as a predicate
 export const zonesDiffer = (a: ZonedInstant, b: ZonedInstant): boolean =>
   tzOffset(a.tz, new Date(a.at)) !== tzOffset(b.tz, new Date(b.at));
 

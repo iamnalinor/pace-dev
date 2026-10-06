@@ -1,4 +1,4 @@
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,10 +18,10 @@ const NEW_YORK = "America/New_York";
 const MOSCOW = "Europe/Moscow";
 const ZONES = [BERLIN, NEW_YORK, MOSCOW, "UTC", "Asia/Tokyo", "Pacific/Auckland"];
 
-const instantArb = fc
-  .integer({ max: Date.UTC(2030, 0, 1), min: Date.UTC(2020, 0, 1) })
-  .map((ms) => new Date(ms).toISOString());
+const msArb = fc.integer({ max: Date.UTC(2030, 0, 1), min: Date.UTC(2020, 0, 1) });
+const instantArb = msArb.map((ms) => new Date(ms).toISOString());
 const zoneArb = fc.constantFrom(...ZONES);
+const minutesArb = fc.integer({ max: 100_000, min: -100_000 });
 
 describe("startOfDayIn / endOfDayIn", () => {
   it("spans 23 hours on the Berlin spring-forward day", () => {
@@ -120,7 +120,7 @@ describe("addMinutesIso / minutesBetween", () => {
 
   it("round-trips", () => {
     fc.assert(
-      fc.property(instantArb, fc.integer({ max: 100_000, min: -100_000 }), (at, minutes) => {
+      fc.property(instantArb, minutesArb, (at, minutes) => {
         expect(minutesBetween(at, addMinutesIso(at, minutes))).toBe(minutes);
       }),
     );
@@ -141,15 +141,9 @@ describe("zonesDiffer", () => {
     const summer = "2026-07-01T12:00:00.000Z";
     const winter = "2026-01-15T12:00:00.000Z";
     expect(zonesDiffer({ at: summer, tz: MOSCOW }, { at: summer, tz: BERLIN })).toBe(true);
-    expect(zonesDiffer({ at: summer, tz: BERLIN }, { at: summer, tz: "Europe/Paris" })).toBe(
-      false,
-    );
-    expect(zonesDiffer({ at: winter, tz: "Europe/London" }, { at: winter, tz: "UTC" })).toBe(
-      false,
-    );
-    expect(zonesDiffer({ at: summer, tz: "Europe/London" }, { at: summer, tz: "UTC" })).toBe(
-      true,
-    );
+    expect(zonesDiffer({ at: summer, tz: BERLIN }, { at: summer, tz: "Europe/Paris" })).toBe(false);
+    expect(zonesDiffer({ at: winter, tz: "Europe/London" }, { at: winter, tz: "UTC" })).toBe(false);
+    expect(zonesDiffer({ at: summer, tz: "Europe/London" }, { at: summer, tz: "UTC" })).toBe(true);
   });
 
   it("is false for the same zone and symmetric", () => {

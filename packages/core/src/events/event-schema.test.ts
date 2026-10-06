@@ -1,8 +1,18 @@
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { newId } from "../ids.ts";
-import { EVENT_TYPES, type Event, type EventInput, EventSchema, parseEvent } from "./event-schema.ts";
+import {
+  type Event,
+  EVENT_TYPES,
+  type EventInput,
+  EventSchema,
+  parseEvent,
+} from "./event-schema.ts";
+
+const errorOf = (result: ReturnType<typeof parseEvent>): string => (result.ok ? "" : result.error);
+
+const byName = (a: string, b: string): number => a.localeCompare(b);
 
 const envelope = {
   deviceId: "device-1",
@@ -28,22 +38,16 @@ const created = {
 
 describe("parseEvent", () => {
   it("round-trips a valid task.created event and fills defaults", () => {
-    const result = parseEvent(created);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value).toEqual({
-        ...created,
-        payload: { ...created.payload, fields: {} },
-      });
-    }
+    expect(parseEvent(created)).toEqual({
+      ok: true,
+      value: { ...created, payload: { ...created.payload, fields: {} } },
+    });
   });
 
   it("rejects an unknown type", () => {
     const result = parseEvent({ ...envelope, payload: {}, type: "task.exploded" });
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("type");
-    }
+    expect(errorOf(result)).toContain("type");
   });
 
   it("rejects an id that is neither a ULID nor a deterministic system id", () => {
@@ -72,9 +76,9 @@ describe("parseEvent", () => {
         payload: { ...created.payload, startAt: "2026-10-07T08:00:00.000Z" },
       }).ok,
     ).toBe(false);
-    expect(parseEvent({ ...created, payload: { ...created.payload, dueTz: "Mars/Olympus" } }).ok).toBe(
-      false,
-    );
+    expect(
+      parseEvent({ ...created, payload: { ...created.payload, dueTz: "Mars/Olympus" } }).ok,
+    ).toBe(false);
   });
 
   it("reports the failing path", () => {
@@ -84,9 +88,7 @@ describe("parseEvent", () => {
       type: "task.progress.set",
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("payload.progress");
-    }
+    expect(errorOf(result)).toContain("payload.progress");
   });
 
   it("validates settings.updated partially", () => {
@@ -95,9 +97,9 @@ describe("parseEvent", () => {
     expect(parseEvent({ ...base, payload: { digestWindows: ["09:00", "21:30"] } }).ok).toBe(true);
     expect(parseEvent({ ...base, payload: { digestWindows: ["25:00"] } }).ok).toBe(false);
     expect(parseEvent({ ...base, payload: { language: "de" } }).ok).toBe(false);
-    expect(parseEvent({ ...base, payload: { quietHours: { from: "23:00", to: "08:00" } } }).ok).toBe(
-      true,
-    );
+    expect(
+      parseEvent({ ...base, payload: { quietHours: { from: "23:00", to: "08:00" } } }).ok,
+    ).toBe(true);
     expect(parseEvent({ ...base, payload: { timezone: "Nowhere/Land" } }).ok).toBe(false);
   });
 
@@ -132,7 +134,7 @@ describe("parseEvent", () => {
 
   it("accepts the task lifecycle payloads", () => {
     const taskId = created.payload.taskId;
-    const cases: ReadonlyArray<readonly [Event["type"], unknown]> = [
+    const cases: readonly (readonly [Event["type"], unknown])[] = [
       ["task.updated", { taskId, title: "New title" }],
       ["task.preset.set", { presetId: "preset-hw", taskId }],
       ["task.overrides.set", { overrides: { softDays: 2 }, taskId }],
@@ -156,42 +158,59 @@ describe("parseEvent", () => {
       ["focus.started", { taskId }],
       ["focus.ended", { taskId }],
     ];
-    for (const [type, payload] of cases) {
-      const result = parseEvent({ ...envelope, payload, type });
-      expect(result, type).toEqual(expect.objectContaining({ ok: true }));
-    }
+    const failures = cases
+      .map(([type, payload]) => [type, parseEvent({ ...envelope, payload, type })] as const)
+      .filter(([, result]) => !result.ok);
+    expect(failures).toEqual([]);
   });
 
   it("rejects wrong enum values in lifecycle payloads", () => {
     const taskId = created.payload.taskId;
-    expect(parseEvent({ ...envelope, payload: { status: "done", taskId }, type: "task.status.set" }).ok).toBe(false);
-    expect(parseEvent({ ...envelope, payload: { outcome: "won", taskId }, type: "task.closed" }).ok).toBe(false);
-    expect(parseEvent({ ...envelope, payload: { importance: "urgent", taskId }, type: "task.importance.set" }).ok).toBe(false);
-    expect(parseEvent({ ...envelope, payload: { color: "octarine", name: "X", projectId: "p" }, type: "project.created" }).ok).toBe(false);
-    expect(parseEvent({ ...envelope, payload: { subtasks: [], taskId }, type: "task.subtasks.added" }).ok).toBe(false);
+    expect(
+      parseEvent({ ...envelope, payload: { status: "done", taskId }, type: "task.status.set" }).ok,
+    ).toBe(false);
+    expect(
+      parseEvent({ ...envelope, payload: { outcome: "won", taskId }, type: "task.closed" }).ok,
+    ).toBe(false);
+    expect(
+      parseEvent({
+        ...envelope,
+        payload: { importance: "urgent", taskId },
+        type: "task.importance.set",
+      }).ok,
+    ).toBe(false);
+    expect(
+      parseEvent({
+        ...envelope,
+        payload: { color: "octarine", name: "X", projectId: "p" },
+        type: "project.created",
+      }).ok,
+    ).toBe(false);
+    expect(
+      parseEvent({ ...envelope, payload: { subtasks: [], taskId }, type: "task.subtasks.added" })
+        .ok,
+    ).toBe(false);
   });
 
   it("parses any generated envelope", () => {
+    const msArb = fc.integer({ max: Date.UTC(2030, 0, 1), min: Date.UTC(2020, 0, 1) });
+    const precisionArb = fc.constantFrom("exact", "approx");
+    const sourceArb = fc.constantFrom("app", "web", "bot", "mcp", "system");
     fc.assert(
-      fc.property(
-        fc.integer({ max: Date.UTC(2030, 0, 1), min: Date.UTC(2020, 0, 1) }),
-        fc.constantFrom("exact", "approx"),
-        fc.constantFrom("app", "web", "bot", "mcp", "system"),
-        (ms, precision, source) => {
-          const at = new Date(ms).toISOString();
-          const result = parseEvent({
-            deviceId: "d",
-            id: newId(ms),
-            occurredAt: at,
-            payload: { taskId: "t" },
-            precision,
-            recordedAt: at,
-            source,
-            type: "task.reopened",
-          });
-          expect(result.ok).toBe(true);
-        },
-      ),
+      fc.property(msArb, precisionArb, sourceArb, (ms, precision, source) => {
+        const at = new Date(ms).toISOString();
+        const result = parseEvent({
+          deviceId: "d",
+          id: newId(ms),
+          occurredAt: at,
+          payload: { taskId: "t" },
+          precision,
+          recordedAt: at,
+          source,
+          type: "task.reopened",
+        });
+        expect(result.ok).toBe(true);
+      }),
     );
   });
 });
@@ -199,9 +218,7 @@ describe("parseEvent", () => {
 describe("EVENT_TYPES", () => {
   it("matches the discriminated union", () => {
     const fromSchema = EventSchema.options.map((option) => option.shape.type.value);
-    expect([...EVENT_TYPES].sort((a, b) => a.localeCompare(b))).toEqual(
-      [...fromSchema].sort((a, b) => a.localeCompare(b)),
-    );
+    expect(EVENT_TYPES.toSorted(byName)).toEqual(fromSchema.toSorted(byName));
     expect(new Set(EVENT_TYPES).size).toBe(EVENT_TYPES.length);
   });
 

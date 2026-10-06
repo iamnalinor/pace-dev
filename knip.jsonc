@@ -19,7 +19,9 @@
       "ignoreDependencies": ["@stryker-mutator/command-runner"]
     },
     "packages/client": {
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.ts"],
+      // Pre-declared for the client store tests (foundation phase B); drop from this list when used.
+      "ignoreDependencies": ["fast-check"]
     },
     "apps/api": {
       "entry": [
@@ -35,7 +37,17 @@
       "ignoreDependencies": ["cloudflare"]
     },
     "apps/web": {
-      "ignoreDependencies": ["@stryker-mutator/command-runner"],
+      "ignoreDependencies": [
+        "@stryker-mutator/command-runner",
+        // Pre-declared for the web shell wiring (foundation phase B); drop from this list when used.
+        "@pace/client",
+        "@pace/core",
+        "@tanstack/react-query",
+        "idb",
+        "lucide-react",
+        "sonner",
+        "zustand"
+      ],
       "entry": ["src/test/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx,css}"]
     },
@@ -44,8 +56,16 @@
       "metro": false,
       "entry": ["plugins/*.js"],
       "project": ["app/**/*.{ts,tsx}", "plugins/*.js", "*.css"],
-      // The expo-font config plugin references these packages by file path in app.config.ts.
-      "ignoreDependencies": ["@expo-google-fonts/geist", "@expo-google-fonts/geist-mono"]
+      "ignoreDependencies": [
+        // The expo-font config plugin references these packages by file path in app.config.ts.
+        "@expo-google-fonts/geist",
+        "@expo-google-fonts/geist-mono",
+        // Pre-declared for the app shell wiring (foundation phase B); drop from this list when used.
+        "@pace/client",
+        "lucide-react-native",
+        "react-native-svg",
+        "zustand"
+      ]
     }
   }
 }

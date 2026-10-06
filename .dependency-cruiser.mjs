@@ -158,7 +158,7 @@ const config = {
     doNotFollow: { path: ["node_modules"] },
     exclude: {
       path: [
-        String.raw`^apps/[^/]+/(dist|coverage|reports|\.stryker-tmp|android|\.expo)/`,
+        String.raw`^apps/[^/]+/(dist|coverage|reports|\.stryker-tmp|android|\.expo|\.wrangler)/`,
         String.raw`^packages/[^/]+/(coverage|reports|\.stryker-tmp)/`,
         "^apps/api/drizzle/",
         String.raw`worker-configuration\.d\.ts$`,

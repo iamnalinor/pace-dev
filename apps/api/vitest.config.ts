@@ -12,6 +12,19 @@ export default defineConfig({
       miniflare: {
         bindings: {
           ENVIRONMENT: "test",
+          ALLOWED_TELEGRAM_IDS: "1001,1002",
+          TELEGRAM_BOT_USERNAME: "PaceTestBot",
+          // Fake secrets: the widget tests sign their own payloads with this token.
+          TELEGRAM_BOT_TOKEN: "123456:TEST-TOKEN",
+          TELEGRAM_WEBHOOK_SECRET: "test-webhook-secret",
+          // Outgoing Telegram calls go to a host the tests intercept with fetchMock.
+          TELEGRAM_API_ROOT: "https://telegram.test",
+          BOT_INFO: JSON.stringify({
+            id: 777,
+            is_bot: true,
+            first_name: "Pace",
+            username: "PaceTestBot",
+          }),
           TEST_MIGRATIONS: await readD1Migrations(path.join(import.meta.dirname, "drizzle/d1")),
         },
       },
