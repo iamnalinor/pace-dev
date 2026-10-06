@@ -25,7 +25,7 @@
       "migrations_dir": "drizzle/d1"
     }
   ],
-  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "79653b9423324ba89a917eae8a8278a3" }],
   "durable_objects": {
     "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
   },
@@ -33,6 +33,8 @@
   "dev": { "port": 8787 },
   "env": {
     "dev": {
+      // Local/e2e environment: no custom domain, local D1/KV/DO emulation.
+      "routes": [],
       "vars": {
         "ENVIRONMENT": "development",
         "ALLOWED_TELEGRAM_IDS": "1919230638",
