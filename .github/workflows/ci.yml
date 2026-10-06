@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun lint
       - name: Lint must not change files (run `bun lint` locally and commit)
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun run --cwd apps/web test:unit
 
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun run --cwd apps/api test:coverage
 
@@ -65,7 +65,7 @@ jobs:
     env:
       E2E_DATABASE_URL: postgres://postgres:postgres@localhost:5432/template_e2e
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bunx playwright install --with-deps chromium
       - run: bun test:e2e
@@ -87,7 +87,7 @@ jobs:
       # The E2E suite signs up many users from one IP within seconds.
       AUTH_RATE_LIMIT: "false"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: docker compose up --build --detach --wait --wait-timeout 180
       - name: Smoke test through nginx (web → api → db)
         run: |
@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       # braces (dev-only, via eslint-plugin-check-file > micromatch) has no patched release yet.
       - run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
