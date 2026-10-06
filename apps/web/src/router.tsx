@@ -1,28 +1,21 @@
 import { createBrowserRouter } from "react-router";
 
-import { RequireAuth } from "#web/features/auth/require-auth.tsx";
-import { SignInPage } from "#web/features/auth/sign-in-page.tsx";
-import { SignUpPage } from "#web/features/auth/sign-up-page.tsx";
-import { ExampleFeedPage } from "#web/features/example-posts/example-feed-page.tsx";
-import { AppLayout } from "#web/shared/app-layout.tsx";
 import { RouteError } from "#web/shared/route-error.tsx";
+import { Button } from "#web/shared/ui/button.tsx";
+
+const Home = () => (
+  <main className="grid gap-4 p-6">
+    <h1 className="text-2xl font-semibold">Pace</h1>
+    <Button>Get started</Button>
+  </main>
+);
 
 export const router = createBrowserRouter([
   {
     children: [
-      {
-        element: (
-          <RequireAuth>
-            <ExampleFeedPage />
-          </RequireAuth>
-        ),
-        index: true,
-      },
-      { element: <SignInPage />, path: "sign-in" },
-      { element: <SignUpPage />, path: "sign-up" },
+      { element: <Home />, index: true },
       { element: <RouteError />, path: "*" },
     ],
-    element: <AppLayout />,
     errorElement: <RouteError />,
     path: "/",
   },

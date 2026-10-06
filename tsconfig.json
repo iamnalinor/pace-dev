@@ -1,8 +1,14 @@
 {
-  // Root config files (eslint, playwright, knip, ...). Apps and e2e have their own tsconfig.
+  // Root config files (eslint, playwright, knip, ...). Apps, packages and e2e have their own tsconfig.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["*.ts", "*.config.*", ".dependency-cruiser.mjs"]
+  "include": [
+    "*.ts",
+    "*.config.*",
+    ".dependency-cruiser.mjs",
+    "scripts/*.ts",
+    "nativewind-env.d.ts"
+  ]
 }

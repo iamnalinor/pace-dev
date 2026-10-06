@@ -4,7 +4,7 @@ export type Logger = Readonly<Record<Level, (message: string, context?: object) 
 
 const SEVERITY: Readonly<Record<Level, number>> = { debug: 0, error: 2, info: 1 };
 
-/** Structured JSON logs to stdout/stderr — the only place in the API allowed to use `console`. */
+/** Structured JSON logs (Workers Logs indexes the fields) — the only place allowed to use `console`. */
 export const createLogger = (minLevel: Level): Logger => {
   const log =
     (level: Level) =>

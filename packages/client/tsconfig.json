@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Platform-agnostic: adapters live in apps/web and apps/app. `fetch`/`crypto` come from lib.dom types only.
+    "lib": ["ESNext", "DOM"],
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": ["src", "*.ts"]
+}

@@ -2,7 +2,14 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "clientKind": "git", "enabled": true, "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!**/drizzle/meta"]
+    "includes": [
+      "**",
+      "!**/drizzle/meta",
+      "!**/drizzle/**/migrations.js",
+      "!**/worker-configuration.d.ts",
+      "!apps/app/android",
+      "!apps/app/.expo"
+    ]
   },
   "formatter": {
     "enabled": true,

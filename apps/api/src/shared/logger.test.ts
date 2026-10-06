@@ -1,34 +1,29 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createLogger } from "./logger.ts";
 
 describe("createLogger", () => {
-  const stdout = spyOn(console, "log").mockImplementation(() => undefined);
-  const stderr = spyOn(console, "error").mockImplementation(() => undefined);
   afterEach(() => {
-    stdout.mockClear();
-    stderr.mockClear();
+    vi.restoreAllMocks();
   });
 
-  test("drops messages below the configured level", () => {
-    const logger = createLogger("info");
-
-    logger.debug("noise");
-    logger.info("kept");
-
-    expect(stdout).toHaveBeenCalledTimes(1);
+  it("writes one JSON line per call with level, message, time and context", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    createLogger("info").info("hello", { requestId: "r1" });
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = JSON.parse(log.mock.calls[0]?.[0] as string) as Record<string, unknown>;
+    expect(line).toMatchObject({ level: "info", message: "hello", requestId: "r1" });
+    expect(typeof line["time"]).toBe("string");
   });
 
-  test("writes one JSON line per entry; errors go to stderr", () => {
-    createLogger("debug").error("boom", { requestId: "r1" });
-
-    expect(stdout).not.toHaveBeenCalled();
-    const line: unknown = stderr.mock.calls[0]?.[0];
-    expect(JSON.parse(String(line))).toEqual({
-      level: "error",
-      message: "boom",
-      requestId: "r1",
-      time: expect.any(String) as string,
-    });
+  it("sends errors to stderr and drops messages below the minimum level", () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const logger = createLogger("error");
+    logger.debug("quiet");
+    logger.info("quiet too");
+    logger.error("loud");
+    expect(log).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledTimes(1);
   });
 });

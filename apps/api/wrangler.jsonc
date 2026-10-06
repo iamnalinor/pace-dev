@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pace-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "pace-api.nalinor.dev", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "vars": {
+    "ENVIRONMENT": "production",
+    // Telegram user ids allowed to sign in (comma separated). Other deployments edit this.
+    "ALLOWED_TELEGRAM_IDS": "1919230638",
+    "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
+    "WEB_ORIGIN": "https://pace.nalinor.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pace",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle/d1"
+    }
+  ],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+  "durable_objects": {
+    "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserStore"] }],
+  "dev": { "port": 8787 },
+  "env": {
+    "dev": {
+      "vars": {
+        "ENVIRONMENT": "development",
+        "ALLOWED_TELEGRAM_IDS": "1919230638",
+        "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
+        "WEB_ORIGIN": "http://localhost:5173"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pace",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "drizzle/d1"
+        }
+      ],
+      "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+      "durable_objects": {
+        "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+      }
+    }
+  }
+}

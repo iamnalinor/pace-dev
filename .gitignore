@@ -34,3 +34,19 @@ vite.config.ts.timestamp-*
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Expo (continuous native generation: android/ is produced by `expo prebuild`)
+apps/app/android/
+apps/app/ios/
+.expo/
+expo-env.d.ts
+
+# Wrangler
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Android signing: only the shared debug keystore is committed
+*.keystore
+*.jks
+!apps/app/keystores/debug.keystore

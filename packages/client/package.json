@@ -1,0 +1,30 @@
+{
+  "name": "@pace/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/client.ts",
+    "./react": "./src/react.ts"
+  },
+  "scripts": {
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@pace/core": "workspace:*",
+    "zustand": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/react": "19.3.0",
+    "@vitest/coverage-v8": "catalog:",
+    "fast-check": "catalog:",
+    "react": "19.3.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  }
+}

@@ -36,20 +36,46 @@ const required = <T>(value: T | undefined, name: string): T => {
   return value;
 };
 
-const TESTS = ["**/*.test.{ts,tsx}", "**/*.fake.ts", "**/tests/**/*.ts", "e2e/**/*.ts"];
+const TESTS = [
+  "**/*.test.{ts,tsx}",
+  "**/*.fake.ts",
+  "**/tests/**/*.ts",
+  "**/test/**/*.{ts,tsx}",
+  "e2e/**/*.ts",
+  "apps/app/jest.setup.ts",
+];
 const WEB = ["apps/web/src/**/*.{ts,tsx}"];
+const APP = [
+  "apps/app/app/**/*.{ts,tsx}",
+  "apps/app/src/**/*.{ts,tsx}",
+  "apps/app/modules/**/*.ts",
+];
+const REACT = [...WEB, ...APP];
+const EXPO_ROUTES = ["apps/app/app/**"];
 const SHADCN_UI = ["apps/web/src/shared/ui/**"];
-const GENERATED = ["apps/api/src/auth/auth-schema.ts"];
 // Tools require a default export from their config files.
 const CONFIG_FILES = [
   "*.config.ts",
   "apps/*/*.config.ts",
+  "packages/*/*.config.ts",
+  "apps/app/app.config.ts",
   "e2e/*.config.ts",
   ".dependency-cruiser.mjs",
   // Module declarations describe third-party packages, which use default exports.
   "*.d.ts",
+  "**/*.d.ts",
 ];
-const PURE_LAYERS = ["apps/api/src/**/domain/**/*.ts", "apps/api/src/**/application/**/*.ts"];
+// Expo tooling loads these as CommonJS under Node, so they are plain JS with `require`.
+const APP_JS_CONFIGS = ["apps/app/*.js", "apps/app/plugins/*.js"];
+// Shared domain logic and view-models: pure and immutable (functional rules apply).
+const PURE_LAYERS = ["packages/core/src/**/*.ts", "packages/client/src/view-models/**/*.ts"];
+// Factories whose *inferred* type is the contract (Hono's `hc` derives the client from it).
+const INFERRED_CONTRACTS = [
+  "apps/api/src/app.ts",
+  "apps/api/src/worker.ts",
+  "apps/api/src/**/*-routes.ts",
+  "apps/api/src/mcp/**/*.ts",
+];
 
 export default defineConfig([
   globalIgnores([
@@ -59,7 +85,12 @@ export default defineConfig([
     "**/playwright-report/",
     "**/test-results/",
     "**/.stryker-tmp/",
+    "**/.wrangler/",
     "apps/api/drizzle/",
+    "apps/api/worker-configuration.d.ts",
+    "apps/app/android/",
+    "apps/app/.expo/",
+    "apps/app/expo-env.d.ts",
   ]),
 
   // ── Base: JS + TypeScript, type-aware ───────────────────────────────────────
@@ -108,7 +139,7 @@ export default defineConfig([
         "error",
         { format: ["PascalCase"], selector: "typeLike" },
         {
-          // UPPER_CASE for true constants, PascalCase for React components and TypeBox schemas.
+          // UPPER_CASE for true constants, PascalCase for React components and zod schemas.
           format: ["camelCase", "UPPER_CASE", "PascalCase"],
           leadingUnderscore: "allow",
           selector: "variable",
@@ -204,8 +235,11 @@ export default defineConfig([
         createTypeScriptImportResolver({
           noWarnOnMultipleProjects: true,
           project: [
+            "packages/core/tsconfig.json",
+            "packages/client/tsconfig.json",
             "apps/api/tsconfig.json",
             "apps/web/tsconfig.json",
+            "apps/app/tsconfig.json",
             "e2e/tsconfig.json",
             "tsconfig.json",
           ],
@@ -221,7 +255,7 @@ export default defineConfig([
       "perfectionist/sort-heritage-clauses": "error",
       "perfectionist/sort-imports": [
         "error",
-        { internalPattern: ["^#web/.*", "^@template/.*"], newlinesBetween: 1 },
+        { internalPattern: ["^#web/.*", "^#app/.*", "^@pace/.*"], newlinesBetween: 1 },
       ],
       "perfectionist/sort-intersection-types": "error",
       "perfectionist/sort-jsx-props": "error",
@@ -242,9 +276,26 @@ export default defineConfig([
         { "**/*.{ts,tsx}": "KEBAB_CASE" },
         { ignoreMiddleExtensions: true },
       ],
-      "check-file/folder-naming-convention": ["error", { "{apps,e2e}/**/": "KEBAB_CASE" }],
+      "check-file/folder-naming-convention": ["error", { "{apps,e2e,packages}/**/": "KEBAB_CASE" }],
       "check-file/no-index": "error",
     },
+  },
+  {
+    files: EXPO_ROUTES,
+    // expo-router maps the file system to routes: `(tabs)`, `[id].tsx`, `_layout.tsx`, `+native-intent.ts`.
+    rules: {
+      "check-file/filename-naming-convention": "off",
+      "check-file/folder-naming-convention": "off",
+      "check-file/no-index": "off",
+      "import-x/no-default-export": "off",
+      // Route components are discovered by file, not imported: the inferred type is fine.
+      "@typescript-eslint/explicit-module-boundary-types": "off",
+    },
+  },
+  {
+    files: ["apps/app/modules/**/index.ts"],
+    // Expo local modules are resolved by their folder's index.ts (autolinking convention).
+    rules: { "check-file/no-index": "off" },
   },
 
   promise.configs["flat/recommended"],
@@ -274,9 +325,10 @@ export default defineConfig([
     },
   },
 
-  // ── Clean Architecture: domain and application are pure and immutable ─────────
+  // ── Shared logic is pure and immutable ───────────────────────────────────────
   {
     files: PURE_LAYERS,
+    ignores: TESTS,
     plugins: { functional },
     rules: {
       "functional/immutable-data": ["error", { ignoreClasses: true }],
@@ -289,51 +341,55 @@ export default defineConfig([
     },
   },
 
-  // ── API ──────────────────────────────────────────────────────────────────────
+  // ── API (Cloudflare Worker) ──────────────────────────────────────────────────
   {
-    files: ["apps/api/src/shared/logger.ts", "apps/api/src/main.ts", "apps/api/src/scripts/**"],
-    // The logger and process entry points own stdout/stderr and the exit code.
+    files: [
+      "apps/api/src/shared/logger.ts",
+      "apps/api/scripts/**",
+      "scripts/**",
+      "packages/core/src/parse/regression/run.ts",
+    ],
+    // Loggers, dev scripts and CLI entry points own stdout/stderr and the exit code.
     rules: { "no-console": "off", "unicorn/no-process-exit": "off" },
   },
   {
-    files: ["apps/api/src/scripts/**"],
+    files: ["apps/api/scripts/**", "scripts/**"],
     // Dev scripts work with paths they compute themselves (temp dirs), not user input.
     rules: { "security/detect-non-literal-fs-filename": "off" },
   },
   {
-    files: [
-      "apps/api/src/app.ts",
-      "apps/api/src/**/*-feature.ts",
-      "apps/api/src/**/http/**",
-      "apps/api/src/auth/**",
-      "apps/api/src/health/**",
-      "apps/api/src/shared/db/client.ts",
-      "apps/api/src/shared/origin-guard.ts",
-    ],
-    rules: {
-      // These factories return Elysia/Drizzle/better-auth builders whose *inferred* type IS
-      // the contract (Eden derives the client from it). Spelling it out is impossible.
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-    },
+    files: INFERRED_CONTRACTS,
+    rules: { "@typescript-eslint/explicit-module-boundary-types": "off" },
   },
   {
-    files: GENERATED,
-    rules: {
-      // Generated by the better-auth CLI; regenerated, never edited by hand.
-      "perfectionist/sort-named-imports": "off",
-      "sonarjs/no-dead-store": "off",
-    },
+    files: ["apps/api/src/worker.ts"],
+    // The Workers runtime loads the entry module's default export.
+    rules: { "import-x/no-default-export": "off" },
   },
 
-  // ── Web (React) ──────────────────────────────────────────────────────────────
+  // ── React (web + app) ────────────────────────────────────────────────────────
   {
     ...eslintReact.configs["strict-type-checked"],
-    files: WEB,
+    files: REACT,
   },
   {
     ...reactHooks.configs.flat["recommended-latest"],
-    files: WEB,
+    files: REACT,
   },
+  {
+    files: REACT,
+    rules: {
+      // JSX components: the inferred return type (JSX.Element) is noise.
+      "@typescript-eslint/explicit-module-boundary-types": "off",
+      // React 19's ReactNode includes Promise, so this rule would "fix" components that
+      // return children into `async` components — which breaks them. Async code in the
+      // UIs is still covered by no-floating-promises / no-misused-promises.
+      "@typescript-eslint/promise-function-async": "off",
+      "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
+    },
+  },
+
+  // ── Web (DOM) ────────────────────────────────────────────────────────────────
   {
     ...jsxA11y.flatConfigs.strict,
     files: WEB,
@@ -353,13 +409,6 @@ export default defineConfig([
   {
     files: WEB,
     rules: {
-      // JSX components: the inferred return type (JSX.Element) is noise.
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-      // React 19's ReactNode includes Promise, so this rule would "fix" components that
-      // return children into `async` components — which breaks them. Async code in the
-      // web app is still covered by no-floating-promises / no-misused-promises.
-      "@typescript-eslint/promise-function-async": "off",
-      "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
       // The web app runs in the browser: Bun APIs would type-check (see tsconfig) but crash.
       "no-restricted-globals": [
         "error",
@@ -380,12 +429,47 @@ export default defineConfig([
     },
   },
 
+  // ── App (React Native): Tailwind v3 classes via NativeWind ───────────────────
+  {
+    files: APP,
+    plugins: { "better-tailwindcss": betterTailwind },
+    rules: {
+      ...betterTailwind.configs["recommended-error"].rules,
+      "better-tailwindcss/enforce-consistent-line-wrapping": "off",
+    },
+    settings: {
+      "better-tailwindcss": { cwd: "apps/app", tailwindConfig: "tailwind.config.js" },
+    },
+  },
+  {
+    files: APP_JS_CONFIGS,
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      globals: {
+        __dirname: "readonly",
+        module: "writable",
+        process: "readonly",
+        require: "readonly",
+      },
+      parserOptions: { project: false, projectService: false },
+      sourceType: "commonjs",
+    },
+    rules: {
+      ...tseslint.configs.disableTypeChecked.rules,
+      // Expo loads these with Node's CommonJS loader.
+      "@typescript-eslint/no-require-imports": "off",
+      "unicorn/prefer-module": "off",
+      "import-x/no-commonjs": "off",
+    },
+  },
+
   // ── Tests ────────────────────────────────────────────────────────────────────
   {
     files: TESTS,
     rules: {
       // describe/test callbacks are long and nested by design; tests favour DAMP over DRY.
       "max-lines-per-function": "off",
+      "max-lines": "off",
       "max-nested-callbacks": ["error", 5],
       "max-statements": "off",
       "sonarjs/no-duplicate-string": "off",
@@ -400,7 +484,7 @@ export default defineConfig([
   },
   {
     ...vitest.configs.recommended,
-    files: ["apps/web/**/*.test.{ts,tsx}"],
+    files: ["packages/**/*.test.ts", "apps/api/**/*.test.ts", "apps/web/**/*.test.{ts,tsx}"],
   },
   {
     ...testingLibrary.configs["flat/react"],
@@ -409,6 +493,15 @@ export default defineConfig([
   {
     ...playwright.configs["flat/recommended"],
     files: ["e2e/**/*.ts"],
+  },
+
+  // ── Declaration files: ambient/global augmentation needs `interface` and `import()` types
+  {
+    files: ["**/*.d.ts"],
+    rules: {
+      "@typescript-eslint/consistent-type-definitions": "off",
+      "@typescript-eslint/consistent-type-imports": "off",
+    },
   },
 
   // ── Config files ─────────────────────────────────────────────────────────────

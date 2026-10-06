@@ -1,0 +1,29 @@
+{
+  "name": "@pace/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/core.ts",
+    "./design/tokens.json": "./src/design/tokens.json"
+  },
+  "scripts": {
+    "test": "vitest run --coverage",
+    "test:llm": "bun src/parse/regression/run.ts",
+    "test:mutation": "stryker run"
+  },
+  "dependencies": {
+    "@date-fns/tz": "catalog:",
+    "date-fns": "catalog:",
+    "ulidx": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@types/bun": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

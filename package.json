@@ -1,42 +1,53 @@
 {
-  "name": "template",
+  "name": "pace",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.2",
   "workspaces": {
     "packages": [
-      "apps/*"
+      "apps/*",
+      "packages/*"
     ],
     "catalog": {
-      "@elysiajs/eden": "1.4.9",
+      "@cloudflare/workers-types": "5.20261006.1",
+      "@date-fns/tz": "1.5.0",
       "@types/bun": "1.4.2",
-      "better-auth": "1.7.6",
-      "elysia": "1.4.30",
+      "@vitest/coverage-v8": "4.1.11",
+      "date-fns": "4.4.0",
+      "drizzle-orm": "0.45.3",
+      "fast-check": "4.10.2",
+      "hono": "4.13.13",
       "typescript": "6.0.3",
+      "ulidx": "2.4.1",
       "vite": "8.3.1",
-      "vitest": "5.0.2"
+      "vitest": "4.1.11",
+      "wrangler": "4.148.0",
+      "zod": "4.6.5",
+      "zustand": "5.0.15"
     }
   },
   "scripts": {
-    "dev": "bun run --filter '@template/*' dev",
-    "build": "bun run --filter '@template/web' build",
-    "lint": "bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run db:check",
+    "dev": "bun run --filter './apps/api' --filter './apps/web' dev",
+    "build": "bun run --cwd apps/web build",
+    "lint": "bun run lint:tokens && bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run db:check",
     "lint:format": "biome format --write .",
     "lint:eslint": "eslint . --fix --max-warnings 0 --cache --cache-location .cache/eslint/",
     "lint:knip": "knip --no-progress",
     "lint:dup": "jscpd",
-    "lint:arch": "depcruise apps e2e --config .dependency-cruiser.mjs",
-    "typecheck": "tsc -p tsconfig.json && tsc -p apps/api && tsc -p apps/web && tsc -p e2e",
-    "test": "bun run test:unit && bun run test:integration && bun run test:e2e",
-    "test:unit": "bun run --cwd apps/api test:unit && bun run --cwd apps/web test:unit",
-    "test:integration": "bun run --cwd apps/api test:integration",
+    "lint:arch": "depcruise apps packages e2e --config .dependency-cruiser.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/client && tsc -p apps/api && tsc -p apps/web && tsc -p apps/app && tsc -p e2e",
+    "test": "bun run test:unit && bun run test:api && bun run test:app && bun run test:e2e",
+    "test:unit": "bun run --cwd packages/core test && bun run --cwd packages/client test && bun run --cwd apps/web test:unit",
+    "test:api": "bun run --cwd apps/api test",
+    "test:app": "bun run --cwd apps/app test",
     "test:e2e": "playwright test",
-    "test:mutation": "bun run --cwd apps/web test:mutation",
+    "test:llm": "bun run --cwd packages/core test:llm",
+    "test:mutation": "bun run --cwd packages/core test:mutation && bun run --cwd apps/web test:mutation",
     "db:generate": "bun run --cwd apps/api db:generate",
-    "db:migrate": "bun run --cwd apps/api db:migrate",
     "db:check": "bun run --cwd apps/api db:check",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "lint:tokens": "bun scripts/generate-tokens.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
@@ -45,6 +56,7 @@
     "@eslint-react/eslint-plugin": "5.20.8",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
+    "@resvg/resvg-js": "2.6.2",
     "@tsconfig/strictest": "2.0.8",
     "@types/bun": "catalog:",
     "@vitest/eslint-plugin": "1.6.27",
