@@ -1,0 +1,33 @@
+name: LLM regression
+
+# Runs the natural-language parsing regression suite against the real providers (Groq, Gemini)
+# and publishes the refreshed docs/llm.md. Weekly and on demand: it costs API calls.
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  llm:
+    name: Parse regression (Groq + Gemini)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: false
+    env:
+      CI: 1
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - run: bun test:llm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: llm-regression-report
+          path: docs/llm.md
+          if-no-files-found: warn
+          retention-days: 90

@@ -14,6 +14,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The Expo CLI and jest run under Node through their shebang when invoked via `bun run`
+# (never `bun --bun`); Playwright starts wrangler dev + vite preview itself (playwright.config.ts).
+env:
+  CI: 1
+
 jobs:
   lint:
     name: Lint (format, eslint, types, knip, jscpd, architecture, migrations)
@@ -31,39 +36,37 @@ jobs:
             exit 1
           fi
 
-  web-unit:
-    name: Web component tests (Vitest)
+  unit:
+    name: Unit tests (core, client, web)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
-      - run: bun run --cwd apps/web test:unit
+      - run: bun test:unit
 
-  api-tests:
-    name: API unit + integration tests (Testcontainers) with coverage
+  api:
+    name: API tests (workerd)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
-      - run: bun run --cwd apps/api test:coverage
+      - run: bun test:api
+
+  app:
+    name: Mobile app tests (jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - run: bun test:app
 
   e2e:
     name: End-to-end (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 3s --health-retries 10
-    env:
-      E2E_DATABASE_URL: postgres://postgres:postgres@localhost:5432/template_e2e
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
@@ -78,34 +81,6 @@ jobs:
             test-results/
           retention-days: 7
 
-  docker:
-    name: Docker images + compose smoke test
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      BETTER_AUTH_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
-      # The E2E suite signs up many users from one IP within seconds.
-      AUTH_RATE_LIMIT: "false"
-    steps:
-      - uses: actions/checkout@v5
-      - run: docker compose up --build --detach --wait --wait-timeout 180
-      - name: Smoke test through nginx (web → api → db)
-        run: |
-          curl --fail --silent http://localhost:8080/ | grep -q '<div id="root">'
-          curl --fail --silent http://localhost:8080/api/health/ready | grep -q '"ready"'
-          # API docs must be disabled in production.
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/docs)" = "404"
-      # The same user journeys in a real browser, through nginx (CSP, headers, proxy).
-      - uses: ./.github/actions/setup
-      - run: bunx playwright install --with-deps chromium
-      - run: bun test:e2e
-        env:
-          E2E_BASE_URL: http://localhost:8080
-      - if: failure()
-        run: docker compose logs
-      - if: always()
-        run: docker compose down --volumes
-
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest
@@ -113,5 +88,38 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
-      # braces (dev-only, via eslint-plugin-check-file > micromatch) has no patched release yet.
-      - run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm
+      - run: bun audit --audit-level=high
+
+  android-debug:
+    name: Android debug APK (arm64)
+    # The repo is private today, so Gradle minutes are rationed: main + manual runs only.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_NO_GIT_STATUS: 1
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install NDK + CMake (the runner image already has the SDK)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Expo prebuild (continuous native generation, android/ is gitignored)
+        working-directory: apps/app
+        run: bun expo prebuild --platform android --no-install
+      - name: Assemble debug APK (signed with the committed debug keystore)
+        working-directory: apps/app/android
+        run: ./gradlew :app:assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pace-debug-apk
+          path: apps/app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,124 @@
+name: Release
+
+# Push a tag vX.Y.Z: gate on the fast checks, build the Android release APK (arm64-v8a) and
+# publish a GitHub Release with it. app.config.ts derives version/versionCode from GITHUB_REF_NAME.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 1
+
+jobs:
+  checks:
+    name: Checks (lint, unit, api, app)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - run: bun lint
+      - name: Lint must not change files
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            exit 1
+          fi
+      - run: bun test:unit
+      - run: bun test:api
+      - run: bun test:app
+
+  apk:
+    name: Android release APK + GitHub Release
+    needs: [checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_NO_GIT_STATUS: 1
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install NDK + CMake (the runner image already has the SDK)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Expo prebuild (continuous native generation, android/ is gitignored)
+        working-directory: apps/app
+        run: bun expo prebuild --platform android --no-install
+
+      # Without ANDROID_KEYSTORE_BASE64 the config plugin (plugins/with-release-signing.js)
+      # falls back to the committed debug keystore, so every build installs over the previous one.
+      - name: Release keystore (only when the secret is set)
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "signing=debug" >> "$GITHUB_OUTPUT"
+            echo "No ANDROID_KEYSTORE_BASE64: signing with the committed debug keystore"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > apps/app/android/app/release.keystore
+          {
+            echo "ORG_GRADLE_PROJECT_PACE_STORE_FILE=release.keystore"
+            echo "ORG_GRADLE_PROJECT_PACE_STORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "ORG_GRADLE_PROJECT_PACE_KEY_ALIAS=$KEY_ALIAS"
+            echo "ORG_GRADLE_PROJECT_PACE_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "signing=release" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble release APK
+        working-directory: apps/app/android
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Rename APK
+        run: |
+          mkdir -p release
+          cp apps/app/android/app/build/outputs/apk/release/app-release.apk "release/pace-${{ github.ref_name }}.apk"
+          ls -l release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pace-${{ github.ref_name }}-apk
+          path: release/pace-${{ github.ref_name }}.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Release body
+        env:
+          SIGNING: ${{ steps.keystore.outputs.signing }}
+        run: |
+          {
+            echo "Android APK: \`pace-${{ github.ref_name }}.apk\` (arm64-v8a)."
+            echo
+            if [ "$SIGNING" = "debug" ]; then
+              echo "> **debug-signed**: built with the committed debug keystore (no release keystore secret configured)."
+            else
+              echo "Signed with the release keystore."
+            fi
+          } > release/notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Pace ${{ github.ref_name }}
+          generate_release_notes: true
+          body_path: release/notes.md
+          files: release/pace-${{ github.ref_name }}.apk
+          fail_on_unmatched_files: true
