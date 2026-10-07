@@ -69,11 +69,23 @@ jobs:
           VALUE: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: if [ -n "$VALUE" ]; then echo "$VALUE" | bunx wrangler secret put TELEGRAM_BOT_TOKEN; fi
 
+      # The webhook secret is what Telegram echoes in X-Telegram-Bot-Api-Secret-Token. An
+      # explicit TELEGRAM_WEBHOOK_SECRET wins; otherwise it is derived from the bot token
+      # (SHA-256, hex), so one secret is enough and the value is stable across deploys.
+      - name: Resolve TELEGRAM_WEBHOOK_SECRET
+        env:
+          EXPLICIT: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -n "$EXPLICIT" ]; then SECRET="$EXPLICIT";
+          elif [ -n "$TOKEN" ]; then SECRET="$(printf '%s' "$TOKEN" | sha256sum | cut -c1-64)";
+          else SECRET=""; fi
+          if [ -n "$SECRET" ]; then echo "::add-mask::$SECRET"; fi
+          echo "WEBHOOK_SECRET=$SECRET" >> "$GITHUB_ENV"
+
       - name: Secret TELEGRAM_WEBHOOK_SECRET
         working-directory: apps/api
-        env:
-          VALUE: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-        run: if [ -n "$VALUE" ]; then echo "$VALUE" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
+        run: if [ -n "$WEBHOOK_SECRET" ]; then echo "$WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
 
       - name: Secret GROQ_API_KEY
         working-directory: apps/api
@@ -102,7 +114,6 @@ jobs:
       - name: Set Telegram webhook
         env:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
         run: |
           if [ -z "$TOKEN" ]; then echo "TELEGRAM_BOT_TOKEN not set, skipping setWebhook"; exit 0; fi
           curl --fail --silent --show-error --request POST "https://api.telegram.org/bot${TOKEN}/setWebhook" \
