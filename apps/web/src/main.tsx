@@ -31,6 +31,8 @@ createRoot(root).render(
         position="bottom-center"
         // Undo is a real target: at least 24px (WCAG 2.2 target size), here 32px.
         toastOptions={{ classNames: { actionButton: "!h-8 !px-3 !text-[13px]" } }}
+        // One at a time: a stack of toasts overlaps their Undo buttons.
+        visibleToasts={1}
       />
     </PaceProvider>
   </StrictMode>,
