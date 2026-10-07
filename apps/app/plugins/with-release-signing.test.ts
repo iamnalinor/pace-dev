@@ -32,7 +32,8 @@ describe("with-release-signing", () => {
   it("adds a release signing config next to the debug one", () => {
     const gradle = applyReleaseSigning(TEMPLATE);
 
-    const signingConfigs = gradle.split("signingConfigs {", 2)[1]?.split("buildTypes {", 1)[0] ?? "";
+    const signingConfigs =
+      gradle.split("signingConfigs {", 2)[1]?.split("buildTypes {", 1)[0] ?? "";
     expect(signingConfigs).toContain("release {");
     expect(signingConfigs).toContain("findProperty('PACE_STORE_FILE')");
     expect(signingConfigs).toContain("file('../../keystores/debug.keystore')");
@@ -55,7 +56,7 @@ describe("with-release-signing", () => {
 
   it("fails loudly when the Expo template changed", () => {
     expect(() => applyReleaseSigning("android {}")).toThrow(/template changed/);
-    expect(() => applyReleaseSigning(TEMPLATE.replaceAll('signingConfigs.debug', "x"))).toThrow(
+    expect(() => applyReleaseSigning(TEMPLATE.replaceAll("signingConfigs.debug", "x"))).toThrow(
       /template changed/,
     );
   });

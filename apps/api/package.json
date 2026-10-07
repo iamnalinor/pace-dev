@@ -12,6 +12,8 @@
     "db:check": "bun scripts/check-migrations.ts"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.2",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@pace/core": "workspace:*",
     "drizzle-orm": "catalog:",
     "grammy": "1.46.0",

@@ -12,6 +12,9 @@ export default defineConfig({
       miniflare: {
         bindings: {
           ENVIRONMENT: "test",
+          // Every test request is addressed to this origin (tests/helpers.ts): the OAuth
+          // provider binds its issuer and the MCP resource to it.
+          API_ORIGIN: "https://pace-api.test",
           ALLOWED_TELEGRAM_IDS: "1001,1002",
           TELEGRAM_BOT_USERNAME: "PaceTestBot",
           // Fake secrets: the widget tests sign their own payloads with this token.

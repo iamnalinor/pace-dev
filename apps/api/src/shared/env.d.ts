@@ -1,3 +1,5 @@
+import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+
 declare global {
   namespace Cloudflare {
     // Secrets (`wrangler secret put`) and optional vars are not in wrangler.jsonc, so
@@ -11,6 +13,11 @@ declare global {
       BOT_INFO?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
+      /**
+       * The OAuth helpers the provider in worker.ts attaches to the env of every request it
+       * hands to the Hono app (consent, grants). Absent when the app runs without the provider.
+       */
+      OAUTH_PROVIDER?: OAuthHelpers;
     }
   }
 }

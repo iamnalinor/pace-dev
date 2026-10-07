@@ -11,6 +11,15 @@ import {
   UserSchema,
 } from "./schemas/auth.ts";
 import {
+  OAuthClientInfoQuerySchema,
+  OAuthClientInfoSchema,
+  OAuthCompleteBodySchema,
+  OAuthDenyBodySchema,
+  OAuthGrantRevokedSchema,
+  OAuthGrantsSchema,
+  OAuthRedirectSchema,
+} from "./schemas/oauth.ts";
+import {
   SyncObservationsBodySchema,
   SyncObservationsOutputSchema,
   SyncPullOutputSchema,
@@ -94,6 +103,49 @@ export const endpoints = {
       output: SyncObservationsOutputSchema,
       path: "/api/sync/observations",
     }),
+  },
+  /** The MCP consent flow (web consent page ↔ Worker) and the "Connected apps" grants. */
+  oauth: {
+    /** What to show on the consent page for an authorization request (`authQuery` = its query string). */
+    clientInfo: endpoint({
+      auth: false,
+      method: "GET",
+      output: OAuthClientInfoSchema,
+      path: "/api/oauth/client-info",
+      query: OAuthClientInfoQuerySchema,
+    }),
+    /** Allow: proves the person's identity (Telegram widget or dev id), stores the grant, returns the client redirect. */
+    complete: endpoint({
+      auth: false,
+      body: OAuthCompleteBodySchema,
+      method: "POST",
+      output: OAuthRedirectSchema,
+      path: "/api/oauth/complete",
+    }),
+    /** Deny: the client redirect carrying `error=access_denied`. */
+    deny: endpoint({
+      auth: false,
+      body: OAuthDenyBodySchema,
+      method: "POST",
+      output: OAuthRedirectSchema,
+      path: "/api/oauth/deny",
+    }),
+    grants: {
+      list: endpoint({
+        auth: true,
+        method: "GET",
+        output: OAuthGrantsSchema,
+        path: "/api/oauth/grants",
+      }),
+      /** Revoking a grant invalidates its access and refresh tokens at once. */
+      revoke: endpoint({
+        auth: true,
+        method: "DELETE",
+        output: OAuthGrantRevokedSchema,
+        params: z.object({ id: z.string().min(1).max(128) }),
+        path: "/api/oauth/grants/:id",
+      }),
+    },
   },
 } as const;
 

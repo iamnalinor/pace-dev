@@ -3,7 +3,9 @@
   "name": "pace-api",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
-  "compatibility_flags": ["nodejs_compat"],
+  // global_fetch_strictly_public: the OAuth provider fetches Client ID Metadata Documents
+  // (MCP clients that identify by URL); the flag keeps those fetches off same-zone routing.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "routes": [{ "pattern": "pace-api.nalinor.dev", "custom_domain": true }],
   "observability": { "enabled": true },
   // Secrets (set with `wrangler secret put`, never here): TELEGRAM_BOT_TOKEN (from @BotFather),
@@ -15,7 +17,9 @@
     // Telegram user ids allowed to sign in (comma separated). Other deployments edit this.
     "ALLOWED_TELEGRAM_IDS": "1919230638",
     "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
-    "WEB_ORIGIN": "https://pace.nalinor.dev"
+    "WEB_ORIGIN": "https://pace.nalinor.dev",
+    // The Worker's own origin: the OAuth issuer and the canonical MCP resource (`<origin>/mcp`).
+    "API_ORIGIN": "https://pace-api.nalinor.dev"
   },
   "d1_databases": [
     {
@@ -39,7 +43,8 @@
         "ENVIRONMENT": "development",
         "ALLOWED_TELEGRAM_IDS": "1919230638",
         "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
-        "WEB_ORIGIN": "http://localhost:5173"
+        "WEB_ORIGIN": "http://localhost:5173",
+        "API_ORIGIN": "http://localhost:8787"
       },
       "d1_databases": [
         {
