@@ -517,7 +517,8 @@ describe("taskReducer: order insensitivity", () => {
 
 describe("taskReducer: confirmed automatic outcomes", () => {
   it("records a closure as unconfirmed unless the payload says otherwise", () => {
-    expect(hw([hwCreated(1), closed(2, T(9), { outcome: "done" })]).closed?.confirmed).toBe(false);
+    const done = closed(2, T(9), { outcome: "done" });
+    expect(hw([hwCreated(1), done]).closed?.confirmed).toBe(false);
     const confirmed = at(2, T(9), {
       type: "task.closed",
       payload: { taskId: HW_ID, outcome: "cancelled_missed", confirmed: true },
@@ -538,8 +539,7 @@ describe("taskReducer: confirmed automatic outcomes", () => {
     });
     expect(hw([hwCreated(1), auto]).closed?.confirmed).toBe(false);
     expect(hw([hwCreated(1), auto, amend]).closed?.confirmed).toBe(true);
-    expect(hw([hwCreated(1), auto, amend, revoke(4, T(11), amend.id)]).closed?.confirmed).toBe(
-      false,
-    );
+    const undo = revoke(4, T(11), amend.id);
+    expect(hw([hwCreated(1), auto, amend, undo]).closed?.confirmed).toBe(false);
   });
 });

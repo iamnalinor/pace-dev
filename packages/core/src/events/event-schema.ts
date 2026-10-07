@@ -64,7 +64,9 @@ export const EVENT_TYPES = [
 export type EventType = (typeof EVENT_TYPES)[number];
 
 /** Deterministic ids for system events (`hw:<presetId>:<isoWeek>`, `auto:<taskId>:<kind>`). */
-const SYSTEM_ID = /^(?:hw|auto):[^\s:]+:[^\s:]+$/;
+// An auto outcome of a recurring instance nests ids ("auto:hw:<preset>:<week>:missed"), so
+// anything non-blank after the prefix is accepted; the reducers own the exact shape.
+const SYSTEM_ID = /^(?:hw|auto):\S+$/;
 
 export const EventIdSchema = z.string().refine((value) => isUlid(value) || SYSTEM_ID.test(value), {
   message: "Expected a ULID or a deterministic system id",

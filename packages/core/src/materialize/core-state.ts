@@ -3,7 +3,11 @@ import type { Reducer } from "./materializer.ts";
 import { INITIAL_PROJECTS_STATE, type ProjectsState } from "../model/project.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../model/settings.ts";
 import { INITIAL_TASKS_STATE, type TasksState } from "../model/task.ts";
-import { INITIAL_PRESETS_STATE, presetReducer, type PresetsState } from "../presets/preset-reducer.ts";
+import {
+  INITIAL_PRESETS_STATE,
+  presetReducer,
+  type PresetsState,
+} from "../presets/preset-reducer.ts";
 import { projectReducer } from "./project-reducer.ts";
 import { settingsReducer } from "./settings-reducer.ts";
 import { taskReducer } from "./task-reducer.ts";

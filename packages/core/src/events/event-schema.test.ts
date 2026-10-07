@@ -54,6 +54,10 @@ describe("parseEvent", () => {
     expect(parseEvent({ ...created, id: "not-an-id" }).ok).toBe(false);
     expect(parseEvent({ ...created, id: "hw:preset-work:2026-W41" }).ok).toBe(true);
     expect(parseEvent({ ...created, id: "auto:01ARZ3NDEKTSV4RRFFQ69G5FAW:missed" }).ok).toBe(true);
+    // The auto outcome of a recurring instance nests the instance id.
+    expect(parseEvent({ ...created, id: "auto:hw:hw.calculus:2026-W40:missed" }).ok).toBe(true);
+    expect(parseEvent({ ...created, id: "auto:" }).ok).toBe(false);
+    expect(parseEvent({ ...created, id: "auto:has space" }).ok).toBe(false);
   });
 
   it("requires UTC ISO instants", () => {

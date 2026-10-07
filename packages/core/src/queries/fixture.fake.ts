@@ -1,7 +1,7 @@
 import type { Event } from "../events/event-schema.ts";
 import type { QueryContext } from "./context.ts";
 
-import { type CoreState, coreReducer, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
+import { coreReducer, type CoreState, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
 import { materializeAt } from "../materialize/materializer.ts";
 import {
   algebraHw6Events,
@@ -166,27 +166,34 @@ const waitingWork = (): readonly Event[] => [
   }),
 ];
 
-const instance = (
-  id: string,
-  title: string,
-  presetId: string,
-  slot: { readonly issuedAt: string; readonly dueAt: string },
-  subtasks: readonly { readonly id: string; readonly label: string; readonly number: number }[],
-): Event =>
-  at(0, slot.issuedAt, {
-    id,
+type InstanceSpec = {
+  readonly id: string;
+  readonly title: string;
+  readonly presetId: string;
+  readonly issuedAt: string;
+  readonly dueAt: string;
+  readonly subtasks: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly number: number;
+  }[];
+};
+
+const instance = (spec: InstanceSpec): Event =>
+  at(0, spec.issuedAt, {
+    id: spec.id,
     type: "task.created",
     source: "system",
     payload: {
-      taskId: id,
-      title,
-      presetId,
-      startAt: slot.issuedAt,
+      taskId: spec.id,
+      title: spec.title,
+      presetId: spec.presetId,
+      startAt: spec.issuedAt,
       startTz: MOSCOW,
-      dueAt: slot.dueAt,
+      dueAt: spec.dueAt,
       dueTz: MOSCOW,
       estimateMinutes: 60,
-      subtasks: [...subtasks],
+      subtasks: [...spec.subtasks],
       fields: {},
     },
   });
@@ -199,13 +206,14 @@ const CALC_PROBLEMS = [1, 2, 3, 4, 5].map((number) => ({
 
 /** Calculus HW 5: due Monday 23:59 Moscow, 3 of 5 solved and sent, "1 day late · 2 problems left". */
 const calculusHw5 = (): readonly Event[] => [
-  instance(
-    CALC_HW5_ID,
-    "Calculus HW 5",
-    "hw.calculus",
-    { issuedAt: "2026-09-29T09:00:00.000Z", dueAt: CALC_HW5_DUE },
-    CALC_PROBLEMS,
-  ),
+  instance({
+    id: CALC_HW5_ID,
+    title: "Calculus HW 5",
+    presetId: "hw.calculus",
+    issuedAt: "2026-09-29T09:00:00.000Z",
+    dueAt: CALC_HW5_DUE,
+    subtasks: CALC_PROBLEMS,
+  }),
   at(40, "2026-09-29T09:05:00.000Z", {
     type: "task.project.set",
     payload: { taskId: CALC_HW5_ID, projectId: CALCULUS_ID },
@@ -244,17 +252,20 @@ const personal = (): readonly Event[] => [
   }),
 ];
 
-const deferred = (
-  index: number,
-  id: string,
-  title: string,
-  when: { readonly createdAt: string; readonly startAt: string; readonly projectId?: string },
-): Event =>
+type DeferredSpec = {
+  readonly id: string;
+  readonly title: string;
+  readonly createdAt: string;
+  readonly startAt: string;
+  readonly projectId?: string;
+};
+
+const deferred = (index: number, when: DeferredSpec): Event =>
   at(index, when.createdAt, {
     type: "task.created",
     payload: {
-      taskId: id,
-      title,
+      taskId: when.id,
+      title: when.title,
       presetId: "deferred",
       ...(when.projectId !== undefined && { projectId: when.projectId }),
       startAt: when.startAt,
@@ -266,38 +277,48 @@ const deferred = (
 
 /** Hidden from Now: future starts and the two empty instances awaiting an assignment. */
 const later = (): readonly Event[] => [
-  deferred(46, GRADE_ID, "Check test 1 grade", {
+  deferred(46, {
+    id: GRADE_ID,
+    title: "Check test 1 grade",
     createdAt: "2026-10-01T10:00:00.000Z",
     startAt: "2026-10-20T06:00:00.000Z",
     projectId: ALGEBRA_ID,
   }),
-  instance(
-    CALC_W41_ID,
-    "Calculus HW 6",
-    "hw.calculus",
-    { issuedAt: "2026-10-06T09:00:00.000Z", dueAt: "2026-10-12T20:59:00.000Z" },
-    [],
-  ),
+  instance({
+    id: CALC_W41_ID,
+    title: "Calculus HW 6",
+    presetId: "hw.calculus",
+    issuedAt: "2026-10-06T09:00:00.000Z",
+    dueAt: "2026-10-12T20:59:00.000Z",
+    subtasks: [],
+  }),
   at(47, "2026-10-06T09:01:00.000Z", {
     type: "task.project.set",
     payload: { taskId: CALC_W41_ID, projectId: CALCULUS_ID },
   }),
-  instance(
-    HISTORY_W40_ID,
-    "History HW 1",
-    "hw.history",
-    { issuedAt: "2026-10-01T06:00:00.000Z", dueAt: "2026-10-08T06:00:00.000Z" },
-    [],
-  ),
-  deferred(48, DEFERRED_IDS[0], "Renew passport", {
+  instance({
+    id: HISTORY_W40_ID,
+    title: "History HW 1",
+    presetId: "hw.history",
+    issuedAt: "2026-10-01T06:00:00.000Z",
+    dueAt: "2026-10-08T06:00:00.000Z",
+    subtasks: [],
+  }),
+  deferred(48, {
+    id: DEFERRED_IDS[0],
+    title: "Renew passport",
     createdAt: "2026-10-02T10:00:00.000Z",
     startAt: "2026-11-01T06:00:00.000Z",
   }),
-  deferred(49, DEFERRED_IDS[1], "Book dentist", {
+  deferred(49, {
+    id: DEFERRED_IDS[1],
+    title: "Book dentist",
     createdAt: "2026-10-02T11:00:00.000Z",
     startAt: "2026-10-15T06:00:00.000Z",
   }),
-  deferred(50, DEFERRED_IDS[2], "Plan winter trip", {
+  deferred(50, {
+    id: DEFERRED_IDS[2],
+    title: "Plan winter trip",
     createdAt: "2026-10-03T10:00:00.000Z",
     startAt: "2026-12-01T06:00:00.000Z",
   }),

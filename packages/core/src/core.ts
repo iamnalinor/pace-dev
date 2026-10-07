@@ -108,6 +108,7 @@ export {
   newId,
   type Prng,
 } from "./ids.ts";
+export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/core-state.ts";
 export {
   apply,
   effectiveEvents,
@@ -205,6 +206,18 @@ export {
   resolvePreset,
   validatePresetInput,
 } from "./presets/resolve-preset.ts";
+export { accountTz, type QueryContext } from "./queries/context.ts";
+export { type InboxItem, inboxList, UNSORTED_TOO_LONG_MINUTES } from "./queries/inbox.ts";
+export { type NowItem, type NowList, nowList, type NowListOptions } from "./queries/now-list.ts";
+export {
+  type DoneItem,
+  type ProjectStats,
+  type ProjectView,
+  projectView,
+} from "./queries/project-view.ts";
+export { suggestFor, type Suggestion } from "./queries/suggest.ts";
+export { type SubmitPreview, type TaskView, taskView } from "./queries/task-view.ts";
+export { rankWithinCategory, urgencyInputFor } from "./queries/urgency-input.ts";
 export {
   expectedInstances,
   type InstanceRef,
@@ -214,6 +227,13 @@ export {
   type MissingInstancesInput,
 } from "./recurrence/hw-instances.ts";
 export { err, ok, type Result } from "./result.ts";
+export {
+  type ReviewAction,
+  type ReviewActionKey,
+  type ReviewItem,
+  reviewItems,
+  type ReviewKind,
+} from "./review/to-sort.ts";
 export {
   addMinutesIso,
   endOfDayIn,
