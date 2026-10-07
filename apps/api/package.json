@@ -12,9 +12,12 @@
     "db:check": "bun scripts/check-migrations.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "4.0.90",
+    "@ai-sdk/groq": "4.0.57",
     "@cloudflare/workers-oauth-provider": "1.2.2",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@pace/core": "workspace:*",
+    "ai": "7.0.131",
     "drizzle-orm": "catalog:",
     "grammy": "1.46.0",
     "hono": "catalog:",

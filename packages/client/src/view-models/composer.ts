@@ -2,8 +2,8 @@ import {
   type CoreState,
   type Importance,
   isHttpUrl,
-  isOpen,
   linkHost,
+  openInstanceOf,
   parseQuickInput,
   presetById,
   projectById,
@@ -12,7 +12,6 @@ import {
   type QuickSpan,
   type QuickSubtask,
   resolvePreset,
-  type Task,
 } from "@pace/core";
 
 import type { TaskLink } from "./task.ts";
@@ -82,20 +81,6 @@ const projectOptions = (state: CoreState): readonly ComposerOption[] =>
 const optionOf = (options: readonly ComposerOption[], id: null | string): ComposerOption | null =>
   options.find((option) => option.id === id) ?? null;
 
-const byDue = (a: Task, b: Task): number => (a.dueAt ?? "").localeCompare(b.dueAt ?? "");
-
-/** The open homework of a recurring course closest to its due: problems typed for it go there. */
-const instanceOf = (state: CoreState, presetId: string, now: string): Task | undefined => {
-  const resolved = resolvePreset(state.presets, presetId);
-  if (!resolved.ok || resolved.value.recurrence === null) {
-    return undefined;
-  }
-  const open = Object.values(state.tasks.byId)
-    .filter((task) => task.presetId === presetId && isOpen(task) && task.id.startsWith("hw:"))
-    .toSorted(byDue);
-  return open.find((task) => task.dueAt !== null && task.dueAt >= now) ?? open.at(-1);
-};
-
 const defaultImportanceOf = (state: CoreState, presetId: string): Importance => {
   const resolved = resolvePreset(state.presets, presetId);
   return resolved.ok ? resolved.value.defaultImportance : "normal";
@@ -136,7 +121,7 @@ const projectOf = (
     : optionOf(projects, projectId);
 
 const targetOf = (state: CoreState, presetId: string, now: string): ComposerTarget => {
-  const instance = instanceOf(state, presetId, now);
+  const instance = openInstanceOf(state, presetId, now);
   return instance === undefined
     ? { kind: "new" }
     : { kind: "instance", taskId: instance.id, title: instance.title };

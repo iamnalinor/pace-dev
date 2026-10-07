@@ -1,31 +1,52 @@
 import { DurableObject } from "cloudflare:workers";
-import { and, asc, eq, gt, max } from "drizzle-orm";
+import { asc, eq, gt } from "drizzle-orm";
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
 import {
   autoOutcomeEvents,
+  type CoreState,
   type Event,
   type EventInput,
   missingInstanceEvents,
+  notifyPlan,
   ok,
   parseEvent,
+  type PlannedNotification,
   type Result,
+  snooze,
 } from "@pace/core";
 
 import type {
   ApplyError,
   ApplyMeta,
   ApplyResult,
+  DecisionEntry,
+  DecisionQuery,
+  DecisionRecord,
   DryRunResult,
   JsonValue,
   Observation,
   ReadResult,
   StoredEvent,
 } from "../shared/contract.ts";
+import type { TelegramTarget } from "../shared/telegram-api.ts";
 
 import migrations from "../../drizzle/do/migrations.js";
+import { insertDecisions, listDecisions } from "./decision-log.ts";
 import { coreValidator, type EventValidator, normalizeEvent } from "./event-log.ts";
+import { hasObservation, latestSeq, loadLog, toEvent } from "./log-queries.ts";
+import {
+  chatOf,
+  memoryOf,
+  type NotifyRun,
+  rearm,
+  runNotifier,
+  saveMemory,
+  SERVER_TZ,
+  setChat,
+  telegramOf,
+} from "./notifier.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
 import {
@@ -64,47 +85,8 @@ const SERVER_DEVICE_ID = "server";
 const idOf = (raw: unknown): string =>
   typeof raw === "object" && raw !== null && "id" in raw ? String(raw.id) : "";
 
-const toEvent = (row: typeof schema.events.$inferSelect): StoredEvent => ({
-  id: row.id,
-  type: row.type,
-  occurredAt: row.occurredAt,
-  recordedAt: row.recordedAt,
-  deviceId: row.deviceId,
-  precision: row.precision as StoredEvent["precision"],
-  source: row.source as StoredEvent["source"],
-  payload: JSON.parse(row.payload) as JsonValue,
-});
-
 /** A parsed event is JSON by construction, so the stored view is the same object. */
 const toStored = (event: Event): StoredEvent => event;
-
-const latestSeq = async (db: Db): Promise<number> => {
-  const [row] = await db.select({ seq: max(schema.events.seq) }).from(schema.events);
-  return row?.seq ?? 0;
-};
-
-const hasObservation = async (db: Db, observation: Observation): Promise<boolean> => {
-  const [existing] = await db
-    .select({ seq: schema.observations.seq })
-    .from(schema.observations)
-    .where(
-      and(
-        eq(schema.observations.kind, observation.kind),
-        eq(schema.observations.key, observation.key),
-      ),
-    )
-    .limit(1);
-  return existing !== undefined;
-};
-
-/** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
-const loadLog = async (db: Db): Promise<readonly Event[]> => {
-  const rows = await db.select().from(schema.events).orderBy(asc(schema.events.seq));
-  return rows.flatMap((row) => {
-    const parsed = parseEvent(toEvent(row));
-    return parsed.ok ? [parsed.value] : [];
-  });
-};
 
 /**
 One instance per user (id = user id): the event log, the materialized state, the SQL
@@ -188,6 +170,15 @@ export class UserStore extends DurableObject {
     return inserted;
   }
 
+  async #state(): Promise<CoreState> {
+    const { state } = await this.#current();
+    return state;
+  }
+
+  async #rearm(now: string): Promise<void> {
+    await rearm(this.ctx.storage, await this.#state(), now);
+  }
+
   /** Smoke check used by tests: the schema is in place. */
   async countEvents(): Promise<number> {
     const rows = await this.db.select({ seq: schema.events.seq }).from(schema.events);
@@ -218,6 +209,7 @@ export class UserStore extends DurableObject {
     }
     await this.#insert(events);
     await this.derive(options.now);
+    await this.#rearm(options.now);
     return { accepted, rejected, seq: await latestSeq(this.db) };
   }
 
@@ -283,6 +275,7 @@ export class UserStore extends DurableObject {
     }
     const inserted = await this.#insert(prepared.value.events);
     await this.derive(meta.now);
+    await this.#rearm(meta.now);
     const current = await this.#current();
     return ok({
       events: inserted.map((event) => toStored(event)),
@@ -306,6 +299,70 @@ export class UserStore extends DurableObject {
           state: toRpcState(prepared.value.state),
         })
       : prepared;
+  }
+
+  /** Keeps a small value until it is recalled (a bot preview waiting for its button). */
+  async remember(key: string, value: JsonValue): Promise<void> {
+    await this.ctx.storage.put(`memo:${key}`, value);
+  }
+
+  /** The remembered value, taken out: a second recall finds nothing. */
+  async recall(key: string): Promise<JsonValue | undefined> {
+    const value = await this.ctx.storage.get<JsonValue>(`memo:${key}`);
+    await this.ctx.storage.delete(`memo:${key}`);
+    return value;
+  }
+
+  /** Appends to the decision log (notifications here, parses from the routes and the bot). */
+  async logDecisions(entries: readonly DecisionEntry[], now: string): Promise<void> {
+    await insertDecisions(this.db, entries, now);
+  }
+
+  /** The decision log, newest first. */
+  async decisions(query: DecisionQuery): Promise<readonly DecisionRecord[]> {
+    return await listDecisions(this.db, query);
+  }
+
+  /** Notifications go to this chat from now on (the bot and every bot login call it). */
+  async notifyTo(chatId: string, now: string): Promise<void> {
+    await setChat(this.ctx.storage, chatId);
+    await this.#rearm(now);
+  }
+
+  /** Silences a task's alerts until `until`. */
+  async snoozeTask(taskId: string, until: string, now: string): Promise<void> {
+    await saveMemory(this.ctx.storage, snooze(await memoryOf(this.ctx.storage), taskId, until));
+    await this.#rearm(now);
+  }
+
+  /** What the phone should schedule locally for the next day. */
+  async notifyPlan(now: string): Promise<readonly PlannedNotification[]> {
+    await this.derive(now);
+    const state = await this.#state();
+    return notifyPlan(state, { deviceTz: SERVER_TZ, now }, await memoryOf(this.ctx.storage));
+  }
+
+  /** One pass of the notifier (see `runNotifier`); nothing happens until the chat is known. */
+  async runNotifications(now: string, telegram: null | TelegramTarget): Promise<NotifyRun> {
+    const chatId = await chatOf(this.ctx.storage);
+    if (chatId === undefined) {
+      return { decisions: 0, nextAt: null, sent: 0 };
+    }
+    await this.derive(now);
+    return await runNotifier({
+      chatId,
+      log: async (decisions) => {
+        await this.logDecisions(decisions, now);
+      },
+      now,
+      state: await this.#state(),
+      storage: this.ctx.storage,
+      telegram,
+    });
+  }
+
+  override async alarm(): Promise<void> {
+    await this.runNotifications(new Date().toISOString(), telegramOf(this.env));
   }
 
   /**

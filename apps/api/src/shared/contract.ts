@@ -76,4 +76,43 @@ export type UserStoreApi = {
     meta: ApplyMeta,
   ) => Promise<Result<DryRunResult, ApplyError>>;
   readonly find: (id: string) => Promise<StoredEvent | undefined>;
+  readonly decisions: (query: DecisionQuery) => Promise<readonly DecisionRecord[]>;
 };
+
+/** What the bot uses besides reading and writing: previews kept until a button is pressed. */
+export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
+  readonly remember: (key: string, value: JsonValue) => Promise<void>;
+  readonly recall: (key: string) => Promise<JsonValue | undefined>;
+  /** Where notifications go: the user's chat with the bot. */
+  readonly notifyTo: (chatId: string, now: string) => Promise<void>;
+  /** Silences a task's alerts until `until`. */
+  readonly snoozeTask: (taskId: string, until: string, now: string) => Promise<void>;
+  readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
+};
+
+/** One row of the decision log, as the API returns it. */
+export type DecisionRecord = {
+  readonly id: string;
+  readonly at: string;
+  readonly kind: string;
+  readonly taskId: null | string;
+  readonly rule: string;
+  readonly inputs: JsonValue;
+  readonly outcome: string;
+  readonly explanation: string;
+};
+
+/** A decision as its maker records it; the store stamps the id and the time. */
+export type DecisionEntry = Omit<DecisionRecord, "at" | "id">;
+
+export type DecisionQuery = {
+  readonly taskId?: string | undefined;
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+  /** Case-insensitive text search over rule, outcome, explanation and inputs. */
+  readonly q?: string | undefined;
+  readonly limit: number;
+};
+
+/** Callback data of the notification buttons, `<action>:<taskId>`: sent by the store, handled by the bot. */
+export const NOTIFY_ACTIONS = { cancel: "x", done: "d", snooze: "z" } as const;

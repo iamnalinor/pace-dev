@@ -12,6 +12,8 @@ export default defineConfig({
       miniflare: {
         bindings: {
           ENVIRONMENT: "test",
+          // The LLM parse answers from inside the Worker: no network, no keys.
+          LLM_PROVIDER: "fake",
           // Every test request is addressed to this origin (tests/helpers.ts): the OAuth
           // provider binds its issuer and the MCP resource to it.
           API_ORIGIN: "https://pace-api.test",

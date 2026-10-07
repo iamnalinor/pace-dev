@@ -2,10 +2,13 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TelegramTransport } from "../src/bot/telegram-api.ts";
+import { newId } from "@pace/core";
+
+import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
-import { json, readJson } from "./helpers.ts";
+import { echoParse, fakeParseModel } from "../src/shared/llm/fake-model.ts";
+import { json, loginAsDev, readJson } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -42,6 +45,7 @@ const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<R
     fetch: async () => {
       throw new Error("no network in tests");
     },
+    parseProviders: () => [{ model: fakeParseModel(echoParse), name: "fake" }],
     telegramFetch,
   }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
@@ -140,5 +144,140 @@ describe("POST /telegram/webhook", () => {
   it("greets a whitelisted user who just opens the bot", async () => {
     await webhook(startUpdate(1002, "/start"));
     expect(sent[0]?.body["text"]).toMatch(/Pace/);
+  });
+});
+
+/** The assistant tests talk as one linked user. */
+const ADA = 1002;
+
+const textUpdate = (text: string) => {
+  const update = startUpdate(ADA, text);
+  const { entities: _entities, ...message } = update.message;
+  return { ...update, message };
+};
+
+const callbackUpdate = (data: string) => {
+  const telegramId = ADA;
+  const updateId = updates.next;
+  updates.next += 1;
+  return {
+    callback_query: {
+      chat_instance: "1",
+      data,
+      from: { first_name: "Ada", id: telegramId, is_bot: false },
+      id: `q${String(updateId)}`,
+      message: {
+        chat: { id: telegramId, type: "private" },
+        date: Math.floor(Date.now() / 1000),
+        message_id: 99,
+        text: "preview",
+      },
+    },
+    update_id: updateId,
+  };
+};
+
+type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
+
+/** The callback data of the preview button labelled `label` in the last message sent. */
+const buttonData = (label: string): string => {
+  const preview = sent.find((call) => call.method === "sendMessage");
+  const keyboard = preview?.body["reply_markup"] as Keyboard | undefined;
+  return keyboard?.inline_keyboard[0]?.find((button) => button.text === label)?.callback_data ?? "";
+};
+
+type Pulled = {
+  events: { type: string; source: string; payload: Record<string, unknown> }[];
+};
+
+/** The last event of `type` the bot wrote for the user. */
+const pulledEvent = async (token: string, type: string) => {
+  const pulled = await json<Pulled>("/api/sync/pull", { token });
+  return pulled.events.findLast((event) => event.type === type && event.source === "bot");
+};
+
+describe("the bot as an assistant", () => {
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("previews a message with buttons and writes the task on Accept", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("купить кабель USB-C"));
+    const text = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
+    expect(text).toContain("I read it as:");
+    expect(text).toContain("купить кабель USB-C");
+    const accept = buttonData("Accept");
+    expect(accept).toMatch(/^a:/u);
+
+    sent.length = 0;
+    await webhook(callbackUpdate(accept));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    expect(sent[1]?.body).toMatchObject({ text: "Done ✓" });
+    expect(await pulledEvent(token, "task.created")).toMatchObject({
+      payload: { title: "купить кабель USB-C" },
+    });
+
+    sent.length = 0;
+    await webhook(callbackUpdate(accept));
+    expect(sent[1]?.body).toMatchObject({
+      text: "This preview has expired. Send the message again.",
+    });
+  });
+
+  it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("подумать об отпуске"));
+    const toInbox = buttonData("To Inbox");
+    sent.length = 0;
+    await webhook(callbackUpdate(toInbox));
+    expect(sent[1]?.body).toMatchObject({ text: "Saved to Inbox." });
+    expect(await pulledEvent(token, "task.created")).toMatchObject({
+      payload: { presetId: "inbox", title: "подумать об отпуске" },
+    });
+
+    sent.length = 0;
+    await webhook(startUpdate(1002, "/now"));
+    expect(sent[0]?.body["text"]).toMatch(/^(Now:|Nothing to do right now\.)/u);
+  });
+});
+
+describe("notification buttons", () => {
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("snoozes a task's alerts and closes it from the chat, keeping the notification text", async () => {
+    const token = await loginAsDev("1002");
+    const taskId = `t-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    await json("/api/sync/push", {
+      body: {
+        events: [
+          {
+            deviceId: "dev-1",
+            id: newId(),
+            occurredAt: now,
+            payload: { presetId: "personal", subtasks: [], taskId, title: "Renew the passport" },
+            precision: "exact",
+            recordedAt: now,
+            source: "app",
+            type: "task.created",
+          },
+        ],
+      },
+      token,
+    });
+
+    await webhook(callbackUpdate(`z:${taskId}`));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    expect(sent[1]?.body["text"]).toMatch(/^preview\n\nSnoozed until \d\d:\d\d\.$/u);
+
+    sent.length = 0;
+    await webhook(callbackUpdate(`d:${taskId}`));
+    expect(sent[1]?.body["text"]).toBe("preview\n\nMarked done ✓");
+    expect(await pulledEvent(token, "task.closed")).toMatchObject({
+      payload: { outcome: "done", taskId },
+    });
   });
 });
