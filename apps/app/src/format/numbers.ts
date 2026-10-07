@@ -2,9 +2,11 @@ import { type Language, t } from "@pace/core";
 
 type OrdinalForm = "few" | "one" | "other" | "two";
 
+const ORDINAL_FORMS = ["one", "two", "few"] as const;
+
 const ordinalForm = (n: number, language: Language): OrdinalForm => {
   const rule = new Intl.PluralRules(language, { type: "ordinal" }).select(n);
-  return rule === "one" || rule === "two" || rule === "few" ? rule : "other";
+  return ORDINAL_FORMS.find((form) => form === rule) ?? "other";
 };
 
 /** `2` → `2nd` / `2-я` ("the 2nd task on Now"). */

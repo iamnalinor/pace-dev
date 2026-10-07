@@ -77,7 +77,7 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
   const t = useT();
   const { hooks } = usePace();
   const [projectId, setProjectId] = useState<null | string>(null);
-  const [isWaitingShown, setWaitingShown] = useState(false);
+  const [isWaitingShown, setIsWaitingShown] = useState(false);
   const board = hooks.useNow(projectId === null ? undefined : { projectId });
   const isEmpty = board.rows.length === 0 && board.waitingCount === 0;
   return (
@@ -94,7 +94,7 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
           accessibilityState={{ expanded: isWaitingShown }}
           className="min-h-11 justify-center px-5"
           onPress={() => {
-            setWaitingShown((shown) => !shown);
+            setIsWaitingShown((shown) => !shown);
           }}
         >
           <Text className="font-sans text-[12px] text-faint">

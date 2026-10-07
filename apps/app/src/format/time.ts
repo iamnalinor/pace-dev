@@ -34,6 +34,9 @@ const MINUTES_PER_HOUR = 60;
 const wallAsUtc = (ms: number, tz: string): number =>
   Date.parse(`${formatInZone(new Date(ms).toISOString(), tz, "yyyy-MM-dd'T'HH:mm")}:00.000Z`);
 
+const isClock = (hours: number, minutes: number): boolean =>
+  hours < HOURS_PER_DAY && minutes < MINUTES_PER_HOUR;
+
 /** The typed date and time as UTC milliseconds of the same wall clock; `null` when not a real one. */
 const typedAsUtc = (date: string, time: string): null | number => {
   const day = DATE.exec(date);
@@ -41,15 +44,12 @@ const typedAsUtc = (date: string, time: string): null | number => {
   if (day === null || clock === null) {
     return null;
   }
-  const [year, month, dayOfMonth] = day.slice(1).map(Number);
-  const [hours, minutes] = clock.slice(1).map(Number);
-  if (
-    (hours ?? HOURS_PER_DAY) >= HOURS_PER_DAY ||
-    (minutes ?? MINUTES_PER_HOUR) >= MINUTES_PER_HOUR
-  ) {
+  const [year = 0, month = 1, dayOfMonth = 1] = day.slice(1).map(Number);
+  const [hours = HOURS_PER_DAY, minutes = MINUTES_PER_HOUR] = clock.slice(1).map(Number);
+  if (!isClock(hours, minutes)) {
     return null;
   }
-  const ms = Date.UTC(year ?? 0, (month ?? 1) - 1, dayOfMonth ?? 1, hours, minutes);
+  const ms = Date.UTC(year, month - 1, dayOfMonth, hours, minutes);
   // Date.UTC rolls 2026-02-30 over into March: a real date survives the round trip.
   return new Date(ms).toISOString().startsWith(date) ? ms : null;
 };

@@ -10,6 +10,8 @@ export const useSubmitTitle = (view: TaskViewModel): string => {
   const t = useT();
   const language = useLanguage();
   const sending = new Set(sendingIds(view));
-  const names = view.problems.filter((problem) => sending.has(problem.id)).map(problemName);
+  const names = view.problems
+    .filter((problem) => sending.has(problem.id))
+    .map((problem) => problemName(problem));
   return t("task.submitProblems", { problems: joinList(names, language) });
 };

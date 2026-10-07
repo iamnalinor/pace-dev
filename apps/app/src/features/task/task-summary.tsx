@@ -6,8 +6,9 @@ import { useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { cx } from "#app/ui/cx.ts";
+import { Dot } from "#app/ui/dot.tsx";
 import { ProgressBar } from "#app/ui/progress-bar.tsx";
-import { formatDuration } from "@pace/core";
+import { formatDuration, IMPORTANCE_COLORS } from "@pace/core";
 
 const tagKey = (tag: TaskTag) => {
   switch (tag.kind) {
@@ -41,6 +42,33 @@ const Stat = ({
 
 const PERCENT = 100;
 
+/** Importance (with its colour), status and submission as small tags. */
+const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
+  const t = useT();
+  return (
+    <View className="flex-row flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <View
+          className="flex-row items-center gap-1.5 rounded-sm bg-raised px-2 py-1"
+          key={tag.kind}
+        >
+          {tag.kind === "importance" && IMPORTANCE_COLORS[tag.importance] !== null ? (
+            <Dot color={IMPORTANCE_COLORS[tag.importance]} />
+          ) : null}
+          <Text
+            className={cx(
+              "font-sans text-[11px]",
+              tag.kind === "importance" ? "font-medium text-fg" : "text-fg2",
+            )}
+          >
+            {t(tagKey(tag))}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 /** Title, link and tags; the stats card (due, work left, tracked) and the window bar. */
 export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
@@ -70,19 +98,7 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
             {view.link.host} ↗
           </Text>
         )}
-        <View className="flex-row flex-wrap gap-1.5">
-          {view.tags.map((tag) => (
-            <Text
-              className={cx(
-                "rounded-sm bg-raised px-2 py-1 font-sans text-[11px]",
-                tag.kind === "importance" ? "font-medium text-fg" : "text-fg2",
-              )}
-              key={tag.kind}
-            >
-              {t(tagKey(tag))}
-            </Text>
-          ))}
-        </View>
+        <TaskTags tags={view.tags} />
       </View>
       <View className="flex-row gap-3 rounded-xl border border-line bg-surface p-3.5">
         <Stat label={t("task.due")} value={due} />

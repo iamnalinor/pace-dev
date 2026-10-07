@@ -31,17 +31,11 @@ const ChipRow = ({
   </ScrollView>
 );
 
-/** What the line was read as: one-tap category, importance and project; the rest as facts. */
-const ComposerChips = ({
-  model,
-  onEdit,
-}: {
-  readonly model: ComposerModel;
-  readonly onEdit: (edits: ComposerEdits) => void;
-}) => {
+/** Due, estimate, link, problems and a new project, read from the line, in words. */
+const useFacts = (model: ComposerModel): readonly string[] => {
   const t = useT();
   const viewer = useViewer();
-  const facts = [
+  return [
     ...(model.due === null
       ? []
       : [zonedText({ at: model.due.at, mode: "due", tz: model.due.tz }, viewer)]),
@@ -56,6 +50,18 @@ const ComposerChips = ({
       ? []
       : [t("composer.newProject", { name: model.newProjectName })]),
   ];
+};
+
+/** What the line was read as: one-tap category, importance and project; the rest as facts. */
+const ComposerChips = ({
+  model,
+  onEdit,
+}: {
+  readonly model: ComposerModel;
+  readonly onEdit: (edits: ComposerEdits) => void;
+}) => {
+  const t = useT();
+  const facts = useFacts(model);
   return (
     <View className="gap-2 pt-2">
       <ChipRow label={t("composer.category")}>
@@ -116,6 +122,30 @@ const ComposerChips = ({
   );
 };
 
+const ComposerActions = ({
+  submitLabel,
+  onAdd,
+  onInbox,
+}: {
+  readonly submitLabel: string;
+  readonly onAdd: () => void;
+  readonly onInbox: () => void;
+}) => {
+  const t = useT();
+  return (
+    <View className="flex-row gap-2 pt-2">
+      <View className="flex-1">
+        <Button onPress={onInbox} variant="secondary">
+          {t("composer.toInbox")}
+        </Button>
+      </View>
+      <View className="flex-1">
+        <Button onPress={onAdd}>{submitLabel}</Button>
+      </View>
+    </View>
+  );
+};
+
 /**
 The app's entry point on Now: one line read into chips as it is typed; Add stores it (or
 adds the problems to this week's homework), To Inbox keeps the raw line for later.
@@ -149,8 +179,8 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
   return (
     <View className="mx-4 mb-3 rounded-xl border border-line bg-surface p-2">
       <TextInput
-        accessibilityLabel={t("composer.label")}
         accessibilityHint={t("composer.hint")}
+        accessibilityLabel={t("composer.label")}
         className="min-h-11 px-2 font-sans text-[15px] text-fg"
         onChangeText={setText}
         onSubmitEditing={() => {
@@ -170,29 +200,19 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
               setEdits((current) => ({ ...current, ...next }));
             }}
           />
-          <View className="flex-row gap-2 pt-2">
-            <View className="flex-1">
-              <Button
-                onPress={() => {
-                  void toInbox();
-                }}
-                variant="secondary"
-              >
-                {t("composer.toInbox")}
-              </Button>
-            </View>
-            <View className="flex-1">
-              <Button
-                onPress={() => {
-                  void add();
-                }}
-              >
-                {model.target.kind === "instance"
-                  ? t("composer.addTo", { title: model.target.title })
-                  : t("composer.add")}
-              </Button>
-            </View>
-          </View>
+          <ComposerActions
+            onAdd={() => {
+              void add();
+            }}
+            onInbox={() => {
+              void toInbox();
+            }}
+            submitLabel={
+              model.target.kind === "instance"
+                ? t("composer.addTo", { title: model.target.title })
+                : t("composer.add")
+            }
+          />
         </>
       )}
     </View>

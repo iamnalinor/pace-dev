@@ -7,12 +7,12 @@ export const SwitchRow = ({
   hint,
   label,
   onChange,
-  value,
+  isOn,
 }: {
   readonly hint?: string;
   readonly label: string;
-  readonly onChange: (value: boolean) => void;
-  readonly value: boolean;
+  readonly onChange: (isOn: boolean) => void;
+  readonly isOn: boolean;
 }) => {
   const { palette } = useTheme();
   return (
@@ -26,9 +26,9 @@ export const SwitchRow = ({
       <Switch
         accessibilityLabel={label}
         onValueChange={onChange}
-        thumbColor={value ? palette.accentFg : palette.fg2}
+        thumbColor={isOn ? palette.accentFg : palette.fg2}
         trackColor={{ false: palette.raised, true: palette.accent }}
-        value={value}
+        value={isOn}
       />
     </View>
   );

@@ -56,13 +56,13 @@ describe("TaskScreen — homework", () => {
   });
 });
 
-describe("TaskScreen — work", () => {
-  const trkScreen = async () => {
-    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
-    await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
-    return runtime;
-  };
+const trkScreen = async () => {
+  const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+  await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+  return runtime;
+};
 
+describe("TaskScreen — work", () => {
   it("explains its place on Now", async () => {
     await trkScreen();
     expect(screen.getByText("tracker.example.com ↗")).toBeOnTheScreen();

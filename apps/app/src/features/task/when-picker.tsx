@@ -10,6 +10,47 @@ import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import type { CloseForm } from "./use-close-form.ts";
 
+/** The exact date and time, typed on the device's wall clock. */
+const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly form: CloseForm }) => {
+  const t = useT();
+  return (
+    <View className="gap-2">
+      <View className="flex-row gap-2">
+        <View className="flex-[3]">
+          <TextField
+            inputMode="numeric"
+            label={t("close.date")}
+            onChangeText={(date) => {
+              form.setTyped({ ...form.typed, date });
+            }}
+            placeholder="2026-10-07"
+            value={form.typed.date}
+          />
+        </View>
+        <View className="flex-[2]">
+          <TextField
+            inputMode="numeric"
+            label={t("close.time")}
+            onChangeText={(time) => {
+              form.setTyped({ ...form.typed, time });
+            }}
+            placeholder="14:52"
+            value={form.typed.time}
+          />
+        </View>
+      </View>
+      <Text className="font-sans text-[12px] text-muted">
+        {t("edit.inZone", { zone: deviceTz })}
+      </Text>
+      {form.at === null ? (
+        <Text accessibilityLiveRegion="polite" className="font-sans text-[12px] text-warn">
+          {t("close.timeInvalid")}
+        </Text>
+      ) : null}
+    </View>
+  );
+};
+
 /** The time pills, a calendar pill for an exact date and time, and the zone they are read in. */
 export const WhenPicker = ({
   deviceTz,
@@ -53,42 +94,7 @@ export const WhenPicker = ({
           {isCustom ? t("close.date") : ""}
         </Chip>
       </View>
-      {isCustom ? (
-        <View className="gap-2">
-          <View className="flex-row gap-2">
-            <View className="flex-[3]">
-              <TextField
-                inputMode="numeric"
-                label={t("close.date")}
-                onChangeText={(date) => {
-                  form.setTyped({ ...form.typed, date });
-                }}
-                placeholder="2026-10-07"
-                value={form.typed.date}
-              />
-            </View>
-            <View className="flex-[2]">
-              <TextField
-                inputMode="numeric"
-                label={t("close.time")}
-                onChangeText={(time) => {
-                  form.setTyped({ ...form.typed, time });
-                }}
-                placeholder="14:52"
-                value={form.typed.time}
-              />
-            </View>
-          </View>
-          <Text className="font-sans text-[12px] text-muted">
-            {t("edit.inZone", { zone: deviceTz })}
-          </Text>
-          {form.at === null ? (
-            <Text accessibilityLiveRegion="polite" className="font-sans text-[12px] text-warn">
-              {t("close.timeInvalid")}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+      {isCustom ? <TypedTime deviceTz={deviceTz} form={form} /> : null}
     </View>
   );
 };

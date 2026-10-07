@@ -26,7 +26,7 @@ export const useCheckTask = (): ((row: NowRow) => void) => {
           ? undefined
           : resolvePreset(current.presets, task.presetId, task.overrides ?? undefined);
       const hasProblems = (task?.subtasks.length ?? 0) > 0;
-      if (preset?.ok === true && preset.value.submission === "per_subtask" && hasProblems) {
+      if (hasProblems && preset?.ok === true && preset.value.submission === "per_subtask") {
         router.push(`/task/${row.id}?close=1`);
         return;
       }

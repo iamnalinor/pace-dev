@@ -29,12 +29,33 @@ const Row = ({
   </View>
 );
 
+/** History and logout. */
+const SettingsFooter = () => {
+  const t = useT();
+  const router = useRouter();
+  const { auth } = useAuth();
+  return (
+    <View className="gap-3 px-5 py-6">
+      <Button
+        onPress={() => {
+          router.push("/history");
+        }}
+        variant="secondary"
+      >
+        {t("history.title")}
+      </Button>
+      <Button onPress={() => void auth.logout()} variant="secondary">
+        {t("settings.logout")}
+      </Button>
+    </View>
+  );
+};
+
 export const SettingsScreen = () => {
   const t = useT();
   const router = useRouter();
   const theme = useTheme();
   const settings = useSettings();
-  const { auth } = useAuth();
   const { state } = usePace();
   const deviceZone = deviceTimeZone();
 
@@ -96,11 +117,7 @@ export const SettingsScreen = () => {
           </Button>
         )}
       </Row>
-      <View className="px-5 py-6">
-        <Button onPress={() => void auth.logout()} variant="secondary">
-          {t("settings.logout")}
-        </Button>
-      </View>
+      <SettingsFooter />
     </View>
   );
 };

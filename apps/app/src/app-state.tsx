@@ -54,10 +54,12 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     }
   });
   const subscription = AppState.addEventListener("change", (next) => {
-    if (next === "active" && auth.store.getState().status === "signed-in") {
-      void actions.ensureInstances();
-      void sync.syncNow();
+    if (!(next === "active" && auth.store.getState().status === "signed-in")) {
+      return;
     }
+
+    void actions.ensureInstances();
+    void sync.syncNow();
   });
   return () => {
     unsubscribe();

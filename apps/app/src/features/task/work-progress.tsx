@@ -20,7 +20,7 @@ export const WorkProgress = ({ view }: { readonly view: TaskViewModel }) => {
   }
   const value = view.progress.slider ?? 0;
   const set = (next: number): void => {
-    if (next >= 0 && next <= MAX && next !== value) {
+    if (next !== value && next >= 0 && next <= MAX) {
       void run(actions.setProgress(view.id, next));
     }
   };

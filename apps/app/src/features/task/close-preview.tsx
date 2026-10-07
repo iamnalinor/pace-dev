@@ -44,10 +44,9 @@ export const ClosePreview = ({
   const t = useT();
   const { deviceTz, now } = useViewer();
   const open = form.mode === "submit" ? stillOpen(view) : [];
-  const outcome =
-    form.mode === "other"
-      ? t(`close.${form.outcome}`)
-      : t(isLatePreview(view, form.mode, form.at ?? now) ? "close.late" : "close.beforeDeadline");
+  const isLate = isLatePreview(view, form.mode, form.at ?? now);
+  const timing = t(isLate ? "close.late" : "close.beforeDeadline");
+  const outcome = form.mode === "other" ? t(`close.${form.outcome}`) : timing;
   const happened = form.at === null ? "—" : clockTime(form.at, deviceTz);
   return (
     <View className="gap-1.5 rounded-lg bg-bg p-3">

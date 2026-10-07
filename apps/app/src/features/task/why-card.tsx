@@ -32,8 +32,9 @@ export const WhyCard = ({
   const t = useT();
   const viewer = useViewer();
   const { palette } = useTheme();
-  const [isOpen, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const title = useTitle(place);
+  const policyName = t(`policy.${view.why.policy}`);
   const Chevron = isOpen ? ChevronDown : ChevronRight;
   return (
     <View className="mx-4 rounded-xl border border-line bg-surface">
@@ -42,7 +43,7 @@ export const WhyCard = ({
         accessibilityState={{ expanded: isOpen }}
         className="min-h-12 flex-row items-center justify-between px-3.5 active:opacity-70"
         onPress={() => {
-          setOpen((open) => !open);
+          setIsOpen((open) => !open);
         }}
       >
         <Text className="font-sans text-[14px] font-medium text-fg">{title}</Text>
@@ -51,7 +52,7 @@ export const WhyCard = ({
       {isOpen ? (
         <View className="gap-1.5 border-t border-line px-3.5 pb-3.5 pt-3" testID="why-card">
           <Text className="font-sans text-[12px] text-muted">
-            {`${t(`policy.${view.why.policy}`)} · ${t("task.whyFormula")}: ${view.why.formula}`}
+            {`${policyName} · ${t("task.whyFormula")}: ${view.why.formula}`}
           </Text>
           {whyLines(view.why.rows, view.overrideSheet.importance, viewer).map((line) => (
             <View className="flex-row justify-between gap-3" key={line.id}>

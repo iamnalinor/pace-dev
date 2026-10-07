@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "#app/screens/placeholder-screen.tsx";
+import { ProjectsScreen } from "#app/screens/projects-screen.tsx";
 
-export default function ProjectsScreen() {
-  return <PlaceholderScreen emptyKey="projects.empty" titleKey="nav.projects" />;
+export default function ProjectsRoute() {
+  return <ProjectsScreen />;
 }

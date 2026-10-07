@@ -7,8 +7,12 @@ import "@testing-library/react-native";
 import "react-native-gesture-handler/jestSetup";
 
 // Reanimated 4 and its worklets runtime need their JS mocks: the native module is absent in Jest.
-jest.mock("react-native-worklets", () => jest.requireActual("react-native-worklets/src/mock"));
-jest.mock("react-native-reanimated", () => jest.requireActual("react-native-reanimated/mock"));
+jest.mock("react-native-worklets", (): unknown =>
+  jest.requireActual("react-native-worklets/src/mock"),
+);
+jest.mock("react-native-reanimated", (): unknown =>
+  jest.requireActual("react-native-reanimated/mock"),
+);
 // Native storage and navigation have in-memory doubles; a test file may still mock them itself.
 jest.mock("expo-secure-store", () =>
   jest

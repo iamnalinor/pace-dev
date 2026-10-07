@@ -19,6 +19,10 @@ const Navigator = () => {
         <Stack.Screen name="auth" options={{ animation: "fade" }} />
         <Stack.Screen name="settings" options={{ presentation: "modal" }} />
         <Stack.Screen name="task/[id]" />
+        <Stack.Screen name="project/[id]" />
+        <Stack.Screen name="inbox" />
+        <Stack.Screen name="review" />
+        <Stack.Screen name="history" />
       </Stack>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
     </>

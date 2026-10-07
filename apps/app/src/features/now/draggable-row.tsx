@@ -1,12 +1,8 @@
 import { type ReactNode, useState } from "react";
 import { type AccessibilityActionEvent, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { useT } from "#app/app-state.tsx";
 
@@ -46,7 +42,7 @@ export const DraggableRow = ({
       offset.value = event.translationY;
     })
     .onEnd((event) => {
-      runOnJS(drop)(event.translationY);
+      scheduleOnRN(drop, event.translationY);
     })
     .onFinalize(() => {
       offset.value = withTiming(0, { duration: SETTLE_MS });

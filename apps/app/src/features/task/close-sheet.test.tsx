@@ -67,9 +67,8 @@ describe("CloseSheet — submitting problems", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("close.other") }));
     await fireEvent.press(screen.getByRole("button", { name: en("close.skipped") }));
     await fireEvent.changeText(screen.getByLabelText(en("close.reason")), "course dropped");
-    await fireEvent.press(
-      screen.getByRole("button", { name: en("close.confirm", { outcome: en("close.skipped") }) }),
-    );
+    const confirm = en("close.confirm", { outcome: en("close.skipped") });
+    await fireEvent.press(screen.getByRole("button", { name: confirm }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toMatchObject({
         outcome: "skipped",

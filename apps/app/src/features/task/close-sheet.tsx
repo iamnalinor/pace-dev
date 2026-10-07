@@ -59,9 +59,9 @@ export const CloseSheet = ({
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
       <SwitchRow
         hint={t("close.exactHint")}
+        isOn={form.isExact}
         label={t("close.exact")}
-        onChange={form.setExact}
-        value={form.isExact}
+        onChange={form.setIsExact}
       />
       <ClosePreview form={form} view={view} />
       <View className="flex-row gap-2">

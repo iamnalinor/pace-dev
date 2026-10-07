@@ -21,7 +21,7 @@ export type CloseForm = {
   /** The chosen instant; `null` while the typed time is not a real one. */
   readonly at: null | string;
   readonly isExact: boolean;
-  readonly setExact: (exact: boolean) => void;
+  readonly setIsExact: (isExact: boolean) => void;
   readonly outcome: GiveUp;
   readonly setOutcome: (outcome: GiveUp) => void;
   readonly reason: string;
@@ -37,7 +37,7 @@ export const useCloseForm = (
   const [mode, setMode] = useState<CloseMode>(() => startMode ?? initialMode(view));
   const [choice, setChoice] = useState<TimeChoice>("now");
   const [typed, setTyped] = useState<WallClock>({ date: "", time: "" });
-  const [isExact, setExact] = useState(true);
+  const [isExact, setIsExact] = useState(true);
   const [outcome, setOutcome] = useState<GiveUp>("cancelled");
   const [reason, setReason] = useState("");
   const pillAt = (key: TimeChoice): null | string =>
@@ -58,7 +58,7 @@ export const useCloseForm = (
     mode,
     outcome,
     reason,
-    setExact,
+    setIsExact,
     setMode,
     setOutcome,
     setReason,

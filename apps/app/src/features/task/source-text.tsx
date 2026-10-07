@@ -6,7 +6,7 @@ import { useT } from "#app/app-state.tsx";
 /** The text the task came from, shown verbatim on request. */
 export const SourceText = ({ text }: { readonly text: null | string }) => {
   const t = useT();
-  const [isShown, setShown] = useState(false);
+  const [isShown, setIsShown] = useState(false);
   if (text === null) {
     return null;
   }
@@ -17,7 +17,7 @@ export const SourceText = ({ text }: { readonly text: null | string }) => {
         accessibilityState={{ expanded: isShown }}
         className="min-h-11 justify-center"
         onPress={() => {
-          setShown((shown) => !shown);
+          setIsShown((shown) => !shown);
         }}
       >
         <Text className="font-sans text-[13px] text-fg2">
