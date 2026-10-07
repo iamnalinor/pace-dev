@@ -656,4 +656,5 @@ export const ru: Catalog = {
   "now.pickTask": "Выберите задачу, чтобы открыть её здесь.",
   "task.progressLess": "Меньше прогресса",
   "task.progressMore": "Больше прогресса",
+  "composer.projectNamed": "Проект {name}",
 };

@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { Composer } from "#app/features/composer/composer.tsx";
 import { TaskRow } from "#app/shared/task-row.tsx";
 import { useCheckTask } from "#app/shared/use-check-task.ts";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";
@@ -71,8 +72,8 @@ const Rows = ({
   );
 };
 
-/** The Main artboard: what to do next, best first. */
-export const NowScreen = () => {
+/** The Main artboard: what to do next, best first; the composer on top (shared text lands there). */
+export const NowScreen = ({ composeText }: { readonly composeText?: string | undefined }) => {
   const t = useT();
   const { hooks } = usePace();
   const [projectId, setProjectId] = useState<null | string>(null);
@@ -81,6 +82,7 @@ export const NowScreen = () => {
   const isEmpty = board.rows.length === 0 && board.waitingCount === 0;
   return (
     <Screen header={<NowHeader inboxCount={board.inboxCount} />}>
+      <Composer initialText={composeText} key={composeText ?? ""} />
       <ZoneBanner />
       <NothingRunning label={t("now.nothingRunning")} />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={projectId} />

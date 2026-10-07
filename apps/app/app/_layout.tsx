@@ -1,6 +1,7 @@
 import "../global.css";
 
 import { Stack } from "expo-router";
+import { ShareIntentProvider } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,6 +18,7 @@ const Navigator = () => {
         <Stack.Screen name="login" options={{ animation: "fade" }} />
         <Stack.Screen name="auth" options={{ animation: "fade" }} />
         <Stack.Screen name="settings" options={{ presentation: "modal" }} />
+        <Stack.Screen name="task/[id]" />
       </Stack>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
     </>
@@ -30,7 +32,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <PaceProvider>
-            <Navigator />
+            <ShareIntentProvider>
+              <Navigator />
+            </ShareIntentProvider>
           </PaceProvider>
         </ThemeProvider>
       </SafeAreaProvider>

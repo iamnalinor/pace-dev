@@ -67,7 +67,24 @@ describe("PaceProvider", () => {
       expect(screen.getByTestId("sync")).toHaveTextContent("synced");
     });
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-in:Ann");
-    expect(api.pathsCalled("/api/sync")).toEqual(["/api/sync/pull"]);
+    // The first pull comes before anything is pushed: the zone is set from what it brought.
+    expect(api.pathsCalled("/api/sync")[0]).toBe("/api/sync/pull");
+  });
+
+  it("gives the account the device's time zone after the first sync", async () => {
+    const { runtime } = await setup();
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    expect(runtime.state.store.getState().settings.timezone).toBeNull();
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.timezone).toBe(runtime.clock.deviceTz);
+    });
   });
 
   it("follows the account language", async () => {
@@ -96,14 +113,18 @@ describe("PaceProvider", () => {
       </PaceProvider>,
     );
     await waitFor(() => {
-      expect(api.pathsCalled("/api/sync/pull")).toHaveLength(1);
+      expect(runtime.state.store.getState().settings.timezone).not.toBeNull();
     });
+    await act(async () => {
+      await runtime.sync.syncNow();
+    });
+    const before = api.pathsCalled("/api/sync/pull").length;
     const [, listener] = addEventListener.mock.calls[0] ?? [];
     await act(async () => {
       listener?.("active");
       await runtime.sync.syncNow();
     });
-    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(2);
+    expect(api.pathsCalled("/api/sync/pull").length).toBeGreaterThan(before);
   });
 
   it("clears local data on logout", async () => {

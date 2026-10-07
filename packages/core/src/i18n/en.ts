@@ -652,4 +652,5 @@ export const en = {
   "now.pickTask": "Pick a task to see it here.",
   "task.progressLess": "Less progress",
   "task.progressMore": "More progress",
+  "composer.projectNamed": "Project {name}",
 } as const;

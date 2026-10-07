@@ -19,12 +19,26 @@ const SYNC_INTERVAL_MS = 30_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 
+/**
+A signed-in start: this week's homework instances, a first sync, then the account's time
+zone from the device when it has none yet (never "not set").
+*/
+const bootstrap = async ({ actions, auth, sync }: PaceRuntime): Promise<void> => {
+  await actions.ensureInstances();
+  await sync.syncNow();
+  await actions.ensureTimezone();
+  // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
+  if (auth.store.getState().status === "signed-in") {
+    sync.start({ intervalMs: SYNC_INTERVAL_MS });
+  }
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
-  const { auth, sync } = runtime;
+  const { actions, auth, sync } = runtime;
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
-      sync.start({ intervalMs: SYNC_INTERVAL_MS });
+      void bootstrap(runtime);
     } else {
       sync.stop();
     }
@@ -41,6 +55,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
   });
   const subscription = AppState.addEventListener("change", (next) => {
     if (next === "active" && auth.store.getState().status === "signed-in") {
+      void actions.ensureInstances();
       void sync.syncNow();
     }
   });
