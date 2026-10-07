@@ -17,8 +17,16 @@
     "noEmit": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["jest", "node"],
-    "paths": { "#app/*": ["./src/*"] }
+    "types": ["jest", "node"]
   },
-  "include": ["app", "src", "modules", "*.ts", "*.d.ts", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": [
+    "app",
+    "src",
+    "modules",
+    "__mocks__",
+    "*.ts",
+    "*.d.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }

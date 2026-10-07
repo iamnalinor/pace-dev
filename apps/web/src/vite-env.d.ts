@@ -1,5 +1,4 @@
-/// <reference types="vite/client" />
-
+// `vite/client` is loaded through tsconfig `types`; this file only names our variables.
 interface ImportMetaEnv {
   /** API origin, e.g. `https://pace-api.nalinor.dev`; defaults to the local Worker. */
   readonly VITE_API_URL?: string;

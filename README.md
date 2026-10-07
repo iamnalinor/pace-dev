@@ -33,8 +33,10 @@ packages/core ◄───────────┘                        ├
 
 - `packages/core` is pure TypeScript (no I/O, no React) and is the only thing every
   runtime shares: the event model, the reducers and the API contract.
-- `packages/client` turns that contract into a typed `fetch` client; the local-first
-  store, sync loop and view-models land here in stage 1.
+- `packages/client` turns that contract into a typed `fetch` client and holds the
+  local-first app state, the auth flows and the sync loop; `createPaceClient` wires them
+  on each platform's adapters (IndexedDB + localStorage on the web, SQLite + SecureStore
+  on Android). View-models land here in stage 1.
 - `apps/api` mounts the contract on Hono, verifies Telegram logins, serves the bot
   webhook and keeps one Durable Object per user as the server copy of the event log.
 - `apps/web` and `apps/app` are thin UIs over the client.
@@ -54,7 +56,8 @@ packages/
     src/i18n/           en.ts (source of truth), ru.ts, i18n.ts (t, plural, formatters)
     src/design/         tokens.json (dark/light palettes), contrast.ts
     src/ids.ts, time.ts, result.ts
-  client/               @pace/client — createApiClient, ApiError; ./react re-exports zustand
+  client/               @pace/client — createPaceClient (api + auth + state + sync), ports and
+                        memory adapters; ./react (createAppHooks, useStore); ./testing (fake fetch)
 apps/
   api/                  Cloudflare Worker (Hono)
     src/worker.ts       entry: fetch handler + UserStore export

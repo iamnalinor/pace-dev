@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <!-- Usage access is granted by the person in system settings, not at install time. -->
+  <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+      tools:ignore="ProtectedPermissions" />
+  <!-- Do Not Disturb during focus sessions (policy access granted in system settings). -->
+  <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+  <!-- Expect/Limit timers fire at exact times. -->
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+</manifest>

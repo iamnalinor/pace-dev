@@ -8,6 +8,7 @@ export {
   type BotLoginError,
   createAuth,
 } from "./auth.ts";
+export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export type { EventStore } from "./event-store.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {

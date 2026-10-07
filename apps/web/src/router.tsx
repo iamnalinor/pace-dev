@@ -1,22 +1,39 @@
 import { createBrowserRouter } from "react-router";
 
+import { RequireAuth } from "#web/features/auth/require-auth.tsx";
+import { AppLayout } from "#web/layout/app-layout.tsx";
+import { AddPage } from "#web/pages/add-page.tsx";
+import { AppLinkPage } from "#web/pages/app-link-page.tsx";
+import { DayPage } from "#web/pages/day-page.tsx";
+import { InsightsPage } from "#web/pages/insights-page.tsx";
+import { LoginPage } from "#web/pages/login-page.tsx";
+import { NowPage } from "#web/pages/now-page.tsx";
+import { OAuthAuthorizePage } from "#web/pages/oauth-authorize-page.tsx";
+import { ProjectsPage } from "#web/pages/projects-page.tsx";
+import { SettingsPage } from "#web/pages/settings-page.tsx";
 import { RouteError } from "#web/shared/route-error.tsx";
-import { Button } from "#web/shared/ui/button.tsx";
-
-const Home = () => (
-  <main className="grid gap-4 p-6">
-    <h1 className="text-2xl font-semibold">Pace</h1>
-    <Button>Get started</Button>
-  </main>
-);
 
 export const router = createBrowserRouter([
+  { element: <LoginPage />, errorElement: <RouteError />, path: "/login" },
+  { element: <AppLinkPage />, errorElement: <RouteError />, path: "/app/auth" },
+  { element: <OAuthAuthorizePage />, errorElement: <RouteError />, path: "/oauth/authorize" },
   {
     children: [
-      { element: <Home />, index: true },
-      { element: <RouteError />, path: "*" },
+      {
+        children: [
+          { element: <NowPage />, index: true },
+          { element: <DayPage />, path: "day" },
+          { element: <AddPage />, path: "add" },
+          { element: <ProjectsPage />, path: "projects" },
+          { element: <InsightsPage />, path: "insights" },
+          { element: <SettingsPage />, path: "settings" },
+        ],
+        element: <AppLayout />,
+      },
     ],
+    element: <RequireAuth />,
     errorElement: <RouteError />,
     path: "/",
   },
+  { element: <RouteError />, path: "*" },
 ]);

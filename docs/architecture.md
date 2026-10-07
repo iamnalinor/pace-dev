@@ -11,7 +11,7 @@ apps/api (Worker)┴──────────────────► pa
 | Layer | Package | Holds | May import |
 |---|---|---|---|
 | core | `@pace/core` | pure, immutable TypeScript: event schemas, sorting, materializer, reducers, settings, i18n, design tokens, time helpers, `Result`, the zod API contract | its npm deps only (zod, ulidx, date-fns) |
-| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`); in stage 1 the local-first store, outbox/sync loop and view-models; `@pace/client/react` re-exports zustand's `useStore` | core |
+| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`), auth flows (`createAuth`), the local-first event store and app state (`createAppState`), the outbox/sync loop (`createSyncClient`) and `createPaceClient`, which wires them the one way both shells use; the `EventStore`/`SessionStore` ports with memory adapters; `@pace/client/react` adds `createAppHooks` and re-exports zustand's `useStore`; `@pace/client/testing` is the fake `fetch` for every test suite | core |
 | api | `@pace/api` | the Cloudflare Worker: Hono app, auth, bot, sync routes, the `UserStore` Durable Object, D1 schema | core |
 | web | `@pace/web` | React SPA (Vite, Tailwind v4, PWA), deployed as the `pace-web` assets Worker | client, core |
 | app | `@pace/app` | Expo / React Native (expo-router, NativeWind) | client, core |

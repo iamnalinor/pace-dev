@@ -11,12 +11,13 @@ const read = (): null | string => {
   }
 };
 
-const write = (token: null | string): boolean => {
+/** True when localStorage accepted the write. */
+const didPersist = (value: null | string): boolean => {
   try {
-    if (token === null) {
+    if (value === null) {
       localStorage.removeItem(SESSION_KEY);
     } else {
-      localStorage.setItem(SESSION_KEY, token);
+      localStorage.setItem(SESSION_KEY, value);
     }
     return true;
   } catch {
@@ -33,11 +34,11 @@ export const createLocalSessionStore = (): SessionStore => {
   return {
     clear: async () => {
       memory = null;
-      write(null);
+      didPersist(null);
     },
     get: async () => read() ?? memory,
     set: async (token) => {
-      memory = write(token) ? null : token;
+      memory = didPersist(token) ? null : token;
     },
   };
 };

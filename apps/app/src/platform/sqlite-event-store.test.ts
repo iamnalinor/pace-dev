@@ -1,13 +1,12 @@
 import type { Event } from "@pace/core";
 
+import { createSqliteEventStore, SCHEMA_VERSION } from "./sqlite-event-store.ts";
 import { createFakeSqlite } from "./sqlite.fake.ts";
 
-import { createSqliteEventStore, SCHEMA_VERSION } from "./sqlite-event-store.ts";
-
-const fake = createFakeSqlite();
+const mockSqlite = createFakeSqlite();
 
 jest.mock("expo-sqlite", () => ({
-  openDatabaseAsync: async () => fake.database,
+  openDatabaseAsync: async () => mockSqlite.open(),
 }));
 
 const at = (hour: number): string => `2026-10-06T${String(hour).padStart(2, "0")}:00:00.000Z`;
@@ -27,16 +26,16 @@ const a = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), "ru");
 const b = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAB", at(10), "en");
 
 beforeEach(() => {
-  fake.reset();
+  mockSqlite.reset();
 });
 
 describe("createSqliteEventStore", () => {
   it("migrates the schema once and records the version", async () => {
     const store = createSqliteEventStore();
     await store.listAll();
-    expect(fake.userVersion()).toBe(SCHEMA_VERSION);
-    expect(fake.tables()).toEqual(["events", "meta", "pending"]);
-    expect(fake.executed.filter((sql) => sql.includes("journal_mode"))).toHaveLength(1);
+    expect(mockSqlite.userVersion()).toBe(SCHEMA_VERSION);
+    expect(mockSqlite.tables()).toEqual(["events", "meta", "pending"]);
+    expect(mockSqlite.executed.filter((sql) => sql.includes("journal_mode"))).toHaveLength(1);
   });
 
   it("appends idempotently by id and lists everything ordered by occurredAt", async () => {
@@ -48,9 +47,11 @@ describe("createSqliteEventStore", () => {
 
   it("writes a batch inside one exclusive transaction with a prepared statement", async () => {
     const store = createSqliteEventStore();
+    await store.listAll();
+    const migrated = mockSqlite.transactions;
     await store.append([a, b]);
-    expect(fake.transactions).toBe(1);
-    expect(fake.prepared.filter((sql) => sql.includes("INTO events"))).toHaveLength(1);
+    expect(mockSqlite.transactions).toBe(migrated + 1);
+    expect(mockSqlite.prepared.filter((sql) => sql.includes("INTO events"))).toHaveLength(1);
   });
 
   it("keeps appended events pending until they are marked synced", async () => {
@@ -81,6 +82,6 @@ describe("createSqliteEventStore", () => {
   it("opens the database once for every operation", async () => {
     const store = createSqliteEventStore();
     await Promise.all([store.getCursor(), store.listAll(), store.listPending()]);
-    expect(fake.opens).toBe(1);
+    expect(mockSqlite.opens).toBe(1);
   });
 });

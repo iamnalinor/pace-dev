@@ -1,13 +1,14 @@
 {
   "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Mutation testing: can the component tests actually catch bugs? `bun test:mutation` (slow; weekly in CI). Pages, presentational cards and route guards are covered by Playwright, which Stryker does not run, so they are not mutated. Uses the generic `command` runner: @stryker-mutator/vitest-runner 10 does not activate mutants under Vitest 5 (every mutant 'survives').",
+  "_comment": "Mutation testing: can the component tests actually catch bugs? `bun test:mutation` (slow; weekly in CI). Pages, layout, the router and route guards are covered by Playwright, which Stryker does not run, so they are not mutated. Uses the generic `command` runner: @stryker-mutator/vitest-runner 10 does not activate mutants under Vitest 5 (every mutant 'survives').",
   "testRunner": "command",
   "mutate": [
     "src/features/**/*.{ts,tsx}",
-    "src/shared/api/unwrap.ts",
+    "src/shared/lib/**/*.ts",
+    "src/app-state.tsx",
+    "src/i18n.tsx",
+    "src/services.ts",
     "!src/**/*.test.{ts,tsx}",
-    "!src/**/*-page.tsx",
-    "!src/**/*-card.tsx",
     "!src/features/auth/require-auth.tsx"
   ],
   "reporters": ["clear-text", "progress", "html"],

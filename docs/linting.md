@@ -30,8 +30,9 @@ and adds `verbatimModuleSyntax`, `erasableSyntaxOnly` (no `enum`, `namespace` or
 parameter properties: Bun, Vite and Metro strip types without transforming code),
 `noUncheckedSideEffectImports`, `checkJs` and `types: []` (every project lists what it
 needs). `skipLibCheck` is the only concession. `apps/app/tsconfig.json` extends
-`expo/tsconfig.base` instead and re-enables the same strict flags by hand, plus the
-`#app/*` path alias; the web uses the `#web/*` alias through package.json `imports`.
+`expo/tsconfig.base` instead and re-enables the same strict flags by hand. Both apps
+declare their alias (`#web/*`, `#app/*`) through package.json `imports`, which
+TypeScript, Vite, Metro, Jest, eslint, knip and dependency-cruiser all resolve natively.
 
 TypeScript is pinned to **6.0.x** in the catalog: typescript-eslint does not support
 TS 7 yet.

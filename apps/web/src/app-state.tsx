@@ -1,7 +1,8 @@
-import { createContext, type ReactNode, useContext, useEffect } from "react";
+import { createContext, type ReactNode, use, useEffect } from "react";
 import { toast } from "sonner";
 
-import { type AppState, type Auth, type AuthState, type SyncClient, type SyncStatus } from "@pace/client";
+import type { AppState, Auth, AuthState, SyncClient, SyncStatus } from "@pace/client";
+
 import { useStore } from "@pace/client/react";
 import { type Language, t } from "@pace/core";
 
@@ -12,7 +13,7 @@ const SYNC_INTERVAL_MS = 30_000;
 const ServicesContext = createContext<null | PaceServices>(null);
 
 export const useServices = (): PaceServices => {
-  const services = useContext(ServicesContext);
+  const services = use(ServicesContext);
   if (services === null) {
     throw new Error("useServices must be used inside <PaceProvider>");
   }
@@ -50,7 +51,7 @@ const runSyncLoop = (services: PaceServices): (() => void) => {
     isRunning = false;
     sync.stop();
     window.removeEventListener("focus", syncNow);
-    window.removeEventListener("online", syncNow);
+    globalThis.removeEventListener("online", syncNow);
   };
   const start = (): void => {
     if (isRunning) {
@@ -59,14 +60,11 @@ const runSyncLoop = (services: PaceServices): (() => void) => {
     isRunning = true;
     sync.start({ intervalMs: SYNC_INTERVAL_MS });
     window.addEventListener("focus", syncNow);
-    window.addEventListener("online", syncNow);
+    globalThis.addEventListener("online", syncNow);
   };
   const apply = (state: AuthState): void => {
     if (state.status === "signed-in") {
       start();
-      if (state.user === null) {
-        void auth.me();
-      }
     } else {
       stop();
     }
@@ -82,10 +80,12 @@ const runSyncLoop = (services: PaceServices): (() => void) => {
 /** Surfaces every new sync failure once, in the account language. */
 const reportSyncErrors = (services: PaceServices): (() => void) =>
   services.sync.status.subscribe((status, previous) => {
-    if (status.lastError !== null && status.lastError !== previous.lastError) {
-      const language = services.state.store.getState().settings.language;
-      toast.error(t(language, "errors.syncFailed", { reason: status.lastError }));
+    if (status.lastError === null || status.lastError === previous.lastError) {
+      return;
     }
+
+    const language = services.state.store.getState().settings.language;
+    toast.error(t(language, "errors.syncFailed", { reason: status.lastError }));
   });
 
 export const PaceProvider = ({

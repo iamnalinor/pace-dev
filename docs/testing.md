@@ -6,7 +6,7 @@ Every level tests what the others cannot. Behaviour changes start with a failing
 | Level | Tool | Runs against | Where | Command |
 |---|---|---|---|---|
 | Core unit | Vitest, fast-check | pure functions: schemas, materializer, reducers, i18n, tokens | `packages/core/src/**/*.test.ts` | `bun test:unit` |
-| Client unit | Vitest | the API client with a fake `fetch` | `packages/client/src/**/*.test.ts` | `bun test:unit` |
+| Client unit | Vitest | API client, auth, app state and sync on memory adapters and the fake `fetch` from `@pace/client/testing` | `packages/client/src/**/*.test.ts` | `bun test:unit` |
 | Web component | Vitest, React Testing Library, jsdom | components with logic | `apps/web/src/**/*.test.{ts,tsx}` | `bun test:unit` |
 | API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
 | App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |

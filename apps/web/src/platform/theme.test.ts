@@ -1,6 +1,12 @@
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { applyTheme, readThemePreference, setThemePreference } from "./theme.ts";
+import {
+  applyTheme,
+  readThemePreference,
+  setThemePreference,
+  useThemePreference,
+} from "./theme.ts";
 
 describe("theme preference", () => {
   beforeEach(() => {
@@ -41,5 +47,23 @@ describe("theme preference", () => {
     setThemePreference("dark");
     applyTheme();
     expect(document.documentElement.dataset["theme"]).toBe("dark");
+  });
+});
+
+describe("useThemePreference", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    delete document.documentElement.dataset["theme"];
+  });
+
+  it("keeps every subscriber in sync when one of them changes the theme", () => {
+    const first = renderHook(() => useThemePreference());
+    const second = renderHook(() => useThemePreference());
+    act(() => {
+      first.result.current[1]("light");
+    });
+    expect(second.result.current[0]).toBe("light");
+    expect(document.documentElement.dataset["theme"]).toBe("light");
+    expect(readThemePreference()).toBe("light");
   });
 });

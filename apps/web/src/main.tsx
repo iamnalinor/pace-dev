@@ -6,8 +6,15 @@ import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
+import { Toaster } from "sonner";
 
+import { PaceProvider } from "./app-state.tsx";
+import { applyTheme } from "./platform/theme.ts";
 import { router } from "./router.tsx";
+import { createWebServices } from "./services.ts";
+
+// Before the first paint, so a stored theme never flashes the system one.
+applyTheme();
 
 const root = document.querySelector("#root");
 if (root === null) {
@@ -16,6 +23,9 @@ if (root === null) {
 
 createRoot(root).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <PaceProvider services={createWebServices()}>
+      <RouterProvider router={router} />
+      <Toaster position="top-center" />
+    </PaceProvider>
   </StrictMode>,
 );

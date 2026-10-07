@@ -53,7 +53,7 @@ describe("PaceProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auth")).toHaveTextContent("signed-out");
     });
-    window.dispatchEvent(new Event("focus"));
+    globalThis.dispatchEvent(new Event("focus"));
     await new Promise((resolve) => {
       setTimeout(resolve, 20);
     });
@@ -69,19 +69,17 @@ describe("PaceProvider", () => {
       expect(api.calls.some((call) => call.path === "/api/sync/pull")).toBe(true);
     });
     const pulls = api.calls.filter((call) => call.path === "/api/sync/pull").length;
-    window.dispatchEvent(new Event("focus"));
+    globalThis.dispatchEvent(new Event("focus"));
     await waitFor(() => {
-      expect(api.calls.filter((call) => call.path === "/api/sync/pull").length).toBe(pulls + 1);
+      expect(api.calls.filter((call) => call.path === "/api/sync/pull")).toHaveLength(pulls + 1);
     });
   });
 
   it("shows a toast when a sync fails", async () => {
     const { services } = createTestServices({
       routes: {
-        "GET /api/sync/pull": () => ({
-          body: { code: "boom", message: "Server exploded" },
-          status: 500,
-        }),
+        "GET /api/sync/pull": () =>
+          Response.json({ code: "boom", message: "Server exploded" }, { status: 500 }),
       },
       session: await signedInSession(),
     });

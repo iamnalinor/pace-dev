@@ -153,7 +153,15 @@ const config = {
   options: {
     builtInModules: {
       add: [],
-      override: [...builtinModules, "bun", "bun:test", "cloudflare:workers", "cloudflare:test"],
+      // `builtinModules` omits the modules that only exist under the `node:` scheme.
+      override: [
+        ...builtinModules,
+        "node:sqlite",
+        "bun",
+        "bun:test",
+        "cloudflare:workers",
+        "cloudflare:test",
+      ],
     },
     doNotFollow: { path: ["node_modules"] },
     exclude: {

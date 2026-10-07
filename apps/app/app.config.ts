@@ -116,7 +116,11 @@ const config: ExpoConfig = {
   // No OTA updates: releases ship as APKs through GitHub Releases.
   updates: { enabled: false },
   experiments: { typedRoutes: true },
-  extra: { apiUrl: envString("EXPO_PUBLIC_API_URL") ?? "https://pace-api.nalinor.dev" },
+  extra: {
+    apiUrl: envString("EXPO_PUBLIC_API_URL") ?? "https://pace-api.nalinor.dev",
+    // The web app, opened for the browser login fallback (`src/platform/api-base.ts`).
+    webOrigin: envString("EXPO_PUBLIC_WEB_ORIGIN") ?? "https://pace.nalinor.dev",
+  },
 };
 
 export default config;

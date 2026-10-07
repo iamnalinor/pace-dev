@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/client.ts",
-    "./react": "./src/react.ts"
+    "./react": "./src/react.ts",
+    "./testing": "./src/fake-fetch.fake.ts"
   },
   "scripts": {
     "test": "vitest run --coverage"

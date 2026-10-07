@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "main": "expo-router/entry",
+  "imports": {
+    "#app/*": "./src/*"
+  },
   "scripts": {
     "dev": "expo start",
     "android": "expo run:android",
@@ -58,7 +61,10 @@
       "<rootDir>/jest.setup.ts"
     ],
     "moduleNameMapper": {
-      "^#app/(.*)$": "<rootDir>/src/$1"
+      "^react$": "<rootDir>/node_modules/react",
+      "^react/(.*)$": "<rootDir>/node_modules/react/$1",
+      "^zustand$": "<rootDir>/node_modules/zustand",
+      "^zustand/(.*)$": "<rootDir>/node_modules/zustand/$1"
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(.bun|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|lucide-react-native|nativewind))",

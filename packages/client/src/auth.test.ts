@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "./api-client.ts";
 import { type Auth, createAuth } from "./auth.ts";
-import { createFakeFetch, type FakeRoute, problem, user } from "./fake-fetch.fake.ts";
+import { createFakeFetch, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
 import { createMemorySessionStore, type SessionStore } from "./session.ts";
 
 const setup = async (
@@ -53,22 +53,22 @@ describe("createAuth session", () => {
   });
 
   it("me() caches the user", async () => {
-    const { auth } = await setup({ "GET /api/me": () => user }, "ok");
-    await expect(auth.me()).resolves.toEqual({ ok: true, value: user });
-    expect(auth.store.getState()).toEqual({ status: "signed-in", user });
+    const { auth } = await setup({ "GET /api/me": () => fakeUser }, "ok");
+    await expect(auth.me()).resolves.toEqual({ ok: true, value: fakeUser });
+    expect(auth.store.getState()).toEqual({ status: "signed-in", user: fakeUser });
   });
 });
 
 describe("createAuth login", () => {
   it("loginWithDev stores the token", async () => {
     const { auth, calls, session } = await setup({
-      "POST /api/auth/dev": () => ({ token: "dev-token", user }),
+      "POST /api/auth/dev": () => ({ token: "dev-token", user: fakeUser }),
     });
-    await expect(auth.loginWithDev("1")).resolves.toEqual({ ok: true, value: user });
+    await expect(auth.loginWithDev("1")).resolves.toEqual({ ok: true, value: fakeUser });
     expect(calls[0]?.body).toEqual({ telegramId: "1" });
     expect(auth.token()).toBe("dev-token");
     await expect(session.get()).resolves.toBe("dev-token");
-    expect(auth.store.getState()).toEqual({ status: "signed-in", user });
+    expect(auth.store.getState()).toEqual({ status: "signed-in", user: fakeUser });
   });
 
   it("loginWithTelegram maps API failures to their code and transport failures to network", async () => {
@@ -89,10 +89,12 @@ describe("createAuth login", () => {
       error: "network",
       ok: false,
     });
-    const granted = await setup({ "POST /api/auth/telegram": () => ({ token: "w", user }) });
+    const granted = await setup({
+      "POST /api/auth/telegram": () => ({ token: "w", user: fakeUser }),
+    });
     await expect(granted.auth.loginWithTelegram(widget)).resolves.toEqual({
       ok: true,
-      value: user,
+      value: fakeUser,
     });
     expect(granted.auth.token()).toBe("w");
   });
@@ -114,7 +116,9 @@ describe("createAuth bot login", () => {
     const { auth, session } = await setup({
       "GET /api/auth/nonce/n1": () => {
         polls += 1;
-        return polls < 3 ? { status: "pending" } : { status: "ready", token: "bot", user };
+        return polls < 3
+          ? { status: "pending" }
+          : { status: "ready", token: "bot", user: fakeUser };
       },
       "POST /api/auth/nonce": nonceRoute,
     });
@@ -123,7 +127,7 @@ describe("createAuth bot login", () => {
     expect(login.deepLink).toContain("login_n1");
     const waiting = login.waitForToken({ intervalMs: 100, timeoutMs: 10_000 });
     await vi.advanceTimersByTimeAsync(250);
-    await expect(waiting).resolves.toEqual({ ok: true, value: user });
+    await expect(waiting).resolves.toEqual({ ok: true, value: fakeUser });
     expect(polls).toBe(3);
     expect(auth.token()).toBe("bot");
     await expect(session.get()).resolves.toBe("bot");
@@ -192,5 +196,36 @@ describe("createAuth logout", () => {
     expect(auth.token()).toBeUndefined();
     await expect(session.get()).resolves.toBeNull();
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+});
+
+describe("adoptToken", () => {
+  it("stores a token minted elsewhere and loads the user behind it", async () => {
+    const { auth, calls, session } = await setup({ "GET /api/me": () => fakeUser });
+    await expect(auth.adoptToken("tok_web")).resolves.toEqual({ ok: true, value: fakeUser });
+    expect(auth.token()).toBe("tok_web");
+    await expect(session.get()).resolves.toBe("tok_web");
+    expect(auth.store.getState()).toEqual({ status: "signed-in", user: fakeUser });
+    expect(calls.map((call) => call.path)).toEqual(["/api/me"]);
+  });
+
+  it("leaves the device signed out when the server rejects the token", async () => {
+    const { auth, session } = await setup({ "GET /api/me": () => problem(401, "auth/invalid") });
+    await expect(auth.adoptToken("tok_bad")).resolves.toEqual({ error: "auth/invalid", ok: false });
+    expect(auth.token()).toBeUndefined();
+    await expect(session.get()).resolves.toBeNull();
+    expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
+  it("drops the token again when the user cannot be loaded", async () => {
+    const { auth, session } = await setup({
+      "GET /api/me": () => {
+        throw new TypeError("offline");
+      },
+    });
+    await expect(auth.adoptToken("tok_offline")).resolves.toEqual({ error: "network", ok: false });
+    expect(auth.token()).toBeUndefined();
+    await expect(session.get()).resolves.toBeNull();
+    expect(auth.store.getState().status).toBe("signed-out");
   });
 });

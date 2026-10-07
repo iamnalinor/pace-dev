@@ -1,9 +1,10 @@
 export const DEVICE_ID_KEY = "pace.device";
 
-const randomId = (): string =>
-  typeof crypto.randomUUID === "function"
-    ? `web-${crypto.randomUUID()}`
-    : `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const randomId = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `web-${hex}`;
+};
 
 /** A stable id for this browser profile; events record which device emitted them. */
 export const readDeviceId = (): string => {

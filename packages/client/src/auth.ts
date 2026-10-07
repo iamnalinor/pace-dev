@@ -43,6 +43,11 @@ export type Auth = {
   readonly logout: () => Promise<void>;
   /** Fetches the signed-in user; a 401 signs out locally. */
   readonly me: () => Promise<Result<User, string>>;
+  /**
+   * Signs in with a token minted outside these flows (a browser fallback, an App Link) by
+   * loading the user behind it; a token the server rejects leaves the device signed out.
+   */
+  readonly adoptToken: (token: string) => Promise<Result<User, string>>;
 };
 
 const errorCode = (error: unknown): string => (error instanceof ApiError ? error.code : "network");
@@ -85,6 +90,8 @@ type Session = {
   readonly token: () => string | undefined;
   readonly signIn: (granted: Granted) => Promise<User>;
   readonly signOut: () => Promise<void>;
+  /** Remembers a token whose user is not known yet. */
+  readonly adopt: (token: string) => Promise<void>;
 };
 
 /** The in-memory token (read synchronously by the API client) mirrored to the session store. */
@@ -92,6 +99,11 @@ const createSession = (sessionStore: SessionStore): Session => {
   const store = createStore<AuthState>(() => ({ status: "loading", user: null }));
   let cached: string | undefined;
   return {
+    adopt: async (token) => {
+      cached = token;
+      await sessionStore.set(token);
+      store.setState({ status: "signed-in", user: null });
+    },
     ready: (async (): Promise<void> => {
       cached = (await sessionStore.get()) ?? undefined;
       store.setState({ status: cached === undefined ? "signed-out" : "signed-in" });
@@ -144,7 +156,28 @@ export const createAuth = (options: {
     }
   };
 
+  const me = async (): Promise<Result<User, string>> => {
+    try {
+      const user = await api.call(endpoints.me, {});
+      session.store.setState({ status: "signed-in", user });
+      return ok(user);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await session.signOut();
+      }
+      return err(errorCode(error));
+    }
+  };
+
   return {
+    adoptToken: async (token) => {
+      await session.adopt(token);
+      const result = await me();
+      if (!result.ok) {
+        await session.signOut();
+      }
+      return result;
+    },
     loginWithDev: async (telegramId) =>
       await login(async () => await api.call(endpoints.auth.dev, { body: { telegramId } })),
     loginWithTelegram: async (payload) =>
@@ -158,18 +191,7 @@ export const createAuth = (options: {
         await session.signOut();
       }
     },
-    me: async () => {
-      try {
-        const user = await api.call(endpoints.me, {});
-        session.store.setState({ status: "signed-in", user });
-        return ok(user);
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
-          await session.signOut();
-        }
-        return err(errorCode(error));
-      }
-    },
+    me,
     ready: session.ready,
     startBotLogin: async () => {
       const created = await api.call(endpoints.auth.nonceCreate, {});
