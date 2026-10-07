@@ -77,7 +77,7 @@ answer is the same the web app shows.
 | `list_review` | read | the "to sort" block: finished-looking tasks, passed deadlines, stale inbox items, automatic outcomes to confirm, with their action keys | — |
 | `search` | read | full-text over titles, descriptions, source texts, subtask labels and project names → `{ results: [{ id, title, url }] }` | `query` |
 | `fetch` | read | the task or project document → `{ id, title, text, url, metadata }` | `id` |
-| `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
+| `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
 | `capture_inbox` | write | a verbatim text into the inbox | `text` |
 | `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted) | `taskId`, `subtaskIds?` or `numbers?` |
 | `submit` | write | per-subtask presets: sends the solved, unsubmitted problems and closes when none remain; whole-submission presets: submits and closes as done | `taskId`, `subtaskIds?` |

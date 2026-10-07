@@ -5,25 +5,19 @@ import {
   err,
   type Importance,
   isOpen,
-  minutesBetween,
   type NowItem,
+  nowItem,
   ok,
   presetById,
-  progressOf,
   type Project,
-  type ResolvedPreset,
   resolvePreset,
   type Result,
-  type Score,
-  solvedCount,
-  submittedCount,
   type Task,
+  taskById,
   taskOutcome,
-  type TaskView,
-  taskView,
 } from "@pace/core";
 
-import type { Scope, ToolFailure } from "./tool-kit.ts";
+import { describeCode, type Scope, type ToolFailure } from "./tool-kit.ts";
 
 /** The shapes the tools answer with for tasks and projects, and the renderers behind them. */
 
@@ -80,75 +74,48 @@ export const ProjectRowSchema = z.object({
 
 export type ProjectRow = z.output<typeof ProjectRowSchema>;
 
-type RowSource = {
-  readonly task: Task;
-  readonly preset: ResolvedPreset;
-  readonly project: null | Project;
-  readonly importance: Importance;
-  readonly score: Score;
-  readonly progress: number;
-  readonly lateMinutes: null | number;
-};
-
 const presetNameOf = (state: CoreState, task: Task): string =>
   presetById(state.presets, task.presetId)?.name ?? task.presetId;
 
-const toRow = (scope: Scope, source: RowSource): TaskRow => {
-  const { task } = source;
+/** A Now-list item as a row: the task's own deadline next to the effective one the score used. */
+export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => {
+  const { task } = item;
   return {
     dueAt: task.dueAt,
     dueTz: task.dueTz,
-    effectiveDueAt: source.score.effectiveDue,
+    effectiveDueAt: item.score.effectiveDue,
     estimateMinutes: task.estimateMinutes,
     id: task.id,
-    importance: source.importance,
-    isLate: source.lateMinutes !== null,
-    lateMinutes: source.lateMinutes,
-    outcome: taskOutcome(task, source.preset),
+    importance: item.importance,
+    isLate: item.isLate,
+    lateMinutes: item.lateMinutes,
+    outcome: taskOutcome(task, item.preset),
     presetId: task.presetId,
     presetName: presetNameOf(scope.state, task),
-    progress: source.progress,
+    progress: item.progress,
     projectId: task.projectId,
-    projectName: source.project?.name ?? null,
-    score: source.score.score,
-    solved: solvedCount(task),
+    projectName: item.project?.name ?? null,
+    score: item.score.score,
+    solved: item.solved,
     startAt: task.startAt,
     status: task.status,
-    submitted: submittedCount(task),
+    submitted: item.submitted,
     title: task.title,
-    total: task.subtasks.length,
+    total: item.total,
     url: taskUrl(scope.webOrigin, task.id),
   };
 };
 
-/** Minutes past the explicit deadline, or null while on time or without one. */
-const lateMinutesOf = (task: Task, now: string): null | number => {
-  if (task.dueAt === null) {
-    return null;
-  }
-  const minutes = minutesBetween(task.dueAt, now);
-  return minutes > 0 ? minutes : null;
-};
+const problem = (code: string): ToolFailure => ({ code, message: describeCode(code) });
 
-export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => toRow(scope, item);
-
-export const rowFromView = (scope: Scope, view: TaskView): TaskRow =>
-  toRow(scope, {
-    importance: view.importance,
-    lateMinutes: lateMinutesOf(view.task, scope.qctx.now),
-    preset: view.preset,
-    progress: progressOf(view.task, view.preset.progressMode),
-    project: view.project,
-    score: view.explanation.score,
-    task: view.task,
-  });
-
-/** One task as a row, through the task view (so the score and outcome are the screen's). */
+/** One task as a row, scored exactly as the Now list scores it (closed tasks included). */
 export const taskRow = (scope: Scope, taskId: string): Result<TaskRow, ToolFailure> => {
-  const view = taskView(scope.state, taskId, scope.qctx);
-  return view.ok
-    ? ok(rowFromView(scope, view.value))
-    : err({ code: view.error, message: view.error });
+  const task = taskById(scope.state.tasks, taskId);
+  if (task === undefined) {
+    return err(problem("task/unknown"));
+  }
+  const item = nowItem(scope.state, task, scope.qctx);
+  return item.ok ? ok(rowFromItem(scope, item.value)) : err(problem(item.error));
 };
 
 /** The row of a task that is known to exist and resolve (after a successful write). */

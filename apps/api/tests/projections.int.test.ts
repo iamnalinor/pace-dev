@@ -7,6 +7,7 @@ import { type EventInput, newId } from "@pace/core";
 import type { UserStore } from "../src/user-store/user-store.ts";
 
 import * as schema from "../src/user-store/schema.ts";
+import { json, loginAsDev } from "./helpers.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 
@@ -122,6 +123,21 @@ describe("projections", () => {
     expect(Object.keys(read.state.tasks.byId)).toContain(taskId);
     expect(read.seq).toBe(1);
   });
+
+  it("rebuilds in canonical order when an event arrives with an earlier occurredAt", async () => {
+    const stub = freshStore();
+    const taskId = newId();
+    const importance = (value: string, occurredAt: string): Raw =>
+      envelope("task.importance.set", { importance: value, taskId }, { occurredAt });
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([taskCreated(taskId), importance("asap", SOLVED_AT)], { now: NOW });
+      // Recorded later but happened earlier: folded on top it would win, in order it loses.
+      await instance.append([importance("normal", EARLIER)], { now: NOW });
+      const [task] = await instance.db.select().from(schema.tasks);
+      expect(task?.importance).toBe("asap");
+    });
+    expect((await stub.read(NOW)).state.tasks.byId[taskId]?.importance).toBe("asap");
+  });
 });
 
 describe("derive", () => {
@@ -155,6 +171,39 @@ describe("derive", () => {
       });
       const [task] = await instance.db.select().from(schema.tasks);
       expect(task?.presetId).toBe("hw.test");
+    });
+  });
+
+  it("derives the instance after a client's sync push as well", async () => {
+    const token = await loginAsDev("1002");
+    const presetId = `hw.${newId().toLowerCase()}`;
+    const pushed = await json<{ accepted: string[] }>("/api/sync/push", {
+      body: {
+        events: [
+          envelope("preset.created", {
+            definition: {
+              recurrence: {
+                due: { time: "23:59", weekday: 7 },
+                issued: { time: "00:00", weekday: 1 },
+                tz: "UTC",
+              },
+            },
+            extends: "hw",
+            id: presetId,
+            name: "Pushed HW",
+          }),
+        ],
+      },
+      token,
+    });
+    expect(pushed.accepted).toHaveLength(1);
+    const pulled = await json<{ events: { id: string; source: string; type: string }[] }>(
+      "/api/sync/pull",
+      { token },
+    );
+    expect(pulled.events.find((event) => event.id.startsWith(`hw:${presetId}:`))).toMatchObject({
+      source: "system",
+      type: "task.created",
     });
   });
 

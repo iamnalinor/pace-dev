@@ -1,7 +1,7 @@
 # Pace
 
 A personal task and time tracker that runs at your own pace: an Android app, a web app,
-a Telegram bot and (planned) an MCP server so Claude, ChatGPT and other assistants can
+a Telegram bot and an MCP server so Claude, ChatGPT and other assistants can
 read and change your tasks. Everything you do is an **immutable event**; every client
 keeps its own copy of the log (**local-first**) and syncs it to a **Cloudflare Worker**
 that fits in the free tier. One TypeScript code base runs the same business rules on the
@@ -28,7 +28,7 @@ apps/web (Vite + React) ──┼─► packages/client ─► apps/api (Cloudfl
 packages/core ◄───────────┘                        ├─ D1 "pace": users, sessions, login_nonces
   events + payload schemas, sort, materialize,     ├─ Durable Object UserStore (SQLite, one per user):
   settings reducer, i18n (en/ru), design tokens,   │    events, observations, decisions, meta
-  zod API contract (endpoints)                     └─ KV OAUTH_KV (reserved for the MCP OAuth provider)
+  zod API contract (endpoints)                     └─ KV OAUTH_KV (MCP OAuth clients, grants, tokens)
 ```
 
 - `packages/core` is pure TypeScript (no I/O, no React) and is the only thing every
@@ -151,7 +151,7 @@ Deployments for other people: edit `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAM
 | Worker | `pace-api` | custom domain `pace-api.nalinor.dev`, `nodejs_compat`, observability on |
 | Worker (static assets) | `pace-web` | `apps/web/wrangler.jsonc`, serves `apps/web/dist` with SPA fallback, custom domain `pace.nalinor.dev` |
 | D1 | `pace` → binding `DB` | migrations in `apps/api/drizzle/d1`; `database_id` in `wrangler.jsonc` is a placeholder until `wrangler d1 create pace` |
-| KV | binding `OAUTH_KV` | reserved for the MCP OAuth provider (stage 1) |
+| KV | binding `OAUTH_KV` | the MCP OAuth provider's clients, grants and tokens |
 | Durable Object | class `UserStore` → binding `USER_STORE` | SQLite-backed, migration tag `v1` |
 
 Create them once (`bunx wrangler d1 create pace`, `bunx wrangler kv namespace create OAUTH_KV`),

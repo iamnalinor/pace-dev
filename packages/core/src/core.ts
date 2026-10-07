@@ -208,6 +208,7 @@ export {
 } from "./presets/resolve-preset.ts";
 export { accountTz, type QueryContext } from "./queries/context.ts";
 export { type InboxItem, inboxList, UNSORTED_TOO_LONG_MINUTES } from "./queries/inbox.ts";
+export { nowItem } from "./queries/now-item.ts";
 export { type NowItem, type NowList, nowList, type NowListOptions } from "./queries/now-list.ts";
 export {
   type DoneItem,

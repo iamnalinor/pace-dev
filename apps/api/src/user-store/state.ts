@@ -118,7 +118,7 @@ const idsOf = (events: readonly Event[], key: keyof Touched): ReadonlySet<string
   new Set(
     events
       .map((event) => entityOf(event))
-      .filter((entity): entity is Entity => entity !== undefined && entity[0] === key)
+      .filter((entity): entity is Entity => entity?.[0] === key)
       .map((entity) => entity[1]),
   );
 
@@ -187,7 +187,7 @@ export const prepareBatch = (
 
 const toRpcTask = (task: Task): RpcTask => {
   const overrides = task.overrides === null ? null : parsePresetDefinition(task.overrides);
-  return { ...task, overrides: overrides !== null && overrides.ok ? overrides.value : null };
+  return { ...task, overrides: overrides?.ok ? overrides.value : null };
 };
 
 /** The state as it crosses RPC: overrides validated into their typed shape (see `RpcState`). */

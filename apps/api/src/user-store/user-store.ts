@@ -126,6 +126,68 @@ export class UserStore extends DurableObject {
     });
   }
 
+  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
+    const events = inputs.flatMap((input) => {
+      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
+      return parsed.ok ? [parsed.value] : [];
+    });
+    return await this.#insert(events);
+  }
+
+  /** The cached state, rebuilt from the log when the cache is missing or behind it. */
+  async #current(): Promise<Materialized> {
+    const seq = await latestSeq(this.db);
+    if (this.#cache?.seq === seq) {
+      return this.#cache;
+    }
+    const rebuilt = rebuild({ events: await loadLog(this.db), seq });
+    await rewriteProjections(this.db, rebuilt.state);
+    this.#cache = rebuilt;
+    return rebuilt;
+  }
+
+  /** Inserts the events whose id is new to the log (and to this batch), in order. */
+  async #insertNew(
+    events: readonly Event[],
+    known: ReadonlySet<string>,
+  ): Promise<readonly Event[]> {
+    const inserted: Event[] = [];
+    for (const event of events) {
+      if (known.has(event.id) || inserted.some((seen) => seen.id === event.id)) {
+        continue;
+      }
+      await this.db
+        .insert(schema.events)
+        .values({ ...event, payload: JSON.stringify(event.payload) })
+        .onConflictDoNothing({ target: schema.events.id });
+      inserted.push(event);
+    }
+    return inserted;
+  }
+
+  /**
+  The one write path: inserts what is new (known ids are skipped), then folds the new
+  events into the cache and the projections, incrementally when the batch is in order
+  and from scratch otherwise.
+  */
+  async #insert(events: readonly Event[]): Promise<readonly Event[]> {
+    const before = await this.#current();
+    const inserted = await this.#insertNew(events, before.ids);
+    if (inserted.length === 0) {
+      return inserted;
+    }
+    const seq = await latestSeq(this.db);
+    if (canApplyInOrder(before, inserted)) {
+      const next = applyInOrder(before, inserted, seq);
+      await updateProjections(this.db, next.state, touchedBy(inserted));
+      this.#cache = next;
+    } else {
+      this.#cache = undefined;
+      await this.#current();
+    }
+    return inserted;
+  }
+
   /** Smoke check used by tests: the schema is in place. */
   async countEvents(): Promise<number> {
     const rows = await this.db.select({ seq: schema.events.seq }).from(schema.events);
@@ -255,67 +317,5 @@ export class UserStore extends DurableObject {
       now,
     );
     return [...instances, ...outcomes].map((event) => event.id);
-  }
-
-  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
-    const events = inputs.flatMap((input) => {
-      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
-      return parsed.ok ? [parsed.value] : [];
-    });
-    return await this.#insert(events);
-  }
-
-  /** The cached state, rebuilt from the log when the cache is missing or behind it. */
-  async #current(): Promise<Materialized> {
-    const seq = await latestSeq(this.db);
-    if (this.#cache?.seq === seq) {
-      return this.#cache;
-    }
-    const rebuilt = rebuild({ events: await loadLog(this.db), seq });
-    await rewriteProjections(this.db, rebuilt.state);
-    this.#cache = rebuilt;
-    return rebuilt;
-  }
-
-  /** Inserts the events whose id is new to the log (and to this batch), in order. */
-  async #insertNew(
-    events: readonly Event[],
-    known: ReadonlySet<string>,
-  ): Promise<readonly Event[]> {
-    const inserted: Event[] = [];
-    for (const event of events) {
-      if (known.has(event.id) || inserted.some((seen) => seen.id === event.id)) {
-        continue;
-      }
-      await this.db
-        .insert(schema.events)
-        .values({ ...event, payload: JSON.stringify(event.payload) })
-        .onConflictDoNothing({ target: schema.events.id });
-      inserted.push(event);
-    }
-    return inserted;
-  }
-
-  /**
-  The one write path: inserts what is new (known ids are skipped), then folds the new
-  events into the cache and the projections, incrementally when the batch is in order
-  and from scratch otherwise.
-  */
-  async #insert(events: readonly Event[]): Promise<readonly Event[]> {
-    const before = await this.#current();
-    const inserted = await this.#insertNew(events, before.ids);
-    if (inserted.length === 0) {
-      return inserted;
-    }
-    const seq = await latestSeq(this.db);
-    if (canApplyInOrder(before, inserted)) {
-      const next = applyInOrder(before, inserted, seq);
-      await updateProjections(this.db, next.state, touchedBy(inserted));
-      this.#cache = next;
-    } else {
-      this.#cache = undefined;
-      await this.#current();
-    }
-    return inserted;
   }
 }

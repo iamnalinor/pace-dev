@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { err, ok, taskView } from "@pace/core";
+import { err, ok, type TaskView, taskView } from "@pace/core";
 
 import { defineTool } from "../registry.ts";
-import { describeRow, rowFromView, TaskRowSchema } from "../rows.ts";
-import { describeCode, runRead } from "../tool-kit.ts";
+import { describeRow, type TaskRow, taskRow, TaskRowSchema } from "../rows.ts";
+import { describeCode, type Rendered, runRead } from "../tool-kit.ts";
 
 const SubtaskSchema = z.object({
   id: z.string(),
@@ -46,6 +46,44 @@ const SubmitPreviewSchema = z.object({
   subtaskIds: z.array(z.string()).optional(),
 });
 
+/** The task screen as structured data, with the row the list tools answer on top. */
+const render = (view: TaskView, row: TaskRow): Rendered => {
+  const { task, explanation } = view;
+  return {
+    structured: {
+      ...row,
+      closed: task.closed,
+      createdAt: task.createdAt,
+      description: task.description,
+      explanation: {
+        formula: explanation.formula,
+        inputs: explanation.inputs,
+        policy: explanation.policy,
+        steps: explanation.steps,
+      },
+      overrides: task.overrides,
+      rank: view.rank,
+      slider: task.slider,
+      sourceText: task.sourceText,
+      startTz: task.startTz,
+      submitPreview: view.submitPreview,
+      subtasks: task.subtasks,
+      waitingMinutes: task.waitingMinutes,
+      windowElapsed: view.windowElapsed,
+      workLeftMinutes: view.workLeftMinutes,
+    },
+    summary: [
+      describeRow(row),
+      `Status ${task.status}; progress ${Math.round(row.progress * 100)}%; score ${row.score.toFixed(2)} (${explanation.policy}).`,
+      ...(task.closed === null ? [] : [`Closed: ${task.closed.outcome} at ${task.closed.at}.`]),
+      ...task.subtasks.map(
+        (item) =>
+          `- ${item.solvedAt === null ? "[ ]" : "[x]"} ${item.label} (${item.id})${item.submittedAt === null ? "" : " submitted"}`,
+      ),
+    ].join("\n"),
+  };
+};
+
 export const taskTool = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
@@ -56,41 +94,8 @@ export const taskTool = defineTool({
       if (!view.ok) {
         return err({ code: view.error, message: describeCode(view.error) });
       }
-      const { task, explanation } = view.value;
-      const row = rowFromView(scope, view.value);
-      return ok({
-        structured: {
-          ...row,
-          closed: task.closed,
-          createdAt: task.createdAt,
-          description: task.description,
-          explanation: {
-            formula: explanation.formula,
-            inputs: explanation.inputs,
-            policy: explanation.policy,
-            steps: explanation.steps,
-          },
-          overrides: task.overrides,
-          rank: view.value.rank,
-          slider: task.slider,
-          sourceText: task.sourceText,
-          startTz: task.startTz,
-          submitPreview: view.value.submitPreview,
-          subtasks: task.subtasks,
-          waitingMinutes: task.waitingMinutes,
-          windowElapsed: view.value.windowElapsed,
-          workLeftMinutes: view.value.workLeftMinutes,
-        },
-        summary: [
-          describeRow(row),
-          `Status ${task.status}; progress ${Math.round(row.progress * 100)}%; score ${row.score.toFixed(2)} (${explanation.policy}).`,
-          ...(task.closed === null ? [] : [`Closed: ${task.closed.outcome} at ${task.closed.at}.`]),
-          ...task.subtasks.map(
-            (item) =>
-              `- ${item.solvedAt === null ? "[ ]" : "[x]"} ${item.label} (${item.id})${item.submittedAt === null ? "" : " submitted"}`,
-          ),
-        ].join("\n"),
-      });
+      const row = taskRow(scope, args.id);
+      return row.ok ? ok(render(view.value, row.value)) : row;
     }),
   input: { id: z.string().min(1).describe("The task id.") },
   name: "get_task",

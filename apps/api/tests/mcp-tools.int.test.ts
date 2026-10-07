@@ -21,7 +21,14 @@ type ToolResult = {
   structuredContent?: Record<string, unknown>;
 };
 type PullResult = {
-  events: { id: string; type: string; source: string; payload: Record<string, unknown> }[];
+  events: {
+    id: string;
+    type: string;
+    source: string;
+    occurredAt: string;
+    precision: string;
+    payload: Record<string, unknown>;
+  }[];
   seq: number;
 };
 type Row = Record<string, unknown>;
@@ -111,13 +118,14 @@ describe("MCP tools catalogue", () => {
     );
     const scopeOf = (name: string) => TOOLS.find((item) => item.name === name)?.scope;
     for (const tool of tools) {
-      expect(tool.annotations?.readOnlyHint).toBe(scopeOf(tool.name) === "tasks:read");
+      const scope = scopeOf(tool.name);
+      expect(tool.annotations?.readOnlyHint).toBe(scope === "tasks:read");
       expect(tool.description?.length ?? 0).toBeGreaterThan(40);
-    }
-    for (const tool of tools.filter((item) => scopeOf(item.name) === "tasks:write")) {
-      expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(
-        expect.arrayContaining(["at", "precision", "dryRun"]),
-      );
+      if (scope === "tasks:write") {
+        expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(
+          expect.arrayContaining(["at", "precision", "dryRun"]),
+        );
+      }
     }
   });
 });
@@ -303,6 +311,39 @@ describe("progress and closing", () => {
       "subtask/unknown",
     );
     expect(await errorText(token, "get_task", { id: "ghost" })).toContain("task/unknown");
+  });
+});
+
+describe("at and precision", () => {
+  const HOUR = 3_600_000;
+  const hoursFromNow = (hours: number): string => new Date(Date.now() + hours * HOUR).toISOString();
+
+  it("records a retroactive instant with its precision and refuses what the retro rules forbid", async () => {
+    const token = await readWriteToken();
+    const taskId = await createTask(token, {
+      at: hoursFromNow(-2),
+      presetId: "hw",
+      subtasks: ["1", "2"],
+      title: "Sheet",
+    });
+    const at = hoursFromNow(-1);
+    const marked = await okTool(token, "mark_subtasks", {
+      at,
+      numbers: [1],
+      precision: "approx",
+      taskId,
+    });
+    const [solve] = rows(marked["events"]);
+    expect(solve).toMatchObject({ occurredAt: at, type: "task.subtask.solved" });
+    const stored = (await pull()).events.find((event) => event.id === solve?.["id"]);
+    expect(stored).toMatchObject({ occurredAt: at, precision: "approx", source: "mcp" });
+    expect(
+      await errorText(token, "mark_subtasks", { at: hoursFromNow(-3), numbers: [2], taskId }),
+    ).toContain("retro/before-created");
+    expect(
+      await errorText(token, "mark_subtasks", { at: hoursFromNow(24), numbers: [2], taskId }),
+    ).toContain("retro/future");
+    expect(await okTool(token, "get_task", { id: taskId })).toMatchObject({ solved: 1 });
   });
 });
 

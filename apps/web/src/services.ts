@@ -1,4 +1,5 @@
 import {
+  type Clock,
   createPaceClient,
   type EventStore,
   type PaceClient,
@@ -20,6 +21,8 @@ export type PaceServices = PaceClient & {
 export type ServiceDeps = {
   readonly baseUrl: string;
   readonly botUsername: string;
+  /** Defaults to the system clock; tests pass a frozen one. */
+  readonly clock?: Clock;
   readonly deviceId: string;
   readonly eventStore: EventStore;
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
@@ -30,13 +33,14 @@ export type ServiceDeps = {
 export const createServices = (deps: ServiceDeps): PaceServices => {
   const client = createPaceClient({
     baseUrl: deps.baseUrl,
+    ...(deps.clock !== undefined && { clock: deps.clock }),
     deviceId: deps.deviceId,
     ...(deps.fetch !== undefined && { fetch: deps.fetch }),
     session: deps.session,
     source: "web",
     store: deps.eventStore,
   });
-  return { ...client, botUsername: deps.botUsername, hooks: createAppHooks(client.state) };
+  return { ...client, botUsername: deps.botUsername, hooks: createAppHooks(client.state, client.clock) };
 };
 
 /** The production wiring: IndexedDB log, localStorage session, the configured API origin. */

@@ -1,5 +1,10 @@
 import { createServices, type PaceServices } from "#web/services.ts";
-import { createMemoryEventStore, createMemorySessionStore, type SessionStore } from "@pace/client";
+import {
+  type Clock,
+  createMemoryEventStore,
+  createMemorySessionStore,
+  type SessionStore,
+} from "@pace/client";
 import { createFakeFetch, type FakeFetch, type FakeRoute } from "@pace/client/testing";
 
 import { defaultRoutes } from "./routes.ts";
@@ -7,6 +12,7 @@ import { defaultRoutes } from "./routes.ts";
 /** Services on memory adapters and a fake API, the way the app wires them. */
 export const createTestServices = (
   options: {
+    readonly clock?: Clock;
     readonly routes?: Readonly<Record<string, FakeRoute>>;
     readonly session?: SessionStore;
   } = {},
@@ -15,6 +21,7 @@ export const createTestServices = (
   const services = createServices({
     baseUrl: "https://api.test",
     botUsername: "TestBot",
+    ...(options.clock !== undefined && { clock: options.clock }),
     deviceId: "test-device",
     eventStore: createMemoryEventStore(),
     fetch: api.fetch,
