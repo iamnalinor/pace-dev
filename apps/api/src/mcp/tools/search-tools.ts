@@ -124,7 +124,9 @@ const dueLine = (task: Task): readonly string[] =>
   task.dueAt === null ? [] : line("Due", `${task.dueAt} (${task.dueTz ?? "UTC"})`);
 
 const outcomeLine = (task: Task, outcome: null | string): readonly string[] =>
-  task.closed === null ? [] : line("Outcome", `${outcome ?? task.closed.outcome} at ${task.closed.at}`);
+  task.closed === null
+    ? []
+    : line("Outcome", `${outcome ?? task.closed.outcome} at ${task.closed.at}`);
 
 const taskHeader = (scope: Scope, task: Task, row: null | TaskRow): readonly string[] => [
   `# ${task.title}`,
@@ -154,7 +156,10 @@ const taskDocument = (scope: Scope, task: Task): Rendered => {
   const text = [
     ...taskHeader(scope, task, row),
     ...section("Description", task.description === null ? [] : [task.description]),
-    ...section("Subtasks", task.subtasks.map((item) => subtaskLine(item))),
+    ...section(
+      "Subtasks",
+      task.subtasks.map((item) => subtaskLine(item)),
+    ),
     ...section("Source text", task.sourceText === null ? [] : [task.sourceText]),
   ].join("\n");
   const metadata = taskMetadata(task, row);

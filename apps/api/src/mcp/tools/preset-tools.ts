@@ -42,7 +42,8 @@ export const seedExamplePresets = defineTool({
       build: (scope, when) => {
         const seeds = exampleCoursePresetEvents(when.at).filter((event) => isPresetCreated(event));
         for (const seed of seeds) {
-          const list = presetById(scope.state.presets, seed.payload.id) === undefined ? created : skipped;
+          const list =
+            presetById(scope.state.presets, seed.payload.id) === undefined ? created : skipped;
           list.push(seed.payload.id);
         }
         return ok(

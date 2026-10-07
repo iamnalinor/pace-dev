@@ -193,5 +193,4 @@ export const labelOf = (row: null | TaskRow, taskId: string): string =>
   row === null ? taskId : describeRow(row);
 
 /** Chains comparators: the next key decides only when the first one ties. */
-export const thenBy = (first: number, next: () => number): number =>
-  first === 0 ? next() : first;
+export const thenBy = (first: number, next: () => number): number => (first === 0 ? next() : first);

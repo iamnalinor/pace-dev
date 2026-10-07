@@ -67,7 +67,7 @@ export const canApplyInOrder = (current: Materialized, fresh: readonly Event[]):
   return (
     first === undefined ||
     (!shouldRematerialize(current.lastAppliedOccurredAt, first) &&
-      !fresh.some((event) => isCorrection(event)))
+      fresh.every((event) => !isCorrection(event)))
   );
 };
 

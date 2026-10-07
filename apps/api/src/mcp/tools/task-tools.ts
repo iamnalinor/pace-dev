@@ -215,7 +215,10 @@ export const updateTask = defineTool({
         return ok([
           ...project.value.events,
           ...fieldEvents(args, when, zone),
-          ...settingEvents(args, when, { current: task.value.projectId, next: project.value.projectId }),
+          ...settingEvents(args, when, {
+            current: task.value.projectId,
+            next: project.value.projectId,
+          }),
         ]);
       },
       render: (scope, events) => {

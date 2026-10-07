@@ -1,13 +1,13 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
-
 import { newId } from "@pace/core";
 
 import { TOOLS } from "../src/mcp/server.ts";
 import { json, loginAsDev } from "./helpers.ts";
 import { mcpResult, obtainToken } from "./oauth-flow.ts";
+
+const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 
 type Listed = {
   name: string;

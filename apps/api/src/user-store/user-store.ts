@@ -278,7 +278,10 @@ export class UserStore extends DurableObject {
   }
 
   /** Inserts the events whose id is new to the log (and to this batch), in order. */
-  async #insertNew(events: readonly Event[], known: ReadonlySet<string>): Promise<readonly Event[]> {
+  async #insertNew(
+    events: readonly Event[],
+    known: ReadonlySet<string>,
+  ): Promise<readonly Event[]> {
     const inserted: Event[] = [];
     for (const event of events) {
       if (known.has(event.id) || inserted.some((seen) => seen.id === event.id)) {

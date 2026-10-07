@@ -2,13 +2,13 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
-
 import { type EventInput, newId } from "@pace/core";
 
 import type { UserStore } from "../src/user-store/user-store.ts";
 
 import * as schema from "../src/user-store/schema.ts";
+
+const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 
 const NOW = "2026-10-07T12:00:00.000Z";
 const EARLIER = "2026-10-07T09:00:00.000Z";
