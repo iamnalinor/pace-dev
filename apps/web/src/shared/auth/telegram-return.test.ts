@@ -28,7 +28,9 @@ describe("telegram return", () => {
 
   it("rejects a query without the signature", () => {
     expect(parseTelegramLogin(new URLSearchParams("id=1&first_name=A&auth_date=1"))).toBeNull();
-    expect(parseTelegramLogin(new URLSearchParams("id=x&first_name=A&auth_date=1&hash=h"))).toBeNull();
+    expect(
+      parseTelegramLogin(new URLSearchParams("id=x&first_name=A&auth_date=1&hash=h")),
+    ).toBeNull();
   });
 
   it("only returns to same-origin paths", () => {
@@ -40,7 +42,11 @@ describe("telegram return", () => {
 
   it("builds the auth url that brings the browser back to the current page", () => {
     expect(
-      telegramAuthUrl({ origin: "https://pace.test", pathname: "/oauth/authorize", search: "?a=1" }),
+      telegramAuthUrl({
+        origin: "https://pace.test",
+        pathname: "/oauth/authorize",
+        search: "?a=1",
+      }),
     ).toBe("https://pace.test/auth/telegram?return=%2Foauth%2Fauthorize%3Fa%3D1");
   });
 

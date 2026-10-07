@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router";
 
 import { useServices } from "#web/app-state.tsx";
+import { Composer } from "#web/features/composer/composer.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useCompleteTask } from "#web/shared/task/use-complete-task.ts";
 import { ZoneBanner } from "#web/shared/time/zone-banner.tsx";
@@ -15,8 +16,14 @@ import { ReviewLink } from "./review-link.tsx";
 
 const PROJECT_PARAM = "project";
 
-/** Artboard 1: what to do now, in score order, filterable by project. */
-export const NowScreen = () => {
+type Props = {
+  /** `/add` and shared text open Now with the composer filled in and expanded. */
+  readonly composeText?: string | undefined;
+  readonly isComposerExpanded?: boolean | undefined;
+};
+
+/** Artboard 1: what to do now, in score order, filterable by project; the composer on top. */
+export const NowScreen = ({ composeText, isComposerExpanded = false }: Props) => {
   const t = useT();
   const [params, setParams] = useSearchParams();
   const projectId = params.get(PROJECT_PARAM);
@@ -30,6 +37,12 @@ export const NowScreen = () => {
       <PageHeader
         action={<NowHeaderActions inboxCount={board.inboxCount} />}
         title={t("nav.now")}
+      />
+      <Composer
+        className="mx-4 mb-3"
+        initialText={composeText}
+        isInitiallyExpanded={isComposerExpanded}
+        key={composeText ?? ""}
       />
       <ZoneBanner />
       <ReviewLink />

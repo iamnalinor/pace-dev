@@ -44,7 +44,11 @@ export const LinkChip = ({ className, url }: Props) => {
           <span className="truncate font-mono text-[11px] text-muted">{preview.host}</span>
         )}
       </span>
-      <ExternalLink aria-hidden="true" className="size-3.5 shrink-0 text-muted" strokeWidth={1.75} />
+      <ExternalLink
+        aria-hidden="true"
+        className="size-3.5 shrink-0 text-muted"
+        strokeWidth={1.75}
+      />
     </a>
   );
 };

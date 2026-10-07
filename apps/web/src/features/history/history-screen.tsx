@@ -47,7 +47,9 @@ const EventRow = ({ entry, tz }: { readonly entry: HistoryEntry; readonly tz: st
           {t("common.undo")}
         </Button>
       ) : (
-        entry.revokedBy !== null && <span className="text-xs text-muted">{t("history.revoked")}</span>
+        entry.revokedBy !== null && (
+          <span className="text-xs text-muted">{t("history.revoked")}</span>
+        )
       )}
     </li>
   );
@@ -80,13 +82,31 @@ export const HistoryScreen = () => {
           />
         </label>
         <div className="flex gap-2">
-          <Button onClick={() => { setAtIso(shiftDays(at, -1)); }} size="sm" variant="outline">
+          <Button
+            onClick={() => {
+              setAtIso(shiftDays(at, -1));
+            }}
+            size="sm"
+            variant="outline"
+          >
             {t("history.dayBack")}
           </Button>
-          <Button onClick={() => { setAtIso(shiftDays(at, 1)); }} size="sm" variant="outline">
+          <Button
+            onClick={() => {
+              setAtIso(shiftDays(at, 1));
+            }}
+            size="sm"
+            variant="outline"
+          >
             {t("history.dayForward")}
           </Button>
-          <Button onClick={() => { setAtIso(null); }} size="sm" variant="ghost">
+          <Button
+            onClick={() => {
+              setAtIso(null);
+            }}
+            size="sm"
+            variant="ghost"
+          >
             {t("history.now")}
           </Button>
         </div>

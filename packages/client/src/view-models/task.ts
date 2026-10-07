@@ -1,11 +1,11 @@
 import {
-  extractLink,
-  linkHost,
   type Closure,
   type CoreState,
   type ExplainKey,
   type ExplainUnit,
+  extractLink,
   type Importance,
+  linkHost,
   type Outcome,
   presetById,
   type PresetError,
@@ -89,9 +89,9 @@ export type TaskViewModel = {
   readonly title: string;
   readonly description: null | string;
   /**
-   * The task's link: set explicitly, else the first web address in the source text or the
-   * description. `host` is what the chip shows until the page title is known.
-   */
+  The task's link: set explicitly, else the first web address in the source text or the
+  description. `host` is what the chip shows until the page title is known.
+  */
   readonly link: null | TaskLink;
   readonly submitVia: null | string;
   readonly sourceText: null | string;

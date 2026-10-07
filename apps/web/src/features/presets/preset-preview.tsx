@@ -4,7 +4,7 @@ import { formatMeta } from "#web/shared/format/meta.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { PaceBar } from "#web/shared/ui/pace-bar.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
-import { type MetaPart, relativeDay  } from "@pace/client";
+import { type MetaPart, relativeDay } from "@pace/client";
 import {
   addMinutesIso,
   endOfDayIn,

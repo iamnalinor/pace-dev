@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { contrastRatio, parseHex, relativeLuminance } from "./contrast.ts";
-import { type PaletteName, THEMES, tokens } from "./tokens.ts";
+import { IMPORTANCE_COLORS, type PaletteName, THEMES, tokens } from "./tokens.ts";
 
 describe("parseHex", () => {
   it("parses 6-digit and 3-digit hex", () => {
@@ -59,5 +59,16 @@ describe("tokens", () => {
     expect(tokens.fonts).toEqual({ mono: "Geist Mono", sans: "Geist" });
     expect(tokens.radius.pill).toBe(999);
     expect(Object.keys(tokens.project)).toHaveLength(8);
+  });
+});
+
+describe("IMPORTANCE_COLORS", () => {
+  it("marks every importance, Normal without a color", () => {
+    expect(IMPORTANCE_COLORS).toEqual({
+      asap: "coral",
+      prioritized: "amber",
+      normal: null,
+      nice_to_have: "slate",
+    });
   });
 });

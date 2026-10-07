@@ -83,7 +83,12 @@ describe("TelegramWidget redirect mode", () => {
     );
     const onAuth = vi.fn();
     render(
-      <TelegramWidget botUsername="TestBot" label="Continue with Telegram" onAuth={onAuth} texts={TEXTS} />,
+      <TelegramWidget
+        botUsername="TestBot"
+        label="Continue with Telegram"
+        onAuth={onAuth}
+        texts={TEXTS}
+      />,
     );
     expect(onAuth).toHaveBeenCalledWith({ auth_date: 1, first_name: "A", hash: "h", id: 7 });
   });

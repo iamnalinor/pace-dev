@@ -29,7 +29,9 @@ export const safeReturnPath = (value: null | string): string =>
   value !== null && value.startsWith("/") && !value.startsWith("//") ? value : "/login";
 
 /** Where Telegram should send the browser back to, for the page that renders the widget. */
-export const telegramAuthUrl = (location: Pick<Location, "origin" | "pathname" | "search">): string =>
+export const telegramAuthUrl = (
+  location: Pick<Location, "origin" | "pathname" | "search">,
+): string =>
   `${location.origin}${TELEGRAM_RETURN_PATH}?return=${encodeURIComponent(location.pathname + location.search)}`;
 
 export const savePendingTelegramLogin = (login: TelegramLogin): void => {

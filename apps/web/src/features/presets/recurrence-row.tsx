@@ -3,7 +3,13 @@ import { useId } from "react";
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
-import { dueWeekOffset, type Language, type Recurrence, type Weekday, type WeekSlot  } from "@pace/core";
+import {
+  dueWeekOffset,
+  type Language,
+  type Recurrence,
+  type Weekday,
+  type WeekSlot,
+} from "@pace/core";
 
 import type { SectionProps } from "./rows.tsx";
 

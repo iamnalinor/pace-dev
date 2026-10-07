@@ -7,7 +7,8 @@ import {
   type PresetFields,
   type ProgressMode,
   ProjectColorSchema,
-  type Submission, type UrgencyPolicy 
+  type Submission,
+  type UrgencyPolicy,
 } from "@pace/core";
 
 import { DeadlineRow } from "./deadline-row.tsx";
@@ -18,12 +19,7 @@ const POLICIES: readonly UrgencyPolicy[] = ["pace", "lag", "age", "resubmission"
 const IMPORTANCES: readonly Importance[] = ["asap", "prioritized", "normal", "nice_to_have"];
 const SUBMISSIONS: readonly Submission[] = ["per_subtask", "whole"];
 const PROGRESS_MODES: readonly ProgressMode[] = ["subtasks", "slider", "none"];
-const FIELD_KEYS: readonly (keyof PresetFields)[] = [
-  "description",
-  "link",
-  "startAt",
-  "submitVia",
-];
+const FIELD_KEYS: readonly (keyof PresetFields)[] = ["description", "link", "startAt", "submitVia"];
 const NOTIFY_KEYS: readonly (keyof NotifyParams)[] = [
   "criticalHours",
   "criticalProgress",

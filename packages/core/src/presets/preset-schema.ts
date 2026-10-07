@@ -63,12 +63,15 @@ const renameLegacyTicket = (value: unknown): unknown => {
   return "link" in rest ? rest : { ...rest, link: ticket };
 };
 
-const FieldsSchema = z.preprocess(renameLegacyTicket, z.strictObject({
-  link: z.boolean().exactOptional(),
-  description: z.boolean().exactOptional(),
-  startAt: z.boolean().exactOptional(),
-  submitVia: z.boolean().exactOptional(),
-}));
+const FieldsSchema = z.preprocess(
+  renameLegacyTicket,
+  z.strictObject({
+    link: z.boolean().exactOptional(),
+    description: z.boolean().exactOptional(),
+    startAt: z.boolean().exactOptional(),
+    submitVia: z.boolean().exactOptional(),
+  }),
+);
 
 const NotifySchema = z.strictObject({
   criticalHours: z.number().min(0).exactOptional(),

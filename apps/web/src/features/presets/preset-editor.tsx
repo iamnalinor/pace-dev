@@ -8,7 +8,7 @@ import { useT } from "#web/i18n.tsx";
 import { actionErrorText } from "#web/shared/lib/action-error.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { BASE_PRESETS, type Preset, presetById, resolvePreset  } from "@pace/core";
+import { BASE_PRESETS, type Preset, presetById, resolvePreset } from "@pace/core";
 
 import { CONTROL_CLASS } from "./control-class.ts";
 import { definitionIssues, type PresetDraft, slugify } from "./preset-draft.ts";

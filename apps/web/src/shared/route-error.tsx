@@ -16,7 +16,9 @@ const describe = (error: unknown): Omit<Described, "headline"> => {
     const body = typeof error.data === "string" ? error.data : JSON.stringify(error.data);
     return { details: body === "" ? null : body, reason: `${error.status} ${error.statusText}` };
   }
-  return error instanceof Error ? { details: error.stack ?? null, reason: `${error.name}: ${error.message}` } : { details: null, reason: String(error) };
+  return error instanceof Error
+    ? { details: error.stack ?? null, reason: `${error.name}: ${error.message}` }
+    : { details: null, reason: String(error) };
 };
 
 /** A screen that failed to render: says what failed, offers a reload and a way home. */
@@ -31,7 +33,9 @@ export const RouteError = () => {
     <main className="mx-auto grid max-w-xl gap-4 p-8" role="alert">
       <h1 className="text-2xl font-semibold">{t("errors.crashTitle")}</h1>
       <p className="text-sm text-muted">{t("errors.crashBody")}</p>
-      <p className="rounded-md bg-surface p-3 font-mono text-sm wrap-break-word text-warn">{reason}</p>
+      <p className="rounded-md bg-surface p-3 font-mono text-sm wrap-break-word text-warn">
+        {reason}
+      </p>
       {details !== null && (
         <details className="text-xs text-muted">
           <summary className="cursor-pointer">{t("errors.details")}</summary>

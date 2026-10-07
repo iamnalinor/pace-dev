@@ -9,7 +9,7 @@ import { actionErrorText } from "#web/shared/lib/action-error.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
-import { EXAMPLE_PRESET_IDS, type Preset, presetById, resolvePreset  } from "@pace/core";
+import { EXAMPLE_PRESET_IDS, type Preset, presetById, resolvePreset } from "@pace/core";
 
 import { CONTROL_CLASS } from "./control-class.ts";
 import { presetLabel } from "./preset-label.ts";

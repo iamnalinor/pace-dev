@@ -46,3 +46,17 @@ export type Tokens = {
 
 /** The design tokens (one source: `tokens.json`), typed. `line`/`track` are rgba strings. */
 export const tokens: Tokens = tokensJson;
+
+/**
+Each importance's marker color from the project palette: hot for ASAP, warm for
+Prioritized, none for Normal, cool for Nice-to-have. Shown as a dot or edge, never as text,
+so the contrast stays with the neutral label next to it.
+*/
+export const IMPORTANCE_COLORS: Readonly<
+  Record<"asap" | "nice_to_have" | "normal" | "prioritized", null | ProjectColorName>
+> = {
+  asap: "coral",
+  prioritized: "amber",
+  normal: null,
+  nice_to_have: "slate",
+};

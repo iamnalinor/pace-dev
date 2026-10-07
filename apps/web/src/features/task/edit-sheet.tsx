@@ -18,7 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "#web/shared/ui/sheet.tsx";
-import { type Event, ImportanceSchema  } from "@pace/core";
+import { type Event, ImportanceSchema } from "@pace/core";
 
 import { editChanges, type EditError, type EditForm, initialEditForm } from "./edit-form.ts";
 
@@ -324,11 +324,7 @@ const EditFields = ({ onDone, view }: FormProps) => {
             {t("common.cancel")}
           </Button>
         </SheetClose>
-        <Button
-          className="h-[50px] flex-2 rounded-lg font-semibold"
-          type="submit"
-          variant="accent"
-        >
+        <Button className="h-[50px] flex-2 rounded-lg font-semibold" type="submit" variant="accent">
           {t("common.save")}
         </Button>
       </SheetFooter>

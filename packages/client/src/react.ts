@@ -14,6 +14,7 @@ import type {
 import type { AppState, AppStateHandle } from "./state.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
+import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
 import { type NowViewModel, nowViewModel } from "./view-models/now.ts";
@@ -35,6 +36,8 @@ export type AppHooks = {
   readonly useInbox: () => InboxViewModel;
   readonly useReview: () => ReviewViewModel;
   readonly useHistory: (atIso: string) => HistoryViewModel;
+  /** The composer's live chips for the typed line and the user's taps. */
+  readonly useComposer: (draft: ComposerDraft) => ComposerModel;
 };
 
 /** Relative times ("5 h ago", "due today") drift slowly: half a minute is fine. */
@@ -65,6 +68,8 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
   return {
     useAppState: (selector) => useStore(state.store, selector),
     useClock,
+    useComposer: (draft) =>
+      useView((current, ctx) => composerModel(current, draft, ctx), JSON.stringify(draft)),
     useHistory: (atIso) =>
       useView(
         (current, ctx) => historyViewModel(current, { atIso, deviceTz: ctx.deviceTz }),

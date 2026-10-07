@@ -1,5 +1,10 @@
-import { type NotifyParams, type PresetDefinition, PresetDefinitionSchema, type PresetFields, type ResolvedPreset  } from "@pace/core";
-
+import {
+  type NotifyParams,
+  type PresetDefinition,
+  PresetDefinitionSchema,
+  type PresetFields,
+  type ResolvedPreset,
+} from "@pace/core";
 
 /** Keys a child preset overrides as a whole. */
 export type WholeKey = Exclude<keyof PresetDefinition, "fields" | "notify">;
@@ -21,7 +26,8 @@ export const isOverridden = (definition: PresetDefinition, key: WholeKey): boole
   definition[key] !== undefined;
 
 export const isSubOverridden = (definition: PresetDefinition, sub: SubKey): boolean =>
-  (sub.group === "fields" ? definition.fields?.[sub.key] : definition.notify?.[sub.key]) !== undefined;
+  (sub.group === "fields" ? definition.fields?.[sub.key] : definition.notify?.[sub.key]) !==
+  undefined;
 
 export const setValue = <K extends WholeKey>(
   definition: PresetDefinition,
@@ -72,7 +78,11 @@ export const toggleSubOverride = (
   if (isSubOverridden(definition, sub)) {
     return withoutSub(definition, sub);
   }
-  return setSub(definition, sub, sub.group === "fields" ? inherited.fields[sub.key] : inherited.notify[sub.key]);
+  return setSub(
+    definition,
+    sub,
+    sub.group === "fields" ? inherited.fields[sub.key] : inherited.notify[sub.key],
+  );
 };
 
 /** Where the schema rejects the definition: the top key, or `group.key` inside fields / notify. */

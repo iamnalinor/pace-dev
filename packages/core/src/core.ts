@@ -57,6 +57,7 @@ export {
 } from "./api/schemas/sync.ts";
 export { contrastRatio, parseHex, relativeLuminance, type Rgb } from "./design/contrast.ts";
 export {
+  IMPORTANCE_COLORS,
   type Palette,
   type PaletteName,
   type ProjectColorName,

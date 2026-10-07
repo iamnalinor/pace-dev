@@ -19,6 +19,12 @@ export default defineConfig({
           { purpose: "any maskable", sizes: "512x512", src: "/icon-512.png", type: "image/png" },
         ],
         name: "Pace",
+        // Text shared from another app lands in the composer.
+        share_target: {
+          action: "/add",
+          method: "GET",
+          params: { text: "text", title: "title", url: "url" },
+        },
         short_name: "Pace",
         theme_color: "#0b0b0c",
       },

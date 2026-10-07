@@ -1,6 +1,7 @@
 import {
   type CoreState,
   type Importance,
+  isHttpUrl,
   isOpen,
   linkHost,
   parseQuickInput,
@@ -122,7 +123,7 @@ const dueOf = (parsed: Parsed, edits: ComposerEdits): ComposerModel["due"] =>
 
 const linkOf = (parsed: Parsed, edits: ComposerEdits): null | TaskLink => {
   const link = pick(edits.link, parsed.link);
-  return link === null ? null : { host: linkHost(link), url: link };
+  return link === null || !isHttpUrl(link) ? null : { host: linkHost(link), url: link };
 };
 
 const projectOf = (
