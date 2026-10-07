@@ -18,12 +18,9 @@ export const zoneLabel = (atIso: string, tz: string, language: Language): string
 
 /** `tomorrow 23:59`, `Friday 18:00`, `Oct 20 09:00`: the day as the zone's calendar sees it. */
 export const formatDayTime = (
-  atIso: string,
-  nowIso: string,
-  tz: string,
-  language: Language,
-): string =>
-  `${formatRelativeDay(atIso, nowIso, { language, tz })} ${formatTime(atIso, tz, language)}`;
+  { at, tz }: { readonly at: string; readonly tz: string },
+  { language, now }: Pick<Viewer, "language" | "now">,
+): string => `${formatRelativeDay(at, now, { language, tz })} ${formatTime(at, tz, language)}`;
 
 /** `Oct 7, 23:59` in the zone. */
 export const formatDateTime = (atIso: string, tz: string, language: Language): string =>
@@ -52,7 +49,9 @@ and the viewer's time: `23:59 MSK (your time 22:59)`.
 */
 export const formatZoned = ({ at, deviceTz, language, mode, now, tz }: ZonedFormat): string => {
   const own =
-    mode === "due" ? formatDayTime(at, now, tz, language) : formatDateTime(at, tz, language);
+    mode === "due"
+      ? formatDayTime({ at, tz }, { language, now })
+      : formatDateTime(at, tz, language);
   if (!zonesDiffer({ at, tz }, { at, tz: deviceTz })) {
     return own;
   }

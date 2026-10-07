@@ -178,16 +178,31 @@ const EditorForm = ({
           {problem}
         </p>
       )}
-      <div className="flex gap-2 px-4 pt-4">
-        {!isNew && !archived && (
-          <Button onClick={() => void archive()} variant="ghost">
-            {t("presets.archive")}
-          </Button>
-        )}
-        <Button className="flex-1" onClick={() => void save()} variant="accent">
-          {t("common.save")}
+      <FormActions canArchive={!isNew && !archived} onArchive={archive} onSave={save} />
+    </div>
+  );
+};
+
+const FormActions = ({
+  canArchive,
+  onArchive,
+  onSave,
+}: {
+  readonly canArchive: boolean;
+  readonly onArchive: () => Promise<void>;
+  readonly onSave: () => Promise<void>;
+}) => {
+  const t = useT();
+  return (
+    <div className="flex gap-2 px-4 pt-4">
+      {canArchive && (
+        <Button onClick={() => void onArchive()} variant="ghost">
+          {t("presets.archive")}
         </Button>
-      </div>
+      )}
+      <Button className="flex-1" onClick={() => void onSave()} variant="accent">
+        {t("common.save")}
+      </Button>
     </div>
   );
 };
@@ -199,51 +214,69 @@ const draftOf = (preset: Preset): PresetDraft => ({
   name: preset.name,
 });
 
+const EditorHeader = ({ title }: { readonly title: string }) => (
+  <header className="flex items-center gap-1 px-2 pt-3.5 pb-3">
+    <BackLink />
+    <h1 className="text-[22px] font-semibold">{title}</h1>
+  </header>
+);
+
+/** A built-in preset is read-only: it can only be the parent of a new one. */
+const BuiltInNotice = ({ preset }: { readonly preset: Preset }) => {
+  const t = useT();
+  return (
+    <>
+      <EditorHeader title={presetLabel(preset, t)} />
+      <p className="px-5 text-sm text-muted">{t("actionError.preset/built-in")}</p>
+      <Button asChild className="mx-4 mt-3 self-start" variant="outline">
+        <Link to={`/settings/presets/new?from=${preset.id}`}>
+          {t("presets.newFrom", { name: presetLabel(preset, t) })}
+        </Link>
+      </Button>
+    </>
+  );
+};
+
+const initialDraft = (existing: Preset | undefined, parent: Preset): PresetDraft =>
+  existing === undefined
+    ? { definition: {}, extends: parent.id, id: "", name: "" }
+    : draftOf(existing);
+
 /** The presets editor (web only): a new preset from a parent, or an existing user preset. */
 export const PresetEditor = ({ from, presetId }: Props) => {
   const t = useT();
   const presets = useServices().hooks.useAppState((state) => state.presets);
   const existing = presetId === null ? undefined : presetById(presets, presetId);
-  const header = (title: string) => (
-    <header className="flex items-center gap-1 px-2 pt-3.5 pb-3">
-      <BackLink />
-      <h1 className="text-[22px] font-semibold">{title}</h1>
-    </header>
-  );
   if (presetId !== null && existing === undefined) {
     return (
       <>
-        {header(t("presets.title"))}
+        <EditorHeader title={t("presets.title")} />
         <p className="px-5 text-sm text-muted">{t("presets.notFound")}</p>
       </>
     );
   }
   if (existing?.builtIn === true) {
-    return (
-      <>
-        {header(presetLabel(existing, t))}
-        <p className="px-5 text-sm text-muted">{t("actionError.preset/built-in")}</p>
-        <Button asChild className="mx-4 mt-3 self-start" variant="outline">
-          <Link to={`/settings/presets/new?from=${existing.id}`}>
-            {t("presets.newFrom", { name: presetLabel(existing, t) })}
-          </Link>
-        </Button>
-      </>
-    );
+    return <BuiltInNotice preset={existing} />;
   }
-  const parent = presetById(presets, from ?? "") ?? BASE_PRESETS.hw;
-  const initial =
-    existing === undefined
-      ? { definition: {}, extends: parent.id, id: "", name: "" }
-      : draftOf(existing);
-  return (
+  const parent = (from === null ? undefined : presetById(presets, from)) ?? BASE_PRESETS.hw;
+  return existing === undefined ? (
     <>
-      {header(existing === undefined ? t("presets.new") : existing.name)}
+      <EditorHeader title={t("presets.new")} />
       <EditorForm
-        archived={existing?.archived ?? false}
-        initial={initial}
-        isNew={existing === undefined}
-        key={presetId ?? `new:${parent.id}`}
+        archived={false}
+        initial={initialDraft(undefined, parent)}
+        isNew
+        key={`new:${parent.id}`}
+      />
+    </>
+  ) : (
+    <>
+      <EditorHeader title={existing.name} />
+      <EditorForm
+        archived={existing.archived}
+        initial={draftOf(existing)}
+        isNew={false}
+        key={existing.id}
       />
     </>
   );

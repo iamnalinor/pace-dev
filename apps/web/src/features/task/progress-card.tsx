@@ -36,8 +36,8 @@ export const ProgressCard = ({ view }: { readonly view: TaskViewModel }) => {
         marker={pace}
         max={SLIDER_MAX}
         min={0}
-        onValueChange={([next]) => {
-          setDraft(next ?? null);
+        onValueChange={([next = null]) => {
+          setDraft(next);
         }}
         onValueCommit={([next]) => {
           void (async () => {

@@ -1,6 +1,6 @@
 import type { MetaPart } from "@pace/client";
 
-import { t } from "@pace/core";
+import { type Importance, t } from "@pace/core";
 
 import { formatAge, formatLate } from "./duration.ts";
 import { formatCount } from "./plural.ts";
@@ -12,6 +12,13 @@ export type MetaTone = "plain" | "strong" | "warn";
 export type MetaSegment = { readonly text: string; readonly tone: MetaTone };
 
 const segment = (text: string, tone: MetaTone = "plain"): MetaSegment => ({ text, tone });
+
+/** A quiet Nice-to-have stays quiet; the two urgent categories stand out. */
+const importanceSegment = (importance: Importance, { language }: Viewer): MetaSegment =>
+  segment(
+    t(language, `importance.${importance}`),
+    importance === "nice_to_have" ? "plain" : "strong",
+  );
 
 const formatPart = (part: MetaPart, viewer: Viewer): MetaSegment => {
   const { language } = viewer;
@@ -29,9 +36,7 @@ const formatPart = (part: MetaPart, viewer: Viewer): MetaSegment => {
       return segment(t(language, "meta.endOfDay"));
     }
     case "importance": {
-      // A quiet Nice-to-have stays quiet; the two urgent categories stand out.
-      const tone = part.importance === "nice_to_have" ? "plain" : "strong";
-      return segment(t(language, `importance.${part.importance}`), tone);
+      return importanceSegment(part.importance, viewer);
     }
     case "late": {
       return segment(formatLate(part.minutes, language), "warn");

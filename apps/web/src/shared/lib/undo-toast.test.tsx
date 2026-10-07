@@ -21,7 +21,9 @@ describe("showUndoToast", () => {
 
 describe("revokeEvents", () => {
   it("revokes exactly the events an action appended", async () => {
-    const revoke = vi.fn(async () => {});
+    const revoke = vi.fn(async () => {
+      await Promise.resolve();
+    });
     await revokeEvents(revoke, [{ id: "a" }, { id: "b" }]);
     expect(revoke.mock.calls).toEqual([["a"], ["b"]]);
   });

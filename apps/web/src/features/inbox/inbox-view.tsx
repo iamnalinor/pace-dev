@@ -16,6 +16,32 @@ import type { SuggestionEdits } from "./suggestion-chips.ts";
 import { InboxCard } from "./inbox-card.tsx";
 import { QuickCapture } from "./quick-capture.tsx";
 
+const InboxHeader = ({
+  count,
+  onAcceptAll,
+}: {
+  readonly count: number;
+  readonly onAcceptAll: () => void;
+}) => {
+  const t = useT();
+  return (
+    <header className="flex items-center gap-1 pt-3.5 pr-4 pb-2.5 pl-2">
+      <Button aria-label={t("common.back")} asChild size="icon" variant="ghost">
+        <Link to="/">
+          <ChevronLeft aria-hidden="true" strokeWidth={1.75} />
+        </Link>
+      </Button>
+      <h1 className="text-[22px] font-semibold">{t("inbox.title")}</h1>
+      <span className="ml-1.5 font-mono text-[13px] text-muted">{count}</span>
+      {count > 0 && (
+        <Button className="ml-auto" onClick={onAcceptAll} size="sm" variant="accent">
+          {t("inbox.acceptAll")}
+        </Button>
+      )}
+    </header>
+  );
+};
+
 /** The inbox (artboard 6): every capture with its guess, sorted one by one or all at once. */
 export const InboxView = () => {
   const t = useT();
@@ -23,7 +49,7 @@ export const InboxView = () => {
   const inbox = hooks.useInbox();
   const [edits, setEdits] = useState<Readonly<Record<string, SuggestionEdits>>>({});
 
-  const accept = async (card: Card): Promise<boolean> => {
+  const wasAccepted = async (card: Card): Promise<boolean> => {
     const result = await actions.acceptSuggestion(card.id, card.suggestion, edits[card.id]);
     if (!result.ok) {
       toast.error(actionErrorText(t, result.error));
@@ -32,7 +58,7 @@ export const InboxView = () => {
   };
 
   const acceptOne = async (card: Card): Promise<void> => {
-    if (await accept(card)) {
+    if (await wasAccepted(card)) {
       toast(t("inbox.accepted"));
     }
   };
@@ -41,7 +67,7 @@ export const InboxView = () => {
     for (const card of inbox.cards) {
       // One after the other: each acceptance is validated against the state the previous left.
 
-      if (!(await accept(card))) {
+      if (!(await wasAccepted(card))) {
         return;
       }
     }
@@ -65,27 +91,12 @@ export const InboxView = () => {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center gap-1 pt-3.5 pr-4 pb-2.5 pl-2">
-        <Button aria-label={t("common.back")} asChild size="icon" variant="ghost">
-          <Link to="/">
-            <ChevronLeft aria-hidden="true" strokeWidth={1.75} />
-          </Link>
-        </Button>
-        <h1 className="text-[22px] font-semibold">{t("inbox.title")}</h1>
-        <span className="ml-1.5 font-mono text-[13px] text-muted">{inbox.count}</span>
-        {inbox.count > 0 && (
-          <Button
-            className="ml-auto"
-            onClick={() => {
-              void acceptAll();
-            }}
-            size="sm"
-            variant="accent"
-          >
-            {t("inbox.acceptAll")}
-          </Button>
-        )}
-      </header>
+      <InboxHeader
+        count={inbox.count}
+        onAcceptAll={() => {
+          void acceptAll();
+        }}
+      />
       <p className="mx-5 mb-3 text-xs text-muted">{t("inbox.hint")}</p>
       {inbox.count === 0 ? (
         <p className="px-5 py-6 text-sm text-muted">{t("inbox.empty")}</p>

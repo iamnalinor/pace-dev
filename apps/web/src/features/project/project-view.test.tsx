@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { artboardServices } from "#web/test/artboard-services.ts";
+import { at } from "#web/test/at.ts";
 import { renderWithProviders } from "#web/test/render.tsx";
 import {
   ALGEBRA_ID,
@@ -24,17 +25,17 @@ describe("ProjectView", () => {
     await setup(ALGEBRA_ID);
     expect(await screen.findByRole("heading", { level: 1, name: "Algebra" })).toBeInTheDocument();
     const stats = screen.getByRole("region", { name: "Stats" });
-    expect(within(stats).getByText("Open").nextSibling).toHaveTextContent("2");
-    expect(within(stats).getByText("On time").nextSibling).toHaveTextContent("9/11");
-    expect(within(stats).getByText("Late").nextSibling).toHaveTextContent("2");
-    expect(within(stats).getByText("This wk").nextSibling).toHaveTextContent("0:00");
+    expect(within(stats).getByRole("group", { name: "Open" })).toHaveTextContent("2");
+    expect(within(stats).getByRole("group", { name: "On time" })).toHaveTextContent("9/11");
+    expect(within(stats).getByRole("group", { name: "Late" })).toHaveTextContent("2");
+    expect(within(stats).getByRole("group", { name: "This wk" })).toHaveTextContent("0:00");
     expect(
       within(stats).getByRole("img", { name: "Hours per week, last 6 weeks: 0, 0, 0, 0, 0, 0" }),
     ).toBeInTheDocument();
     const open = screen.getByRole("list", { name: "Open" });
     const rows = within(open).getAllByRole("listitem");
     expect(rows).toHaveLength(2);
-    expect(within(rows[0]!).getByRole("link", { name: /Algebra HW 6/ })).toHaveAttribute(
+    expect(within(at(rows, 0)).getByRole("link", { name: /Algebra HW 6/ })).toHaveAttribute(
       "href",
       `/task/${HW_ID}`,
     );

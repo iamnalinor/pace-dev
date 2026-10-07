@@ -15,8 +15,10 @@ const clockHours = (hours: number): string => {
 };
 
 const Figure = ({ children, label }: { readonly children: ReactNode; readonly label: string }) => (
-  <div>
-    <p className="text-[11px] text-muted">{label}</p>
+  <div aria-label={label} role="group">
+    <p aria-hidden="true" className="text-[11px] text-muted">
+      {label}
+    </p>
     <p className="mt-0.5 font-mono text-lg">{children}</p>
   </div>
 );

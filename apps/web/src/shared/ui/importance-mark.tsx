@@ -1,6 +1,5 @@
-import { type Importance, IMPORTANCE_COLORS, type ProjectColorName } from "@pace/core";
-
 import { cn } from "#web/shared/lib/cn.ts";
+import { type Importance, IMPORTANCE_COLORS, type ProjectColorName } from "@pace/core";
 
 import { ProjectDot } from "./project-dot.tsx";
 

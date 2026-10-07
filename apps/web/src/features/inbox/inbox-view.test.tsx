@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { artboardServices } from "#web/test/artboard-services.ts";
+import { at } from "#web/test/at.ts";
 import { renderWithProviders } from "#web/test/render.tsx";
 import {
   ALGEBRA_ID,
@@ -26,7 +27,7 @@ const expectCards = async (count: number): Promise<void> => {
 
 const setup = async () => {
   const { services } = await artboardServices();
-  const rendered = renderWithProviders(
+  const view = renderWithProviders(
     <>
       <Toaster />
       <InboxView />
@@ -35,7 +36,7 @@ const setup = async () => {
   );
   const cards = within(await screen.findByRole("list", { name: "Inbox" })).getAllByRole("listitem");
   const task = (id: string) => services.state.store.getState().tasks.byId[id];
-  return { ...rendered, cards, task };
+  return { ...view, cards, task };
 };
 
 describe("InboxView", () => {
@@ -51,27 +52,27 @@ describe("InboxView", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText(/Everything here counts as Nice-to-have/)).toBeInTheDocument();
     expect(cards).toHaveLength(3);
-    const [cable, grade, sync] = cards;
-    const text = within(cable!).getByText(INBOX_TEXTS[INBOX_CABLE_ID]);
+    const [cable, grade, sync] = [at(cards, 0), at(cards, 1), at(cards, 2)];
+    const text = within(cable).getByText(INBOX_TEXTS[INBOX_CABLE_ID]);
     expect(text).not.toHaveAttribute("lang");
     expect(cable).toHaveTextContent("6d · unsorted too long");
     expect(grade).toHaveTextContent("2d");
     expect(sync).toHaveTextContent("5h");
-    const chips = within(sync!)
+    const chips = within(sync)
       .getAllByRole("button", { name: /tap to change/ })
       .map((chip) => chip.textContent);
     expect(chips).toEqual(["Work", "Work", "Due Friday 23:59", "Prioritized"]);
     expect(
-      within(cable!).getByRole("button", { name: "Project: No project, tap to change" }),
+      within(cable).getByRole("button", { name: "Project: No project, tap to change" }),
     ).toBeInTheDocument();
     expect(
-      within(cable!).getByRole("button", { name: "Due: No deadline, tap to change" }),
+      within(cable).getByRole("button", { name: "Due: No deadline, tap to change" }),
     ).toBeInTheDocument();
   });
 
   it("accepts a suggestion with the fields changed through the chips", async () => {
     const { cards, task, user } = await setup();
-    const sync = cards[2]!;
+    const sync = at(cards, 2);
     await user.click(
       within(sync).getByRole("button", { name: "Importance: Prioritized, tap to change" }),
     );
@@ -99,7 +100,7 @@ describe("InboxView", () => {
 
   it("moves a capture to another project and preset, or drops its deadline", async () => {
     const { cards, task, user } = await setup();
-    const cable = cards[0]!;
+    const cable = at(cards, 0);
     await user.click(
       within(cable).getByRole("button", { name: "Project: No project, tap to change" }),
     );
@@ -118,7 +119,7 @@ describe("InboxView", () => {
     await user.click(within(cable).getByRole("button", { name: "Accept" }));
     expect(task(INBOX_CABLE_ID)).toMatchObject({ presetId: "hw.algebra", projectId: ALGEBRA_ID });
 
-    const sync = cardsNow()[1]!;
+    const sync = at(cardsNow(), 1);
     await user.click(
       within(sync).getByRole("button", { name: "Due: Due Friday 23:59, tap to change" }),
     );
@@ -131,7 +132,7 @@ describe("InboxView", () => {
   it("deletes a capture and brings it back with Undo", async () => {
     const { cards, user } = await setup();
     await user.click(
-      within(cards[1]!).getByRole("button", { name: `Delete ${INBOX_TEXTS[INBOX_GRADE_ID]}` }),
+      within(at(cards, 1)).getByRole("button", { name: `Delete ${INBOX_TEXTS[INBOX_GRADE_ID]}` }),
     );
     await expectCards(2);
     expect(screen.queryByText(INBOX_TEXTS[INBOX_GRADE_ID])).not.toBeInTheDocument();

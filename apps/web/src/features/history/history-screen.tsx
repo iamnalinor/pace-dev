@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { HistoryEntry } from "@pace/client";
+import type { HistoryEntry, NowRow } from "@pace/client";
 import type { MessageKey } from "@pace/core";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
@@ -56,6 +56,25 @@ const EventRow = ({ entry, tz }: { readonly entry: HistoryEntry; readonly tz: st
 };
 
 /** The board as it was at any instant, and every recorded change with an undo. */
+/** The Now board as it stood at the chosen instant. */
+const BoardSection = ({ at, rows }: { readonly at: string; readonly rows: readonly NowRow[] }) => {
+  const t = useT();
+  return (
+    <section aria-label={t("history.board")} className="px-3">
+      <h2 className="px-2 pb-1 text-sm font-medium text-muted">{t("history.boardAt")}</h2>
+      {rows.length === 0 ? (
+        <p className="px-2 text-sm text-muted">{t("history.boardEmpty")}</p>
+      ) : (
+        <ul className="flex flex-col">
+          {rows.map((row) => (
+            <TaskRow key={row.id} now={at} row={row} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+};
+
 export const HistoryScreen = () => {
   const t = useT();
   const { hooks } = useServices();
@@ -111,18 +130,7 @@ export const HistoryScreen = () => {
           </Button>
         </div>
       </section>
-      <section aria-label={t("history.board")} className="px-3">
-        <h2 className="px-2 pb-1 text-sm font-medium text-muted">{t("history.boardAt")}</h2>
-        {history.board.rows.length === 0 ? (
-          <p className="px-2 text-sm text-muted">{t("history.boardEmpty")}</p>
-        ) : (
-          <ul className="flex flex-col">
-            {history.board.rows.map((row) => (
-              <TaskRow key={row.id} now={at} row={row} />
-            ))}
-          </ul>
-        )}
-      </section>
+      <BoardSection at={at} rows={history.board.rows} />
       <section aria-label={t("history.events")} className="px-5">
         <h2 className="pb-1 text-sm font-medium text-muted">{t("history.events")}</h2>
         {history.events.length === 0 ? (

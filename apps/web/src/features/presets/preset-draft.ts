@@ -35,10 +35,7 @@ export const setValue = <K extends WholeKey>(
   value: ResolvedPreset[K],
 ): PresetDefinition => ({ ...definition, [key]: value });
 
-const without = <K extends keyof PresetDefinition>(
-  definition: PresetDefinition,
-  key: K,
-): PresetDefinition => {
+const without = (definition: PresetDefinition, key: keyof PresetDefinition): PresetDefinition => {
   const { [key]: _removed, ...rest } = definition;
   return rest;
 };
@@ -94,7 +91,7 @@ export const definitionIssues = (definition: PresetDefinition): ReadonlySet<stri
   return new Set(
     parsed.error.issues.map((issue) => {
       const [top = "", sub] = issue.path.map(String);
-      return (top === "fields" || top === "notify") && sub !== undefined ? `${top}.${sub}` : top;
+      return sub !== undefined && (top === "fields" || top === "notify") ? `${top}.${sub}` : top;
     }),
   );
 };
@@ -103,5 +100,6 @@ export const definitionIssues = (definition: PresetDefinition): ReadonlySet<stri
 export const slugify = (name: string): string =>
   name
     .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "");
+    .split(/[^a-z0-9]+/u)
+    .filter((word) => word !== "")
+    .join("-");

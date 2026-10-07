@@ -15,7 +15,7 @@ the host, opening in a new tab.
 */
 export const LinkChip = ({ className, url }: Props) => {
   const preview = useLinkPreview(url);
-  const [isIconBroken, setIconBroken] = useState(false);
+  const [isIconBroken, setIsIconBroken] = useState(false);
   return (
     <a
       className={cn(
@@ -26,12 +26,12 @@ export const LinkChip = ({ className, url }: Props) => {
       rel="noreferrer"
       target="_blank"
     >
-      {preview.icon !== null && !isIconBroken ? (
+      {!isIconBroken && preview.icon !== null ? (
         <img
           alt=""
           className="size-4 shrink-0 rounded-sm"
           onError={() => {
-            setIconBroken(true);
+            setIsIconBroken(true);
           }}
           src={preview.icon}
         />

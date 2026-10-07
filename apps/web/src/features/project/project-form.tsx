@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from "react";
+import { type SyntheticEvent, useId, useState } from "react";
 
 import type { MessageKey } from "@pace/core";
 
@@ -9,13 +9,42 @@ import { Button } from "#web/shared/ui/button.tsx";
 
 import { ColorRadios } from "./color-radios.tsx";
 import { FIELD_CLASS } from "./field-class.ts";
-import { type ProjectDraft, projectNameProblem, updateProject } from "./project-events.ts";
+import { didUpdateProject, type ProjectDraft, projectNameProblem } from "./project-events.ts";
 
 type Props = {
   readonly projectId: string;
   readonly initial: ProjectDraft;
   readonly archived: boolean;
   readonly onDone: () => void;
+};
+
+const FormButtons = ({
+  archived,
+  onArchive,
+  onCancel,
+}: {
+  readonly archived: boolean;
+  readonly onArchive: () => Promise<void>;
+  readonly onCancel: () => void;
+}) => {
+  const t = useT();
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button
+        className="mr-auto"
+        onClick={() => {
+          void onArchive();
+        }}
+        variant="ghost"
+      >
+        {t(archived ? "project.restore" : "project.archive")}
+      </Button>
+      <Button onClick={onCancel} variant="ghost">
+        {t("common.cancel")}
+      </Button>
+      <Button type="submit">{t("common.save")}</Button>
+    </div>
+  );
 };
 
 /** Name, color and description of a project, plus archive / restore. */
@@ -26,7 +55,7 @@ export const ProjectForm = ({ archived, initial, onDone, projectId }: Props) => 
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState<MessageKey | null>(null);
 
-  const save = async (event: FormEvent): Promise<void> => {
+  const save = async (event: SyntheticEvent): Promise<void> => {
     event.preventDefault();
     const found = projectNameProblem(
       services.state.store.getState().projects,
@@ -34,13 +63,13 @@ export const ProjectForm = ({ archived, initial, onDone, projectId }: Props) => 
       projectId,
     );
     setProblem(found);
-    if (found === null && (await updateProject(services, projectId, draft))) {
+    if (found === null && (await didUpdateProject(services, projectId, draft))) {
       onDone();
     }
   };
 
   const toggleArchive = async (): Promise<void> => {
-    await updateProject(services, projectId, { archived: !archived });
+    await didUpdateProject(services, projectId, { archived: !archived });
     onDone();
   };
 
@@ -86,21 +115,7 @@ export const ProjectForm = ({ archived, initial, onDone, projectId }: Props) => 
           {t(problem)}
         </p>
       )}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button
-          className="mr-auto"
-          onClick={() => {
-            void toggleArchive();
-          }}
-          variant="ghost"
-        >
-          {t(archived ? "project.restore" : "project.archive")}
-        </Button>
-        <Button onClick={onDone} variant="ghost">
-          {t("common.cancel")}
-        </Button>
-        <Button type="submit">{t("common.save")}</Button>
-      </div>
+      <FormButtons archived={archived} onArchive={toggleArchive} onCancel={onDone} />
     </form>
   );
 };

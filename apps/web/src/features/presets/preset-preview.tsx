@@ -55,6 +55,21 @@ const progressParts = (resolved: ResolvedPreset): readonly MetaPart[] => {
   }
 };
 
+/** The next instance's due for a recurring preset, else tomorrow's end of day. */
+const previewDue = (
+  presets: Parameters<typeof expectedInstances>[0],
+  now: string,
+  zone: string,
+): { readonly at: string; readonly tz: string } => {
+  const slot = expectedInstances(presets, now).find(
+    (candidate) =>
+      candidate.presetId === PREVIEW_ID && Date.parse(candidate.dueAt) > Date.parse(now),
+  );
+  return slot === undefined
+    ? { at: endOfDayIn(addMinutesIso(now, MINUTES_PER_DAY), zone), tz: zone }
+    : { at: slot.dueAt, tz: slot.dueTz };
+};
+
 /** A sample task of this preset drawn like a Now row: its color, importance, due and progress. */
 export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
   const t = useT();
@@ -68,15 +83,7 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
   if (!resolved.ok) {
     return null;
   }
-  const zone = timezone ?? ctx.deviceTz;
-  const slot = expectedInstances(previewPresets, ctx.now).find(
-    (candidate) =>
-      candidate.presetId === PREVIEW_ID && Date.parse(candidate.dueAt) > Date.parse(ctx.now),
-  );
-  const due =
-    slot === undefined
-      ? { at: endOfDayIn(addMinutesIso(ctx.now, MINUTES_PER_DAY), zone), tz: zone }
-      : { at: slot.dueAt, tz: slot.dueTz };
+  const due = previewDue(previewPresets, ctx.now, timezone ?? ctx.deviceTz);
   const { defaultImportance: importance, progressMode } = resolved.value;
   const meta: readonly MetaPart[] = [
     ...(importance === "normal" ? [] : [{ importance, kind: "importance" } as const]),

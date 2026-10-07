@@ -34,23 +34,31 @@ type RowProps = {
 /** A board row that can be dragged by its handle, or moved with Space and the arrow keys. */
 const SortableTaskRow = ({ isTop, onCheck, row }: RowProps) => {
   const t = useT();
-  const sortable = useSortable({ attributes: { roleDescription: t("now.dnd.role") }, id: row.id });
+  const {
+    attributes,
+    isDragging,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ attributes: { roleDescription: t("now.dnd.role") }, id: row.id });
   return (
     <TaskRow
-      className={cn(sortable.isDragging && "relative z-10 bg-raised shadow-lg")}
+      className={cn(isDragging && "relative z-10 bg-raised shadow-lg")}
       isTop={isTop}
       onCheck={onCheck}
-      ref={sortable.setNodeRef}
+      ref={setNodeRef}
       row={row}
       style={{
-        transform: CSS.Translate.toString(sortable.transform),
-        transition: sortable.transition,
+        transform: CSS.Translate.toString(transform),
+        transition,
       }}
       trailing={
         <button
-          ref={sortable.setActivatorNodeRef}
-          {...sortable.attributes}
-          {...sortable.listeners}
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
           aria-label={t("now.reorder", { title: row.title })}
           className="-my-1 -mr-2 flex w-8 shrink-0 cursor-grab touch-none items-center justify-center self-stretch rounded-md text-faint transition-colors outline-none hover:text-fg2 focus-visible:ring-[3px] focus-visible:ring-accent/40"
           type="button"

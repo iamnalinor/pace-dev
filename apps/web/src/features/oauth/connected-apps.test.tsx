@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { at } from "#web/test/at.ts";
 import { renderWithProviders } from "#web/test/render.tsx";
 import { createTestServices, signedInSession } from "#web/test/services.ts";
 import { type FakeRoute, problem } from "@pace/client/testing";
@@ -54,7 +55,7 @@ describe("ConnectedApps", () => {
 
   it("revokes a grant after a confirmation", async () => {
     const { api, user } = await setup();
-    const claude = (await screen.findAllByRole("listitem"))[0]!;
+    const claude = at(await screen.findAllByRole("listitem"), 0);
     await user.click(within(claude).getByRole("button", { name: "Revoke" }));
     expect(within(claude).getByText("Revoke access for Claude?")).toBeInTheDocument();
     expect(api.pathsCalled("/api/oauth/grants/")).toEqual([]);
@@ -73,7 +74,7 @@ describe("ConnectedApps", () => {
     const { user } = await setup({
       "DELETE /api/oauth/grants/g1": () => problem(500, "oauth/revoke-failed"),
     });
-    const claude = (await screen.findAllByRole("listitem"))[0]!;
+    const claude = at(await screen.findAllByRole("listitem"), 0);
     await user.click(within(claude).getByRole("button", { name: "Revoke" }));
     await user.click(within(claude).getByRole("button", { name: "Yes, revoke" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not revoke. Try again.");

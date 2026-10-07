@@ -61,17 +61,12 @@ const valueOf = (row: WhyRow, context: WhyContext): string => {
 const labelOf = (row: WhyRow, context: WhyContext): string => {
   const { language } = context;
   const importance = t(language, `importance.${context.importance}`);
-  switch (row.key) {
-    case "multiplier": {
-      return importance;
-    }
-    case "rank": {
-      return t(language, "explain.rank", { importance });
-    }
-    default: {
-      return t(language, `explain.${row.key}`);
-    }
+  if (row.key === "multiplier") {
+    return importance;
   }
+  return row.key === "rank"
+    ? t(language, "explain.rank", { importance })
+    : t(language, `explain.${row.key}`);
 };
 
 const lineOf = (row: WhyRow, context: WhyContext): readonly WhyLine[] => {

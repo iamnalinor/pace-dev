@@ -30,7 +30,7 @@ const MetaLine = ({ now, row }: { readonly row: NowRow; readonly now: string | u
     <p className="text-xs text-muted">
       {segments.map((segment, index) => (
         // The parts are positional and never reorder within a row.
-        // eslint-disable-next-line react/no-array-index-key -- positional, never reordered
+        // eslint-disable-next-line @eslint-react/no-array-index-key -- positional, never reordered
         <span key={index}>
           {index > 0 && " · "}
           <span className={TONE_CLASS[segment.tone]}>{segment.text}</span>
@@ -97,7 +97,10 @@ export const TaskRow = ({
       >
         <span className="flex items-center gap-2">
           <ProjectDot color={row.color} />
-          <span className={cn("truncate text-[15px]", row.dimmed ? "text-fg2" : "font-medium")}>
+          <span
+            className={cn("truncate text-[15px]", row.dimmed ? "text-fg2" : "font-medium")}
+            data-testid="task-title"
+          >
             {row.title}
           </span>
         </span>

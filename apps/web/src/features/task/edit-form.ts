@@ -58,17 +58,19 @@ type Instant = { readonly error: EditError | null; readonly at: null | string };
 A time field: blank stays blank (a due can be moved, not removed, yet); anything typed has
 to be a real wall-clock time in a real zone.
 */
-const readInstant = (
-  value: string,
-  had: string,
-  zone: string,
-  errors: { readonly invalid: EditError; readonly required: EditError },
-): Instant => {
+type InstantField = {
+  readonly value: string;
+  readonly had: string;
+  readonly invalid: EditError;
+  readonly required: EditError;
+};
+
+const readInstant = ({ had, invalid, required, value }: InstantField, zone: string): Instant => {
   if (value === "") {
-    return { at: null, error: had === "" ? null : errors.required };
+    return { at: null, error: had === "" ? null : required };
   }
   const at = isValidTimeZone(zone) ? wallClockToIso(value, zone) : null;
-  return { at, error: at === null && isValidTimeZone(zone) ? errors.invalid : null };
+  return { at, error: at === null && isValidTimeZone(zone) ? invalid : null };
 };
 
 const fieldsPatch = (initial: EditForm, form: EditForm): TaskPatch["fields"] | undefined => {
@@ -80,8 +82,7 @@ const fieldsPatch = (initial: EditForm, form: EditForm): TaskPatch["fields"] | u
 };
 
 const schedulePatch = (
-  initial: EditForm,
-  form: EditForm,
+  { form, initial }: { readonly initial: EditForm; readonly form: EditForm },
   due: Instant,
   start: Instant,
 ): TaskPatch => {
@@ -94,6 +95,29 @@ const schedulePatch = (
   };
 };
 
+const formErrors = (form: EditForm, instants: readonly Instant[]): readonly EditError[] => [
+  ...(form.title.trim() === "" ? ["titleRequired" as const] : []),
+  ...(isValidTimeZone(form.zone) ? [] : ["zoneInvalid" as const]),
+  ...instants.map((instant) => instant.error).filter((error) => error !== null),
+];
+
+const taskPatch = (
+  pair: { readonly initial: EditForm; readonly form: EditForm },
+  due: Instant,
+  start: Instant,
+): TaskPatch => {
+  const { form, initial } = pair;
+  const fields = fieldsPatch(initial, form);
+  return {
+    ...(form.title !== initial.title && { title: form.title }),
+    ...(form.description !== initial.description && {
+      description: form.description === "" ? null : form.description,
+    }),
+    ...schedulePatch(pair, due, start),
+    ...(fields !== undefined && { fields }),
+  };
+};
+
 /**
 What to write for the sheet, compared with how it opened (so untouched fields write
 nothing), or every reason it cannot be saved.
@@ -103,31 +127,19 @@ export const editChanges = (
   initial: EditForm,
   form: EditForm,
 ): Result<EditChanges, readonly EditError[]> => {
-  const due = readInstant(form.due, initial.due, form.zone, {
-    invalid: "dueInvalid",
-    required: "dueRequired",
-  });
-  const start = readInstant(form.start, initial.start, form.zone, {
-    invalid: "startInvalid",
-    required: "startRequired",
-  });
-  const errors: readonly EditError[] = [
-    ...(form.title.trim() === "" ? ["titleRequired" as const] : []),
-    ...(isValidTimeZone(form.zone) ? [] : ["zoneInvalid" as const]),
-    ...[due.error, start.error].filter((error): error is EditError => error !== null),
-  ];
+  const due = readInstant(
+    { had: initial.due, invalid: "dueInvalid", required: "dueRequired", value: form.due },
+    form.zone,
+  );
+  const start = readInstant(
+    { had: initial.start, invalid: "startInvalid", required: "startRequired", value: form.start },
+    form.zone,
+  );
+  const errors = formErrors(form, [due, start]);
   if (errors.length > 0) {
     return err(errors);
   }
-  const fields = fieldsPatch(initial, form);
-  const patch: TaskPatch = {
-    ...(form.title !== initial.title && { title: form.title }),
-    ...(form.description !== initial.description && {
-      description: form.description === "" ? null : form.description,
-    }),
-    ...schedulePatch(initial, form, due, start),
-    ...(fields !== undefined && { fields }),
-  };
+  const patch = taskPatch({ form, initial }, due, start);
   return ok({
     patch,
     ...(form.presetId !== view.overrideSheet.presetId && { presetId: form.presetId }),

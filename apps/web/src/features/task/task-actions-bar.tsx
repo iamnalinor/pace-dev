@@ -20,49 +20,46 @@ type Props = {
   readonly onClose: (mode: CloseMode) => void;
 };
 
-/** Focus (stage 3), the status switch, and the primary action: Submit, Done or Reopen. */
-export const TaskActionsBar = ({ onClose, view }: Props) => {
+/** A closed task: how it ended, and Reopen. */
+const ClosedBar = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
-  const language = useLanguage();
   const { actions } = useServices();
   const run = useRunAction();
-  const status = view.tags.find((tag) => tag.kind === "status");
-  const isOnHold =
-    status?.kind === "status" && (status.status === "waiting" || status.status === "paused");
-  const setStatus = (next: "in_progress" | "waiting"): void => {
-    void run(actions.setStatus(view.id, next), {
-      undo: t("task.statusSet", { status: t(`status.${next}`), title: view.title }),
-    });
-  };
-
-  if (view.closed !== null) {
-    return (
-      <div className="flex flex-col gap-3 px-4 pt-3 pb-6">
-        <p className="text-center text-[13px] text-muted">
-          {t("task.closedAs", { outcome: t(`outcome.${view.outcome ?? view.closed.outcome}`) })}
-          {view.closed.reason !== null && ` · ${t("task.reason", { reason: view.closed.reason })}`}
-        </p>
-        <Button
-          className={BUTTON}
-          onClick={() => {
-            void run(actions.reopen(view.id), { undo: t("task.reopened") });
-          }}
-          variant="secondary"
-        >
-          <RotateCcw aria-hidden="true" strokeWidth={1.75} />
-          {t("task.reopen")}
-        </Button>
-      </div>
-    );
+  const closed = view.closed;
+  if (closed === null) {
+    return null;
   }
+  return (
+    <div className="flex flex-col gap-3 px-4 pt-3 pb-6">
+      <p className="text-center text-[13px] text-muted">
+        {t("task.closedAs", { outcome: t(`outcome.${view.outcome ?? closed.outcome}`) })}
+        {closed.reason !== null && ` · ${t("task.reason", { reason: closed.reason })}`}
+      </p>
+      <Button
+        className={BUTTON}
+        onClick={() => {
+          void run(actions.reopen(view.id), { undo: t("task.reopened") });
+        }}
+        variant="secondary"
+      >
+        <RotateCcw aria-hidden="true" strokeWidth={1.75} />
+        {t("task.reopen")}
+      </Button>
+    </div>
+  );
+};
 
+/** The primary button: Submit the solved problems, Done, or Close. */
+const usePrimary = (view: TaskViewModel) => {
+  const t = useT();
+  const language = useLanguage();
   const { primaryAction } = view;
-  const primary = (() => {
+  return (() => {
     switch (primaryAction.kind) {
       case "submit": {
         const names = view.problems
           .filter((problem) => primaryAction.subtaskIds.includes(problem.id))
-          .map(problemName);
+          .map((problem) => problemName(problem));
         return {
           icon: <Upload aria-hidden="true" strokeWidth={1.75} />,
           label: t("task.submitProblems", { problems: formatList(names, language) }),
@@ -85,6 +82,26 @@ export const TaskActionsBar = ({ onClose, view }: Props) => {
       }
     }
   })();
+};
+
+/** Focus (stage 3), the status switch, and the primary action: Submit, Done or Reopen. */
+export const TaskActionsBar = ({ onClose, view }: Props) => {
+  const t = useT();
+  const { actions } = useServices();
+  const run = useRunAction();
+  const primary = usePrimary(view);
+  if (view.closed !== null) {
+    return <ClosedBar view={view} />;
+  }
+
+  const status = view.tags.find((tag) => tag.kind === "status");
+  const isOnHold =
+    status?.kind === "status" && (status.status === "waiting" || status.status === "paused");
+  const setStatus = (next: "in_progress" | "waiting"): void => {
+    void run(actions.setStatus(view.id, next), {
+      undo: t("task.statusSet", { status: t(`status.${next}`), title: view.title }),
+    });
+  };
 
   return (
     <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2 px-4 pt-3 pb-6">

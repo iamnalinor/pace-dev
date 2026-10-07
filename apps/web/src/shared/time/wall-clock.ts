@@ -41,6 +41,24 @@ malformed value, a date that does not exist, an unknown zone). The offset is rea
 because the first guess may sit on the other side of a DST change; a time inside the
 spring-forward gap resolves to a real instant next to it.
 */
+type WallParts = {
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+};
+
+/** Date.UTC rolls 30 February over into March: a value that does not read back is not real. */
+const isReadBack = (asUtc: number, parts: WallParts): boolean => {
+  const probe = new Date(asUtc);
+  return (
+    probe.getUTCMonth() === parts.month - 1 &&
+    probe.getUTCDate() === parts.day &&
+    probe.getUTCHours() === parts.hour &&
+    probe.getUTCMinutes() === parts.minute
+  );
+};
+
 export const wallClockToIso = (local: string, tz: string): null | string => {
   const match = WALL_CLOCK.exec(local);
   if (match === null || !isValidTimeZone(tz)) {
@@ -48,14 +66,7 @@ export const wallClockToIso = (local: string, tz: string): null | string => {
   }
   const [, year = 0, month = 1, day = 1, hour = 0, minute = 0] = match.map(Number);
   const asUtc = Date.UTC(year, month - 1, day, hour, minute);
-  // Date.UTC rolls 30 February over into March: a value that does not read back is not real.
-  const probe = new Date(asUtc);
-  const isReal =
-    probe.getUTCMonth() === month - 1 &&
-    probe.getUTCDate() === day &&
-    probe.getUTCHours() === hour &&
-    probe.getUTCMinutes() === minute;
-  if (!isReal) {
+  if (!isReadBack(asUtc, { day, hour, minute, month })) {
     return null;
   }
   const guess = asUtc - offsetMinutes(tz, asUtc) * MINUTE_MS;

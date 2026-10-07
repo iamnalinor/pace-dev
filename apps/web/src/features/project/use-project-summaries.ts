@@ -24,21 +24,20 @@ export const useProjectSummaries = (): readonly ProjectSummary[] => {
   return useMemo(
     () =>
       Object.values(state.projects.byId)
-        .flatMap((project) => {
+        .map((project) => {
           const view = projectViewModel(state, project.id, ctx);
           return view.ok
-            ? [
-                {
-                  archived: project.archived,
-                  color: project.color,
-                  id: project.id,
-                  name: project.name,
-                  onTime: view.value.stats.onTime,
-                  open: view.value.stats.open,
-                },
-              ]
-            : [];
+            ? {
+                archived: project.archived,
+                color: project.color,
+                id: project.id,
+                name: project.name,
+                onTime: view.value.stats.onTime,
+                open: view.value.stats.open,
+              }
+            : null;
         })
+        .filter((summary) => summary !== null)
         .toSorted((a, b) =>
           a.archived === b.archived ? byName(a, b) : Number(a.archived) - Number(b.archived),
         ),

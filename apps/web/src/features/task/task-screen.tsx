@@ -42,7 +42,7 @@ const TaskDetails = ({ view }: { readonly view: TaskViewModel }) => {
   const [params, setParams] = useSearchParams();
   const isCloseRequested = params.has(CLOSE_SHEET_PARAM) && view.closed === null;
   const [sheet, setSheet] = useState<Sheet>(isCloseRequested ? "close" : null);
-  const [closeMode, setCloseMode] = useState<CloseMode>(requestedMode(view));
+  const [closeMode, setCloseMode] = useState<CloseMode>(() => requestedMode(view));
   const closeSheet = (): void => {
     setSheet(null);
     if (params.has(CLOSE_SHEET_PARAM)) {

@@ -14,7 +14,7 @@ type Props = {
 /** "+ 6 later · 2 waiting" under the board; tapping it unfolds the waiting tasks. */
 export const FoldedFooter = ({ laterCount, onCheck, waiting }: Props) => {
   const t = useT();
-  const [isOpen, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const label = [
     ...(laterCount > 0 ? [t("now.later", { count: laterCount })] : []),
     ...(waiting.length > 0 ? [t("now.waitingCount", { count: waiting.length })] : []),
@@ -32,7 +32,7 @@ export const FoldedFooter = ({ laterCount, onCheck, waiting }: Props) => {
         aria-expanded={isOpen}
         className="mx-2 flex min-h-11 items-center self-start rounded-md px-3 text-xs text-faint transition-colors outline-none hover:text-fg2 focus-visible:ring-[3px] focus-visible:ring-accent/40"
         onClick={() => {
-          setOpen((current) => !current);
+          setIsOpen((current) => !current);
         }}
         type="button"
       >

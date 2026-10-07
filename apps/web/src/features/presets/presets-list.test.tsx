@@ -11,7 +11,9 @@ describe("PresetsList", () => {
     const { services } = await artboardServices();
     const { user } = renderWithProviders(<PresetsList />, { services });
     const list = await screen.findByRole("list", { name: "Presets" });
-    const homework = within(list).getByText("Homework").closest("li")!;
+    const homework = within(list)
+      .getAllByRole("listitem")
+      .find((item) => within(item).queryByText("Homework") !== null);
     expect(homework).toHaveTextContent("Built-in");
     expect(within(list).queryByText("Inbox")).not.toBeInTheDocument();
     const algebra = within(list).getByRole("link", { name: /Algebra HW/ });

@@ -90,8 +90,8 @@ export const PresetSections = (section: SectionProps) => {
       <Section title={t("presets.section.fields")}>
         {FIELD_KEYS.map((key) => (
           <FieldToggleRow
-            {...section}
             key={key}
+            {...section}
             label={t(`presets.taskField.${key}`)}
             sub={{ group: "fields", key }}
           />
@@ -100,8 +100,8 @@ export const PresetSections = (section: SectionProps) => {
       <Section title={t("presets.section.notify")}>
         {NOTIFY_KEYS.map((key) => (
           <NotifyRow
-            {...section}
             key={key}
+            {...section}
             label={t(`presets.notify.${key}`)}
             sub={{ group: "notify", key }}
           />

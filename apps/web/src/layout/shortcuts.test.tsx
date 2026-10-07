@@ -9,7 +9,7 @@ import { nowViewModel, queryContext } from "@pace/client";
 
 import { Shortcuts } from "./shortcuts.tsx";
 
-const setup = async (route = "/") => {
+const setup = async () => {
   const { services } = await artboardServices();
   const rows = nowViewModel(services.state.store.getState(), queryContext(services.clock)).rows;
   const view = renderWithProviders(
@@ -18,7 +18,7 @@ const setup = async (route = "/") => {
       <Composer />
       <Shortcuts />
     </>,
-    { route, services },
+    { services },
   );
   const path = () => view.router.state.location.pathname;
   return { ...view, path, rows };

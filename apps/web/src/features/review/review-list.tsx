@@ -22,6 +22,9 @@ export const ReviewList = () => {
   // "Keep open" writes nothing, so the card is hidden locally until the next visit.
   const [dismissed, setDismissed] = useState<readonly string[]>([]);
   const rows = review.items.filter((row) => !dismissed.includes(row.taskId));
+  if (rows.length === 0) {
+    return <p className="px-5 py-8 text-sm text-muted">{t("review.empty")}</p>;
+  }
   const zone = settings.timezone ?? ctx.deviceTz;
 
   const run = async (row: ReviewRow, key: ReviewActionKey): Promise<void> => {
@@ -42,9 +45,6 @@ export const ReviewList = () => {
     }
   };
 
-  if (rows.length === 0) {
-    return <p className="px-5 py-8 text-sm text-muted">{t("review.empty")}</p>;
-  }
   return (
     <ul aria-label={t("review.title")} className="grid gap-2.5 px-4">
       {rows.map((row) => (

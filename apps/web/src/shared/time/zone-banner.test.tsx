@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { frozenServices } from "#web/test/artboard-services.ts";
@@ -38,9 +38,9 @@ describe("ZoneBanner", () => {
     });
     const { user } = renderWithProviders(<ZoneBanner />, { services });
     await user.click(await screen.findByRole("button", { name: "Use Europe/Moscow" }));
-    expect(
-      await screen.findByRole("button", { name: "Use Europe/Moscow" }).catch(() => null),
-    ).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Use Europe/Moscow" })).not.toBeInTheDocument();
+    });
     expect(services.state.store.getState().settings.timezone).toBe(MOSCOW);
   });
 });

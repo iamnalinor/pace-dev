@@ -222,79 +222,54 @@ const MenuPanel = ({ close, onEdit, onPanel, view }: MenuProps) => {
       close();
     })();
   };
+  const items = [
+    { key: "edit", label: t("task.edit"), onSelect: onEdit },
+    { key: "preset", label: t("task.menu.preset"), onSelect: () => { onPanel("preset"); } },
+    { key: "move", label: t("task.move"), onSelect: () => { onPanel("move"); } },
+    ...(isOpen && !isPaused
+      ? [
+          {
+            key: "pause",
+            label: t("task.pause"),
+            onSelect: () => {
+              act(
+                actions.setStatus(view.id, "paused"),
+                t("task.statusSet", { status: t("status.paused"), title: view.title }),
+              );
+            },
+          },
+        ]
+      : []),
+    ...(isOpen
+      ? []
+      : [
+          {
+            key: "reopen",
+            label: t("task.reopen"),
+            onSelect: () => {
+              act(actions.reopen(view.id), t("task.reopened"));
+            },
+          },
+        ]),
+    { isWarn: true, key: "delete", label: t("task.delete"), onSelect: () => { onPanel("delete"); } },
+  ];
   return (
     <>
       <SheetHeader>
         <SheetTitle>{t("task.menuTitle")}</SheetTitle>
       </SheetHeader>
       <ul>
-        <li>
-          <button className={ROW} onClick={onEdit} type="button">
-            {t("task.edit")}
-          </button>
-        </li>
-        <li>
-          <button
-            className={ROW}
-            onClick={() => {
-              onPanel("preset");
-            }}
-            type="button"
-          >
-            {t("task.menu.preset")}
-          </button>
-        </li>
-        <li>
-          <button
-            className={ROW}
-            onClick={() => {
-              onPanel("move");
-            }}
-            type="button"
-          >
-            {t("task.move")}
-          </button>
-        </li>
-        {isOpen && !isPaused && (
-          <li>
+        {items.map((item) => (
+          <li key={item.key}>
             <button
-              className={ROW}
-              onClick={() => {
-                act(
-                  actions.setStatus(view.id, "paused"),
-                  t("task.statusSet", { status: t("status.paused"), title: view.title }),
-                );
-              }}
+              className={cn(ROW, "isWarn" in item && "text-warn")}
+              onClick={item.onSelect}
               type="button"
             >
-              {t("task.pause")}
+              {item.label}
             </button>
           </li>
-        )}
-        {!isOpen && (
-          <li>
-            <button
-              className={ROW}
-              onClick={() => {
-                act(actions.reopen(view.id), t("task.reopened"));
-              }}
-              type="button"
-            >
-              {t("task.reopen")}
-            </button>
-          </li>
-        )}
-        <li>
-          <button
-            className={cn(ROW, "text-warn")}
-            onClick={() => {
-              onPanel("delete");
-            }}
-            type="button"
-          >
-            {t("task.delete")}
-          </button>
-        </li>
+        ))}
       </ul>
     </>
   );

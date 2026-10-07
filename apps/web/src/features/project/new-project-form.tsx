@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { type FormEvent, useId, useState } from "react";
+import { type SyntheticEvent, useId, useState } from "react";
 import { toast } from "sonner";
 
 import type { MessageKey, ProjectColorName } from "@pace/core";
@@ -23,24 +23,6 @@ export const NewProjectForm = () => {
   const [color, setColor] = useState<ProjectColorName>("blue");
   const [problem, setProblem] = useState<MessageKey | null>(null);
 
-  const close = (): void => {
-    setIsOpen(false);
-    setName("");
-    setProblem(null);
-  };
-
-  const submit = async (event: FormEvent): Promise<void> => {
-    event.preventDefault();
-    const found = projectNameProblem(services.state.store.getState().projects, name);
-    setProblem(found);
-    if (found !== null || (await createProject(services, { color, name })) === null) {
-      return;
-    }
-
-    toast(t("projects.created", { name: name.trim() }));
-    close();
-  };
-
   if (!isOpen) {
     return (
       <Button
@@ -55,6 +37,24 @@ export const NewProjectForm = () => {
       </Button>
     );
   }
+  const close = (): void => {
+    setIsOpen(false);
+    setName("");
+    setProblem(null);
+  };
+
+  const submit = async (event: SyntheticEvent): Promise<void> => {
+    event.preventDefault();
+    const found = projectNameProblem(services.state.store.getState().projects, name);
+    setProblem(found);
+    if (found !== null || (await createProject(services, { color, name })) === null) {
+      return;
+    }
+
+    toast(t("projects.created", { name: name.trim() }));
+    close();
+  };
+
   return (
     <form
       className="grid gap-3 rounded-xl border border-line bg-surface p-3.5"

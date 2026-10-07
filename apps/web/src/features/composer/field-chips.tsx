@@ -49,7 +49,7 @@ const useDueText = (due: ComposerModel["due"]): null | string => {
     return null;
   }
   return t("composer.dueChip", {
-    when: formatDayTime(due.at, now, due.tz, language),
+    when: formatDayTime(due, { language, now }),
     zone: zoneLabel(due.at, due.tz, language),
   });
 };

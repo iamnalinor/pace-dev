@@ -1,7 +1,9 @@
 import { cn } from "#web/shared/lib/cn.ts";
 
-const percent = (fraction: number): string =>
-  `${String(Math.round(Math.min(Math.max(fraction, 0), 1) * 100))}%`;
+const clamp = (fraction: number): number => Math.min(Math.max(fraction, 0), 1);
+
+export const percent = (fraction: number): string =>
+  `${String(Math.round(clamp(fraction) * 100))}%`;
 
 /**
 A row's 3px progress bar with the lime pace marker: where the work should be by now.

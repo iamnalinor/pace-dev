@@ -6,11 +6,10 @@ import type { InboxCard as Card } from "@pace/client";
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
+import { ImportanceDot } from "#web/shared/ui/importance-mark.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 
 import { formatAge } from "./age.ts";
-import { ImportanceDot } from "#web/shared/ui/importance-mark.tsx";
-
 import { ChipPicker } from "./chip-picker.tsx";
 import {
   CHIP_FIELDS,

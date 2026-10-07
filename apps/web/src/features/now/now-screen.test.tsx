@@ -8,14 +8,14 @@ import { CALC_HW5_ID, HW_ID, REPLY_ID, TRK_ID, WORK_ID } from "@pace/core/testin
 
 import { NowScreen } from "./now-screen.tsx";
 
-const renderBoard = async (route = "/") => {
+const renderBoard = async () => {
   const { services } = await artboardServices();
   return renderWithProviders(
     <>
       <Toaster />
       <NowScreen />
     </>,
-    { route, services },
+    { services },
   );
 };
 
@@ -23,7 +23,7 @@ const board = () => screen.getByRole("list", { name: "Tasks" });
 const titles = () =>
   within(board())
     .getAllByRole("listitem")
-    .map((item) => within(item).getByRole("link").querySelector(".truncate")?.textContent);
+    .map((item) => within(item).getByTestId("task-title").textContent);
 
 describe("NowScreen", () => {
   beforeEach(() => {
@@ -55,7 +55,7 @@ describe("NowScreen", () => {
       "Return library books",
     ]);
     const meta = (title: string) =>
-      screen.getByRole("link", { name: new RegExp(`^${title}`) }).textContent;
+      screen.getAllByRole("link").find((link) => link.textContent.startsWith(title))?.textContent;
     expect(meta("Calculus HW 5")).toContain("1 day late · 2 problems left");
     expect(meta("Reply to course curator")).toContain("ASAP · by end of day");
     expect(meta("Algebra HW 6")).toContain("Due tomorrow 23:59 · 4/7 solved · 2 sent");
@@ -127,8 +127,10 @@ describe("NowScreen", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
       this: HTMLElement,
     ) {
+      /* eslint-disable testing-library/no-node-access -- jsdom has no layout: the mock places each row by its index */
       const item = this.closest("li");
       const index = item === null ? 0 : [...(item.parentElement?.children ?? [])].indexOf(item);
+      /* eslint-enable testing-library/no-node-access -- end of the layout mock */
       return DOMRect.fromRect({ height: 60, width: 390, x: 0, y: index * 60 });
     });
     const { services, user } = await renderBoard();

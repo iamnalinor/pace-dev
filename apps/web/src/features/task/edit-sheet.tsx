@@ -3,10 +3,8 @@ import { useState } from "react";
 import type { ActionResult, TaskViewModel } from "@pace/client";
 import type { Event } from "@pace/core";
 
-import { useLanguage, useServices } from "#web/app-state.tsx";
-import { type Translate, useT } from "#web/i18n.tsx";
-import { formatMinutes } from "#web/shared/format/duration.ts";
-import { cn } from "#web/shared/lib/cn.ts";
+import { useServices } from "#web/app-state.tsx";
+import { useT } from "#web/i18n.tsx";
 import { revokeEvents, showUndoToast } from "#web/shared/lib/undo-toast.ts";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
@@ -21,39 +19,8 @@ import {
   SheetTitle,
 } from "#web/shared/ui/sheet.tsx";
 
-import { editChanges, type EditError, type EditForm, initialEditForm } from "./edit-form.ts";
-
-const INPUT =
-  "h-11 w-full rounded-md border border-line bg-bg px-3 text-sm text-fg placeholder:text-faint aria-[invalid=true]:border-warn";
-const LABEL = "flex flex-col gap-1.5 text-xs text-muted";
-
-const ERROR_KEYS = {
-  dueInvalid: "edit.dueInvalid",
-  dueRequired: "edit.dueRequired",
-  startInvalid: "edit.startInvalid",
-  startRequired: "edit.startRequired",
-  titleRequired: "edit.titleRequired",
-  zoneInvalid: "edit.zoneInvalid",
-} as const satisfies Readonly<Record<EditError, string>>;
-
-const FieldError = ({
-  errors,
-  id,
-  t,
-  which,
-}: {
-  readonly errors: readonly EditError[];
-  readonly which: readonly EditError[];
-  readonly id: string;
-  readonly t: Translate;
-}) => {
-  const shown = errors.filter((error) => which.includes(error));
-  return shown.length === 0 ? null : (
-    <span className="text-xs text-warn" id={id} role="alert">
-      {shown.map((error) => t(ERROR_KEYS[error])).join(" ")}
-    </span>
-  );
-};
+import { editChanges, type EditForm, initialEditForm } from "./edit-form.ts";
+import { EstimateField, LinkFields, ScheduleFields, TextFields } from "./edit-parts.tsx";
 
 type FormProps = {
   readonly view: TaskViewModel;
@@ -114,8 +81,7 @@ const useSave = (view: TaskViewModel) => {
 
 const EditFields = ({ onDone, view }: FormProps) => {
   const t = useT();
-  const language = useLanguage();
-  const { actions, hooks } = useServices();
+  const { hooks } = useServices();
   const { deviceTz } = hooks.useClock();
   const settings = hooks.useSettings();
   const [initial] = useState(() => initialEditForm(view, settings.timezone ?? deviceTz));
@@ -127,12 +93,6 @@ const EditFields = ({ onDone, view }: FormProps) => {
   const set = <K extends keyof EditForm>(key: K, value: EditForm[K]): void => {
     setForm((current) => ({ ...current, [key]: value }));
   };
-  const buckets = actions.estimateHints(form.presetId);
-  const presetDefault = view.overrideSheet.isEstimateOwn
-    ? null
-    : view.overrideSheet.estimateMinutes;
-  const invalid = (which: readonly EditError[]): boolean =>
-    errors.some((error) => which.includes(error));
 
   return (
     <form
@@ -159,87 +119,8 @@ const EditFields = ({ onDone, view }: FormProps) => {
           value={form.presetId}
         />
       </div>
-      <label className={LABEL}>
-        {t("edit.taskTitle")}
-        <input
-          aria-describedby="edit-title-error"
-          aria-invalid={invalid(["titleRequired"])}
-          className={INPUT}
-          onChange={(event) => {
-            set("title", event.target.value);
-          }}
-          value={form.title}
-        />
-        <FieldError errors={errors} id="edit-title-error" t={t} which={["titleRequired"]} />
-      </label>
-      <label className={LABEL}>
-        {t("edit.description")}
-        <textarea
-          className={cn(INPUT, "h-auto min-h-20 py-2")}
-          onChange={(event) => {
-            set("description", event.target.value);
-          }}
-          value={form.description}
-        />
-      </label>
-      <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1.5 text-xs text-muted">
-          {t("edit.inZone", { zone: form.zone })}
-        </legend>
-        <label className={LABEL}>
-          {t("edit.due")}
-          <input
-            aria-describedby="edit-due-error"
-            aria-invalid={invalid(["dueInvalid", "dueRequired"])}
-            className={cn(INPUT, "font-mono")}
-            onChange={(event) => {
-              set("due", event.target.value);
-            }}
-            type="datetime-local"
-            value={form.due}
-          />
-          <FieldError
-            errors={errors}
-            id="edit-due-error"
-            t={t}
-            which={["dueInvalid", "dueRequired"]}
-          />
-        </label>
-        <label className={LABEL}>
-          {t("edit.start")}
-          <input
-            aria-describedby="edit-start-error"
-            aria-invalid={invalid(["startInvalid", "startRequired"])}
-            className={cn(INPUT, "font-mono")}
-            onChange={(event) => {
-              set("start", event.target.value);
-            }}
-            type="datetime-local"
-            value={form.start}
-          />
-          <FieldError
-            errors={errors}
-            id="edit-start-error"
-            t={t}
-            which={["startInvalid", "startRequired"]}
-          />
-        </label>
-        <label className={LABEL}>
-          {t("edit.zone")}
-          <input
-            aria-describedby="edit-zone-error"
-            aria-invalid={invalid(["zoneInvalid"])}
-            autoCapitalize="off"
-            className={cn(INPUT, "font-mono")}
-            onChange={(event) => {
-              set("zone", event.target.value);
-            }}
-            spellCheck={false}
-            value={form.zone}
-          />
-          <FieldError errors={errors} id="edit-zone-error" t={t} which={["zoneInvalid"]} />
-        </label>
-      </fieldset>
+      <TextFields errors={errors} form={form} set={set} />
+      <ScheduleFields errors={errors} form={form} set={set} />
       <div className="flex flex-col gap-1.5">
         <span aria-hidden="true" className="text-xs text-muted">
           {t("edit.importance")}
@@ -251,64 +132,8 @@ const EditFields = ({ onDone, view }: FormProps) => {
           value={form.importance}
         />
       </div>
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1.5 text-xs text-muted">{t("edit.estimate")}</legend>
-        <div className="flex flex-wrap gap-1.5">
-          {[{ minutes: null, samples: [] }, ...buckets].map((bucket) => {
-            const isOn = form.estimate === bucket.minutes;
-            const label =
-              bucket.minutes === null
-                ? t("edit.estimateDefault", {
-                    duration: formatMinutes(
-                      presetDefault ?? view.overrideSheet.estimateMinutes,
-                      language,
-                    ),
-                  })
-                : formatMinutes(bucket.minutes, language);
-            return (
-              <button
-                aria-pressed={isOn}
-                className={cn(
-                  "flex h-9 items-center rounded-pill border px-3 text-[13px] outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
-                  isOn
-                    ? "border-inverse bg-inverse font-medium text-inverseFg"
-                    : "border-line text-fg2",
-                )}
-                key={bucket.minutes ?? "default"}
-                onClick={() => {
-                  set("estimate", bucket.minutes);
-                }}
-                title={bucket.samples.map((sample) => sample.title).join(", ")}
-                type="button"
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
-      <div className="grid grid-cols-2 gap-3">
-        <label className={LABEL}>
-          {t("edit.link")}
-          <input
-            className={INPUT}
-            onChange={(event) => {
-              set("link", event.target.value);
-            }}
-            value={form.link}
-          />
-        </label>
-        <label className={LABEL}>
-          {t("edit.submitVia")}
-          <input
-            className={INPUT}
-            onChange={(event) => {
-              set("submitVia", event.target.value);
-            }}
-            value={form.submitVia}
-          />
-        </label>
-      </div>
+      <EstimateField form={form} set={set} view={view} />
+      <LinkFields form={form} set={set} />
       <SheetFooter>
         <SheetClose asChild>
           <Button className="h-[50px] flex-1 rounded-lg" variant="secondary">

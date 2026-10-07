@@ -78,7 +78,7 @@ describe("PaceProvider", () => {
   it("generates the week's instances once per load, after sign-in", async () => {
     const { services } = createTestServices();
     const ensure = vi.spyOn(services.actions, "ensureInstances");
-    const first = renderWithProviders(<Probe />, { services });
+    const { unmount } = renderWithProviders(<Probe />, { services });
     await new Promise((resolve) => {
       setTimeout(resolve, 20);
     });
@@ -89,7 +89,7 @@ describe("PaceProvider", () => {
       expect(ensure).toHaveBeenCalledTimes(1);
     });
     // A remount (StrictMode, a new route tree) and a new sign-in reuse the same load.
-    first.unmount();
+    unmount();
     renderWithProviders(<Probe />, { services });
     await services.auth.logout();
     await services.auth.loginWithDev("1919230638");

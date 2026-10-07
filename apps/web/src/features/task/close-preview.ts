@@ -33,7 +33,7 @@ export const closePreview = ({ at, dueAt, problems, sending }: Input): ClosePrev
   outcome: outcomeOf(at, dueAt),
   stillOpen: problems
     .filter((problem) => problem.state !== "submitted" && !sending.includes(problem.id))
-    .map(problemName),
+    .map((problem) => problemName(problem)),
 });
 
 const RECENT_REASONS = 5;
@@ -46,11 +46,13 @@ export const recentReasons = (
   tasks: Readonly<Record<string, { readonly closed: Closure | null }>>,
 ): readonly string[] => {
   const given = Object.values(tasks)
-    .flatMap(({ closed }) =>
-      closed === null || closed.reason === null || closed.source === "system"
-        ? []
-        : [{ at: closed.at, reason: closed.reason }],
-    )
+    .map(({ closed }) => {
+      const reason = closed?.reason ?? null;
+      return closed === null || reason === null || closed.source === "system"
+        ? null
+        : { at: closed.at, reason };
+    })
+    .filter((entry) => entry !== null)
     .toSorted((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .map(({ reason }) => reason);
   return [...new Set(given)].slice(0, RECENT_REASONS);

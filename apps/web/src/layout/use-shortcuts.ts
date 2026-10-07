@@ -24,7 +24,9 @@ export const useShortcuts = (onHelp: () => void): void => {
   const taskId = useMatch("/task/:id")?.params.id ?? null;
   const step = (delta: number): void => {
     const index = rows.findIndex((row) => row.id === taskId);
-    const next = rows.at(index === -1 ? (delta > 0 ? 0 : -1) : (index + delta) % rows.length);
+    // Nothing open yet: j starts at the top, k at the bottom.
+    const start = delta > 0 ? 0 : -1;
+    const next = rows.at(index === -1 ? start : (index + delta) % rows.length);
     if (next !== undefined) {
       void navigate(`/task/${next.id}`);
     }
@@ -58,14 +60,16 @@ export const useShortcuts = (onHelp: () => void): void => {
     },
   };
   // The listener is added once; it always reads the latest handlers.
-  const latest = useRef(handlers);
-  latest.current = handlers;
+  const handlersRef = useRef(handlers);
+  useEffect(() => {
+    handlersRef.current = handlers;
+  });
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) {
         return;
       }
-      const handler = latest.current[event.key];
+      const handler = handlersRef.current[event.key];
       if (handler === undefined) {
         return;
       }

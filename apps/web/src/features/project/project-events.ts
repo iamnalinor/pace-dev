@@ -50,7 +50,7 @@ export const createProject = async (
   return result.ok ? projectId : null;
 };
 
-export const updateProject = async (
+export const didUpdateProject = async (
   { clock, state }: PaceServices,
   projectId: string,
   patch: Partial<ProjectDraft> & { readonly archived?: boolean },

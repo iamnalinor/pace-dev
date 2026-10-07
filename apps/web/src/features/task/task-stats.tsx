@@ -8,6 +8,7 @@ import { formatMinutes } from "#web/shared/format/duration.ts";
 import { formatDayTime } from "#web/shared/format/time.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { ZonedTime } from "#web/shared/time/zoned-time.tsx";
+import { percent } from "#web/shared/ui/pace-bar.tsx";
 
 import { whyLines, whyTitle } from "./why-lines.ts";
 
@@ -33,13 +34,15 @@ const WindowBar = ({ view }: { readonly view: TaskViewModel }) => {
   if (windowElapsed === null) {
     return null;
   }
-  const width = `${String(Math.round(Math.min(Math.max(windowElapsed, 0), 1) * 100))}%`;
+  const width = percent(windowElapsed);
   return (
     <div>
       <p className="flex justify-between gap-2 text-[11px] text-muted">
         <span>
           {startAt !== null &&
-            t("task.issued", { when: formatDayTime(startAt, now, startTz ?? deviceTz, language) })}
+            t("task.issued", {
+              when: formatDayTime({ at: startAt, tz: startTz ?? deviceTz }, { language, now }),
+            })}
         </span>
         <span>{t("task.windowGone", { percent: Math.round(windowElapsed * 100) })}</span>
       </p>
@@ -87,7 +90,7 @@ const WhyCard = ({ title, view }: WhyProps) => {
           </div>
         ))}
       </dl>
-      <p className="mt-2 border-t border-line pt-2 font-mono text-[11px] wrap-break-word text-faint">
+      <p className="mt-2 border-t border-line pt-2 font-mono text-[11px] wrap-break-word text-muted">
         <span className="sr-only">{t("task.whyFormula")}: </span>
         {view.why.formula}
       </p>
@@ -102,7 +105,7 @@ export const TaskStats = ({ view }: { readonly view: TaskViewModel }) => {
   const { hooks } = useServices();
   const { deviceTz } = hooks.useClock();
   const { rows } = hooks.useNow();
-  const [isWhyOpen, setWhyOpen] = useState(false);
+  const [isWhyOpen, setIsWhyOpen] = useState(false);
   const { dueAt, dueTz, trackedMinutes, workLeftMinutes } = view.stats;
   const title = whyTitle(
     rows.findIndex((row) => row.id === view.id),
@@ -131,7 +134,7 @@ export const TaskStats = ({ view }: { readonly view: TaskViewModel }) => {
             aria-expanded={isWhyOpen}
             className="-my-2 min-h-11 self-start rounded-sm text-left text-xs text-fg2 outline-none hover:text-fg focus-visible:ring-[3px] focus-visible:ring-accent/40"
             onClick={() => {
-              setWhyOpen((current) => !current);
+              setIsWhyOpen((current) => !current);
             }}
             type="button"
           >

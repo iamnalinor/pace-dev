@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { describe, expect, it } from "vitest";
 
 import { artboardServices } from "#web/test/artboard-services.ts";
+import { at } from "#web/test/at.ts";
 import { renderWithProviders } from "#web/test/render.tsx";
 import {
   BOOKS_ID,
@@ -163,13 +164,17 @@ describe("TaskScreen — TRK-231 (progress slider)", () => {
 
     const toggle = screen.getByRole("button", { name: /^Why it's/ });
     await user.click(toggle);
-    const card = screen.getByRole("region", { name: toggle.textContent?.replace(" →", "") });
-    expect(within(card).getByText("Window elapsed").nextSibling).toHaveTextContent("65%");
-    expect(within(card).getByText("Behind pace").nextSibling).toHaveTextContent("+0.25");
-    expect(within(card).getByText("Prioritized").nextSibling).toHaveTextContent("× 5");
-    expect(within(card).getByText("Your rank in Prioritized").nextSibling).toHaveTextContent(
-      "2 of 3",
-    );
+    const card = screen.getByRole("region", { name: toggle.textContent.replace(" →", "") });
+    const valueOf = (label: string) => {
+      const index = within(card)
+        .getAllByRole("term")
+        .findIndex((term) => term.textContent === label);
+      return at(within(card).getAllByRole("definition"), index);
+    };
+    expect(valueOf("Window elapsed")).toHaveTextContent("65%");
+    expect(valueOf("Behind pace")).toHaveTextContent("+0.25");
+    expect(valueOf("Prioritized")).toHaveTextContent("× 5");
+    expect(valueOf("Your rank in Prioritized")).toHaveTextContent("2 of 3");
 
     const slider = screen.getByRole("slider", { name: "Progress, 0 to 10" });
     slider.focus();
