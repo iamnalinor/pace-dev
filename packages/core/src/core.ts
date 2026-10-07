@@ -202,6 +202,14 @@ export {
   resolvePreset,
   validatePresetInput,
 } from "./presets/resolve-preset.ts";
+export {
+  expectedInstances,
+  type InstanceRef,
+  type InstanceSlot,
+  instanceWeekOf,
+  missingInstanceEvents,
+  type MissingInstancesInput,
+} from "./recurrence/hw-instances.ts";
 export { err, ok, type Result } from "./result.ts";
 export {
   addMinutesIso,

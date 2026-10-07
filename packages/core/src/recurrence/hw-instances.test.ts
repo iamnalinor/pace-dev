@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PresetDefinition, Recurrence, Weekday } from "../model/preset.ts";
 
-import { EventIdSchema, type EventInput, parseEvent  } from "../events/event-schema.ts";
+import { EventIdSchema, type EventInput, parseEvent } from "../events/event-schema.ts";
 import { instanceId } from "../ids.ts";
 import { materialize } from "../materialize/materializer.ts";
 import { event } from "../materialize/task-fixture.fake.ts";
@@ -70,6 +70,10 @@ const EXAMPLES = foldPresets(exampleCoursePresetEvents(SEEDED_AT));
 const BERLIN_PRESETS = foldPresets([
   presetCreated("hw.berlin", "Berlin HW", {
     recurrence: weekly([1, "10:00"], [5, "18:00"], BERLIN),
+  }),
+  // Issued at the same instant as Berlin HW: ties are ordered by preset id.
+  presetCreated("hw.aachen", "Aachen HW", {
+    recurrence: weekly([1, "10:00"], [3, "12:00"], BERLIN),
   }),
   // Due the Monday after a Thursday issue: the slot pair straddles the autumn change.
   presetCreated("hw.berlin-span", "Berlin span HW", {
@@ -204,6 +208,14 @@ describe("expectedInstances", () => {
     // Tuesday 2026-10-20 (W43); CEST ends on Sunday 2026-10-25 at 03:00.
     const slots = expectedInstances(BERLIN_PRESETS, "2026-10-20T10:00:00.000Z");
 
+    expect(slots.map((slot) => `${slot.presetId} ${slot.isoWeek}`)).toEqual([
+      "hw.aachen 2026-W43",
+      "hw.berlin 2026-W43",
+      "hw.berlin-span 2026-W43",
+      "hw.aachen 2026-W44",
+      "hw.berlin 2026-W44",
+      "hw.berlin-span 2026-W44",
+    ]);
     expect(slotOf(slots, "hw.berlin", "2026-W43")).toEqual({
       presetId: "hw.berlin",
       isoWeek: "2026-W43",
@@ -369,7 +381,8 @@ describe("missingInstanceEvents", () => {
   });
 
   it("creates nothing before the issue instant and the instance at that very instant", () => {
-    const presets = foldPresets([exampleCoursePresetEvents(SEEDED_AT)[0]!]);
+    // Algebra alone: issued Monday 10:00 Moscow.
+    const presets = foldPresets(exampleCoursePresetEvents(SEEDED_AT).slice(0, 1));
     const before = missingInstanceEvents({
       tasks: INITIAL_TASKS_STATE,
       presets,
@@ -476,7 +489,11 @@ describe("missingInstanceEvents", () => {
     const slotArb = fc.tuple(weekdayArb, timeArb);
     const zoneArb = fc.constantFrom(MOSCOW, BERLIN, NEW_YORK, "UTC", "Asia/Kolkata");
     const nowArb = fc
-      .date({ min: new Date("2020-01-01T00:00:00Z"), max: new Date("2030-12-31T00:00:00Z") })
+      .date({
+        min: new Date("2020-01-01T00:00:00Z"),
+        max: new Date("2030-12-31T00:00:00Z"),
+        noInvalidDate: true,
+      })
       .map((date) => date.toISOString());
 
     fc.assert(
@@ -490,8 +507,9 @@ describe("missingInstanceEvents", () => {
         const slots = expectedInstances(presets, now);
         const events = missingInstanceEvents({ tasks: INITIAL_TASKS_STATE, presets, now });
 
+        const [current, next] = slots;
         expect(slots).toHaveLength(2);
-        expect(slots[0]!.isoWeek).toBe(isoWeekKey(now, zone));
+        expect(current?.isoWeek).toBe(isoWeekKey(now, zone));
         for (const slot of slots) {
           expect(isoWeekKey(slot.issuedAt, zone)).toBe(slot.isoWeek);
           expect(formatInZone(slot.issuedAt, zone, "i HH:mm")).toBe(`${issued[0]} ${issued[1]}`);
@@ -505,10 +523,11 @@ describe("missingInstanceEvents", () => {
             isoWeek: slot.isoWeek,
           });
         }
-        expect(slots[1]!.issuedAt > slots[0]!.issuedAt).toBe(true);
-        expect(dueWeekOffset(recurrence)).toBe(
-          slots[0]!.isoWeek === isoWeekKey(slots[0]!.dueAt, zone) ? 0 : 1,
-        );
+        expect(
+          current !== undefined && next !== undefined && next.issuedAt > current.issuedAt,
+        ).toBe(true);
+        const dueWeek = current === undefined ? undefined : isoWeekKey(current.dueAt, zone);
+        expect(dueWeekOffset(recurrence)).toBe(dueWeek === current?.isoWeek ? 0 : 1);
 
         expect(events.length).toBeLessThanOrEqual(1);
         for (const input of events) {
@@ -533,8 +552,10 @@ describe("instanceWeekOf", () => {
   it("is undefined for every other id", () => {
     expect(instanceWeekOf("01ARZ3NDEKTSV4RRFFQ69G5001")).toBeUndefined();
     expect(instanceWeekOf("auto:hw:hw.algebra:2026-W41:missed")).toBeUndefined();
+    expect(instanceWeekOf("hw")).toBeUndefined();
     expect(instanceWeekOf("hw:hw.algebra")).toBeUndefined();
     expect(instanceWeekOf("hw::2026-W41")).toBeUndefined();
     expect(instanceWeekOf("hw:hw.algebra:")).toBeUndefined();
+    expect(instanceWeekOf("hw:hw.algebra:2026-W41:extra")).toBeUndefined();
   });
 });
