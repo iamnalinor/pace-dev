@@ -3,21 +3,19 @@ import { z } from "zod";
 import {
   type CoreState,
   err,
-  type Importance,
-  isOpen,
   type NowItem,
   nowItem,
   ok,
   presetById,
   type Project,
-  resolvePreset,
+  projectView,
   type Result,
   type Task,
   taskById,
   taskOutcome,
 } from "@pace/core";
 
-import { describeCode, type Scope, type ToolFailure } from "./tool-kit.ts";
+import { describeCode, type Rendered, type Scope, type ToolFailure } from "./tool-kit.ts";
 
 /** The shapes the tools answer with for tasks and projects, and the renderers behind them. */
 
@@ -124,28 +122,20 @@ export const rowOf = (scope: Scope, taskId: string): null | TaskRow => {
   return row.ok ? row.value : null;
 };
 
-export const effectiveImportance = (state: CoreState, task: Task): Importance => {
-  if (task.importance !== null) {
-    return task.importance;
-  }
-  const preset = resolvePreset(state.presets, task.presetId, task.overrides ?? undefined);
-  return preset.ok ? preset.value.defaultImportance : "normal";
+/** The open count is the project page's: empty homework instances awaiting assignment excluded. */
+export const projectRow = (scope: Scope, project: Project): ProjectRow => {
+  const view = projectView(scope.state, project.id, scope.qctx);
+  return {
+    archived: project.archived,
+    color: project.color,
+    createdAt: project.createdAt,
+    description: project.description,
+    id: project.id,
+    name: project.name,
+    openTasks: view.ok ? view.value.stats.open : 0,
+    url: projectUrl(scope.webOrigin, project.id),
+  };
 };
-
-const openTasksOf = (state: CoreState, projectId: string): number =>
-  Object.values(state.tasks.byId).filter((task) => task.projectId === projectId && isOpen(task))
-    .length;
-
-export const projectRow = (scope: Scope, project: Project): ProjectRow => ({
-  archived: project.archived,
-  color: project.color,
-  createdAt: project.createdAt,
-  description: project.description,
-  id: project.id,
-  name: project.name,
-  openTasks: openTasksOf(scope.state, project.id),
-  url: projectUrl(scope.webOrigin, project.id),
-});
 
 /** One line per task for text summaries. */
 export const describeRow = (row: TaskRow): string => {
@@ -158,6 +148,17 @@ export const describeRow = (row: TaskRow): string => {
 /** The row's line, or the bare id when the task cannot be rendered. */
 export const labelOf = (row: null | TaskRow, taskId: string): string =>
   row === null ? taskId : describeRow(row);
+
+/** The answer of a write about one task: its row after the write and a one-line summary. */
+export const renderTask =
+  (taskId: string, verb: string, extra: Record<string, unknown> = {}) =>
+  (scope: Scope): Rendered => {
+    const row = rowOf(scope, taskId);
+    return {
+      structured: { ...extra, task: row, taskId },
+      summary: `${verb} ${labelOf(row, taskId)}.`,
+    };
+  };
 
 /** Chains comparators: the next key decides only when the first one ties. */
 export const thenBy = (first: number, next: () => number): number => (first === 0 ? next() : first);

@@ -7,6 +7,7 @@ import type { ProjectViewModel } from "@pace/client";
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { Button } from "#web/shared/ui/button.tsx";
+import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 import { projectById } from "@pace/core";
 
 import { ProjectForm } from "./project-form.tsx";
@@ -83,15 +84,7 @@ const Header = ({
         </Button>
       </div>
       <div className="flex items-center gap-2.5 px-5">
-        <span
-          aria-hidden="true"
-          className="size-3 shrink-0 rounded-sm bg-faint"
-          style={
-            project.color === null
-              ? undefined
-              : { backgroundColor: `var(--color-project-${project.color})` }
-          }
-        />
+        <ProjectDot className="size-3 rounded-sm" color={project.color} />
         <h1 className="text-[28px] font-semibold tracking-[-0.02em]">{project.name}</h1>
         {archived && (
           <span className="rounded-sm bg-raised px-2 py-0.5 text-xs text-muted">

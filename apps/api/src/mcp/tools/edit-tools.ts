@@ -4,45 +4,24 @@ import {
   type CoreState,
   err,
   type EventInput,
+  type Importance,
+  importanceOf,
   ok,
+  presetOf,
   rankWithinCategory,
   type Result,
   type Task,
   TaskStatusSchema,
 } from "@pace/core";
 
-import {
-  IMPORTANCE,
-  requireTask,
-  SUBTASK_INPUT,
-  TASK_ID,
-  toSubtasks,
-  WRITE_INPUT,
-} from "../inputs.ts";
+import { forTask, IMPORTANCE, SUBTASK_INPUT, TASK_ID, toSubtasks, WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { effectiveImportance, labelOf, rowOf, TaskRowSchema } from "../rows.ts";
-import {
-  type Rendered,
-  runWrite,
-  type Scope,
-  stamp,
-  type ToolFailure,
-  WRITE_OUTPUT,
-} from "../tool-kit.ts";
+import { labelOf, renderTask, rowOf, TaskRowSchema } from "../rows.ts";
+import { runWrite, stamp, type ToolFailure, WRITE_OUTPUT } from "../tool-kit.ts";
 
 const SETTER = { destructiveHint: false, idempotentHint: true, readOnlyHint: false };
 
 const TASK_OUTPUT = { ...WRITE_OUTPUT, task: TaskRowSchema.nullable(), taskId: z.string() };
-
-const renderTask =
-  (taskId: string, verb: string) =>
-  (scope: Scope): Rendered => {
-    const row = rowOf(scope, taskId);
-    return {
-      structured: { task: row, taskId },
-      summary: `${verb} ${labelOf(row, taskId)}.`,
-    };
-  };
 
 export const importanceTool = defineTool({
   annotations: SETTER,
@@ -50,17 +29,14 @@ export const importanceTool = defineTool({
     "Sets a task's importance: asap (wants to be done today), prioritized (within about three days of being set), normal, nice_to_have. Setting it again restarts the prioritized horizon.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        return task.ok
-          ? ok([
-              stamp(when, {
-                payload: { importance: args.importance, taskId: args.taskId },
-                type: "task.importance.set",
-              }),
-            ])
-          : task;
-      },
+      build: forTask(args.taskId, (_scope, when) =>
+        ok([
+          stamp(when, {
+            payload: { importance: args.importance, taskId: args.taskId },
+            type: "task.importance.set",
+          }),
+        ]),
+      ),
       render: renderTask(args.taskId, `Importance set to ${args.importance} on`),
     }),
   input: { ...WRITE_INPUT, taskId: TASK_ID, importance: IMPORTANCE },
@@ -76,17 +52,14 @@ export const statusTool = defineTool({
     "Sets a task's status: in_progress, paused, waiting (on someone else: its urgency freezes and the waiting time is counted) or not_started. Work on subtasks moves a task to in_progress by itself; use this for pauses and waiting.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        return task.ok
-          ? ok([
-              stamp(when, {
-                payload: { status: args.status, taskId: args.taskId },
-                type: "task.status.set",
-              }),
-            ])
-          : task;
-      },
+      build: forTask(args.taskId, (_scope, when) =>
+        ok([
+          stamp(when, {
+            payload: { status: args.status, taskId: args.taskId },
+            type: "task.status.set",
+          }),
+        ]),
+      ),
       render: renderTask(args.taskId, `Status set to ${args.status} on`),
     }),
   input: {
@@ -102,13 +75,19 @@ export const statusTool = defineTool({
 
 type Member = { readonly task: Task; readonly position: number };
 
+/** The importance the rank categories group by; `undefined` when the preset chain is broken. */
+const categoryKey = (state: CoreState, task: Task): Importance | undefined => {
+  const preset = presetOf(state, task);
+  return preset.ok ? importanceOf(task, preset.value) : undefined;
+};
+
 /** The open, competing tasks of the target's importance category in their current order. */
 const categoryOf = (state: CoreState, target: Task): readonly Task[] => {
-  const importance = effectiveImportance(state, target);
+  const importance = categoryKey(state, target);
   return Object.values(state.tasks.byId)
     .flatMap((task): readonly Member[] => {
       const rank = rankWithinCategory(state, task);
-      return rank === null || effectiveImportance(state, task) !== importance
+      return rank === null || categoryKey(state, task) !== importance
         ? []
         : [{ position: rank.position, task }];
     })
@@ -137,12 +116,8 @@ export const rankTool = defineTool({
   handler: async (args, ctx) => {
     const order: string[] = [];
     return await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const target = requireTask(scope.state, args.taskId);
-        if (!target.ok) {
-          return target;
-        }
-        const ordered = reorder(scope.state, target.value, args.position);
+      build: forTask(args.taskId, (scope, when, target) => {
+        const ordered = reorder(scope.state, target, args.position);
         if (!ordered.ok) {
           return ordered;
         }
@@ -158,7 +133,7 @@ export const rankTool = defineTool({
               ],
         );
         return ok(events);
-      },
+      }),
       render: () => ({
         structured: { order, position: order.indexOf(args.taskId) + 1, taskId: args.taskId },
         summary: `Moved to position ${order.indexOf(args.taskId) + 1} of ${order.length}.`,
@@ -185,17 +160,14 @@ export const subtasksTool = defineTool({
   handler: async (args, ctx) => {
     const subtasks = toSubtasks(args.labels);
     return await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        return task.ok
-          ? ok([
-              stamp(when, {
-                payload: { subtasks: [...subtasks], taskId: args.taskId },
-                type: "task.subtasks.added",
-              }),
-            ])
-          : task;
-      },
+      build: forTask(args.taskId, (_scope, when) =>
+        ok([
+          stamp(when, {
+            payload: { subtasks: [...subtasks], taskId: args.taskId },
+            type: "task.subtasks.added",
+          }),
+        ]),
+      ),
       render: (scope) => {
         const row = rowOf(scope, args.taskId);
         return {

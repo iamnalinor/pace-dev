@@ -1,5 +1,6 @@
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
+import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 import { type ProjectColorName, ProjectColorSchema } from "@pace/core";
 
 type Props = {
@@ -29,13 +30,12 @@ export const ColorRadios = ({ label, onChange, value }: Props) => {
           title={t(`color.${color}`)}
           type="button"
         >
-          <span
-            aria-hidden="true"
+          <ProjectDot
             className={cn(
-              "size-5 rounded-full",
+              "size-5",
               color === value && "ring-2 ring-fg ring-offset-2 ring-offset-bg",
             )}
-            style={{ backgroundColor: `var(--color-project-${color})` }}
+            color={color}
           />
         </button>
       ))}

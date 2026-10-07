@@ -4,10 +4,11 @@ import { inArray } from "drizzle-orm";
 
 import {
   type CoreState,
+  importanceOf,
   type Preset,
+  presetOf,
   progressOf,
   type Project,
-  resolvePreset,
   type Task,
   taskOutcome,
 } from "@pace/core";
@@ -27,8 +28,8 @@ type PresetRow = typeof schema.presets.$inferInsert;
 const MAX_PARAMETERS = 100;
 
 /** A task whose preset chain is broken still gets a row: its own fields, no derived ones. */
-export const taskRow = (state: CoreState, task: Task): TaskRow => {
-  const preset = resolvePreset(state.presets, task.presetId, task.overrides ?? undefined);
+const taskRow = (state: CoreState, task: Task): TaskRow => {
+  const preset = presetOf(state, task);
   return {
     closedAt: task.closed?.at ?? null,
     createdAt: task.createdAt,
@@ -36,7 +37,7 @@ export const taskRow = (state: CoreState, task: Task): TaskRow => {
     dueTz: task.dueTz,
     estimateMinutes: task.estimateMinutes,
     id: task.id,
-    importance: task.importance ?? (preset.ok ? preset.value.defaultImportance : "normal"),
+    importance: preset.ok ? importanceOf(task, preset.value) : (task.importance ?? "normal"),
     outcome: preset.ok ? taskOutcome(task, preset.value) : (task.closed?.outcome ?? null),
     presetId: task.presetId,
     progress: preset.ok ? progressOf(task, preset.value.progressMode) : 0,
@@ -49,7 +50,7 @@ export const taskRow = (state: CoreState, task: Task): TaskRow => {
   };
 };
 
-export const subtaskRows = (task: Task): readonly SubtaskRow[] =>
+const subtaskRows = (task: Task): readonly SubtaskRow[] =>
   task.subtasks.map((item) => ({
     id: item.id,
     label: item.label,
@@ -59,7 +60,7 @@ export const subtaskRows = (task: Task): readonly SubtaskRow[] =>
     taskId: task.id,
   }));
 
-export const projectRow = (project: Project): ProjectRow => ({
+const projectRow = (project: Project): ProjectRow => ({
   archived: project.archived,
   color: project.color,
   createdAt: project.createdAt,
@@ -67,7 +68,7 @@ export const projectRow = (project: Project): ProjectRow => ({
   name: project.name,
 });
 
-export const presetRow = (preset: Preset): PresetRow => ({
+const presetRow = (preset: Preset): PresetRow => ({
   archived: preset.archived,
   builtIn: preset.builtIn,
   definition: JSON.stringify(preset.definition),
@@ -76,52 +77,26 @@ export const presetRow = (preset: Preset): PresetRow => ({
   name: preset.name,
 });
 
-const chunks = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
-    items.slice(index * size, (index + 1) * size),
-  );
+type Batch<T> = (batch: T[]) => Promise<unknown>;
 
-type Insert<T extends object> = (chunk: T[]) => Promise<unknown>;
+/** Runs a statement per slice of `items`, `size` at a time. */
+const inBatches = async <T>(items: readonly T[], size: number, run: Batch<T>): Promise<void> => {
+  for (let start = 0; start < items.length; start += size) {
+    await run(items.slice(start, start + size));
+  }
+};
 
-/** Inserts in chunks small enough for every row's columns to fit the parameter cap. */
-const insertChunked = async <T extends object>(
+/** Inserts in batches small enough for every row's columns to fit the parameter cap. */
+const insertRows = async <T extends object>(
   rows: readonly T[],
-  insert: Insert<T>,
+  insert: Batch<T>,
 ): Promise<void> => {
   const columns = Math.max(1, Object.keys(rows[0] ?? {}).length);
-  const batches = chunks(rows, Math.max(1, Math.floor(MAX_PARAMETERS / columns)));
-  for (const chunk of batches) {
-    await insert([...chunk]);
-  }
+  await inBatches(rows, Math.max(1, Math.floor(MAX_PARAMETERS / columns)), insert);
 };
 
-type Remove = (ids: string[]) => Promise<unknown>;
-
-const deleteChunked = async (ids: ReadonlySet<string>, remove: Remove): Promise<void> => {
-  const batches = chunks([...ids], MAX_PARAMETERS);
-  for (const chunk of batches) {
-    await remove([...chunk]);
-  }
-};
-
-const taskRows = (state: CoreState, tasks: readonly Task[]) => ({
-  subtasks: tasks.flatMap((task) => subtaskRows(task)),
-  tasks: tasks.map((task) => taskRow(state, task)),
-});
-
-/** Every row from scratch: after a rebuild nothing can be assumed about what changed. */
-export const rewriteProjections = async (db: Db, state: CoreState): Promise<void> => {
-  await db.delete(schema.subtasks);
-  await db.delete(schema.tasks);
-  await db.delete(schema.projects);
-  await db.delete(schema.presets);
-  const rows = taskRows(state, Object.values(state.tasks.byId));
-  await insertChunked(rows.tasks, (chunk) => db.insert(schema.tasks).values(chunk));
-  await insertChunked(rows.subtasks, (chunk) => db.insert(schema.subtasks).values(chunk));
-  const projects = Object.values(state.projects.byId).map((project) => projectRow(project));
-  await insertChunked(projects, (chunk) => db.insert(schema.projects).values(chunk));
-  const presets = Object.values(state.presets.byId).map((preset) => presetRow(preset));
-  await insertChunked(presets, (chunk) => db.insert(schema.presets).values(chunk));
+const deleteIds = async (ids: ReadonlySet<string>, remove: Batch<string>): Promise<void> => {
+  await inBatches([...ids], MAX_PARAMETERS, remove);
 };
 
 const present = <T>(byId: Readonly<Record<string, T>>, ids: ReadonlySet<string>): readonly T[] =>
@@ -129,51 +104,65 @@ const present = <T>(byId: Readonly<Record<string, T>>, ids: ReadonlySet<string>)
     .filter(([id]) => ids.has(id))
     .map(([, value]) => value);
 
-const updateTasks = async (db: Db, state: CoreState, ids: ReadonlySet<string>): Promise<void> => {
-  if (ids.size === 0) {
-    return;
-  }
-  await deleteChunked(ids, (list) =>
-    db.delete(schema.subtasks).where(inArray(schema.subtasks.taskId, list)),
+/** Inserts the current rows of the given entities; their previous rows must be gone. */
+const insertTouched = async (db: Db, state: CoreState, touched: Touched): Promise<void> => {
+  const tasks = present(state.tasks.byId, touched.taskIds);
+  const projects = present(state.projects.byId, touched.projectIds);
+  const presets = present(state.presets.byId, touched.presetIds);
+  await insertRows(
+    tasks.map((task) => taskRow(state, task)),
+    (batch) => db.insert(schema.tasks).values(batch),
   );
-  await deleteChunked(ids, (list) => db.delete(schema.tasks).where(inArray(schema.tasks.id, list)));
-  const rows = taskRows(state, present(state.tasks.byId, ids));
-  await insertChunked(rows.tasks, (chunk) => db.insert(schema.tasks).values(chunk));
-  await insertChunked(rows.subtasks, (chunk) => db.insert(schema.subtasks).values(chunk));
+  await insertRows(
+    tasks.flatMap((task) => subtaskRows(task)),
+    (batch) => db.insert(schema.subtasks).values(batch),
+  );
+  await insertRows(
+    projects.map((project) => projectRow(project)),
+    (batch) => db.insert(schema.projects).values(batch),
+  );
+  await insertRows(
+    presets.map((preset) => presetRow(preset)),
+    (batch) => db.insert(schema.presets).values(batch),
+  );
 };
 
-const updateProjects = async (
-  db: Db,
-  state: CoreState,
-  ids: ReadonlySet<string>,
-): Promise<void> => {
-  if (ids.size === 0) {
-    return;
-  }
-  await deleteChunked(ids, (list) =>
-    db.delete(schema.projects).where(inArray(schema.projects.id, list)),
+const deleteTouched = async (db: Db, touched: Touched): Promise<void> => {
+  await deleteIds(touched.taskIds, (ids) =>
+    db.delete(schema.subtasks).where(inArray(schema.subtasks.taskId, ids)),
   );
-  const rows = present(state.projects.byId, ids).map((project) => projectRow(project));
-  await insertChunked(rows, (chunk) => db.insert(schema.projects).values(chunk));
+  await deleteIds(touched.taskIds, (ids) =>
+    db.delete(schema.tasks).where(inArray(schema.tasks.id, ids)),
+  );
+  await deleteIds(touched.projectIds, (ids) =>
+    db.delete(schema.projects).where(inArray(schema.projects.id, ids)),
+  );
+  await deleteIds(touched.presetIds, (ids) =>
+    db.delete(schema.presets).where(inArray(schema.presets.id, ids)),
+  );
 };
 
-const updatePresets = async (db: Db, state: CoreState, ids: ReadonlySet<string>): Promise<void> => {
-  if (ids.size === 0) {
-    return;
-  }
-  await deleteChunked(ids, (list) =>
-    db.delete(schema.presets).where(inArray(schema.presets.id, list)),
-  );
-  const rows = present(state.presets.byId, ids).map((preset) => presetRow(preset));
-  await insertChunked(rows, (chunk) => db.insert(schema.presets).values(chunk));
+/** Every row from scratch: after a rebuild nothing can be assumed about what changed. */
+export const rewriteProjections = async (db: Db, state: CoreState): Promise<void> => {
+  await db.delete(schema.subtasks);
+  await db.delete(schema.tasks);
+  await db.delete(schema.projects);
+  await db.delete(schema.presets);
+  await insertTouched(db, state, {
+    presetIds: new Set(Object.keys(state.presets.byId)),
+    projectIds: new Set(Object.keys(state.projects.byId)),
+    taskIds: new Set(Object.keys(state.tasks.byId)),
+  });
 };
 
 /**
 A preset change moves the derived columns (default importance, progress, outcome) of every
 task down its chain, children included; presets change rarely, so all task rows are rewritten.
 */
-const affectedTasks = (state: CoreState, touched: Touched): ReadonlySet<string> =>
-  touched.presetIds.size === 0 ? touched.taskIds : new Set(Object.keys(state.tasks.byId));
+const withAffectedTasks = (state: CoreState, touched: Touched): Touched =>
+  touched.presetIds.size === 0
+    ? touched
+    : { ...touched, taskIds: new Set(Object.keys(state.tasks.byId)) };
 
 /** Rewrites only the rows a batch touched (the incremental path). */
 export const updateProjections = async (
@@ -181,7 +170,7 @@ export const updateProjections = async (
   state: CoreState,
   touched: Touched,
 ): Promise<void> => {
-  await updateTasks(db, state, affectedTasks(state, touched));
-  await updateProjects(db, state, touched.projectIds);
-  await updatePresets(db, state, touched.presetIds);
+  const affected = withAffectedTasks(state, touched);
+  await deleteTouched(db, affected);
+  await insertTouched(db, state, affected);
 };

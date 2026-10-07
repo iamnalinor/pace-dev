@@ -40,13 +40,6 @@ export type Log = {
   readonly seq: number;
 };
 
-export const EMPTY_MATERIALIZED: Materialized = {
-  ids: new Set(),
-  lastAppliedOccurredAt: null,
-  seq: 0,
-  state: INITIAL_CORE_STATE,
-};
-
 /** Full rebuild from the whole log: corrections applied, canonical order. */
 export const rebuild = (log: Log): Materialized => ({
   ids: new Set(log.events.map((event) => event.id)),

@@ -245,13 +245,17 @@ Pace is an MCP server: `https://pace-api.nalinor.dev/mcp` (streamable HTTP) behi
 with PKCE, dynamic client registration and a branded consent page on the web origin where you
 sign in with Telegram and pick the scopes. Claude (web, desktop, Code), ChatGPT connectors,
 Cursor and MCP Inspector connect with just that URL. The stage-1 tools cover the whole task
-loop: `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`,
-`list_inbox`, `list_review`, `search` and `fetch` (the pair ChatGPT needs) to read;
-`create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`,
-`update_task`, `set_importance`, `set_status`, `set_rank`, `add_subtasks`, `revoke_event`,
-`review_action` and the preset tools to write. Every write takes `at` (retroactive records),
-`precision` and `dryRun` (preview without writing), answers the recorded event ids for undo,
-and refusals come back as tool errors with the Result code. [docs/mcp.md](docs/mcp.md) has
+loop: `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`,
+`list_presets`, `list_inbox`, `list_review`, `search` and `fetch` (the pair ChatGPT needs)
+to read (`tasks:read`); `create_task`, `capture_inbox`, `mark_subtasks`, `submit`,
+`close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`,
+`add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`,
+`update_preset` and `archive_preset` to write (`tasks:write`). Every write takes `at`
+(retroactive records), `precision` and `dryRun` (preview without writing), answers the
+recorded event ids for undo, and refusals come back as tool errors (`isError`) that start
+with the Result code. The tools read and write through your Durable Object, so they see
+the state the apps sync: this week's homework instances and automatic outcomes are derived
+before every read and after every write. [docs/mcp.md](docs/mcp.md) has
 the setup per client, the tools table, the scopes, the consent flow and local testing.
 
 ## LLM providers (planned, stage 2)

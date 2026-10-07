@@ -6,11 +6,10 @@ import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatDateTime, formatDue, type Viewer } from "#web/shared/format/time.ts";
 import { cn } from "#web/shared/lib/cn.ts";
-
-import { metaPieces } from "./meta-line.ts";
+import { TaskRow } from "#web/shared/task/task-row.tsx";
+import { useCompleteTask } from "#web/shared/task/use-complete-task.ts";
 
 const ROW_CLASS = "flex min-h-[52px] items-center gap-3 border-b border-line px-1 py-2";
-const PERCENT = 100;
 
 const useViewer = (): Viewer => {
   const language = useLanguage();
@@ -18,54 +17,17 @@ const useViewer = (): Viewer => {
   return { deviceTz, language, now };
 };
 
-/** An open task, read like a Now row: color dot, title, meta line, progress with the pace marker. */
+/** An open task, drawn as on Now; its check circle completes it the same way. */
 export const OpenTaskRow = ({ row }: { readonly row: NowRow }) => {
-  const viewer = useViewer();
+  const complete = useCompleteTask();
   return (
-    <li className={cn(ROW_CLASS, row.dimmed && "opacity-55")}>
-      <span
-        aria-hidden="true"
-        className="size-[22px] shrink-0 rounded-full border-[1.5px] border-muted"
-      />
-      <Link className="flex min-w-0 flex-1 flex-col gap-1 text-fg" to={`/task/${row.id}`}>
-        <span className="flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="size-[7px] shrink-0 rounded-full"
-            style={{ backgroundColor: `var(--color-project-${row.color})` }}
-          />
-          <span className="truncate text-[15px]">{row.title}</span>
-        </span>
-        <span className="text-xs text-muted">
-          {metaPieces(row.meta, viewer).map((part, index) => (
-            <span
-              className={cn(
-                part.tone === "warn" && "text-warn",
-                part.tone === "strong" && "font-medium text-fg",
-              )}
-              // Pieces repeat kinds rarely but can share text; the position is their identity.
-              // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-              key={index}
-            >
-              {index > 0 && " · "}
-              {part.text}
-            </span>
-          ))}
-        </span>
-        {row.paceExpected !== null && (
-          <span aria-hidden="true" className="relative mt-1 block h-[3px] rounded-full bg-track">
-            <span
-              className="block h-[3px] rounded-full bg-fg"
-              style={{ width: `${row.progress * PERCENT}%` }}
-            />
-            <span
-              className="absolute top-[-3px] h-[9px] w-0.5 rounded-[1px] bg-accent"
-              style={{ left: `${row.paceExpected * PERCENT}%` }}
-            />
-          </span>
-        )}
-      </Link>
-    </li>
+    <TaskRow
+      className="rounded-none border-b border-line px-1"
+      onCheck={(target) => {
+        void complete(target);
+      }}
+      row={row}
+    />
   );
 };
 

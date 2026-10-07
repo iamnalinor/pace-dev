@@ -7,7 +7,7 @@ import { SegmentedControl } from "#web/shared/ui/segmented-control.tsx";
 export const LanguageControl = () => {
   const t = useT();
   const language = useLanguage();
-  const { state } = useServices();
+  const { actions } = useServices();
   const options: readonly { readonly value: Language; readonly label: string }[] = [
     { label: t("settings.language.en"), value: "en" },
     { label: t("settings.language.ru"), value: "ru" },
@@ -16,11 +16,7 @@ export const LanguageControl = () => {
     <SegmentedControl
       label={t("settings.language")}
       onChange={(next) => {
-        void state.dispatch({
-          occurredAt: new Date().toISOString(),
-          payload: { language: next },
-          type: "settings.updated",
-        });
+        void actions.setLanguage(next);
       }}
       options={options}
       value={language}

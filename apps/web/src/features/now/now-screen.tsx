@@ -1,0 +1,48 @@
+import { useSearchParams } from "react-router";
+
+import { useServices } from "#web/app-state.tsx";
+import { useT } from "#web/i18n.tsx";
+import { useCompleteTask } from "#web/shared/task/use-complete-task.ts";
+import { ZoneBanner } from "#web/shared/time/zone-banner.tsx";
+import { PageHeader } from "#web/shared/ui/page-header.tsx";
+
+import { FoldedFooter } from "./folded-footer.tsx";
+import { NowHeaderActions } from "./inbox-counter.tsx";
+import { NothingRunning } from "./nothing-running.tsx";
+import { NowList } from "./now-list.tsx";
+import { ProjectChips } from "./project-chips.tsx";
+import { ReviewLink } from "./review-link.tsx";
+
+const PROJECT_PARAM = "project";
+
+/** Artboard 1: what to do now, in score order, filterable by project. */
+export const NowScreen = () => {
+  const t = useT();
+  const [params, setParams] = useSearchParams();
+  const projectId = params.get(PROJECT_PARAM);
+  const board = useServices().hooks.useNow(projectId === null ? undefined : { projectId });
+  const complete = useCompleteTask();
+  const check = ({ id, title }: { readonly id: string; readonly title: string }): void => {
+    void complete({ id, title });
+  };
+  return (
+    <main className="flex flex-1 flex-col pb-4">
+      <PageHeader
+        action={<NowHeaderActions inboxCount={board.inboxCount} />}
+        title={t("nav.now")}
+      />
+      <ZoneBanner />
+      <ReviewLink />
+      <NothingRunning />
+      <ProjectChips
+        onSelect={(selected) => {
+          setParams(selected === null ? {} : { [PROJECT_PARAM]: selected });
+        }}
+        projects={board.projects}
+        selected={projectId}
+      />
+      <NowList onCheck={check} rows={board.rows} />
+      <FoldedFooter laterCount={board.laterCount} onCheck={check} waiting={board.waiting} />
+    </main>
+  );
+};

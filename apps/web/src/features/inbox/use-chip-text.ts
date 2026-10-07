@@ -1,9 +1,14 @@
-import type { ProjectColorName } from "@pace/core";
-
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatDue } from "#web/shared/format/time.ts";
-import { isBuiltInPreset, type Preset, presetById, projectById, type Suggestion } from "@pace/core";
+import {
+  isBuiltInPreset,
+  type Preset,
+  presetById,
+  projectById,
+  type ProjectColorName,
+  type Suggestion,
+} from "@pace/core";
 
 import type { ChipField } from "./suggestion-chips.ts";
 

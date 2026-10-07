@@ -16,7 +16,14 @@ import {
   TimeZoneSchema,
 } from "@pace/core";
 
-import { stamp, type ToolFailure, type When } from "./tool-kit.ts";
+import {
+  type Build,
+  stamp,
+  type TargetBuild,
+  type ToolFailure,
+  type When,
+  withTarget,
+} from "./tool-kit.ts";
 
 /** Input pieces the mutating tools share, and the normalizers that turn them into payloads. */
 
@@ -34,12 +41,6 @@ export const WRITE_INPUT = {
     .boolean()
     .optional()
     .describe("true: validate and return the events that would be recorded, without writing."),
-};
-
-export type WriteArgs = {
-  readonly at?: string | undefined;
-  readonly precision?: "approx" | "exact" | undefined;
-  readonly dryRun?: boolean | undefined;
 };
 
 export const TASK_ID = z
@@ -143,12 +144,16 @@ export const findProject = (state: CoreState, ref: ProjectRef): Result<string, T
     : ok(found.id);
 };
 
-export const requireTask = (state: CoreState, taskId: string): Result<Task, ToolFailure> => {
+const requireTask = (state: CoreState, taskId: string): Result<Task, ToolFailure> => {
   const task = taskById(state.tasks, taskId);
   return task === undefined
     ? err({ code: "task/unknown", message: `No task with id ${taskId}` })
     : ok(task);
 };
+
+/** The build of a write about one existing task. */
+export const forTask = (taskId: string, build: TargetBuild<Task>): Build =>
+  withTarget((scope) => requireTask(scope.state, taskId), build);
 
 /** Zoned instants as tools take them: the zone defaults to the account's. */
 export type ZonedInput = {

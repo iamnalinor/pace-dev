@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { actionErrorText } from "#web/shared/lib/action-error.ts";
-import { revokeEvents, showUndoToast } from "#web/shared/lib/undo-toast.ts";
+import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { queryContext, taskViewModel } from "@pace/client";
 
 /** The query string that opens the close sheet on the task page. */
@@ -22,6 +22,7 @@ export const useCompleteTask = (): ((target: Target) => Promise<void>) => {
   const { actions, clock, state } = useServices();
   const t = useT();
   const navigate = useNavigate();
+  const run = useRunAction();
   return useCallback(
     async ({ id, title }: Target) => {
       const view = taskViewModel(state.store.getState(), id, queryContext(clock));
@@ -36,19 +37,10 @@ export const useCompleteTask = (): ((target: Target) => Promise<void>) => {
         await navigate(`/task/${id}?${CLOSE_SHEET_PARAM}=1`);
         return;
       }
-      const result = await actions.closeTask({ outcome: "done", taskId: id });
-      if (!result.ok) {
-        toast.error(actionErrorText(t, result.error));
-        return;
-      }
-      showUndoToast({
-        message: t("now.doneToast", { title }),
-        onUndo: () => {
-          void revokeEvents(actions.revoke, result.value);
-        },
-        undoLabel: t("common.undo"),
+      await run(actions.closeTask({ outcome: "done", taskId: id }), {
+        undo: t("now.doneToast", { title }),
       });
     },
-    [actions, clock, navigate, state, t],
+    [actions, clock, navigate, run, state, t],
   );
 };

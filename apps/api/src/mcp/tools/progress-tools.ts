@@ -1,23 +1,23 @@
 import { z } from "zod";
 
 import {
-  type CoreState,
   err,
   type EventInput,
   ok,
-  resolvePreset,
   type Result,
+  type SubmitPreview,
   type Subtask,
   type Task,
   taskById,
+  taskView,
+  unsubmittedSubtasks,
 } from "@pace/core";
 
-import { requireTask, TASK_ID, WRITE_INPUT } from "../inputs.ts";
+import { forTask, TASK_ID, WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { labelOf, rowOf, TaskRowSchema } from "../rows.ts";
+import { labelOf, renderTask, rowOf, TaskRowSchema } from "../rows.ts";
 import {
   describeCode,
-  type Rendered,
   runWrite,
   type Scope,
   stamp,
@@ -27,16 +27,6 @@ import {
 } from "../tool-kit.ts";
 
 const TASK_OUTPUT = { ...WRITE_OUTPUT, task: TaskRowSchema.nullable(), taskId: z.string() };
-
-const renderTask =
-  (taskId: string, verb: string, extra: Record<string, unknown> = {}) =>
-  (scope: Scope): Rendered => {
-    const row = rowOf(scope, taskId);
-    return {
-      structured: { ...extra, task: row, taskId },
-      summary: `${verb} ${labelOf(row, taskId)}.`,
-    };
-  };
 
 type Selection = {
   readonly subtaskIds?: readonly string[] | undefined;
@@ -80,16 +70,12 @@ export const markSubtasks = defineTool({
     const solved: string[] = [];
     const alreadySolved: string[] = [];
     return await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        if (!task.ok) {
-          return task;
-        }
+      build: forTask(args.taskId, (_scope, when, task) => {
         // Core refuses solves on a closed task; an all-solved selection would emit none and slip by.
-        if (task.value.closed !== null) {
+        if (task.closed !== null) {
           return err({ code: "retro/task-closed", message: describeCode("retro/task-closed") });
         }
-        const picked = selectSubtasks(task.value, args);
+        const picked = selectSubtasks(task, args);
         if (!picked.ok) {
           return picked;
         }
@@ -107,7 +93,7 @@ export const markSubtasks = defineTool({
             }),
           ),
         );
-      },
+      }),
       render: renderTask(
         args.taskId,
         `Marked ${solved.length} solved (${alreadySolved.length} already were) on`,
@@ -139,48 +125,47 @@ type Submission = {
   readonly subtaskIds: readonly string[];
 };
 
-/**
-Per-subtask presets send the solved, unsubmitted problems (or the ones named) and close
-the task when none remain unsubmitted; whole-submission presets submit and close at once.
-*/
 type SubmitRequest = {
+  readonly task: Task;
+  /** The subtasks the caller named; the preview's solved, unsubmitted ones otherwise. */
   readonly ids: readonly string[] | undefined;
   readonly when: When;
 };
 
+/**
+What the task screen's Submit button does (core's submit preview): per-subtask presets send
+the solved, unsubmitted problems and close the task with the last of them; whole-submission
+presets submit and close at once.
+*/
 const submission = (
-  state: CoreState,
-  task: Task,
-  { ids, when }: SubmitRequest,
+  preview: SubmitPreview,
+  { task, ids, when }: SubmitRequest,
 ): Result<Submission, ToolFailure> => {
-  const preset = resolvePreset(state.presets, task.presetId, task.overrides ?? undefined);
-  if (!preset.ok) {
-    return err({ code: preset.error, message: preset.error });
-  }
-  if (preset.value.submission === "whole") {
+  if (preview.kind === "whole") {
     return ok({
       event: stamp(when, { payload: { closes: true, taskId: task.id }, type: "task.submitted" }),
       subtaskIds: [],
     });
   }
-  const subtaskIds =
-    ids ??
-    task.subtasks
-      .filter((item) => item.solvedAt !== null && item.submittedAt === null)
-      .map((item) => item.id);
+  const subtaskIds = ids ?? preview.subtaskIds;
   if (subtaskIds.length === 0) {
     return err({ code: "retro/nothing-to-submit", message: "No solved, unsubmitted subtasks" });
   }
-  const isCloses = task.subtasks.every(
-    (item) => item.submittedAt !== null || subtaskIds.includes(item.id),
-  );
+  const isLast = unsubmittedSubtasks(task).every((item) => subtaskIds.includes(item.id));
   return ok({
     event: stamp(when, {
-      payload: { closes: isCloses, subtaskIds: [...subtaskIds], taskId: task.id },
+      payload: { closes: isLast, subtaskIds: [...subtaskIds], taskId: task.id },
       type: "task.submitted",
     }),
     subtaskIds,
   });
+};
+
+const submitting = (scope: Scope, request: SubmitRequest): Result<Submission, ToolFailure> => {
+  const view = taskView(scope.state, request.task.id, scope.qctx);
+  return view.ok
+    ? submission(view.value.submitPreview, request)
+    : err({ code: view.error, message: describeCode(view.error) });
 };
 
 export const submit = defineTool({
@@ -190,18 +175,14 @@ export const submit = defineTool({
   handler: async (args, ctx) => {
     const sent: string[] = [];
     return await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        if (!task.ok) {
-          return task;
-        }
-        const built = submission(scope.state, task.value, { ids: args.subtaskIds, when });
+      build: forTask(args.taskId, (scope, when, task) => {
+        const built = submitting(scope, { ids: args.subtaskIds, task, when });
         if (!built.ok) {
           return built;
         }
         sent.push(...built.value.subtaskIds);
         return ok([built.value.event]);
-      },
+      }),
       render: (scope) => {
         const row = rowOf(scope, args.taskId);
         const isClosed = taskById(scope.state.tasks, args.taskId)?.closed !== null;
@@ -239,17 +220,14 @@ export const closeTask = defineTool({
     "Closes a task with an outcome: done (done_late is derived when it is past the deadline), cancelled (not needed any more; reason recommended) or skipped (consciously not done). A closed task keeps its history and can be reopened. For sending homework problems use submit.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        return task.ok
-          ? ok([
-              stamp(when, {
-                payload: { outcome: args.outcome, reason: args.reason, taskId: args.taskId },
-                type: "task.closed",
-              }),
-            ])
-          : task;
-      },
+      build: forTask(args.taskId, (_scope, when) =>
+        ok([
+          stamp(when, {
+            payload: { outcome: args.outcome, reason: args.reason, taskId: args.taskId },
+            type: "task.closed",
+          }),
+        ]),
+      ),
       render: renderTask(args.taskId, `Closed as ${args.outcome}:`, { outcome: args.outcome }),
     }),
   input: {
@@ -274,12 +252,9 @@ export const reopen = defineTool({
     "Reopens a closed task (done, cancelled, skipped or automatically missed), keeping its subtasks and history. To undo an automatic outcome instead, revoke its closing event (see list_review).",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        return task.ok
-          ? ok([stamp(when, { payload: { taskId: args.taskId }, type: "task.reopened" })])
-          : task;
-      },
+      build: forTask(args.taskId, (_scope, when) =>
+        ok([stamp(when, { payload: { taskId: args.taskId }, type: "task.reopened" })]),
+      ),
       render: renderTask(args.taskId, "Reopened"),
     }),
   input: { ...WRITE_INPUT, taskId: TASK_ID },

@@ -133,6 +133,21 @@ const eventRefs = (events: readonly StoredEvent[]) =>
 
 export type Build = (scope: Scope, when: When) => Result<readonly EventInput[], ToolFailure>;
 
+/** A build for a write about one existing thing (a task, a preset), handed the thing found. */
+export type TargetBuild<T> = (
+  scope: Scope,
+  when: When,
+  target: T,
+) => Result<readonly EventInput[], ToolFailure>;
+
+/** Finds the target first: its refusal (`task/unknown`, `preset/unknown`) wins over the build. */
+export const withTarget =
+  <T>(lookup: (scope: Scope) => Result<T, ToolFailure>, build: TargetBuild<T>): Build =>
+  (scope, when) => {
+    const target = lookup(scope);
+    return target.ok ? build(scope, when, target.value) : target;
+  };
+
 export type Render = (scope: Scope, events: readonly StoredEvent[]) => Rendered;
 
 export type WriteSteps = {

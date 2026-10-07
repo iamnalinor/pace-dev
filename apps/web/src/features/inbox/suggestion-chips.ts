@@ -9,7 +9,10 @@ export type ChipField = (typeof CHIP_FIELDS)[number];
 export type SuggestionEdits = Partial<Suggestion>;
 
 /** The suggestion as it will be accepted: the guess with the person's edits on top. */
-export const editedSuggestion = (suggestion: Suggestion, edits: SuggestionEdits = {}): Suggestion => ({
+export const editedSuggestion = (
+  suggestion: Suggestion,
+  edits: SuggestionEdits = {},
+): Suggestion => ({
   ...suggestion,
   ...edits,
 });

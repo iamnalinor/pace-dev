@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { err, ok, reviewItems } from "@pace/core";
 
-import { requireTask, TASK_ID, WRITE_INPUT } from "../inputs.ts";
+import { forTask, TASK_ID, WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
 import { labelOf, rowOf, TaskRowSchema } from "../rows.ts";
 import { failure, runWrite, stamp, WRITE_OUTPUT } from "../tool-kit.ts";
@@ -58,19 +58,12 @@ export const reviewAction = defineTool({
     "Runs one of the actions a review item offers (see list_review): submit-now / mark-done / keep-open for a task that looks finished, mark-done / cancel / skip / keep-open for a passed deadline, sort / cancel for an old inbox item, confirm / undo for an automatic outcome. keep-open records nothing.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        if (!task.ok) {
-          return task;
-        }
+      build: forTask(args.taskId, (scope, when, task) => {
         const item = reviewItems(scope.state, scope.qctx).find(
           (entry) => entry.taskId === args.taskId,
         );
         if (item === undefined) {
-          return err({
-            code: "review/no-item",
-            message: `Nothing to review for ${task.value.title}`,
-          });
+          return err({ code: "review/no-item", message: `Nothing to review for ${task.title}` });
         }
         const action = item.actions.find((candidate) => candidate.key === args.key);
         return action === undefined
@@ -86,7 +79,7 @@ export const reviewAction = defineTool({
                 source: "mcp" as const,
               })),
             );
-      },
+      }),
       render: (scope, events) => {
         const row = rowOf(scope, args.taskId);
         return {

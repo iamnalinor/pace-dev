@@ -16,11 +16,20 @@ const row = (id: string, importance: NowRow["importance"]): NowRow => ({
   title: id,
 });
 
-const rows = [row("calc", "normal"), row("reply", "asap"), row("trk", "prioritized"), row("hw", "normal")];
+const rows = [
+  row("calc", "normal"),
+  row("reply", "asap"),
+  row("trk", "prioritized"),
+  row("hw", "normal"),
+];
 
 describe("reorderTarget", () => {
   it("moves a task onto the place of another task of its importance", () => {
-    expect(reorderTarget(rows, "hw", "calc")).toEqual({ kind: "move", overId: "calc", taskId: "hw" });
+    expect(reorderTarget(rows, "hw", "calc")).toEqual({
+      kind: "move",
+      overId: "calc",
+      taskId: "hw",
+    });
   });
 
   it("refuses to move across importance categories", () => {

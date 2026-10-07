@@ -8,8 +8,7 @@ export const formatAge = (minutes: number, t: Translate): string => {
   if (minutes < MINUTES_PER_HOUR) {
     return t("inbox.age.minutes", { count: Math.max(0, Math.floor(minutes)) });
   }
-  if (minutes < MINUTES_PER_DAY) {
-    return t("inbox.age.hours", { count: Math.floor(minutes / MINUTES_PER_HOUR) });
-  }
-  return t("inbox.age.days", { count: Math.floor(minutes / MINUTES_PER_DAY) });
+  return minutes < MINUTES_PER_DAY
+    ? t("inbox.age.hours", { count: Math.floor(minutes / MINUTES_PER_HOUR) })
+    : t("inbox.age.days", { count: Math.floor(minutes / MINUTES_PER_DAY) });
 };

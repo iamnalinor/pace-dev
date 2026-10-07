@@ -5,14 +5,26 @@ import {
   type EventInput,
   exampleCoursePresetEvents,
   ok,
+  type Preset,
   presetById,
   type PresetValidationError,
+  type Result,
   validatePresetInput,
 } from "@pace/core";
 
 import { WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { describeCode, runWrite, stamp, WRITE_OUTPUT } from "../tool-kit.ts";
+import {
+  type Build,
+  describeCode,
+  runWrite,
+  type Scope,
+  stamp,
+  type TargetBuild,
+  type ToolFailure,
+  withTarget,
+  WRITE_OUTPUT,
+} from "../tool-kit.ts";
 
 const PRESET_ID = z.string().min(1).describe("Lowercase slug, e.g. hw.algebra or work.ops.");
 
@@ -23,6 +35,15 @@ const DEFINITION = z
   );
 
 const presetFailure = (code: PresetValidationError) => err({ code, message: describeCode(code) });
+
+const existingPreset = (scope: Scope, id: string): Result<Preset, ToolFailure> => {
+  const preset = presetById(scope.state.presets, id);
+  return preset === undefined ? presetFailure("preset/unknown") : ok(preset);
+};
+
+/** The build of a write about one existing preset (archived ones included). */
+const forPreset = (id: string, build: TargetBuild<Preset>): Build =>
+  withTarget((scope) => existingPreset(scope, id), build);
 
 type PresetCreated = Extract<EventInput, { readonly type: "preset.created" }>;
 
@@ -115,11 +136,7 @@ export const updatePreset = defineTool({
     "Changes a user preset's name, parent or definition (a definition replaces the stored one entirely: pass every key the preset should keep). Built-in presets cannot be changed.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const current = presetById(scope.state.presets, args.id);
-        if (current === undefined) {
-          return presetFailure("preset/unknown");
-        }
+      build: forPreset(args.id, (scope, when, current) => {
         const checked = validatePresetInput(
           scope.state.presets,
           {
@@ -143,7 +160,7 @@ export const updatePreset = defineTool({
               }),
             ])
           : presetFailure(checked.error);
-      },
+      }),
       render: () => ({ structured: { presetId: args.id }, summary: `Updated preset ${args.id}.` }),
     }),
   input: {
@@ -165,15 +182,11 @@ export const archivePreset = defineTool({
     "Archives a user preset: no new instances are created and it leaves the pickers, while its existing tasks keep working. Revoke the archiving event to bring it back. Built-ins cannot be archived.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const current = presetById(scope.state.presets, args.id);
-        if (current === undefined) {
-          return presetFailure("preset/unknown");
-        }
-        return current.builtIn
+      build: forPreset(args.id, (_scope, when, current) =>
+        current.builtIn
           ? presetFailure("preset/built-in")
-          : ok([stamp(when, { payload: { id: args.id }, type: "preset.archived" })]);
-      },
+          : ok([stamp(when, { payload: { id: args.id }, type: "preset.archived" })]),
+      ),
       render: () => ({ structured: { presetId: args.id }, summary: `Archived preset ${args.id}.` }),
     }),
   input: { ...WRITE_INPUT, id: PRESET_ID },

@@ -268,13 +268,15 @@ export class UserStore extends DurableObject {
 
   /**
   Writes a batch on behalf of an MCP or bot caller: validated against the current state
-  in order (the first refusal stops everything, nothing is written), stamped with ids,
-  `recordedAt` and the caller's device, appended, then derived.
+  (derived first, so this week's instance can be addressed) in order (the first refusal
+  stops everything, none of the batch is written), stamped with ids, `recordedAt` and the
+  caller's device, appended, then derived again.
   */
   async apply(
     inputs: readonly EventInput[],
     meta: ApplyMeta,
   ): Promise<Result<ApplyResult, ApplyError>> {
+    await this.derive(meta.now);
     const prepared = prepareBatch(await this.#current(), inputs, meta);
     if (!prepared.ok) {
       return prepared;
@@ -289,7 +291,10 @@ export class UserStore extends DurableObject {
     });
   }
 
-  /** `apply` without the write: the would-be events and the state they would produce. */
+  /**
+  `apply` without any write: the would-be events and the state they would produce. It does
+  not derive either; callers that need this week's instances read first (as MCP does).
+  */
   async dryRun(
     inputs: readonly EventInput[],
     meta: ApplyMeta,

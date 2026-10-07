@@ -1,3 +1,7 @@
-import { PlaceholderPage } from "./placeholder-page.tsx";
+import { AddForm } from "#web/features/add/add-form.tsx";
 
-export const AddPage = () => <PlaceholderPage emptyKey="add.empty" titleKey="nav.add" />;
+export const AddPage = () => (
+  <main className="flex flex-1 flex-col">
+    <AddForm />
+  </main>
+);

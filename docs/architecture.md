@@ -172,10 +172,28 @@ drizzle (`drizzle-orm/durable-sqlite`); migrations (`drizzle/do`, bundled as
 `migrations.js`) run in the constructor inside `blockConcurrencyWhile`, so no request
 sees a half-migrated store. Tables (`user-store/schema.ts`): `events` (`seq` primary key,
 `id` unique, indexed by `occurredAt`), `observations`, `decisions` (every automatic
-decision with its inputs, for "why?"), `meta` (cursors, budgets). Methods today:
-`append`, `list`, `appendObservations`, `countEvents`. Projections, alarms (digests,
-automatic outcomes) and the MCP tools will run inside the same object in later stages,
-so heavy recomputes never cross a network boundary.
+decision with its inputs, for "why?"), `meta` (cursors, budgets) and the projections
+`tasks`, `subtasks`, `projects`, `presets` (the materialized state as SQL rows for SQL
+readers; never the source of truth).
+
+The object keeps core's `CoreState` materialized in memory (`user-store/state.ts`), tagged
+with the log `seq` it was built at; a cache behind the log is rebuilt. A batch that is in
+order (nothing before the last applied `occurredAt`, no correction: core's
+`shouldRematerialize`) is folded incrementally and only the rows it touched are rewritten
+(a preset change rewrites every task row, since it moves their derived columns); anything
+else rebuilds the state and every projection row (`user-store/projections.ts`). After every
+append (a client's sync push, an `apply`) and before every read and every `apply`,
+`derive(now)` appends the system events the state calls for: this week's homework instances and the automatic
+`cancelled_missed` / `skipped` outcomes, with deterministic ids, so they are idempotent
+against clients that derived the same events.
+
+Methods: `append` and `list` (sync), `appendObservations`, `find(id)`, `read(now)`,
+`apply(inputs, { source, deviceId, now })` (derives, then validates the batch in order with
+core's `validateEventInput`, the first refusal stops it and none of it is written; stamps
+ids, `recordedAt` and the device; returns the stored events and the new state), `dryRun`
+(the same without any write, derivation included), `derive(now)`, `countEvents`. The MCP tools (and the bot from stage
+2) reach it through `UserStoreApi` in `shared/contract.ts`; alarms (digests) join in stage
+2, so heavy recomputes never cross a network boundary.
 
 ## How to add an endpoint
 

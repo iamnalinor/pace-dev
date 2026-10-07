@@ -645,7 +645,7 @@ const refusals = (
 ): Record<string, readonly [Record<string, unknown>, string]> => ({
   add_subtasks: [{ labels: ["3"], taskId: "ghost" }, "task/unknown"],
   archive_preset: [{ id: "hw" }, "preset/built-in"],
-  capture_inbox: [{ text: ' '.repeat(3) }, "inbox/empty"],
+  capture_inbox: [{ text: " ".repeat(3) }, "inbox/empty"],
   close_task: [{ outcome: "done", taskId: "ghost" }, "task/unknown"],
   create_preset: [
     { definition: {}, extends: "nope", id: "work.orphan", name: "Orphan" },
@@ -687,40 +687,52 @@ describe("every write tool", () => {
 
   it("previews with dryRun and writes nothing", async () => {
     const token = await readWriteToken();
-    const fixture = await writeFixture(token);
+    const calls = Object.entries(writeArgs(await writeFixture(token)));
     const log = await logOf(token);
     const before = await log.count();
-    for (const [name, args] of Object.entries(writeArgs(fixture))) {
+    for (const [name, args] of calls) {
       const result = await callTool(token, name, { ...args, dryRun: true });
-      expect(result.isError, `${name}: ${result.content[0]?.text ?? ""}`).toBeUndefined();
-      expect(result.structuredContent?.["dryRun"], name).toBe(true);
-      expect(result.content[0]?.text, name).toMatch(/^Dry run: nothing was written\./u);
+      // The name rides along so a failure says which tool broke the contract.
+      expect({
+        dryRun: result.structuredContent?.["dryRun"],
+        isError: result.isError ?? false,
+        name,
+        saysDryRun: (result.content[0]?.text ?? "").startsWith("Dry run: nothing was written."),
+      }).toEqual({ dryRun: true, isError: false, name, saysDryRun: true });
     }
     expect(await log.count()).toBe(before);
   });
 
   it("is refused with a read-only grant, before anything is written", async () => {
     const token = await readWriteToken();
-    const fixture = await writeFixture(token);
+    const calls = Object.entries(writeArgs(await writeFixture(token)));
     const { tokens } = await obtainToken({ scope: "tasks:read", scopes: ["tasks:read"] });
     const log = await logOf(token);
     const before = await log.count();
-    for (const [name, args] of Object.entries(writeArgs(fixture))) {
-      expect(await errorText(tokens.access_token, name, args), name).toContain('"tasks:write"');
+    for (const [name, args] of calls) {
+      const result = await callTool(tokens.access_token, name, args);
+      expect({
+        isError: result.isError,
+        name,
+        namesScope: (result.content[0]?.text ?? "").includes('"tasks:write"'),
+      }).toEqual({ isError: true, name, namesScope: true });
     }
     expect(await log.count()).toBe(before);
   });
 
   it("answers a refusal as an isError result that starts with the Result code", async () => {
     const token = await readWriteToken();
-    const fixture = await writeFixture(token);
+    const cases = Object.entries(refusals(await writeFixture(token)));
     const log = await logOf(token);
     const before = await log.count();
-    for (const [name, [args, code]] of Object.entries(refusals(fixture))) {
+    for (const [name, [args, code]] of cases) {
       const result = await callTool(token, name, args);
-      expect(result.isError, name).toBe(true);
-      expect(result.content[0]?.text?.split(": ", 1)[0], name).toBe(code);
-      expect(result.structuredContent, name).toMatchObject({ error: { code } });
+      expect({
+        code: result.content[0]?.text?.split(": ", 1)[0],
+        isError: result.isError,
+        name,
+        structured: result.structuredContent,
+      }).toMatchObject({ code, isError: true, name, structured: { error: { code } } });
     }
     expect(await log.count()).toBe(before);
   });

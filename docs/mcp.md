@@ -59,18 +59,19 @@ tool carries the MCP annotations `readOnlyHint`, `destructiveHint`, `idempotentH
 Every tool answers `structuredContent` (typed by its output schema) plus a short text
 summary; ids are opaque strings, times are ISO 8601 UTC, and deadlines carry the IANA
 zone they were set in (`dueAt` + `dueTz`). A refusal is a tool result with `isError: true`
-whose text starts with the Result code (`task/unknown: No task with this id.`), never a
-JSON-RPC error, so the assistant can read it and try again. The server runs every tool
-against the user's Durable Object: a read first derives the system events due by now
-(this week's homework instances, automatic `cancelled_missed` / `skipped` outcomes), so the
-answer is the same the web app shows.
+whose text starts with the Result code (`task/unknown: No task with id …`) and whose
+`structuredContent` is `{ error: { code, message } }`, never a JSON-RPC error, so the
+assistant can read it and try again. The server runs every tool against the user's Durable
+Object: a read first derives the system events due by now (this week's homework instances,
+automatic `cancelled_missed` / `skipped` outcomes), so the answer is the same the web app
+shows.
 
 | Tool | Scope | What it does | Key inputs |
 |---|---|---|---|
 | `whoami` | read | the account behind the token, its scopes, the server time | — |
 | `list_now` | read | the Now list (score order) with lateness and progress, the waiting tasks, `laterCount`, `inboxCount` | `projectId?` |
 | `get_task` | read | one task with subtasks, closure and derived outcome, window elapsed, work left, the "why it is here" explanation, the submit preview | `id` |
-| `list_projects` | read | projects with open counts and links | — |
+| `list_projects` | read | projects (active first) with the project page's open count and links | — |
 | `list_project_tasks` | read | the project page: open, awaiting assignment, done with outcomes, stats | `projectId` or `projectName` |
 | `list_presets` | read | built-in and user presets, each with its own definition and the resolved settings | — |
 | `list_inbox` | read | unsorted captures with a rule-based suggestion each | — |
@@ -78,20 +79,22 @@ answer is the same the web app shows.
 | `search` | read | full-text over titles, descriptions, source texts, subtask labels and project names → `{ results: [{ id, title, url }] }` | `query` |
 | `fetch` | read | the task or project document → `{ id, title, text, url, metadata }` | `id` |
 | `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
-| `capture_inbox` | write | a verbatim text into the inbox | `text` |
-| `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted) | `taskId`, `subtaskIds?` or `numbers?` |
-| `submit` | write | per-subtask presets: sends the solved, unsubmitted problems and closes when none remain; whole-submission presets: submits and closes as done | `taskId`, `subtaskIds?` |
-| `close_task` | write | closes with `done`, `cancelled` or `skipped` (+ reason) | `taskId`, `outcome`, `reason?` |
-| `reopen` | write | reopens a closed task | `taskId` |
-| `update_task` | write | title, description, deadline, start, estimate, preset, project (by id or name) | `taskId`, the fields to change |
+| `capture_inbox` | write | a verbatim text into the inbox (`inbox/empty` for blank text) | `text` |
+| `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted); already solved ones are reported, not repeated | `taskId`, `subtaskIds?` or `numbers?` |
+| `submit` | write | what the task screen's Submit does: per-subtask presets send the solved, unsubmitted problems (or the ones named) and close with the last of them; whole-submission presets submit and close as done | `taskId`, `subtaskIds?` |
+| `close_task` | write | closes with `done` (`done_late` is derived), `cancelled` or `skipped` (+ reason) | `taskId`, `outcome`, `reason?` |
+| `reopen` | write | reopens a closed task, subtasks and history kept | `taskId` |
+| `update_task` | write | only the fields given: title, description (`null` clears), deadline, start, estimate (`null` clears), preset, project (by id or name) | `taskId`, `title?`, `description?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `presetId?`, `projectId?`/`projectName?` |
 | `set_importance` | write | `asap` / `prioritized` / `normal` / `nice_to_have` | `taskId`, `importance` |
 | `set_status` | write | `in_progress` / `paused` / `waiting` / `not_started` | `taskId`, `status` |
-| `set_rank` | write | moves a task to a 1-based position in its importance category and renumbers the category | `taskId`, `position` |
-| `add_subtasks` | write | appends subtasks | `taskId`, `labels` |
-| `revoke_event` | write | undoes one event by id (the log keeps it) | `eventId`, `reason?` |
-| `review_action` | write | runs a review item's action (`submit-now`, `mark-done`, `cancel`, `skip`, `keep-open`, `sort`, `confirm`, `undo`) | `taskId`, `key` |
+| `set_rank` | write | moves a task to a 1-based position in its importance category and renumbers the category (`rank/not-competing` for closed, inbox and empty tasks) | `taskId`, `position` |
+| `add_subtasks` | write | appends subtasks and answers their ids | `taskId`, `labels` (labels or `{ label, number }`) |
+| `revoke_event` | write | undoes one event by id (the log keeps it); revoking a revocation restores the original | `eventId`, `reason?` |
+| `review_action` | write | runs a review item's action (`submit-now`, `mark-done`, `cancel`, `skip`, `keep-open`, `sort`, `confirm`, `undo`; `review/no-item`, `review/no-action` otherwise) | `taskId`, `key` |
 | `seed_example_presets` | write | the three example course presets, skipping existing ones | — |
-| `create_preset` / `update_preset` / `archive_preset` | write | user presets, validated like the web editor (`preset/exists`, `preset/invalid-definition`, `preset/built-in`, …) | `id`, `name`, `extends`, `definition` |
+| `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
+| `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
+| `archive_preset` | write | archives a user preset; its tasks keep working (`preset/built-in` for built-ins) | `id` |
 
 ### Writes: `at`, `precision`, `dryRun`
 
@@ -108,7 +111,9 @@ Every mutating tool takes three optional inputs on top of its own:
   and call again without `dryRun` once the person agrees.
 
 Every write answers `{ dryRun, events: [{ id, type, occurredAt }], … }`; the event ids are
-what `revoke_event` takes to undo. Events written through MCP carry `source: "mcp"` and
+what `revoke_event` takes to undo. A write about a task or preset that does not exist is
+refused first (`task/unknown`, `preset/unknown`), and a write without the `tasks:write`
+scope never reaches the store. Events written through MCP carry `source: "mcp"` and
 `deviceId: "mcp"`, and clients pull them through `/api/sync/pull` like any other.
 
 ### ChatGPT connectors
@@ -181,13 +186,13 @@ apps/api/src/shared/telegram-identity.ts  widget signature + whitelist + user ro
 apps/api/src/mcp/server.ts          TOOLS, createMcpServer(ctx), mcpHandler (whitelist, stateless transport, the user's DO)
 apps/api/src/mcp/registry.ts        defineTool({ name, title, description, scope, annotations, input, output, handler }), ToolContext
 apps/api/src/mcp/grant.ts           McpGrant from ctx.props + ctx.auth (zod-checked)
-apps/api/src/mcp/tool-kit.ts        runRead / runWrite (read → build → apply or dryRun → render), stamp, failure codes
-apps/api/src/mcp/inputs.ts          shared input schemas (at/precision/dryRun, subtasks, project by id or name)
-apps/api/src/mcp/rows.ts            TaskRow / ProjectRow schemas and renderers, task and project URLs
+apps/api/src/mcp/tool-kit.ts        runRead / runWrite (read → build → apply or dryRun → render), withTarget, stamp, failure codes
+apps/api/src/mcp/inputs.ts          shared input schemas (at/precision/dryRun, subtasks, project by id or name), forTask
+apps/api/src/mcp/rows.ts            TaskRow / ProjectRow schemas rendered from core's query results, renderTask, URLs
 apps/api/src/mcp/tools/*.ts         the tools: list-tools, get-task, search-tools, task-tools, edit-tools,
                                     progress-tools, correction-tools, preset-tools, whoami
-apps/api/src/user-store/state.ts    the DO's materialized CoreState cache, batch validation (prepareBatch)
-apps/api/src/user-store/projections.ts  tasks / subtasks / projects / presets SQL rows
+apps/api/src/user-store/state.ts    the DO's materialized CoreState cache (by seq), in-order vs rebuild, batch validation (prepareBatch)
+apps/api/src/user-store/projections.ts  tasks / subtasks / projects / presets SQL rows (touched rows, or all after a rebuild)
 apps/api/src/shared/contract.ts     the DO ↔ Worker types (RpcState, ApplyMeta, ApplyError, UserStoreApi)
 packages/core/src/api/schemas/oauth.ts  OAUTH_SCOPES, requestedScopes, grantedScopes, the consent contract
 apps/web/src/features/oauth/        the consent page
@@ -195,12 +200,15 @@ apps/web/src/features/oauth/        the consent page
 
 Adding a tool: `defineTool` in `apps/api/src/mcp/tools/<group>.ts` (a read tool wraps
 `runRead`, a write tool `runWrite` with a `build` that turns the arguments into event
-inputs against the current state and a `render` for the answer), add it to `TOOLS` in
-`server.ts`, and the scope check, annotations, typed input, `dryRun` and the error
-convention come for free. The Durable Object does the writing: `UserStore.apply` validates
-the batch with core's retro rules in order (the first refusal stops everything), stamps
-ids and `recordedAt`, appends, derives the system events and returns the stored events
-with the new state; `UserStore.dryRun` does the same without writing.
+inputs against the current state, `forTask(taskId, …)` when it is about one task, and a
+`render` for the answer), add it to `TOOLS` in `server.ts` and to the contract fixtures in
+`tests/mcp-tools.int.test.ts`, and the scope check, annotations, typed input, `dryRun` and
+the error convention come for free. Renderers read core's queries (`nowItem`, `taskView`,
+`projectView`, `inboxList`, `reviewItems`) rather than recomputing them. The Durable Object
+does the writing: `UserStore.apply(inputs, { source, deviceId, now })` derives what is due,
+validates the batch with core's `validateEventInput` in order (the first refusal stops
+everything), stamps ids, `recordedAt` and the device, appends, derives again and returns
+the stored events with the new state; `UserStore.dryRun` does the same without writing.
 
 ## Local testing
 
@@ -219,11 +227,14 @@ The same flow runs in workerd in `apps/api/tests/oauth.int.test.ts` (discovery, 
 the PKCE dance, refresh rotation, revocation, whitelist, scope checks, grants) and
 `apps/api/tests/mcp.int.test.ts` (initialize, tools/list, whoami, 403 for a token whose
 Telegram id is not allowed), `apps/api/tests/mcp-tools.int.test.ts` (every tool through the
-endpoint: create → pull → list_now, project on the fly, inbox, mark + submit closes, dry run
-writes nothing, read-only grant refused, search/fetch with a Cyrillic query, review, presets)
-and `apps/api/tests/projections.int.test.ts` (SQL rows, revoke, derived instances and
-automatic outcomes, `apply` / `dryRun`); `apps/api/src/mcp/registry.test.ts` covers the
-scope guard with an in-memory client. `bun test:api` runs them.
+endpoint: create → pull → list_now, project on the fly, inbox, mark + submit closes,
+retroactive `at`/`precision`, search/fetch with a Cyrillic query, review, presets; and a
+contract over **every** write tool: `dryRun` writes nothing, a read-only grant is refused
+before the store, each refusal is an `isError` result starting with its Result code) and
+`apps/api/tests/projections.int.test.ts` (SQL rows, revoke, a preset change rewriting task
+rows, rebuild on an earlier `occurredAt`, derived instances and automatic outcomes after a
+sync push, before and after `apply`, `apply` / `dryRun`); `apps/api/src/mcp/registry.test.ts` covers
+the scope guard with an in-memory client. `bun test:api` runs them.
 
 ## Operational notes
 

@@ -23,7 +23,13 @@ const SELECT_CLASS =
 
 const IMPORTANCES: readonly Importance[] = ["asap", "prioritized", "normal", "nice_to_have"];
 
-const Labelled = ({ children, label }: { readonly children: (id: string) => ReactNode; readonly label: string }) => {
+const Labelled = ({
+  children,
+  label,
+}: {
+  readonly children: (id: string) => ReactNode;
+  readonly label: string;
+}) => {
   const id = useId();
   return (
     <div className="grid gap-1 text-xs text-muted">
@@ -66,7 +72,9 @@ const PresetPicker = ({ onEdit, suggestion }: Omit<Props, "field">) => {
   const t = useT();
   const { presetName } = useChipText();
   const presets = useServices().hooks.useAppState((state) => state.presets);
-  const choices = Object.values(presets.byId).filter((preset) => !preset.archived && preset.id !== "inbox");
+  const choices = Object.values(presets.byId).filter(
+    (preset) => !preset.archived && preset.id !== "inbox",
+  );
   return (
     <Labelled label={t("inbox.preset")}>
       {(id) => (

@@ -2,7 +2,11 @@ import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { useAuth } from "#web/app-state.tsx";
+import { ConnectedApps } from "#web/features/oauth/connected-apps.tsx";
+import { DigestWindowsControl } from "#web/features/settings/digest-windows-control.tsx";
 import { LanguageControl } from "#web/features/settings/language-control.tsx";
+import { QuietHoursControl } from "#web/features/settings/quiet-hours-control.tsx";
+import { SettingsLinks } from "#web/features/settings/settings-links.tsx";
 import { ThemeControl } from "#web/features/settings/theme-control.tsx";
 import { TimezoneControl } from "#web/features/settings/timezone-control.tsx";
 import { useT } from "#web/i18n.tsx";
@@ -29,6 +33,22 @@ export const SettingsPage = () => {
         <Card className="grid gap-3">
           <CardTitle>{t("settings.timezone")}</CardTitle>
           <TimezoneControl />
+        </Card>
+        <Card className="grid gap-3">
+          <CardTitle>{t("settings.digestWindows")}</CardTitle>
+          <DigestWindowsControl />
+        </Card>
+        <Card className="grid gap-3">
+          <CardTitle>{t("settings.quietHours")}</CardTitle>
+          <QuietHoursControl />
+        </Card>
+        <Card className="grid gap-1">
+          <CardTitle>{t("settings.more")}</CardTitle>
+          <SettingsLinks />
+        </Card>
+        <Card className="grid gap-3">
+          <CardTitle>{t("settings.connectedApps")}</CardTitle>
+          <ConnectedApps />
         </Card>
         <Button
           className="mt-3"

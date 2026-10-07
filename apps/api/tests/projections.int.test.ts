@@ -423,6 +423,44 @@ describe("apply", () => {
     expect(result.value.seq).toBeGreaterThan(1);
   });
 
+  it("derives what is due by its own clock before validating (an instance issued since)", async () => {
+    const stub = freshStore();
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append(
+        [
+          envelope("preset.created", {
+            definition: {
+              recurrence: {
+                due: { time: "23:59", weekday: 7 },
+                issued: { time: "00:00", weekday: 1 },
+                tz: "UTC",
+              },
+            },
+            extends: "hw",
+            id: "hw.later",
+            name: "Later HW",
+          }),
+        ],
+        { now: NOW },
+      );
+    });
+    // Two weeks on, nobody has read the store since: the W43 instance exists only once derived.
+    const later = "2026-10-19T12:00:00.000Z";
+    const result = await stub.apply(
+      [
+        {
+          occurredAt: later,
+          payload: { importance: "asap", taskId: "hw:hw.later:2026-W43" },
+          precision: "exact",
+          source: "mcp",
+          type: "task.importance.set",
+        },
+      ],
+      { ...meta, now: later },
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it("dryRun returns the would-be events and the resulting state without writing", async () => {
     const stub = freshStore();
     const taskId = newId();

@@ -64,7 +64,8 @@
       "^react$": "<rootDir>/node_modules/react",
       "^react/(.*)$": "<rootDir>/node_modules/react/$1",
       "^zustand$": "<rootDir>/node_modules/zustand",
-      "^zustand/(.*)$": "<rootDir>/node_modules/zustand/$1"
+      "^zustand/(.*)$": "<rootDir>/node_modules/zustand/$1",
+      "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!(.bun|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|lucide-react-native|nativewind))",

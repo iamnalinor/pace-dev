@@ -3,9 +3,9 @@ import { z } from "zod";
 import { accountTz, err, type EventInput, newId, ok } from "@pace/core";
 
 import {
+  forTask,
   IMPORTANCE,
   PROJECT_REF,
-  requireTask,
   resolveProject,
   SUBTASK_INPUT,
   TASK_ID,
@@ -202,25 +202,18 @@ export const updateTask = defineTool({
     "Changes a task's title, description (null clears it), deadline, start, estimate (null clears it), preset or project (by id, or by name — created when new). Only the fields given change; subtasks are kept across a preset switch. Use set_importance, set_status and set_rank for those; mark_subtasks, submit and close_task for progress.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
-      build: (scope, when) => {
-        const task = requireTask(scope.state, args.taskId);
-        if (!task.ok) {
-          return task;
-        }
+      build: forTask(args.taskId, (scope, when, task) => {
         const project = resolveProject(scope.state, args, when);
         if (!project.ok) {
           return project;
         }
-        const zone = task.value.dueTz ?? accountTz(scope.state, scope.qctx);
+        const zone = task.dueTz ?? accountTz(scope.state, scope.qctx);
         return ok([
           ...project.value.events,
           ...fieldEvents(args, when, zone),
-          ...settingEvents(args, when, {
-            current: task.value.projectId,
-            next: project.value.projectId,
-          }),
+          ...settingEvents(args, when, { current: task.projectId, next: project.value.projectId }),
         ]);
-      },
+      }),
       render: (scope, events) => {
         const row = rowOf(scope, args.taskId);
         const label = labelOf(row, args.taskId);
