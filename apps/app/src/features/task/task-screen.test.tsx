@@ -65,7 +65,7 @@ describe("TaskScreen — work", () => {
 
   it("explains its place on Now", async () => {
     await trkScreen();
-    expect(screen.getByText("TRK-231")).toBeOnTheScreen();
+    expect(screen.getByText("tracker.example.com ↗")).toBeOnTheScreen();
     expect(
       screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
     ).toBeOnTheScreen();

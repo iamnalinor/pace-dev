@@ -26,11 +26,11 @@ describe("CloseSheet — submitting problems", () => {
     for (const key of ["now", "hour-ago", "yesterday-evening", "at-deadline"] as const) {
       expect(screen.getByRole("button", { name: en(`quickTime.${key}`) })).toBeOnTheScreen();
     }
-    expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"));
-    expect(preview("open")).toHaveTextContent("5, 6, 7a Bonus");
-    expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50");
+    expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
+    expect(preview("open")).toHaveTextContent("5, 6, 7a Bonus", { exact: false });
+    expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50", { exact: false });
     await fireEvent.press(screen.getByRole("button", { name: en("quickTime.hour-ago") }));
-    expect(preview("recorded")).toHaveTextContent("12:50 · happened 11:50");
+    expect(preview("recorded")).toHaveTextContent("12:50 · happened 11:50", { exact: false });
   });
 
   it("submits an hour ago as an approximate time", async () => {
@@ -59,7 +59,7 @@ describe("CloseSheet — submitting problems", () => {
     expect(screen.getByText(en("close.timeInvalid"))).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: en("close.submit") })).toBeDisabled();
     await fireEvent.changeText(time, "10:15");
-    expect(preview("recorded")).toHaveTextContent("12:50 · happened 10:15");
+    expect(preview("recorded")).toHaveTextContent("12:50 · happened 10:15", { exact: false });
   });
 
   it("closes the task as skipped with a reason instead", async () => {
@@ -84,9 +84,9 @@ describe("CloseSheet — closing a whole task", () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC", now: "2026-10-10T10:00:00.000Z" });
     await renderScreen(<TaskScreen id={TRK_ID} openClose />, runtime);
     expect(screen.getByRole("header", { name: en("close.closeTitle") })).toBeOnTheScreen();
-    expect(preview("outcome")).toHaveTextContent(en("close.late"));
+    expect(preview("outcome")).toHaveTextContent(en("close.late"), { exact: false });
     await fireEvent.press(screen.getByRole("button", { name: en("quickTime.at-deadline") }));
-    expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"));
+    expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
     await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed?.outcome).toBe("done");

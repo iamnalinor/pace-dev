@@ -650,4 +650,6 @@ export const en = {
   "shortcuts.close": "Close the task pane",
   "shortcuts.help": "Show this list",
   "now.pickTask": "Pick a task to see it here.",
+  "task.progressLess": "Less progress",
+  "task.progressMore": "More progress",
 } as const;

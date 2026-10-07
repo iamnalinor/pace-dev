@@ -36,13 +36,15 @@ export const isLatePreview = (view: TaskViewModel, mode: CloseMode, at: string):
   const sentAt = view.problems.flatMap((problem) =>
     problem.submittedAt === null ? [] : [problem.submittedAt],
   );
-  return mode === "done" && sentAt.length > 0 ? sentAt.some((sent) => isAfter(sent, due)) : isAfter(at, due);
+  return mode === "done" && sentAt.length > 0
+    ? sentAt.some((sent) => isAfter(sent, due))
+    : isAfter(at, due);
 };
 
 const RECENT_REASONS = 5;
 
 /** The reasons people typed when they gave tasks up, newest first, each once. */
-export const recentReasons = (state: CoreState): readonly string[] => {
+export const recentReasons = (state: Pick<CoreState, "tasks">): readonly string[] => {
   const given = Object.values(state.tasks.byId)
     .flatMap((task) => {
       const { closed } = task;

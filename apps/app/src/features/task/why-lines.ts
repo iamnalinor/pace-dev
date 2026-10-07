@@ -1,7 +1,7 @@
 import type { WhyRow } from "@pace/client";
 
 import { countText } from "#app/format/meta.ts";
-import { type Viewer, zonedText  } from "#app/format/time.ts";
+import { type Viewer, zonedText } from "#app/format/time.ts";
 import { formatDuration, type Importance, t } from "@pace/core";
 
 export type WhyLine = {
@@ -71,7 +71,7 @@ export const whyLines = (
             }),
           }
         : {
-            key: row.key,
+            id: `${row.key}:${index}`,
             label: t(viewer.language, `explain.${row.key}`),
             value: valueText(row, viewer),
           },

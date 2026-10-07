@@ -654,4 +654,6 @@ export const ru: Catalog = {
   "shortcuts.close": "Закрыть панель задачи",
   "shortcuts.help": "Показать этот список",
   "now.pickTask": "Выберите задачу, чтобы открыть её здесь.",
+  "task.progressLess": "Меньше прогресса",
+  "task.progressMore": "Больше прогресса",
 };

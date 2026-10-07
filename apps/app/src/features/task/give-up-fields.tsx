@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Text, View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
@@ -13,7 +14,9 @@ const OUTCOMES: readonly GiveUp[] = ["cancelled", "skipped"];
 /** Cancelled or Skipped, an optional reason, and the reasons used before (one tap fills them). */
 export const GiveUpFields = ({ form }: { readonly form: CloseForm }) => {
   const t = useT();
-  const reasons = useAppState(recentReasons);
+  // Select the stable task map; a fresh array from the selector would re-render forever.
+  const tasks = useAppState((state) => state.tasks);
+  const reasons = useMemo(() => recentReasons({ tasks }), [tasks]);
   return (
     <View className="gap-3">
       <View className="flex-row gap-1.5">

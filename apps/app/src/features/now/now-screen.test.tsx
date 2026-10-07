@@ -14,7 +14,7 @@ beforeEach(() => {
 const checks = (): readonly string[] =>
   screen
     .getAllByRole("button", { name: /^Mark .* done$/ })
-    .map((button) => String(button.props.accessibilityLabel));
+    .map((button) => String(button.props["accessibilityLabel"]));
 
 describe("NowScreen", () => {
   it("lists the artboard rows in score order with their meta lines", async () => {

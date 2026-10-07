@@ -81,9 +81,7 @@ export const SettingsScreen = () => {
         />
       </Row>
       <Row label={t("settings.timezone")}>
-        <Text className="font-sans text-[15px] text-fg">
-          {settings.timezone ?? deviceZone}
-        </Text>
+        <Text className="font-sans text-[15px] text-fg">{settings.timezone ?? deviceZone}</Text>
         <Text className="font-sans text-[13px] text-muted">
           {t("settings.timezone.device", { tz: deviceZone })}
         </Text>
