@@ -2,13 +2,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import type { ReviewRow } from "@pace/client";
-import type { ReviewActionKey } from "@pace/core";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { actionErrorText } from "#web/shared/lib/action-error.ts";
 import { showUndoToast } from "#web/shared/lib/undo-toast.ts";
-import { formatRelativeDay } from "@pace/core";
+import { formatRelativeDay, type ReviewActionKey } from "@pace/core";
 
 import { ReviewCard } from "./review-card.tsx";
 

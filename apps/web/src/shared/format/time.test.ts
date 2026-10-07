@@ -57,19 +57,17 @@ describe("formatZoned", () => {
   });
 
   it("treats zones with the same offset as the same zone", () => {
-    expect(formatZoned({ ...base, deviceTz: "Europe/Minsk", mode: "due" })).toBe(
-      "tomorrow 23:59",
-    );
+    expect(formatZoned({ ...base, deviceTz: "Europe/Minsk", mode: "due" })).toBe("tomorrow 23:59");
   });
 });
 
 describe("formatDue", () => {
   it("prefixes the meta line with Due", () => {
-    expect(formatDue({ at: HW_DUE, tz: MOSCOW }, { deviceTz: MOSCOW, language: "en", now: NOW })).toBe(
-      "Due tomorrow 23:59",
-    );
-    expect(formatDue({ at: HW_DUE, tz: MOSCOW }, { deviceTz: MOSCOW, language: "ru", now: NOW })).toBe(
-      "Срок завтра 23:59",
-    );
+    expect(
+      formatDue({ at: HW_DUE, tz: MOSCOW }, { deviceTz: MOSCOW, language: "en", now: NOW }),
+    ).toBe("Due tomorrow 23:59");
+    expect(
+      formatDue({ at: HW_DUE, tz: MOSCOW }, { deviceTz: MOSCOW, language: "ru", now: NOW }),
+    ).toBe("Срок завтра 23:59");
   });
 });

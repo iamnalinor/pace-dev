@@ -168,13 +168,20 @@ const updatePresets = async (db: Db, state: CoreState, ids: ReadonlySet<string>)
   await insertChunked(rows, (chunk) => db.insert(schema.presets).values(chunk));
 };
 
+/**
+A preset change moves the derived columns (default importance, progress, outcome) of every
+task down its chain, children included; presets change rarely, so all task rows are rewritten.
+*/
+const affectedTasks = (state: CoreState, touched: Touched): ReadonlySet<string> =>
+  touched.presetIds.size === 0 ? touched.taskIds : new Set(Object.keys(state.tasks.byId));
+
 /** Rewrites only the rows a batch touched (the incremental path). */
 export const updateProjections = async (
   db: Db,
   state: CoreState,
   touched: Touched,
 ): Promise<void> => {
-  await updateTasks(db, state, touched.taskIds);
+  await updateTasks(db, state, affectedTasks(state, touched));
   await updateProjects(db, state, touched.projectIds);
   await updatePresets(db, state, touched.presetIds);
 };

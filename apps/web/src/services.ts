@@ -40,7 +40,11 @@ export const createServices = (deps: ServiceDeps): PaceServices => {
     source: "web",
     store: deps.eventStore,
   });
-  return { ...client, botUsername: deps.botUsername, hooks: createAppHooks(client.state, client.clock) };
+  return {
+    ...client,
+    botUsername: deps.botUsername,
+    hooks: createAppHooks(client.state, client.clock),
+  };
 };
 
 /** The production wiring: IndexedDB log, localStorage session, the configured API origin. */

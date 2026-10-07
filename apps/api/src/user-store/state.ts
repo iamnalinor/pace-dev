@@ -186,8 +186,11 @@ export const prepareBatch = (
 };
 
 const toRpcTask = (task: Task): RpcTask => {
-  const overrides = task.overrides === null ? null : parsePresetDefinition(task.overrides);
-  return { ...task, overrides: overrides?.ok ? overrides.value : null };
+  if (task.overrides === null) {
+    return { ...task, overrides: null };
+  }
+  const overrides = parsePresetDefinition(task.overrides);
+  return { ...task, overrides: overrides.ok ? overrides.value : null };
 };
 
 /** The state as it crosses RPC: overrides validated into their typed shape (see `RpcState`). */

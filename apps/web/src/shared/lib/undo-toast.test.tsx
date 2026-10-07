@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Toaster } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 
-import { showUndoToast } from "./undo-toast.ts";
+import { revokeEvents, showUndoToast } from "./undo-toast.ts";
 
 describe("showUndoToast", () => {
   it("shows the message with an Undo action that calls back", async () => {
@@ -16,5 +16,13 @@ describe("showUndoToast", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
     expect(screen.getByText("Accepted")).toBeInTheDocument();
     expect(onUndo).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("revokeEvents", () => {
+  it("revokes exactly the events an action appended", async () => {
+    const revoke = vi.fn(async () => {});
+    await revokeEvents(revoke, [{ id: "a" }, { id: "b" }]);
+    expect(revoke.mock.calls).toEqual([["a"], ["b"]]);
   });
 });

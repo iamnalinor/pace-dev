@@ -1,11 +1,10 @@
 import { screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { freezeAt, seedArtboard } from "#web/test/artboard-world.ts";
 import { renderWithProviders } from "#web/test/render.tsx";
 import { createTestServices } from "#web/test/services.ts";
 import { CALC_HW5_ID, INBOX_CABLE_ID } from "@pace/core/testing";
-import { freezeAt, seedArtboard } from "#web/test/artboard-world.ts";
-import { vi } from "vitest";
 
 import { ReviewList } from "./review-list.tsx";
 

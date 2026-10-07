@@ -1,8 +1,7 @@
-import { zonesDiffer } from "@pace/core";
-
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { Button } from "#web/shared/ui/button.tsx";
+import { zonesDiffer } from "@pace/core";
 
 /** Shown when the device sits in another zone than the account: one tap moves the account. */
 export const ZoneBanner = () => {

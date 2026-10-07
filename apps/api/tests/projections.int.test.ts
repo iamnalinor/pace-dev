@@ -113,6 +113,41 @@ describe("projections", () => {
     });
   });
 
+  it("rewrites the rows of the tasks a preset change affects", async () => {
+    const stub = freshStore();
+    const taskId = newId();
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append(
+        [
+          envelope("preset.created", {
+            definition: {},
+            extends: "work",
+            id: "work.ops",
+            name: "Ops",
+          }),
+          envelope("task.created", { presetId: "work.ops", taskId, title: "Deploy" }),
+        ],
+        { now: NOW },
+      );
+      // In order (later occurredAt), so the incremental path writes the rows.
+      await instance.append(
+        [
+          envelope(
+            "preset.updated",
+            { definition: { defaultImportance: "asap" }, id: "work.ops" },
+            { occurredAt: SOLVED_AT },
+          ),
+        ],
+        { now: NOW },
+      );
+      const [task] = await instance.db.select().from(schema.tasks);
+      expect(task?.importance).toBe("asap");
+      const presets = await instance.db.select().from(schema.presets);
+      const ops = presets.find((row) => row.id === "work.ops");
+      expect(JSON.parse(ops?.definition ?? "null")).toEqual({ defaultImportance: "asap" });
+    });
+  });
+
   it("rebuilds from storage when the in-memory cache is empty", async () => {
     const stub = freshStore();
     const taskId = newId();
@@ -351,6 +386,41 @@ describe("apply", () => {
       meta,
     );
     expect(result).toEqual({ error: { code: "event/not-found", index: 0 }, ok: false });
+  });
+
+  it("derives the system events the write calls for (a new recurring preset's instance)", async () => {
+    const stub = freshStore();
+    const result = await stub.apply(
+      [
+        {
+          occurredAt: NOW,
+          payload: {
+            definition: {
+              recurrence: {
+                due: { time: "23:59", weekday: 7 },
+                issued: { time: "00:00", weekday: 1 },
+                tz: "UTC",
+              },
+            },
+            extends: "hw",
+            id: "hw.applied",
+            name: "Applied HW",
+          },
+          precision: "exact",
+          source: "mcp",
+          type: "preset.created",
+        },
+      ],
+      meta,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.events.map((event) => event.type)).toEqual(["preset.created"]);
+    const instances = Object.keys(result.value.state.tasks.byId);
+    expect(instances.some((id) => id.startsWith("hw:hw.applied:"))).toBe(true);
+    expect(result.value.seq).toBeGreaterThan(1);
   });
 
   it("dryRun returns the would-be events and the resulting state without writing", async () => {

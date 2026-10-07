@@ -18,7 +18,13 @@ const offsetMinutes = (tz: string, instantMs: number): number => {
   }).formatToParts(new Date(instantMs));
   const read = (type: Intl.DateTimeFormatPartTypes): number =>
     Number(parts.find((part) => part.type === type)?.value ?? "0");
-  const asUtc = Date.UTC(read("year"), read("month") - 1, read("day"), read("hour"), read("minute"));
+  const asUtc = Date.UTC(
+    read("year"),
+    read("month") - 1,
+    read("day"),
+    read("hour"),
+    read("minute"),
+  );
   return Math.round((asUtc - instantMs) / MINUTE_MS);
 };
 
@@ -30,16 +36,28 @@ export const isoToWallClock = (atIso: string, tz: string): string => {
 };
 
 /**
-The UTC instant of a `datetime-local` value read in `tz`; `null` for anything else. The
-offset is read twice because the first guess may sit on the other side of a DST change.
+The UTC instant of a `datetime-local` value read in `tz`; `null` for anything else (a
+malformed value, a date that does not exist, an unknown zone). The offset is read twice
+because the first guess may sit on the other side of a DST change; a time inside the
+spring-forward gap resolves to a real instant next to it.
 */
 export const wallClockToIso = (local: string, tz: string): null | string => {
   const match = WALL_CLOCK.exec(local);
   if (match === null || !isValidTimeZone(tz)) {
     return null;
   }
-  const [, year, month, day, hour, minute] = match.map(Number);
-  const asUtc = Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0);
+  const [, year = 0, month = 1, day = 1, hour = 0, minute = 0] = match.map(Number);
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute);
+  // Date.UTC rolls 30 February over into March: a value that does not read back is not real.
+  const probe = new Date(asUtc);
+  const isReal =
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day &&
+    probe.getUTCHours() === hour &&
+    probe.getUTCMinutes() === minute;
+  if (!isReal) {
+    return null;
+  }
   const guess = asUtc - offsetMinutes(tz, asUtc) * MINUTE_MS;
   const instant = asUtc - offsetMinutes(tz, guess) * MINUTE_MS;
   return new Date(instant).toISOString();

@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import { Toaster } from "sonner";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { useAuth, useSync } from "./app-state.tsx";
 import { useT } from "./i18n.tsx";
@@ -73,6 +73,30 @@ describe("PaceProvider", () => {
     await waitFor(() => {
       expect(api.calls.filter((call) => call.path === "/api/sync/pull")).toHaveLength(pulls + 1);
     });
+  });
+
+  it("generates the week's instances once per load, after sign-in", async () => {
+    const { services } = createTestServices();
+    const ensure = vi.spyOn(services.actions, "ensureInstances");
+    const first = renderWithProviders(<Probe />, { services });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 20);
+    });
+    expect(ensure).not.toHaveBeenCalled();
+
+    await services.auth.loginWithDev("1919230638");
+    await waitFor(() => {
+      expect(ensure).toHaveBeenCalledTimes(1);
+    });
+    // A remount (StrictMode, a new route tree) and a new sign-in reuse the same load.
+    first.unmount();
+    renderWithProviders(<Probe />, { services });
+    await services.auth.logout();
+    await services.auth.loginWithDev("1919230638");
+    await new Promise((resolve) => {
+      setTimeout(resolve, 20);
+    });
+    expect(ensure).toHaveBeenCalledTimes(1);
   });
 
   it("shows a toast when a sync fails", async () => {

@@ -38,7 +38,9 @@ describe("ZoneBanner", () => {
     });
     const { user } = renderWithProviders(<ZoneBanner />, { services });
     await user.click(await screen.findByRole("button", { name: "Use Europe/Moscow" }));
-    expect(await screen.findByRole("button", { name: "Use Europe/Moscow" }).catch(() => null)).toBeNull();
+    expect(
+      await screen.findByRole("button", { name: "Use Europe/Moscow" }).catch(() => null),
+    ).toBeNull();
     expect(services.state.store.getState().settings.timezone).toBe(MOSCOW);
   });
 });

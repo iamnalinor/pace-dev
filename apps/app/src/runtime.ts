@@ -1,4 +1,5 @@
 import {
+  type Clock,
   createPaceClient,
   type EventStore,
   type PaceClient,
@@ -21,6 +22,8 @@ export type PaceRuntime = PaceClient & {
 
 export type RuntimeOptions = {
   readonly baseUrl?: string;
+  /** Defaults to the system clock; tests freeze it at the artboard instant. */
+  readonly clock?: Clock;
   readonly deviceId?: () => Promise<string>;
   readonly eventStore?: EventStore;
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
@@ -34,6 +37,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
   const deviceId = await (options.deviceId ?? loadDeviceId)();
   const client = createPaceClient({
     baseUrl: options.baseUrl ?? API_BASE_URL,
+    ...(options.clock !== undefined && { clock: options.clock }),
     deviceId,
     ...(options.fetch !== undefined && { fetch: options.fetch }),
     ...(options.now !== undefined && { now: options.now }),
@@ -44,7 +48,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
   return {
     ...client,
     deviceId,
-    hooks: createAppHooks(client.state),
+    hooks: createAppHooks(client.state, client.clock),
     resetLocalData: async () => {
       await eventStore.clear();
       await client.state.rematerialize();

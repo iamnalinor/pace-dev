@@ -88,6 +88,30 @@ const reportSyncErrors = (services: PaceServices): (() => void) =>
     toast.error(t(language, "errors.syncFailed", { reason: status.lastError }));
   });
 
+/** Services whose instances were already generated in this page load. */
+const ensured = new WeakSet<PaceServices>();
+
+/**
+Appends this week's homework instances and the automatic outcomes that came due, once per
+page load as soon as someone is signed in and the local log is loaded. The ids are
+deterministic, so another device doing the same never duplicates them.
+*/
+const ensureInstancesOnce = (services: PaceServices): (() => void) => {
+  const { actions, auth, state } = services;
+  const apply = (current: AuthState): void => {
+    if (current.status !== "signed-in" || ensured.has(services)) {
+      return;
+    }
+    ensured.add(services);
+    void (async (): Promise<void> => {
+      await state.ready;
+      await actions.ensureInstances();
+    })();
+  };
+  apply(auth.store.getState());
+  return auth.store.subscribe(apply);
+};
+
 export const PaceProvider = ({
   children,
   services,
@@ -97,5 +121,6 @@ export const PaceProvider = ({
 }) => {
   useEffect(() => runSyncLoop(services), [services]);
   useEffect(() => reportSyncErrors(services), [services]);
+  useEffect(() => ensureInstancesOnce(services), [services]);
   return <ServicesContext value={services}>{children}</ServicesContext>;
 };

@@ -9,6 +9,27 @@ import { mcpResult, obtainToken } from "./oauth-flow.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 
+/** Every mutating tool; the contract tests below cover each one. */
+const WRITE_TOOLS = [
+  "add_subtasks",
+  "archive_preset",
+  "capture_inbox",
+  "close_task",
+  "create_preset",
+  "create_task",
+  "mark_subtasks",
+  "reopen",
+  "review_action",
+  "revoke_event",
+  "seed_example_presets",
+  "set_importance",
+  "set_rank",
+  "set_status",
+  "submit",
+  "update_preset",
+  "update_task",
+].toSorted(byText);
+
 type Listed = {
   name: string;
   annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
@@ -118,14 +139,15 @@ describe("MCP tools catalogue", () => {
     );
     const scopeOf = (name: string) => TOOLS.find((item) => item.name === name)?.scope;
     for (const tool of tools) {
-      const scope = scopeOf(tool.name);
-      expect(tool.annotations?.readOnlyHint).toBe(scope === "tasks:read");
+      expect(tool.annotations?.readOnlyHint).toBe(scopeOf(tool.name) === "tasks:read");
       expect(tool.description?.length ?? 0).toBeGreaterThan(40);
-      if (scope === "tasks:write") {
-        expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(
-          expect.arrayContaining(["at", "precision", "dryRun"]),
-        );
-      }
+    }
+    const writes = tools.filter((tool) => scopeOf(tool.name) === "tasks:write");
+    expect(writes.map((tool) => tool.name).toSorted(byText)).toEqual(WRITE_TOOLS);
+    for (const tool of writes) {
+      expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(
+        expect.arrayContaining(["at", "precision", "dryRun"]),
+      );
     }
   });
 });
@@ -551,5 +573,155 @@ describe("search and fetch", () => {
     const projectDocument = await okTool(token, "fetch", { id: String(project?.["id"]) });
     expect(String(projectDocument["text"])).toContain("ДЗ по алгебре");
     expect(await errorText(token, "fetch", { id: "ghost" })).toContain("not-found");
+  });
+});
+
+/** What the contract tests act on: one task per situation a write tool needs. */
+type Fixture = {
+  /** An open homework task: problem 1 solved, problem 2 open. */
+  readonly taskId: string;
+  /** The event that solved problem 1. */
+  readonly solveId: string;
+  /** A task whose deadline passed: closed as missed, with a review item to confirm. */
+  readonly missedId: string;
+  /** A user preset. */
+  readonly presetId: string;
+};
+
+const writeFixture = async (token: string): Promise<Fixture> => {
+  const taskId = await createTask(token, {
+    presetId: "hw",
+    subtasks: ["1", "2"],
+    title: "Contract sheet",
+  });
+  const marked = await okTool(token, "mark_subtasks", { numbers: [1], taskId });
+  const missedId = await createTask(token, {
+    at: "2026-09-01T10:00:00.000Z",
+    dueAt: "2026-09-10T10:00:00.000Z",
+    dueTz: "UTC",
+    title: "Contract missed",
+  });
+  const presetId = `work.c${newId().toLowerCase()}`;
+  await okTool(token, "create_preset", {
+    definition: {},
+    extends: "work",
+    id: presetId,
+    name: "Contract",
+  });
+  return { missedId, presetId, solveId: String(rows(marked["events"])[0]?.["id"]), taskId };
+};
+
+/** Arguments every write tool accepts against the fixture. */
+const writeArgs = (fixture: Fixture): Record<string, Record<string, unknown>> => ({
+  add_subtasks: { labels: ["3"], taskId: fixture.taskId },
+  archive_preset: { id: fixture.presetId },
+  capture_inbox: { text: "Contract capture" },
+  close_task: { outcome: "skipped", taskId: fixture.taskId },
+  create_preset: {
+    definition: {},
+    extends: fixture.presetId,
+    id: `${fixture.presetId}.x`,
+    name: "X",
+  },
+  create_task: { projectName: "Contract project", title: "Contract task" },
+  mark_subtasks: { numbers: [2], taskId: fixture.taskId },
+  reopen: { taskId: fixture.missedId },
+  review_action: { key: "confirm", taskId: fixture.missedId },
+  revoke_event: { eventId: fixture.solveId },
+  seed_example_presets: {},
+  set_importance: { importance: "asap", taskId: fixture.taskId },
+  set_rank: { position: 1, taskId: fixture.taskId },
+  set_status: { status: "paused", taskId: fixture.taskId },
+  submit: { taskId: fixture.taskId },
+  update_preset: { id: fixture.presetId, name: "Renamed" },
+  update_task: { taskId: fixture.taskId, title: "Renamed" },
+});
+
+const tomorrow = (): string => new Date(Date.now() + 86_400_000).toISOString();
+
+/** One refusal per write tool and the Result code it answers (seeding skips, it never refuses). */
+const refusals = (
+  fixture: Fixture,
+): Record<string, readonly [Record<string, unknown>, string]> => ({
+  add_subtasks: [{ labels: ["3"], taskId: "ghost" }, "task/unknown"],
+  archive_preset: [{ id: "hw" }, "preset/built-in"],
+  capture_inbox: [{ text: ' '.repeat(3) }, "inbox/empty"],
+  close_task: [{ outcome: "done", taskId: "ghost" }, "task/unknown"],
+  create_preset: [
+    { definition: {}, extends: "nope", id: "work.orphan", name: "Orphan" },
+    "preset/unknown-parent",
+  ],
+  create_task: [{ presetId: "nope", title: "x" }, "preset/unknown"],
+  mark_subtasks: [{ numbers: [9], taskId: fixture.taskId }, "subtask/unknown"],
+  reopen: [{ at: tomorrow(), taskId: fixture.missedId }, "retro/future"],
+  review_action: [{ key: "undo", taskId: fixture.taskId }, "review/no-item"],
+  revoke_event: [{ eventId: "ghost" }, "event/not-found"],
+  set_importance: [{ importance: "asap", taskId: "ghost" }, "task/unknown"],
+  set_rank: [{ position: 1, taskId: fixture.missedId }, "rank/not-competing"],
+  set_status: [{ status: "paused", taskId: fixture.missedId }, "retro/task-closed"],
+  submit: [{ taskId: fixture.missedId }, "retro/task-closed"],
+  update_preset: [{ id: "nope", name: "x" }, "preset/unknown"],
+  update_task: [
+    { at: "2020-01-01T00:00:00.000Z", taskId: fixture.taskId, title: "x" },
+    "retro/before-created",
+  ],
+});
+
+/** The caller's Durable Object, to count the log around calls that must not write. */
+const logOf = async (token: string) => {
+  const me = await okTool(token, "whoami");
+  const store = env.USER_STORE.get(env.USER_STORE.idFromName(String(me["userId"])));
+  // A read derives the system events due by now first, so the count only moves on a write.
+  await okTool(token, "list_now");
+  return { count: async () => await store.countEvents() };
+};
+
+describe("every write tool", () => {
+  it("covers the whole write catalogue in the contract fixtures", () => {
+    const fixture: Fixture = { missedId: "m", presetId: "p", solveId: "s", taskId: "t" };
+    expect(Object.keys(writeArgs(fixture)).toSorted(byText)).toEqual(WRITE_TOOLS);
+    expect(Object.keys(refusals(fixture)).toSorted(byText)).toEqual(
+      WRITE_TOOLS.filter((name) => name !== "seed_example_presets"),
+    );
+  });
+
+  it("previews with dryRun and writes nothing", async () => {
+    const token = await readWriteToken();
+    const fixture = await writeFixture(token);
+    const log = await logOf(token);
+    const before = await log.count();
+    for (const [name, args] of Object.entries(writeArgs(fixture))) {
+      const result = await callTool(token, name, { ...args, dryRun: true });
+      expect(result.isError, `${name}: ${result.content[0]?.text ?? ""}`).toBeUndefined();
+      expect(result.structuredContent?.["dryRun"], name).toBe(true);
+      expect(result.content[0]?.text, name).toMatch(/^Dry run: nothing was written\./u);
+    }
+    expect(await log.count()).toBe(before);
+  });
+
+  it("is refused with a read-only grant, before anything is written", async () => {
+    const token = await readWriteToken();
+    const fixture = await writeFixture(token);
+    const { tokens } = await obtainToken({ scope: "tasks:read", scopes: ["tasks:read"] });
+    const log = await logOf(token);
+    const before = await log.count();
+    for (const [name, args] of Object.entries(writeArgs(fixture))) {
+      expect(await errorText(tokens.access_token, name, args), name).toContain('"tasks:write"');
+    }
+    expect(await log.count()).toBe(before);
+  });
+
+  it("answers a refusal as an isError result that starts with the Result code", async () => {
+    const token = await readWriteToken();
+    const fixture = await writeFixture(token);
+    const log = await logOf(token);
+    const before = await log.count();
+    for (const [name, [args, code]] of Object.entries(refusals(fixture))) {
+      const result = await callTool(token, name, args);
+      expect(result.isError, name).toBe(true);
+      expect(result.content[0]?.text?.split(": ", 1)[0], name).toBe(code);
+      expect(result.structuredContent, name).toMatchObject({ error: { code } });
+    }
+    expect(await log.count()).toBe(before);
   });
 });

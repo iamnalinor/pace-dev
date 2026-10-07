@@ -1,6 +1,6 @@
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
-import { useLanguage } from "#web/app-state.tsx";
+import { useLanguage, useServices } from "#web/app-state.tsx";
 import { formatEyebrow } from "#web/shared/lib/eyebrow.ts";
 
 type Props = {
@@ -11,17 +11,15 @@ type Props = {
   readonly action?: ReactNode;
 };
 
-const deviceZone = (): string => new Intl.DateTimeFormat().resolvedOptions().timeZone;
-
 export const PageHeader = ({ action, eyebrow, title }: Props) => {
   const language = useLanguage();
-  // Captured at mount: every tab remounts its header, so the eyebrow is current per visit.
-  const [today] = useState(() => new Date());
+  // The client clock (frozen in tests) on the device's calendar, refreshed every 30 s.
+  const { deviceTz, now } = useServices().hooks.useClock();
   return (
     <header className="flex items-end justify-between px-5 pt-6 pb-3">
       <div>
         <p className="font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
-          {eyebrow ?? formatEyebrow(today, language, deviceZone())}
+          {eyebrow ?? formatEyebrow(new Date(now), language, deviceTz)}
         </p>
         <h1 className="mt-1 text-3xl font-semibold tracking-[-0.02em]">{title}</h1>
       </div>

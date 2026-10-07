@@ -30,4 +30,21 @@ describe("wallClockToIso", () => {
     expect(wallClockToIso("yesterday", MOSCOW)).toBeNull();
     expect(wallClockToIso("2026-10-07T23:59", "Nowhere/Nope")).toBeNull();
   });
+
+  it("rejects a date or time that does not exist on any calendar", () => {
+    expect(wallClockToIso("2026-13-40T25:61", "UTC")).toBeNull();
+    expect(wallClockToIso("2026-02-30T10:00", "UTC")).toBeNull();
+  });
+
+  it("resolves a time inside the spring-forward gap to a real instant", () => {
+    const instant = wallClockToIso("2026-03-29T02:30", "Europe/Berlin");
+    expect(instant).not.toBeNull();
+    expect(Number.isNaN(Date.parse(instant ?? ""))).toBe(false);
+  });
+
+  it("round-trips through the autumn overlap", () => {
+    const zone = "America/New_York";
+    const local = "2026-11-01T01:30";
+    expect(isoToWallClock(wallClockToIso(local, zone) ?? "", zone)).toBe(local);
+  });
 });

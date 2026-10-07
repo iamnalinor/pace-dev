@@ -26,8 +26,6 @@ clock's instant: what happened later (TRK-231's Wednesday re-prioritization) is 
 export const artboardServices = async (options: Options = {}) => {
   const world = frozenServices(options);
   const until = options.now ?? NOW;
-  await world.services.state.ingest(
-    artboardEvents().filter((event) => event.occurredAt <= until),
-  );
+  await world.services.state.ingest(artboardEvents().filter((event) => event.occurredAt <= until));
   return world;
 };
