@@ -8,6 +8,7 @@ import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMeta, type MetaTone } from "#web/shared/format/meta.ts";
 import { cn } from "#web/shared/lib/cn.ts";
+import { ImportanceEdge } from "#web/shared/ui/importance-mark.tsx";
 import { PaceBar } from "#web/shared/ui/pace-bar.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 
@@ -69,13 +70,14 @@ export const TaskRow = ({
   return (
     <li
       className={cn(
-        "flex gap-3 rounded-lg p-3",
+        "flex gap-3 rounded-lg py-3 pr-3 pl-1.5",
         isTop && "bg-fg/[0.035]",
         row.dimmed && "opacity-55",
         className,
       )}
       {...props}
     >
+      <ImportanceEdge className="-mr-1.5" importance={row.importance} />
       {onCheck !== undefined && (
         <button
           aria-label={t("now.markDone", { title: row.title })}

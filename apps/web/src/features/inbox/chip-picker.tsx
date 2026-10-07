@@ -1,16 +1,16 @@
 import { type ReactNode, useId } from "react";
 
-import type { Importance, Suggestion } from "@pace/core";
+import type { Suggestion } from "@pace/core";
 
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { isoToWallClock, wallClockToIso } from "#web/shared/time/wall-clock.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { SegmentedControl } from "#web/shared/ui/segmented-control.tsx";
+import { CategoryChips } from "#web/shared/ui/category-chips.tsx";
+import { ChipGroup } from "#web/shared/ui/chip-group.tsx";
+import { ImportanceChips } from "#web/shared/ui/importance-chips.tsx";
 
 import type { ChipField, SuggestionEdits } from "./suggestion-chips.ts";
-
-import { useChipText } from "./use-chip-text.ts";
 
 type Props = {
   readonly field: ChipField;
@@ -20,8 +20,6 @@ type Props = {
 
 const SELECT_CLASS =
   "h-11 w-full rounded-md border border-line bg-bg px-3 text-sm text-fg outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40";
-
-const IMPORTANCES: readonly Importance[] = ["asap", "prioritized", "normal", "nice_to_have"];
 
 const Labelled = ({
   children,
@@ -39,6 +37,8 @@ const Labelled = ({
   );
 };
 
+const NO_PROJECT = "none";
+
 const ProjectPicker = ({ onEdit, suggestion }: Omit<Props, "field">) => {
   const t = useT();
   const projects = useServices().hooks.useAppState((state) => state.projects);
@@ -46,56 +46,32 @@ const ProjectPicker = ({ onEdit, suggestion }: Omit<Props, "field">) => {
     .filter((project) => !project.archived)
     .toSorted((a, b) => a.name.localeCompare(b.name));
   return (
-    <Labelled label={t("inbox.project")}>
-      {(id) => (
-        <select
-          className={SELECT_CLASS}
-          id={id}
-          onChange={(event) => {
-            onEdit({ projectId: event.target.value === "" ? null : event.target.value });
-          }}
-          value={suggestion.projectId ?? ""}
-        >
-          <option value="">{t("task.noProject")}</option>
-          {active.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-      )}
-    </Labelled>
+    <ChipGroup
+      label={t("inbox.project")}
+      onChange={(value) => {
+        onEdit({ projectId: value === NO_PROJECT ? null : value });
+      }}
+      options={[
+        { label: t("task.noProject"), value: NO_PROJECT },
+        ...active.map((project) => ({
+          color: project.color,
+          label: project.name,
+          value: project.id,
+        })),
+      ]}
+      value={suggestion.projectId ?? NO_PROJECT}
+    />
   );
 };
 
-const PresetPicker = ({ onEdit, suggestion }: Omit<Props, "field">) => {
-  const t = useT();
-  const { presetName } = useChipText();
-  const presets = useServices().hooks.useAppState((state) => state.presets);
-  const choices = Object.values(presets.byId).filter(
-    (preset) => !preset.archived && preset.id !== "inbox",
-  );
-  return (
-    <Labelled label={t("inbox.preset")}>
-      {(id) => (
-        <select
-          className={SELECT_CLASS}
-          id={id}
-          onChange={(event) => {
-            onEdit({ presetId: event.target.value });
-          }}
-          value={suggestion.presetId}
-        >
-          {choices.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {presetName(preset)}
-            </option>
-          ))}
-        </select>
-      )}
-    </Labelled>
-  );
-};
+const PresetPicker = ({ onEdit, suggestion }: Omit<Props, "field">) => (
+  <CategoryChips
+    onChange={(presetId, importance) => {
+      onEdit({ importance, presetId });
+    }}
+    value={suggestion.presetId}
+  />
+);
 
 const DuePicker = ({ onEdit, suggestion }: Omit<Props, "field">) => {
   const t = useT();
@@ -139,19 +115,16 @@ const DuePicker = ({ onEdit, suggestion }: Omit<Props, "field">) => {
 
 /** The small editor a chip opens: one field of the suggestion, changed in place. */
 export const ChipPicker = ({ field, onEdit, suggestion }: Props) => {
-  const t = useT();
   switch (field) {
     case "due": {
       return <DuePicker onEdit={onEdit} suggestion={suggestion} />;
     }
     case "importance": {
       return (
-        <SegmentedControl
-          label={t("inbox.importance")}
+        <ImportanceChips
           onChange={(importance) => {
             onEdit({ importance });
           }}
-          options={IMPORTANCES.map((value) => ({ label: t(`importance.${value}`), value }))}
           value={suggestion.importance}
         />
       );

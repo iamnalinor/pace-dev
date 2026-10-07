@@ -103,11 +103,15 @@ describe("InboxView", () => {
     await user.click(
       within(cable).getByRole("button", { name: "Project: No project, tap to change" }),
     );
-    await user.selectOptions(within(cable).getByLabelText("Project"), "Algebra");
+    await user.click(
+      within(within(cable).getByRole("radiogroup", { name: "Project" })).getByRole("radio", {
+        name: "Algebra",
+      }),
+    );
     await user.click(
       within(cable).getByRole("button", { name: "Preset: Personal, tap to change" }),
     );
-    await user.selectOptions(within(cable).getByLabelText("Preset"), "Algebra HW");
+    await user.click(within(cable).getByRole("radio", { name: "Algebra HW" }));
     expect(
       within(cable).getByRole("button", { name: "Preset: Algebra HW, tap to change" }),
     ).toBeInTheDocument();

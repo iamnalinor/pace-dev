@@ -9,6 +9,8 @@ import { Button } from "#web/shared/ui/button.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 
 import { formatAge } from "./age.ts";
+import { ImportanceDot } from "#web/shared/ui/importance-mark.tsx";
+
 import { ChipPicker } from "./chip-picker.tsx";
 import {
   CHIP_FIELDS,
@@ -61,10 +63,7 @@ export const InboxCard = ({ card, edits, onAccept, onDelete, onEdit }: Props) =>
               aria-expanded={open === field}
               aria-label={t(CHANGE_KEY[field], { value: text })}
               className={cn(
-                "flex h-11 items-center gap-1.5 rounded-md bg-raised px-2.5 text-xs text-fg2 outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
-                field === "importance" &&
-                  suggestion.importance === "prioritized" &&
-                  "text-question",
+                "flex h-9 items-center gap-1.5 rounded-md bg-raised px-2.5 text-xs text-fg2 outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
                 open === field && "ring-1 ring-fg2",
               )}
               key={field}
@@ -76,6 +75,8 @@ export const InboxCard = ({ card, edits, onAccept, onDelete, onEdit }: Props) =>
               {field === "project" && suggestion.projectId !== null && (
                 <ProjectDot color={chips.color(suggestion)} />
               )}
+              {field === "preset" && <ProjectDot color={chips.presetColor(suggestion)} />}
+              {field === "importance" && <ImportanceDot importance={suggestion.importance} />}
               {text}
             </button>
           );

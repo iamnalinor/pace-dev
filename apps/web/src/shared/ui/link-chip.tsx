@@ -1,8 +1,8 @@
 import { ExternalLink, Link2 } from "lucide-react";
 import { useState } from "react";
 
-import { useLinkPreview } from "#web/shared/lib/use-link-preview.ts";
 import { cn } from "#web/shared/lib/cn.ts";
+import { useLinkPreview } from "#web/shared/lib/use-link-preview.ts";
 
 type Props = {
   readonly url: string;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { ActionResult, TaskViewModel } from "@pace/client";
+import type { Event } from "@pace/core";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { type Translate, useT } from "#web/i18n.tsx";
@@ -9,7 +10,8 @@ import { cn } from "#web/shared/lib/cn.ts";
 import { revokeEvents, showUndoToast } from "#web/shared/lib/undo-toast.ts";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { SegmentedControl } from "#web/shared/ui/segmented-control.tsx";
+import { CategoryChips } from "#web/shared/ui/category-chips.tsx";
+import { ImportanceChips } from "#web/shared/ui/importance-chips.tsx";
 import {
   Sheet,
   SheetClose,
@@ -18,7 +20,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "#web/shared/ui/sheet.tsx";
-import { type Event, ImportanceSchema } from "@pace/core";
 
 import { editChanges, type EditError, type EditForm, initialEditForm } from "./edit-form.ts";
 
@@ -147,22 +148,17 @@ const EditFields = ({ onDone, view }: FormProps) => {
         })();
       }}
     >
-      <label className={LABEL}>
-        {t("edit.preset")}
-        <select
-          className={INPUT}
-          onChange={(event) => {
-            set("presetId", event.target.value);
+      <div className="flex flex-col gap-1.5">
+        <span aria-hidden="true" className="text-xs text-muted">
+          {t("edit.preset")}
+        </span>
+        <CategoryChips
+          onChange={(presetId, defaultImportance) => {
+            setForm((current) => ({ ...current, importance: defaultImportance, presetId }));
           }}
           value={form.presetId}
-        >
-          {view.overrideSheet.presets.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.builtIn ? `${preset.name} · ${t("task.presetBuiltIn")}` : preset.name}
-            </option>
-          ))}
-        </select>
-      </label>
+        />
+      </div>
       <label className={LABEL}>
         {t("edit.taskTitle")}
         <input
@@ -248,15 +244,10 @@ const EditFields = ({ onDone, view }: FormProps) => {
         <span aria-hidden="true" className="text-xs text-muted">
           {t("edit.importance")}
         </span>
-        <SegmentedControl
-          label={t("edit.importance")}
+        <ImportanceChips
           onChange={(value) => {
             set("importance", value);
           }}
-          options={ImportanceSchema.options.map((value) => ({
-            label: t(`importance.${value}`),
-            value,
-          }))}
           value={form.importance}
         />
       </div>

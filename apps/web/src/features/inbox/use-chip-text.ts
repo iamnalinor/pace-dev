@@ -1,12 +1,13 @@
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatDue } from "#web/shared/format/time.ts";
+import { presetLabel } from "#web/shared/lib/preset-label.ts";
 import {
-  isBuiltInPreset,
   type Preset,
   presetById,
   projectById,
   type ProjectColorName,
+  resolvePreset,
   type Suggestion,
 } from "@pace/core";
 
@@ -15,6 +16,7 @@ import type { ChipField } from "./suggestion-chips.ts";
 export type ChipText = {
   readonly text: (field: ChipField, suggestion: Suggestion) => string;
   readonly color: (suggestion: Suggestion) => null | ProjectColorName;
+  readonly presetColor: (suggestion: Suggestion) => null | ProjectColorName;
   readonly presetName: (preset: Preset) => string;
 };
 
@@ -26,8 +28,7 @@ export const useChipText = (): ChipText => {
   const projects = hooks.useAppState((state) => state.projects);
   const presets = hooks.useAppState((state) => state.presets);
   const { deviceTz, now } = hooks.useClock();
-  const presetName = (preset: Preset): string =>
-    isBuiltInPreset(preset.id) ? t(`preset.base.${preset.id}`) : preset.name;
+  const presetName = (preset: Preset): string => presetLabel(t, preset);
   const project = (suggestion: Suggestion) =>
     suggestion.projectId === null ? undefined : projectById(projects, suggestion.projectId);
   const text = (field: ChipField, suggestion: Suggestion): string => {
@@ -49,5 +50,14 @@ export const useChipText = (): ChipText => {
       }
     }
   };
-  return { color: (suggestion) => project(suggestion)?.color ?? null, presetName, text };
+  const presetColor = (suggestion: Suggestion): null | ProjectColorName => {
+    const resolved = resolvePreset(presets, suggestion.presetId);
+    return resolved.ok ? resolved.value.color : null;
+  };
+  return {
+    color: (suggestion) => project(suggestion)?.color ?? null,
+    presetColor,
+    presetName,
+    text,
+  };
 };

@@ -2,6 +2,7 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 
 import { type Translate, useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
+import { ImportanceDot } from "#web/shared/ui/importance-mark.tsx";
 import { LinkChip } from "#web/shared/ui/link-chip.tsx";
 
 const tagText = (t: Translate, tag: TaskTag): string => {
@@ -30,11 +31,12 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
         {view.tags.map((tag) => (
           <li
             className={cn(
-              "rounded-sm bg-raised px-2 py-1 text-xs",
+              "flex items-center gap-1.5 rounded-sm bg-raised px-2 py-1 text-xs",
               tag.kind === "importance" ? "text-fg" : "text-fg2",
             )}
             key={tag.kind}
           >
+            {tag.kind === "importance" && <ImportanceDot importance={tag.importance} />}
             {tagText(t, tag)}
           </li>
         ))}

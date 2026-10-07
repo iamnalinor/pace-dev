@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { ComposerEdits, ComposerModel } from "@pace/client";
 
 import { useT } from "#web/i18n.tsx";
+import { presetLabel } from "#web/shared/lib/preset-label.ts";
 import { ChipGroup } from "#web/shared/ui/chip-group.tsx";
 import { ImportanceChips } from "#web/shared/ui/importance-chips.tsx";
 
@@ -31,7 +32,7 @@ export const ComposerChips = ({ model, onEdit }: Props) => {
         }}
         options={model.presets.map((preset) => ({
           color: preset.color,
-          label: preset.name,
+          label: presetLabel(t, preset),
           value: preset.id,
         }))}
         value={model.preset.id}
