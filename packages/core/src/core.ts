@@ -20,7 +20,6 @@ export {
   type User,
   UserSchema,
 } from "./api/schemas/auth.ts";
-export { type ParseResponse, ParseRequestSchema, ParseResponseSchema } from "./api/schemas/parse.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,
@@ -44,6 +43,7 @@ export {
   OAuthScopeSchema,
   requestedScopes,
 } from "./api/schemas/oauth.ts";
+export { ParseRequestSchema, type ParseResponse, ParseResponseSchema } from "./api/schemas/parse.ts";
 export {
   type Observation,
   ObservationSchema,
@@ -115,6 +115,7 @@ export {
   newId,
   type Prng,
 } from "./ids.ts";
+export { openInstanceOf, quickInputBodies } from "./input/compose.ts";
 export { parseQuickInput, type QuickInput } from "./input/parse-quick-input.ts";
 export type { QuickSubtask } from "./input/quick-fields.ts";
 export type { QuickSpan, QuickSpanKind } from "./input/quick-spans.ts";
