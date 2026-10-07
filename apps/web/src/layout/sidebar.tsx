@@ -1,12 +1,12 @@
 import { Plus } from "lucide-react";
-import { Link, NavLink } from "react-router";
+import { Link } from "react-router";
 
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
 import { PaceMark } from "#web/shared/ui/pace-mark.tsx";
 
-import { NAV_ITEMS } from "./nav-items.ts";
+import { NavLinks } from "./nav-links.tsx";
 
 const itemClass = ({ isActive }: { readonly isActive: boolean }): string =>
   cn(
@@ -37,17 +37,7 @@ export const Sidebar = ({ className }: { readonly className?: string }) => {
         {t("nav.newTask")}
         <kbd className="ml-auto font-mono text-[11px] opacity-70">N</kbd>
       </Link>
-      <nav aria-label={t("nav.main")} className="flex flex-col gap-0.5">
-        {NAV_ITEMS.map((item) => (
-          <NavLink className={itemClass} end={item.to === "/"} key={item.to} to={item.to}>
-            <item.icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-            {t(item.labelKey)}
-            {item.hasInboxCount === true && inboxCount > 0 && (
-              <span className="ml-auto font-mono text-xs text-muted">{inboxCount}</span>
-            )}
-          </NavLink>
-        ))}
-      </nav>
+      <NavLinks className="flex flex-col gap-0.5" inboxCount={inboxCount} itemClass={itemClass} />
       <p className="mt-auto px-2.5 text-xs text-muted">{t("shortcuts.hint")}</p>
     </aside>
   );

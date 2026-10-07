@@ -10,6 +10,7 @@ import { Button } from "#web/shared/ui/button.tsx";
 import { ColorRadios } from "./color-radios.tsx";
 import { FIELD_CLASS } from "./field-class.ts";
 import { didUpdateProject, type ProjectDraft, projectNameProblem } from "./project-events.ts";
+import { ProjectNameField } from "./project-name-field.tsx";
 
 type Props = {
   readonly projectId: string;
@@ -81,17 +82,13 @@ export const ProjectForm = ({ archived, initial, onDone, projectId }: Props) => 
         void save(event);
       }}
     >
-      <label className="grid gap-1 text-sm text-fg2" htmlFor={`${id}-name`}>
-        {t("projects.name")}
-        <input
-          className={cn(FIELD_CLASS, "h-11")}
-          id={`${id}-name`}
-          onChange={(event) => {
-            setDraft({ ...draft, name: event.target.value });
-          }}
-          value={draft.name}
-        />
-      </label>
+      <ProjectNameField
+        id={`${id}-name`}
+        onChange={(name) => {
+          setDraft({ ...draft, name });
+        }}
+        value={draft.name}
+      />
       <ColorRadios
         label={t("projects.color")}
         onChange={(color) => {

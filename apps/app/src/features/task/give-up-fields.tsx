@@ -4,10 +4,9 @@ import { Text, View } from "react-native";
 import { useAppState, useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { recentReasons } from "@pace/client";
 
 import type { CloseForm, GiveUp } from "./use-close-form.ts";
-
-import { recentReasons } from "./close-model.ts";
 
 const OUTCOMES: readonly GiveUp[] = ["cancelled", "skipped"];
 
@@ -16,7 +15,7 @@ export const GiveUpFields = ({ form }: { readonly form: CloseForm }) => {
   const t = useT();
   // Select the stable task map; a fresh array from the selector would re-render forever.
   const tasks = useAppState((state) => state.tasks);
-  const reasons = useMemo(() => recentReasons({ tasks }), [tasks]);
+  const reasons = useMemo(() => recentReasons(tasks.byId), [tasks]);
   return (
     <View className="gap-3">
       <View className="flex-row gap-1.5">

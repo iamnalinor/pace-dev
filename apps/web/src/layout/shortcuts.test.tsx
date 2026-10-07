@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import { Toaster } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Composer } from "#web/features/composer/composer.tsx";
+import { Composer } from "#web/features/now/composer/composer.tsx";
 import { artboardServices } from "#web/test/artboard-services.ts";
 import { renderWithProviders } from "#web/test/render.tsx";
 import { nowViewModel, queryContext } from "@pace/client";

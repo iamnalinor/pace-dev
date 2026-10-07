@@ -57,6 +57,7 @@ export {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-client.ts";
+export { recentReasons } from "./view-models/close-reasons.ts";
 export {
   type ComposerDraft,
   type ComposerEdits,

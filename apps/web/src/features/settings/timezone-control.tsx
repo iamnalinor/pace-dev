@@ -1,5 +1,5 @@
-import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
+import { useZones } from "#web/shared/time/use-zones.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { zonesDiffer } from "@pace/core";
 
@@ -9,12 +9,10 @@ worth a warning, but the device zone stays one tap away whenever the names diffe
 */
 export const TimezoneControl = () => {
   const t = useT();
-  const { actions, clock, hooks } = useServices();
-  const { timezone } = hooks.useSettings();
-  const { now } = hooks.useClock();
-  const device = clock.deviceTz;
+  const zones = useZones();
+  const { device, now } = zones;
   // Until the first sync assigns one, the account runs on the device zone (queries do too).
-  const account = timezone ?? device;
+  const account = zones.account ?? device;
   const isOffsetDifferent = zonesDiffer({ at: now, tz: account }, { at: now, tz: device });
   return (
     <div className="grid gap-3 text-sm">
@@ -26,7 +24,7 @@ export const TimezoneControl = () => {
       {account !== device && (
         <Button
           onClick={() => {
-            void actions.setTimezone(device);
+            void zones.switchToDevice();
           }}
           variant="outline"
         >

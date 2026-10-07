@@ -378,13 +378,14 @@ describe("taskReducer: close and reopen", () => {
   });
 });
 
+const withTicket = (ticket: string): Task =>
+  hw([
+    hwCreated(1),
+    at(2, T(9), { type: "task.updated", payload: { taskId: HW_ID, fields: { ticket } } }),
+  ]);
+
 describe("taskReducer: attributes", () => {
   it("reads a legacy ticket as the link only when it is a web address", () => {
-    const withTicket = (ticket: string): Task =>
-      hw([
-        hwCreated(1),
-        at(2, T(9), { type: "task.updated", payload: { taskId: HW_ID, fields: { ticket } } }),
-      ]);
     expect(withTicket("https://tracker.example.com/T-1").fields.link).toBe(
       "https://tracker.example.com/T-1",
     );

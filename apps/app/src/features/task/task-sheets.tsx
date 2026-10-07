@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
+import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
@@ -89,23 +89,15 @@ export const EditTextSheet = ({
         onChangeText={setDescription}
         value={description}
       />
-      <View className="flex-row gap-2">
-        <View className="flex-1">
-          <Button onPress={onClose} variant="secondary">
-            {t("common.cancel")}
-          </Button>
-        </View>
-        <View className="flex-1">
-          <Button
-            disabled={isTitleMissing}
-            onPress={() => {
-              void save();
-            }}
-          >
-            {t("common.save")}
-          </Button>
-        </View>
-      </View>
+      <SheetActions
+        cancelLabel={t("common.cancel")}
+        isDisabled={isTitleMissing}
+        onCancel={onClose}
+        onPrimary={() => {
+          void save();
+        }}
+        primaryLabel={t("common.save")}
+      />
     </Sheet>
   );
 };

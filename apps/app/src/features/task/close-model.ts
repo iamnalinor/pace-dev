@@ -1,5 +1,4 @@
 import type { ProblemRow, TaskViewModel } from "@pace/client";
-import type { CoreState } from "@pace/core";
 
 /** What the sheet records: problems sent, the task done, or the task given up. */
 export type CloseMode = "done" | "other" | "submit";
@@ -39,21 +38,4 @@ export const isLatePreview = (view: TaskViewModel, mode: CloseMode, at: string):
   return mode === "done" && sentAt.length > 0
     ? sentAt.some((sent) => isAfter(sent, due))
     : isAfter(at, due);
-};
-
-const RECENT_REASONS = 5;
-
-/** The reasons people typed when they gave tasks up, newest first, each once. */
-export const recentReasons = (state: Pick<CoreState, "tasks">): readonly string[] => {
-  const given = Object.values(state.tasks.byId)
-    .map(({ closed }) => {
-      const reason = closed?.reason ?? null;
-      return closed === null || reason === null || closed.source === "system"
-        ? null
-        : { at: closed.at, reason };
-    })
-    .filter((entry) => entry !== null)
-    .toSorted((a, b) => Date.parse(b.at) - Date.parse(a.at))
-    .map((entry) => entry.reason);
-  return [...new Set(given)].slice(0, RECENT_REASONS);
 };

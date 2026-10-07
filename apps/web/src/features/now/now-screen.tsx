@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router";
 
 import { useServices } from "#web/app-state.tsx";
-import { Composer } from "#web/features/composer/composer.tsx";
+import { Composer } from "#web/features/now/composer/composer.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useCompleteTask } from "#web/shared/task/use-complete-task.ts";
 import { ZoneBanner } from "#web/shared/time/zone-banner.tsx";

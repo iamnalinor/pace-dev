@@ -6,12 +6,11 @@ import type { MessageKey, ProjectColorName } from "@pace/core";
 
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
-import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 
 import { ColorRadios } from "./color-radios.tsx";
-import { FIELD_CLASS } from "./field-class.ts";
 import { createProject, projectNameProblem } from "./project-events.ts";
+import { ProjectNameField } from "./project-name-field.tsx";
 
 /** "+ New project": a name and a color, created on the spot. */
 export const NewProjectForm = () => {
@@ -63,17 +62,7 @@ export const NewProjectForm = () => {
         void submit(event);
       }}
     >
-      <label className="grid gap-1 text-sm text-fg2" htmlFor={`${id}-name`}>
-        {t("projects.name")}
-        <input
-          className={cn(FIELD_CLASS, "h-11")}
-          id={`${id}-name`}
-          onChange={(event) => {
-            setName(event.target.value);
-          }}
-          value={name}
-        />
-      </label>
+      <ProjectNameField id={`${id}-name`} onChange={setName} value={name} />
       <ColorRadios label={t("projects.color")} onChange={setColor} value={color} />
       {problem !== null && (
         <p className="text-sm text-warn" role="alert">

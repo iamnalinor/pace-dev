@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useMatch, useNavigate } from "react-router";
 
 import { useServices } from "#web/app-state.tsx";
-import { COMPOSER_INPUT_ID } from "#web/features/composer/composer.tsx";
+import { COMPOSER_INPUT_ID } from "#web/features/now/composer/composer.tsx";
 import { useCompleteTask } from "#web/shared/task/use-complete-task.ts";
 
 /** Typing in a field never triggers a shortcut. */

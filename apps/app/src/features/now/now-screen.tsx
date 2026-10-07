@@ -5,7 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { Composer } from "#app/features/composer/composer.tsx";
+import { Composer } from "#app/features/now/composer/composer.tsx";
 import { TaskRow } from "#app/shared/task-row.tsx";
 import { useCheckTask } from "#app/shared/use-check-task.ts";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";

@@ -79,36 +79,60 @@ export const ChoiceRow = <K extends ChoiceKey>({
   );
 };
 
+type NumberRowProps = {
+  readonly label: string;
+  readonly isInvalid: boolean;
+  readonly isOn: boolean;
+  readonly parentName: string;
+  readonly onToggle: () => void;
+  readonly inherited: number;
+  readonly own: number | undefined;
+  readonly onValue: (value: number) => void;
+};
+
+/** A number that is inherited (shown as the placeholder) until it is overridden. */
+const NumberOverrideRow = (props: NumberRowProps) => (
+  <OverrideRow
+    invalid={props.isInvalid}
+    isOverridden={props.isOn}
+    label={props.label}
+    onToggle={props.onToggle}
+    parentName={props.parentName}
+  >
+    {({ disabled, id, invalid }) => (
+      <NumberInput
+        disabled={disabled}
+        id={id}
+        invalid={invalid}
+        key={String(props.isOn)}
+        onChange={props.onValue}
+        placeholder={String(props.inherited)}
+        value={props.own}
+      />
+    )}
+  </OverrideRow>
+);
+
 /** The default estimate in minutes; the inherited figure is the placeholder. */
 export const EstimateRow = (section: SectionProps) => {
   const t = useT();
   const { definition, inherited, onChange } = section;
   const key: WholeKey = "defaultEstimateMinutes";
-  const isOn = isOverridden(definition, key);
   return (
-    <OverrideRow
-      invalid={section.issues.has(key)}
-      isOverridden={isOn}
+    <NumberOverrideRow
+      inherited={inherited.defaultEstimateMinutes}
+      isInvalid={section.issues.has(key)}
+      isOn={isOverridden(definition, key)}
       label={t("presets.field.defaultEstimateMinutes")}
       onToggle={() => {
         onChange(toggleOverride(definition, key, inherited));
       }}
+      onValue={(minutes) => {
+        onChange(setValue(definition, key, minutes));
+      }}
+      own={definition.defaultEstimateMinutes}
       parentName={section.parentName}
-    >
-      {({ disabled, id, invalid }) => (
-        <NumberInput
-          disabled={disabled}
-          id={id}
-          invalid={invalid}
-          key={String(isOn)}
-          onChange={(minutes) => {
-            onChange(setValue(definition, key, minutes));
-          }}
-          placeholder={String(inherited.defaultEstimateMinutes)}
-          value={definition.defaultEstimateMinutes}
-        />
-      )}
-    </OverrideRow>
+    />
   );
 };
 
@@ -117,33 +141,21 @@ type SubProps = SectionProps & { readonly sub: SubKey; readonly label: string };
 /** One notification threshold; each is overridden on its own. */
 export const NotifyRow = ({ label, sub, ...section }: SubProps) => {
   const { definition, inherited, onChange } = section;
-  const isOn = isSubOverridden(definition, sub);
-  const own = sub.group === "notify" ? definition.notify?.[sub.key] : undefined;
-  const parent = sub.group === "notify" ? inherited.notify[sub.key] : 0;
   return (
-    <OverrideRow
-      invalid={section.issues.has(`${sub.group}.${sub.key}`)}
-      isOverridden={isOn}
+    <NumberOverrideRow
+      inherited={sub.group === "notify" ? inherited.notify[sub.key] : 0}
+      isInvalid={section.issues.has(`${sub.group}.${sub.key}`)}
+      isOn={isSubOverridden(definition, sub)}
       label={label}
       onToggle={() => {
         onChange(toggleSubOverride(definition, sub, inherited));
       }}
+      onValue={(value) => {
+        onChange(setSub(definition, sub, value));
+      }}
+      own={sub.group === "notify" ? definition.notify?.[sub.key] : undefined}
       parentName={section.parentName}
-    >
-      {({ disabled, id, invalid }) => (
-        <NumberInput
-          disabled={disabled}
-          id={id}
-          invalid={invalid}
-          key={String(isOn)}
-          onChange={(value) => {
-            onChange(setSub(definition, sub, value));
-          }}
-          placeholder={String(parent)}
-          value={own}
-        />
-      )}
-    </OverrideRow>
+    />
   );
 };
 

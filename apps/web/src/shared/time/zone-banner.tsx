@@ -1,15 +1,13 @@
-import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
+import { useZones } from "#web/shared/time/use-zones.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { zonesDiffer } from "@pace/core";
 
 /** Shown when the device sits in another zone than the account: one tap moves the account. */
 export const ZoneBanner = () => {
   const t = useT();
-  const { actions, clock, hooks } = useServices();
-  const { timezone } = hooks.useSettings();
-  const { now } = hooks.useClock();
-  const device = clock.deviceTz;
+  const zones = useZones();
+  const { account: timezone, device, now } = zones;
   if (timezone === null || !zonesDiffer({ at: now, tz: timezone }, { at: now, tz: device })) {
     return null;
   }
@@ -21,7 +19,7 @@ export const ZoneBanner = () => {
       <p className="flex-1">{t("zone.banner", { account: timezone, device })}</p>
       <Button
         onClick={() => {
-          void actions.setTimezone(device);
+          void zones.switchToDevice();
         }}
         size="sm"
         variant="outline"

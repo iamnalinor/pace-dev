@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 
-import type { QuickTimeKey, TaskViewModel } from "@pace/client";
-
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { wallClockToIso } from "#web/shared/time/wall-clock.ts";
+import { type QuickTimeKey, recentReasons, type TaskViewModel } from "@pace/client";
 
-import { closePreview, recentReasons } from "./close-preview.ts";
+import { closePreview } from "./close-preview.ts";
 
 /** `submit` sends solved problems; `done` closes a whole task; `close` closes one with nothing to send. */
 export type CloseMode = "close" | "done" | "submit";

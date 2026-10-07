@@ -1,7 +1,7 @@
 import { createContext, type ReactNode, use, useEffect } from "react";
 import { toast } from "sonner";
 
-import type { AppState, Auth, AuthState, SyncClient, SyncStatus } from "@pace/client";
+import type { Auth, AuthState, SyncClient, SyncStatus } from "@pace/client";
 
 import { useStore } from "@pace/client/react";
 import { type Language, t } from "@pace/core";
@@ -31,9 +31,6 @@ export const useSync = (): SyncStatus & { readonly sync: SyncClient } => {
   const status = useStore(sync.status);
   return { ...status, sync };
 };
-
-export const useAppState = <T,>(selector: (state: AppState) => T): T =>
-  useServices().hooks.useAppState(selector);
 
 export const useLanguage = (): Language => useServices().hooks.useLanguage();
 

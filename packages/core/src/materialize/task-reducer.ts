@@ -1,7 +1,7 @@
 import type { Event, EventOf, EventType } from "../events/event-schema.ts";
-import { isHttpUrl } from "../links.ts";
 import type { Reducer } from "./materializer.ts";
 
+import { isHttpUrl } from "../links.ts";
 import {
   type CloseOutcome,
   type Subtask,

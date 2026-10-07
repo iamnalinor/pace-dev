@@ -1,12 +1,11 @@
 import { ChevronRight } from "lucide-react";
 import { useId, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
 
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
-import { actionErrorText } from "#web/shared/lib/action-error.ts";
 import { cn } from "#web/shared/lib/cn.ts";
+import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 import { EXAMPLE_PRESET_IDS, type Preset, presetById, resolvePreset } from "@pace/core";
@@ -106,6 +105,7 @@ const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
 export const PresetsList = () => {
   const t = useT();
   const { actions, hooks } = useServices();
+  const run = useRunAction();
   const presets = hooks.useAppState((state) => state.presets);
   const [isShowingArchived, setIsShowingArchived] = useState(false);
   const all = Object.values(presets.byId)
@@ -115,10 +115,8 @@ export const PresetsList = () => {
   const hasExamples = EXAMPLE_PRESET_IDS.some((id) => presetById(presets, id) !== undefined);
 
   const seed = async (): Promise<void> => {
-    const result = await actions.seedExamplePresets();
-    if (!result.ok) {
-      toast.error(actionErrorText(t, result.error));
-    }
+    // A refusal shows its reason in a toast; success shows the new presets right here.
+    await run(actions.seedExamplePresets());
   };
 
   return (

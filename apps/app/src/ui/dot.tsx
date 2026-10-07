@@ -5,7 +5,7 @@ import type { ProjectColorName } from "@pace/core";
 import { cx } from "./cx.ts";
 
 /** Static class names: NativeWind only compiles the classes it can read in the source. */
-const FILL: Readonly<Record<ProjectColorName, string>> = {
+export const PROJECT_FILL: Readonly<Record<ProjectColorName, string>> = {
   amber: "bg-project-amber",
   blue: "bg-project-blue",
   coral: "bg-project-coral",
@@ -27,7 +27,7 @@ export const Dot = ({
   <View
     className={cx(
       square ? "h-3 w-3 rounded-[4px]" : "h-[7px] w-[7px] rounded-full",
-      color === null ? "bg-faint" : FILL[color],
+      color === null ? "bg-faint" : PROJECT_FILL[color],
     )}
   />
 );

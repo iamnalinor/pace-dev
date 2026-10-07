@@ -1,10 +1,10 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Button } from "#app/ui/button.tsx";
+import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 
@@ -64,18 +64,13 @@ export const CloseSheet = ({
         onChange={form.setIsExact}
       />
       <ClosePreview form={form} view={view} />
-      <View className="flex-row gap-2">
-        <View className="flex-1">
-          <Button onPress={onClose} variant="secondary">
-            {t("common.cancel")}
-          </Button>
-        </View>
-        <View className="flex-[2]">
-          <Button disabled={form.at === null} onPress={submit}>
-            {primary}
-          </Button>
-        </View>
-      </View>
+      <SheetActions
+        cancelLabel={t("common.cancel")}
+        isDisabled={form.at === null}
+        onCancel={onClose}
+        onPrimary={submit}
+        primaryLabel={primary}
+      />
       {form.mode === "other" ? null : (
         <Pressable
           accessibilityRole="button"

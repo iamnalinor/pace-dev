@@ -122,6 +122,8 @@ const config = {
       from: {
         pathNot: [
           "[.](test|fake)[.]tsx?$|^apps/api/tests/|^e2e/|/test/",
+          // Jest's setup file is test code: it installs the fakes before every suite.
+          String.raw`^apps/app/jest\.setup\.ts$`,
           // The test-support entry (`@pace/core/testing`) re-exports the fixtures on purpose.
           String.raw`^packages/core/src/testing\.ts$`,
         ],

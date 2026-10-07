@@ -1,11 +1,11 @@
 import { Plus } from "lucide-react";
-import { Link, NavLink } from "react-router";
+import { Link } from "react-router";
 
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
 import { PaceMark } from "#web/shared/ui/pace-mark.tsx";
 
-import { NAV_ITEMS } from "./nav-items.ts";
+import { NavLinks } from "./nav-links.tsx";
 
 const itemClass = ({ isActive }: { readonly isActive: boolean }): string =>
   cn(
@@ -24,14 +24,7 @@ export const TopNav = ({ className }: { readonly className?: string }) => {
       )}
     >
       <PaceMark className="size-5 shrink-0" />
-      <nav aria-label={t("nav.main")} className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
-        {NAV_ITEMS.map((item) => (
-          <NavLink className={itemClass} end={item.to === "/"} key={item.to} to={item.to}>
-            <item.icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-            {t(item.labelKey)}
-          </NavLink>
-        ))}
-      </nav>
+      <NavLinks className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto" itemClass={itemClass} />
       <Link
         aria-label={t("nav.newTask")}
         className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accentFg outline-none hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-accent/40"
