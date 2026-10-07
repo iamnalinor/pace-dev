@@ -8,12 +8,12 @@ import {
   type ProjectsState,
 } from "./project.ts";
 
-const project = (id: string, name: string, archived = false): Project => ({
+const project = (id: string, name: string, isArchived = false): Project => ({
   id,
   name,
   color: null,
   description: null,
-  archived,
+  archived: isArchived,
   createdAt: "2026-10-05T07:00:00.000Z",
 });
 
@@ -43,7 +43,8 @@ describe("findProjectByName", () => {
   });
 
   it("returns undefined when nothing matches", () => {
-    expect(findProjectByName(stateWith(project("p1", "Algebra")), "History")).toBeUndefined();
+    const algebra = stateWith(project("p1", "Algebra"));
+    expect(findProjectByName(algebra, "History")).toBeUndefined();
     expect(findProjectByName(INITIAL_PROJECTS_STATE, "")).toBeUndefined();
   });
 

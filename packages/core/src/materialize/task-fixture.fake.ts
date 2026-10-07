@@ -18,9 +18,9 @@ type Body<I = EventInput> = I extends { readonly type: unknown; readonly payload
 
 type Extra = Partial<Pick<EventInput, "id" | "precision" | "source">>;
 
-/** A task event at `occurredAt` with the usual envelope (`exact`, from the app). */
-export const at = (index: number, occurredAt: string, body: Body, extra: Extra = {}): Event =>
-  event(index, { occurredAt, precision: "exact", source: "app", ...body, ...extra });
+/** A task event at `occurredAt`; the envelope defaults to `exact` from the app. */
+export const at = (index: number, occurredAt: string, body: Body & Extra): Event =>
+  event(index, { occurredAt, precision: "exact", source: "app", ...body });
 
 export const subtask = (id: string, label: string, number: null | number = null): Subtask => ({
   id,
@@ -63,20 +63,29 @@ export const hwCreated = (index = 1): Event =>
 export const solved = (
   index: number,
   occurredAt: string,
-  subtaskId: string,
-  taskId = HW_ID,
-): Event => at(index, occurredAt, { type: "task.subtask.solved", payload: { taskId, subtaskId } });
+  target: string | { readonly id: string; readonly taskId: string },
+): Event =>
+  at(index, occurredAt, {
+    type: "task.subtask.solved",
+    payload:
+      typeof target === "string"
+        ? { taskId: HW_ID, subtaskId: target }
+        : { taskId: target.taskId, subtaskId: target.id },
+  });
 
 export const submitted = (
   index: number,
   occurredAt: string,
-  payload: { readonly subtaskIds?: readonly string[]; readonly closes?: boolean },
-  taskId = HW_ID,
+  payload: {
+    readonly subtaskIds?: readonly string[];
+    readonly closes?: boolean;
+    readonly taskId?: string;
+  },
 ): Event =>
   at(index, occurredAt, {
     type: "task.submitted",
     payload: {
-      taskId,
+      taskId: payload.taskId ?? HW_ID,
       ...(payload.subtaskIds !== undefined && { subtaskIds: [...payload.subtaskIds] }),
       ...(payload.closes !== undefined && { closes: payload.closes }),
     },

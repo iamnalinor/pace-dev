@@ -46,13 +46,33 @@ const appendSubtasks = (
       existing.every((known) => known.id !== item.id) &&
       items.findIndex((other) => other.id === item.id) === index,
   );
-  return fresh.length === 0 ? existing : [...existing, ...fresh.map(toSubtask)];
+  return fresh.length === 0 ? existing : [...existing, ...fresh.map((item) => toSubtask(item))];
 };
 
 const emptyToNull = (
   overrides: Readonly<Record<string, unknown>> | undefined,
 ): null | Readonly<Record<string, unknown>> =>
   overrides === undefined || Object.keys(overrides).length === 0 ? null : overrides;
+
+type CreatedPayload = EventOf<"task.created">["payload"];
+
+const scheduleOf = (
+  payload: CreatedPayload,
+): Pick<Task, "dueAt" | "dueTz" | "startAt" | "startTz"> => ({
+  dueAt: payload.dueAt ?? null,
+  dueTz: payload.dueTz ?? null,
+  startAt: payload.startAt ?? null,
+  startTz: payload.startTz ?? null,
+});
+
+/** An importance given at creation counts as set then (it starts the Prioritized horizon). */
+const importanceOf = (
+  payload: CreatedPayload,
+  occurredAt: string,
+): Pick<Task, "importance" | "importanceSetAt"> => ({
+  importance: payload.importance ?? null,
+  importanceSetAt: payload.importance === undefined ? null : occurredAt,
+});
 
 const fromCreated = (event: EventOf<"task.created">): Task => {
   const { payload, occurredAt } = event;
@@ -61,12 +81,8 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
     title: payload.title,
     presetId: payload.presetId,
     projectId: payload.projectId ?? null,
-    importance: payload.importance ?? null,
-    importanceSetAt: payload.importance === undefined ? null : occurredAt,
-    dueAt: payload.dueAt ?? null,
-    dueTz: payload.dueTz ?? null,
-    startAt: payload.startAt ?? null,
-    startTz: payload.startTz ?? null,
+    ...importanceOf(payload, occurredAt),
+    ...scheduleOf(payload),
     estimateMinutes: payload.estimateMinutes ?? null,
     subtasks: appendSubtasks([], payload.subtasks),
     slider: null,
@@ -141,7 +157,7 @@ const statusSet: Handler<"task.status.set"> = (task, event) => {
 const subtaskSolved: Handler<"task.subtask.solved"> = (task, event) => {
   const { subtaskId } = event.payload;
   const target = task.subtasks.find((item) => item.id === subtaskId);
-  if (target === undefined || target.solvedAt !== null) {
+  if (target?.solvedAt !== null) {
     return task;
   }
   const subtasks = task.subtasks.map((item) =>
@@ -154,7 +170,7 @@ const subtaskSolved: Handler<"task.subtask.solved"> = (task, event) => {
 const submitSubtasks = (task: Task, ids: readonly string[], at: string): Task => {
   const isDue = (item: Subtask): boolean =>
     ids.includes(item.id) && item.solvedAt !== null && item.submittedAt === null;
-  if (!task.subtasks.some(isDue)) {
+  if (!task.subtasks.some((item) => isDue(item))) {
     return task;
   }
   const subtasks = task.subtasks.map((item) => (isDue(item) ? { ...item, submittedAt: at } : item));

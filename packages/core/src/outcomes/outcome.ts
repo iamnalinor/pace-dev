@@ -49,8 +49,10 @@ const doneOutcome = (
   preset: ResolvedPreset,
 ): "done" | "done_late" => {
   if (preset.submission === "per_subtask" && task.subtasks.length > 0) {
-    const isLate = (item: Subtask): boolean => subtaskOutcome(item, task.dueAt) === "done_late";
-    return task.subtasks.some(isLate) ? "done_late" : "done";
+    const isLate = task.subtasks.some(
+      (item) => subtaskOutcome(item, task.dueAt) === "done_late",
+    );
+    return isLate ? "done_late" : "done";
   }
   return lateness(closedAt, task.dueAt);
 };
