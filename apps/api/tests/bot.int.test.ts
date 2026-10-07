@@ -42,6 +42,7 @@ const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<R
     fetch: async () => {
       throw new Error("no network in tests");
     },
+    parseProviders: () => [],
     telegramFetch,
   }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {

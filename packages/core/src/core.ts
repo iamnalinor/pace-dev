@@ -20,6 +20,7 @@ export {
   type User,
   UserSchema,
 } from "./api/schemas/auth.ts";
+export { type ParseResponse, ParseRequestSchema, ParseResponseSchema } from "./api/schemas/parse.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,

@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { endpoints, ok } from "@pace/core";
 
+import type { ParseProvider } from "./parse/llm.ts";
 import type { AppEnv } from "./shared/app-env.ts";
 
 import { mountAuthRoutes } from "./auth/auth-routes.ts";
@@ -12,7 +13,9 @@ import { isAllowed } from "./auth/whitelist.ts";
 import { mountBotRoutes } from "./bot/bot-routes.ts";
 import { telegramFetch, type TelegramTransport } from "./bot/telegram-api.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
-import { loadConfig } from "./shared/config.ts";
+import { mountParseRoutes } from "./parse/parse-routes.ts";
+import { parseProviders } from "./parse/providers.ts";
+import { type Config, loadConfig } from "./shared/config.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
 import { mountSyncRoutes } from "./sync/sync-routes.ts";
@@ -26,6 +29,8 @@ export type AppDeps = {
   readonly telegramFetch: TelegramTransport;
   /** Outbound fetch for link previews; tests pass a fake. */
   readonly fetch: (input: string, init: RequestInit) => Promise<Response>;
+  /** The LLMs the parse may ask; tests script their answers. */
+  readonly parseProviders: (config: Config) => readonly ParseProvider[];
 };
 
 /**
@@ -34,6 +39,7 @@ Builds the HTTP app. No bindings are read at module scope: everything comes from
 */
 const PLATFORM_DEPS: AppDeps = {
   fetch: async (input, init) => await fetch(input, init),
+  parseProviders,
   telegramFetch,
 };
 
@@ -74,5 +80,6 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   mountBotRoutes(app, { bindLogin: bindBotLogin, isAllowed, telegramFetch: deps.telegramFetch });
   mountSyncRoutes(app);
   mountLinkRoutes(app, deps.fetch);
+  mountParseRoutes(app, deps.parseProviders);
   return app;
 };

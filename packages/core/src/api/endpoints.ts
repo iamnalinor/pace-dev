@@ -11,6 +11,7 @@ import {
   UserSchema,
 } from "./schemas/auth.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
+import { ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
   OAuthClientInfoQuerySchema,
   OAuthClientInfoSchema,
@@ -103,6 +104,16 @@ export const endpoints = {
       method: "POST",
       output: SyncObservationsOutputSchema,
       path: "/api/sync/observations",
+    }),
+  },
+  parse: {
+    /** Free text read by the LLM into a task, or changes to one; nothing is saved. */
+    run: endpoint({
+      auth: true,
+      body: ParseRequestSchema,
+      method: "POST",
+      output: ParseResponseSchema,
+      path: "/api/parse",
     }),
   },
   links: {
