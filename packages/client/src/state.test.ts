@@ -170,3 +170,47 @@ describe("createAppState ingest", () => {
     );
   });
 });
+
+describe("createAppState slices", () => {
+  it("materializes tasks, projects and presets with the core reducers", async () => {
+    const { state } = await setup();
+    await state.dispatch({
+      occurredAt: at(9),
+      payload: { projectId: "p1", name: "Algebra", color: "blue" },
+      type: "project.created",
+    });
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: {
+        taskId: "t1",
+        title: "Sheet 1",
+        presetId: "hw",
+        projectId: "p1",
+        subtasks: [],
+        fields: {},
+      },
+      type: "task.created",
+    });
+    const snapshot = state.store.getState();
+    expect(snapshot.projects.byId["p1"]).toMatchObject({ name: "Algebra", color: "blue" });
+    expect(snapshot.tasks.byId["t1"]).toMatchObject({ title: "Sheet 1", projectId: "p1" });
+    expect(snapshot.presets.byId["hw"]?.builtIn).toBe(true);
+  });
+
+  it("keeps the raw log, corrections included, next to the effective events", async () => {
+    const { state } = await setup();
+    const first = await state.dispatch(languageInput(at(10), "ru"));
+    if (!first.ok) {
+      throw new Error(first.error);
+    }
+    const revoked = await state.revoke(first.value.id);
+    if (!revoked.ok) {
+      throw new Error(revoked.error);
+    }
+    const snapshot = state.store.getState();
+    expect(snapshot.events).toEqual([]);
+    expect(snapshot.log.map((event) => event.id)).toEqual([first.value.id, revoked.value.id]);
+    await state.rematerialize();
+    expect(state.store.getState().log).toHaveLength(2);
+  });
+});

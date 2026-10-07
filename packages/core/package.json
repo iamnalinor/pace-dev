@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/core.ts",
-    "./design/tokens.json": "./src/design/tokens.json"
+    "./design/tokens.json": "./src/design/tokens.json",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "test": "vitest run --coverage",

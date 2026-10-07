@@ -52,6 +52,16 @@ describe("createPaceClient", () => {
     expect(client.state.store.getState().settings.language).toBe("ru");
   });
 
+  it("exposes the actions and the clock, both on the same store", async () => {
+    const { client } = await setup();
+    expect(client.clock.now()).toBe("2026-10-06T12:00:00.000Z");
+    const captured = await client.actions.captureInbox("buy milk");
+    expect(captured.ok).toBe(true);
+    expect(
+      Object.values(client.state.store.getState().tasks.byId).map((task) => task.title),
+    ).toEqual(["buy milk"]);
+  });
+
   it("gives the API client the auth token", async () => {
     const { api, client } = await setup({
       "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),

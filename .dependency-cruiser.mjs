@@ -119,7 +119,13 @@ const config = {
       name: "not-to-test",
       comment: "Production code must not depend on tests or test fakes.",
       severity: "error",
-      from: { pathNot: "[.](test|fake)[.]tsx?$|^apps/api/tests/|^e2e/|/test/" },
+      from: {
+        pathNot: [
+          "[.](test|fake)[.]tsx?$|^apps/api/tests/|^e2e/|/test/",
+          // The test-support entry (`@pace/core/testing`) re-exports the fixtures on purpose.
+          String.raw`^packages/core/src/testing\.ts$`,
+        ],
+      },
       to: { path: "[.](test|fake)[.]tsx?$|^apps/api/tests/|/test/" },
     },
     {

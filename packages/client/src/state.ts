@@ -7,25 +7,42 @@ import {
   err,
   type Event,
   type EventInput,
+  INITIAL_PRESETS_STATE,
+  INITIAL_PROJECTS_STATE,
+  INITIAL_TASKS_STATE,
   materialize,
   newId,
   ok,
   parseEvent,
+  presetReducer,
+  type PresetsState,
+  projectReducer,
+  type ProjectsState,
   type Reducer,
   type Result,
   type Settings,
   settingsReducer,
   shouldRematerialize,
   sortEvents,
+  taskReducer,
+  type TasksState,
 } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 
-/** The whole client state: the materialized slices plus the log and bookkeeping. */
+/**
+The whole client state: the materialized slices (the same four as the core's `CoreState`,
+so every query reads it as is) plus the log and bookkeeping.
+*/
 export type AppState = {
   readonly status: "loading" | "ready";
   /** Effective events (corrections applied) in canonical order. */
   readonly events: readonly Event[];
+  /** Every event in the store, corrections included, in canonical order: what history shows. */
+  readonly log: readonly Event[];
+  readonly tasks: TasksState;
+  readonly projects: ProjectsState;
+  readonly presets: PresetsState;
   readonly settings: Settings;
   readonly deviceId: string;
   readonly lastAppliedOccurredAt: null | string;
@@ -33,8 +50,8 @@ export type AppState = {
   readonly version: number;
 };
 
-/** Materialized slices. M1 adds `tasks`, `projects`, `presets` here and in `rootReducer`. */
-type SliceKey = "settings";
+/** Materialized slices, each folded by its core reducer. */
+type SliceKey = "presets" | "projects" | "settings" | "tasks";
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -76,14 +93,23 @@ const composeReducers =
   };
 
 /** One entry per materialized slice, applied in order. */
-export const rootReducer: Reducer<AppState> = composeReducers([slice("settings", settingsReducer)]);
+export const rootReducer: Reducer<AppState> = composeReducers([
+  slice("tasks", taskReducer),
+  slice("projects", projectReducer),
+  slice("presets", presetReducer),
+  slice("settings", settingsReducer),
+]);
 
 const initialState = (deviceId: string): AppState => ({
   deviceId,
   events: [],
   lastAppliedOccurredAt: null,
+  log: [],
+  presets: INITIAL_PRESETS_STATE,
+  projects: INITIAL_PROJECTS_STATE,
   settings: DEFAULT_SETTINGS,
   status: "loading",
+  tasks: INITIAL_TASKS_STATE,
   version: 0,
 });
 
@@ -98,6 +124,7 @@ const rebuild = (state: AppState, all: readonly Event[]): AppState => {
     ...materialize(all, rootReducer, base),
     events,
     lastAppliedOccurredAt: events.at(-1)?.occurredAt ?? null,
+    log: sortEvents(all),
   };
 };
 
@@ -112,6 +139,7 @@ const applyInOrder = (state: AppState, fresh: readonly Event[]): AppState => {
     ...folded,
     events: sortEvents([...state.events, ...sorted]),
     lastAppliedOccurredAt: sorted.at(-1)?.occurredAt ?? state.lastAppliedOccurredAt,
+    log: sortEvents([...state.log, ...sorted]),
     version: state.version + 1,
   };
 };

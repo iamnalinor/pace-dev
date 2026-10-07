@@ -23,7 +23,6 @@
     "@types/react": "19.3.0",
     "@vitest/coverage-v8": "catalog:",
     "fast-check": "catalog:",
-    "react": "19.3.0",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
