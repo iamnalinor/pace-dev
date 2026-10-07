@@ -22,7 +22,7 @@ const DEFAULT_NOTIFY: NotifyParams = {
 };
 
 const NO_FIELDS: PresetFields = {
-  ticket: false,
+  link: false,
   description: false,
   startAt: false,
   submitVia: false,
@@ -59,7 +59,7 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     submission: "whole",
     progressMode: "slider",
     recurrence: null,
-    fields: { ...NO_FIELDS, ticket: true, description: true, startAt: true },
+    fields: { ...NO_FIELDS, link: true, description: true, startAt: true },
     notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 120,
     color: "violet",

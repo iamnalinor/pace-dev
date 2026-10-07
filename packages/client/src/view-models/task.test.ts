@@ -25,13 +25,36 @@ const view = (taskId: string, now: string, deviceTz?: string): TaskViewModel => 
 };
 
 describe("taskViewModel", () => {
+  it("takes the link from the description when none was set", () => {
+    const at = TRK_NOW;
+    const state = artboardState(at);
+    const task = state.tasks.byId[BOOKS_ID];
+    if (task === undefined) {
+      throw new Error("fixture lost the books task");
+    }
+    const withDescription = {
+      ...state,
+      tasks: {
+        byId: {
+          ...state.tasks.byId,
+          [BOOKS_ID]: { ...task, description: "renew at https://library.example.org/renew." },
+        },
+      },
+    };
+    const result = taskViewModel(withDescription, BOOKS_ID, ctx(at));
+    expect(result.ok && result.value.link).toEqual({
+      host: "library.example.org",
+      url: "https://library.example.org/renew",
+    });
+  });
+
   it("shows TRK-231 on Thursday: tags, stats, the why rows and Done as the primary action", () => {
     const trk = view(TRK_ID, TRK_NOW, "UTC");
     expect(trk).toMatchObject({
       description: "p99 check fails ~1 in 5 runs on the shared runner.",
       id: TRK_ID,
       project: { id: WORK_ID, name: "Work" },
-      ticket: "TRK-231",
+      link: { host: "tracker.example.com", url: "https://tracker.example.com/browse/TRK-231" },
       title: "Flaky latency test in nightly",
     });
     expect(trk.tags).toEqual([

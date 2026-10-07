@@ -147,7 +147,7 @@ export const NotifyRow = ({ label, sub, ...section }: SubProps) => {
   );
 };
 
-/** Whether the task form shows an optional field (ticket, description, start, submit via). */
+/** Whether the task form shows an optional field (link, description, start, submit via). */
 export const FieldToggleRow = ({ label, sub, ...section }: SubProps) => {
   const t = useT();
   const { definition, inherited, onChange } = section;

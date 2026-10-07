@@ -1,4 +1,6 @@
 import {
+  extractLink,
+  linkHost,
   type Closure,
   type CoreState,
   type ExplainKey,
@@ -71,11 +73,26 @@ export type OverrideSheet = {
   readonly overrides: null | Readonly<Record<string, unknown>>;
 };
 
+export type TaskLink = { readonly url: string; readonly host: string };
+
+const taskLink = (
+  explicit: null | string,
+  sourceText: null | string,
+  description: null | string,
+): null | TaskLink => {
+  const url = explicit ?? extractLink(sourceText) ?? extractLink(description);
+  return url === null ? null : { host: linkHost(url), url };
+};
+
 export type TaskViewModel = {
   readonly id: string;
   readonly title: string;
   readonly description: null | string;
-  readonly ticket: null | string;
+  /**
+   * The task's link: set explicitly, else the first web address in the source text or the
+   * description. `host` is what the chip shows until the page title is known.
+   */
+  readonly link: null | TaskLink;
   readonly submitVia: null | string;
   readonly sourceText: null | string;
   readonly project: null | {
@@ -205,7 +222,7 @@ export const taskViewModel = (
       id: task.id,
       title: task.title,
       description: task.description,
-      ticket: task.fields.ticket,
+      link: taskLink(task.fields.link, task.sourceText, task.description),
       submitVia: task.fields.submitVia,
       sourceText: task.sourceText,
       project:

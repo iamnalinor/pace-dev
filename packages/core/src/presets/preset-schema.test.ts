@@ -10,6 +10,13 @@ const recurrence = {
 };
 
 describe("PresetDefinitionSchema", () => {
+  it("keeps a legacy ticket toggle under its new name, link", () => {
+    expect(parsePresetDefinition({ fields: { ticket: true } })).toEqual({
+      ok: true,
+      value: { fields: { link: true } },
+    });
+  });
+
   it("accepts an empty definition (a child that changes nothing)", () => {
     expect(PresetDefinitionSchema.safeParse({}).success).toBe(true);
   });
@@ -25,7 +32,7 @@ describe("PresetDefinitionSchema", () => {
       },
       defaultEstimateMinutes: 60,
       defaultImportance: "normal",
-      fields: { description: true, startAt: false, submitVia: false, ticket: false },
+      fields: { description: true, startAt: false, submitVia: false, link: false },
       notify: {
         criticalHours: 12,
         criticalProgress: 0.5,

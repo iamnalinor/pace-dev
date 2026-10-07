@@ -31,7 +31,7 @@ const PRESET_ID = z.string().min(1).describe("Lowercase slug, e.g. hw.algebra or
 const DEFINITION = z
   .record(z.string(), z.unknown())
   .describe(
-    "Only the keys to change: urgencyPolicy (age|lag|pace|resubmission), defaultImportance, deadlinePolicy ({kind:'hard'} or {kind:'resubmission', softDays, finalAt, finalTz}), submission (whole|per_subtask), progressMode (subtasks|slider|none), recurrence ({issued:{weekday,time}, due:{weekday,time}, tz} or null), fields ({ticket,description,startAt,submitVia}), notify ({criticalHours,criticalProgress,criticalScore,waitingDays,inProgressIdleDays}), defaultEstimateMinutes, color.",
+    "Only the keys to change: urgencyPolicy (age|lag|pace|resubmission), defaultImportance, deadlinePolicy ({kind:'hard'} or {kind:'resubmission', softDays, finalAt, finalTz}), submission (whole|per_subtask), progressMode (subtasks|slider|none), recurrence ({issued:{weekday,time}, due:{weekday,time}, tz} or null), fields ({link,description,startAt,submitVia}), notify ({criticalHours,criticalProgress,criticalScore,waitingDays,inProgressIdleDays}), defaultEstimateMinutes, color.",
   );
 
 const presetFailure = (code: PresetValidationError) => err({ code, message: describeCode(code) });

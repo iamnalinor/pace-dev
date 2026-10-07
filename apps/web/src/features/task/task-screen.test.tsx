@@ -151,7 +151,10 @@ describe("TaskScreen — closing", () => {
 describe("TaskScreen — TRK-231 (progress slider)", () => {
   it("explains its place on Now and moves the slider", async () => {
     const { services, user } = await renderTask(TRK_ID, { deviceTz: "UTC", now: TRK_NOW });
-    expect(await screen.findByText("TRK-231")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /tracker\.example\.com/ })).toHaveAttribute(
+      "href",
+      "https://tracker.example.com/browse/TRK-231",
+    );
     expect(
       screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
     ).toBeInTheDocument();

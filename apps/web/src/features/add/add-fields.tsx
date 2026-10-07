@@ -147,13 +147,13 @@ export const WorkFields = ({ draft, onPatch }: Omit<Props, "zone">) => {
           />
         )}
       </Field>
-      {fields?.ticket === true && (
+      {fields?.link === true && (
         <TextRow
-          label={t("add.ticket")}
-          onChange={(ticket) => {
-            onPatch({ ticket });
+          label={t("add.link")}
+          onChange={(link) => {
+            onPatch({ link });
           }}
-          value={draft.ticket}
+          value={draft.link}
         />
       )}
       {fields?.submitVia === true && (

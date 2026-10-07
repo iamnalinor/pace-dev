@@ -19,7 +19,7 @@ export type AddDraft = {
   readonly estimate: null | number;
   readonly problems: readonly string[];
   readonly description: string;
-  readonly ticket: string;
+  readonly link: string;
   readonly submitVia: string;
 };
 
@@ -35,7 +35,7 @@ export const EMPTY_DRAFT: AddDraft = {
   projectName: "",
   submitVia: "",
   text: "",
-  ticket: "",
+  link: "",
 };
 
 /** `1, 3, 5а, 6` → four problems; each label stays exactly as typed between the commas. */
@@ -63,7 +63,7 @@ export const draftToForm = (draft: AddDraft, zone: string): Result<CreateTaskFor
   }
   const description = filled(draft.description);
   const projectName = filled(draft.projectName);
-  const ticket = filled(draft.ticket);
+  const link = filled(draft.link);
   const submitVia = filled(draft.submitVia);
   return ok({
     title: draft.text,
@@ -75,7 +75,7 @@ export const draftToForm = (draft: AddDraft, zone: string): Result<CreateTaskFor
     subtasks: draft.problems.map((label) => ({ label })),
     ...(description !== undefined && { description }),
     fields: {
-      ...(ticket !== undefined && { ticket }),
+      ...(link !== undefined && { link }),
       ...(submitVia !== undefined && { submitVia }),
     },
   });

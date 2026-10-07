@@ -34,13 +34,13 @@ describe("toggleSubOverride", () => {
     const one = toggleSubOverride({}, { group: "notify", key: "criticalHours" }, hw);
     expect(one).toEqual({ notify: { criticalHours: 12 } });
     const two = setSub(
-      toggleSubOverride(one, { group: "fields", key: "ticket" }, hw),
-      { group: "fields", key: "ticket" },
+      toggleSubOverride(one, { group: "fields", key: "link" }, hw),
+      { group: "fields", key: "link" },
       true,
     );
-    expect(two).toEqual({ fields: { ticket: true }, notify: { criticalHours: 12 } });
+    expect(two).toEqual({ fields: { link: true }, notify: { criticalHours: 12 } });
     expect(toggleSubOverride(two, { group: "notify", key: "criticalHours" }, hw)).toEqual({
-      fields: { ticket: true },
+      fields: { link: true },
     });
   });
 });

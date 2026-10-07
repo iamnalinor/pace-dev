@@ -1,4 +1,5 @@
 import type { Event, EventOf, EventType } from "../events/event-schema.ts";
+import { isHttpUrl } from "../links.ts";
 import type { Reducer } from "./materializer.ts";
 
 import {
@@ -30,8 +31,11 @@ type SubtaskInput = EventOf<"task.subtasks.added">["payload"]["subtasks"][number
 
 type FieldsInput = EventOf<"task.created">["payload"]["fields"];
 
+const legacyLink = (ticket: string | undefined): null | string =>
+  ticket !== undefined && isHttpUrl(ticket) ? ticket : null;
+
 const toFields = (fields: FieldsInput): TaskFields => ({
-  ticket: fields.ticket ?? null,
+  link: fields.link ?? legacyLink(fields.ticket),
   submitVia: fields.submitVia ?? null,
 });
 
@@ -202,7 +206,7 @@ const PATCHED_KEYS = ["title", "description", "dueAt", "dueTz", "startAt", "star
 
 const isSamePatch = (a: Task, b: Task): boolean =>
   PATCHED_KEYS.every((key) => a[key] === b[key]) &&
-  a.fields.ticket === b.fields.ticket &&
+  a.fields.link === b.fields.link &&
   a.fields.submitVia === b.fields.submitVia;
 
 /** `description: null` clears; `fields` replaces both fields when present. */

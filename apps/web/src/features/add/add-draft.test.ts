@@ -59,7 +59,7 @@ describe("draftToForm", () => {
         projectName: " Thesis ",
         submitVia: "",
         text: " Write the intro ",
-        ticket: "TRK-9",
+        link: "https://tracker.example.com/TRK-9",
       }),
       MOSCOW,
     );
@@ -68,7 +68,7 @@ describe("draftToForm", () => {
       value: {
         description: "Chapter 3",
         estimateMinutes: 90,
-        fields: { ticket: "TRK-9" },
+        fields: { link: "https://tracker.example.com/TRK-9" },
         importance: "asap",
         presetId: "work",
         projectName: "Thesis",

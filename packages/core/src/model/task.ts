@@ -36,7 +36,7 @@ export type TaskSource = {
 };
 
 export type TaskFields = {
-  readonly ticket: null | string;
+  readonly link: null | string;
   readonly submitVia: null | string;
 };
 

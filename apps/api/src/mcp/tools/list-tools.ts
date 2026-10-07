@@ -192,7 +192,7 @@ const PresetSchema = z.object({
 export const listPresets = defineTool({
   annotations: READ_ONLY,
   description:
-    "Every preset: the five built-ins (hw = homework with numbered problems and per-problem submission, work = ticket with a progress slider, personal, deferred, inbox) and the user's own (courses extend hw; archived ones stay listed for their existing tasks). Each comes with its own definition and the fully resolved settings: urgency policy, default importance, deadline policy, submission mode, progress mode, weekly recurrence, notify thresholds, default estimate. Use it to pick a presetId for create_task or to check a course's schedule.",
+    "Every preset: the five built-ins (hw = homework with numbered problems and per-problem submission, work = a link and a progress slider, personal, deferred, inbox) and the user's own (courses extend hw; archived ones stay listed for their existing tasks). Each comes with its own definition and the fully resolved settings: urgency policy, default importance, deadline policy, submission mode, progress mode, weekly recurrence, notify thresholds, default estimate. Use it to pick a presetId for create_task or to check a course's schedule.",
   handler: async (_args, ctx) =>
     await runRead(ctx, (scope) => {
       const presets = Object.values(scope.state.presets.byId)

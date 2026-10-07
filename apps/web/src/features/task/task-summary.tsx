@@ -2,6 +2,7 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 
 import { type Translate, useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
+import { LinkChip } from "#web/shared/ui/link-chip.tsx";
 
 const tagText = (t: Translate, tag: TaskTag): string => {
   switch (tag.kind) {
@@ -17,29 +18,11 @@ const tagText = (t: Translate, tag: TaskTag): string => {
   }
 };
 
-const isUrl = (text: string): boolean => /^https?:\/\//i.test(text);
-
-/** The ticket of a work task: a link when it is one, else its id in mono. */
-const Ticket = ({ ticket }: { readonly ticket: string }) =>
-  isUrl(ticket) ? (
-    <a
-      className="font-mono text-xs text-fg2 no-underline hover:text-fg"
-      href={ticket}
-      rel="noreferrer"
-      target="_blank"
-    >
-      {ticket} ↗
-    </a>
-  ) : (
-    <span className="font-mono text-xs text-fg2">{ticket}</span>
-  );
-
-/** Ticket, title, tags and description, all as the user typed them. */
+/** Title, tags, description and the link, all as the user typed them. */
 export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   return (
     <div className="px-5 pt-0.5">
-      {view.ticket !== null && view.ticket !== "" && <Ticket ticket={view.ticket} />}
       <h1 className="mt-1 text-[26px] leading-tight font-semibold tracking-[-0.02em]">
         {view.title}
       </h1>
@@ -61,6 +44,7 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
           {view.description}
         </p>
       )}
+      {view.link !== null && <LinkChip className="mt-3" url={view.link.url} />}
     </div>
   );
 };

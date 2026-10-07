@@ -51,12 +51,24 @@ const DeadlinePolicySchema = z.discriminatedUnion("kind", [
     }),
 ]);
 
-const FieldsSchema = z.strictObject({
-  ticket: z.boolean().exactOptional(),
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Presets saved before `link` replaced `ticket` keep their toggle under the new name. */
+const renameLegacyTicket = (value: unknown): unknown => {
+  if (!isRecord(value) || !("ticket" in value)) {
+    return value;
+  }
+  const { ticket, ...rest } = value;
+  return "link" in rest ? rest : { ...rest, link: ticket };
+};
+
+const FieldsSchema = z.preprocess(renameLegacyTicket, z.strictObject({
+  link: z.boolean().exactOptional(),
   description: z.boolean().exactOptional(),
   startAt: z.boolean().exactOptional(),
   submitVia: z.boolean().exactOptional(),
-});
+}));
 
 const NotifySchema = z.strictObject({
   criticalHours: z.number().min(0).exactOptional(),

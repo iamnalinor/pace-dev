@@ -10,6 +10,7 @@ import {
   TelegramLoginSchema,
   UserSchema,
 } from "./schemas/auth.ts";
+import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import {
   OAuthClientInfoQuerySchema,
   OAuthClientInfoSchema,
@@ -102,6 +103,16 @@ export const endpoints = {
       method: "POST",
       output: SyncObservationsOutputSchema,
       path: "/api/sync/observations",
+    }),
+  },
+  links: {
+    /** Title and icon of a web page, for the link chip on a task (cached by the Worker). */
+    preview: endpoint({
+      auth: true,
+      method: "GET",
+      output: LinkPreviewSchema,
+      path: "/api/links/preview",
+      query: LinkPreviewQuerySchema,
     }),
   },
   /** The MCP consent flow (web consent page ↔ Worker) and the "Connected apps" grants. */

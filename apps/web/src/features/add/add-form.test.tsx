@@ -109,17 +109,17 @@ describe("AddForm", () => {
     const { services } = await artboardServices();
     const { user } = renderWithProviders(<AddForm />, { services });
     expect(await screen.findByLabelText("Description")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Ticket")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Link")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Goes to"), "Work");
     await user.type(screen.getByLabelText("Paste or type anything"), "Fix flaky test");
-    await user.type(screen.getByLabelText("Ticket"), "TRK-300");
+    await user.type(screen.getByLabelText("Link"), "https://tracker.example.com/TRK-300");
     await user.selectOptions(screen.getByLabelText("Importance"), "Prioritized");
     await user.click(screen.getByRole("radio", { name: "2h" }));
     await user.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => {
       expect(lastTask(services)).toMatchObject({
         estimateMinutes: 120,
-        fields: { ticket: "TRK-300" },
+        fields: { link: "https://tracker.example.com/TRK-300" },
         importance: "prioritized",
         title: "Fix flaky test",
       });

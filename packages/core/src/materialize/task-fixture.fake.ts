@@ -121,7 +121,7 @@ export const trk231Events = (): readonly Event[] => [
       estimateMinutes: 480,
       subtasks: [],
       description: "p99 check fails ~1 in 5 runs on the shared runner.",
-      fields: { ticket: "TRK-231" },
+      fields: { link: "https://tracker.example.com/browse/TRK-231" },
     },
   }),
   at(12, "2026-10-06T10:00:00.000Z", {
@@ -148,7 +148,7 @@ export const taskFixture = (overrides: Partial<Task> = {}): Task => ({
   description: null,
   sourceText: null,
   sources: [],
-  fields: { ticket: null, submitVia: null },
+  fields: { link: null, submitVia: null },
   overrides: null,
   status: "not_started",
   statusSince: HW_CREATED,

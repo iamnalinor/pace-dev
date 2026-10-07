@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 
 import type { TaskTag, TaskViewModel } from "@pace/client";
 
@@ -41,7 +41,7 @@ const Stat = ({
 
 const PERCENT = 100;
 
-/** Title, ticket and tags; the stats card (due, work left, tracked) and the window bar. */
+/** Title, link and tags; the stats card (due, work left, tracked) and the window bar. */
 export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   const viewer = useViewer();
@@ -59,8 +59,16 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
         >
           {view.title}
         </Text>
-        {view.ticket === null ? null : (
-          <Text className="font-mono text-[12px] text-muted">{view.ticket}</Text>
+        {view.link === null ? null : (
+          <Text
+            accessibilityRole="link"
+            className="font-mono text-[12px] text-fg2"
+            onPress={() => {
+              void Linking.openURL(view.link?.url ?? "");
+            }}
+          >
+            {view.link.host} ↗
+          </Text>
         )}
         <View className="flex-row flex-wrap gap-1.5">
           {view.tags.map((tag) => (

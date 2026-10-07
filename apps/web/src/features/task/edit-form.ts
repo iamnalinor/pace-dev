@@ -14,7 +14,7 @@ export type EditForm = {
   readonly importance: Importance;
   /** `null` follows the preset's default. */
   readonly estimate: null | number;
-  readonly ticket: string;
+  readonly link: string;
   readonly submitVia: string;
 };
 
@@ -46,7 +46,7 @@ export const initialEditForm = (view: TaskViewModel, fallbackTz: string): EditFo
     presetId: sheet.presetId,
     start: stats.startAt === null ? "" : isoToWallClock(stats.startAt, zone),
     submitVia: view.submitVia ?? "",
-    ticket: view.ticket ?? "",
+    link: view.link?.url ?? "",
     title: view.title,
     zone,
   };
@@ -73,7 +73,7 @@ const readInstant = (
 
 const fieldsPatch = (initial: EditForm, form: EditForm): TaskPatch["fields"] | undefined => {
   const fields = {
-    ...(form.ticket !== initial.ticket && { ticket: form.ticket }),
+    ...(form.link !== initial.link && { link: form.link }),
     ...(form.submitVia !== initial.submitVia && { submitVia: form.submitVia }),
   };
   return Object.keys(fields).length === 0 ? undefined : fields;

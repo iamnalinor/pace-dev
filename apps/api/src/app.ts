@@ -10,6 +10,7 @@ import { mountAuthRoutes } from "./auth/auth-routes.ts";
 import { bindBotLogin } from "./auth/bot-login.ts";
 import { isAllowed } from "./auth/whitelist.ts";
 import { mountBotRoutes } from "./bot/bot-routes.ts";
+import { mountLinkRoutes } from "./links/link-routes.ts";
 import { telegramFetch, type TelegramTransport } from "./bot/telegram-api.ts";
 import { loadConfig } from "./shared/config.ts";
 import { createLogger } from "./shared/logger.ts";
@@ -23,13 +24,18 @@ const isAllowedOrigin = (origin: string, webOrigin: string): boolean =>
 /** Platform services the app talks to; tests replace them with recorders. */
 export type AppDeps = {
   readonly telegramFetch: TelegramTransport;
+  /** Outbound fetch for link previews; tests pass a fake. */
+  readonly fetch: (input: string, init: RequestInit) => Promise<Response>;
 };
 
 /**
 Builds the HTTP app. No bindings are read at module scope: everything comes from
 `c.env` per request, so tests and wrangler dev can supply different bindings.
 */
-const PLATFORM_DEPS: AppDeps = { telegramFetch };
+const PLATFORM_DEPS: AppDeps = {
+  fetch: async (input, init) => await fetch(input, init),
+  telegramFetch,
+};
 
 export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   const app = new Hono<AppEnv>();
@@ -67,5 +73,6 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   mountAuthRoutes(app);
   mountBotRoutes(app, { bindLogin: bindBotLogin, isAllowed, telegramFetch: deps.telegramFetch });
   mountSyncRoutes(app);
+  mountLinkRoutes(app, deps.fetch);
   return app;
 };

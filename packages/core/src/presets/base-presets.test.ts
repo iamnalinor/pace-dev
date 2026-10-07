@@ -11,7 +11,7 @@ const DEFAULT_NOTIFY = {
   waitingDays: 7,
 };
 
-const NO_FIELDS = { description: false, startAt: false, submitVia: false, ticket: false };
+const NO_FIELDS = { description: false, startAt: false, submitVia: false, link: false };
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
 
@@ -55,13 +55,13 @@ describe("BASE_PRESETS", () => {
     });
   });
 
-  it("work: lag policy with a slider and ticket/description/start fields", () => {
+  it("work: lag policy with a slider and link/description/start fields", () => {
     expect(BASE_PRESETS.work.definition).toEqual({
       color: "violet",
       deadlinePolicy: { kind: "hard" },
       defaultEstimateMinutes: 120,
       defaultImportance: "normal",
-      fields: { ...NO_FIELDS, description: true, startAt: true, ticket: true },
+      fields: { ...NO_FIELDS, description: true, startAt: true, link: true },
       notify: DEFAULT_NOTIFY,
       progressMode: "slider",
       recurrence: null,

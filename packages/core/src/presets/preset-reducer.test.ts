@@ -119,9 +119,9 @@ describe("presetReducer: preset.created", () => {
 
   it("drops unknown keys only when the schema would: the stored definition is the parsed one", () => {
     const state = fold([
-      created(1, { definition: { fields: { ticket: true } }, extends: "work", id: "w.1" }),
+      created(1, { definition: { fields: { link: true } }, extends: "work", id: "w.1" }),
     ]);
-    expect(state.byId["w.1"]?.definition).toEqual({ fields: { ticket: true } });
+    expect(state.byId["w.1"]?.definition).toEqual({ fields: { link: true } });
   });
 });
 

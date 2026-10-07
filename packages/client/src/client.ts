@@ -91,6 +91,7 @@ export {
   type ProblemRow,
   type ProblemState,
   type TaskTag,
+  type TaskLink,
   type TaskViewModel,
   taskViewModel,
   type WhyRow,

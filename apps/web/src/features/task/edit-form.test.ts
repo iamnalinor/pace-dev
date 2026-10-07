@@ -71,7 +71,7 @@ describe("editChanges", () => {
         importance: "asap",
         presetId: "work",
         submitVia: "LMS",
-        ticket: "ALG-6",
+        link: "https://lms.example.com/alg-6",
         title: "Algebra HW 6 (fixed)",
       }),
     ).toEqual({
@@ -79,7 +79,7 @@ describe("editChanges", () => {
       value: {
         estimate: null,
         importance: "asap",
-        patch: { fields: { submitVia: "LMS", ticket: "ALG-6" }, title: "Algebra HW 6 (fixed)" },
+        patch: { fields: { submitVia: "LMS", link: "https://lms.example.com/alg-6" }, title: "Algebra HW 6 (fixed)" },
         presetId: "work",
       },
     });

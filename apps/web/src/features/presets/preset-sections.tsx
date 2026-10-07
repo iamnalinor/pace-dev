@@ -20,7 +20,7 @@ const SUBMISSIONS: readonly Submission[] = ["per_subtask", "whole"];
 const PROGRESS_MODES: readonly ProgressMode[] = ["subtasks", "slider", "none"];
 const FIELD_KEYS: readonly (keyof PresetFields)[] = [
   "description",
-  "ticket",
+  "link",
   "startAt",
   "submitVia",
 ];

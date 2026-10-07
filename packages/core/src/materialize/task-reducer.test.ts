@@ -98,7 +98,7 @@ describe("taskReducer: artboard scenarios", () => {
       status: "in_progress",
       statusSince: "2026-10-06T10:00:00.000Z",
       touched: true,
-      fields: { ticket: "TRK-231", submitVia: null },
+      fields: { link: "https://tracker.example.com/browse/TRK-231", submitVia: null },
       description: "p99 check fails ~1 in 5 runs on the shared runner.",
     });
     expect(task === undefined ? -1 : progressOf(task, "slider")).toBeCloseTo(0.4, 10);
@@ -379,6 +379,18 @@ describe("taskReducer: close and reopen", () => {
 });
 
 describe("taskReducer: attributes", () => {
+  it("reads a legacy ticket as the link only when it is a web address", () => {
+    const withTicket = (ticket: string): Task =>
+      hw([
+        hwCreated(1),
+        at(2, T(9), { type: "task.updated", payload: { taskId: HW_ID, fields: { ticket } } }),
+      ]);
+    expect(withTicket("https://tracker.example.com/T-1").fields.link).toBe(
+      "https://tracker.example.com/T-1",
+    );
+    expect(withTicket("TRK-231").fields.link).toBeNull();
+  });
+
   it("patches title, description, dates and fields through task.updated", () => {
     const task = hw([
       hwCreated(1),
@@ -401,7 +413,7 @@ describe("taskReducer: attributes", () => {
       startAt: T(8),
       startTz: "UTC",
       dueAt: HW_DUE,
-      fields: { ticket: null, submitVia: "LMS" },
+      fields: { link: null, submitVia: "LMS" },
     });
   });
 

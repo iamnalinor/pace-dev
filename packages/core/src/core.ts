@@ -39,6 +39,11 @@ export {
   requestedScopes,
 } from "./api/schemas/oauth.ts";
 export {
+  type LinkPreview,
+  LinkPreviewQuerySchema,
+  LinkPreviewSchema,
+} from "./api/schemas/links.ts";
+export {
   type Observation,
   ObservationSchema,
   type SyncEvent,
@@ -109,6 +114,7 @@ export {
   type Prng,
 } from "./ids.ts";
 export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/core-state.ts";
+export { extractLink, isHttpUrl, linkHost } from "./links.ts";
 export {
   apply,
   effectiveEvents,

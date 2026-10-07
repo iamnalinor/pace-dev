@@ -32,6 +32,9 @@ export const SubtaskSchema = z.object({
 });
 
 export const TaskFieldsSchema = z.object({
+  /** An http(s) address the task is about (issue, document, call). */
+  link: z.string().optional(),
+  /** Legacy (stage-1 drafts): read as the link when it is a web address, never written. */
   ticket: z.string().optional(),
   submitVia: z.string().optional(),
 });

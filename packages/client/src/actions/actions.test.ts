@@ -350,7 +350,7 @@ describe("task fields", () => {
       await world.actions.updateTask(TRK_ID, {
         description: null,
         dueAt: "2026-10-12T15:00:00.000Z",
-        fields: { ticket: "TRK-232" },
+        fields: { link: "https://tracker.example.com/TRK-232" },
         title: "Flaky test",
       }),
     );
@@ -358,7 +358,7 @@ describe("task fields", () => {
       description: null,
       dueAt: "2026-10-12T15:00:00.000Z",
       dueTz: MOSCOW,
-      fields: { ticket: "TRK-232" },
+      fields: { link: "https://tracker.example.com/TRK-232" },
       taskId: TRK_ID,
       title: "Flaky test",
     });

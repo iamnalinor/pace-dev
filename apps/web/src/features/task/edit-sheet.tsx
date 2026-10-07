@@ -298,13 +298,13 @@ const EditFields = ({ onDone, view }: FormProps) => {
       </fieldset>
       <div className="grid grid-cols-2 gap-3">
         <label className={LABEL}>
-          {t("edit.ticket")}
+          {t("edit.link")}
           <input
             className={INPUT}
             onChange={(event) => {
-              set("ticket", event.target.value);
+              set("link", event.target.value);
             }}
-            value={form.ticket}
+            value={form.link}
           />
         </label>
         <label className={LABEL}>

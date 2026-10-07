@@ -9,7 +9,8 @@ export type SubtaskForm = {
 };
 
 export type TaskFieldsForm = {
-  readonly ticket?: string | undefined;
+  /** An http(s) address; when absent, the view takes the first one from the text. */
+  readonly link?: string | undefined;
   readonly submitVia?: string | undefined;
 };
 
@@ -64,8 +65,8 @@ export const subtaskInputs = (items: readonly (string | SubtaskForm)[]): Subtask
         },
   );
 
-const fieldsInput = (fields: TaskFieldsForm): { ticket?: string; submitVia?: string } => ({
-  ...(fields.ticket !== undefined && { ticket: fields.ticket }),
+const fieldsInput = (fields: TaskFieldsForm): { link?: string; submitVia?: string } => ({
+  ...(fields.link !== undefined && { link: fields.link }),
   ...(fields.submitVia !== undefined && { submitVia: fields.submitVia }),
 });
 

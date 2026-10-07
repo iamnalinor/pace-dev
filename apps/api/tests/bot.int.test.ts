@@ -38,7 +38,7 @@ type WebhookOptions = {
 const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<Response> => {
   const ctx = createExecutionContext();
   const ip = options.ip === undefined ? TELEGRAM_IP : options.ip;
-  const response = await createApp({ telegramFetch }).fetch(
+  const response = await createApp({ fetch: () => Promise.reject(new Error("no network in tests")), telegramFetch }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
       body: JSON.stringify(update),
       headers: {

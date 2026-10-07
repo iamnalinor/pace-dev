@@ -46,7 +46,7 @@ export type Recurrence = {
 
 /** Which optional task fields the form shows. */
 export type PresetFields = {
-  readonly ticket: boolean;
+  readonly link: boolean;
   readonly description: boolean;
   readonly startAt: boolean;
   readonly submitVia: boolean;

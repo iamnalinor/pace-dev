@@ -88,14 +88,14 @@ describe("resolvePreset", () => {
 
   it("merges fields and notify key by key across the chain", () => {
     const state = stateWith(
-      user("w.a", "work", { fields: { ticket: false }, notify: { waitingDays: 3 } }),
+      user("w.a", "work", { fields: { link: false }, notify: { waitingDays: 3 } }),
       user("w.b", "w.a", { fields: { submitVia: true }, notify: { criticalHours: 48 } }),
     );
     const result = resolvePreset(state, "w.b", { notify: { criticalScore: 20 } });
     expect(result).toMatchObject({
       ok: true,
       value: {
-        fields: { description: true, startAt: true, submitVia: true, ticket: false },
+        fields: { description: true, startAt: true, submitVia: true, link: false },
         notify: {
           criticalHours: 48,
           criticalProgress: 0.5,
@@ -176,7 +176,7 @@ describe("resolvePreset", () => {
         color: fc.constantFrom("blue", "teal"),
         defaultEstimateMinutes: fc.nat({ max: 600 }),
         defaultImportance: fc.constantFrom("asap", "nice_to_have"),
-        fields: fc.record({ ticket: fc.boolean() }, { requiredKeys: [] }),
+        fields: fc.record({ link: fc.boolean() }, { requiredKeys: [] }),
         notify: fc.record({ criticalHours: fc.nat({ max: 72 }) }, { requiredKeys: [] }),
         recurrence: fc.constantFrom(null, recurrence),
       },
