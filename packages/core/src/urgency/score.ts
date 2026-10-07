@@ -1,4 +1,5 @@
-import type { UrgencyInput, UrgencyPolicy } from "./input.ts";
+import type { UrgencyPolicy } from "../model/preset.ts";
+import type { UrgencyInput } from "./input.ts";
 import type { PolicyTrace } from "./trace.ts";
 
 import { endOfDayIn } from "../time.ts";

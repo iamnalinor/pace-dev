@@ -122,6 +122,8 @@ export { projectReducer } from "./materialize/project-reducer.ts";
 export { settingsReducer } from "./materialize/settings-reducer.ts";
 export { taskReducer } from "./materialize/task-reducer.ts";
 export {
+  type DeadlinePolicy,
+  type Importance,
   type NotifyParams,
   type Preset,
   type PresetDefinition,
@@ -130,6 +132,7 @@ export {
   type Recurrence,
   type ResolvedPreset,
   type Submission,
+  type UrgencyPolicy,
   type Weekday,
   type WeekSlot,
 } from "./model/preset.ts";
@@ -236,13 +239,7 @@ export {
   U_MAX,
 } from "./urgency/constants.ts";
 export { explain, type Explanation } from "./urgency/explain.ts";
-export {
-  type DeadlinePolicy,
-  type Importance,
-  type UrgencyInput,
-  type UrgencyPolicy,
-  type WorkLeft,
-} from "./urgency/input.ts";
+export { type UrgencyInput, type WorkLeft } from "./urgency/input.ts";
 export { age, lag, pace, resubmission } from "./urgency/policies.ts";
 export {
   compareScores,

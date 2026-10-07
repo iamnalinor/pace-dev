@@ -1,16 +1,10 @@
+import type { DeadlinePolicy, Importance, UrgencyPolicy } from "../model/preset.ts";
+
 /**
  * What the urgency module needs to know about a task. The queries layer maps a task plus
- * its resolved preset to this shape; the literal unions mirror the task model's spellings.
+ * its resolved preset to this shape; the importance, policy and deadline types are the
+ * preset model's own, so a `ResolvedPreset` feeds in without conversion.
  */
-
-export type Importance = "asap" | "nice_to_have" | "normal" | "prioritized";
-
-export type UrgencyPolicy = "age" | "lag" | "pace" | "resubmission";
-
-/** How a preset treats the due date once it has passed. */
-export type DeadlinePolicy =
-  | { readonly kind: "hard" }
-  | { readonly kind: "resubmission"; readonly softDays: number; readonly finalAt: null | string };
 
 /** Progress (0..1) and estimate in hours over some part of the task. */
 export type WorkLeft = {

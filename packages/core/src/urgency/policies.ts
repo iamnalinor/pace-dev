@@ -1,4 +1,5 @@
-import type { DeadlinePolicy, UrgencyInput, UrgencyPolicy, WorkLeft } from "./input.ts";
+import type { DeadlinePolicy, UrgencyPolicy } from "../model/preset.ts";
+import type { UrgencyInput, WorkLeft } from "./input.ts";
 
 import { addDays, daysBetween, evaluationClock, hoursBetween, isAfter } from "./clock.ts";
 import {

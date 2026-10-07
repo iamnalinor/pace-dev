@@ -181,10 +181,12 @@ describe("expectedInstances", () => {
     const presets = foldPresets([
       ...exampleCoursePresetEvents(SEEDED_AT),
       presetArchived("hw.history"),
+      // Stored by the reducer as given; the chain breaks at the unknown parent.
       {
-        ...presetCreated("hw.orphan", "Orphan HW", {
-          recurrence: weekly([1, "10:00"], [5, "18:00"], MOSCOW),
-        }),
+        type: "preset.created",
+        occurredAt: SEEDED_AT,
+        precision: "exact",
+        source: "web",
         payload: {
           id: "hw.orphan",
           name: "Orphan HW",
@@ -496,8 +498,10 @@ describe("missingInstanceEvents", () => {
       })
       .map((date) => date.toISOString());
 
+    const caseArb = fc.record({ issued: slotArb, due: slotArb, zone: zoneArb, now: nowArb });
+
     fc.assert(
-      fc.property(slotArb, slotArb, zoneArb, nowArb, (issued, due, zone, now) => {
+      fc.property(caseArb, ({ issued, due, zone, now }) => {
         const recurrence = weekly(issued, due, zone);
         const presets = foldPresets([
           presetCreated("hw.prop", "Prop HW", { recurrence }),

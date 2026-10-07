@@ -1,7 +1,8 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import type { Importance, UrgencyInput } from "./input.ts";
+import type { Importance } from "../model/preset.ts";
+import type { UrgencyInput } from "./input.ts";
 
 import { addMinutesIso } from "../time.ts";
 import { MULTIPLIERS, RANK_BONUS, U_FLOOR } from "./constants.ts";
@@ -126,11 +127,13 @@ const workArb = fc.record({
 });
 const deadlineArb = fc.oneof(
   fc.constant({ kind: "hard" as const }),
-  fc.record({
-    kind: fc.constant("resubmission" as const),
-    softDays: fc.integer({ max: 14, min: 0 }),
-    finalAt: fc.option(aroundArb, { nil: null }),
-  }),
+  fc
+    .record({
+      kind: fc.constant("resubmission" as const),
+      softDays: fc.integer({ max: 14, min: 0 }),
+      finalAt: fc.option(aroundArb, { nil: null }),
+    })
+    .map((deadline) => ({ ...deadline, finalTz: deadline.finalAt === null ? null : "UTC" })),
 );
 const rankArb = fc.option(
   fc

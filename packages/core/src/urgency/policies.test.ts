@@ -150,7 +150,7 @@ const resubmissionTask = (
   task({
     policy: "resubmission",
     dueAt: TRK_DUE,
-    deadline: { kind: "resubmission", softDays, finalAt },
+    deadline: { kind: "resubmission", softDays, finalAt, finalTz: finalAt === null ? null : "UTC" },
     progress: work.progress,
     estimateHours: work.estimateHours,
     remaining: work,

@@ -1,4 +1,5 @@
-import type { UrgencyInput, UrgencyPolicy } from "./input.ts";
+import type { UrgencyPolicy } from "../model/preset.ts";
+import type { UrgencyInput } from "./input.ts";
 import type { ExplainInput, ExplainKey, ExplainStep } from "./trace.ts";
 
 import { evaluate, type Evaluation, type Score, toScore } from "./score.ts";

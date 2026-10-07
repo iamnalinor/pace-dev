@@ -61,15 +61,21 @@ const recurringPresets = (presets: PresetsState): readonly RecurringPreset[] =>
 
 const toIso = (date: Date): string => new Date(date).toISOString();
 
+/** The ISO week containing `now`: its Monday 00:00 in the recurrence zone, and that zone. */
+type Week = {
+  readonly startIso: string;
+  readonly zone: string;
+};
+
 /**
- * The instant of `slot` in the week that begins `weeks` weeks after `weekStartIso`
- * (a Monday 00:00 in `zone`). Days are added and the clock is set on the zone's calendar,
- * so a schedule keeps its wall-clock time across a summer-time change; a time that does
- * not exist on the change night resolves forward.
+ * The instant of `slot` in the week that begins `weeks` weeks after `week`. Days are added
+ * and the clock is set on the zone's calendar, so a schedule keeps its wall-clock time
+ * across a summer-time change; a time that does not exist on the change night resolves
+ * forward.
  */
-const slotInstant = (weekStartIso: string, weeks: number, slot: WeekSlot, zone: string): string => {
-  const context = { in: tz(zone) };
-  const day = addDays(weekStartIso, weeks * 7 + slot.weekday - 1, context);
+const slotInstant = (week: Week, weeks: number, slot: WeekSlot): string => {
+  const context = { in: tz(week.zone) };
+  const day = addDays(week.startIso, weeks * 7 + slot.weekday - 1, context);
   // `HH:MM` is enforced by the preset schema.
   const clock = { hours: Number(slot.time.slice(0, 2)), minutes: Number(slot.time.slice(3)) };
   return toIso(set(day, { ...clock, seconds: 0, milliseconds: 0 }, context));
@@ -78,15 +84,14 @@ const slotInstant = (weekStartIso: string, weeks: number, slot: WeekSlot, zone: 
 /** The slot of the ISO week containing `now` and of the next one, read in the recurrence zone. */
 const weekSlots = (source: RecurringPreset, now: string): readonly InstanceSlot[] => {
   const { recurrence } = source;
-  const weekStart = startOfWeekIn(now, recurrence.tz);
+  const week: Week = { startIso: startOfWeekIn(now, recurrence.tz), zone: recurrence.tz };
   return [0, 1].map((weeks) => {
-    const issuedAt = slotInstant(weekStart, weeks, recurrence.issued, recurrence.tz);
-    const dueWeeks = weeks + dueWeekOffset(recurrence);
+    const issuedAt = slotInstant(week, weeks, recurrence.issued);
     return {
       presetId: source.preset.id,
       isoWeek: isoWeekKey(issuedAt, recurrence.tz),
       issuedAt,
-      dueAt: slotInstant(weekStart, dueWeeks, recurrence.due, recurrence.tz),
+      dueAt: slotInstant(week, weeks + dueWeekOffset(recurrence), recurrence.due),
       dueTz: recurrence.tz,
     };
   });
@@ -121,12 +126,13 @@ export const expectedInstances = (presets: PresetsState, now: string): readonly 
 const isIssuedBy = (slot: InstanceSlot, now: string): boolean =>
   Date.parse(slot.issuedAt) <= Date.parse(now);
 
-/** The instances of one preset already in the state, latest week first. */
+/** The instances of one preset already in the state, whatever their outcome. */
 const instancesOf = (tasks: TasksState, presetId: string): readonly Task[] =>
-  Object.values(tasks.byId)
-    .filter((task) => instanceWeekOf(task.id)?.presetId === presetId)
-    // Ids of one preset share their prefix, so id order is `YYYY-Www` order.
-    .toSorted((a, b) => (a.id < b.id ? 1 : -1));
+  Object.values(tasks.byId).filter((task) => instanceWeekOf(task.id)?.presetId === presetId);
+
+/** Ids of one preset share their prefix, so the greatest id is the latest `YYYY-Www`. */
+const latestOf = (instances: readonly Task[]): Task | undefined =>
+  instances.find((task) => instances.every((other) => other.id <= task.id));
 
 /**
  * The creation of one instance. It is numbered after every instance of the preset so far,
@@ -154,7 +160,8 @@ const instanceEvent = (
       dueTz: slot.dueTz,
       startAt: slot.issuedAt,
       startTz: source.recurrence.tz,
-      estimateMinutes: existing[0]?.estimateMinutes ?? source.resolved.defaultEstimateMinutes,
+      estimateMinutes:
+        latestOf(existing)?.estimateMinutes ?? source.resolved.defaultEstimateMinutes,
       subtasks: [],
       fields: {},
     },

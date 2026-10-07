@@ -95,7 +95,12 @@ describe("explain", () => {
     const input = task({
       policy: "resubmission",
       dueAt: TRK_DUE,
-      deadline: { kind: "resubmission", softDays: 7, finalAt: addDays(TRK_DUE, 20) },
+      deadline: {
+        kind: "resubmission",
+        softDays: 7,
+        finalAt: addDays(TRK_DUE, 20),
+        finalTz: "UTC",
+      },
       progress: 0.9,
       remaining: { progress: 0.9, estimateHours: 4 },
       estimateHours: 4,
