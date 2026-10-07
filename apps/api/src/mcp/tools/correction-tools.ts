@@ -4,7 +4,7 @@ import { err, ok, reviewItems } from "@pace/core";
 
 import { requireTask, TASK_ID, WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { describeRow, rowOf, TaskRowSchema } from "../rows.ts";
+import { labelOf, rowOf, TaskRowSchema } from "../rows.ts";
 import { failure, runWrite, stamp, WRITE_OUTPUT } from "../tool-kit.ts";
 
 export const revokeEvent = defineTool({
@@ -94,7 +94,7 @@ export const reviewAction = defineTool({
           summary:
             events.length === 0
               ? `${args.key}: nothing to record.`
-              : `${args.key} applied to ${row === null ? args.taskId : describeRow(row)}.`,
+              : `${args.key} applied to ${labelOf(row, args.taskId)}.`,
         };
       },
     }),

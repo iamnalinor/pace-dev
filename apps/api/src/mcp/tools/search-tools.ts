@@ -13,7 +13,7 @@ import {
 } from "@pace/core";
 
 import { defineTool } from "../registry.ts";
-import { projectUrl, rowOf, taskUrl } from "../rows.ts";
+import { projectUrl, rowOf, type TaskRow, taskUrl, thenBy } from "../rows.ts";
 import { type Rendered, runRead, type Scope, type ToolFailure } from "../tool-kit.ts";
 
 /** Case folding that treats Cyrillic like Latin and `ё` like `е`. */
@@ -47,7 +47,7 @@ type Hit = { readonly id: string; readonly title: string; readonly url: string }
 
 /** Open tasks before closed ones, most recently touched first. */
 const byRelevance = (a: Task, b: Task): number =>
-  Number(isOpen(b)) - Number(isOpen(a)) || b.lastEventAt.localeCompare(a.lastEventAt);
+  thenBy(Number(isOpen(b)) - Number(isOpen(a)), () => b.lastEventAt.localeCompare(a.lastEventAt));
 
 const searchTasks = (scope: Scope, terms: readonly string[]): readonly Hit[] =>
   Object.values(scope.state.tasks.byId)
@@ -64,7 +64,9 @@ const searchProjects = (scope: Scope, terms: readonly string[]): readonly Hit[] 
       const haystack = projectHaystack(project);
       return terms.every((term) => haystack.includes(term));
     })
-    .toSorted((a, b) => Number(a.archived) - Number(b.archived) || a.name.localeCompare(b.name))
+    .toSorted((a, b) =>
+      thenBy(Number(a.archived) - Number(b.archived), () => a.name.localeCompare(b.name)),
+    )
     .map((project) => ({
       id: project.id,
       title: project.name,
@@ -99,46 +101,63 @@ export const search = defineTool({
   title: "Search",
 });
 
+/** A labelled line, or nothing when there is no value to show. */
 const line = (label: string, value: null | number | string | undefined): readonly string[] =>
-  value === null || value === undefined || value === "" ? [] : [`${label}: ${String(value)}`];
+  (value ?? "") === "" ? [] : [`${label}: ${String(value)}`];
+
+const box = (isDone: boolean): string => (isDone ? "[x]" : "[ ]");
 
 const subtaskLine = (item: Task["subtasks"][number]): string => {
   const marks = [
     ...(item.solvedAt === null ? [] : [`solved ${item.solvedAt}`]),
     ...(item.submittedAt === null ? [] : [`submitted ${item.submittedAt}`]),
   ];
-  return `- ${item.solvedAt === null ? "[ ]" : "[x]"} ${item.label}${marks.length === 0 ? "" : ` (${marks.join(", ")})`}`;
+  const suffix = marks.length === 0 ? "" : ` (${marks.join(", ")})`;
+  return `- ${box(item.solvedAt !== null)} ${item.label}${suffix}`;
 };
+
+/** A section with a heading, or nothing when it is empty. */
+const section = (heading: string, lines: readonly string[]): readonly string[] =>
+  lines.length === 0 ? [] : ["", `## ${heading}`, ...lines];
+
+const dueLine = (task: Task): readonly string[] =>
+  task.dueAt === null ? [] : line("Due", `${task.dueAt} (${task.dueTz ?? "UTC"})`);
+
+const outcomeLine = (task: Task, outcome: null | string): readonly string[] =>
+  task.closed === null ? [] : line("Outcome", `${outcome ?? task.closed.outcome} at ${task.closed.at}`);
+
+const taskHeader = (scope: Scope, task: Task, row: null | TaskRow): readonly string[] => [
+  `# ${task.title}`,
+  ...line("Preset", presetById(scope.state.presets, task.presetId)?.name ?? task.presetId),
+  ...line("Project", projectNameOf(scope.state, task)),
+  ...line("Importance", row?.importance),
+  ...line("Status", task.status),
+  ...dueLine(task),
+  ...line("Start", task.startAt),
+  ...line("Estimate (minutes)", task.estimateMinutes),
+  ...outcomeLine(task, row?.outcome ?? null),
+];
+
+const taskMetadata = (task: Task, row: null | TaskRow) => ({
+  closedAt: task.closed?.at ?? null,
+  dueAt: task.dueAt,
+  importance: row?.importance ?? null,
+  kind: "task",
+  outcome: row?.outcome ?? null,
+  presetId: task.presetId,
+  projectId: task.projectId,
+  status: task.status,
+});
 
 const taskDocument = (scope: Scope, task: Task): Rendered => {
   const row = rowOf(scope, task.id);
   const text = [
-    `# ${task.title}`,
-    ...line("Preset", presetById(scope.state.presets, task.presetId)?.name ?? task.presetId),
-    ...line("Project", projectNameOf(scope.state, task)),
-    ...line("Importance", row?.importance),
-    ...line("Status", task.status),
-    ...line("Due", task.dueAt === null ? null : `${task.dueAt} (${task.dueTz ?? "UTC"})`),
-    ...line("Start", task.startAt),
-    ...line("Estimate (minutes)", task.estimateMinutes),
-    ...line(
-      "Outcome",
-      task.closed === null ? null : `${row?.outcome ?? task.closed.outcome} at ${task.closed.at}`,
-    ),
-    ...(task.description === null ? [] : ["", "## Description", task.description]),
-    ...(task.subtasks.length === 0 ? [] : ["", "## Subtasks", ...task.subtasks.map(subtaskLine)]),
-    ...(task.sourceText === null ? [] : ["", "## Source text", task.sourceText]),
+    ...taskHeader(scope, task, row),
+    ...section("Description", task.description === null ? [] : [task.description]),
+    ...section("Subtasks", task.subtasks.map((item) => subtaskLine(item))),
+    ...section("Source text", task.sourceText === null ? [] : [task.sourceText]),
   ].join("\n");
-  const metadata = {
-    closedAt: task.closed?.at ?? null,
-    dueAt: task.dueAt,
-    importance: row?.importance ?? null,
-    kind: "task",
-    outcome: row?.outcome ?? null,
-    presetId: task.presetId,
-    projectId: task.projectId,
-    status: task.status,
-  };
+  const metadata = taskMetadata(task, row);
   return {
     structured: {
       id: task.id,
@@ -151,6 +170,11 @@ const taskDocument = (scope: Scope, task: Task): Rendered => {
   };
 };
 
+const projectTaskLine = (task: Task): string => {
+  const outcome = task.closed === null ? "" : ` — ${task.closed.outcome}`;
+  return `- ${box(!isOpen(task))} ${task.title} (${task.id})${outcome}`;
+};
+
 const projectDocument = (scope: Scope, project: Project): Rendered => {
   const tasks = Object.values(scope.state.tasks.byId)
     .filter((task) => task.projectId === project.id)
@@ -161,10 +185,7 @@ const projectDocument = (scope: Scope, project: Project): Rendered => {
     ...(project.description === null ? [] : ["", project.description]),
     "",
     "## Tasks",
-    ...tasks.map(
-      (task) =>
-        `- ${isOpen(task) ? "[ ]" : "[x]"} ${task.title} (${task.id})${task.closed === null ? "" : ` — ${task.closed.outcome}`}`,
-    ),
+    ...tasks.map((task) => projectTaskLine(task)),
   ].join("\n");
   const metadata = {
     archived: project.archived,

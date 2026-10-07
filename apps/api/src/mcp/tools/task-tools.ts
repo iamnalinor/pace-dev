@@ -15,8 +15,8 @@ import {
   zonedPayload,
 } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { describeRow, rowOf, TaskRowSchema } from "../rows.ts";
-import { runWrite, stamp, WRITE_OUTPUT } from "../tool-kit.ts";
+import { describeRow, labelOf, rowOf, TaskRowSchema } from "../rows.ts";
+import { runWrite, stamp, type When, WRITE_OUTPUT } from "../tool-kit.ts";
 
 const WRITE = { destructiveHint: false, idempotentHint: false, readOnlyHint: false };
 
@@ -31,7 +31,7 @@ const ZONED_INPUT = {
 
 const DEFAULT_PRESET = "personal";
 
-export const createTask = defineTool({
+export const taskCreation = defineTool({
   annotations: WRITE,
   description:
     "Creates a task. presetId picks the behaviour (hw: numbered problems submitted per problem; work: progress slider, ticket; personal (default); deferred: someday) — see list_presets for the user's own course presets. A project is attached by id or by name (a new name creates the project). Subtasks are labels ('3', '4', 'read chapter 2') or { label, number }; a bare number label becomes the problem number. dueAt needs its zone (dueTz, default the account zone). Returns the task as it appears on Now. Set dryRun to preview.",
@@ -150,6 +150,52 @@ type UpdateArgs = {
 const hasFieldChange = (args: UpdateArgs): boolean =>
   [args.title, args.description, args.dueAt, args.startAt].some((value) => value !== undefined);
 
+/** The `task.updated` for the plain fields, when any was given. */
+const fieldEvents = (args: UpdateArgs, when: When, zone: string): readonly EventInput[] =>
+  hasFieldChange(args)
+    ? [
+        stamp(when, {
+          payload: {
+            ...zonedPayload(args, zone),
+            description: args.description,
+            taskId: args.taskId,
+            title: args.title?.trim(),
+          },
+          type: "task.updated",
+        }),
+      ]
+    : [];
+
+type ProjectChange = {
+  readonly current: null | string;
+  readonly next: string | undefined;
+};
+
+/** Estimate, preset and project each have their own event; only the given ones are emitted. */
+const settingEvents = (
+  args: UpdateArgs,
+  when: When,
+  project: ProjectChange,
+): readonly EventInput[] => {
+  const { taskId } = args;
+  return [
+    ...(args.estimateMinutes === undefined
+      ? []
+      : [
+          stamp(when, {
+            payload: { estimateMinutes: args.estimateMinutes, taskId },
+            type: "task.estimate.set",
+          }),
+        ]),
+    ...(args.presetId === undefined
+      ? []
+      : [stamp(when, { payload: { presetId: args.presetId, taskId }, type: "task.preset.set" })]),
+    ...(project.next === undefined || project.next === project.current
+      ? []
+      : [stamp(when, { payload: { projectId: project.next, taskId }, type: "task.project.set" })]),
+  ];
+};
+
 export const updateTask = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
   description:
@@ -166,58 +212,18 @@ export const updateTask = defineTool({
           return project;
         }
         const zone = task.value.dueTz ?? accountTz(scope.state, scope.qctx);
-        const taskId = args.taskId;
-        const events: readonly EventInput[] = [
+        return ok([
           ...project.value.events,
-          ...(hasFieldChange(args)
-            ? [
-                stamp(when, {
-                  payload: {
-                    ...zonedPayload(args, zone),
-                    description: args.description,
-                    taskId,
-                    title: args.title?.trim(),
-                  },
-                  type: "task.updated",
-                }),
-              ]
-            : []),
-          ...(args.estimateMinutes === undefined
-            ? []
-            : [
-                stamp(when, {
-                  payload: { estimateMinutes: args.estimateMinutes, taskId },
-                  type: "task.estimate.set",
-                }),
-              ]),
-          ...(args.presetId === undefined
-            ? []
-            : [
-                stamp(when, {
-                  payload: { presetId: args.presetId, taskId },
-                  type: "task.preset.set",
-                }),
-              ]),
-          ...(project.value.projectId === undefined ||
-          project.value.projectId === task.value.projectId
-            ? []
-            : [
-                stamp(when, {
-                  payload: { projectId: project.value.projectId, taskId },
-                  type: "task.project.set",
-                }),
-              ]),
-        ];
-        return ok(events);
+          ...fieldEvents(args, when, zone),
+          ...settingEvents(args, when, { current: task.value.projectId, next: project.value.projectId }),
+        ]);
       },
       render: (scope, events) => {
         const row = rowOf(scope, args.taskId);
+        const label = labelOf(row, args.taskId);
         return {
           structured: { task: row, taskId: args.taskId },
-          summary:
-            events.length === 0
-              ? "Nothing to change."
-              : `Updated ${row === null ? args.taskId : describeRow(row)}.`,
+          summary: events.length === 0 ? "Nothing to change." : `Updated ${label}.`,
         };
       },
     }),

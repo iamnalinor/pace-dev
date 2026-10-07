@@ -7,8 +7,8 @@ import { isAllowed } from "../shared/telegram-identity.ts";
 import { readGrant } from "./grant.ts";
 import { registerTools, type Tool, type ToolContext } from "./registry.ts";
 import { reviewAction, revokeEvent } from "./tools/correction-tools.ts";
-import { addSubtasks, setImportance, setRank, setStatus } from "./tools/edit-tools.ts";
-import { getTask } from "./tools/get-task.ts";
+import { importanceTool, rankTool, statusTool, subtasksTool } from "./tools/edit-tools.ts";
+import { taskTool } from "./tools/get-task.ts";
 import {
   listInbox,
   listNow,
@@ -19,13 +19,13 @@ import {
 } from "./tools/list-tools.ts";
 import {
   archivePreset,
-  createPreset,
+  presetCreation,
   seedExamplePresets,
   updatePreset,
 } from "./tools/preset-tools.ts";
 import { closeTask, markSubtasks, reopen, submit } from "./tools/progress-tools.ts";
 import { fetchDocument, search } from "./tools/search-tools.ts";
-import { captureInbox, createTask, updateTask } from "./tools/task-tools.ts";
+import { captureInbox, taskCreation, updateTask } from "./tools/task-tools.ts";
 import { whoami } from "./tools/whoami.ts";
 
 const SERVER_INFO = { name: "pace", version: "0.1.0" };
@@ -42,7 +42,7 @@ const INSTRUCTIONS = [
 export const TOOLS: readonly Tool[] = [
   whoami,
   listNow,
-  getTask,
+  taskTool,
   listProjects,
   listProjectTasks,
   listPresets,
@@ -50,21 +50,21 @@ export const TOOLS: readonly Tool[] = [
   listReview,
   search,
   fetchDocument,
-  createTask,
+  taskCreation,
   captureInbox,
   markSubtasks,
   submit,
   closeTask,
   reopen,
   updateTask,
-  setImportance,
-  setStatus,
-  setRank,
-  addSubtasks,
+  importanceTool,
+  statusTool,
+  rankTool,
+  subtasksTool,
   revokeEvent,
   reviewAction,
   seedExamplePresets,
-  createPreset,
+  presetCreation,
   updatePreset,
   archivePreset,
 ];

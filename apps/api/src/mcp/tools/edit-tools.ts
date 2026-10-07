@@ -20,7 +20,7 @@ import {
   WRITE_INPUT,
 } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { describeRow, effectiveImportance, rowOf, TaskRowSchema } from "../rows.ts";
+import { effectiveImportance, labelOf, rowOf, TaskRowSchema } from "../rows.ts";
 import {
   type Rendered,
   runWrite,
@@ -40,11 +40,11 @@ const renderTask =
     const row = rowOf(scope, taskId);
     return {
       structured: { task: row, taskId },
-      summary: `${verb} ${row === null ? taskId : describeRow(row)}.`,
+      summary: `${verb} ${labelOf(row, taskId)}.`,
     };
   };
 
-export const setImportance = defineTool({
+export const importanceTool = defineTool({
   annotations: SETTER,
   description:
     "Sets a task's importance: asap (wants to be done today), prioritized (within about three days of being set), normal, nice_to_have. Setting it again restarts the prioritized horizon.",
@@ -70,7 +70,7 @@ export const setImportance = defineTool({
   title: "Set importance",
 });
 
-export const setStatus = defineTool({
+export const statusTool = defineTool({
   annotations: SETTER,
   description:
     "Sets a task's status: in_progress, paused, waiting (on someone else: its urgency freezes and the waiting time is counted) or not_started. Work on subtasks moves a task to in_progress by itself; use this for pauses and waiting.",
@@ -130,7 +130,7 @@ const reorder = (
   return ok([...others.slice(0, index), target, ...others.slice(index)]);
 };
 
-export const setRank = defineTool({
+export const rankTool = defineTool({
   annotations: SETTER,
   description:
     "Moves a task to a 1-based position among the open tasks of its importance category (asap, prioritized, normal or nice_to_have) and renumbers the whole category, as dragging on the Now list does. The rank adds a small bonus to the score, so it only orders tasks whose urgency is close. Returns the resulting order of ids.",
@@ -178,7 +178,7 @@ export const setRank = defineTool({
 
 const AddedSchema = z.object({ id: z.string(), label: z.string(), number: z.int().nullable() });
 
-export const addSubtasks = defineTool({
+export const subtasksTool = defineTool({
   annotations: { destructiveHint: false, idempotentHint: false, readOnlyHint: false },
   description:
     "Appends subtasks (problems, steps) to a task: labels like '5', '6' or 'write the intro', or { label, number }. A bare number label becomes the problem number. Returns the new subtasks with their ids for mark_subtasks.",
@@ -208,7 +208,7 @@ export const addSubtasks = defineTool({
             task: row,
             taskId: args.taskId,
           },
-          summary: `Added ${subtasks.length} subtask(s) to ${row === null ? args.taskId : describeRow(row)}.`,
+          summary: `Added ${subtasks.length} subtask(s) to ${labelOf(row, args.taskId)}.`,
         };
       },
     });

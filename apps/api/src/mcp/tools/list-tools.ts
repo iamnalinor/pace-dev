@@ -1,9 +1,11 @@
 import { z } from "zod";
 
 import {
+  err,
   inboxList,
   nowList,
   ok,
+  type Preset,
   projectView,
   resolvePreset,
   reviewItems,
@@ -19,8 +21,9 @@ import {
   rowFromItem,
   TaskRowSchema,
   taskUrl,
+  thenBy,
 } from "../rows.ts";
-import { runRead } from "../tool-kit.ts";
+import { describeCode, runRead } from "../tool-kit.ts";
 
 const READ_ONLY = { destructiveHint: false, idempotentHint: true, readOnlyHint: true };
 
@@ -64,7 +67,9 @@ export const listProjects = defineTool({
   handler: async (_args, ctx) =>
     await runRead(ctx, (scope) => {
       const projects = Object.values(scope.state.projects.byId)
-        .toSorted((a, b) => Number(a.archived) - Number(b.archived) || a.name.localeCompare(b.name))
+        .toSorted((a, b) =>
+          thenBy(Number(a.archived) - Number(b.archived), () => a.name.localeCompare(b.name)),
+        )
         .map((project) => projectRow(scope, project));
       return ok({
         structured: { projects },
@@ -119,7 +124,7 @@ export const listProjectTasks = defineTool({
       }
       const view = projectView(scope.state, projectId.value, scope.qctx);
       if (!view.ok) {
-        return view.ok ? view : { ok: false, error: { code: view.error, message: view.error } };
+        return err({ code: view.error, message: describeCode(view.error) });
       }
       const { project, stats } = view.value;
       const open = view.value.open.map((item) => rowFromItem(scope, item));
@@ -162,6 +167,12 @@ export const listProjectTasks = defineTool({
   title: "Project tasks",
 });
 
+const presetLine = (preset: Preset): string => {
+  const parent = preset.builtIn ? " (built-in)" : ` extends ${preset.extends ?? "?"}`;
+  const archived = preset.archived ? " (archived)" : "";
+  return `- ${preset.id}: ${preset.name}${parent}${archived}`;
+};
+
 const PresetSchema = z.object({
   archived: z.boolean(),
   builtIn: z.boolean(),
@@ -185,19 +196,16 @@ export const listPresets = defineTool({
   handler: async (_args, ctx) =>
     await runRead(ctx, (scope) => {
       const presets = Object.values(scope.state.presets.byId)
-        .toSorted((a, b) => Number(b.builtIn) - Number(a.builtIn) || a.id.localeCompare(b.id))
+        .toSorted((a, b) =>
+          thenBy(Number(b.builtIn) - Number(a.builtIn), () => a.id.localeCompare(b.id)),
+        )
         .map((preset) => {
           const resolved = resolvePreset(scope.state.presets, preset.id);
           return { ...preset, resolved: resolved.ok ? resolved.value : null };
         });
       return ok({
         structured: { presets },
-        summary: presets
-          .map(
-            (preset) =>
-              `- ${preset.id}: ${preset.name}${preset.builtIn ? " (built-in)" : ` extends ${preset.extends ?? "?"}`}${preset.archived ? " (archived)" : ""}`,
-          )
-          .join("\n"),
+        summary: presets.map((preset) => presetLine(preset)).join("\n"),
       });
     }),
   input: {},

@@ -2,6 +2,8 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
+
 import { type EventInput, newId } from "@pace/core";
 
 import type { UserStore } from "../src/user-store/user-store.ts";
@@ -197,11 +199,11 @@ describe("derive", () => {
         payload: { outcome: "skipped", reason: "not-assigned" },
       });
       const rows = await instance.db.select().from(schema.tasks);
-      expect(rows.map((row) => [row.id, row.outcome, row.closedAt]).toSorted()).toEqual(
+      expect(rows.map((row) => [row.id, row.outcome, row.closedAt]).toSorted(byText)).toEqual(
         [
           [taskId, "cancelled_missed", "2026-10-01T00:00:00.000Z"],
           ["hw:hw:2026-W39", "skipped", "2026-10-02T00:00:00.000Z"],
-        ].toSorted(),
+        ].toSorted(byText),
       );
     });
   });

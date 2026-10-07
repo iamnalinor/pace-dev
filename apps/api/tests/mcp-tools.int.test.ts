@@ -1,6 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
+
 import { newId } from "@pace/core";
 
 import { TOOLS } from "../src/mcp/server.ts";
@@ -43,7 +45,9 @@ const okTool = async (
   args: Record<string, unknown> = {},
 ): Promise<Row> => {
   const result = await callTool(token, name, args);
-  expect(result.isError, result.content[0]?.text).toBeUndefined();
+  if (result.isError === true) {
+    throw new Error(`${name} failed: ${result.content[0]?.text ?? ""}`);
+  }
   return result.structuredContent ?? {};
 };
 
@@ -72,8 +76,8 @@ describe("MCP tools catalogue", () => {
   it("lists every tool with annotations, a title and an LLM-facing description", async () => {
     const token = await readWriteToken();
     const { tools } = await mcpResult<{ tools: Listed[] }>(token, "tools/list");
-    const names = tools.map((tool) => tool.name).toSorted();
-    expect(names).toEqual(TOOLS.map((tool) => tool.name).toSorted());
+    const names = tools.map((tool) => tool.name).toSorted(byText);
+    expect(names).toEqual(TOOLS.map((tool) => tool.name).toSorted(byText));
     expect(names).toEqual(
       expect.arrayContaining([
         "whoami",
@@ -105,15 +109,15 @@ describe("MCP tools catalogue", () => {
         "archive_preset",
       ]),
     );
+    const scopeOf = (name: string) => TOOLS.find((item) => item.name === name)?.scope;
     for (const tool of tools) {
-      const definition = TOOLS.find((item) => item.name === tool.name);
-      expect(tool.annotations?.readOnlyHint).toBe(definition?.scope === "tasks:read");
+      expect(tool.annotations?.readOnlyHint).toBe(scopeOf(tool.name) === "tasks:read");
       expect(tool.description?.length ?? 0).toBeGreaterThan(40);
-      if (definition?.scope === "tasks:write") {
-        expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(
-          expect.arrayContaining(["at", "precision", "dryRun"]),
-        );
-      }
+    }
+    for (const tool of tools.filter((item) => scopeOf(item.name) === "tasks:write")) {
+      expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(
+        expect.arrayContaining(["at", "precision", "dryRun"]),
+      );
     }
   });
 });
@@ -184,7 +188,7 @@ describe("create_task", () => {
     expect(
       rows(view["open"])
         .map((row) => row["title"])
-        .toSorted(),
+        .toSorted(byText),
     ).toEqual(["HW 1", "HW 2"]);
     expect(view["stats"]).toMatchObject({ open: 2 });
   });
@@ -318,7 +322,7 @@ describe("editing", () => {
     expect(
       rows(updated["events"])
         .map((event) => event["type"])
-        .toSorted(),
+        .toSorted(byText),
     ).toEqual([
       "project.created",
       "task.estimate.set",
@@ -484,7 +488,7 @@ describe("search and fetch", () => {
     });
     const other = await createTask(token, { projectName: "Work", title: "Unrelated" });
     const found = rows((await okTool(token, "search", { query: "алгебр" }))["results"]);
-    expect(found.map((row) => row["id"]).toSorted()).not.toContain(other);
+    expect(found.map((row) => row["id"]).toSorted(byText)).not.toContain(other);
     expect(found.find((row) => row["id"] === taskId)).toMatchObject({
       title: "ДЗ по алгебре",
       url: `${env.WEB_ORIGIN}/task/${taskId}`,

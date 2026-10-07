@@ -66,7 +66,8 @@ export const canApplyInOrder = (current: Materialized, fresh: readonly Event[]):
   const [first] = sortEvents(fresh);
   return (
     first === undefined ||
-    (!shouldRematerialize(current.lastAppliedOccurredAt, first) && !fresh.some(isCorrection))
+    (!shouldRematerialize(current.lastAppliedOccurredAt, first) &&
+      !fresh.some((event) => isCorrection(event)))
   );
 };
 
@@ -98,35 +99,27 @@ export type Touched = {
 
 type Entity = readonly [keyof Touched, string];
 
-/** The entity an event is about; settings and corrections name none. */
+/**
+The entity an event is about, told apart by the payload keys: every task and focus event
+carries `taskId`, project events `projectId` (checked after the task events, which may
+carry one too), preset events `id`. Settings and corrections name none.
+*/
 const entityOf = (event: Event): Entity | undefined => {
-  switch (event.type) {
-    case "project.created":
-    case "project.updated": {
-      return ["projectIds", event.payload.projectId];
-    }
-    case "preset.created":
-    case "preset.updated":
-    case "preset.archived": {
-      return ["presetIds", event.payload.id];
-    }
-    case "settings.updated":
-    case "event.amended":
-    case "event.revoked": {
-      return undefined;
-    }
-    default: {
-      return ["taskIds", event.payload.taskId];
-    }
+  if ("taskId" in event.payload) {
+    return ["taskIds", event.payload.taskId];
   }
+  if ("projectId" in event.payload) {
+    return ["projectIds", event.payload.projectId];
+  }
+  return "id" in event.payload ? ["presetIds", event.payload.id] : undefined;
 };
 
 const idsOf = (events: readonly Event[], key: keyof Touched): ReadonlySet<string> =>
   new Set(
-    events.flatMap((event) => {
-      const entity = entityOf(event);
-      return entity?.[0] === key ? [entity[1]] : [];
-    }),
+    events
+      .map((event) => entityOf(event))
+      .filter((entity): entity is Entity => entity !== undefined && entity[0] === key)
+      .map((entity) => entity[1]),
   );
 
 /** Corrections name no entity: they force a rebuild, which rewrites every row anyway. */
@@ -194,7 +187,7 @@ export const prepareBatch = (
 
 const toRpcTask = (task: Task): RpcTask => {
   const overrides = task.overrides === null ? null : parsePresetDefinition(task.overrides);
-  return { ...task, overrides: overrides?.ok ? overrides.value : null };
+  return { ...task, overrides: overrides !== null && overrides.ok ? overrides.value : null };
 };
 
 /** The state as it crosses RPC: overrides validated into their typed shape (see `RpcState`). */

@@ -14,7 +14,7 @@ import {
 
 import { requireTask, TASK_ID, WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
-import { describeRow, rowOf, TaskRowSchema } from "../rows.ts";
+import { labelOf, rowOf, TaskRowSchema } from "../rows.ts";
 import {
   describeCode,
   type Rendered,
@@ -22,6 +22,7 @@ import {
   type Scope,
   stamp,
   type ToolFailure,
+  type When,
   WRITE_OUTPUT,
 } from "../tool-kit.ts";
 
@@ -33,7 +34,7 @@ const renderTask =
     const row = rowOf(scope, taskId);
     return {
       structured: { ...extra, task: row, taskId },
-      summary: `${verb} ${row === null ? taskId : describeRow(row)}.`,
+      summary: `${verb} ${labelOf(row, taskId)}.`,
     };
   };
 
@@ -142,11 +143,15 @@ type Submission = {
 Per-subtask presets send the solved, unsubmitted problems (or the ones named) and close
 the task when none remain unsubmitted; whole-submission presets submit and close at once.
 */
+type SubmitRequest = {
+  readonly ids: readonly string[] | undefined;
+  readonly when: When;
+};
+
 const submission = (
   state: CoreState,
   task: Task,
-  ids: readonly string[] | undefined,
-  when: Parameters<typeof stamp>[0],
+  { ids, when }: SubmitRequest,
 ): Result<Submission, ToolFailure> => {
   const preset = resolvePreset(state.presets, task.presetId, task.overrides ?? undefined);
   if (!preset.ok) {
@@ -190,7 +195,7 @@ export const submit = defineTool({
         if (!task.ok) {
           return task;
         }
-        const built = submission(scope.state, task.value, args.subtaskIds, when);
+        const built = submission(scope.state, task.value, { ids: args.subtaskIds, when });
         if (!built.ok) {
           return built;
         }
@@ -200,6 +205,7 @@ export const submit = defineTool({
       render: (scope) => {
         const row = rowOf(scope, args.taskId);
         const isClosed = taskById(scope.state.tasks, args.taskId)?.closed !== null;
+        const what = sent.length === 0 ? "the task" : `${sent.length} subtask(s)`;
         return {
           structured: {
             closed: isClosed,
@@ -207,7 +213,7 @@ export const submit = defineTool({
             task: row,
             taskId: args.taskId,
           },
-          summary: `Submitted ${sent.length === 0 ? "the task" : `${sent.length} subtask(s)`}${isClosed ? " and closed" : ""}: ${row === null ? args.taskId : describeRow(row)}.`,
+          summary: `Submitted ${what}${isClosed ? " and closed" : ""}: ${labelOf(row, args.taskId)}.`,
         };
       },
     });

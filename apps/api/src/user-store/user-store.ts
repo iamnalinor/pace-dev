@@ -113,9 +113,9 @@ storage. The state is cached in memory with the log sequence it was built at and
 rebuilt when the cache is stale or a batch cannot be applied in order.
 */
 export class UserStore extends DurableObject {
-  readonly db: Db;
-
   #cache: Materialized | undefined;
+
+  readonly db: Db;
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
@@ -221,7 +221,7 @@ export class UserStore extends DurableObject {
     await this.derive(meta.now);
     const current = await this.#current();
     return ok({
-      events: inserted.map(toStored),
+      events: inserted.map((event) => toStored(event)),
       state: toRpcState(current.state),
       seq: current.seq,
     });
@@ -234,7 +234,10 @@ export class UserStore extends DurableObject {
   ): Promise<Result<DryRunResult, ApplyError>> {
     const prepared = prepareBatch(await this.#current(), inputs, meta);
     return prepared.ok
-      ? ok({ events: prepared.value.events.map(toStored), state: toRpcState(prepared.value.state) })
+      ? ok({
+          events: prepared.value.events.map((event) => toStored(event)),
+          state: toRpcState(prepared.value.state),
+        })
       : prepared;
   }
 
@@ -274,16 +277,11 @@ export class UserStore extends DurableObject {
     return rebuilt;
   }
 
-  /**
-  The one write path: inserts what is new (known ids are skipped), then folds the new
-  events into the cache and the projections, incrementally when the batch is in order
-  and from scratch otherwise.
-  */
-  async #insert(events: readonly Event[]): Promise<readonly Event[]> {
-    const before = await this.#current();
+  /** Inserts the events whose id is new to the log (and to this batch), in order. */
+  async #insertNew(events: readonly Event[], known: ReadonlySet<string>): Promise<readonly Event[]> {
     const inserted: Event[] = [];
     for (const event of events) {
-      if (before.ids.has(event.id) || inserted.some((known) => known.id === event.id)) {
+      if (known.has(event.id) || inserted.some((seen) => seen.id === event.id)) {
         continue;
       }
       await this.db
@@ -292,6 +290,17 @@ export class UserStore extends DurableObject {
         .onConflictDoNothing({ target: schema.events.id });
       inserted.push(event);
     }
+    return inserted;
+  }
+
+  /**
+  The one write path: inserts what is new (known ids are skipped), then folds the new
+  events into the cache and the projections, incrementally when the batch is in order
+  and from scratch otherwise.
+  */
+  async #insert(events: readonly Event[]): Promise<readonly Event[]> {
+    const before = await this.#current();
+    const inserted = await this.#insertNew(events, before.ids);
     if (inserted.length === 0) {
       return inserted;
     }

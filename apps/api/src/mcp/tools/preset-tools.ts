@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   err,
+  type EventInput,
   exampleCoursePresetEvents,
   ok,
   presetById,
@@ -23,6 +24,13 @@ const DEFINITION = z
 
 const presetFailure = (code: PresetValidationError) => err({ code, message: describeCode(code) });
 
+type PresetCreated = Extract<EventInput, { readonly type: "preset.created" }>;
+
+const isPresetCreated = (event: EventInput): event is PresetCreated =>
+  event.type === "preset.created";
+
+const names = (ids: readonly string[]): string => (ids.length === 0 ? "nothing" : ids.join(", "));
+
 export const seedExamplePresets = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
   description:
@@ -31,23 +39,21 @@ export const seedExamplePresets = defineTool({
     const created: string[] = [];
     const skipped: string[] = [];
     return await runWrite(ctx, args, {
-      build: (scope, when) =>
-        ok(
-          exampleCoursePresetEvents(when.at).flatMap((event) => {
-            if (event.type !== "preset.created") {
-              return [];
-            }
-            if (presetById(scope.state.presets, event.payload.id) !== undefined) {
-              skipped.push(event.payload.id);
-              return [];
-            }
-            created.push(event.payload.id);
-            return [{ ...event, precision: when.precision, source: "mcp" as const }];
-          }),
-        ),
+      build: (scope, when) => {
+        const seeds = exampleCoursePresetEvents(when.at).filter((event) => isPresetCreated(event));
+        for (const seed of seeds) {
+          const list = presetById(scope.state.presets, seed.payload.id) === undefined ? created : skipped;
+          list.push(seed.payload.id);
+        }
+        return ok(
+          seeds
+            .filter((seed) => created.includes(seed.payload.id))
+            .map((seed) => ({ ...seed, precision: when.precision, source: "mcp" as const })),
+        );
+      },
       render: () => ({
         structured: { created, skipped },
-        summary: `Created ${created.join(", ") || "nothing"}; skipped ${skipped.join(", ") || "nothing"}.`,
+        summary: `Created ${names(created)}; skipped ${names(skipped)}.`,
       }),
     });
   },
@@ -58,7 +64,7 @@ export const seedExamplePresets = defineTool({
   title: "Seed example presets",
 });
 
-export const createPreset = defineTool({
+export const presetCreation = defineTool({
   annotations: { destructiveHint: false, idempotentHint: false, readOnlyHint: false },
   description:
     "Creates a user preset that extends a built-in (hw, work, personal, deferred) or another user preset; the definition holds only what it changes (a course: a recurrence and maybe a resubmission deadline policy). Validated: unknown keys, cycles and built-in ids are refused with the code.",

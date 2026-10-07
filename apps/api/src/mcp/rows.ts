@@ -182,7 +182,16 @@ export const projectRow = (scope: Scope, project: Project): ProjectRow => ({
 
 /** One line per task for text summaries. */
 export const describeRow = (row: TaskRow): string => {
-  const due = row.dueAt === null ? "" : `, due ${row.dueAt}${row.isLate ? " (late)" : ""}`;
+  const late = row.isLate ? " (late)" : "";
+  const due = row.dueAt === null ? "" : `, due ${row.dueAt}${late}`;
   const progress = row.total > 0 ? `, ${row.solved}/${row.total} solved` : "";
   return `${row.title} [${row.id}] (${row.importance}, ${row.presetName}${due}${progress})`;
 };
+
+/** The row's line, or the bare id when the task cannot be rendered. */
+export const labelOf = (row: null | TaskRow, taskId: string): string =>
+  row === null ? taskId : describeRow(row);
+
+/** Chains comparators: the next key decides only when the first one ties. */
+export const thenBy = (first: number, next: () => number): number =>
+  first === 0 ? next() : first;

@@ -46,7 +46,7 @@ const SubmitPreviewSchema = z.object({
   subtaskIds: z.array(z.string()).optional(),
 });
 
-export const getTask = defineTool({
+export const taskTool = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
     "Everything about one task: its fields, subtasks with solved/submitted marks, the closure and derived outcome, progress, how much of its time window has elapsed, the work left, the 'why it is ranked here' explanation (policy, formula, inputs, steps) and what submit would do next. Use it before mark_subtasks (to learn subtask ids and numbers), before submit, or to answer questions about a task's deadline and urgency.",

@@ -89,7 +89,8 @@ const insertChunked = async <T extends object>(
   insert: Insert<T>,
 ): Promise<void> => {
   const columns = Math.max(1, Object.keys(rows[0] ?? {}).length);
-  for (const chunk of chunks(rows, Math.max(1, Math.floor(MAX_PARAMETERS / columns)))) {
+  const batches = chunks(rows, Math.max(1, Math.floor(MAX_PARAMETERS / columns)));
+  for (const chunk of batches) {
     await insert([...chunk]);
   }
 };
@@ -97,7 +98,8 @@ const insertChunked = async <T extends object>(
 type Remove = (ids: string[]) => Promise<unknown>;
 
 const deleteChunked = async (ids: ReadonlySet<string>, remove: Remove): Promise<void> => {
-  for (const chunk of chunks([...ids], MAX_PARAMETERS)) {
+  const batches = chunks([...ids], MAX_PARAMETERS);
+  for (const chunk of batches) {
     await remove([...chunk]);
   }
 };
@@ -116,9 +118,9 @@ export const rewriteProjections = async (db: Db, state: CoreState): Promise<void
   const rows = taskRows(state, Object.values(state.tasks.byId));
   await insertChunked(rows.tasks, (chunk) => db.insert(schema.tasks).values(chunk));
   await insertChunked(rows.subtasks, (chunk) => db.insert(schema.subtasks).values(chunk));
-  const projects = Object.values(state.projects.byId).map(projectRow);
+  const projects = Object.values(state.projects.byId).map((project) => projectRow(project));
   await insertChunked(projects, (chunk) => db.insert(schema.projects).values(chunk));
-  const presets = Object.values(state.presets.byId).map(presetRow);
+  const presets = Object.values(state.presets.byId).map((preset) => presetRow(preset));
   await insertChunked(presets, (chunk) => db.insert(schema.presets).values(chunk));
 };
 
@@ -151,7 +153,7 @@ const updateProjects = async (
   await deleteChunked(ids, (list) =>
     db.delete(schema.projects).where(inArray(schema.projects.id, list)),
   );
-  const rows = present(state.projects.byId, ids).map(projectRow);
+  const rows = present(state.projects.byId, ids).map((project) => projectRow(project));
   await insertChunked(rows, (chunk) => db.insert(schema.projects).values(chunk));
 };
 
@@ -162,7 +164,7 @@ const updatePresets = async (db: Db, state: CoreState, ids: ReadonlySet<string>)
   await deleteChunked(ids, (list) =>
     db.delete(schema.presets).where(inArray(schema.presets.id, list)),
   );
-  const rows = present(state.presets.byId, ids).map(presetRow);
+  const rows = present(state.presets.byId, ids).map((preset) => presetRow(preset));
   await insertChunked(rows, (chunk) => db.insert(schema.presets).values(chunk));
 };
 
