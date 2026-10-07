@@ -29,11 +29,16 @@ const markShapes = ({ accent, fg, track }: Palette): string =>
     `<circle cx="106" cy="60" r="8" fill="${fg}"/>`,
   ].join("\n  ");
 
-/** The favicon's chevrons in a 120x120 tile (no <svg> wrapper, no tile). */
+/**
+ * The favicon's chevrons in a 120x120 tile (no <svg> wrapper, no tile). Two chevrons carry
+ * their weight on the left, so a geometrically centred pair reads as shifted left: the pair
+ * is drawn 5 units to the right of centre (optical centring) and 10% smaller, which keeps the
+ * right tip inside the maskable safe zone (a 48-unit circle) after the shift.
+ */
 const faviconShapes = ({ accent, track }: Palette): string =>
   [
-    `<path d="M22 26 L56 60 L22 94" ${STROKE} stroke="${track}" stroke-width="20"/>`,
-    `<path d="M64 26 L98 60 L64 94" ${STROKE} stroke="${accent}" stroke-width="20"/>`,
+    `<path d="M30.8 29.4 L61.4 60 L30.8 90.6" ${STROKE} stroke="${track}" stroke-width="18"/>`,
+    `<path d="M68.6 29.4 L99.2 60 L68.6 90.6" ${STROKE} stroke="${accent}" stroke-width="18"/>`,
   ].join("\n  ");
 
 const svg = (viewBox: number, body: string): string =>
