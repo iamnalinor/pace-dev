@@ -13,14 +13,11 @@ const setup = () => {
 };
 
 describe("TimezoneControl", () => {
-  it("offers the device zone when the account has none, then shows it as set", async () => {
-    const { services, user } = setup();
-    expect(await screen.findByText(`This device: ${MOSCOW}`)).toBeInTheDocument();
-    expect(screen.getByText("Not set yet")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: `Use ${MOSCOW} for the account` }));
+  it("shows the device zone as the account zone while the account has none", async () => {
+    setup();
     expect(await screen.findByText(`Account: ${MOSCOW}`)).toBeInTheDocument();
+    expect(screen.queryByText("Not set yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(services.state.store.getState().settings.timezone).toBe(MOSCOW);
   });
 
   it("offers a switch when the account zone differs from the device", async () => {

@@ -73,7 +73,6 @@ export const en = {
 
   "settings.title": "Settings",
   "settings.timezone.device": "This device: {tz}",
-  "settings.timezone.unset": "Not set yet",
   "settings.language.en": "English",
   "settings.language.ru": "Русский",
   "settings.theme": "Theme",
@@ -105,6 +104,12 @@ export const en = {
   "errors.notFound": "Not found.",
   "errors.pageNotFound": "Page not found",
   "errors.generic": "Something went wrong",
+  "errors.pageNotFoundBody": "There is nothing at {path}.",
+  "errors.crashTitle": "This screen crashed",
+  "errors.crashBody": "The error below stopped it from rendering. Reloading usually helps; if it keeps happening, the details help fix it.",
+  "errors.httpStatus": "{status} {text}",
+  "errors.details": "Technical details",
+  "errors.reload": "Reload",
   "errors.syncFailed": "Sync failed: {reason}",
 
   "review.title": "To sort",

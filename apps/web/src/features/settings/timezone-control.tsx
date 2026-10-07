@@ -13,18 +13,17 @@ export const TimezoneControl = () => {
   const { timezone } = hooks.useSettings();
   const { now } = hooks.useClock();
   const device = clock.deviceTz;
-  const isOffsetDifferent =
-    timezone !== null && zonesDiffer({ at: now, tz: timezone }, { at: now, tz: device });
+  // Until the first sync assigns one, the account runs on the device zone (queries do too).
+  const account = timezone ?? device;
+  const isOffsetDifferent = zonesDiffer({ at: now, tz: account }, { at: now, tz: device });
   return (
     <div className="grid gap-3 text-sm">
-      <p className="font-mono text-fg2">{t("settings.timezone.device", { tz: device })}</p>
-      <p className="text-muted">
-        {timezone === null
-          ? t("settings.timezone.unset")
-          : t("settings.timezone.account", { tz: timezone })}
-      </p>
+      <p className="font-mono text-fg">{t("settings.timezone.account", { tz: account })}</p>
+      {account !== device && (
+        <p className="text-muted">{t("settings.timezone.device", { tz: device })}</p>
+      )}
       {isOffsetDifferent && <p className="text-warn">{t("settings.timezone.differs")}</p>}
-      {timezone !== device && (
+      {account !== device && (
         <Button
           onClick={() => {
             void actions.setTimezone(device);

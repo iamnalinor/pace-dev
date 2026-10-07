@@ -76,7 +76,6 @@ export const ru: Catalog = {
 
   "settings.title": "Настройки",
   "settings.timezone.device": "Это устройство: {tz}",
-  "settings.timezone.unset": "Пока не задан",
   "settings.language.en": "English",
   "settings.language.ru": "Русский",
   "settings.theme": "Тема",
@@ -108,6 +107,12 @@ export const ru: Catalog = {
   "errors.notFound": "Не найдено.",
   "errors.pageNotFound": "Страница не найдена",
   "errors.generic": "Что-то пошло не так",
+  "errors.pageNotFoundBody": "По адресу {path} ничего нет.",
+  "errors.crashTitle": "Экран упал",
+  "errors.crashBody": "Ошибка ниже не дала ему отрисоваться. Обычно помогает перезагрузка; если повторяется, детали помогут починить.",
+  "errors.httpStatus": "{status} {text}",
+  "errors.details": "Технические детали",
+  "errors.reload": "Перезагрузить",
   "errors.syncFailed": "Синхронизация не удалась: {reason}",
 
   "review.title": "Разобрать",

@@ -93,7 +93,8 @@ const ensured = new WeakSet<PaceServices>();
 
 /**
 Appends this week's homework instances and the automatic outcomes that came due, once per
-page load as soon as someone is signed in and the local log is loaded. The ids are
+page load as soon as someone is signed in and the local log is loaded; then, after a sync,
+gives an account without a time zone the browser's zone. The ids are
 deterministic, so another device doing the same never duplicates them.
 */
 const ensureInstancesOnce = (services: PaceServices): (() => void) => {
@@ -106,6 +107,9 @@ const ensureInstancesOnce = (services: PaceServices): (() => void) => {
     void (async (): Promise<void> => {
       await state.ready;
       await actions.ensureInstances();
+      // After the first pull, so a zone chosen on another device is not overwritten.
+      await services.sync.syncNow();
+      await actions.ensureTimezone();
     })();
   };
   apply(auth.store.getState());

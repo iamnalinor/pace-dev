@@ -578,6 +578,13 @@ describe("review", () => {
 });
 
 describe("settings", () => {
+  it("gives an account without a zone the device zone, once", async () => {
+    const world = await setupActions([]);
+    expect(unwrap(await world.actions.ensureTimezone())).toHaveLength(1);
+    expect(world.state.store.getState().settings.timezone).toBe(MOSCOW);
+    expect(unwrap(await world.actions.ensureTimezone())).toHaveLength(0);
+  });
+
   it("updates the account settings", async () => {
     const world = await setupActions([]);
     unwrap(await world.actions.setLanguage("ru"));
