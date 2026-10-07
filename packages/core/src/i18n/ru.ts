@@ -29,6 +29,10 @@ export const ru: Catalog = {
   "auth.backToLogin": "Назад ко входу",
   "login.botFallback": "Войти через бота",
   "login.botHint": "Откройте бота, нажмите Start и вернитесь сюда.",
+  "login.widgetLoading": "Загружаем кнопку Telegram…",
+  "login.widgetSlow":
+    "Telegram сейчас отвечает медленно. Кнопка появится, когда загрузится; бот работает сразу.",
+  "login.widgetFailed": "Кнопку Telegram загрузить не удалось. Войдите через бота.",
   "login.dev": "Вход для разработки",
   "login.devId": "Telegram id",
   "login.devSubmit": "Войти как dev",

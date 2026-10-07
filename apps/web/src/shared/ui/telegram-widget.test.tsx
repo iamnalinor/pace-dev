@@ -1,19 +1,69 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TelegramWidget } from "./telegram-widget.tsx";
+import { SLOW_AFTER_MS, TelegramWidget } from "./telegram-widget.tsx";
+
+const TEXTS = {
+  failed: "Could not load the Telegram button.",
+  loading: "Loading the Telegram button…",
+  slow: "Telegram is slow to answer.",
+};
+
+const renderWidget = () =>
+  render(
+    <TelegramWidget
+      botUsername="TestBot"
+      label="Continue with Telegram"
+      onAuth={vi.fn()}
+      texts={TEXTS}
+    />,
+  );
+
+/** The real script (not loaded in jsdom) replaces itself with an untitled iframe. */
+const injectFrame = (): HTMLIFrameElement => {
+  const iframe = document.createElement("iframe");
+  iframe.id = "telegram-login-TestBot";
+  screen.getByTestId("telegram-widget").append(iframe);
+  return iframe;
+};
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("TelegramWidget", () => {
-  it("gives the iframe the widget script injects an accessible name", async () => {
-    render(
-      <TelegramWidget botUsername="TestBot" label="Continue with Telegram" onAuth={vi.fn()} />,
-    );
+  it("shows a loading row until the button exists, then names the iframe", async () => {
+    renderWidget();
+    expect(screen.getByRole("status")).toHaveTextContent(TEXTS.loading);
 
-    // The real script (not loaded in jsdom) replaces itself with an untitled iframe.
-    const iframe = document.createElement("iframe");
-    iframe.id = "telegram-login-TestBot";
-    screen.getByTestId("telegram-widget").append(iframe);
+    const iframe = injectFrame();
 
     expect(await screen.findByTitle("Continue with Telegram")).toBe(iframe);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("says so when telegram.org is slow, and stops once the button arrives", async () => {
+    vi.useFakeTimers();
+    renderWidget();
+
+    act(() => {
+      vi.advanceTimersByTime(SLOW_AFTER_MS);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(TEXTS.slow);
+
+    injectFrame();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("reports a script that failed to load", () => {
+    renderWidget();
+    act(() => {
+      screen.getByTestId("telegram-widget-script").dispatchEvent(new Event("error"));
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent(TEXTS.failed);
   });
 });

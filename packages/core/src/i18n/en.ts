@@ -26,6 +26,10 @@ export const en = {
   "auth.backToLogin": "Back to sign-in",
   "login.botFallback": "Log in with the bot instead",
   "login.botHint": "Open the bot, press Start, then come back here.",
+  "login.widgetLoading": "Loading the Telegram button…",
+  "login.widgetSlow":
+    "Telegram is slow to answer right now. The button appears when it loads; the bot works at once.",
+  "login.widgetFailed": "The Telegram button could not load. Use the bot instead.",
   "login.dev": "Dev login",
   "login.devId": "Telegram id",
   "login.devSubmit": "Sign in as dev",

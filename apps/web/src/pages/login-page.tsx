@@ -73,6 +73,11 @@ export const LoginPage = ({ pollIntervalMs = DEFAULT_POLL_MS }: { pollIntervalMs
               }
             })();
           }}
+          texts={{
+            failed: t("login.widgetFailed"),
+            loading: t("login.widgetLoading"),
+            slow: t("login.widgetSlow"),
+          }}
         />
         <BotLogin onError={onError} pollIntervalMs={pollIntervalMs} />
         {error !== null && (

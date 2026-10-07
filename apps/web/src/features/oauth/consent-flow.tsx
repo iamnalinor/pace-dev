@@ -46,6 +46,11 @@ const IdentityStep = ({ consent }: { readonly consent: Consent }) => {
           const name = [payload.first_name, payload.last_name].filter(Boolean).join(" ");
           consent.identify({ kind: "telegram", name, payload });
         }}
+        texts={{
+          failed: t("login.widgetFailed"),
+          loading: t("login.widgetLoading"),
+          slow: t("login.widgetSlow"),
+        }}
       />
       {IS_DEV_LOGIN_ENABLED && (
         <DevIdentity

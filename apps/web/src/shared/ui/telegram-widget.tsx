@@ -1,14 +1,24 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { TelegramLogin } from "@pace/core";
 
 const WIDGET_SRC = "https://telegram.org/js/telegram-widget.js?22";
+/** After this long without the button, say so: telegram.org is slow from some networks. */
+export const SLOW_AFTER_MS = 4000;
+
+type Phase = "failed" | "loading" | "ready" | "slow";
 
 type Props = {
   readonly botUsername: string;
   /** Accessible name for the button iframe the script injects (it ships without one). */
   readonly label: string;
   readonly onAuth: (user: TelegramLogin) => void;
+  /** Copy for the three states before the button is on screen. */
+  readonly texts: {
+    readonly loading: string;
+    readonly slow: string;
+    readonly failed: string;
+  };
 };
 
 /** The official loader tag; the script replaces it with the button iframe. */
@@ -22,14 +32,23 @@ const createWidgetScript = (botUsername: string): HTMLScriptElement => {
   script.dataset["userpic"] = "false";
   script.dataset["requestAccess"] = "write";
   script.dataset["onauth"] = "onTelegramAuth(user)";
+  // Lets tests reach the loader tag without walking the DOM.
+  script.dataset["testid"] = "telegram-widget-script";
   return script;
 };
 
-/** The injected iframe has no title; name it so assistive tech and axe know what it is. */
-const nameFrames = (host: HTMLElement, label: string): (() => void) => {
+/**
+The injected iframe has no title; name it so assistive tech and axe know what it is, and
+tell the caller once a frame is on screen.
+*/
+const watchFrames = (host: HTMLElement, label: string, onFrame: () => void): (() => void) => {
   const apply = (): void => {
-    for (const frame of host.querySelectorAll("iframe")) {
+    const frames = host.querySelectorAll("iframe");
+    for (const frame of frames) {
       frame.title = label;
+    }
+    if (frames.length > 0) {
+      onFrame();
     }
   };
   apply();
@@ -40,13 +59,43 @@ const nameFrames = (host: HTMLElement, label: string): (() => void) => {
   };
 };
 
+const Placeholder = ({ phase, texts }: Pick<Props, "texts"> & { readonly phase: Phase }) => {
+  if (phase === "ready") {
+    return null;
+  }
+  const isFailed = phase === "failed";
+  return (
+    <div
+      className="flex min-h-11 flex-col items-center justify-center gap-1 text-center"
+      role="status"
+    >
+      {isFailed ? (
+        <p className="text-sm text-warn">{texts.failed}</p>
+      ) : (
+        <>
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <span
+              aria-hidden="true"
+              className="size-3.5 animate-spin rounded-full border-2 border-muted border-t-transparent"
+            />
+            {texts.loading}
+          </p>
+          {phase === "slow" && <p className="text-xs text-muted">{texts.slow}</p>}
+        </>
+      )}
+    </div>
+  );
+};
+
 /**
 The official Telegram Login Widget: the script replaces itself with an iframe button and
-calls `window.onTelegramAuth` with the signed payload.
+calls `window.onTelegramAuth` with the signed payload. Until the button exists the slot shows
+a loading row, then a hint when telegram.org is slow, or an error when the script failed.
 */
-export const TelegramWidget = ({ botUsername, label, onAuth }: Props) => {
+export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const onAuthRef = useRef(onAuth);
+  const [phase, setPhase] = useState<Phase>("loading");
 
   useEffect(() => {
     onAuthRef.current = onAuth;
@@ -63,10 +112,21 @@ export const TelegramWidget = ({ botUsername, label, onAuth }: Props) => {
       onAuthRef.current(user);
     };
     const script = createWidgetScript(botUsername);
+    const onScriptError = (): void => {
+      setPhase("failed");
+    };
+    script.addEventListener("error", onScriptError);
     host.append(script);
-    const stopNaming = nameFrames(host, label);
+    const stopWatching = watchFrames(host, label, () => {
+      setPhase("ready");
+    });
+    const slowTimer = setTimeout(() => {
+      setPhase((current) => (current === "loading" ? "slow" : current));
+    }, SLOW_AFTER_MS);
     return () => {
-      stopNaming();
+      clearTimeout(slowTimer);
+      stopWatching();
+      script.removeEventListener("error", onScriptError);
       script.remove();
       // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Telegram widget contract
       globalThis.onTelegramAuth = undefined;
@@ -74,10 +134,13 @@ export const TelegramWidget = ({ botUsername, label, onAuth }: Props) => {
   }, [botUsername, label]);
 
   return (
-    <div
-      className="flex min-h-11 justify-center"
-      data-testid="telegram-widget"
-      ref={containerRef}
-    />
+    <div className="grid gap-2">
+      <Placeholder phase={phase} texts={texts} />
+      <div
+        className={phase === "ready" ? "flex min-h-11 justify-center" : "flex justify-center"}
+        data-testid="telegram-widget"
+        ref={containerRef}
+      />
+    </div>
   );
 };
