@@ -2,12 +2,16 @@ import type { Hono } from "hono";
 
 import { webhookCallback } from "grammy";
 
+import type { ParseProvider } from "../parse/llm.ts";
 import type { AppEnv } from "../shared/app-env.ts";
+import type { Config } from "../shared/config.ts";
 import type { TelegramTransport } from "./telegram-api.ts";
 
+import { findUserIdByTelegramId } from "../auth/users.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
 import { isIpInCidrs } from "../shared/ip.ts";
 import { createLogger } from "../shared/logger.ts";
+import { createAssistant } from "./assistant.ts";
 import { type BotDeps, createBot } from "./bot.ts";
 
 /** What the bot needs from the rest of the Worker; `app.ts` composes it with the auth feature. */
@@ -15,6 +19,7 @@ export type BotRouteDeps = {
   readonly telegramFetch: TelegramTransport;
   readonly isAllowed: (telegramId: string, allowedIds: readonly string[]) => boolean;
   readonly bindLogin: (db: Db) => BotDeps["bindLogin"];
+  readonly parseProviders: (config: Config) => readonly ParseProvider[];
 };
 
 /**
@@ -44,6 +49,12 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
       bindLogin: deps.bindLogin(d1(c.env.DB)),
       botInfo: config.botInfo,
       fetch: deps.telegramFetch,
+      assistant: createAssistant({
+        now: () => new Date().toISOString(),
+        providers: deps.parseProviders(config),
+        storeOf: (userId) => c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId)),
+        userIdOf: async (telegramId) => await findUserIdByTelegramId(d1(c.env.DB), telegramId),
+      }),
       isAllowed: (telegramId) => deps.isAllowed(telegramId, config.allowedTelegramIds),
       token: config.telegramBotToken,
     });

@@ -77,3 +77,9 @@ export type UserStoreApi = {
   ) => Promise<Result<DryRunResult, ApplyError>>;
   readonly find: (id: string) => Promise<StoredEvent | undefined>;
 };
+
+/** What the bot uses besides reading and writing: previews kept until a button is pressed. */
+export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
+  readonly remember: (key: string, value: JsonValue) => Promise<void>;
+  readonly recall: (key: string) => Promise<JsonValue | undefined>;
+};

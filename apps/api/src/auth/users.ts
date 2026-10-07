@@ -61,3 +61,16 @@ export const findUserById = async (db: Db, id: string): Promise<null | User> => 
   const row = await db.query.users.findFirst({ where: eq(users.id, id) });
   return row === undefined ? null : toUser(row);
 };
+
+/** The Pace user behind a Telegram account, if they ever signed in. */
+export const findUserIdByTelegramId = async (
+  db: Db,
+  telegramId: string,
+): Promise<null | string> => {
+  const row = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.telegramId, telegramId))
+    .get();
+  return row?.id ?? null;
+};

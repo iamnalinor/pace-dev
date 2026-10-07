@@ -77,7 +77,12 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
 
   mount(app, endpoints.health, () => ok({ status: "ok" as const }));
   mountAuthRoutes(app);
-  mountBotRoutes(app, { bindLogin: bindBotLogin, isAllowed, telegramFetch: deps.telegramFetch });
+  mountBotRoutes(app, {
+    bindLogin: bindBotLogin,
+    isAllowed,
+    parseProviders: deps.parseProviders,
+    telegramFetch: deps.telegramFetch,
+  });
   mountSyncRoutes(app);
   mountLinkRoutes(app, deps.fetch);
   mountParseRoutes(app, deps.parseProviders);

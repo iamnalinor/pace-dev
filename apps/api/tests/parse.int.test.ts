@@ -32,7 +32,9 @@ describe("POST /api/parse", () => {
       fetch: async () => {
         throw new Error("no network in tests");
       },
-      parseProviders: () => [{ model: fakeParseModel(() => ({ rateLimitedFor: 30 })), name: "groq" }],
+      parseProviders: () => [
+        { model: fakeParseModel(() => ({ rateLimitedFor: 30 })), name: "groq" },
+      ],
       telegramFetch: async () => {
         throw new Error("no network in tests");
       },
@@ -58,6 +60,8 @@ describe("POST /api/parse", () => {
     expect((await json<{ code: string }>("/api/parse", { body: { text: " " }, token })).code).toBe(
       "validation",
     );
-    expect((await json<{ code: string }>("/api/parse", { body: { text: "x" } })).code).toBeDefined();
+    expect(
+      (await json<{ code: string }>("/api/parse", { body: { text: "x" } })).code,
+    ).toBeDefined();
   });
 });

@@ -7,7 +7,11 @@ import { runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
 
 const NOW = Date.parse("2026-10-06T12:00:00.000Z");
-const prompt = buildParsePrompt("купить кабель", { ctx: ctx(), language: "en", state: artboardState() });
+const prompt = buildParsePrompt("купить кабель", {
+  ctx: ctx(),
+  language: "en",
+  state: artboardState(),
+});
 
 describe("buildParsePrompt", () => {
   it("lists categories, projects and open tasks within the token budget", () => {
@@ -22,7 +26,10 @@ describe("buildParsePrompt", () => {
 describe("runParse", () => {
   it("returns the first provider's structured answer", async () => {
     const result = await runParse([{ model: fakeParseModel(echoParse), name: "groq" }], prompt);
-    expect(result).toEqual({ ok: true, value: { provider: "groq", result: echoParse("купить кабель") } });
+    expect(result).toEqual({
+      ok: true,
+      value: { provider: "groq", result: echoParse("купить кабель") },
+    });
   });
 
   it("moves to the next provider when one is rate limited", async () => {

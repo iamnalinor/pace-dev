@@ -308,6 +308,18 @@ export class UserStore extends DurableObject {
       : prepared;
   }
 
+  /** Keeps a small value until it is recalled (a bot preview waiting for its button). */
+  async remember(key: string, value: JsonValue): Promise<void> {
+    await this.ctx.storage.put(`memo:${key}`, value);
+  }
+
+  /** The remembered value, taken out: a second recall finds nothing. */
+  async recall(key: string): Promise<JsonValue | undefined> {
+    const value = await this.ctx.storage.get<JsonValue>(`memo:${key}`);
+    await this.ctx.storage.delete(`memo:${key}`);
+    return value;
+  }
+
   /**
   Appends the system events the state calls for at `now`: the homework instances of
   the current week and the automatic outcomes whose deadline passed. Deterministic ids

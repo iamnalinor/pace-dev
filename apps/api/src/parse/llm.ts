@@ -73,7 +73,9 @@ export const runParse = async (
         output: Output.object({ schema: ParseResultSchema }),
         prompt: prompt.prompt,
         system: prompt.system,
-        ...(provider.providerOptions !== undefined && { providerOptions: provider.providerOptions }),
+        ...(provider.providerOptions !== undefined && {
+          providerOptions: provider.providerOptions,
+        }),
       });
       const parsed = ParseResultSchema.safeParse(answer.output);
       return parsed.success

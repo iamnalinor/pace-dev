@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TelegramTransport } from "../src/bot/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
-import { json, readJson } from "./helpers.ts";
+import { echoParse, fakeParseModel } from "../src/parse/fake-model.ts";
+import { json, loginAsDev, readJson } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -42,7 +43,7 @@ const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<R
     fetch: async () => {
       throw new Error("no network in tests");
     },
-    parseProviders: () => [],
+    parseProviders: () => [{ model: fakeParseModel(echoParse), name: "fake" }],
     telegramFetch,
   }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
@@ -141,5 +142,90 @@ describe("POST /telegram/webhook", () => {
   it("greets a whitelisted user who just opens the bot", async () => {
     await webhook(startUpdate(1002, "/start"));
     expect(sent[0]?.body["text"]).toMatch(/Pace/);
+  });
+});
+
+const textUpdate = (telegramId: number, text: string) => {
+  const update = startUpdate(telegramId, text);
+  const { entities: _entities, ...message } = update.message;
+  return { ...update, message };
+};
+
+const callbackUpdate = (telegramId: number, data: string) => {
+  const updateId = updates.next;
+  updates.next += 1;
+  return {
+    callback_query: {
+      chat_instance: "1",
+      data,
+      from: { first_name: "Ada", id: telegramId, is_bot: false },
+      id: `q${String(updateId)}`,
+      message: {
+        chat: { id: telegramId, type: "private" },
+        date: Math.floor(Date.now() / 1000),
+        message_id: 99,
+        text: "preview",
+      },
+    },
+    update_id: updateId,
+  };
+};
+
+type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
+
+describe("the bot as an assistant", () => {
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("previews a message with buttons and writes the task on Accept", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate(1002, "купить кабель USB-C"));
+    const preview = sent.find((call) => call.method === "sendMessage");
+    expect(preview?.body["text"]).toContain("I read it as:");
+    expect(preview?.body["text"]).toContain("купить кабель USB-C");
+    const keyboard = preview?.body["reply_markup"] as Keyboard;
+    const accept = keyboard.inline_keyboard[0]?.find((button) => button.text === "Accept");
+    expect(accept?.callback_data).toMatch(/^a:/u);
+
+    sent.length = 0;
+    await webhook(callbackUpdate(1002, accept?.callback_data ?? ""));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    expect(sent[1]?.body).toMatchObject({ text: "Done ✓" });
+
+    const pulled = await json<{ events: { type: string; source: string; payload: { title?: string } }[] }>(
+      "/api/sync/pull",
+      { token },
+    );
+    expect(pulled.events).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ title: "купить кабель USB-C" }),
+        source: "bot",
+        type: "task.created",
+      }),
+    );
+
+    sent.length = 0;
+    await webhook(callbackUpdate(1002, accept?.callback_data ?? ""));
+    expect(sent[1]?.body).toMatchObject({ text: "This preview has expired. Send the message again." });
+  });
+
+  it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate(1002, "подумать об отпуске"));
+    const keyboard = sent.find((call) => call.method === "sendMessage")?.body["reply_markup"] as Keyboard;
+    const toInbox = keyboard.inline_keyboard[0]?.find((button) => button.text === "To Inbox");
+    sent.length = 0;
+    await webhook(callbackUpdate(1002, toInbox?.callback_data ?? ""));
+    expect(sent[1]?.body).toMatchObject({ text: "Saved to Inbox." });
+    const pulled = await json<{ events: { payload: { presetId?: string; title?: string } }[] }>(
+      "/api/sync/pull",
+      { token },
+    );
+    expect(pulled.events.at(-1)?.payload).toMatchObject({ presetId: "inbox", title: "подумать об отпуске" });
+
+    sent.length = 0;
+    await webhook(startUpdate(1002, "/now"));
+    expect(sent[0]?.body["text"]).toMatch(/^(Now:|Nothing to do right now\.)/u);
   });
 });
