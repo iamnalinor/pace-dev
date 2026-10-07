@@ -19,8 +19,7 @@ export type SettingsActions = {
 
 export const settingsActions = (deps: ActionDeps): SettingsActions => ({
   ensureTimezone: async () =>
-    deps.state.store.getState().settings.timezone === null &&
-    isValidTimeZone(deps.clock.deviceTz)
+    deps.state.store.getState().settings.timezone === null && isValidTimeZone(deps.clock.deviceTz)
       ? await emit(deps, [
           stamp(deps, { type: "settings.updated", payload: { timezone: deps.clock.deviceTz } }),
         ])

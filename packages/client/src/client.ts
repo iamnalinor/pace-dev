@@ -1,5 +1,6 @@
 /** Public surface of @pace/client: the local-first store, actions, view-models, sync, auth and their ports. */
 export { type Actions, type ActionsOptions, createActions } from "./actions/actions.ts";
+export type { ComposerExtras } from "./actions/composer-actions.ts";
 export type { ActionError, ActionResult, When } from "./actions/deps.ts";
 export {
   defaultEstimateHints,
@@ -57,6 +58,14 @@ export {
   type SyncSummary,
 } from "./sync-client.ts";
 export {
+  type ComposerDraft,
+  type ComposerEdits,
+  composerModel,
+  type ComposerModel,
+  type ComposerOption,
+  type ComposerTarget,
+} from "./view-models/composer.ts";
+export {
   type HistoryEntry,
   type HistoryOptions,
   type HistorySource,
@@ -90,8 +99,8 @@ export {
   type PrimaryAction,
   type ProblemRow,
   type ProblemState,
-  type TaskTag,
   type TaskLink,
+  type TaskTag,
   type TaskViewModel,
   taskViewModel,
   type WhyRow,

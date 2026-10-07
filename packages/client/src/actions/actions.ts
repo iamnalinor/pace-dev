@@ -1,6 +1,7 @@
 import type { Clock } from "../clock.ts";
 import type { AppStateHandle } from "../state.ts";
 
+import { type ComposerActions, composerActions } from "./composer-actions.ts";
 import { type ActionDeps, type ActionResult, fromStore } from "./deps.ts";
 import { defaultEstimateHints, type EstimateBucket, type EstimateHints } from "./estimate-hints.ts";
 import { type InboxActions, inboxActions } from "./inbox-actions.ts";
@@ -20,7 +21,8 @@ export type ActionsOptions = {
   readonly hints?: EstimateHints | undefined;
 };
 
-export type Actions = InboxActions &
+export type Actions = ComposerActions &
+  InboxActions &
   InstanceActions &
   PresetActions &
   RankActions &
@@ -43,6 +45,7 @@ export const createActions = (options: ActionsOptions): Actions => {
   const deps: ActionDeps = { clock: options.clock, source: options.source, state: options.state };
   const hints = options.hints ?? defaultEstimateHints;
   return {
+    ...composerActions(deps),
     ...inboxActions(deps),
     ...instanceActions(deps),
     ...presetActions(deps),
