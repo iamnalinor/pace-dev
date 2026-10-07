@@ -26,7 +26,7 @@
     {
       "binding": "DB",
       "database_name": "pace",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "2ae0224e-f7ba-4f66-b182-65f762ddb6d0",
       "migrations_dir": "drizzle/d1"
     }
   ],
