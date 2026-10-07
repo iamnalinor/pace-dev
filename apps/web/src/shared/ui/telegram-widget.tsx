@@ -11,6 +11,20 @@ type Props = {
   readonly onAuth: (user: TelegramLogin) => void;
 };
 
+/** The official loader tag; the script replaces it with the button iframe. */
+const createWidgetScript = (botUsername: string): HTMLScriptElement => {
+  const script = document.createElement("script");
+  script.src = WIDGET_SRC;
+  script.async = true;
+  script.dataset["telegramLogin"] = botUsername;
+  script.dataset["size"] = "large";
+  script.dataset["radius"] = "10";
+  script.dataset["userpic"] = "false";
+  script.dataset["requestAccess"] = "write";
+  script.dataset["onauth"] = "onTelegramAuth(user)";
+  return script;
+};
+
 /** The injected iframe has no title; name it so assistive tech and axe know what it is. */
 const nameFrames = (host: HTMLElement, label: string): (() => void) => {
   const apply = (): void => {
@@ -48,15 +62,7 @@ export const TelegramWidget = ({ botUsername, label, onAuth }: Props) => {
     globalThis.onTelegramAuth = (user: TelegramLogin) => {
       onAuthRef.current(user);
     };
-    const script = document.createElement("script");
-    script.src = WIDGET_SRC;
-    script.async = true;
-    script.dataset["telegramLogin"] = botUsername;
-    script.dataset["size"] = "large";
-    script.dataset["radius"] = "10";
-    script.dataset["userpic"] = "false";
-    script.dataset["requestAccess"] = "write";
-    script.dataset["onauth"] = "onTelegramAuth(user)";
+    const script = createWidgetScript(botUsername);
     host.append(script);
     const stopNaming = nameFrames(host, label);
     return () => {
@@ -67,5 +73,11 @@ export const TelegramWidget = ({ botUsername, label, onAuth }: Props) => {
     };
   }, [botUsername, label]);
 
-  return <div className="flex min-h-11 justify-center" ref={containerRef} />;
+  return (
+    <div
+      className="flex min-h-11 justify-center"
+      data-testid="telegram-widget"
+      ref={containerRef}
+    />
+  );
 };
