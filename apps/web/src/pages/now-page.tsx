@@ -1,3 +1,3 @@
-import { NowScreen } from "#web/features/now/now-screen.tsx";
+import { NowSplit } from "#web/features/now/now-split.tsx";
 
-export const NowPage = () => <NowScreen />;
+export const NowPage = () => <NowSplit />;

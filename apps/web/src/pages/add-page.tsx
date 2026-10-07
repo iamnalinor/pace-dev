@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router";
 
-import { NowScreen } from "#web/features/now/now-screen.tsx";
+import { NowSplit } from "#web/features/now/now-split.tsx";
 
 /** `/add` (and the share target, `?text=`): Now with the composer expanded and filled in. */
 export const AddPage = () => {
@@ -8,5 +8,5 @@ export const AddPage = () => {
   const shared = [params.get("title"), params.get("text"), params.get("url")]
     .filter((part) => part !== null && part !== "")
     .join(" ");
-  return <NowScreen composeText={shared} isComposerExpanded />;
+  return <NowSplit composeText={shared} isComposerExpanded />;
 };

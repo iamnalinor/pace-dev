@@ -62,7 +62,8 @@ describe("TaskRow", () => {
   it("dims a Nice-to-have without a due and draws no bar when nothing is done or paced", async () => {
     renderRow(<TaskRow row={books} />);
     const item = await screen.findByRole("listitem");
-    expect(item).toHaveClass("opacity-55");
+    // Quiet by a lighter title, not by transparency: the text keeps its AA contrast.
+    expect(screen.getByText("Return library books")).toHaveClass("text-fg2");
     expect(item).toHaveTextContent("Nice-to-have · 12 days old");
     expect(screen.queryByTestId("pace-marker")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

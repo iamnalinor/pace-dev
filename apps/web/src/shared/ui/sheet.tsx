@@ -37,8 +37,8 @@ function SheetOverlay({
 }
 
 /**
-The artboards' bottom sheet: a surface panel with a 22px top radius and a grab handle,
-kept inside the 430px phone column on wide screens. `closeLabel` adds a corner close
+The artboards' bottom sheet: a surface panel with a 22px top radius and a grab handle on
+a phone; from 640px a centred dialog. `closeLabel` adds a corner close
 button (translated by the caller); without it the sheet closes by Escape, the overlay or
 its own Cancel button.
 */
@@ -57,11 +57,16 @@ function SheetContent({
         data-slot="sheet-content"
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-[430px] flex-col gap-[18px] overflow-y-auto rounded-t-[22px] border-t border-line bg-surface px-5 pt-2.5 pb-6 text-fg shadow-lg outline-none data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:duration-300 data-[state=open]:slide-in-from-bottom",
+          // From 640px a sheet is a centred dialog.
+          "sm:top-1/2 sm:bottom-auto sm:max-w-lg sm:-translate-y-1/2 sm:rounded-[22px] sm:border sm:pt-6 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=open]:zoom-in-95",
           className,
         )}
         {...props}
       >
-        <div aria-hidden="true" className="h-1 w-9 shrink-0 self-center rounded-full bg-faint/40" />
+        <div
+          aria-hidden="true"
+          className="h-1 w-9 shrink-0 self-center rounded-full bg-faint/40 sm:hidden"
+        />
         {children}
         {closeLabel !== undefined && (
           <SheetPrimitive.Close className="absolute top-2 right-2 flex size-11 items-center justify-center rounded-md text-fg2 transition-colors outline-none hover:text-fg focus-visible:ring-[3px] focus-visible:ring-accent/40">

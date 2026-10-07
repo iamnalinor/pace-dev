@@ -136,7 +136,29 @@ export const ProjectView = ({ projectId }: { readonly projectId: string }) => {
           projectId={projectId}
         />
       )}
-      <ProjectStats stats={project.stats} />
+      {/* From 1024px the stats stand in a right column beside the lists. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
+        <div className="lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1">
+          <ProjectStats stats={project.stats} />
+        </div>
+        <div className="lg:col-start-1 lg:row-start-1">
+          <ProjectLists isEmpty={isEmpty} project={project} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProjectLists = ({
+  isEmpty,
+  project,
+}: {
+  readonly isEmpty: boolean;
+  readonly project: ProjectViewModel;
+}) => {
+  const t = useT();
+  return (
+    <>
       {isEmpty && <p className="px-5 py-6 text-sm text-muted">{t("project.empty")}</p>}
       {project.open.length > 0 && (
         <Section title={t("project.open")}>
@@ -153,6 +175,6 @@ export const ProjectView = ({ projectId }: { readonly projectId: string }) => {
         </Section>
       )}
       <DoneSection done={project.done} />
-    </div>
+    </>
   );
 };

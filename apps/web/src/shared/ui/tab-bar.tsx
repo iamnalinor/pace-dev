@@ -36,12 +36,15 @@ const tabClass = (tab: Tab, isActive: boolean): string =>
   );
 
 /** The bottom navigation: Now, Day, Add, Projects, Insights. */
-export const TabBar = () => {
+export const TabBar = ({ className }: { readonly className?: string }) => {
   const t = useT();
   return (
     <nav
       aria-label={t("nav.main")}
-      className="flex justify-around border-t border-line px-3 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+      className={cn(
+        "flex justify-around border-t border-line px-3 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]",
+        className,
+      )}
     >
       {TABS.map((tab) => (
         <NavLink

@@ -25,7 +25,8 @@ createRoot(root).render(
   <StrictMode>
     <PaceProvider services={createWebServices()}>
       <RouterProvider router={router} />
-      <Toaster position="top-center" />
+      {/* Bottom, clear of the phone tab bar, so a toast never covers a page title. */}
+      <Toaster mobileOffset={{ bottom: 92 }} position="bottom-center" />
     </PaceProvider>
   </StrictMode>,
 );

@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 
-import { Link } from "react-router";
+import { Link, useMatch } from "react-router";
 
 import type { NowRow } from "@pace/client";
 
@@ -67,12 +67,14 @@ export const TaskRow = ({
 }: Props) => {
   const t = useT();
   const hasBar = row.progress > 0 || row.paceExpected !== null;
+  // The task open in the pane beside the list (from 1024px) is marked in the list.
+  const isOpen = useMatch("/task/:id")?.params.id === row.id;
   return (
     <li
       className={cn(
         "flex gap-3 rounded-lg py-3 pr-3 pl-1.5",
         isTop && "bg-fg/[0.035]",
-        row.dimmed && "opacity-55",
+        isOpen && "bg-raised",
         className,
       )}
       {...props}
@@ -89,12 +91,13 @@ export const TaskRow = ({
         />
       )}
       <Link
+        aria-current={isOpen ? "page" : undefined}
         className="flex min-w-0 flex-1 flex-col gap-[5px] rounded-sm text-inherit no-underline outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40"
         to={`/task/${row.id}`}
       >
         <span className="flex items-center gap-2">
           <ProjectDot color={row.color} />
-          <span className={cn("truncate text-[15px]", !row.dimmed && "font-medium")}>
+          <span className={cn("truncate text-[15px]", row.dimmed ? "text-fg2" : "font-medium")}>
             {row.title}
           </span>
         </span>

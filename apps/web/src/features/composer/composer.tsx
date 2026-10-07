@@ -1,5 +1,5 @@
 import { ChevronDown, Inbox } from "lucide-react";
-import { type SyntheticEvent, useId, useState } from "react";
+import { type SyntheticEvent, useEffect, useId, useRef, useState } from "react";
 
 import type { ComposerEdits, ComposerModel } from "@pace/client";
 
@@ -36,11 +36,19 @@ type LineProps = {
   readonly onText: (text: string) => void;
   readonly isExpanded: boolean;
   readonly onToggle: () => void;
+  /** `/add` and "New task" land with the cursor in the line. */
+  readonly shouldFocus: boolean;
 };
 
-const ComposerLine = ({ isExpanded, model, onText, onToggle, text }: LineProps) => {
+const ComposerLine = ({ isExpanded, model, onText, onToggle, shouldFocus, text }: LineProps) => {
   const t = useT();
   const hintId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (shouldFocus) {
+      inputRef.current?.focus();
+    }
+  }, [shouldFocus]);
   return (
     <div className="flex items-center gap-1.5">
       <label className="sr-only" htmlFor={COMPOSER_INPUT_ID}>
@@ -49,7 +57,7 @@ const ComposerLine = ({ isExpanded, model, onText, onToggle, text }: LineProps) 
       <input
         aria-describedby={hintId}
         autoComplete="off"
-        className="h-10 min-w-0 flex-1 bg-transparent px-2 text-[15px] text-fg outline-none placeholder:text-faint"
+        className="h-10 min-w-0 flex-1 bg-transparent px-2 text-[15px] text-fg outline-none placeholder:text-muted"
         id={COMPOSER_INPUT_ID}
         onChange={(event) => {
           onText(event.target.value);
@@ -60,6 +68,7 @@ const ComposerLine = ({ isExpanded, model, onText, onToggle, text }: LineProps) 
           }
         }}
         placeholder={t("composer.placeholder")}
+        ref={inputRef}
         value={text}
       />
       <span className="sr-only" id={hintId}>
@@ -131,6 +140,7 @@ export const Composer = ({ className, initialText, isInitiallyExpanded = false }
           onToggle={() => {
             setIsExpanded((current) => !current);
           }}
+          shouldFocus={isInitiallyExpanded}
           text={draft.text}
         />
         {!model.isEmpty && (
