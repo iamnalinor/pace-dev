@@ -67,3 +67,24 @@ describe("TelegramWidget", () => {
     expect(screen.getByRole("status")).toHaveTextContent(TEXTS.failed);
   });
 });
+
+describe("TelegramWidget redirect mode", () => {
+  it("asks Telegram to redirect back through /auth/telegram instead of evaluating a callback", () => {
+    renderWidget();
+    const script = screen.getByTestId("telegram-widget-script");
+    expect(script).not.toHaveAttribute("data-onauth");
+    expect(script.dataset["authUrl"]).toContain("/auth/telegram?return=");
+  });
+
+  it("finishes a login the return page stored", () => {
+    sessionStorage.setItem(
+      "pace.telegram-login",
+      JSON.stringify({ auth_date: 1, first_name: "A", hash: "h", id: 7 }),
+    );
+    const onAuth = vi.fn();
+    render(
+      <TelegramWidget botUsername="TestBot" label="Continue with Telegram" onAuth={onAuth} texts={TEXTS} />,
+    );
+    expect(onAuth).toHaveBeenCalledWith({ auth_date: 1, first_name: "A", hash: "h", id: 7 });
+  });
+});

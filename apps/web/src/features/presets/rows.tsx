@@ -152,7 +152,7 @@ export const FieldToggleRow = ({ label, sub, ...section }: SubProps) => {
   const t = useT();
   const { definition, inherited, onChange } = section;
   const own = sub.group === "fields" ? definition.fields?.[sub.key] : undefined;
-  const shown = own ?? (sub.group === "fields" && inherited.fields[sub.key]);
+  const isShown = own ?? (sub.group === "fields" && inherited.fields[sub.key]);
   return (
     <OverrideRow
       isOverridden={isSubOverridden(definition, sub)}
@@ -166,7 +166,7 @@ export const FieldToggleRow = ({ label, sub, ...section }: SubProps) => {
       {({ disabled }) => (
         <label className="flex min-h-11 items-center gap-3 text-sm">
           <input
-            checked={shown}
+            checked={isShown}
             className="size-4 accent-accent"
             disabled={disabled}
             onChange={(event) => {

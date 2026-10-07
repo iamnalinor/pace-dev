@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import type { TelegramLogin } from "@pace/core";
 
+import { takePendingTelegramLogin, telegramAuthUrl } from "#web/shared/auth/telegram-return.ts";
+
 const WIDGET_SRC = "https://telegram.org/js/telegram-widget.js?22";
 /** After this long without the button, say so: telegram.org is slow from some networks. */
 export const SLOW_AFTER_MS = 4000;
@@ -22,7 +24,7 @@ type Props = {
 };
 
 /** The official loader tag; the script replaces it with the button iframe. */
-const createWidgetScript = (botUsername: string): HTMLScriptElement => {
+const createWidgetScript = (botUsername: string, authUrl: string): HTMLScriptElement => {
   const script = document.createElement("script");
   script.src = WIDGET_SRC;
   script.async = true;
@@ -31,7 +33,8 @@ const createWidgetScript = (botUsername: string): HTMLScriptElement => {
   script.dataset["radius"] = "10";
   script.dataset["userpic"] = "false";
   script.dataset["requestAccess"] = "write";
-  script.dataset["onauth"] = "onTelegramAuth(user)";
+  // Redirect mode: `data-onauth` would make the script eval a string, which the CSP forbids.
+  script.dataset["authUrl"] = authUrl;
   // Lets tests reach the loader tag without walking the DOM.
   script.dataset["testid"] = "telegram-widget-script";
   return script;
@@ -88,8 +91,9 @@ const Placeholder = ({ phase, texts }: Pick<Props, "texts"> & { readonly phase: 
 };
 
 /**
-The official Telegram Login Widget: the script replaces itself with an iframe button and
-calls `window.onTelegramAuth` with the signed payload. Until the button exists the slot shows
+The official Telegram Login Widget: the script replaces itself with an iframe button; after
+a login Telegram redirects to `/auth/telegram`, which hands the signed payload back to this
+widget on the page that started the flow. Until the button exists the slot shows
 a loading row, then a hint when telegram.org is slow, or an error when the script failed.
 */
 export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => {
@@ -101,17 +105,20 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
     onAuthRef.current = onAuth;
   }, [onAuth]);
 
+  // Coming back from Telegram's redirect: finish the login the return page stored.
+  useEffect(() => {
+    const pending = takePendingTelegramLogin();
+    if (pending !== null) {
+      onAuthRef.current(pending);
+    }
+  }, []);
+
   useEffect(() => {
     const host = containerRef.current;
     if (host === null) {
       return;
     }
-    // The widget calls a global by the name given in data-onauth; there is no other hook.
-    // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Telegram widget contract
-    globalThis.onTelegramAuth = (user: TelegramLogin) => {
-      onAuthRef.current(user);
-    };
-    const script = createWidgetScript(botUsername);
+    const script = createWidgetScript(botUsername, telegramAuthUrl(globalThis.location));
     const onScriptError = (): void => {
       setPhase("failed");
     };
@@ -128,8 +135,6 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
       stopWatching();
       script.removeEventListener("error", onScriptError);
       script.remove();
-      // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Telegram widget contract
-      globalThis.onTelegramAuth = undefined;
     };
   }, [botUsername, label]);
 

@@ -1,7 +1,7 @@
-import type { QuickTime } from "@pace/client";
-
 import { CalendarDays } from "lucide-react-native";
 import { Text, View } from "react-native";
+
+import type { QuickTime } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";

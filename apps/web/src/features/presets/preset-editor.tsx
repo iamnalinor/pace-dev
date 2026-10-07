@@ -3,14 +3,12 @@ import { useId, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import type { Preset } from "@pace/core";
-
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { actionErrorText } from "#web/shared/lib/action-error.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { BASE_PRESETS, presetById, resolvePreset } from "@pace/core";
+import { BASE_PRESETS, type Preset, presetById, resolvePreset  } from "@pace/core";
 
 import { CONTROL_CLASS } from "./control-class.ts";
 import { definitionIssues, type PresetDraft, slugify } from "./preset-draft.ts";
@@ -143,19 +141,23 @@ const EditorForm = ({
         : NO_ISSUES,
     );
     setProblem(result.ok ? null : actionErrorText(t, result.error));
-    if (result.ok) {
-      toast(t("presets.saved"));
-      await navigate("/settings/presets");
+    if (!result.ok) {
+      return;
     }
+
+    toast(t("presets.saved"));
+    await navigate("/settings/presets");
   };
 
   const archive = async (): Promise<void> => {
     const result = await actions.archivePreset(draft.id);
     setProblem(result.ok ? null : actionErrorText(t, result.error));
-    if (result.ok) {
-      toast(t("presets.archived"));
-      await navigate("/settings/presets");
+    if (!result.ok) {
+      return;
     }
+
+    toast(t("presets.archived"));
+    await navigate("/settings/presets");
   };
 
   return (

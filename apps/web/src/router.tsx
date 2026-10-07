@@ -10,14 +10,18 @@ import { InsightsPage } from "#web/pages/insights-page.tsx";
 import { LoginPage } from "#web/pages/login-page.tsx";
 import { NowPage } from "#web/pages/now-page.tsx";
 import { OAuthAuthorizePage } from "#web/pages/oauth-authorize-page.tsx";
+import { PresetPage } from "#web/pages/preset-page.tsx";
+import { PresetsPage } from "#web/pages/presets-page.tsx";
 import { ProjectPage } from "#web/pages/project-page.tsx";
 import { ProjectsPage } from "#web/pages/projects-page.tsx";
 import { ReviewPage } from "#web/pages/review-page.tsx";
 import { SettingsPage } from "#web/pages/settings-page.tsx";
+import { TelegramReturnPage } from "#web/pages/telegram-return-page.tsx";
 import { RouteError } from "#web/shared/route-error.tsx";
 
 export const router = createBrowserRouter([
   { element: <LoginPage />, errorElement: <RouteError />, path: "/login" },
+  { element: <TelegramReturnPage />, errorElement: <RouteError />, path: "/auth/telegram" },
   { element: <AppLinkPage />, errorElement: <RouteError />, path: "/app/auth" },
   { element: <OAuthAuthorizePage />, errorElement: <RouteError />, path: "/oauth/authorize" },
   {
@@ -33,6 +37,8 @@ export const router = createBrowserRouter([
           { element: <ReviewPage />, path: "review" },
           { element: <InsightsPage />, path: "insights" },
           { element: <SettingsPage />, path: "settings" },
+          { element: <PresetsPage />, path: "settings/presets" },
+          { element: <PresetPage />, path: "settings/presets/:id" },
         ],
         element: <AppLayout />,
       },

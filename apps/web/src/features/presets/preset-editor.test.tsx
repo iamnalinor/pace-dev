@@ -36,9 +36,11 @@ describe("PresetEditor", () => {
     await user.click(
       screen.getByRole("checkbox", { name: "Override: Default estimate (minutes)" }),
     );
-    expect(estimate).toHaveValue(60);
-    await user.clear(estimate);
-    await user.type(estimate, "45");
+    // The input starts over from the inherited figure once the field is overridden.
+    const overridden = within(row("Default estimate (minutes)")).getByRole("spinbutton");
+    expect(overridden).toHaveValue(60);
+    await user.clear(overridden);
+    await user.type(overridden, "45");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {

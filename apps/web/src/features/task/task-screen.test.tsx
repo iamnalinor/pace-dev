@@ -39,8 +39,13 @@ const task = (services: Awaited<ReturnType<typeof renderTask>>["services"], id: 
 describe("TaskScreen — Algebra HW 6 (per problem)", () => {
   it("shows the header, tags, stats and problems of the artboard", async () => {
     await renderTask(HW_ID);
-    expect(await screen.findByRole("heading", { level: 1, name: "Algebra HW 6" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Algebra" })).toHaveAttribute("href", "/projects/p-algebra");
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Algebra HW 6" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Algebra" })).toHaveAttribute(
+      "href",
+      "/projects/p-algebra",
+    );
     expect(screen.getByText("In progress")).toBeInTheDocument();
     expect(screen.getByText("Submit per problem")).toBeInTheDocument();
     expect(screen.getByText("today 23:59")).toBeInTheDocument();
@@ -54,7 +59,8 @@ describe("TaskScreen — Algebra HW 6 (per problem)", () => {
   it("toggles a problem between solved and not", async () => {
     const { services, user } = await renderTask(HW_ID);
     await user.click(await screen.findByRole("button", { name: "Mark Kronecker–Capelli solved" }));
-    const solvedAt = () => task(services, HW_ID)?.subtasks.find((item) => item.id === "s5")?.solvedAt;
+    const solvedAt = () =>
+      task(services, HW_ID)?.subtasks.find((item) => item.id === "s5")?.solvedAt;
     expect(solvedAt()).not.toBeNull();
     expect(screen.getByText("5 solved · 2 sent")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Kronecker–Capelli solved, tap to undo" }));
@@ -111,10 +117,14 @@ describe("TaskScreen — Algebra HW 6 (per problem)", () => {
 
 describe("TaskScreen — closing", () => {
   it("previews a late close and closes as cancelled with the reason as typed", async () => {
-    const { services, user } = await renderTask(CALC_HW5_ID, { route: `/task/${CALC_HW5_ID}?close=1` });
+    const { services, user } = await renderTask(CALC_HW5_ID, {
+      route: `/task/${CALC_HW5_ID}?close=1`,
+    });
     const sheet = await screen.findByRole("dialog", { name: "Close task" });
     expect(within(sheet).getByText("Done · late")).toBeInTheDocument();
-    await user.click(within(sheet).getByRole("button", { name: "Close task as… Cancelled · Skipped" }));
+    await user.click(
+      within(sheet).getByRole("button", { name: "Close task as… Cancelled · Skipped" }),
+    );
     await user.type(within(sheet).getByLabelText("Reason"), "курс отменили");
     await user.click(within(sheet).getByRole("button", { name: "Cancelled" }));
     await waitFor(() => {
@@ -123,7 +133,9 @@ describe("TaskScreen — closing", () => {
         reason: "курс отменили",
       });
     });
-    expect(await screen.findByText("Closed · Cancelled · Reason: курс отменили")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Closed · Cancelled · Reason: курс отменили"),
+    ).toBeInTheDocument();
   });
 
   it("shows a closed task's outcome and reopens it", async () => {
@@ -139,8 +151,10 @@ describe("TaskScreen — closing", () => {
 describe("TaskScreen — TRK-231 (progress slider)", () => {
   it("explains its place on Now and moves the slider", async () => {
     const { services, user } = await renderTask(TRK_ID, { deviceTz: "UTC", now: TRK_NOW });
-    expect(await screen.findByRole("link", { name: "TRK-231" }).catch(() => screen.getByText("TRK-231"))).toBeInTheDocument();
-    expect(screen.getByText("p99 check fails ~1 in 5 runs on the shared runner.")).toBeInTheDocument();
+    expect(await screen.findByText("TRK-231")).toBeInTheDocument();
+    expect(
+      screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
+    ).toBeInTheDocument();
     expect(screen.getByText("4 / 10")).toBeInTheDocument();
     expect(screen.getByText("pace says 6.5 by now")).toBeInTheDocument();
 
@@ -150,7 +164,9 @@ describe("TaskScreen — TRK-231 (progress slider)", () => {
     expect(within(card).getByText("Window elapsed").nextSibling).toHaveTextContent("65%");
     expect(within(card).getByText("Behind pace").nextSibling).toHaveTextContent("+0.25");
     expect(within(card).getByText("Prioritized").nextSibling).toHaveTextContent("× 5");
-    expect(within(card).getByText("Your rank in Prioritized").nextSibling).toHaveTextContent("2 of 3");
+    expect(within(card).getByText("Your rank in Prioritized").nextSibling).toHaveTextContent(
+      "2 of 3",
+    );
 
     const slider = screen.getByRole("slider", { name: "Progress, 0 to 10" });
     slider.focus();
@@ -191,7 +207,10 @@ describe("TaskScreen — menu", () => {
     await user.type(due, "2026-10-08T12:00");
     await user.click(within(sheet).getByRole("button", { name: "Save" }));
     await waitFor(() => {
-      expect(task(services, HW_ID)).toMatchObject({ dueAt: "2026-10-08T09:00:00.000Z", dueTz: MOSCOW });
+      expect(task(services, HW_ID)).toMatchObject({
+        dueAt: "2026-10-08T09:00:00.000Z",
+        dueTz: MOSCOW,
+      });
     });
     expect(await screen.findByText("Task updated")).toBeInTheDocument();
   });

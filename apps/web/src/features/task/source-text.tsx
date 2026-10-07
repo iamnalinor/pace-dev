@@ -17,7 +17,7 @@ export const SourceText = ({ text }: { readonly text: string }) => {
         }}
         type="button"
       >
-        {isOpen ? t("task.hideSource") : t("task.showSource")}
+        {t(isOpen ? "task.hideSource" : "task.showSource")}
       </button>
       {isOpen && (
         <blockquote

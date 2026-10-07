@@ -36,10 +36,7 @@ export const isLatePreview = (view: TaskViewModel, mode: CloseMode, at: string):
   const sentAt = view.problems.flatMap((problem) =>
     problem.submittedAt === null ? [] : [problem.submittedAt],
   );
-  if (mode === "done" && sentAt.length > 0) {
-    return sentAt.some((sent) => isAfter(sent, due));
-  }
-  return isAfter(at, due);
+  return mode === "done" && sentAt.length > 0 ? sentAt.some((sent) => isAfter(sent, due)) : isAfter(at, due);
 };
 
 const RECENT_REASONS = 5;

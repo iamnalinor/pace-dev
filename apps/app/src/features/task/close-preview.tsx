@@ -1,13 +1,14 @@
-import type { TaskViewModel } from "@pace/client";
-
 import { Text, View } from "react-native";
+
+import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 
-import { isLatePreview, stillOpen } from "./close-model.ts";
 import type { CloseForm } from "./use-close-form.ts";
+
+import { isLatePreview, stillOpen } from "./close-model.ts";
 
 const Line = ({
   id,

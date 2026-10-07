@@ -1,11 +1,10 @@
-import type { MetaPart } from "@pace/client";
-
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMeta } from "#web/shared/format/meta.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { PaceBar } from "#web/shared/ui/pace-bar.tsx";
 import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { type MetaPart, relativeDay  } from "@pace/client";
 import {
   addMinutesIso,
   endOfDayIn,
@@ -15,7 +14,6 @@ import {
   resolvePreset,
   zonesDiffer,
 } from "@pace/core";
-import { relativeDay } from "@pace/client";
 
 import type { PresetDraft } from "./preset-draft.ts";
 

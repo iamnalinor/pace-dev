@@ -1,29 +1,21 @@
-import type { TaskViewModel } from "@pace/client";
-
 import { Pressable, Text, View } from "react-native";
 
-import { useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { joinList } from "#app/format/numbers.ts";
+import type { TaskViewModel } from "@pace/client";
+
+import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 
-import { problemName, sendingIds } from "./close-model.ts";
+import type { CloseMode } from "./close-model.ts";
+
 import { ClosePreview } from "./close-preview.tsx";
 import { GiveUpFields } from "./give-up-fields.tsx";
 import { useCloseForm } from "./use-close-form.ts";
 import { useSubmitClose } from "./use-submit-close.ts";
+import { useSubmitTitle } from "./use-submit-title.ts";
 import { WhenPicker } from "./when-picker.tsx";
-
-/** "Submit 3 and 4" from the problems being sent. */
-export const useSubmitTitle = (view: TaskViewModel): string => {
-  const t = useT();
-  const language = useLanguage();
-  const sending = new Set(sendingIds(view));
-  const names = view.problems.filter((problem) => sending.has(problem.id)).map(problemName);
-  return t("task.submitProblems", { problems: joinList(names, language) });
-};
 
 /**
 The Close artboard: when it happened (pills or an exact time), whether that time is exact,
@@ -31,14 +23,17 @@ a preview of what gets recorded, and the way out ("Close task as… Cancelled ·
 */
 export const CloseSheet = ({
   onClose,
+  startMode,
   view,
 }: {
   readonly onClose: () => void;
+  /** "Close as…" from the menu opens straight on Cancelled · Skipped. */
+  readonly startMode?: CloseMode;
   readonly view: TaskViewModel;
 }) => {
   const t = useT();
   const { deviceTz } = useViewer();
-  const form = useCloseForm(view, deviceTz);
+  const form = useCloseForm(view, deviceTz, startMode);
   const submitTitle = useSubmitTitle(view);
   const submit = useSubmitClose(view, form, onClose);
   const isSubmit = form.mode === "submit";

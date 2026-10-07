@@ -18,9 +18,9 @@ describe("LoginPage", () => {
     );
     expect(script).not.toBeNull();
     expect(script?.src).toBe("https://telegram.org/js/telegram-widget.js?22");
-    expect(script?.dataset["onauth"]).toBe("onTelegramAuth(user)");
+    // Redirect mode: the callback mode would need `unsafe-eval` in the CSP.
+    expect(script?.dataset["authUrl"]).toContain("/auth/telegram?return=");
     expect(script?.dataset["requestAccess"]).toBe("write");
-    expect(globalThis.onTelegramAuth).toBeTypeOf("function");
   });
 
   it("signs in through the dev form and navigates to ?next=", async () => {

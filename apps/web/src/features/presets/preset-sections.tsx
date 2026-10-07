@@ -1,16 +1,14 @@
 import type { ReactNode } from "react";
 
-import type {
-  Importance,
-  NotifyParams,
-  PresetFields,
-  ProgressMode,
-  Submission,
-  UrgencyPolicy,
-} from "@pace/core";
-
 import { useT } from "#web/i18n.tsx";
-import { ProjectColorSchema } from "@pace/core";
+import {
+  type Importance,
+  type NotifyParams,
+  type PresetFields,
+  type ProgressMode,
+  ProjectColorSchema,
+  type Submission, type UrgencyPolicy 
+} from "@pace/core";
 
 import { DeadlineRow } from "./deadline-row.tsx";
 import { RecurrenceRow } from "./recurrence-row.tsx";

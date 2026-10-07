@@ -171,10 +171,12 @@ const DeletePanel = ({ close, view }: PanelProps) => {
       plan.kind === "revoke"
         ? await run(actions.revoke(plan.eventId), undo)
         : await run(actions.closeTask({ outcome: "cancelled", taskId: view.id }), undo);
-    if (events !== null) {
-      close();
-      await navigate("/");
+    if (events === null) {
+      return;
     }
+
+    close();
+    await navigate("/");
   };
   return (
     <>
@@ -310,6 +312,7 @@ type Props = {
 export const TaskMenu = ({ isOpen, onEdit, onOpenChange, view }: Props) => {
   const [panel, setPanel] = useState<Panel>("menu");
   const close = (): void => {
+    setPanel("menu");
     onOpenChange(false);
   };
   const panelProps = { close, view };

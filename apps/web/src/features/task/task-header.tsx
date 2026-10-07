@@ -24,7 +24,11 @@ export const TaskHeader = ({ onMore, project }: Props) => {
         aria-label={t("common.back")}
         className="text-fg2"
         onClick={() => {
-          void navigate(canGoBack ? -1 : "/");
+          if (canGoBack) {
+            void navigate(-1);
+          } else {
+            void navigate("/");
+          }
         }}
         size="icon"
         variant="ghost"

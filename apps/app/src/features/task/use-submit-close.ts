@@ -3,8 +3,9 @@ import type { TaskViewModel } from "@pace/client";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 
-import { sendingIds } from "./close-model.ts";
 import type { CloseForm } from "./use-close-form.ts";
+
+import { sendingIds } from "./close-model.ts";
 
 /** Records what the sheet says, closes it once that worked, and offers Undo in the toast. */
 export const useSubmitClose = (

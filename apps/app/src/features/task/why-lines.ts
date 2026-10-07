@@ -1,12 +1,15 @@
 import type { WhyRow } from "@pace/client";
 
+import { countText } from "#app/format/meta.ts";
+import { type Viewer, zonedText  } from "#app/format/time.ts";
 import { formatDuration, type Importance, t } from "@pace/core";
 
-import { countText } from "#app/format/meta.ts";
-import type { Viewer } from "#app/format/time.ts";
-import { zonedText } from "#app/format/time.ts";
-
-export type WhyLine = { readonly key: string; readonly label: string; readonly value: string };
+export type WhyLine = {
+  /** Unique within the card: a key may show up both as an input and as a step. */
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+};
 
 const ISO = /^\d{4}-\d{2}-\d{2}T/;
 const MINUTES_PER_HOUR = 60;
@@ -55,10 +58,10 @@ export const whyLines = (
   const size = rows.find((row) => row.key === "rankSize")?.value;
   return rows
     .filter((row) => row.key !== "rankSize")
-    .map((row) =>
+    .map((row, index) =>
       row.key === "rank"
         ? {
-            key: row.key,
+            id: `${row.key}:${index}`,
             label: t(viewer.language, "explain.rank", {
               importance: t(viewer.language, `importance.${importance}`),
             }),

@@ -4,8 +4,9 @@ import { useAppState, useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
-import { recentReasons } from "./close-model.ts";
 import type { CloseForm, GiveUp } from "./use-close-form.ts";
+
+import { recentReasons } from "./close-model.ts";
 
 const OUTCOMES: readonly GiveUp[] = ["cancelled", "skipped"];
 

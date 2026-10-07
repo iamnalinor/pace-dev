@@ -22,7 +22,7 @@ export const IconButton = ({
   readonly icon: LucideIcon;
   readonly label: string;
   readonly onPress: () => void;
-  readonly variant?: "plain" | "surface" | "raised";
+  readonly variant?: "plain" | "raised" | "surface";
 }) => {
   const { palette } = useTheme();
   return (

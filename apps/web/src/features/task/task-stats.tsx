@@ -87,7 +87,7 @@ const WhyCard = ({ title, view }: WhyProps) => {
           </div>
         ))}
       </dl>
-      <p className="mt-2 border-t border-line pt-2 font-mono text-[11px] break-words text-faint">
+      <p className="mt-2 border-t border-line pt-2 font-mono text-[11px] wrap-break-word text-faint">
         <span className="sr-only">{t("task.whyFormula")}: </span>
         {view.why.formula}
       </p>

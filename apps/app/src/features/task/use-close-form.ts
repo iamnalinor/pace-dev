@@ -1,6 +1,6 @@
-import type { QuickTimeKey, TaskViewModel } from "@pace/client";
-
 import { useState } from "react";
+
+import type { QuickTimeKey, TaskViewModel } from "@pace/client";
 
 import { fromWallClock, type WallClock, wallClock } from "#app/format/time.ts";
 
@@ -29,8 +29,12 @@ export type CloseForm = {
 };
 
 /** The close sheet's state: which time, how precise, and how the task ends. */
-export const useCloseForm = (view: TaskViewModel, deviceTz: string): CloseForm => {
-  const [mode, setMode] = useState<CloseMode>(() => initialMode(view));
+export const useCloseForm = (
+  view: TaskViewModel,
+  deviceTz: string,
+  startMode?: CloseMode,
+): CloseForm => {
+  const [mode, setMode] = useState<CloseMode>(() => startMode ?? initialMode(view));
   const [choice, setChoice] = useState<TimeChoice>("now");
   const [typed, setTyped] = useState<WallClock>({ date: "", time: "" });
   const [isExact, setExact] = useState(true);

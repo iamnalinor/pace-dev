@@ -194,9 +194,9 @@ const CloseForm = ({ mode, onDone, view }: FormProps) => {
           </button>
         </div>
         {when.kind === "exact" && (
-          <label className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted">
-            <span className="sr-only">{t("close.pickExact")}</span>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted">
             <input
+              aria-label={t("close.pickExact")}
               className="h-11 rounded-md border border-line bg-bg px-3 font-mono text-sm text-fg"
               onChange={(event) => {
                 setWhen({ kind: "exact", local: event.target.value });
@@ -205,7 +205,7 @@ const CloseForm = ({ mode, onDone, view }: FormProps) => {
               value={when.local}
             />
             <span>{t("edit.inZone", { zone })}</span>
-          </label>
+          </div>
         )}
         {at === null && (
           <p className="mt-1.5 text-xs text-warn" role="alert">
@@ -255,14 +255,14 @@ const CloseForm = ({ mode, onDone, view }: FormProps) => {
           </Button>
         </SheetClose>
         <Button
-          className="h-[50px] flex-[2] rounded-lg text-[15px] font-semibold"
+          className="h-[50px] flex-2 rounded-lg text-[15px] font-semibold"
           disabled={at === null}
           onClick={() => {
             void finish();
           }}
           variant="accent"
         >
-          {mode === "submit" ? t("close.submit") : t("close.done")}
+          {t(mode === "submit" ? "close.submit" : "close.done")}
         </Button>
       </SheetFooter>
 

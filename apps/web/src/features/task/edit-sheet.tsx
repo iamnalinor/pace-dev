@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import type { ActionResult, TaskViewModel } from "@pace/client";
-import type { Event } from "@pace/core";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { type Translate, useT } from "#web/i18n.tsx";
@@ -19,7 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "#web/shared/ui/sheet.tsx";
-import { ImportanceSchema } from "@pace/core";
+import { type Event, ImportanceSchema  } from "@pace/core";
 
 import { editChanges, type EditError, type EditForm, initialEditForm } from "./edit-form.ts";
 
@@ -326,7 +325,7 @@ const EditFields = ({ onDone, view }: FormProps) => {
           </Button>
         </SheetClose>
         <Button
-          className="h-[50px] flex-[2] rounded-lg font-semibold"
+          className="h-[50px] flex-2 rounded-lg font-semibold"
           type="submit"
           variant="accent"
         >
