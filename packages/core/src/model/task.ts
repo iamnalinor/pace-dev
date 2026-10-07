@@ -25,6 +25,8 @@ export type Closure = {
   readonly reason: null | string;
   readonly source: Event["source"];
   readonly eventId: string;
+  /** True once the user confirmed a system-made outcome (`confirmed: true` amended onto the event). */
+  readonly confirmed: boolean;
 };
 
 export type TaskSource = {

@@ -324,6 +324,7 @@ describe("taskReducer: submission", () => {
       reason: null,
       source: "app",
       eventId: last.id,
+      confirmed: false,
     });
   });
 
@@ -350,6 +351,7 @@ describe("taskReducer: close and reopen", () => {
       reason: "superseded",
       source: "mcp",
       eventId: close.id,
+      confirmed: false,
     });
     expect(task.touched).toBe(true);
     expect(task.status).toBe("in_progress");
@@ -509,6 +511,35 @@ describe("taskReducer: order insensitivity", () => {
       fc.property(fc.shuffledSubarray(events, { minLength: events.length }), (shuffled) => {
         expect(fold(shuffled)).toEqual(expected);
       }),
+    );
+  });
+});
+
+describe("taskReducer: confirmed automatic outcomes", () => {
+  it("records a closure as unconfirmed unless the payload says otherwise", () => {
+    expect(hw([hwCreated(1), closed(2, T(9), { outcome: "done" })]).closed?.confirmed).toBe(false);
+    const confirmed = at(2, T(9), {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "cancelled_missed", confirmed: true },
+      source: "system",
+    });
+    expect(hw([hwCreated(1), confirmed]).closed?.confirmed).toBe(true);
+  });
+
+  it("is confirmed by amending the closing event", () => {
+    const auto = at(2, T(9), {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "cancelled_missed" },
+      source: "system",
+    });
+    const amend = at(3, T(10), {
+      type: "event.amended",
+      payload: { targetId: auto.id, patch: { confirmed: true } },
+    });
+    expect(hw([hwCreated(1), auto]).closed?.confirmed).toBe(false);
+    expect(hw([hwCreated(1), auto, amend]).closed?.confirmed).toBe(true);
+    expect(hw([hwCreated(1), auto, amend, revoke(4, T(11), amend.id)]).closed?.confirmed).toBe(
+      false,
     );
   });
 });

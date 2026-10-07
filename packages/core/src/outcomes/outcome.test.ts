@@ -41,6 +41,7 @@ const closure = (outcome: Closure["outcome"], when: string): Closure => ({
   reason: null,
   source: "app",
   eventId: "e",
+  confirmed: false,
 });
 
 const closedTask = (outcome: Closure["outcome"], when: string, patch: Partial<Task> = {}): Task =>

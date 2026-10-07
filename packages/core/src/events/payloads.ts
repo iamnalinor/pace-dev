@@ -113,6 +113,8 @@ export const TaskClosedPayload = z.object({
   ...taskRef,
   outcome: CloseOutcomeSchema,
   reason: z.string().optional(),
+  /** Set (by amendment) once the user has confirmed an automatic outcome in the review block. */
+  confirmed: z.boolean().optional(),
 });
 export const TaskReopenedPayload = z.object(taskRef);
 export const TaskImportanceSetPayload = z.object({ ...taskRef, importance: ImportanceSchema });

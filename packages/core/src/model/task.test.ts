@@ -53,6 +53,7 @@ describe("isOpen", () => {
       reason: null,
       source: "app" as const,
       eventId: "e",
+      confirmed: false,
     };
     expect(isOpen(taskFixture({ closed }))).toBe(false);
   });

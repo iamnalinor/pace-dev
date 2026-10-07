@@ -138,7 +138,11 @@ const touched = (task: Task, at: string): Task => {
 const close = (
   task: Task,
   event: TaskEvent<"task.closed" | "task.submitted">,
-  closure: { readonly outcome: CloseOutcome; readonly reason: null | string },
+  closure: {
+    readonly outcome: CloseOutcome;
+    readonly reason: null | string;
+    readonly confirmed: boolean;
+  },
 ): Task =>
   task.closed === null
     ? {
@@ -189,7 +193,9 @@ const submitted: Handler<"task.submitted"> = (task, event) => {
   const whole = task.submittedAt === null ? { ...task, submittedAt: event.occurredAt } : task;
   const marked =
     subtaskIds === undefined ? whole : submitSubtasks(task, subtaskIds, event.occurredAt);
-  return closes === true ? close(marked, event, { outcome: "done", reason: null }) : marked;
+  return closes === true
+    ? close(marked, event, { outcome: "done", reason: null, confirmed: false })
+    : marked;
 };
 
 const PATCHED_KEYS = ["title", "description", "dueAt", "dueTz", "startAt", "startTz"] as const;
@@ -235,7 +241,11 @@ const HANDLERS: Handlers = {
   "task.subtasks.added": subtasksAdded,
   "task.submitted": submitted,
   "task.closed": (task, event) =>
-    close(task, event, { outcome: event.payload.outcome, reason: event.payload.reason ?? null }),
+    close(task, event, {
+      outcome: event.payload.outcome,
+      reason: event.payload.reason ?? null,
+      confirmed: event.payload.confirmed ?? false,
+    }),
   "task.reopened": (task, event) =>
     task.closed === null
       ? task
