@@ -8,8 +8,11 @@ import { HW_ID, WORK_ID } from "@pace/core/testing";
 
 import { Composer } from "./composer.tsx";
 
-const setup = async (props: Parameters<typeof Composer>[0] = {}) => {
-  const { services } = await artboardServices();
+const setup = async (
+  props: Parameters<typeof Composer>[0] = {},
+  routes: Parameters<typeof artboardServices>[0] = {},
+) => {
+  const { services } = await artboardServices(routes);
   const view = renderWithProviders(
     <>
       <Toaster />
@@ -90,5 +93,58 @@ describe("Composer", () => {
       "aria-expanded",
       "true",
     );
+  });
+
+  it("fills the chips from the assistant and marks what to check", async () => {
+    const parsed = {
+      doubtful: ["estimateMinutes"],
+      isClean: false,
+      provider: "fake",
+      result: {
+        category: "work",
+        description: null,
+        dueDate: null,
+        dueTime: null,
+        estimateMinutes: 90,
+        evidence: [],
+        importance: "asap",
+        intent: "create_task",
+        outcome: null,
+        project: null,
+        questions: [{ field: "dueDate", options: ["завтра"], question: "Когда сдать?" }],
+        subtasks: [],
+        task: null,
+        title: "разобрать почту",
+      },
+      status: "parsed",
+    };
+    const { services, user } = await setup({}, { routes: { "POST /api/parse": () => parsed } });
+    await user.type(line(), "срочно разобрать почту");
+    await user.click(screen.getByRole("button", { name: "Read with AI" }));
+
+    expect(await screen.findByText("Check: estimate")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Work" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "ASAP" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Estimate" })).toHaveTextContent("1h 30m");
+
+    await user.click(line());
+    await user.keyboard("{Enter}");
+    expect(tasks(services).find((task) => task.title === "разобрать почту")).toMatchObject({
+      estimateMinutes: 90,
+      importance: "asap",
+      presetId: "work",
+      sourceText: "срочно разобрать почту",
+    });
+  });
+
+  it("says when the assistant is out of requests and keeps the rule-based chips", async () => {
+    const { user } = await setup(
+      {},
+      { routes: { "POST /api/parse": () => ({ retryAt: null, status: "unavailable" }) } },
+    );
+    await user.type(line(), "renew the passport");
+    await user.click(screen.getByRole("button", { name: "Read with AI" }));
+    expect(await screen.findByText(/out of requests for now/u)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Personal" })).toBeChecked();
   });
 });

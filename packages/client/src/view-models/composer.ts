@@ -27,6 +27,11 @@ export type ComposerEdits = {
   readonly due?: null | undefined | { readonly at: string; readonly tz: string };
   readonly estimateMinutes?: null | number | undefined;
   readonly link?: null | string | undefined;
+  /** A project to create by name (the assistant named one that does not exist yet). */
+  readonly projectName?: null | string | undefined;
+  /** The assistant's reading of the title and the problems, over the rules' one. */
+  readonly title?: string | undefined;
+  readonly subtasks?: readonly QuickSubtask[] | undefined;
 };
 
 export type ComposerOption = {
@@ -120,6 +125,14 @@ const projectOf = (
     ? null
     : optionOf(projects, projectId);
 
+/** A picked project wins over any name; otherwise a name the assistant gave, then the text's `#name`. */
+const newProjectNameOf = (parsed: Parsed, edits: ComposerEdits): null | string => {
+  if (edits.projectId !== undefined) {
+    return null;
+  }
+  return edits.projectName === undefined ? parsed.projectName : edits.projectName;
+};
+
 const targetOf = (state: CoreState, presetId: string, now: string): ComposerTarget => {
   const instance = openInstanceOf(state, presetId, now);
   return instance === undefined
@@ -152,15 +165,15 @@ export const composerModel = (
     importance: edits.importance ?? textImportance ?? defaultImportance,
     isEmpty: text.trim() === "",
     link: linkOf(parsed, edits),
-    newProjectName: edits.projectId === undefined ? parsed.projectName : null,
+    newProjectName: newProjectNameOf(parsed, edits),
     preset: optionOf(presets, presetId) ?? { color: null, id: presetId, name: presetId },
     presets,
     project: projectOf(state, projects, pick(edits.projectId, parsed.projectId)),
     projects,
     spans: parsed.spans,
-    subtasks: parsed.subtasks,
+    subtasks: edits.subtasks ?? parsed.subtasks,
     target: targetOf(state, presetId, ctx.now),
     text,
-    title: parsed.title,
+    title: edits.title ?? parsed.title,
   };
 };

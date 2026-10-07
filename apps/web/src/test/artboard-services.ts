@@ -1,4 +1,5 @@
 import type { Clock } from "@pace/client";
+import type { FakeRoute } from "@pace/client/testing";
 
 import { artboardEvents, MOSCOW, NOW } from "@pace/core/testing";
 
@@ -7,6 +8,8 @@ import { createTestServices } from "./services.ts";
 type Options = {
   readonly now?: string;
   readonly deviceTz?: string;
+  /** Extra fake API routes (for example the assistant's parse). */
+  readonly routes?: Readonly<Record<string, FakeRoute>>;
 };
 
 /** A clock frozen at the artboard instant in Moscow, so every relative figure matches the design. */
@@ -17,7 +20,10 @@ export const frozenClock = ({ deviceTz = MOSCOW, now = NOW }: Options = {}): Clo
 
 /** Services whose clock never moves (the store stays empty). */
 export const frozenServices = (options: Options = {}) =>
-  createTestServices({ clock: frozenClock(options) });
+  createTestServices({
+    clock: frozenClock(options),
+    ...(options.routes !== undefined && { routes: options.routes }),
+  });
 
 /**
 Services on the frozen clock with the artboard world ingested as synced events, up to the

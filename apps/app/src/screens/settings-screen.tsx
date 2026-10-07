@@ -44,6 +44,14 @@ const SettingsFooter = () => {
       >
         {t("history.title")}
       </Button>
+      <Button
+        onPress={() => {
+          router.push("/decisions");
+        }}
+        variant="secondary"
+      >
+        {t("decisions.title")}
+      </Button>
       <Button onPress={() => void auth.logout()} variant="secondary">
         {t("settings.logout")}
       </Button>

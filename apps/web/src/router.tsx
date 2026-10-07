@@ -5,6 +5,7 @@ import { AppLayout } from "#web/layout/app-layout.tsx";
 import { AddPage } from "#web/pages/add-page.tsx";
 import { AppLinkPage } from "#web/pages/app-link-page.tsx";
 import { DayPage } from "#web/pages/day-page.tsx";
+import { DecisionsPage } from "#web/pages/decisions-page.tsx";
 import { HistoryPage } from "#web/pages/history-page.tsx";
 import { InboxPage } from "#web/pages/inbox-page.tsx";
 import { InsightsPage } from "#web/pages/insights-page.tsx";
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
           { element: <AddPage />, path: "add" },
           { element: <TaskPage />, path: "task/:id" },
           { element: <HistoryPage />, path: "history" },
+          { element: <DecisionsPage />, path: "decisions" },
           { element: <ProjectsPage />, path: "projects" },
           { element: <ProjectPage />, path: "projects/:id" },
           { element: <InboxPage />, path: "inbox" },

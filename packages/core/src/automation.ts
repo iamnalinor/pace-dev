@@ -1,3 +1,4 @@
+export type { Decision } from "./api/schemas/notify.ts";
 export {
   ParseRequestSchema,
   type ParseResponse,

@@ -26,6 +26,7 @@ export type {
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
+export type { AiOutcome, Assistant } from "./assistant.ts";
 export {
   type Auth,
   type AuthState,
@@ -43,6 +44,13 @@ export {
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export type { EventStore } from "./event-store.ts";
+export {
+  fetchNotificationPlan,
+  type LocalNotification,
+  localNotifications,
+  scheduleChanges,
+  type ScheduleChanges,
+} from "./local-notifications.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {
   type AppState,
@@ -57,6 +65,7 @@ export {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-client.ts";
+export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
   type ComposerDraft,
@@ -66,6 +75,7 @@ export {
   type ComposerOption,
   type ComposerTarget,
 } from "./view-models/composer.ts";
+export { decisionLabelKey } from "./view-models/decisions.ts";
 export {
   type HistoryEntry,
   type HistoryOptions,

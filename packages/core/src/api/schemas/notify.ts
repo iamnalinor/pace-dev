@@ -38,3 +38,5 @@ export const DecisionSchema = z.object({
 export const DecisionsOutputSchema = z.object({
   decisions: z.array(DecisionSchema),
 });
+
+export type Decision = z.output<typeof DecisionSchema>;

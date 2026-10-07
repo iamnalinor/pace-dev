@@ -2,16 +2,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
 
-import type {
-  Language,
-  NowListOptions,
-  PresetError,
-  QueryContext,
-  Result,
-  Settings,
+import {
+  type Decision,
+  endpoints,
+  type Language,
+  type NowListOptions,
+  type PresetError,
+  type QueryContext,
+  type Result,
+  type Settings,
 } from "@pace/core";
 
+import type { ApiClient } from "./api-client.ts";
+import type { AiOutcome, Assistant } from "./assistant.ts";
 import type { AppState, AppStateHandle } from "./state.ts";
+import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
 import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
@@ -85,4 +90,71 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     useSettings: () => useStore(state.store, (current) => current.settings),
     useTaskView: (taskId) => useView((current, ctx) => taskViewModel(current, taskId, ctx), taskId),
   };
+};
+
+/** Where the assistant's reading of a composer line stands. */
+export type AiState =
+  | Exclude<AiOutcome, { status: "read" }>
+  | { readonly status: "idle" }
+  | { readonly status: "read"; readonly reading: AiReading }
+  | { readonly status: "reading" };
+
+export type AiRead = {
+  readonly state: AiState;
+  /** Asks the assistant; `onReading` receives the chips it filled. */
+  readonly read: (text: string, onReading: (reading: AiReading) => void) => Promise<void>;
+  readonly reset: () => void;
+};
+
+/** "Read with AI" in a composer: one request per press, nothing written until the user adds. */
+export const useAiRead = (assistant: Assistant): AiRead => {
+  const [state, setState] = useState<AiState>({ status: "idle" });
+  return {
+    read: async (text, onReading) => {
+      setState({ status: "reading" });
+      const outcome = await assistant.read(text);
+      if (outcome.status === "read") {
+        onReading(outcome.reading);
+      }
+      setState(outcome);
+    },
+    reset: () => {
+      setState({ status: "idle" });
+    },
+    state,
+  };
+};
+
+const DECISIONS_LIMIT = 100;
+
+export type DecisionsState =
+  | { readonly status: "failed" }
+  | { readonly status: "loaded"; readonly decisions: readonly Decision[] }
+  | { readonly status: "loading" };
+
+/** The decision log from the server, newest first, filtered by `search` (refetched when it changes). */
+export const useDecisions = (api: ApiClient, search: string): DecisionsState => {
+  const [loaded, setLoaded] = useState<DecisionsState>({ status: "loading" });
+  useEffect(() => {
+    const status = { isCurrent: true };
+    void (async () => {
+      try {
+        const q = search.trim();
+        const { decisions } = await api.call(endpoints.decisions.list, {
+          query: { limit: DECISIONS_LIMIT, ...(q !== "" && { q }) },
+        });
+        if (status.isCurrent) {
+          setLoaded({ decisions, status: "loaded" });
+        }
+      } catch {
+        if (status.isCurrent) {
+          setLoaded({ status: "failed" });
+        }
+      }
+    })();
+    return () => {
+      status.isCurrent = false;
+    };
+  }, [api, search]);
+  return loaded;
 };

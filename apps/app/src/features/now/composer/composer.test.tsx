@@ -58,4 +58,42 @@ describe("Composer", () => {
       expect(titles).toContain("think about the trip");
     });
   });
+
+  it("fills the chips from the assistant and says what to check", async () => {
+    const parsed = {
+      doubtful: ["estimateMinutes"],
+      isClean: false,
+      provider: "fake",
+      result: {
+        category: "work",
+        description: null,
+        dueDate: null,
+        dueTime: null,
+        estimateMinutes: 90,
+        evidence: [],
+        importance: "asap",
+        intent: "create_task",
+        outcome: null,
+        project: null,
+        questions: [],
+        subtasks: [],
+        task: null,
+        title: "разобрать почту",
+      },
+      status: "parsed",
+    };
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => parsed } });
+    await renderScreen(<Composer />, runtime);
+    await fireEvent.changeText(line(), "срочно разобрать почту");
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.ai") }));
+    expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Work", selected: true })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.add") }));
+    await waitFor(() => {
+      const created = Object.values(runtime.state.store.getState().tasks.byId).find(
+        (task) => task.title === "разобрать почту",
+      );
+      expect(created).toMatchObject({ estimateMinutes: 90, importance: "asap", presetId: "work" });
+    });
+  });
 });
