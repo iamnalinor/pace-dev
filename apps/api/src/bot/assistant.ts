@@ -1,9 +1,11 @@
 import {
+  addMinutesIso,
   type CoreState,
   type EventBody,
   type EventInput,
   type Language,
   newId,
+  nextDigestAt,
   nowList,
   openInstanceOf,
   planParse,
@@ -12,18 +14,17 @@ import {
   verifyParse,
 } from "@pace/core";
 
-import type { BotStoreApi } from "../shared/contract.ts";
+import { type BotStoreApi, NOTIFY_ACTIONS } from "../shared/contract.ts";
+import type { OutgoingMessage } from "../shared/telegram-api.ts";
+
+import { clockIn } from "../shared/clock.ts";
 
 import { type ParseProvider, runParse  } from "../parse/llm.ts";
 import { buildParsePrompt } from "../parse/prompt.ts";
 import { describePlan } from "./describe.ts";
 
-export type BotButton = { readonly label: string; readonly data: string };
-
-export type BotReply = {
-  readonly text: string;
-  readonly buttons: readonly (readonly BotButton[])[];
-};
+/** A reply with its inline keyboard. */
+export type BotReply = OutgoingMessage;
 
 export type AssistantDeps = {
   /** The Pace user behind a Telegram account, if they ever logged in through the bot. */
@@ -43,6 +44,8 @@ export type Assistant = {
 type Pending = { readonly text: string; readonly bodies: null | readonly EventBody[] };
 
 const BOT_DEVICE = "bot";
+/** A snooze without any digest window ahead lasts this long. */
+const SNOOZE_FALLBACK_MINUTES = 3 * 60;
 const NOW_ROWS = 5;
 
 const plain = (text: string): BotReply => ({ buttons: [], text });
@@ -74,12 +77,7 @@ const buttonsFor = (id: string, language: Language, canAccept: boolean): BotRepl
 ];
 
 const timeOf = (iso: string, state: CoreState): string =>
-  new Intl.DateTimeFormat(state.settings.language, {
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    timeZone: state.settings.timezone ?? "UTC",
-  }).format(new Date(iso));
+  clockIn(iso, state.settings.language, state.settings.timezone ?? "UTC");
 
 /** The bot's conversation: free text → a preview with buttons; a button writes it. */
 export const createAssistant = (deps: AssistantDeps): Assistant => {
@@ -92,7 +90,10 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
       return plain(t("en", "bot.notLinked"));
     }
     const store = deps.storeOf(userId);
-    const { state } = await store.read(deps.now());
+    const now = deps.now();
+    // Every conversation tells the store where the user's notifications go.
+    await store.notifyTo(telegramId, now);
+    const { state } = await store.read(now);
     return await run(store, state);
   };
 
@@ -154,11 +155,40 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
     };
   };
 
+  /** A notification button: snooze the task's alerts, or close it from the chat. */
+  const notificationAction = async (
+    store: BotStoreApi,
+    state: CoreState,
+    action: string,
+    taskId: string,
+  ): Promise<BotReply> => {
+    const now = deps.now();
+    const { language } = state.settings;
+    const zone = state.settings.timezone ?? "UTC";
+    if (action === NOTIFY_ACTIONS.snooze) {
+      const until = nextDigestAt(now, zone, state.settings) ?? addMinutesIso(now, SNOOZE_FALLBACK_MINUTES);
+      await store.snoozeTask(taskId, until, now);
+      return plain(t(language, "notify.snoozed", { time: timeOf(until, state) }));
+    }
+    const isDone = action === NOTIFY_ACTIONS.done;
+    const failure = await apply(
+      store,
+      [{ payload: { outcome: isDone ? "done" : "cancelled", taskId }, type: "task.closed" }],
+      language,
+    );
+    return plain(failure ?? t(language, isDone ? "notify.closedDone" : "notify.closedCancelled"));
+  };
+
   return {
     choose: async (telegramId, data) =>
       await withUser(telegramId, async (store, state) => {
         const { language } = state.settings;
-        const [action = "", id = ""] = data.split(":", 2);
+        const split = data.indexOf(":");
+        const action = data.slice(0, Math.max(split, 0));
+        const id = data.slice(split + 1);
+        if ((Object.values(NOTIFY_ACTIONS) as readonly string[]).includes(action)) {
+          return await notificationAction(store, state, action, id);
+        }
         const pending = (await store.recall(id)) as Pending | undefined;
         if (pending === undefined) {
           return plain(t(language, "bot.expired"));

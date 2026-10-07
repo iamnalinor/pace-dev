@@ -1,22 +1,33 @@
 import { DurableObject } from "cloudflare:workers";
-import { and, asc, eq, gt, max } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, like, lte, max, or, type SQL } from "drizzle-orm";
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
 import {
   autoOutcomeEvents,
+  evaluateNotifications,
   type Event,
   type EventInput,
+  INITIAL_NOTIFY_MEMORY,
   missingInstanceEvents,
+  newId,
+  nextAlarmAt,
+  type NotifyDecision,
+  type NotifyMemory,
+  notifyPlan,
   ok,
   parseEvent,
+  type PlannedNotification,
   type Result,
+  snooze,
 } from "@pace/core";
 
 import type {
   ApplyError,
   ApplyMeta,
   ApplyResult,
+  DecisionQuery,
+  DecisionRecord,
   DryRunResult,
   JsonValue,
   Observation,
@@ -24,8 +35,11 @@ import type {
   StoredEvent,
 } from "../shared/contract.ts";
 
+import { loadConfig } from "../shared/config.ts";
+import { sendTelegramMessage, telegramFetch, type TelegramTarget } from "../shared/telegram-api.ts";
 import migrations from "../../drizzle/do/migrations.js";
 import { coreValidator, type EventValidator, normalizeEvent } from "./event-log.ts";
+import { notificationText } from "./notify-text.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
 import {
@@ -60,6 +74,40 @@ export type ListResult = {
 
 /** System events are the server's own: this is their device. */
 const SERVER_DEVICE_ID = "server";
+
+/** Storage keys of the notifier: the user's chat with the bot and what was already sent. */
+const NOTIFY_CHAT_KEY = "notify:chat";
+const NOTIFY_MEMORY_KEY = "notify:memory";
+
+/** The account zone wins; this only matters before any device reported one. */
+const SERVER_TZ = "UTC";
+
+export type NotifyRun = {
+  readonly sent: number;
+  readonly decisions: number;
+  readonly nextAt: null | string;
+};
+
+const toDecision = (row: typeof schema.decisions.$inferSelect): DecisionRecord => ({
+  ...row,
+  inputs: JSON.parse(row.inputs) as JsonValue,
+});
+
+const decisionFilters = (query: DecisionQuery): readonly SQL[] => [
+  ...(query.taskId === undefined ? [] : [eq(schema.decisions.taskId, query.taskId)]),
+  ...(query.from === undefined ? [] : [gte(schema.decisions.at, query.from)]),
+  ...(query.to === undefined ? [] : [lte(schema.decisions.at, query.to)]),
+  ...(query.q === undefined
+    ? []
+    : [
+        or(
+          like(schema.decisions.rule, `%${query.q}%`),
+          like(schema.decisions.outcome, `%${query.q}%`),
+          like(schema.decisions.explanation, `%${query.q}%`),
+          like(schema.decisions.inputs, `%${query.q}%`),
+        ) ?? eq(schema.decisions.id, ""),
+      ]),
+];
 
 const idOf = (raw: unknown): string =>
   typeof raw === "object" && raw !== null && "id" in raw ? String(raw.id) : "";
@@ -218,6 +266,7 @@ export class UserStore extends DurableObject {
     }
     await this.#insert(events);
     await this.derive(options.now);
+    await this.#rearm(options.now);
     return { accepted, rejected, seq: await latestSeq(this.db) };
   }
 
@@ -283,6 +332,7 @@ export class UserStore extends DurableObject {
     }
     const inserted = await this.#insert(prepared.value.events);
     await this.derive(meta.now);
+    await this.#rearm(meta.now);
     const current = await this.#current();
     return ok({
       events: inserted.map((event) => toStored(event)),
@@ -318,6 +368,111 @@ export class UserStore extends DurableObject {
     const value = await this.ctx.storage.get<JsonValue>(`memo:${key}`);
     await this.ctx.storage.delete(`memo:${key}`);
     return value;
+  }
+
+  async #notifyMemory(): Promise<NotifyMemory> {
+    return (await this.ctx.storage.get<NotifyMemory>(NOTIFY_MEMORY_KEY)) ?? INITIAL_NOTIFY_MEMORY;
+  }
+
+  /** Moves the alarm earlier when the state now calls for an earlier evaluation. */
+  async #rearm(now: string): Promise<void> {
+    if ((await this.ctx.storage.get<string>(NOTIFY_CHAT_KEY)) === undefined) {
+      return;
+    }
+    const { state } = await this.#current();
+    const next = nextAlarmAt(state, { deviceTz: SERVER_TZ, now }, await this.#notifyMemory());
+    const existing = await this.ctx.storage.getAlarm();
+    if (next !== null && (existing === null || Date.parse(next) < existing)) {
+      await this.ctx.storage.setAlarm(Date.parse(next));
+    }
+  }
+
+  async #record(decisions: readonly NotifyDecision[], now: string): Promise<void> {
+    for (const decision of decisions) {
+      await this.db.insert(schema.decisions).values({
+        ...decision,
+        at: now,
+        id: newId(),
+        inputs: JSON.stringify(decision.inputs),
+      });
+    }
+  }
+
+  /** Notifications go to this chat from now on (the bot and every login call it). */
+  async notifyTo(chatId: string, now: string): Promise<void> {
+    if ((await this.ctx.storage.get<string>(NOTIFY_CHAT_KEY)) !== chatId) {
+      await this.ctx.storage.put(NOTIFY_CHAT_KEY, chatId);
+    }
+    await this.#rearm(now);
+  }
+
+  /** Silences a task's alerts until `until`. */
+  async snoozeTask(taskId: string, until: string, now: string): Promise<void> {
+    await this.ctx.storage.put(NOTIFY_MEMORY_KEY, snooze(await this.#notifyMemory(), taskId, until));
+    await this.#rearm(now);
+  }
+
+  /** What the phone should schedule locally for the next day. */
+  async notifyPlan(now: string): Promise<readonly PlannedNotification[]> {
+    await this.derive(now);
+    const { state } = await this.#current();
+    return notifyPlan(state, { deviceTz: SERVER_TZ, now }, await this.#notifyMemory());
+  }
+
+  /**
+  One pass of the notifier: evaluates the rules, sends what is due to the user's chat,
+  logs every decision and arms the next alarm. Without a chat nothing is evaluated; without
+  a bot (`telegram` null) the decisions are still logged.
+  */
+  async runNotifications(now: string, telegram: null | TelegramTarget): Promise<NotifyRun> {
+    const chatId = await this.ctx.storage.get<string>(NOTIFY_CHAT_KEY);
+    if (chatId === undefined) {
+      return { decisions: 0, nextAt: null, sent: 0 };
+    }
+    await this.derive(now);
+    const { state } = await this.#current();
+    const evaluation = evaluateNotifications(
+      state,
+      { deviceTz: SERVER_TZ, now },
+      await this.#notifyMemory(),
+    );
+    let sent = 0;
+    for (const message of evaluation.messages) {
+      if (
+        telegram !== null &&
+        (await sendTelegramMessage(telegram, chatId, notificationText(message, state, now)))
+      ) {
+        sent += 1;
+      }
+    }
+    await this.#record(evaluation.decisions, now);
+    await this.ctx.storage.put(NOTIFY_MEMORY_KEY, evaluation.memory);
+    await (evaluation.nextAt === null
+      ? this.ctx.storage.deleteAlarm()
+      : this.ctx.storage.setAlarm(Date.parse(evaluation.nextAt)));
+    return { decisions: evaluation.decisions.length, nextAt: evaluation.nextAt, sent };
+  }
+
+  override async alarm(): Promise<void> {
+    const config = loadConfig(this.env);
+    const token = config.ok ? config.value.telegramBotToken : undefined;
+    await this.runNotifications(
+      new Date().toISOString(),
+      config.ok && token !== undefined
+        ? { apiRoot: config.value.telegramApiRoot, fetch: telegramFetch, token }
+        : null,
+    );
+  }
+
+  /** The decision log, newest first. */
+  async decisions(query: DecisionQuery): Promise<readonly DecisionRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.decisions)
+      .where(and(...decisionFilters(query)))
+      .orderBy(desc(schema.decisions.at))
+      .limit(query.limit);
+    return rows.map((row) => toDecision(row));
   }
 
   /**

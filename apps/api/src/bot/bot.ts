@@ -2,8 +2,10 @@ import type { UserFromGetMe } from "grammy/types";
 
 import { Bot, type Context } from "grammy";
 
+import type { TelegramTransport } from "../shared/telegram-api.ts";
 import type { Assistant, BotReply } from "./assistant.ts";
-import type { TelegramTransport } from "./telegram-api.ts";
+
+import { NOTIFY_ACTIONS } from "../shared/contract.ts";
 
 /** Who opened the bot, as the login flow needs them. */
 export type BotUser = {
@@ -111,9 +113,17 @@ export const createBot = (deps: BotDeps): Bot => {
       await ctx.reply(...replyOf(await assistant.message(String(ctx.from.id), ctx.message.text)));
     });
     bot.on("callback_query:data", async (ctx) => {
-      const reply = await assistant.choose(String(ctx.from.id), ctx.callbackQuery.data);
+      const { data } = ctx.callbackQuery;
+      const reply = await assistant.choose(String(ctx.from.id), data);
       await ctx.answerCallbackQuery();
-      await ctx.editMessageText(reply.text);
+      // A notification keeps its text (the buttons go away); a preview is replaced by the result.
+      const original = ctx.callbackQuery.message?.text;
+      const isNotification = Object.values(NOTIFY_ACTIONS).some((action) =>
+        data.startsWith(`${action}:`),
+      );
+      await ctx.editMessageText(
+        isNotification && original !== undefined ? `${original}\n\n${reply.text}` : reply.text,
+      );
     });
   }
   return bot;

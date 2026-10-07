@@ -11,8 +11,9 @@ import { mountAuthRoutes } from "./auth/auth-routes.ts";
 import { bindBotLogin } from "./auth/bot-login.ts";
 import { isAllowed } from "./auth/whitelist.ts";
 import { mountBotRoutes } from "./bot/bot-routes.ts";
-import { telegramFetch, type TelegramTransport } from "./bot/telegram-api.ts";
+import { telegramFetch, type TelegramTransport } from "./shared/telegram-api.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
+import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
 import { parseProviders } from "./parse/providers.ts";
 import { type Config, loadConfig } from "./shared/config.ts";
@@ -86,5 +87,6 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   mountSyncRoutes(app);
   mountLinkRoutes(app, deps.fetch);
   mountParseRoutes(app, deps.parseProviders);
+  mountNotifyRoutes(app);
   return app;
 };

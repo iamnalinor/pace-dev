@@ -2,7 +2,9 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TelegramTransport } from "../src/bot/telegram-api.ts";
+import type { TelegramTransport } from "../src/shared/telegram-api.ts";
+
+import { newId } from "@pace/core";
 
 import { createApp } from "../src/app.ts";
 import { echoParse, fakeParseModel } from "../src/parse/fake-model.ts";
@@ -227,5 +229,49 @@ describe("the bot as an assistant", () => {
     sent.length = 0;
     await webhook(startUpdate(1002, "/now"));
     expect(sent[0]?.body["text"]).toMatch(/^(Now:|Nothing to do right now\.)/u);
+  });
+});
+
+describe("notification buttons", () => {
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("snoozes a task's alerts and closes it from the chat, keeping the notification text", async () => {
+    const token = await loginAsDev("1002");
+    const taskId = `t-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    await json("/api/sync/push", {
+      body: {
+        events: [
+          {
+            deviceId: "dev-1",
+            id: newId(),
+            occurredAt: now,
+            payload: { presetId: "personal", subtasks: [], taskId, title: "Renew the passport" },
+            precision: "exact",
+            recordedAt: now,
+            source: "app",
+            type: "task.created",
+          },
+        ],
+      },
+      token,
+    });
+
+    await webhook(callbackUpdate(1002, `z:${taskId}`));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    expect(sent[1]?.body["text"]).toMatch(/^preview\n\nSnoozed until \d\d:\d\d\.$/u);
+
+    sent.length = 0;
+    await webhook(callbackUpdate(1002, `d:${taskId}`));
+    expect(sent[1]?.body["text"]).toBe("preview\n\nMarked done ✓");
+    const pulled = await json<{ events: { type: string; source: string; payload: { taskId?: string } }[] }>(
+      "/api/sync/pull",
+      { token },
+    );
+    expect(pulled.events).toContainEqual(
+      expect.objectContaining({ payload: expect.objectContaining({ outcome: "done", taskId }), source: "bot", type: "task.closed" }),
+    );
   });
 });

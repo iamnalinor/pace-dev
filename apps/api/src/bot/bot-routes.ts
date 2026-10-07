@@ -5,7 +5,7 @@ import { webhookCallback } from "grammy";
 import type { ParseProvider } from "../parse/llm.ts";
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
-import type { TelegramTransport } from "./telegram-api.ts";
+import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { findUserIdByTelegramId } from "../auth/users.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
@@ -44,16 +44,27 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
     if (config.telegramBotToken === undefined || config.telegramWebhookSecret === undefined) {
       return c.json({ code: "bot/not-configured", message: "Telegram bot is not configured" }, 503);
     }
+    const db = d1(c.env.DB);
+    const storeOf = (userId: string) => c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId));
+    const bindLogin = deps.bindLogin(db);
     const bot = createBot({
       apiRoot: config.telegramApiRoot,
-      bindLogin: deps.bindLogin(d1(c.env.DB)),
+      // Logging in through the bot also opens the chat notifications go to.
+      bindLogin: async (user, nonce) => {
+        const outcome = await bindLogin(user, nonce);
+        const userId = outcome === "ok" ? await findUserIdByTelegramId(db, user.telegramId) : null;
+        if (userId !== null) {
+          await storeOf(userId).notifyTo(user.telegramId, new Date().toISOString());
+        }
+        return outcome;
+      },
       botInfo: config.botInfo,
       fetch: deps.telegramFetch,
       assistant: createAssistant({
         now: () => new Date().toISOString(),
         providers: deps.parseProviders(config),
-        storeOf: (userId) => c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId)),
-        userIdOf: async (telegramId) => await findUserIdByTelegramId(d1(c.env.DB), telegramId),
+        storeOf,
+        userIdOf: async (telegramId) => await findUserIdByTelegramId(db, telegramId),
       }),
       isAllowed: (telegramId) => deps.isAllowed(telegramId, config.allowedTelegramIds),
       token: config.telegramBotToken,

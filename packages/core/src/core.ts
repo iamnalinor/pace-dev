@@ -315,3 +315,18 @@ export {
   validateEventInput,
   type ValidationState,
 } from "./validation/retro-rules.ts";
+export {
+  type Digest,
+  type DigestRow,
+  evaluateNotifications,
+  INITIAL_NOTIFY_MEMORY,
+  nextAlarmAt,
+  type NotifyDecision,
+  type NotifyEvaluation,
+  type NotifyMemory,
+  type NotifyMessage,
+  snooze,
+} from "./notify/evaluate.ts";
+export { notifyPlan, type PlannedNotification } from "./notify/plan.ts";
+export type { Critical, CriticalRule, Stuck, StuckRule } from "./notify/rules.ts";
+export { nextDigestAt } from "./notify/schedule.ts";
