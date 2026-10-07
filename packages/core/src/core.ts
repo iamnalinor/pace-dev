@@ -184,6 +184,26 @@ export {
   taskOutcome,
 } from "./outcomes/outcome.ts";
 export {
+  type EventBody,
+  findTaskRef,
+  type ParseApplyError,
+  type ParsePlan,
+  parseToQuickInput,
+  planParse,
+  wallClockInstant,
+} from "./parse/apply.ts";
+export { isQuotedFrom, normalizeForEvidence } from "./parse/normalize.ts";
+export {
+  PARSE_FIELDS,
+  PARSE_INTENTS,
+  type ParseField,
+  type ParseIntent,
+  type ParseQuestion,
+  type ParseResult,
+  ParseResultSchema,
+} from "./parse/schema.ts";
+export { type VerifiedParse, verifyParse } from "./parse/verify.ts";
+export {
   BASE_PRESET_IDS,
   BASE_PRESETS,
   type BasePreset,
