@@ -2,11 +2,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * The design tokens have one source (packages/core/src/design/tokens.json). This script
- * renders them for Tailwind v4 on the web (CSS variables per theme). The Expo app reads
- * the JSON directly in tailwind.config.js. Runs as part of `bun lint`; CI fails if the
- * generated file drifts from the source.
- */
+The design tokens have one source (packages/core/src/design/tokens.json). This script
+renders them for Tailwind v4 on the web (CSS variables per theme). The Expo app reads
+the JSON directly in tailwind.config.js. Runs as part of `bun lint`; CI fails if the
+generated file drifts from the source.
+*/
 type Palette = Readonly<Record<string, string>>;
 type Tokens = {
   readonly fonts: { readonly mono: string; readonly sans: string };

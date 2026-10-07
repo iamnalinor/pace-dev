@@ -39,10 +39,10 @@ const readJson = async (c: Context<AppEnv>): Promise<unknown> => {
 };
 
 /**
- * Mounts a contract endpoint on the app: guards it when the contract says `auth: true`,
- * validates params/query/body against the shared zod schemas (422 on mismatch), runs
- * the handler, serialises its Result.
- */
+Mounts a contract endpoint on the app: guards it when the contract says `auth: true`,
+validates params/query/body against the shared zod schemas (422 on mismatch), runs
+the handler, serialises its Result.
+*/
 export const mount = <E extends EndpointShape>(
   app: Hono<AppEnv>,
   endpoint: E,

@@ -17,10 +17,10 @@ jobs:
     env:
       CI: 1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun test:mutation
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-reports

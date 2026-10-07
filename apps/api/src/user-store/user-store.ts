@@ -63,9 +63,9 @@ const hasObservation = async (db: Db, observation: Observation): Promise<boolean
 };
 
 /**
- * One instance per user (id = user id): the event log, projections, decisions and
- * alarms. Migrations run before the first request touches storage.
- */
+One instance per user (id = user id): the event log, projections, decisions and
+alarms. Migrations run before the first request touches storage.
+*/
 export class UserStore extends DurableObject {
   readonly db: Db;
 
@@ -85,10 +85,10 @@ export class UserStore extends DurableObject {
   }
 
   /**
-   * Appends events in the given order. Known ids are accepted again without a second
-   * copy (clients retry freely); an event the validator refuses is reported in
-   * `rejected` and the rest of the batch still goes in.
-   */
+  Appends events in the given order. Known ids are accepted again without a second
+  copy (clients retry freely); an event the validator refuses is reported in
+  `rejected` and the rest of the batch still goes in.
+  */
   async append(raw: readonly unknown[], options: AppendOptions): Promise<AppendResult> {
     const validateEvent = options.validateEvent ?? coreValidator;
     const accepted: string[] = [];

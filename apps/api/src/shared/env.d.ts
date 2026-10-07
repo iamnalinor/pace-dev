@@ -14,9 +14,9 @@ declare global {
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
       /**
-       * The OAuth helpers the provider in worker.ts attaches to the env of every request it
-       * hands to the Hono app (consent, grants). Absent when the app runs without the provider.
-       */
+      The OAuth helpers the provider in worker.ts attaches to the env of every request it
+      hands to the Hono app (consent, grants). Absent when the app runs without the provider.
+      */
       OAUTH_PROVIDER?: OAuthHelpers;
     }
   }

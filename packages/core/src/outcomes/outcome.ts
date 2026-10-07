@@ -39,10 +39,10 @@ export const subtaskOutcome = (subtask: Subtask, dueAt: null | string): SubtaskO
   subtask.submittedAt === null ? "pending" : lateness(subtask.submittedAt, dueAt);
 
 /**
- * Per-subtask submission: the submitted problems decide, and the ones still unsubmitted
- * when the task was closed as done were simply not needed. Whole submission (or a
- * per-subtask task without problems) goes by the closing instant.
- */
+Per-subtask submission: the submitted problems decide, and the ones still unsubmitted
+when the task was closed as done were simply not needed. Whole submission (or a
+per-subtask task without problems) goes by the closing instant.
+*/
 const doneOutcome = (
   task: Task,
   closedAt: string,
@@ -56,10 +56,10 @@ const doneOutcome = (
 };
 
 /**
- * `null` while the task is open. An automatic `cancelled_missed` is beaten by a retro
- * "done before the deadline" because the reducer keeps the earliest closure; the action
- * layer also revokes the automatic event so the log tells the same story.
- */
+`null` while the task is open. An automatic `cancelled_missed` is beaten by a retro
+"done before the deadline" because the reducer keeps the earliest closure; the action
+layer also revokes the automatic event so the log tells the same story.
+*/
 export const taskOutcome = (task: Task, preset: ResolvedPreset): null | Outcome => {
   if (task.closed === null) {
     return null;
@@ -146,10 +146,10 @@ const compare = (a: AutoOutcomeEvent, b: AutoOutcomeEvent): number => {
 };
 
 /**
- * The automatic outcomes due by `now`: `cancelled_missed` at the final deadline and
- * `skipped` for empty recurring instances a day after their due date. Deterministic ids
- * (`auto:<taskId>:<kind>`) keep them idempotent across devices and the server.
- */
+The automatic outcomes due by `now`: `cancelled_missed` at the final deadline and
+`skipped` for empty recurring instances a day after their due date. Deterministic ids
+(`auto:<taskId>:<kind>`) keep them idempotent across devices and the server.
+*/
 export const autoOutcomeEvents = (input: AutoOutcomeInput): readonly EventInput[] =>
   Object.values(input.tasks.byId)
     .filter(isOpen)

@@ -34,9 +34,9 @@ export type Evaluation = {
 };
 
 /**
- * Soft horizon implied by the importance: ASAP wants the task done by the end of the day
- * (in the account zone), Prioritized within three days of being prioritized.
- */
+Soft horizon implied by the importance: ASAP wants the task done by the end of the day
+(in the account zone), Prioritized within three days of being prioritized.
+*/
 const implicitHorizon = (input: UrgencyInput, at: string): null | string => {
   switch (input.importance) {
     case "asap": {

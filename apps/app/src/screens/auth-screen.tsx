@@ -7,9 +7,9 @@ import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
 
 /**
- * Landing for `pace://auth?token=…` and `https://pace.nalinor.dev/app/auth?token=…`:
- * adopts the token, then goes home. A missing or rejected token offers the login screen.
- */
+Landing for `pace://auth?token=…` and `https://pace.nalinor.dev/app/auth?token=…`:
+adopts the token, then goes home. A missing or rejected token offers the login screen.
+*/
 export const AuthScreen = () => {
   const t = useT();
   const router = useRouter();

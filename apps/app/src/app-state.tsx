@@ -52,9 +52,9 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
 };
 
 /**
- * Wires auth → API → app state → sync for the whole app. Renders a blank view until the
- * platform adapters are ready (the splash screen is still up), then the children.
- */
+Wires auth → API → app state → sync for the whole app. Renders a blank view until the
+platform adapters are ready (the splash screen is still up), then the children.
+*/
 export const PaceProvider = ({
   children,
   runtime: provided,

@@ -85,9 +85,9 @@ const deletePending = async (db: SQLiteDatabase, ids: readonly string[]): Promis
 };
 
 /**
- * `EventStore` on expo-sqlite (`pace.db`, WAL). Events are stored as JSON next to their
- * `occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor.
- */
+`EventStore` on expo-sqlite (`pace.db`, WAL). Events are stored as JSON next to their
+`occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor.
+*/
 export const createSqliteEventStore = (): EventStore => {
   let connection: Promise<SQLiteDatabase> | undefined;
   const db = async (): Promise<SQLiteDatabase> => {

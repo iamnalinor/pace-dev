@@ -99,10 +99,10 @@ const checkTask = (state: ValidationState, input: TaskInput): RetroError | undef
 };
 
 /**
- * What a retro edit may not do (spec «Актуализация задним числом»), checked before an event
- * is appended. Corrections and events that are not about a task pass through untouched;
- * the reducer never validates, so this is the one gate.
- */
+What a retro edit may not do (spec «Актуализация задним числом»), checked before an event
+is appended. Corrections and events that are not about a task pass through untouched;
+the reducer never validates, so this is the one gate.
+*/
 export const validateEventInput = (
   state: ValidationState,
   input: EventInput,

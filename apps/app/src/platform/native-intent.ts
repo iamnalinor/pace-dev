@@ -5,9 +5,9 @@ export const APP_LINK_PREFIX = "https://pace.nalinor.dev/app";
 const SHARE_INTENT = /^[a-z][a-z0-9+.-]*:\/\/dataUrl=/i;
 
 /**
- * Rewrites a system path into an in-app route: App Links drop the `/app` prefix, share
- * intents land on the Add screen, everything else (including `pace://` links) passes through.
- */
+Rewrites a system path into an in-app route: App Links drop the `/app` prefix, share
+intents land on the Add screen, everything else (including `pace://` links) passes through.
+*/
 export const mapSystemPath = (path: string): string => {
   if (SHARE_INTENT.test(path)) {
     return "/add";

@@ -3,11 +3,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Brand assets (design board "08 · Step"). The mark is two chevrons and a dot; the favicon is
- * the chevrons on a lime tile. This script is the single source for every logo SVG in
- * assets/logo and for the committed PNG icons of the web app and the Expo app. Rerun with
- * `bun scripts/generate-icons.ts` after changing the mark; the output is deterministic.
- */
+Brand assets (design board "08 · Step"). The mark is two chevrons and a dot; the favicon is
+the chevrons on a lime tile. This script is the single source for every logo SVG in
+assets/logo and for the committed PNG icons of the web app and the Expo app. Rerun with
+`bun scripts/generate-icons.ts` after changing the mark; the output is deterministic.
+*/
 type Palette = { readonly accent: string; readonly fg: string; readonly track: string };
 type LogoFile = { readonly path: string; readonly svg: string };
 type IconSpec = { readonly path: string; readonly size: number; readonly svg: string };
@@ -30,11 +30,11 @@ const markShapes = ({ accent, fg, track }: Palette): string =>
   ].join("\n  ");
 
 /**
- * The favicon's chevrons in a 120x120 tile (no <svg> wrapper, no tile). Two chevrons carry
- * their weight on the left, so a geometrically centred pair reads as shifted left: the pair
- * is drawn 5 units to the right of centre (optical centring) and 10% smaller, which keeps the
- * right tip inside the maskable safe zone (a 48-unit circle) after the shift.
- */
+The favicon's chevrons in a 120x120 tile (no <svg> wrapper, no tile). Two chevrons carry
+their weight on the left, so a geometrically centred pair reads as shifted left: the pair
+is drawn 5 units to the right of centre (optical centring) and 10% smaller, which keeps the
+right tip inside the maskable safe zone (a 48-unit circle) after the shift.
+*/
 const faviconShapes = ({ accent, track }: Palette): string =>
   [
     `<path d="M30.8 29.4 L61.4 60 L30.8 90.6" ${STROKE} stroke="${track}" stroke-width="18"/>`,

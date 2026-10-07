@@ -124,9 +124,9 @@ const endWaiting = (task: Task, at: string): Task =>
     : task;
 
 /**
- * Work implies "in progress", but only from "not started": an explicit paused or waiting
- * status set by the user is never overridden by an implicit one.
- */
+Work implies "in progress", but only from "not started": an explicit paused or waiting
+status set by the user is never overridden by an implicit one.
+*/
 const touched = (task: Task, at: string): Task => {
   if (task.status === "not_started") {
     return { ...task, status: "in_progress", statusSince: at, touched: true };
@@ -292,11 +292,11 @@ const created = (state: TasksState, event: EventOf<"task.created">): TasksState 
   taskById(state, event.payload.taskId) === undefined ? put(state, fromCreated(event)) : state;
 
 /**
- * Folds every task event plus `focus.started` / `focus.ended`. Dumb by design: it records
- * what happened and never validates (`validation/retro-rules.ts` does that on input) nor
- * re-interprets outcomes (`outcomes/outcome.ts` derives them). Untouched state keeps its
- * reference.
- */
+Folds every task event plus `focus.started` / `focus.ended`. Dumb by design: it records
+what happened and never validates (`validation/retro-rules.ts` does that on input) nor
+re-interprets outcomes (`outcomes/outcome.ts` derives them). Untouched state keeps its
+reference.
+*/
 export const taskReducer: Reducer<TasksState> = (state, event) => {
   if (event.type === "task.created") {
     return created(state, event);

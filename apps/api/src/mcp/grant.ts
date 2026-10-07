@@ -21,10 +21,10 @@ const AuthSchema = z.object({ scope: z.array(z.string()) });
 const authOf = (ctx: ExecutionContext): unknown => ("auth" in ctx ? ctx.auth : undefined);
 
 /**
- * Reads the grant the OAuth provider attached to the execution context. A token minted
- * before a props change (or by something else entirely) fails here instead of deep inside
- * a tool.
- */
+Reads the grant the OAuth provider attached to the execution context. A token minted
+before a props change (or by something else entirely) fails here instead of deep inside
+a tool.
+*/
 export const readGrant = (ctx: ExecutionContext): Result<McpGrant, "mcp/invalid-grant"> => {
   const props = McpPropsSchema.safeParse(ctx.props);
   const auth = AuthSchema.safeParse(authOf(ctx));

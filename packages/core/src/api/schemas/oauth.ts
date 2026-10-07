@@ -4,9 +4,9 @@ import { err, ok, type Result } from "../../result.ts";
 import { TelegramLoginSchema } from "./auth.ts";
 
 /**
- * Every scope the OAuth provider can grant to an MCP client. Tools declare the one they
- * need; `offline_access` only asks for a refresh token.
- */
+Every scope the OAuth provider can grant to an MCP client. Tools declare the one they
+need; `offline_access` only asks for a refresh token.
+*/
 export const OAUTH_SCOPES = [
   "tasks:read",
   "tasks:write",
@@ -24,10 +24,10 @@ const isOAuthScope = (value: string): value is OAuthScope =>
   OAuthScopeSchema.safeParse(value).success;
 
 /**
- * The scopes the consent page offers for a request: what the client asked for, limited to
- * the ones Pace knows. A client that asks for nothing (most MCP clients, when the resource
- * names no baseline) is offered everything and the person decides.
- */
+The scopes the consent page offers for a request: what the client asked for, limited to
+the ones Pace knows. A client that asks for nothing (most MCP clients, when the resource
+names no baseline) is offered everything and the person decides.
+*/
 export const requestedScopes = (requested: readonly string[]): readonly OAuthScope[] => {
   const known = requested.filter(isOAuthScope);
   return known.length === 0 ? OAUTH_SCOPES : [...new Set(known)];

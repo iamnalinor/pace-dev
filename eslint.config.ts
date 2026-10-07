@@ -1,10 +1,10 @@
 import type { Linter } from "eslint";
 
 /**
- * One flat config for the whole monorepo. Principle: as strict as possible, except
- * where a rule makes code worse — every such exception is disabled here WITH a reason.
- * See docs/linting.md for the rationale behind the tool chain.
- */
+One flat config for the whole monorepo. Principle: as strict as possible, except
+where a rule makes code worse — every such exception is disabled here WITH a reason.
+See docs/linting.md for the rationale behind the tool chain.
+*/
 import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import eslintReact from "@eslint-react/eslint-plugin";
 import eslint from "@eslint/js";
@@ -509,6 +509,8 @@ export default defineConfig([
     files: CONFIG_FILES,
     rules: {
       "import-x/no-default-export": "off",
+      // A config file is one `export default defineConfig(...)` call by design.
+      "unicorn/no-top-level-side-effects": "off",
       // Tool configs are declarative lists; several plugins ship without type definitions.
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",

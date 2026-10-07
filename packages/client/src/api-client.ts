@@ -49,9 +49,9 @@ const withQuery = (path: string, query: Readonly<Record<string, string>> | undef
 };
 
 /**
- * Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
- * token is read on every request so a login or logout takes effect immediately.
- */
+Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
+token is read on every request so a login or logout takes effect immediately.
+*/
 export const createApiClient = (options: {
   readonly baseUrl: string;
   readonly fetch?: FetchLike;

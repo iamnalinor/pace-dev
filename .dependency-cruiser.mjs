@@ -1,13 +1,13 @@
 /**
- * Architecture as code. `bun lint` fails when a dependency crosses a boundary.
- *
- *   apps/app ─┐
- *   apps/web ─┼─► packages/client ─► packages/core (incl. the zod API contract)
- *   apps/api ─┴───────────────────► packages/core
- *
- * core is pure (no platform, no other workspace); client never imports an app or the API;
- * apps never import each other; API features only reach other features through shared/.
- */
+Architecture as code. `bun lint` fails when a dependency crosses a boundary.
+
+  apps/app ─┐
+  apps/web ─┼─► packages/client ─► packages/core (incl. the zod API contract)
+  apps/api ─┴───────────────────► packages/core
+
+core is pure (no platform, no other workspace); client never imports an app or the API;
+apps never import each other; API features only reach other features through shared/.
+*/
 import { builtinModules } from "node:module";
 
 const API_FEATURE = "^apps/api/src/([^/]+)/";

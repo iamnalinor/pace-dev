@@ -3,9 +3,9 @@ import type { z } from "zod";
 export type HttpMethod = "DELETE" | "GET" | "POST" | "PUT";
 
 /**
- * One HTTP endpoint, described once and shared by the Worker (which mounts it with
- * validation) and the clients (which call it, typed). Paths use Hono's `:param` syntax.
- */
+One HTTP endpoint, described once and shared by the Worker (which mounts it with
+validation) and the clients (which call it, typed). Paths use Hono's `:param` syntax.
+*/
 export type EndpointShape = {
   readonly method: HttpMethod;
   readonly path: `/${string}`;

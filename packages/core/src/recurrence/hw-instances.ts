@@ -47,17 +47,22 @@ type RecurringPreset = {
   readonly recurrence: Recurrence;
 };
 
+/** The preset with its resolved schedule, or null when archived or without a recurrence. */
+const recurringPreset = (presets: PresetsState, preset: Preset): null | RecurringPreset => {
+  if (preset.archived) {
+    return null;
+  }
+  const resolved = resolvePreset(presets, preset.id);
+  return resolved.ok && resolved.value.recurrence !== null
+    ? { preset, resolved: resolved.value, recurrence: resolved.value.recurrence }
+    : null;
+};
+
 /** Non-archived presets whose chain resolves to a schedule; the built-ins carry none. */
 const recurringPresets = (presets: PresetsState): readonly RecurringPreset[] =>
-  Object.values(presets.byId).flatMap((preset) => {
-    if (preset.archived) {
-      return [];
-    }
-    const resolved = resolvePreset(presets, preset.id);
-    return resolved.ok && resolved.value.recurrence !== null
-      ? [{ preset, resolved: resolved.value, recurrence: resolved.value.recurrence }]
-      : [];
-  });
+  Object.values(presets.byId)
+    .map((preset) => recurringPreset(presets, preset))
+    .filter((candidate): candidate is RecurringPreset => candidate !== null);
 
 const toIso = (date: Date): string => new Date(date).toISOString();
 
@@ -68,11 +73,11 @@ type Week = {
 };
 
 /**
- * The instant of `slot` in the week that begins `weeks` weeks after `week`. Days are added
- * and the clock is set on the zone's calendar, so a schedule keeps its wall-clock time
- * across a summer-time change; a time that does not exist on the change night resolves
- * forward.
- */
+The instant of `slot` in the week that begins `weeks` weeks after `week`. Days are added
+and the clock is set on the zone's calendar, so a schedule keeps its wall-clock time
+across a summer-time change; a time that does not exist on the change night resolves
+forward.
+*/
 const slotInstant = (week: Week, weeks: number, slot: WeekSlot): string => {
   const context = { in: tz(week.zone) };
   const day = addDays(week.startIso, weeks * 7 + slot.weekday - 1, context);
@@ -116,9 +121,9 @@ const expected = (presets: PresetsState, now: string): readonly Expected[] =>
     .toSorted(compareExpected);
 
 /**
- * Every instance a recurring preset expects for the ISO week containing `now` and the
- * following one. Archived presets expect nothing; existing tasks do not matter here.
- */
+Every instance a recurring preset expects for the ISO week containing `now` and the
+following one. Archived presets expect nothing; existing tasks do not matter here.
+*/
 export const expectedInstances = (presets: PresetsState, now: string): readonly InstanceSlot[] =>
   expected(presets, now).map((item) => item.slot);
 
@@ -135,10 +140,10 @@ const latestOf = (instances: readonly Task[]): Task | undefined =>
   instances.find((task) => instances.every((other) => other.id <= task.id));
 
 /**
- * The creation of one instance. It is numbered after every instance of the preset so far,
- * closed ones included, and inherits the estimate of the most recent one: the student
- * knows better than the preset how long a sheet takes.
- */
+The creation of one instance. It is numbered after every instance of the preset so far,
+closed ones included, and inherits the estimate of the most recent one: the student
+knows better than the preset how long a sheet takes.
+*/
 const instanceEvent = (
   slot: InstanceSlot,
   source: RecurringPreset,
@@ -169,11 +174,11 @@ const instanceEvent = (
 };
 
 /**
- * One `task.created` per expected slot that is already issued and has no task yet.
- * The deterministic id (`hw:<presetId>:<isoWeek>`) makes this idempotent across devices
- * and the server. At most one slot per preset can be issued at a time (the next week's
- * issue instant is always after `now`), so numbering within one batch cannot collide.
- */
+One `task.created` per expected slot that is already issued and has no task yet.
+The deterministic id (`hw:<presetId>:<isoWeek>`) makes this idempotent across devices
+and the server. At most one slot per preset can be issued at a time (the next week's
+issue instant is always after `now`), so numbering within one batch cannot collide.
+*/
 export const missingInstanceEvents = (input: MissingInstancesInput): readonly EventInput[] =>
   expected(input.presets, input.now)
     .filter(

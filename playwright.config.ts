@@ -18,9 +18,9 @@ const E2E_TELEGRAM_IDS = "1919230638,1001,1002,1003";
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
 
 /**
- * End-to-end: the production web build (vite preview) against the real Worker running
- * locally in wrangler dev (workerd with local D1/KV/Durable Objects, ENVIRONMENT=test).
- */
+End-to-end: the production web build (vite preview) against the real Worker running
+locally in wrangler dev (workerd with local D1/KV/Durable Objects, ENVIRONMENT=test).
+*/
 export default defineConfig({
   forbidOnly: isCi,
   fullyParallel: true,

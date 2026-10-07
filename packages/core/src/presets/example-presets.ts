@@ -46,9 +46,9 @@ const EXAMPLES: Readonly<
 };
 
 /**
- * The one-click seed offered on first login. The ids are fixed, so applying the seed
- * again creates nothing: the reducer ignores a `preset.created` for an existing id.
- */
+The one-click seed offered on first login. The ids are fixed, so applying the seed
+again creates nothing: the reducer ignores a `preset.created` for an existing id.
+*/
 export const exampleCoursePresetEvents = (now: string): readonly EventInput[] =>
   EXAMPLE_PRESET_IDS.map((id) => ({
     type: "preset.created",

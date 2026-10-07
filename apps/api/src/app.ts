@@ -26,9 +26,9 @@ export type AppDeps = {
 };
 
 /**
- * Builds the HTTP app. No bindings are read at module scope: everything comes from
- * `c.env` per request, so tests and wrangler dev can supply different bindings.
- */
+Builds the HTTP app. No bindings are read at module scope: everything comes from
+`c.env` per request, so tests and wrangler dev can supply different bindings.
+*/
 const PLATFORM_DEPS: AppDeps = { telegramFetch };
 
 export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {

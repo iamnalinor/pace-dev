@@ -1,9 +1,9 @@
 import type { UrgencyInput } from "./input.ts";
 
 /**
- * The TRK-231 artboard timeline: started Monday 09:00, due Friday 18:00 (a 105 h window);
- * "now" is 65 % through the window with 40 % progress.
- */
+The TRK-231 artboard timeline: started Monday 09:00, due Friday 18:00 (a 105 h window);
+"now" is 65 % through the window with 40 % progress.
+*/
 export const TRK_START = "2026-10-05T09:00:00.000Z";
 export const TRK_DUE = "2026-10-09T18:00:00.000Z";
 export const TRK_NOW = "2026-10-08T05:15:00.000Z";

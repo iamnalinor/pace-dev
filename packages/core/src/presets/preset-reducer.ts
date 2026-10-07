@@ -19,12 +19,12 @@ const put = (state: PresetsState, preset: Preset): PresetsState => ({
 });
 
 /**
- * A creation is ignored when the id is taken (this is what makes the example seed
- * idempotent), when it is a built-in id or not a slug, or when the definition is invalid.
- * An unknown parent is stored as given: `resolvePreset` reports it, the editor prevents it.
- */
+A creation is ignored when the id is taken (this is what makes the example seed
+idempotent), when it is a built-in id or not a slug, or when the definition is invalid.
+An unknown parent is stored as given: `resolvePreset` reports it, the editor prevents it.
+*/
 const created = (state: PresetsState, event: EventOf<"preset.created">): PresetsState => {
-  const { id, name, extends: parent, definition } = event.payload;
+  const { id, name, extends: parent = null, definition } = event.payload;
   if (
     !PresetIdSchema.safeParse(id).success ||
     isBuiltInPreset(id) ||
@@ -39,7 +39,7 @@ const created = (state: PresetsState, event: EventOf<"preset.created">): Presets
   return put(state, {
     id,
     name,
-    extends: parent ?? null,
+    extends: parent,
     builtIn: false,
     archived: false,
     definition: parsed.value,

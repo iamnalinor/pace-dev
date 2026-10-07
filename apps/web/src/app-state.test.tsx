@@ -10,14 +10,14 @@ import { createTestServices, signedInSession } from "./test/services.ts";
 const Probe = () => {
   const t = useT();
   const { status, user } = useAuth();
-  const { lastError } = useSync();
+  const sync = useSync();
   return (
     <div>
       <p>{t("nav.now")}</p>
       <p>{t("login.openBot", { bot: "@Bot" })}</p>
       <p data-testid="auth">{status}</p>
       <p data-testid="user">{user?.name ?? "-"}</p>
-      <p data-testid="sync-error">{lastError ?? "-"}</p>
+      <p data-testid="sync-error">{sync.lastError ?? "-"}</p>
     </div>
   );
 };

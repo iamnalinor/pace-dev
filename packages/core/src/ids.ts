@@ -6,9 +6,9 @@ export type Prng = () => number;
 export type IdFactory = (seedTime?: number) => string;
 
 /**
- * ULIDs sort by creation time and stay unique within one millisecond thanks to the
- * monotonic counter. One factory per process keeps the counter shared.
- */
+ULIDs sort by creation time and stay unique within one millisecond thanks to the
+monotonic counter. One factory per process keeps the counter shared.
+*/
 export const createIdFactory = (prng?: Prng): IdFactory => {
   const make = monotonicFactory(prng);
   return (seedTime?: number): string => make(seedTime);

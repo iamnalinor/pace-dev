@@ -1,7 +1,7 @@
 /**
- * Urgency constants. Rough but reasonable starting values per the spec; a preset may
- * override the policy parameters, and stage 3 calibrates estimates from tracked time.
- */
+Urgency constants. Rough but reasonable starting values per the spec; a preset may
+override the policy parameters, and stage 3 calibrates estimates from tracked time.
+*/
 
 /** Importance multipliers: `score = multiplier × urgency + rank bonus`. */
 export const MULTIPLIERS = {
@@ -18,9 +18,9 @@ export const U_FLOOR = 0.25;
 export const U_MAX = 3;
 
 /**
- * How much the age policy can add on top of the floor. Chosen so an aged Nice-to-have
- * (at most 1 × (U_FLOOR + AGE_SAT) = 0.65) never beats a fresh Normal task (3 × U_FLOOR = 0.75).
- */
+How much the age policy can add on top of the floor. Chosen so an aged Nice-to-have
+(at most 1 × (U_FLOOR + AGE_SAT) = 0.65) never beats a fresh Normal task (3 × U_FLOOR = 0.75).
+*/
 export const AGE_SAT = 0.4;
 
 /** Time constant of the age curve: after this many days the age term reaches 1 − e⁻¹ of AGE_SAT. */

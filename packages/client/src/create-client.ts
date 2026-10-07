@@ -28,9 +28,9 @@ export type PaceClientOptions = {
 const wallClock = (): string => new Date().toISOString();
 
 /**
- * Wires API client → auth → app state → sync on the platform adapters: the one way a shell
- * builds the client. A device that starts with a stored token refreshes its user right away.
- */
+Wires API client → auth → app state → sync on the platform adapters: the one way a shell
+builds the client. A device that starts with a stored token refreshes its user right away.
+*/
 export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   const now = options.now ?? wallClock;
   // The API client reads the token synchronously, so it is wired before auth exists.

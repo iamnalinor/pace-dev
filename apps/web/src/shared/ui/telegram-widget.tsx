@@ -10,9 +10,9 @@ type Props = {
 };
 
 /**
- * The official Telegram Login Widget: the script replaces itself with an iframe button and
- * calls `window.onTelegramAuth` with the signed payload.
- */
+The official Telegram Login Widget: the script replaces itself with an iframe button and
+calls `window.onTelegramAuth` with the signed payload.
+*/
 export const TelegramWidget = ({ botUsername, onAuth }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const onAuthRef = useRef(onAuth);

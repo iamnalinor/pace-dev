@@ -11,10 +11,10 @@ import {
 import { err, ok, type Result } from "../result.ts";
 
 /**
- * Lowercase slug: `[a-z0-9]` segments joined by single `.` or `-`, 1–64 characters. Each
- * separator must be followed by a segment character, which rules out trailing and doubled
- * separators without a nested quantifier.
- */
+Lowercase slug: `[a-z0-9]` segments joined by single `.` or `-`, 1–64 characters. Each
+separator must be followed by a segment character, which rules out trailing and doubled
+separators without a nested quantifier.
+*/
 export const PresetIdSchema = z
   .string()
   .max(64)
@@ -67,10 +67,10 @@ const NotifySchema = z.strictObject({
 });
 
 /**
- * Strict: unknown keys fail, so a typo in the editor or an MCP call cannot silently become
- * an ignored setting. Every key is exact-optional (absent, never `undefined`) because a
- * preset stores only what it changes.
- */
+Strict: unknown keys fail, so a typo in the editor or an MCP call cannot silently become
+an ignored setting. Every key is exact-optional (absent, never `undefined`) because a
+preset stores only what it changes.
+*/
 export const PresetDefinitionSchema = z.strictObject({
   urgencyPolicy: z.enum(["age", "lag", "pace", "resubmission"]).exactOptional(),
   defaultImportance: ImportanceSchema.exactOptional(),

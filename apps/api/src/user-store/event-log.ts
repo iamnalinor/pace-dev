@@ -1,10 +1,10 @@
 import { ok, parseEvent, type Result, type SyncEvent } from "@pace/core";
 
 /**
- * The validation seam of the log: decides whether a raw envelope may be appended.
- * The default is the core event schema (per-type payloads, ULID or system ids, UTC
- * instants); unknown event types never reach storage.
- */
+The validation seam of the log: decides whether a raw envelope may be appended.
+The default is the core event schema (per-type payloads, ULID or system ids, UTC
+instants); unknown event types never reach storage.
+*/
 export type EventValidator = (raw: unknown) => Result<SyncEvent, string>;
 
 export const coreValidator: EventValidator = (raw) => parseEvent(raw);

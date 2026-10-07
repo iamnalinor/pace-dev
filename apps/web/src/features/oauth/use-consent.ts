@@ -58,9 +58,9 @@ const identityBody = (identity: Identity) =>
   identity.kind === "dev" ? { devTelegramId: identity.telegramId } : { telegram: identity.payload };
 
 /**
- * The consent page's state machine: load what to show for the request, let the person tick
- * scopes and prove who they are, then Allow or Deny — both end in a redirect to the client.
- */
+The consent page's state machine: load what to show for the request, let the person tick
+scopes and prove who they are, then Allow or Deny — both end in a redirect to the client.
+*/
 export const useConsent = (authQuery: string, redirect: (url: string) => void): Consent => {
   const { api } = useServices();
   const [phase, setPhase] = useState<Phase>(() =>

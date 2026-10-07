@@ -26,9 +26,9 @@ const didPersist = (value: null | string): boolean => {
 };
 
 /**
- * The bearer token in localStorage. When storage is unavailable (private window, blocked
- * site data) the token lives in memory for this page load instead of failing the login.
- */
+The bearer token in localStorage. When storage is unavailable (private window, blocked
+site data) the token lives in memory for this page load instead of failing the login.
+*/
 export const createLocalSessionStore = (): SessionStore => {
   let memory: null | string = null;
   return {

@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 /**
- * Fails when the schema changed without a migration: regenerates both migration sets
- * into a temp directory and compares the SQL with what is committed. Run by `bun lint`.
- */
+Fails when the schema changed without a migration: regenerates both migration sets
+into a temp directory and compares the SQL with what is committed. Run by `bun lint`.
+*/
 const configs = [
   { committed: "drizzle/d1", config: "drizzle.d1.config.ts", env: "DRIZZLE_OUT_D1" },
   { committed: "drizzle/do", config: "drizzle.do.config.ts", env: "DRIZZLE_OUT_DO" },

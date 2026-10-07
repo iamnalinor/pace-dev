@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 /**
- * The structural event envelope exchanged by clients and the Worker. The payload is
- * opaque here; its per-type shape is validated by the core event schema (wired into
- * the user store's `validateEvent` seam), not by the transport.
- */
+The structural event envelope exchanged by clients and the Worker. The payload is
+opaque here; its per-type shape is validated by the core event schema (wired into
+the user store's `validateEvent` seam), not by the transport.
+*/
 export const SyncEventSchema = z.object({
   id: z.string().min(1).max(64),
   type: z.string().min(1).max(64),

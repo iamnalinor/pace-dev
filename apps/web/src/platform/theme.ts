@@ -44,9 +44,9 @@ export const setThemePreference = (preference: ThemePreference): void => {
 const currentPreference = (): ThemePreference => memory.fallback ?? readThemePreference();
 
 /**
- * Sets `<html data-theme>` so the token stylesheet picks the palette; `system` removes
- * the attribute and lets `prefers-color-scheme` decide. Call before the first render.
- */
+Sets `<html data-theme>` so the token stylesheet picks the palette; `system` removes
+the attribute and lets `prefers-color-scheme` decide. Call before the first render.
+*/
 export const applyTheme = (preference: ThemePreference = currentPreference()): void => {
   const root = document.documentElement;
   if (preference === "system") {

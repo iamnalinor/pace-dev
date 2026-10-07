@@ -58,9 +58,9 @@ const IdentityStep = ({ consent }: { readonly consent: Consent }) => {
 };
 
 /**
- * The branded consent page an MCP client lands on: the client, the scopes it asked for, the
- * person's identity, then Allow or Deny. Both answers send the browser back to the client.
- */
+The branded consent page an MCP client lands on: the client, the scopes it asked for, the
+person's identity, then Allow or Deny. Both answers send the browser back to the client.
+*/
 export const ConsentFlow = ({ authQuery, redirect = navigateTo }: Props) => {
   const t = useT();
   const consent = useConsent(authQuery, redirect);

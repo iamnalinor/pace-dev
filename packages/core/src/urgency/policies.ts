@@ -123,10 +123,10 @@ const afterSoftTarget = (input: UrgencyInput, at: string, soft: string): PolicyT
 };
 
 /**
- * Piecewise per spec: pace until `due`, then pace against `due + softDays` over the
- * unsubmitted work, then linear growth until `finalAt`, after which the outcomes module
- * closes the task (the urgency saturates meanwhile).
- */
+Piecewise per spec: pace until `due`, then pace against `due + softDays` over the
+unsubmitted work, then linear growth until `finalAt`, after which the outcomes module
+closes the task (the urgency saturates meanwhile).
+*/
 const traceResubmission = (input: UrgencyInput, at: string): PolicyTrace => {
   if (input.dueAt === null) {
     return traceAge(input, at);

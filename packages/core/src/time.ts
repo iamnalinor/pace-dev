@@ -11,9 +11,9 @@ import {
 } from "date-fns";
 
 /**
- * An instant plus the IANA zone it was entered in. Instants are ISO 8601 strings in UTC
- * (`...Z`); the zone is kept so the UI can say "18:00 Moscow time" when the device has moved.
- */
+An instant plus the IANA zone it was entered in. Instants are ISO 8601 strings in UTC
+(`...Z`); the zone is kept so the UI can say "18:00 Moscow time" when the device has moved.
+*/
 export type ZonedInstant = {
   readonly at: string;
   readonly tz: string;

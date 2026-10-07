@@ -15,12 +15,12 @@ const app = mountOAuthRoutes(createApp());
 const ACCESS_TOKEN_TTL_SECONDS = 86_400;
 
 /**
- * OAuth 2.1 authorization server and the protected MCP resource in one Worker. The provider
- * owns discovery, registration, the token endpoint and bearer validation for `/mcp`; the
- * Hono app owns `/authorize` (a redirect to the web consent page), the consent API and
- * everything else. The canonical resource is `<API_ORIGIN>/mcp`, so a token is only ever
- * valid for the origin that issued it.
- */
+OAuth 2.1 authorization server and the protected MCP resource in one Worker. The provider
+owns discovery, registration, the token endpoint and bearer validation for `/mcp`; the
+Hono app owns `/authorize` (a redirect to the web consent page), the consent API and
+everything else. The canonical resource is `<API_ORIGIN>/mcp`, so a token is only ever
+valid for the origin that issued it.
+*/
 export const providerOptions = (apiOrigin: string): OAuthProviderOptions => ({
   accessTokenTTL: ACCESS_TOKEN_TTL_SECONDS,
   apiHandler: { fetch: mcpHandler },

@@ -25,15 +25,15 @@ const templateChanged = () =>
   new Error("with-release-signing: the Expo build.gradle template changed, update the anchors");
 
 /**
- * Pure transform over the generated `android/app/build.gradle` contents.
- *
- * The template references `signingConfigs.debug` twice: once in `buildTypes.debug` and once in
- * `buildTypes.release`. Only the *last* occurrence (the release build type) switches to the
- * release config; the debug build type keeps the stock debug keystore.
- *
- * @param {string} gradle
- * @returns {string}
- */
+Pure transform over the generated `android/app/build.gradle` contents.
+
+The template references `signingConfigs.debug` twice: once in `buildTypes.debug` and once in
+`buildTypes.release`. Only the *last* occurrence (the release build type) switches to the
+release config; the debug build type keeps the stock debug keystore.
+
+@param {string} gradle
+@returns {string}
+*/
 const applyReleaseSigning = (gradle) => {
   const debugBlock = DEBUG_CONFIG.exec(gradle);
   const anchorAt = gradle.lastIndexOf(RELEASE_ANCHOR);

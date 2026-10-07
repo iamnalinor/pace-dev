@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun lint
       - name: Lint must not change files
@@ -44,7 +44,7 @@ jobs:
       EXPO_NO_GIT_STATUS: 1
       EXPO_NO_TELEMETRY: 1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - uses: actions/setup-java@v4
         with:
@@ -94,7 +94,7 @@ jobs:
           cp apps/app/android/app/build/outputs/apk/release/app-release.apk "release/pace-${{ github.ref_name }}.apk"
           ls -l release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pace-${{ github.ref_name }}-apk
           path: release/pace-${{ github.ref_name }}.apk

@@ -21,10 +21,10 @@ jobs:
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun test:llm
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: llm-regression-report

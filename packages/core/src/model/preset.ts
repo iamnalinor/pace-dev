@@ -34,9 +34,9 @@ export type WeekSlot = {
 };
 
 /**
- * A weekly homework schedule. The due slot falls in the same ISO week as the issued slot
- * when it is later in that week, otherwise in the following week (`dueWeekOffset`).
- */
+A weekly homework schedule. The due slot falls in the same ISO week as the issued slot
+when it is later in that week, otherwise in the following week (`dueWeekOffset`).
+*/
 export type Recurrence = {
   readonly issued: WeekSlot;
   readonly due: WeekSlot;

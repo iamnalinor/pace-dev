@@ -26,10 +26,10 @@ export type BotLogin = {
 };
 
 /**
- * Login flows and the session token. `token()` is synchronous (the API client reads it on
- * every request), so wire the two with a closure:
- * `const api = createApiClient({ baseUrl, token: () => auth.token() }); const auth = createAuth({ api, session });`
- */
+Login flows and the session token. `token()` is synchronous (the API client reads it on
+every request), so wire the two with a closure:
+`const api = createApiClient({ baseUrl, token: () => auth.token() }); const auth = createAuth({ api, session });`
+*/
 export type Auth = {
   readonly store: StoreApi<AuthState>;
   /** Resolves once the stored token is loaded. */
@@ -44,9 +44,9 @@ export type Auth = {
   /** Fetches the signed-in user; a 401 signs out locally. */
   readonly me: () => Promise<Result<User, string>>;
   /**
-   * Signs in with a token minted outside these flows (a browser fallback, an App Link) by
-   * loading the user behind it; a token the server rejects leaves the device signed out.
-   */
+  Signs in with a token minted outside these flows (a browser fallback, an App Link) by
+  loading the user behind it; a token the server rejects leaves the device signed out.
+  */
   readonly adoptToken: (token: string) => Promise<Result<User, string>>;
 };
 

@@ -2,9 +2,9 @@ import type { Page } from "@playwright/test";
 
 export const API_URL = "http://localhost:8787";
 /**
- * The ids the e2e Worker whitelists (playwright.config.ts). The UI login test uses the default;
- * every API-login test takes its own id so parallel tests never share account state.
- */
+The ids the e2e Worker whitelists (playwright.config.ts). The UI login test uses the default;
+every API-login test takes its own id so parallel tests never share account state.
+*/
 export const DEV_TELEGRAM_ID = "1919230638";
 
 /** Same key as apps/web/src/platform/local-session.ts. */
@@ -27,9 +27,9 @@ export const createDevSession = async (
 };
 
 /**
- * Seeds the bearer token before any page script runs, so the shell starts signed in and the
- * test skips the login UI. Call before the first `page.goto`.
- */
+Seeds the bearer token before any page script runs, so the shell starts signed in and the
+test skips the login UI. Call before the first `page.goto`.
+*/
 export const loginViaApi = async (page: Page, telegramId = DEV_TELEGRAM_ID): Promise<void> => {
   const { token } = await createDevSession(telegramId);
   await page.addInitScript(

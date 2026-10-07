@@ -85,9 +85,9 @@ export type RelativeDayContext = {
 };
 
 /**
- * `today` / `tomorrow` / `yesterday`, the weekday within the next six days, otherwise a
- * short date (with the year when it differs). Days are the zone's calendar days.
- */
+`today` / `tomorrow` / `yesterday`, the weekday within the next six days, otherwise a
+short date (with the year when it differs). Days are the zone's calendar days.
+*/
 export const formatRelativeDay = (
   atIso: string,
   nowIso: string,

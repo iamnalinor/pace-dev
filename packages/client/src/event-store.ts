@@ -1,12 +1,12 @@
 import type { Event } from "@pace/core";
 
 /**
- * Persistence port for the local event log. Platforms implement it (IndexedDB on the
- * web, SQLite in the app); `createMemoryEventStore` is the reference implementation.
- *
- * "Pending" events are local ones the server has not acknowledged yet (the outbox).
- * `append` always adds to the outbox; the caller marks remote events synced right after.
- */
+Persistence port for the local event log. Platforms implement it (IndexedDB on the
+web, SQLite in the app); `createMemoryEventStore` is the reference implementation.
+
+"Pending" events are local ones the server has not acknowledged yet (the outbox).
+`append` always adds to the outbox; the caller marks remote events synced right after.
+*/
 export type EventStore = {
   readonly listAll: () => Promise<readonly Event[]>;
   /** Idempotent by `id`: an event already stored is left untouched. */

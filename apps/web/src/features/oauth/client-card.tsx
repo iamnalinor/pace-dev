@@ -3,9 +3,9 @@ import type { OAuthClientInfo } from "@pace/core";
 import { useT } from "#web/i18n.tsx";
 
 /**
- * Who is asking and where the access goes. Every string here came from the client (its
- * registration or metadata document); React renders them as text, never as markup.
- */
+Who is asking and where the access goes. Every string here came from the client (its
+registration or metadata document); React renders them as text, never as markup.
+*/
 export const ClientCard = ({ info }: { readonly info: OAuthClientInfo }) => {
   const t = useT();
   return (

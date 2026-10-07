@@ -30,10 +30,10 @@ export type AuthProblem = Problem & {
 };
 
 /**
- * Maps what `parseAuthRequest` throws to a problem. An `AuthorizationError` is the client's
- * fault (unknown client, bad redirect URI, missing PKCE); a `CimdFetchError` means the
- * client's metadata document could not be fetched. Anything else is a bug or an outage.
- */
+Maps what `parseAuthRequest` throws to a problem. An `AuthorizationError` is the client's
+fault (unknown client, bad redirect URI, missing PKCE); a `CimdFetchError` means the
+client's metadata document could not be fetched. Anything else is a bug or an outage.
+*/
 const describeFailure = (error: unknown): AuthProblem => {
   if (error instanceof AuthorizationError) {
     return {
@@ -71,10 +71,10 @@ export type Consent = {
 };
 
 /**
- * Rebuilds the authorization request the consent page carries (`authQuery` is the query
- * string `GET /authorize` received) and validates it again: the page never sees a request
- * the provider did not accept, and nothing it posts is trusted beyond that string.
- */
+Rebuilds the authorization request the consent page carries (`authQuery` is the query
+string `GET /authorize` received) and validates it again: the page never sees a request
+the provider did not accept, and nothing it posts is trusted beyond that string.
+*/
 export const loadConsent = async (
   c: Context<AppEnv>,
   authQuery: string,

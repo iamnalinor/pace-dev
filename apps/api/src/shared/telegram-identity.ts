@@ -79,10 +79,10 @@ const identify = async (
 };
 
 /**
- * Proves who is at the keyboard (a signed Login Widget payload, or a dev id outside
- * production), applies the whitelist and returns the user row, created on first sight.
- * Shared by the web login and the MCP consent page.
- */
+Proves who is at the keyboard (a signed Login Widget payload, or a dev id outside
+production), applies the whitelist and returns the user row, created on first sight.
+Shared by the web login and the MCP consent page.
+*/
 export const resolveTelegramIdentity = async (
   db: Db,
   config: Config,

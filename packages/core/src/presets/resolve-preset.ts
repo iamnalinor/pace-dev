@@ -31,9 +31,9 @@ export type PresetInputMode = "create" | "update";
 type Chain = { readonly base: BasePreset; readonly presets: readonly Preset[] };
 
 /**
- * Follows `extends` upwards, accumulating root → leaf. A chain is valid only when it ends
- * at a built-in preset: that is what guarantees every value has a definition somewhere.
- */
+Follows `extends` upwards, accumulating root → leaf. A chain is valid only when it ends
+at a built-in preset: that is what guarantees every value has a definition somewhere.
+*/
 const walk = (
   state: PresetsState,
   id: string,
@@ -99,9 +99,9 @@ export const presetChain = (
 };
 
 /**
- * Base preset → user presets along the chain → the task's own overrides, later wins.
- * Archived presets resolve, so existing tasks keep working.
- */
+Base preset → user presets along the chain → the task's own overrides, later wins.
+Archived presets resolve, so existing tasks keep working.
+*/
 export const resolvePreset = (
   state: PresetsState,
   presetId: string,

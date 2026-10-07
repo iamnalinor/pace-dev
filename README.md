@@ -216,8 +216,8 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
 2. `/setdomain` → the web origin (`pace.nalinor.dev` for this deployment) so the Login
    Widget may run there. A bot has one widget domain.
 3. Put the username into `TELEGRAM_BOT_USERNAME` (`wrangler.jsonc` and the GitHub
-   variable), the token into the `TELEGRAM_BOT_TOKEN` secret and a random string into
-   `TELEGRAM_WEBHOOK_SECRET`.
+   variable), the token into the `TELEGRAM_BOT_TOKEN` secret; `TELEGRAM_WEBHOOK_SECRET` is optional
+   (derived from the token when unset).
 4. The deploy workflow sets the webhook to `https://<api host>/telegram/webhook` with
    that secret (`allowed_updates: message, callback_query`) and stores `getMe` as
    `BOT_INFO` so the Worker never calls Telegram on a cold start. For a manual setup call

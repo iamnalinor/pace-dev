@@ -9,15 +9,15 @@ const put = (state: ProjectsState, project: Project): ProjectsState => ({
 
 /** A second creation for an existing id is a no-op (projects are created on the fly by name). */
 const created = (state: ProjectsState, event: EventOf<"project.created">): ProjectsState => {
-  const { projectId, name, color, description } = event.payload;
+  const { projectId, name, color = null, description = null } = event.payload;
   if (projectById(state, projectId) !== undefined) {
     return state;
   }
   return put(state, {
     id: projectId,
     name,
-    color: color ?? null,
-    description: description ?? null,
+    color,
+    description,
     archived: false,
     createdAt: event.occurredAt,
   });

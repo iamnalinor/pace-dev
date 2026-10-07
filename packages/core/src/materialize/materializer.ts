@@ -27,9 +27,9 @@ const groupByTarget = <T extends Amendment | Revocation>(
 };
 
 /**
- * A revocation is active unless an active revocation targets it (so revoking a revocation
- * restores the original). A cycle (two revocations revoking each other) counts as inactive.
- */
+A revocation is active unless an active revocation targets it (so revoking a revocation
+restores the original). A cycle (two revocations revoking each other) counts as inactive.
+*/
 const isActiveRevocation = (
   revocation: Revocation,
   revokers: ReadonlyMap<string, readonly Revocation[]>,
@@ -67,10 +67,10 @@ const patched = (event: Event, amendments: readonly Amendment[]): Event => {
 };
 
 /**
- * Applies corrections: revoked events disappear, amendments patch their target's payload
- * (in `occurredAt` order). Corrections apply regardless of their own `occurredAt`, can
- * themselves be revoked, and are never part of the output. Unknown targets are ignored.
- */
+Applies corrections: revoked events disappear, amendments patch their target's payload
+(in `occurredAt` order). Corrections apply regardless of their own `occurredAt`, can
+themselves be revoked, and are never part of the output. Unknown targets are ignored.
+*/
 export const effectiveEvents = (events: readonly Event[]): readonly Event[] => {
   const revoked = revokedIds(
     events.filter((event): event is Revocation => event.type === "event.revoked"),

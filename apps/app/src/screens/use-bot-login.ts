@@ -16,10 +16,10 @@ export type BotLoginPhase =
   | { readonly kind: "waiting" };
 
 /**
- * The Telegram bot flow: mint a nonce, open the deep link, poll while this screen is
- * focused. A successful poll stores the token through `Auth`, so the caller only watches
- * the auth status; the poll is aborted whenever the screen loses focus or unmounts.
- */
+The Telegram bot flow: mint a nonce, open the deep link, poll while this screen is
+focused. A successful poll stores the token through `Auth`, so the caller only watches
+the auth status; the poll is aborted whenever the screen loses focus or unmounts.
+*/
 export const useBotLogin = (): {
   readonly phase: BotLoginPhase;
   readonly start: () => Promise<void>;

@@ -100,9 +100,9 @@ const idbBackend = (db: Db): EventStore => ({
 });
 
 /**
- * Opens IndexedDB once; when it is unavailable (some private windows, blocked site data)
- * the log lives in memory for this page load so the app still works, just without persistence.
- */
+Opens IndexedDB once; when it is unavailable (some private windows, blocked site data)
+the log lives in memory for this page load so the app still works, just without persistence.
+*/
 const openBackend = async (): Promise<EventStore> => {
   try {
     return idbBackend(await open());

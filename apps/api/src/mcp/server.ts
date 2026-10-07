@@ -27,10 +27,10 @@ const oauthError = (status: number, error: string, description: string): Respons
   Response.json({ error, error_description: description }, { status });
 
 /**
- * The protected handler behind `OAuthProvider` (`apiRoute: "/mcp"`): the provider has
- * validated the bearer and attached `ctx.props` (what consent stored) and `ctx.auth` (the
- * token's scopes). Stateless streamable HTTP: every POST is a complete JSON-RPC exchange.
- */
+The protected handler behind `OAuthProvider` (`apiRoute: "/mcp"`): the provider has
+validated the bearer and attached `ctx.props` (what consent stored) and `ctx.auth` (the
+token's scopes). Stateless streamable HTTP: every POST is a complete JSON-RPC exchange.
+*/
 export const mcpHandler = async (
   request: Request,
   env: Cloudflare.Env,

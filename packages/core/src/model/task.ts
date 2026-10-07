@@ -101,9 +101,9 @@ const SLIDER_MAX = 10;
 const sliderProgress = (task: Task): number => (task.slider ?? 0) / SLIDER_MAX;
 
 /**
- * Progress in `[0, 1]`. A task without subtasks but with a slider value follows the slider
- * whatever the mode: that is the only progress the user ever gave it.
- */
+Progress in `[0, 1]`. A task without subtasks but with a slider value follows the slider
+whatever the mode: that is the only progress the user ever gave it.
+*/
 export const progressOf = (task: Task, progressMode: ProgressMode): number => {
   if (task.subtasks.length === 0 && task.slider !== null) {
     return sliderProgress(task);

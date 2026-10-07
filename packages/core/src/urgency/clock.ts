@@ -30,8 +30,8 @@ export const earliest = (a: null | string, b: null | string): null | string => {
 };
 
 /**
- * Waiting freezes the clock at `waitingSince`: the task keeps the urgency it had when it
- * started waiting, and a retro edit of that instant moves the freeze with it.
- */
+Waiting freezes the clock at `waitingSince`: the task keeps the urgency it had when it
+started waiting, and a retro edit of that instant moves the freeze with it.
+*/
 export const evaluationClock = (input: UrgencyInput, now: string): string =>
   input.waitingSince ?? now;

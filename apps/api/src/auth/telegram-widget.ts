@@ -43,11 +43,11 @@ const checkString = (payload: TelegramLoginPayload): string => {
 };
 
 /**
- * Verifies a Login Widget payload the way Telegram documents it
- * (https://core.telegram.org/widgets/login#checking-authorization): HMAC-SHA-256 of
- * the check string under SHA-256(bot token), compared in constant time, and
- * `auth_date` no older than five minutes.
- */
+Verifies a Login Widget payload the way Telegram documents it
+(https://core.telegram.org/widgets/login#checking-authorization): HMAC-SHA-256 of
+the check string under SHA-256(bot token), compared in constant time, and
+`auth_date` no older than five minutes.
+*/
 export const verifyTelegramLogin = async (
   payload: TelegramLoginPayload,
   botToken: string,

@@ -61,9 +61,9 @@ export const authorizeQuery = (
   }).toString();
 
 /**
- * `GET /authorize` without following its redirect: the loopback fetch would otherwise follow
- * the 302 to the web origin, which lands back in this Worker as a 404.
- */
+`GET /authorize` without following its redirect: the loopback fetch would otherwise follow
+the 302 to the web origin, which lands back in this Worker as a 404.
+*/
 export const getAuthorize = async (query: string): Promise<Response> =>
   await api.fetch(new Request(`${API_ORIGIN}/authorize?${query}`, { redirect: "manual" }));
 

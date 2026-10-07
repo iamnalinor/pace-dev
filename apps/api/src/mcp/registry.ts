@@ -50,10 +50,10 @@ const scopeError = (name: string, scope: OAuthScope): CallToolResult =>
   );
 
 /**
- * Declares a tool once: name, docs, the scope it needs, its MCP annotations and a typed
- * handler. Registration wraps the handler with the scope check, so a tool outside the grant
- * answers an MCP error instead of running (or crashing the request).
- */
+Declares a tool once: name, docs, the scope it needs, its MCP annotations and a typed
+handler. Registration wraps the handler with the scope check, so a tool outside the grant
+answers an MCP error instead of running (or crashing the request).
+*/
 export const defineTool = <Input extends z.ZodRawShape>(
   definition: ToolDefinition<Input>,
 ): Tool => {

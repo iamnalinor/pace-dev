@@ -1,7 +1,7 @@
 /**
- * Structured explanation rows. The keys are translated by the UI (`explain.<key>`); core
- * never produces prose.
- */
+Structured explanation rows. The keys are translated by the UI (`explain.<key>`); core
+never produces prose.
+*/
 export type ExplainKey =
   | "ageDays"
   | "behindPace"

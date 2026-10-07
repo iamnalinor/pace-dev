@@ -21,9 +21,9 @@ export const projectById = (state: ProjectsState, id: string): Project | undefin
 const nameKey = (name: string): string => name.trim().toLowerCase();
 
 /**
- * "Project on the fly": a task bound to a project by name reuses the existing one. An
- * active project wins over an archived namesake, so archiving frees the name.
- */
+"Project on the fly": a task bound to a project by name reuses the existing one. An
+active project wins over an archived namesake, so archiving frees the name.
+*/
 export const findProjectByName = (state: ProjectsState, name: string): Project | undefined => {
   const key = nameKey(name);
   const matches = Object.values(state.byId).filter((project) => nameKey(project.name) === key);
