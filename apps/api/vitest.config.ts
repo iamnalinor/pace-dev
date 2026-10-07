@@ -20,6 +20,8 @@ export default defineConfig({
           // Fake secrets: the widget tests sign their own payloads with this token.
           TELEGRAM_BOT_TOKEN: "123456:TEST-TOKEN",
           TELEGRAM_WEBHOOK_SECRET: "test-webhook-secret",
+          // The real Telegram subnets: webhook tests send CF-Connecting-IP from inside or outside them.
+          TELEGRAM_WEBHOOK_ALLOWED_CIDRS: "149.154.160.0/20,91.108.4.0/22",
           // Outgoing Telegram calls go to a host the tests intercept with fetchMock.
           TELEGRAM_API_ROOT: "https://telegram.test",
           BOT_INFO: JSON.stringify({

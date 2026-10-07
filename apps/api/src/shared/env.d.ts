@@ -9,6 +9,12 @@ declare global {
       TELEGRAM_BOT_TOKEN?: string;
       /** Shared secret Telegram echoes in `X-Telegram-Bot-Api-Secret-Token` on every webhook call. */
       TELEGRAM_WEBHOOK_SECRET?: string;
+      /**
+      Comma-separated IPv4 CIDRs the webhook accepts calls from, matched against the
+      `CF-Connecting-IP` Cloudflare sets. Set in wrangler.jsonc to Telegram's subnets;
+      unset or empty disables the check (local tunnels that are not Cloudflare's).
+      */
+      TELEGRAM_WEBHOOK_ALLOWED_CIDRS?: string;
       /** JSON of `getMe`, stored at deploy time so the bot never calls Telegram on cold start. */
       BOT_INFO?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */

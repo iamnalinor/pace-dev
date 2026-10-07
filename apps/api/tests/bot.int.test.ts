@@ -22,6 +22,12 @@ const telegramFetch: TelegramTransport = async (input, init) => {
   return Response.json({ ok: true, result: { message_id: 1 } });
 };
 
+// Addresses the webhook is called from: inside Telegram's subnets (vitest.config.ts) and outside.
+// eslint-disable-next-line sonarjs/no-hardcoded-ip -- the fixture of the source-IP allowlist
+const TELEGRAM_IP = "149.154.167.220";
+// eslint-disable-next-line sonarjs/no-hardcoded-ip -- the fixture of the source-IP allowlist
+const OUTSIDE_IP = "8.8.8.8";
+
 type WebhookOptions = {
   readonly secret?: string;
   /** The `CF-Connecting-IP` Cloudflare sets; `null` leaves the header out. */
@@ -31,14 +37,14 @@ type WebhookOptions = {
 /** Calls the webhook as Telegram would: from one of its subnets, with the shared secret. */
 const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<Response> => {
   const ctx = createExecutionContext();
-  const ip = options.ip === undefined ? "149.154.167.220" : options.ip;
+  const ip = options.ip === undefined ? TELEGRAM_IP : options.ip;
   const response = await createApp({ telegramFetch }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
       body: JSON.stringify(update),
       headers: {
         "Content-Type": "application/json",
         "X-Telegram-Bot-Api-Secret-Token": options.secret ?? "test-webhook-secret",
-        ...(ip === null ? {} : { "CF-Connecting-IP": ip }),
+        ...(ip !== null && { "CF-Connecting-IP": ip }),
       },
       method: "POST",
     }),
@@ -83,12 +89,12 @@ describe("POST /telegram/webhook", () => {
 
   it("rejects a call from outside Telegram's subnets with 403 and logs the address", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const response = await webhook(startUpdate(1001, "/start"), { ip: "8.8.8.8" });
+    const response = await webhook(startUpdate(1001, "/start"), { ip: OUTSIDE_IP });
     expect(response.status).toBe(403);
     expect(await readJson(response)).toMatchObject({ code: "bot/forbidden-ip" });
     expect(sent).toEqual([]);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]?.[0]).toContain("8.8.8.8");
+    expect(warn.mock.calls[0]?.[0]).toContain(OUTSIDE_IP);
   });
 
   it("rejects a call without CF-Connecting-IP with 403 even with the right secret", async () => {

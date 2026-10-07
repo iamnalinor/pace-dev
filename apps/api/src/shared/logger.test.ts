@@ -32,10 +32,10 @@ describe("createLogger", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const logger = createLogger("warn");
     logger.info("quiet");
-    logger.warn("careful", { ip: "8.8.8.8" });
+    logger.warn("careful", { attempt: 3 });
     expect(log).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(1);
     const line = JSON.parse(warn.mock.calls[0]?.[0] as string) as Record<string, unknown>;
-    expect(line).toMatchObject({ level: "warn", message: "careful", ip: "8.8.8.8" });
+    expect(line).toMatchObject({ level: "warn", message: "careful", attempt: 3 });
   });
 });

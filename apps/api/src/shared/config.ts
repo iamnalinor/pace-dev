@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { err, ok, type Result } from "@pace/core";
 
+import { parseCidr } from "./ip.ts";
+
 /** `getMe` as stored in BOT_INFO; the capability flags default to false when the JSON is trimmed. */
 const BotInfoSchema = z.object({
   id: z.number().int(),
@@ -36,6 +38,19 @@ const csv = (text: string): readonly string[] =>
     .map((item) => item.trim())
     .filter((item) => item !== "");
 
+/** Comma-separated CIDRs; every entry must parse so a typo fails config loading, not a webhook call. */
+const cidrList = (text: string, ctx: z.RefinementCtx): readonly string[] => {
+  const entries = csv(text);
+  for (const entry of entries) {
+    const parsed = parseCidr(entry);
+    if (!parsed.ok) {
+      ctx.addIssue({ code: "custom", message: parsed.error });
+      return z.NEVER;
+    }
+  }
+  return entries;
+};
+
 const EnvSchema = z.object({
   ENVIRONMENT: z.enum(["development", "test", "production"]),
   ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
@@ -43,6 +58,7 @@ const EnvSchema = z.object({
   WEB_ORIGIN: z.url(),
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
+  TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
   TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
   BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
 });
@@ -54,6 +70,8 @@ export type Config = {
   readonly webOrigin: string;
   readonly telegramBotToken: string | undefined;
   readonly telegramWebhookSecret: string | undefined;
+  /** Source subnets the webhook accepts (checked against `CF-Connecting-IP`); empty = check disabled. */
+  readonly telegramWebhookAllowedCidrs: readonly string[];
   readonly telegramApiRoot: string;
   readonly botInfo: undefined | UserFromGetMe;
 };
@@ -73,6 +91,7 @@ export const loadConfig = (env: object): Result<Config, string> => {
     webOrigin: value.WEB_ORIGIN,
     telegramBotToken: value.TELEGRAM_BOT_TOKEN,
     telegramWebhookSecret: value.TELEGRAM_WEBHOOK_SECRET,
+    telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
     telegramApiRoot: value.TELEGRAM_API_ROOT,
     botInfo: value.BOT_INFO,
   });

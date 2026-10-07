@@ -9,6 +9,11 @@ const base = {
   WEB_ORIGIN: "https://pace.test",
 };
 
+/** The two Telegram subnets, as the var is written in wrangler.jsonc. */
+const TELEGRAM_CIDRS = "149.154.160.0/20,91.108.4.0/22";
+// eslint-disable-next-line sonarjs/no-hardcoded-ip -- a typo fixture: the prefix length is out of range
+const BAD_CIDR = "149.154.160.0/33";
+
 describe("loadConfig", () => {
   it("parses the csv whitelist and defaults the optional values", () => {
     const result = loadConfig(base);
@@ -44,22 +49,21 @@ describe("loadConfig", () => {
     expect(empty.ok && empty.value.telegramWebhookAllowedCidrs).toEqual([]);
     const telegram = loadConfig({
       ...base,
-      TELEGRAM_WEBHOOK_ALLOWED_CIDRS: " 149.154.160.0/20 ,91.108.4.0/22,",
+      TELEGRAM_WEBHOOK_ALLOWED_CIDRS: ` ${TELEGRAM_CIDRS.replace(",", " , ")},`,
     });
-    expect(telegram.ok && telegram.value.telegramWebhookAllowedCidrs).toEqual([
-      "149.154.160.0/20",
-      "91.108.4.0/22",
-    ]);
+    expect(telegram.ok && telegram.value.telegramWebhookAllowedCidrs).toEqual(
+      TELEGRAM_CIDRS.split(","),
+    );
   });
 
   it("fails on a CIDR typo and names the variable and the entry", () => {
     const result = loadConfig({
       ...base,
-      TELEGRAM_WEBHOOK_ALLOWED_CIDRS: "149.154.160.0/20,149.154.160.0/33",
+      TELEGRAM_WEBHOOK_ALLOWED_CIDRS: `${TELEGRAM_CIDRS},${BAD_CIDR}`,
     });
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error).toContain("TELEGRAM_WEBHOOK_ALLOWED_CIDRS");
-    expect(!result.ok && result.error).toContain("149.154.160.0/33");
+    expect(!result.ok && result.error).toContain(BAD_CIDR);
     expect(loadConfig({ ...base, TELEGRAM_WEBHOOK_ALLOWED_CIDRS: "telegram" }).ok).toBe(false);
     expect(loadConfig({ ...base, TELEGRAM_WEBHOOK_ALLOWED_CIDRS: "2001:db8::/32" }).ok).toBe(false);
   });

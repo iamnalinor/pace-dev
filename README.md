@@ -177,6 +177,7 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_USERNAME` | variable | deploy | baked into the web build as `VITE_TELEGRAM_BOT` (defaults to `PaceTaskTrackerBot`) |
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
+| `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
 | `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider (stage 2) |
 | `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider (stage 2) |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
@@ -184,7 +185,7 @@ Secrets and variables read by the workflows:
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
 Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME`,
-`WEB_ORIGIN`) lives in `wrangler.jsonc`.
+`TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`.
 
 ## Android release
 
@@ -224,6 +225,16 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
    that secret (`allowed_updates: message, callback_query`) and stores `getMe` as
    `BOT_INFO` so the Worker never calls Telegram on a cold start. For a manual setup call
    `setWebhook` yourself and `bunx wrangler secret put BOT_INFO` with the `result` of `getMe`.
+5. The webhook answers only calls from [Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version):
+   `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` in `wrangler.jsonc` (default
+   `149.154.160.0/20,91.108.4.0/22`) is matched against the `CF-Connecting-IP` header,
+   which Cloudflare sets itself on every request that reaches the Worker, so a caller
+   cannot forge it. Any other address — or a missing header — gets `403 bot/forbidden-ip`
+   (logged at warn level) before the secret token is even read; a typo in the list fails
+   config loading with a message naming the entry. Set the var to an empty string to turn
+   the check off, e.g. in `.dev.vars` when a tunnel that is not Cloudflare's (ngrok)
+   delivers the webhook to `wrangler dev`. When Telegram changes its subnets, update the
+   var and redeploy.
 
 Today the bot only handles `/start login_<nonce>` (Android login) and tells everyone
 else "Not allowed"; stage 2 adds task capture, `/now` and digests.
