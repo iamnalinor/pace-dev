@@ -26,7 +26,12 @@ createRoot(root).render(
     <PaceProvider services={createWebServices()}>
       <RouterProvider router={router} />
       {/* Bottom, clear of the phone tab bar, so a toast never covers a page title. */}
-      <Toaster mobileOffset={{ bottom: 92 }} position="bottom-center" />
+      <Toaster
+        mobileOffset={{ bottom: 92 }}
+        position="bottom-center"
+        // Undo is a real target: at least 24px (WCAG 2.2 target size), here 32px.
+        toastOptions={{ classNames: { actionButton: "!h-8 !px-3 !text-[13px]" } }}
+      />
     </PaceProvider>
   </StrictMode>,
 );

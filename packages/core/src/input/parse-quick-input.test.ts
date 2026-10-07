@@ -75,6 +75,14 @@ describe("parseQuickInput", () => {
     expect(parse("прочитать статью полчаса").estimateMinutes).toBe(30);
   });
 
+  it("does not read metres as minutes", () => {
+    expect(parse("купить 2 м ткани")).toMatchObject({
+      estimateMinutes: null,
+      title: "купить 2 м ткани",
+    });
+    expect(parse("созвон 30 мин").estimateMinutes).toBe(30);
+  });
+
   it("puts a bare time that has passed on tomorrow", () => {
     expect(parse("call at 9:00").dueAt).toBe("2026-10-07T06:00:00.000Z");
     expect(parse("call at 18:00").dueAt).toBe("2026-10-06T15:00:00.000Z");

@@ -1,0 +1,68 @@
+import type { Page } from "@playwright/test";
+
+import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
+import { loginViaApi } from "./support/login.ts";
+
+const SIZES = [
+  { height: 844, name: "phone", width: 390 },
+  { height: 900, name: "desktop", width: 1440 },
+] as const;
+
+const add = async (page: Page, text: string): Promise<void> => {
+  const line = page.getByRole("textbox", { name: "New task" });
+  await line.fill(text);
+  await line.press("Enter");
+  await expect(line).toHaveValue("");
+};
+
+for (const size of SIZES) {
+  test.describe(`${size.name} (${String(size.width)}px)`, () => {
+    test.use({ viewport: { height: size.height, width: size.width } });
+
+    test("checks a task off and brings it back with Undo", async ({ page }) => {
+      await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
+      await page.goto("/");
+      await add(page, `water the plants ${size.name}`);
+      const board = page.getByRole("list", { name: "Tasks" });
+      const title = `water the plants ${size.name}`;
+      await board.getByRole("button", { name: `Mark ${title} done` }).click();
+      await expect(board.getByText(title)).toHaveCount(0);
+      // The "Added" toast has an Undo too: take the one about this task.
+      await page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: title })
+        .getByRole("button", { name: "Undo" })
+        .click();
+      await expect(board.getByText(title)).toBeVisible();
+    });
+
+    test("sends a line to Inbox and sorts it there", async ({ page }) => {
+      await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
+      await page.goto("/");
+      const text = `ask about the ${size.name} invoice`;
+      await page.getByRole("textbox", { name: "New task" }).fill(text);
+      await page.getByRole("button", { name: "To Inbox" }).click();
+      await page.goto("/inbox");
+      await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+      const card = page.getByRole("listitem").filter({ hasText: text });
+      await expect(card).toBeVisible();
+      await expectNoA11yViolations(page);
+      await card.getByRole("button", { name: "Accept" }).click();
+      await expect(page.getByRole("listitem").filter({ hasText: text })).toHaveCount(0);
+    });
+
+    test("history, settings and an unknown page explain themselves", async ({ page }) => {
+      await loginViaApi(page, "1003");
+      await page.goto("/history");
+      await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+      await expectNoA11yViolations(page);
+      await page.goto("/settings");
+      await expect(page.getByText(/^Account: /u)).toBeVisible();
+      await expect(page.getByText("Not set yet")).toHaveCount(0);
+      await page.goto("/no-such-page");
+      await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+      await expect(page.getByText("There is nothing at /no-such-page.")).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+  });
+}

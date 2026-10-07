@@ -16,6 +16,7 @@ const TIME_AMPM = /(?<![\p{L}\p{N}])(1[0-2]|0?[1-9]) ?(am|pm)(?![\p{L}\p{N}])/gi
 const BARE_HOUR = /(?<![\p{L}\p{N}])([01]?\d|2[0-3])(?![\p{L}\p{N}:.])/gu;
 /** A number with a unit word right after it: "1ч", "1.5 h", "30 мин". */
 const AMOUNT = /(?<![\p{L}\p{N}])(\d{1,3}[.,]\d{1,2}|\d{1,3}) ?(\p{L}+)(?![\p{L}\p{N}])/gu;
+/** No bare «м»: «2 м ткани» is metres. */
 const MINUTES_PER_UNIT: Readonly<Record<string, number>> = {
   ч: 60,
   час: 60,
@@ -26,7 +27,6 @@ const MINUTES_PER_UNIT: Readonly<Record<string, number>> = {
   hrs: 60,
   hour: 60,
   hours: 60,
-  м: 1,
   мин: 1,
   минут: 1,
   минуты: 1,

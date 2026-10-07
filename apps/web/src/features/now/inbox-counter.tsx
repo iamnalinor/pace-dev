@@ -17,7 +17,8 @@ export const NowHeaderActions = ({ inboxCount }: { readonly inboxCount: number }
         <Inbox aria-hidden="true" className="size-[18px]" strokeWidth={1.75} />
         <span className="font-mono">{inboxCount}</span>
       </Link>
-      <Button asChild size="icon" variant="ghost">
+      {/* From 1024px Settings sits in the sidebar. */}
+      <Button asChild className="lg:hidden" size="icon" variant="ghost">
         <Link aria-label={t("nav.settings")} title={t("nav.settings")} to="/settings">
           <Settings aria-hidden="true" strokeWidth={1.75} />
         </Link>
