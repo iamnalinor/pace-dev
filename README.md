@@ -118,9 +118,11 @@ describes every level.
 
 ## How auth works
 
-Pace has no passwords. Telegram is the identity provider and a **whitelist** decides who
-may use a deployment: `ALLOWED_TELEGRAM_IDS` in `apps/api/wrangler.jsonc` (comma-separated
-Telegram user ids). Anyone else gets `403 auth/not-allowed` and never gets a user row.
+Pace has no passwords. Telegram is the identity provider and an optional **whitelist**
+decides who may use a deployment: `ALLOWED_TELEGRAM_IDS` in `apps/api/wrangler.jsonc`
+(comma-separated Telegram user ids). With ids set, anyone else gets `403 auth/not-allowed`
+and never gets a user row; left empty (the default), the whitelist is off and any Telegram
+account may sign in.
 
 - **Web** — the [Telegram Login Widget](https://core.telegram.org/widgets/login) posts its
   payload to `POST /api/auth/telegram`. The Worker rebuilds the check string, verifies the

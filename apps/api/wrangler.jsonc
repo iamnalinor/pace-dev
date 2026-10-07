@@ -14,8 +14,9 @@
   // All are typed in src/shared/env.d.ts and parsed by src/shared/config.ts.
   "vars": {
     "ENVIRONMENT": "production",
-    // Telegram user ids allowed to sign in (comma separated). Other deployments edit this.
-    "ALLOWED_TELEGRAM_IDS": "1919230638",
+    // Telegram user ids allowed to sign in (comma separated). Empty = the whitelist is off
+    // and any Telegram account may sign in; set ids to restrict a deployment.
+    "ALLOWED_TELEGRAM_IDS": "",
     "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
     "WEB_ORIGIN": "https://pace.nalinor.dev",
     // The Worker's own origin: the OAuth issuer and the canonical MCP resource (`<origin>/mcp`).
@@ -41,7 +42,7 @@
       "routes": [],
       "vars": {
         "ENVIRONMENT": "development",
-        "ALLOWED_TELEGRAM_IDS": "1919230638",
+        "ALLOWED_TELEGRAM_IDS": "",
         "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
         "WEB_ORIGIN": "http://localhost:5173",
         "API_ORIGIN": "http://localhost:8787"
