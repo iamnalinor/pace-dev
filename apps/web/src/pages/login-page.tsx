@@ -4,11 +4,11 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useAuth, useServices } from "#web/app-state.tsx";
 import { BotLogin } from "#web/features/auth/bot-login.tsx";
 import { DevLogin } from "#web/features/auth/dev-login.tsx";
-import { TelegramWidget } from "#web/features/auth/telegram-widget.tsx";
 import { useT } from "#web/i18n.tsx";
 import { IS_DEV_LOGIN_ENABLED } from "#web/platform/api-base.ts";
 import { Card } from "#web/shared/ui/card.tsx";
 import { PaceMark } from "#web/shared/ui/pace-mark.tsx";
+import { TelegramWidget } from "#web/shared/ui/telegram-widget.tsx";
 
 const DEFAULT_POLL_MS = 2000;
 
@@ -64,6 +64,7 @@ export const LoginPage = ({ pollIntervalMs = DEFAULT_POLL_MS }: { pollIntervalMs
         </div>
         <TelegramWidget
           botUsername={botUsername}
+          label={t("login.telegram")}
           onAuth={(user) => {
             void (async () => {
               const result = await auth.loginWithTelegram(user);

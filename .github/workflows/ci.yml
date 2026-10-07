@@ -19,6 +19,8 @@ concurrency:
 # (never `bun --bun`); Playwright starts wrangler dev + vite preview itself (playwright.config.ts).
 env:
   CI: 1
+  # Typed ESLint over seven tsconfig projects outgrew Node's default heap on the runners.
+  NODE_OPTIONS: --max-old-space-size=4096
 
 jobs:
   lint:

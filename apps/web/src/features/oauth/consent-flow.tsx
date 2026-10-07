@@ -41,6 +41,7 @@ const IdentityStep = ({ consent }: { readonly consent: Consent }) => {
       <p className="text-sm text-muted">{t("oauth.identify")}</p>
       <TelegramWidget
         botUsername={botUsername}
+        label={t("login.telegram")}
         onAuth={(payload) => {
           const name = [payload.first_name, payload.last_name].filter(Boolean).join(" ");
           consent.identify({ kind: "telegram", name, payload });
