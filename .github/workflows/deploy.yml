@@ -112,6 +112,37 @@ jobs:
             --data-urlencode "drop_pending_updates=false" \
             | grep -q '"ok":true'
 
+      # The bot's public identity is code too: avatar, name, descriptions and the command menu
+      # are pushed on every deploy (the calls are idempotent), so BotFather is only needed for
+      # the token and /setdomain. The avatar comes from scripts/generate-icons.ts.
+      - name: Set Telegram bot identity (avatar, name, descriptions, commands)
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "TELEGRAM_BOT_TOKEN not set, skipping bot identity"; exit 0; fi
+          api="https://api.telegram.org/bot${TOKEN}"
+          call() { curl --fail --silent --show-error --request POST "$api/$1" "${@:2}" | grep -q '"ok":true'; }
+          call setMyProfilePhoto \
+            --form 'photo={"type":"static","photo":"attach://avatar"}' \
+            --form "avatar=@assets/logo/bot-avatar.png;type=image/png"
+          call setMyName --data-urlencode "name=Pace"
+          call setMyShortDescription \
+            --data-urlencode "short_description=Personal task & time tracker. Sign in, add tasks by text, get digests."
+          call setMyShortDescription --data-urlencode "language_code=ru" \
+            --data-urlencode "short_description=Личный трекер задач и времени. Вход, задачи текстом, дайджесты."
+          call setMyDescription \
+            --data-urlencode "description=$(printf '%s\n\n%s' \
+              'Pace — a personal task & time tracker.' \
+              'Press Start to sign in to the Pace app or the web. Send any text here to add a task; digests and reminders arrive in this chat.')"
+          call setMyDescription --data-urlencode "language_code=ru" \
+            --data-urlencode "description=$(printf '%s\n\n%s' \
+              'Pace — личный трекер задач и времени.' \
+              'Нажмите Start, чтобы войти в приложение или на сайт. Отправьте сюда любой текст, чтобы добавить задачу; дайджесты и напоминания приходят в этот чат.')"
+          call setMyCommands \
+            --data-urlencode 'commands=[{"command":"start","description":"Sign in to Pace"}]'
+          call setMyCommands --data-urlencode "language_code=ru" \
+            --data-urlencode 'commands=[{"command":"start","description":"Войти в Pace"}]'
+
       - name: Smoke test
         run: |
           curl --fail --silent "${API_URL}/api/health" >/dev/null

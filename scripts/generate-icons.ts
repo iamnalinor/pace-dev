@@ -95,6 +95,17 @@ export const ICONS: readonly IconSpec[] = [
     size: 96,
     svg: canvas(faviconShapes(WHITE), 0.9),
   },
+  // Telegram crops profile photos to a circle: a full lime square with the chevrons well
+  // inside the inscribed circle. Uploaded by deploy.yml through the Bot API (setMyProfilePhoto).
+  {
+    path: "assets/logo/bot-avatar.png",
+    size: 640,
+    svg: canvas(
+      faviconShapes({ accent: DARK_BG, fg: DARK_BG, track: "rgba(0,0,0,.3)" }),
+      0.62,
+      LIME,
+    ),
+  },
 ];
 
 export const renderPng = (source: string, width: number): Buffer =>
