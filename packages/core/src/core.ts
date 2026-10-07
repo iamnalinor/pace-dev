@@ -21,6 +21,11 @@ export {
   UserSchema,
 } from "./api/schemas/auth.ts";
 export {
+  type LinkPreview,
+  LinkPreviewQuerySchema,
+  LinkPreviewSchema,
+} from "./api/schemas/links.ts";
+export {
   grantedScopes,
   type GrantScopesError,
   OAUTH_SCOPES,
@@ -38,11 +43,6 @@ export {
   OAuthScopeSchema,
   requestedScopes,
 } from "./api/schemas/oauth.ts";
-export {
-  type LinkPreview,
-  LinkPreviewQuerySchema,
-  LinkPreviewSchema,
-} from "./api/schemas/links.ts";
 export {
   type Observation,
   ObservationSchema,
@@ -113,8 +113,11 @@ export {
   newId,
   type Prng,
 } from "./ids.ts";
-export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/core-state.ts";
+export { parseQuickInput, type QuickInput } from "./input/parse-quick-input.ts";
+export type { QuickSubtask } from "./input/quick-fields.ts";
+export type { QuickSpan, QuickSpanKind } from "./input/quick-spans.ts";
 export { extractLink, isHttpUrl, linkHost } from "./links.ts";
+export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/core-state.ts";
 export {
   apply,
   effectiveEvents,

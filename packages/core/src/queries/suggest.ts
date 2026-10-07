@@ -77,11 +77,27 @@ const tokensOf = (text: string): readonly string[] =>
     .split(/[^\p{L}\p{N}]+/u)
     .filter((token) => token !== "");
 
-/** Two words are the same when one starts with the other and the shared part is long enough. */
+/** A case ending ("алгебре" for "Algebra") changes at most this many trailing letters. */
+const ENDING_SLACK = 2;
+
+/** Length of the shared start of two folded words (folded text is plain Latin letters). */
+const commonPrefix = (a: string, b: string): number => {
+  const differs = Array.from({ length: Math.min(a.length, b.length) }, (_, index) => index).find(
+    (index) => a[index] !== b[index],
+  );
+  return differs ?? Math.min(a.length, b.length);
+};
+
+/**
+Two words are the same when one starts with the other and the shared part is long enough,
+or when only a short ending differs ("алгебре", "algebra").
+*/
 const isSameWord = (token: string, word: string): boolean => {
   const a = fold(token);
   const b = fold(word);
-  return Math.min(a.length, b.length) >= STEM_LENGTH && (a.startsWith(b) || b.startsWith(a));
+  const isLongEnough = Math.min(a.length, b.length) >= STEM_LENGTH;
+  const sharedNeeded = Math.max(STEM_LENGTH + 1, Math.max(a.length, b.length) - ENDING_SLACK);
+  return isLongEnough && (a.startsWith(b) || b.startsWith(a) || commonPrefix(a, b) >= sharedNeeded);
 };
 
 const nameWords = (name: string): readonly string[] =>
