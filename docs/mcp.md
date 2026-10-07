@@ -26,7 +26,7 @@ against `wrangler dev`). Clients discover the rest: the first unauthenticated ca
 |---|---|
 | **Claude** (web and desktop) | Settings → Connectors → *Add custom connector* → URL `https://pace-api.nalinor.dev/mcp`. Claude registers itself (CIMD or DCR), opens the consent page, and the connector shows up with the Pace tools. |
 | **Claude Code** | `claude mcp add --transport http pace https://pace-api.nalinor.dev/mcp`, then `/mcp` inside Claude Code to sign in. |
-| **ChatGPT** (developer mode connectors) | Settings → Connectors → *Create* with the same URL; ChatGPT identifies itself by its metadata document (`chatgpt.com`). The `search` and `fetch` tools ChatGPT expects arrive with the task tools in the next phase. |
+| **ChatGPT** (developer mode connectors) | Settings → Connectors → *Create* with the same URL; ChatGPT identifies itself by its metadata document (`chatgpt.com`). The `search` and `fetch` tools ChatGPT requires are there (see below), so the connector works in chat and deep research; the other tools are available in developer mode. |
 | **Cursor** | Settings → MCP → *Add new MCP server* → type `streamableHttp` with the URL, or in `~/.cursor/mcp.json`: `{ "mcpServers": { "pace": { "url": "https://pace-api.nalinor.dev/mcp" } } }`. Cursor uses the `cursor://` callback alongside a loopback one; only the loopback is accepted. |
 | **MCP Inspector** | `bunx @modelcontextprotocol/inspector`, transport *Streamable HTTP*, the URL, then *Open Auth Settings → Quick OAuth Flow* (or just *Connect*). |
 
@@ -41,20 +41,96 @@ tool error (`isError: true`, explaining which scope is missing) instead of runni
 
 | Scope | Lets a client | Tools (stage 1) |
 |---|---|---|
-| `tasks:read` | see tasks, subtasks, projects and presets | `whoami`, `get_task`, `list_now`, `list_projects`, `list_project_tasks`, `list_presets`, `search`, `fetch` |
-| `tasks:write` | add and change tasks and projects | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_rank`, `revoke_event` |
+| `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch` |
+| `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
 | `time:read` | see the time ledger and focus sessions | stage 3 |
 | `time:write` | start, stop and log activities | stage 3 |
 | `analytics:read` | see analytics | stage 3 |
 | `offline_access` | keep a refresh token, so the connection survives the 24 h access token | — |
 
-Only `whoami` exists today (user id, Telegram id, granted scopes, server time); the task
-tools come with the next phase. The catalogue is advertised as `scopes_supported` in the
-authorization server metadata. The protected resource names no baseline scope, so clients
-that follow the metadata request none and the **consent page offers the whole catalogue**;
-a client that asks for specific scopes gets exactly those offered, and the person can
-untick any of them. Mutating tools will take `at`, `precision` and `dryRun` (the preview);
-every tool carries the MCP annotations `readOnlyHint`, `destructiveHint`, `idempotentHint`.
+The catalogue is advertised as `scopes_supported` in the authorization server metadata.
+The protected resource names no baseline scope, so clients that follow the metadata
+request none and the **consent page offers the whole catalogue**; a client that asks for
+specific scopes gets exactly those offered, and the person can untick any of them. Every
+tool carries the MCP annotations `readOnlyHint`, `destructiveHint`, `idempotentHint`.
+
+## Tools
+
+Every tool answers `structuredContent` (typed by its output schema) plus a short text
+summary; ids are opaque strings, times are ISO 8601 UTC, and deadlines carry the IANA
+zone they were set in (`dueAt` + `dueTz`). A refusal is a tool result with `isError: true`
+whose text starts with the Result code (`task/unknown: No task with this id.`), never a
+JSON-RPC error, so the assistant can read it and try again. The server runs every tool
+against the user's Durable Object: a read first derives the system events due by now
+(this week's homework instances, automatic `cancelled_missed` / `skipped` outcomes), so the
+answer is the same the web app shows.
+
+| Tool | Scope | What it does | Key inputs |
+|---|---|---|---|
+| `whoami` | read | the account behind the token, its scopes, the server time | — |
+| `list_now` | read | the Now list (score order) with lateness and progress, the waiting tasks, `laterCount`, `inboxCount` | `projectId?` |
+| `get_task` | read | one task with subtasks, closure and derived outcome, window elapsed, work left, the "why it is here" explanation, the submit preview | `id` |
+| `list_projects` | read | projects with open counts and links | — |
+| `list_project_tasks` | read | the project page: open, awaiting assignment, done with outcomes, stats | `projectId` or `projectName` |
+| `list_presets` | read | built-in and user presets, each with its own definition and the resolved settings | — |
+| `list_inbox` | read | unsorted captures with a rule-based suggestion each | — |
+| `list_review` | read | the "to sort" block: finished-looking tasks, passed deadlines, stale inbox items, automatic outcomes to confirm, with their action keys | — |
+| `search` | read | full-text over titles, descriptions, source texts, subtask labels and project names → `{ results: [{ id, title, url }] }` | `query` |
+| `fetch` | read | the task or project document → `{ id, title, text, url, metadata }` | `id` |
+| `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
+| `capture_inbox` | write | a verbatim text into the inbox | `text` |
+| `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted) | `taskId`, `subtaskIds?` or `numbers?` |
+| `submit` | write | per-subtask presets: sends the solved, unsubmitted problems and closes when none remain; whole-submission presets: submits and closes as done | `taskId`, `subtaskIds?` |
+| `close_task` | write | closes with `done`, `cancelled` or `skipped` (+ reason) | `taskId`, `outcome`, `reason?` |
+| `reopen` | write | reopens a closed task | `taskId` |
+| `update_task` | write | title, description, deadline, start, estimate, preset, project (by id or name) | `taskId`, the fields to change |
+| `set_importance` | write | `asap` / `prioritized` / `normal` / `nice_to_have` | `taskId`, `importance` |
+| `set_status` | write | `in_progress` / `paused` / `waiting` / `not_started` | `taskId`, `status` |
+| `set_rank` | write | moves a task to a 1-based position in its importance category and renumbers the category | `taskId`, `position` |
+| `add_subtasks` | write | appends subtasks | `taskId`, `labels` |
+| `revoke_event` | write | undoes one event by id (the log keeps it) | `eventId`, `reason?` |
+| `review_action` | write | runs a review item's action (`submit-now`, `mark-done`, `cancel`, `skip`, `keep-open`, `sort`, `confirm`, `undo`) | `taskId`, `key` |
+| `seed_example_presets` | write | the three example course presets, skipping existing ones | — |
+| `create_preset` / `update_preset` / `archive_preset` | write | user presets, validated like the web editor (`preset/exists`, `preset/invalid-definition`, `preset/built-in`, …) | `id`, `name`, `extends`, `definition` |
+
+### Writes: `at`, `precision`, `dryRun`
+
+Every mutating tool takes three optional inputs on top of its own:
+
+- `at` — the ISO instant the event happened; defaults to the server time. A past instant
+  records something retroactively ("I solved 3 and 4 an hour ago"); the core retro rules
+  refuse what makes no sense (`retro/before-created`, `retro/task-closed`, `retro/future`
+  beyond five minutes of clock skew).
+- `precision` — `exact` (default) or `approx` when `at` is an estimate.
+- `dryRun` — `true` validates the call, builds the events and answers the preview
+  (`events`, the resulting task row) **without writing anything**; the summary starts with
+  "Dry run: nothing was written." The assistant is the confirmer: it can show the preview
+  and call again without `dryRun` once the person agrees.
+
+Every write answers `{ dryRun, events: [{ id, type, occurredAt }], … }`; the event ids are
+what `revoke_event` takes to undo. Events written through MCP carry `source: "mcp"` and
+`deviceId: "mcp"`, and clients pull them through `/api/sync/pull` like any other.
+
+### ChatGPT connectors
+
+ChatGPT requires exactly two tools to use a connector in chat and deep research: `search`
+(`{ results: [{ id, title, url }] }`) and `fetch` (`{ id, title, text, url, metadata }`).
+Both are present with those shapes; `url` points at the web app (`/task/<id>`,
+`/projects/<id>`). The other tools are reachable from ChatGPT's developer mode and from
+Claude, Cursor and the Inspector as usual.
+
+### Prompts that work
+
+- "What should I do now?" → `list_now`.
+- "Add homework 3, 4 and 7 for Algebra due Thursday evening" → `create_task` with
+  `presetId: "hw.algebra"` (or `projectName: "Algebra"`), `subtasks: ["3", "4", "7"]`,
+  `dueAt` + `dueTz`.
+- "I solved 3 and 4 an hour ago" → `mark_subtasks` with `numbers: [3, 4]` and `at`.
+- "Send them" → `submit`; "mark the report done" → `close_task` or `submit`.
+- "Why is the dashboard task on top?" → `get_task` (`explanation`).
+- "Undo that" → `revoke_event` with the id from the previous answer.
+- "Anything to sort out?" → `list_review`, then `review_action`.
+- "Save this for later: …" → `capture_inbox`.
 
 ## The consent flow, step by step
 
@@ -102,16 +178,29 @@ apps/api/src/worker.ts              OAuthProvider({ apiRoute: "/mcp", defaultHan
 apps/api/src/oauth/oauth-routes.ts  GET /authorize, /api/oauth/{client-info,complete,deny,grants}
 apps/api/src/oauth/consent.ts       parseAuthRequest / describeConsent wrappers → Result
 apps/api/src/shared/telegram-identity.ts  widget signature + whitelist + user row (shared with login)
-apps/api/src/mcp/server.ts          createMcpServer(grant), mcpHandler (whitelist, stateless transport)
-apps/api/src/mcp/registry.ts        defineTool({ name, title, description, scope, annotations, input, output, handler })
+apps/api/src/mcp/server.ts          TOOLS, createMcpServer(ctx), mcpHandler (whitelist, stateless transport, the user's DO)
+apps/api/src/mcp/registry.ts        defineTool({ name, title, description, scope, annotations, input, output, handler }), ToolContext
 apps/api/src/mcp/grant.ts           McpGrant from ctx.props + ctx.auth (zod-checked)
-apps/api/src/mcp/tools/*.ts         one file per tool (whoami today)
+apps/api/src/mcp/tool-kit.ts        runRead / runWrite (read → build → apply or dryRun → render), stamp, failure codes
+apps/api/src/mcp/inputs.ts          shared input schemas (at/precision/dryRun, subtasks, project by id or name)
+apps/api/src/mcp/rows.ts            TaskRow / ProjectRow schemas and renderers, task and project URLs
+apps/api/src/mcp/tools/*.ts         the tools: list-tools, get-task, search-tools, task-tools, edit-tools,
+                                    progress-tools, correction-tools, preset-tools, whoami
+apps/api/src/user-store/state.ts    the DO's materialized CoreState cache, batch validation (prepareBatch)
+apps/api/src/user-store/projections.ts  tasks / subtasks / projects / presets SQL rows
+apps/api/src/shared/contract.ts     the DO ↔ Worker types (RpcState, ApplyMeta, ApplyError, UserStoreApi)
 packages/core/src/api/schemas/oauth.ts  OAUTH_SCOPES, requestedScopes, grantedScopes, the consent contract
 apps/web/src/features/oauth/        the consent page
 ```
 
-Adding a tool: `defineTool` in `apps/api/src/mcp/tools/<name>.ts`, add it to `TOOLS` in
-`server.ts`, and the scope check, annotations and typed input come for free.
+Adding a tool: `defineTool` in `apps/api/src/mcp/tools/<group>.ts` (a read tool wraps
+`runRead`, a write tool `runWrite` with a `build` that turns the arguments into event
+inputs against the current state and a `render` for the answer), add it to `TOOLS` in
+`server.ts`, and the scope check, annotations, typed input, `dryRun` and the error
+convention come for free. The Durable Object does the writing: `UserStore.apply` validates
+the batch with core's retro rules in order (the first refusal stops everything), stamps
+ids and `recordedAt`, appends, derives the system events and returns the stored events
+with the new state; `UserStore.dryRun` does the same without writing.
 
 ## Local testing
 
@@ -129,8 +218,12 @@ clients and grants live in the local KV emulation (`.wrangler/state`).
 The same flow runs in workerd in `apps/api/tests/oauth.int.test.ts` (discovery, registration,
 the PKCE dance, refresh rotation, revocation, whitelist, scope checks, grants) and
 `apps/api/tests/mcp.int.test.ts` (initialize, tools/list, whoami, 403 for a token whose
-Telegram id is not allowed); `apps/api/src/mcp/registry.test.ts` covers the scope guard with
-an in-memory client. `bun test:api` runs them.
+Telegram id is not allowed), `apps/api/tests/mcp-tools.int.test.ts` (every tool through the
+endpoint: create → pull → list_now, project on the fly, inbox, mark + submit closes, dry run
+writes nothing, read-only grant refused, search/fetch with a Cyrillic query, review, presets)
+and `apps/api/tests/projections.int.test.ts` (SQL rows, revoke, derived instances and
+automatic outcomes, `apply` / `dryRun`); `apps/api/src/mcp/registry.test.ts` covers the
+scope guard with an in-memory client. `bun test:api` runs them.
 
 ## Operational notes
 

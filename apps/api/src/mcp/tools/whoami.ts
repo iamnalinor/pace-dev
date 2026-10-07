@@ -6,13 +6,13 @@ import { defineTool } from "../registry.ts";
 export const whoami = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
-    "Returns the Pace account behind this connection: its user id, Telegram id, the scopes the person granted, and the server time (ISO 8601, UTC).",
-  handler: (_args, grant) => {
+    "Returns the Pace account behind this connection: its user id, Telegram id, the scopes the person granted, and the server time (ISO 8601, UTC). Use it to check what this connection may do before calling a mutating tool.",
+  handler: (_args, ctx) => {
     const result = {
-      scopes: [...grant.scopes],
-      serverTime: new Date().toISOString(),
-      telegramId: grant.telegramId,
-      userId: grant.userId,
+      scopes: [...ctx.grant.scopes],
+      serverTime: ctx.now,
+      telegramId: ctx.grant.telegramId,
+      userId: ctx.grant.userId,
     };
     return { content: [{ text: JSON.stringify(result), type: "text" }], structuredContent: result };
   },

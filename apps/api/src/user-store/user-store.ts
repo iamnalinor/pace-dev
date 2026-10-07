@@ -3,11 +3,40 @@ import { and, asc, eq, gt, max } from "drizzle-orm";
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
-import type { JsonValue, Observation, StoredEvent } from "../shared/contract.ts";
+import {
+  autoOutcomeEvents,
+  type Event,
+  type EventInput,
+  missingInstanceEvents,
+  ok,
+  parseEvent,
+  type Result,
+} from "@pace/core";
+
+import type {
+  ApplyError,
+  ApplyMeta,
+  ApplyResult,
+  DryRunResult,
+  JsonValue,
+  Observation,
+  ReadResult,
+  StoredEvent,
+} from "../shared/contract.ts";
 
 import migrations from "../../drizzle/do/migrations.js";
 import { coreValidator, type EventValidator, normalizeEvent } from "./event-log.ts";
+import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
+import {
+  applyInOrder,
+  canApplyInOrder,
+  type Materialized,
+  prepareBatch,
+  rebuild,
+  toRpcState,
+  touchedBy,
+} from "./state.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -29,6 +58,9 @@ export type ListResult = {
   readonly more: boolean;
 };
 
+/** System events are the server's own: this is their device. */
+const SERVER_DEVICE_ID = "server";
+
 const idOf = (raw: unknown): string =>
   typeof raw === "object" && raw !== null && "id" in raw ? String(raw.id) : "";
 
@@ -42,6 +74,9 @@ const toEvent = (row: typeof schema.events.$inferSelect): StoredEvent => ({
   source: row.source as StoredEvent["source"],
   payload: JSON.parse(row.payload) as JsonValue,
 });
+
+/** A parsed event is JSON by construction, so the stored view is the same object. */
+const toStored = (event: Event): StoredEvent => event;
 
 const latestSeq = async (db: Db): Promise<number> => {
   const [row] = await db.select({ seq: max(schema.events.seq) }).from(schema.events);
@@ -62,12 +97,25 @@ const hasObservation = async (db: Db, observation: Observation): Promise<boolean
   return existing !== undefined;
 };
 
+/** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
+const loadLog = async (db: Db): Promise<readonly Event[]> => {
+  const rows = await db.select().from(schema.events).orderBy(asc(schema.events.seq));
+  return rows.flatMap((row) => {
+    const parsed = parseEvent(toEvent(row));
+    return parsed.ok ? [parsed.value] : [];
+  });
+};
+
 /**
-One instance per user (id = user id): the event log, projections, decisions and
-alarms. Migrations run before the first request touches storage.
+One instance per user (id = user id): the event log, the materialized state, the SQL
+projections, decisions and alarms. Migrations run before the first request touches
+storage. The state is cached in memory with the log sequence it was built at and
+rebuilt when the cache is stale or a batch cannot be applied in order.
 */
 export class UserStore extends DurableObject {
   readonly db: Db;
+
+  #cache: Materialized | undefined;
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
@@ -87,25 +135,27 @@ export class UserStore extends DurableObject {
   /**
   Appends events in the given order. Known ids are accepted again without a second
   copy (clients retry freely); an event the validator refuses is reported in
-  `rejected` and the rest of the batch still goes in.
+  `rejected` and the rest of the batch still goes in. The system events the new state
+  calls for (instances, automatic outcomes) are derived right after.
   */
   async append(raw: readonly unknown[], options: AppendOptions): Promise<AppendResult> {
     const validateEvent = options.validateEvent ?? coreValidator;
     const accepted: string[] = [];
     const rejected: { id: string; reason: string }[] = [];
+    const events: Event[] = [];
     for (const item of raw) {
       const normalized = normalizeEvent(item, { now: options.now, validateEvent });
-      if (!normalized.ok) {
-        rejected.push({ id: idOf(item), reason: normalized.error });
-        continue;
+      // The validator seam may be wider than the core schema; storage never is.
+      const parsed = normalized.ok ? parseEvent(normalized.value) : normalized;
+      if (parsed.ok) {
+        events.push(parsed.value);
+        accepted.push(parsed.value.id);
+      } else {
+        rejected.push({ id: idOf(item), reason: parsed.error });
       }
-      const event = normalized.value;
-      await this.db
-        .insert(schema.events)
-        .values({ ...event, payload: JSON.stringify(event.payload ?? null) })
-        .onConflictDoNothing({ target: schema.events.id });
-      accepted.push(event.id);
     }
+    await this.#insert(events);
+    await this.derive(options.now);
     return { accepted, rejected, seq: await latestSeq(this.db) };
   }
 
@@ -126,6 +176,12 @@ export class UserStore extends DurableObject {
     };
   }
 
+  /** One event by id, corrections included; `undefined` when the log has no such id. */
+  async find(id: string): Promise<StoredEvent | undefined> {
+    const [row] = await this.db.select().from(schema.events).where(eq(schema.events.id, id));
+    return row === undefined ? undefined : toEvent(row);
+  }
+
   /** Append-only facts from the phone; a `kind+key` pair is stored once. Returns how many were new. */
   async appendObservations(observations: readonly Observation[]): Promise<number> {
     let inserted = 0;
@@ -137,6 +193,116 @@ export class UserStore extends DurableObject {
         .insert(schema.observations)
         .values({ ...observation, payload: JSON.stringify(observation.payload ?? null) });
       inserted += 1;
+    }
+    return inserted;
+  }
+
+  /** The materialized state as of `now`, with the system events due by then derived first. */
+  async read(now: string): Promise<ReadResult> {
+    await this.derive(now);
+    const current = await this.#current();
+    return { state: toRpcState(current.state), seq: current.seq };
+  }
+
+  /**
+  Writes a batch on behalf of an MCP or bot caller: validated against the current state
+  in order (the first refusal stops everything, nothing is written), stamped with ids,
+  `recordedAt` and the caller's device, appended, then derived.
+  */
+  async apply(
+    inputs: readonly EventInput[],
+    meta: ApplyMeta,
+  ): Promise<Result<ApplyResult, ApplyError>> {
+    const prepared = prepareBatch(await this.#current(), inputs, meta);
+    if (!prepared.ok) {
+      return prepared;
+    }
+    const inserted = await this.#insert(prepared.value.events);
+    await this.derive(meta.now);
+    const current = await this.#current();
+    return ok({
+      events: inserted.map(toStored),
+      state: toRpcState(current.state),
+      seq: current.seq,
+    });
+  }
+
+  /** `apply` without the write: the would-be events and the state they would produce. */
+  async dryRun(
+    inputs: readonly EventInput[],
+    meta: ApplyMeta,
+  ): Promise<Result<DryRunResult, ApplyError>> {
+    const prepared = prepareBatch(await this.#current(), inputs, meta);
+    return prepared.ok
+      ? ok({ events: prepared.value.events.map(toStored), state: toRpcState(prepared.value.state) })
+      : prepared;
+  }
+
+  /**
+  Appends the system events the state calls for at `now`: the homework instances of
+  the current week and the automatic outcomes whose deadline passed. Deterministic ids
+  make this idempotent against clients that derived the same events. Returns their ids.
+  */
+  async derive(now: string): Promise<readonly string[]> {
+    const before = await this.#current();
+    const instances = await this.#system(missingInstanceEvents({ ...before.state, now }), now);
+    const after = await this.#current();
+    const outcomes = await this.#system(
+      autoOutcomeEvents({ ...after.state, existingEventIds: after.ids, now }),
+      now,
+    );
+    return [...instances, ...outcomes].map((event) => event.id);
+  }
+
+  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
+    const events = inputs.flatMap((input) => {
+      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
+      return parsed.ok ? [parsed.value] : [];
+    });
+    return await this.#insert(events);
+  }
+
+  /** The cached state, rebuilt from the log when the cache is missing or behind it. */
+  async #current(): Promise<Materialized> {
+    const seq = await latestSeq(this.db);
+    if (this.#cache?.seq === seq) {
+      return this.#cache;
+    }
+    const rebuilt = rebuild({ events: await loadLog(this.db), seq });
+    await rewriteProjections(this.db, rebuilt.state);
+    this.#cache = rebuilt;
+    return rebuilt;
+  }
+
+  /**
+  The one write path: inserts what is new (known ids are skipped), then folds the new
+  events into the cache and the projections, incrementally when the batch is in order
+  and from scratch otherwise.
+  */
+  async #insert(events: readonly Event[]): Promise<readonly Event[]> {
+    const before = await this.#current();
+    const inserted: Event[] = [];
+    for (const event of events) {
+      if (before.ids.has(event.id) || inserted.some((known) => known.id === event.id)) {
+        continue;
+      }
+      await this.db
+        .insert(schema.events)
+        .values({ ...event, payload: JSON.stringify(event.payload) })
+        .onConflictDoNothing({ target: schema.events.id });
+      inserted.push(event);
+    }
+    if (inserted.length === 0) {
+      return inserted;
+    }
+    const seq = await latestSeq(this.db);
+    if (canApplyInOrder(before, inserted)) {
+      const next = applyInOrder(before, inserted, seq);
+      await updateProjections(this.db, next.state, touchedBy(inserted));
+      this.#cache = next;
+    } else {
+      this.#cache = undefined;
+      await this.#current();
     }
     return inserted;
   }

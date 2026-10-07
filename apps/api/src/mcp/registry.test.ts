@@ -5,16 +5,16 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { McpGrant } from "./grant.ts";
+import type { UserStoreApi } from "../shared/contract.ts";
 
-import { defineTool, registerTools } from "./registry.ts";
+import { defineTool, registerTools, type ToolContext } from "./registry.ts";
 
 const renameTask = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
   description: "Renames a task (test double).",
-  handler: ({ title }, grant) => ({
-    content: [{ text: `${grant.userId} renamed to ${title}`, type: "text" }],
-    structuredContent: { by: grant.userId, title },
+  handler: ({ title }, ctx) => ({
+    content: [{ text: `${ctx.grant.userId} renamed to ${title}`, type: "text" }],
+    structuredContent: { by: ctx.grant.userId, title },
   }),
   input: { title: z.string().min(1) },
   name: "rename_task",
@@ -23,16 +23,33 @@ const renameTask = defineTool({
   title: "Rename task",
 });
 
-const grant = (scopes: readonly string[]): McpGrant => ({
-  scopes,
-  telegramId: "1001",
-  userId: "user-1",
+/** The registry never touches the store itself; a tool that did would fail loudly here. */
+const untouchedStore: UserStoreApi = {
+  apply: async () => {
+    throw new Error("store not expected");
+  },
+  dryRun: async () => {
+    throw new Error("store not expected");
+  },
+  find: async () => {
+    throw new Error("store not expected");
+  },
+  read: async () => {
+    throw new Error("store not expected");
+  },
+};
+
+const context = (scopes: readonly string[]): ToolContext => ({
+  grant: { scopes, telegramId: "1001", userId: "user-1" },
+  now: "2026-10-07T10:00:00.000Z",
+  store: untouchedStore,
+  webOrigin: "https://pace.test",
 });
 
 /** A client wired to a fresh server over the in-memory transport pair. */
 const connect = async (scopes: readonly string[]): Promise<Client> => {
   const server = new McpServer({ name: "test", version: "0" });
-  registerTools(server, [renameTask], grant(scopes));
+  registerTools(server, [renameTask], context(scopes));
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: "test-client", version: "0" });
@@ -47,7 +64,7 @@ const callRename = async (client: Client) =>
   );
 
 describe("tool registry", () => {
-  it("runs the tool with the parsed input and the grant when its scope is granted", async () => {
+  it("runs the tool with the parsed input and the context when its scope is granted", async () => {
     const client = await connect(["tasks:read", "tasks:write"]);
     const result = await callRename(client);
     expect(result).toMatchObject({

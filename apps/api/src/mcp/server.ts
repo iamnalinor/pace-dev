@@ -4,22 +4,75 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { loadConfig } from "../shared/config.ts";
 import { createLogger } from "../shared/logger.ts";
 import { isAllowed } from "../shared/telegram-identity.ts";
-import { type McpGrant, readGrant } from "./grant.ts";
-import { registerTools, type Tool } from "./registry.ts";
+import { readGrant } from "./grant.ts";
+import { registerTools, type Tool, type ToolContext } from "./registry.ts";
+import { reviewAction, revokeEvent } from "./tools/correction-tools.ts";
+import { addSubtasks, setImportance, setRank, setStatus } from "./tools/edit-tools.ts";
+import { getTask } from "./tools/get-task.ts";
+import {
+  listInbox,
+  listNow,
+  listPresets,
+  listProjects,
+  listProjectTasks,
+  listReview,
+} from "./tools/list-tools.ts";
+import {
+  archivePreset,
+  createPreset,
+  seedExamplePresets,
+  updatePreset,
+} from "./tools/preset-tools.ts";
+import { closeTask, markSubtasks, reopen, submit } from "./tools/progress-tools.ts";
+import { fetchDocument, search } from "./tools/search-tools.ts";
+import { captureInbox, createTask, updateTask } from "./tools/task-tools.ts";
 import { whoami } from "./tools/whoami.ts";
 
 const SERVER_INFO = { name: "pace", version: "0.1.0" };
 
-const INSTRUCTIONS =
-  "Pace is a personal task and time tracker. Every tool acts as the person who authorized this connection; tools state the scope they need and whether they change anything.";
+const INSTRUCTIONS = [
+  "Pace is a personal task and time tracker. Every tool acts as the person who authorized this connection.",
+  "Read tools (tasks:read): whoami, list_now, get_task, list_projects, list_project_tasks, list_presets, list_inbox, list_review, search, fetch.",
+  "Mutating tools (tasks:write) take `at` (ISO instant, default now; use the past to record retroactively), `precision` (exact|approx) and `dryRun` (true = validate and preview the events, write nothing).",
+  "Ids are opaque strings; find them with list_now, search or get_task. Times are ISO 8601 UTC; deadlines carry the IANA zone they were set in.",
+  "A refusal is a tool error whose text starts with a code such as task/unknown, retro/task-closed or preset/exists.",
+].join(" ");
 
 /** Every tool the server offers; each one checks its own scope against the grant when called. */
-export const TOOLS: readonly Tool[] = [whoami];
+export const TOOLS: readonly Tool[] = [
+  whoami,
+  listNow,
+  getTask,
+  listProjects,
+  listProjectTasks,
+  listPresets,
+  listInbox,
+  listReview,
+  search,
+  fetchDocument,
+  createTask,
+  captureInbox,
+  markSubtasks,
+  submit,
+  closeTask,
+  reopen,
+  updateTask,
+  setImportance,
+  setStatus,
+  setRank,
+  addSubtasks,
+  revokeEvent,
+  reviewAction,
+  seedExamplePresets,
+  createPreset,
+  updatePreset,
+  archivePreset,
+];
 
-/** One server per request: the Worker keeps no MCP session, so the grant is baked in here. */
-export const createMcpServer = (grant: McpGrant): McpServer => {
+/** One server per request: the Worker keeps no MCP session, so the context is baked in here. */
+export const createMcpServer = (ctx: ToolContext): McpServer => {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });
-  registerTools(server, TOOLS, grant);
+  registerTools(server, TOOLS, ctx);
   return server;
 };
 
@@ -49,7 +102,14 @@ export const mcpHandler = async (
   if (!isAllowed(grant.value.telegramId, config.value.allowedTelegramIds)) {
     return oauthError(403, "access_denied", "This Telegram account is not allowed to use Pace");
   }
-  const server = createMcpServer(grant.value);
+  // The same Durable Object the sync routes use: one per user, named by the user id.
+  const store = env.USER_STORE.get(env.USER_STORE.idFromName(grant.value.userId));
+  const server = createMcpServer({
+    grant: grant.value,
+    now: new Date().toISOString(),
+    store,
+    webOrigin: config.value.webOrigin,
+  });
   // No session id generator = stateless; JSON responses keep the Worker request-shaped.
   const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
   await server.connect(transport);

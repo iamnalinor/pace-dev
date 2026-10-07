@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { OAuthScope } from "@pace/core";
 
+import type { UserStoreApi } from "../shared/contract.ts";
 import type { McpGrant } from "./grant.ts";
 
 /** The MCP behaviour hints every Pace tool must state (clients show them before calling). */
@@ -13,6 +14,16 @@ export type ToolAnnotations = {
   readonly readOnlyHint: boolean;
   readonly destructiveHint: boolean;
   readonly idempotentHint: boolean;
+};
+
+/** What a tool call runs with: the grant behind the token and the caller's user store. */
+export type ToolContext = {
+  readonly grant: McpGrant;
+  readonly store: UserStoreApi;
+  /** The web app's origin: links in search results and documents point there. */
+  readonly webOrigin: string;
+  /** Server time at the start of the request (ISO 8601, UTC). */
+  readonly now: string;
 };
 
 export type ToolDefinition<Input extends z.ZodRawShape> = {
@@ -27,7 +38,7 @@ export type ToolDefinition<Input extends z.ZodRawShape> = {
   readonly output: z.ZodRawShape;
   readonly handler: (
     args: z.output<z.ZodObject<Input>>,
-    grant: McpGrant,
+    ctx: ToolContext,
   ) => CallToolResult | Promise<CallToolResult>;
 };
 
@@ -35,7 +46,7 @@ export type ToolDefinition<Input extends z.ZodRawShape> = {
 export type Tool = {
   readonly name: string;
   readonly scope: OAuthScope;
-  readonly register: (server: McpServer, grant: McpGrant) => void;
+  readonly register: (server: McpServer, ctx: ToolContext) => void;
 };
 
 const toolError = (text: string): CallToolResult => ({
@@ -60,17 +71,17 @@ export const defineTool = <Input extends z.ZodRawShape>(
   // The SDK validates the arguments against the same shape and hands over plain data; parsing
   // them once more is what gives the handler its typed view without a cast.
   const schema = z.object(definition.input);
-  const run = async (raw: unknown, grant: McpGrant): Promise<CallToolResult> => {
+  const run = async (raw: unknown, ctx: ToolContext): Promise<CallToolResult> => {
     const parsed = schema.safeParse(raw);
     return parsed.success
-      ? await definition.handler(parsed.data, grant)
+      ? await definition.handler(parsed.data, ctx)
       : toolError(`Invalid arguments for ${definition.name}: ${parsed.error.message}`);
   };
   // Widened on purpose: the SDK's callback type is only concrete for a non-generic shape.
   const inputSchema: ZodRawShapeCompat = definition.input;
   return {
     name: definition.name,
-    register: (server, grant) => {
+    register: (server, ctx) => {
       server.registerTool(
         definition.name,
         {
@@ -81,8 +92,8 @@ export const defineTool = <Input extends z.ZodRawShape>(
           title: definition.title,
         },
         async (args) =>
-          grant.scopes.includes(definition.scope)
-            ? await run(args, grant)
+          ctx.grant.scopes.includes(definition.scope)
+            ? await run(args, ctx)
             : scopeError(definition.name, definition.scope),
       );
     },
@@ -90,8 +101,12 @@ export const defineTool = <Input extends z.ZodRawShape>(
   };
 };
 
-export const registerTools = (server: McpServer, tools: readonly Tool[], grant: McpGrant): void => {
+export const registerTools = (
+  server: McpServer,
+  tools: readonly Tool[],
+  ctx: ToolContext,
+): void => {
   for (const tool of tools) {
-    tool.register(server, grant);
+    tool.register(server, ctx);
   }
 };
