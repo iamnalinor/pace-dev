@@ -1,3 +1,5 @@
 * text=auto eol=lf
 bun.lock linguist-generated
 apps/api/drizzle/** linguist-generated
+apps/api/worker-configuration.d.ts linguist-generated
+*.keystore binary

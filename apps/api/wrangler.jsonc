@@ -1,0 +1,70 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pace-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  // global_fetch_strictly_public: the OAuth provider fetches Client ID Metadata Documents
+  // (MCP clients that identify by URL); the flag keeps those fetches off same-zone routing.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "routes": [{ "pattern": "pace-api.nalinor.dev", "custom_domain": true }],
+  "observability": { "enabled": true },
+  // Secrets (set with `wrangler secret put`, never here): TELEGRAM_BOT_TOKEN (from @BotFather),
+  // TELEGRAM_WEBHOOK_SECRET (random string echoed by Telegram on every webhook call).
+  // Optional vars set at deploy time: BOT_INFO (JSON of getMe), TELEGRAM_API_ROOT (tests only).
+  // All are typed in src/shared/env.d.ts and parsed by src/shared/config.ts.
+  "vars": {
+    "ENVIRONMENT": "production",
+    // Telegram user ids allowed to sign in (comma separated). Empty = the whitelist is off
+    // and any Telegram account may sign in; set ids to restrict a deployment.
+    "ALLOWED_TELEGRAM_IDS": "",
+    "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
+    // Subnets Telegram sends webhook calls from (https://core.telegram.org/bots/webhooks#the-short-version),
+    // matched against CF-Connecting-IP; anything else gets 403. Empty = the check is off.
+    "TELEGRAM_WEBHOOK_ALLOWED_CIDRS": "149.154.160.0/20,91.108.4.0/22",
+    "WEB_ORIGIN": "https://pace.nalinor.dev",
+    // The Worker's own origin: the OAuth issuer and the canonical MCP resource (`<origin>/mcp`).
+    "API_ORIGIN": "https://pace-api.nalinor.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pace",
+      "database_id": "2ae0224e-f7ba-4f66-b182-65f762ddb6d0",
+      "migrations_dir": "drizzle/d1"
+    }
+  ],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "79653b9423324ba89a917eae8a8278a3" }],
+  "durable_objects": {
+    "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserStore"] }],
+  "dev": { "port": 8787 },
+  "env": {
+    "dev": {
+      // Local/e2e environment: no custom domain, local D1/KV/DO emulation.
+      "routes": [],
+      "vars": {
+        "ENVIRONMENT": "development",
+        "ALLOWED_TELEGRAM_IDS": "",
+        "TELEGRAM_BOT_USERNAME": "PaceTaskTrackerBot",
+        // Same Telegram subnets as production; override with an empty value in .dev.vars
+        // when a non-Cloudflare tunnel delivers the webhook locally.
+        "TELEGRAM_WEBHOOK_ALLOWED_CIDRS": "149.154.160.0/20,91.108.4.0/22",
+        "WEB_ORIGIN": "http://localhost:5173",
+        "API_ORIGIN": "http://localhost:8787"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pace",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "drizzle/d1"
+        }
+      ],
+      "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+      "durable_objects": {
+        "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+      }
+    }
+  }
+}

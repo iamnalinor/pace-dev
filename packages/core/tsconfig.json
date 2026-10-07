@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Pure TypeScript: no DOM, no Node, no Bun. Everything here runs on phone, browser and Worker.
+    "lib": ["ESNext"],
+    "types": []
+  },
+  "include": ["src", "*.ts"]
+}

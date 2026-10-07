@@ -1,7 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["bun"]
+    // Workers runtime types come from the generated worker-configuration.d.ts (wrangler types).
+    "lib": ["ESNext"],
+    "types": ["node", "@cloudflare/vitest-plugin/types"]
   },
-  "include": ["src", "tests", "*.ts"]
+  "include": [
+    "src",
+    "tests",
+    "scripts",
+    "*.ts",
+    "worker-configuration.d.ts",
+    "drizzle/do/migrations.d.ts"
+  ]
 }

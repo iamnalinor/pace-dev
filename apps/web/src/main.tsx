@@ -1,30 +1,39 @@
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
+
 import "./styles.css";
 
-import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
+import { Toaster } from "sonner";
 
-import { createQueryClient } from "#web/shared/api/query-client.ts";
-import { Toaster } from "#web/shared/ui/sonner.tsx";
-
+import { PaceProvider } from "./app-state.tsx";
+import { applyTheme } from "./platform/theme.ts";
 import { router } from "./router.tsx";
+import { createWebServices } from "./services.ts";
+
+// Before the first paint, so a stored theme never flashes the system one.
+applyTheme();
 
 const root = document.querySelector("#root");
 if (root === null) {
   throw new Error("#root element is missing in index.html");
 }
 
-// A full navigation also drops every cached response of the expired session.
-const queryClient = createQueryClient(() => {
-  globalThis.location.assign("/sign-in");
-});
-
 createRoot(root).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PaceProvider services={createWebServices()}>
       <RouterProvider router={router} />
-      <Toaster />
-    </QueryClientProvider>
+      {/* Bottom, clear of the phone tab bar, so a toast never covers a page title. */}
+      <Toaster
+        mobileOffset={{ bottom: 92 }}
+        position="bottom-center"
+        // Undo is a real target: at least 24px (WCAG 2.2 target size), here 32px.
+        toastOptions={{ classNames: { actionButton: "!h-8 !px-3 !text-[13px]" } }}
+        // One at a time: a stack of toasts overlaps their Undo buttons.
+        visibleToasts={1}
+      />
+    </PaceProvider>
   </StrictMode>,
 );

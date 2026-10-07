@@ -8,21 +8,17 @@ export default defineConfig({
     coverage: {
       include: ["src/**/*.{ts,tsx}"],
       // Component tests target logic. Composition and wiring — pages, layout, route
-      // guards, API/auth client setup, shadcn/ui — are covered by Playwright instead
-      // (same scope as Stryker's `mutate` in stryker.config.json).
+      // guards, platform adapters, shadcn/ui — are covered by Playwright instead.
       exclude: [
-        "src/**/*.test.tsx",
+        "src/**/*.test.{ts,tsx}",
         "src/test/**",
         "src/main.tsx",
         "src/router.tsx",
         "src/shared/ui/**",
-        "src/shared/app-layout.tsx",
-        "src/shared/route-error.tsx",
-        "src/shared/**/*-client.ts",
-        "src/shared/auth/use-current-user.ts",
+        "src/platform/**",
         "src/**/*-page.tsx",
-        "src/**/*-card.tsx",
-        "src/features/auth/require-auth.tsx",
+        "src/**/*-layout.tsx",
+        "src/shared/route-error.tsx",
       ],
       provider: "v8",
       thresholds: { branches: 75, functions: 85, lines: 90, statements: 90 },

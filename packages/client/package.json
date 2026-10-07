@@ -1,0 +1,30 @@
+{
+  "name": "@pace/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/client.ts",
+    "./react": "./src/react.ts",
+    "./testing": "./src/fake-fetch.fake.ts"
+  },
+  "scripts": {
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@pace/core": "workspace:*",
+    "zustand": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/react": "19.3.0",
+    "@vitest/coverage-v8": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  }
+}

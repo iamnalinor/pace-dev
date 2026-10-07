@@ -1,0 +1,10 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing of the shared domain logic: `bun test:mutation` (slow; weekly in CI).",
+  "testRunner": "command",
+  "mutate": ["src/**/*.ts", "!src/**/*.test.ts", "!src/parse/regression/**", "!src/core.ts"],
+  "reporters": ["clear-text", "progress", "html"],
+  "thresholds": { "high": 90, "low": 75, "break": 70 },
+  "tempDirName": ".stryker-tmp",
+  "commandRunner": { "command": "bunx vitest run --bail=1" }
+}

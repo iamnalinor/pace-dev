@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dev.nalinor.pace",
+      "sha256_cert_fingerprints": [
+        "AE:37:BA:15:E9:78:03:CF:71:8B:91:54:9B:B9:3B:A0:BD:F1:52:56:CD:96:91:7A:64:CE:11:07:1F:03:50:96"
+      ]
+    }
+  }
+]

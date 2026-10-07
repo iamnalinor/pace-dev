@@ -1,80 +1,86 @@
 /**
- * Architecture as code. `bun lint` fails when a dependency crosses a boundary.
- * Layers inside every API feature (Clean Architecture, dependencies point inward):
- *
- *   http ──► application ──► domain
- *     │            ▲
- *     └──► (wired only in *-feature.ts) ◄── infrastructure
- */
+Architecture as code. `bun lint` fails when a dependency crosses a boundary.
+
+  apps/app ─┐
+  apps/web ─┼─► packages/client ─► packages/core (incl. the zod API contract)
+  apps/api ─┴───────────────────► packages/core
+
+core is pure (no platform, no other workspace); client never imports an app or the API;
+apps never import each other; API features only reach other features through shared/.
+*/
 import { builtinModules } from "node:module";
 
-const FEATURE = "^apps/api/src/features/([^/]+)/";
-const TEST_FILE = "[.]test[.]tsx?$";
+const API_FEATURE = "^apps/api/src/([^/]+)/";
 
 /** @type {import("dependency-cruiser").IConfiguration} */
 const config = {
   forbidden: [
-    // ── Clean Architecture ──────────────────────────────────────────────────────
+    // ── Workspace boundaries ────────────────────────────────────────────────────
     {
-      name: "domain-is-pure",
-      comment:
-        "Domain = business rules only: no frameworks, no I/O, no other layers, no Node/Bun APIs.",
+      name: "core-is-pure",
+      comment: "core = shared business rules: no workspace imports, no platform code.",
       severity: "error",
-      from: { path: `${FEATURE}domain/`, pathNot: TEST_FILE },
-      to: {
-        pathNot: [`${FEATURE}domain/`, String.raw`^apps/api/src/shared/result\.ts$`],
-      },
+      from: { path: "^packages/core/src/" },
+      to: { path: "^(apps|packages/client|e2e)/" },
     },
     {
-      name: "application-depends-on-domain-only",
-      comment:
-        "Use cases orchestrate the domain through ports (interfaces). No HTTP, no DB, no libraries.",
+      name: "client-does-not-know-apps",
+      comment: "The API contract lives in core (zod endpoints); client never sees Worker code.",
       severity: "error",
-      from: { path: `${FEATURE}application/`, pathNot: TEST_FILE },
-      to: {
-        pathNot: [
-          `${FEATURE}(application|domain)/`,
-          String.raw`^apps/api/src/shared/(result|clock)\.ts$`,
-          String.raw`^apps/api/src/auth/current-user\.ts$`,
-        ],
-      },
+      from: { path: "^packages/client/src/" },
+      to: { path: "^apps/" },
     },
     {
-      name: "infrastructure-does-not-know-http",
-      comment: "Adapters implement application ports; they never import the HTTP layer.",
+      name: "api-does-not-import-ui",
       severity: "error",
-      from: { path: `${FEATURE}infrastructure/` },
-      to: { path: `${FEATURE}http/` },
+      from: { path: "^apps/api/" },
+      to: { path: "^(apps/(web|app)|packages/client)/" },
     },
     {
-      name: "http-does-not-know-infrastructure",
-      comment:
-        "Routes call use cases; concrete adapters are wired in the feature's composition root (*-feature.ts).",
+      name: "ui-does-not-import-api",
+      comment: "The browser/phone bundle must never include server code; the contract is in core.",
       severity: "error",
-      from: { path: `${FEATURE}http/` },
-      to: { path: `${FEATURE}infrastructure/` },
+      from: { path: "^apps/(web|app)/" },
+      to: { path: "^apps/api/" },
     },
     {
-      name: "features-are-isolated",
-      comment:
-        "A feature must not reach into another feature. Share via apps/api/src/shared or compose in app.ts.",
-      severity: "error",
-      from: { path: FEATURE },
-      to: { path: "^apps/api/src/features/", pathNot: "^apps/api/src/features/$1/" },
-    },
-    {
-      name: "web-imports-api-types-only",
-      comment:
-        "The browser bundle must never include server code: only `import type { App }` for Eden.",
+      name: "apps-are-isolated",
       severity: "error",
       from: { path: "^apps/web/" },
-      to: { path: "^apps/api/", dependencyTypesNot: ["type-only"] },
+      to: { path: "^apps/app/" },
+    },
+    {
+      name: "app-does-not-import-web",
+      severity: "error",
+      from: { path: "^apps/app/" },
+      to: { path: "^apps/web/" },
+    },
+    {
+      name: "api-features-are-isolated",
+      comment:
+        "An API feature folder must not reach into another one. Share via apps/api/src/shared or compose in app.ts/worker.ts.",
+      severity: "error",
+      from: { path: API_FEATURE, pathNot: "^apps/api/src/shared/" },
+      to: {
+        path: "^apps/api/src/",
+        pathNot: [
+          "^apps/api/src/$1/",
+          "^apps/api/src/shared/",
+          String.raw`^apps/api/src/[^/]+\.ts$`,
+        ],
+      },
     },
     {
       name: "web-features-are-isolated",
       severity: "error",
       from: { path: "^apps/web/src/features/([^/]+)/" },
       to: { path: "^apps/web/src/features/", pathNot: "^apps/web/src/features/$1/" },
+    },
+    {
+      name: "app-features-are-isolated",
+      severity: "error",
+      from: { path: "^apps/app/src/features/([^/]+)/" },
+      to: { path: "^apps/app/src/features/", pathNot: "^apps/app/src/features/$1/" },
     },
 
     // ── General hygiene ─────────────────────────────────────────────────────────
@@ -93,11 +99,18 @@ const config = {
         pathNot: [
           "(^|/)[.][^/]+[.](?:js|cjs|mjs|ts)$",
           "[.]d[.]ts$",
-          "[.]config[.]ts$",
-          String.raw`(^|/)(main|app)\.ts$`,
-          "^apps/api/src/scripts/",
+          "[.]config[.](ts|js)$",
+          String.raw`^apps/api/src/worker\.ts$`,
+          "^apps/api/scripts/",
+          "^apps/app/app/", // expo-router discovers routes by file name
+          "^apps/app/plugins/",
+          "^apps/app/modules/[^/]+/index[.]ts$",
+          String.raw`^apps/app/jest\.setup\.ts$`,
           "^e2e/",
+          "^scripts/",
           String.raw`^apps/web/src/test/setup\.ts$`, // loaded by vitest.config.ts
+          String.raw`^apps/api/tests/setup\.ts$`, // loaded by vitest.config.ts
+          "^packages/core/src/parse/regression/",
         ],
       },
       to: {},
@@ -106,16 +119,24 @@ const config = {
       name: "not-to-test",
       comment: "Production code must not depend on tests or test fakes.",
       severity: "error",
-      from: { pathNot: "[.](test|fake)[.]tsx?$|^apps/api/tests/|^e2e/" },
-      to: { path: "[.](test|fake)[.]tsx?$|^apps/api/tests/" },
+      from: {
+        pathNot: [
+          "[.](test|fake)[.]tsx?$|^apps/api/tests/|^e2e/|/test/",
+          // Jest's setup file is test code: it installs the fakes before every suite.
+          String.raw`^apps/app/jest\.setup\.ts$`,
+          // The test-support entry (`@pace/core/testing`) re-exports the fixtures on purpose.
+          String.raw`^packages/core/src/testing\.ts$`,
+        ],
+      },
+      to: { path: "[.](test|fake)[.]tsx?$|^apps/api/tests/|/test/" },
     },
     {
       name: "not-to-dev-dep",
-      comment: "Production code must not import devDependencies (they are absent in the image).",
+      comment: "Production code must not import devDependencies.",
       severity: "error",
       from: {
-        path: "^apps/[^/]+/src/",
-        pathNot: ["[.](test|fake)[.]tsx?$", "^apps/web/src/test/"],
+        path: "^(apps/[^/]+/(src|app|modules)|packages/[^/]+/src)/",
+        pathNot: ["[.](test|fake)[.]tsx?$", "/test/"],
       },
       to: {
         dependencyTypes: ["npm-dev"],
@@ -138,20 +159,34 @@ const config = {
     },
   ],
   options: {
-    // Node's built-ins plus Bun's (the types require spelling out the full list).
-    builtInModules: { add: [], override: [...builtinModules, "bun", "bun:test"] },
+    builtInModules: {
+      add: [],
+      // `builtinModules` omits the modules that only exist under the `node:` scheme.
+      override: [
+        ...builtinModules,
+        "node:sqlite",
+        "bun",
+        "bun:test",
+        "cloudflare:workers",
+        "cloudflare:test",
+      ],
+    },
     doNotFollow: { path: ["node_modules"] },
-    // Only build output is excluded; node_modules is kept (not followed), otherwise
-    // every npm import silently vanishes and the package rules above never fire.
-    exclude: { path: [String.raw`^apps/[^/]+/(dist|coverage|reports|\.stryker-tmp)/`] },
+    exclude: {
+      path: [
+        String.raw`^apps/[^/]+/(dist|coverage|reports|\.stryker-tmp|android|\.expo|\.wrangler)/`,
+        String.raw`^packages/[^/]+/(coverage|reports|\.stryker-tmp)/`,
+        "^apps/api/drizzle/",
+        String.raw`worker-configuration\.d\.ts$`,
+        String.raw`nativewind-env\.d\.ts$`, // triple-slash reference to a types-only package entry
+      ],
+    },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
-    // Resolve packages the way Bun/Vite do (package.json "exports", ESM first).
-    // No "types" condition: resolving to .d.ts files hides runtime dependencies.
     enhancedResolveOptions: {
-      conditionNames: ["import", "require", "node", "default"],
+      conditionNames: ["import", "require", "node", "react-native", "default"],
       exportsFields: ["exports"],
-      extensions: [".ts", ".tsx", ".js", ".mjs", ".cjs"],
+      extensions: [".ts", ".tsx", ".js", ".mjs", ".cjs", ".json"],
       mainFields: ["module", "main"],
     },
   },

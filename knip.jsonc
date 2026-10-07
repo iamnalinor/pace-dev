@@ -1,22 +1,68 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  // Vendored shadcn/ui components export every sub-component (CardAction, ...);
-  // we keep them close to upstream instead of trimming exports we don't use yet.
-  "ignoreIssues": { "apps/web/src/shared/ui/**": ["exports", "types"] },
+  "ignoreIssues": {
+    // Vendored shadcn/ui components export every sub-component (CardAction, ...);
+    // we keep them close to upstream instead of trimming exports we don't use yet.
+    "apps/web/src/shared/ui/**": ["exports", "types"],
+    // Drizzle consumes these modules as a namespace (`import * as schema`).
+    "apps/api/src/shared/db/d1-schema.ts": ["exports"],
+    "apps/api/src/user-store/schema.ts": ["exports"]
+  },
   "workspaces": {
     ".": {
-      "entry": ["*.config.ts", "e2e/**/*.ts"]
+      "entry": ["*.config.ts", "e2e/**/*.ts", "scripts/*.ts"]
+    },
+    "packages/core": {
+      "project": ["src/**/*.ts"],
+      // Stryker's command runner is built into @stryker-mutator/core.
+      "ignoreDependencies": ["@stryker-mutator/command-runner"]
+    },
+    "packages/client": {
+      "project": ["src/**/*.ts"]
     },
     "apps/api": {
-      "entry": ["src/scripts/*.ts", "src/**/*.test.ts", "tests/**/*.ts"],
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
+      "entry": [
+        "scripts/*.ts",
+        "tests/**/*.ts",
+        "drizzle.*.config.ts",
+        // Referenced by path from the drizzle configs.
+        "src/shared/db/d1-schema.ts",
+        "src/user-store/schema.ts"
+      ],
+      "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
+      // `cloudflare:workers` / `cloudflare:test` are runtime modules, not npm packages.
+      "ignoreDependencies": ["cloudflare"]
     },
     "apps/web": {
-      // Stryker's command runner is built into @stryker-mutator/core.
-      "ignoreDependencies": ["@stryker-mutator/command-runner"],
-      "entry": ["src/**/*.test.tsx", "src/test/*.ts"],
+      "ignoreDependencies": [
+        "@stryker-mutator/command-runner",
+        // Pre-declared for later shell work; drop from this list when used.
+        // react-query: server-only state (login polling UI) is not needed yet.
+        "@tanstack/react-query",
+        // zustand reaches the web app through @pace/client/react, never directly.
+        "zustand"
+      ],
+      "entry": ["src/test/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx,css}"]
+    },
+    "apps/app": {
+      // Loading metro.config.js would execute NativeWind's Metro plugin (it writes files).
+      "metro": false,
+      // Local Expo modules are autolinked by folder; their index.ts is the JS entry.
+      "entry": ["plugins/*.js", "modules/*/index.ts"],
+      "project": [
+        "app/**/*.{ts,tsx}",
+        "src/**/*.{ts,tsx}",
+        "modules/**/*.ts",
+        "plugins/*.js",
+        "*.css"
+      ],
+      "ignoreDependencies": [
+        // The expo-font config plugin references these packages by file path in app.config.ts.
+        "@expo-google-fonts/geist",
+        "@expo-google-fonts/geist-mono"
+      ]
     }
   }
 }

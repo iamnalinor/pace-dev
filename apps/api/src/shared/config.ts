@@ -1,63 +1,98 @@
-import { type Static, Type } from "@sinclair/typebox";
-import { Value } from "@sinclair/typebox/value";
+import type { UserFromGetMe } from "grammy/types";
 
-import { err, ok, type Result } from "./result.ts";
+import { z } from "zod";
 
-const ConfigSchema = Type.Object({
-  // Brute-force protection on auth endpoints; only CI smoke runs turn it off.
-  AUTH_RATE_LIMIT: Type.Boolean({ default: true }),
-  BETTER_AUTH_SECRET: Type.String({ minLength: 32 }),
-  BETTER_AUTH_URL: Type.String({ pattern: "^https?://" }),
-  DATABASE_URL: Type.String({ pattern: "^postgres(ql)?://" }),
-  LOG_LEVEL: Type.Union([Type.Literal("debug"), Type.Literal("info"), Type.Literal("error")], {
-    default: "info",
-  }),
-  NODE_ENV: Type.Union(
-    [Type.Literal("development"), Type.Literal("production"), Type.Literal("test")],
-    { default: "development" },
-  ),
-  PORT: Type.Integer({ default: 3000, maximum: 65_535, minimum: 0 }),
-});
+import { err, ok, type Result } from "@pace/core";
 
-export type Config = Static<typeof ConfigSchema>;
+import { parseCidr } from "./ip.ts";
 
-// The value shipped in .env.example: fine for local development, never for production.
-const PLACEHOLDER_SECRET_MARKER = "change-me";
+/** `getMe` as stored in BOT_INFO; the capability flags default to false when the JSON is trimmed. */
+const BotInfoSchema = z.object({
+  id: z.number().int(),
+  is_bot: z.literal(true),
+  first_name: z.string(),
+  username: z.string(),
+  can_join_groups: z.boolean().default(false),
+  can_read_all_group_messages: z.boolean().default(false),
+  supports_inline_queries: z.boolean().default(false),
+  can_connect_to_business: z.boolean().default(false),
+  has_main_web_app: z.boolean().default(false),
+  has_topics_enabled: z.boolean().default(false),
+  allows_users_to_create_topics: z.boolean().default(false),
+  can_manage_bots: z.boolean().default(false),
+  supports_join_request_queries: z.boolean().default(false),
+}) satisfies z.ZodType<UserFromGetMe>;
 
-/** One message per variable: TypeBox reports several failures for a single missing value. */
-const describeErrors = (value: unknown): readonly string[] => {
-  const byVariable = new Map<string, string>();
-  for (const error of Value.Errors(ConfigSchema, value)) {
-    const name = error.path.slice(1);
-    if (!byVariable.has(name)) {
-      byVariable.set(name, `${name}: ${error.message}`);
-    }
+const parseJson = (text: string, ctx: z.RefinementCtx): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    ctx.addIssue({ code: "custom", message: "not valid JSON" });
+    return z.NEVER;
   }
-  return byVariable.values().toArray();
 };
 
-/**
- * Parses and validates environment variables once, at startup (fail fast).
- * Unknown variables are dropped, defaults applied, strings converted ("3000" → 3000).
- * Returns every problem at once, not just the first one.
- */
-export const parseConfig = (
-  env: Readonly<Record<string, string | undefined>>,
-): Result<Config, readonly string[]> => {
-  const prepared = Value.Convert(
-    ConfigSchema,
-    Value.Default(ConfigSchema, Value.Clean(ConfigSchema, { ...env })),
-  );
-  if (!Value.Check(ConfigSchema, prepared)) {
-    return err(describeErrors(prepared));
+const csv = (text: string): readonly string[] =>
+  text
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
+
+/** Comma-separated CIDRs; every entry must parse so a typo fails config loading, not a webhook call. */
+const cidrList = (text: string, ctx: z.RefinementCtx): readonly string[] => {
+  const entries = csv(text);
+  for (const entry of entries) {
+    const parsed = parseCidr(entry);
+    if (!parsed.ok) {
+      ctx.addIssue({ code: "custom", message: parsed.error });
+      return z.NEVER;
+    }
   }
-  if (
-    prepared.NODE_ENV === "production" &&
-    prepared.BETTER_AUTH_SECRET.includes(PLACEHOLDER_SECRET_MARKER)
-  ) {
-    return err([
-      "BETTER_AUTH_SECRET: replace the .env.example placeholder (openssl rand -base64 32)",
-    ]);
+  return entries;
+};
+
+const EnvSchema = z.object({
+  ENVIRONMENT: z.enum(["development", "test", "production"]),
+  ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
+  TELEGRAM_BOT_USERNAME: z.string().min(1),
+  WEB_ORIGIN: z.url(),
+  TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
+  TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
+  TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
+  BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
+});
+
+export type Config = {
+  readonly environment: "development" | "production" | "test";
+  readonly allowedTelegramIds: readonly string[];
+  readonly telegramBotUsername: string;
+  readonly webOrigin: string;
+  readonly telegramBotToken: string | undefined;
+  readonly telegramWebhookSecret: string | undefined;
+  /** Source subnets the webhook accepts (checked against `CF-Connecting-IP`); empty = check disabled. */
+  readonly telegramWebhookAllowedCidrs: readonly string[];
+  readonly telegramApiRoot: string;
+  readonly botInfo: undefined | UserFromGetMe;
+};
+
+/** Reads and validates the Worker's vars and secrets; a failure names the offending variable. */
+export const loadConfig = (env: object): Result<Config, string> => {
+  const parsed = EnvSchema.safeParse(env);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return err(`config: ${issue?.path.join(".") ?? "env"}: ${issue?.message ?? "invalid"}`);
   }
-  return ok(prepared);
+  const value = parsed.data;
+  return ok({
+    environment: value.ENVIRONMENT,
+    allowedTelegramIds: value.ALLOWED_TELEGRAM_IDS,
+    telegramBotUsername: value.TELEGRAM_BOT_USERNAME,
+    webOrigin: value.WEB_ORIGIN,
+    telegramBotToken: value.TELEGRAM_BOT_TOKEN,
+    telegramWebhookSecret: value.TELEGRAM_WEBHOOK_SECRET,
+    telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
+    telegramApiRoot: value.TELEGRAM_API_ROOT,
+    botInfo: value.BOT_INFO,
+  });
 };
