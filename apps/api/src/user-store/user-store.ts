@@ -1,18 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
-import { and, asc, desc, eq, gt, gte, like, lte, max, or, type SQL } from "drizzle-orm";
+import { asc, eq, gt } from "drizzle-orm";
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
 import {
   autoOutcomeEvents,
-  evaluateNotifications,
+  type CoreState,
   type Event,
   type EventInput,
-  INITIAL_NOTIFY_MEMORY,
   missingInstanceEvents,
-  newId,
-  nextAlarmAt,
-  type NotifyMemory,
   notifyPlan,
   ok,
   parseEvent,
@@ -34,12 +30,23 @@ import type {
   ReadResult,
   StoredEvent,
 } from "../shared/contract.ts";
+import type { TelegramTarget } from "../shared/telegram-api.ts";
 
-import { loadConfig } from "../shared/config.ts";
-import { sendTelegramMessage, telegramFetch, type TelegramTarget } from "../shared/telegram-api.ts";
 import migrations from "../../drizzle/do/migrations.js";
+import { insertDecisions, listDecisions } from "./decision-log.ts";
 import { coreValidator, type EventValidator, normalizeEvent } from "./event-log.ts";
-import { notificationText } from "./notify-text.ts";
+import { hasObservation, latestSeq, loadLog, toEvent } from "./log-queries.ts";
+import {
+  chatOf,
+  memoryOf,
+  type NotifyRun,
+  rearm,
+  runNotifier,
+  saveMemory,
+  SERVER_TZ,
+  setChat,
+  telegramOf,
+} from "./notifier.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
 import {
@@ -75,84 +82,11 @@ export type ListResult = {
 /** System events are the server's own: this is their device. */
 const SERVER_DEVICE_ID = "server";
 
-/** Storage keys of the notifier: the user's chat with the bot and what was already sent. */
-const NOTIFY_CHAT_KEY = "notify:chat";
-const NOTIFY_MEMORY_KEY = "notify:memory";
-
-/** The account zone wins; this only matters before any device reported one. */
-const SERVER_TZ = "UTC";
-
-export type NotifyRun = {
-  readonly sent: number;
-  readonly decisions: number;
-  readonly nextAt: null | string;
-};
-
-const toDecision = (row: typeof schema.decisions.$inferSelect): DecisionRecord => ({
-  ...row,
-  inputs: JSON.parse(row.inputs) as JsonValue,
-});
-
-const decisionFilters = (query: DecisionQuery): readonly SQL[] => [
-  ...(query.taskId === undefined ? [] : [eq(schema.decisions.taskId, query.taskId)]),
-  ...(query.from === undefined ? [] : [gte(schema.decisions.at, query.from)]),
-  ...(query.to === undefined ? [] : [lte(schema.decisions.at, query.to)]),
-  ...(query.q === undefined
-    ? []
-    : [
-        or(
-          like(schema.decisions.rule, `%${query.q}%`),
-          like(schema.decisions.outcome, `%${query.q}%`),
-          like(schema.decisions.explanation, `%${query.q}%`),
-          like(schema.decisions.inputs, `%${query.q}%`),
-        ) ?? eq(schema.decisions.id, ""),
-      ]),
-];
-
 const idOf = (raw: unknown): string =>
   typeof raw === "object" && raw !== null && "id" in raw ? String(raw.id) : "";
 
-const toEvent = (row: typeof schema.events.$inferSelect): StoredEvent => ({
-  id: row.id,
-  type: row.type,
-  occurredAt: row.occurredAt,
-  recordedAt: row.recordedAt,
-  deviceId: row.deviceId,
-  precision: row.precision as StoredEvent["precision"],
-  source: row.source as StoredEvent["source"],
-  payload: JSON.parse(row.payload) as JsonValue,
-});
-
 /** A parsed event is JSON by construction, so the stored view is the same object. */
 const toStored = (event: Event): StoredEvent => event;
-
-const latestSeq = async (db: Db): Promise<number> => {
-  const [row] = await db.select({ seq: max(schema.events.seq) }).from(schema.events);
-  return row?.seq ?? 0;
-};
-
-const hasObservation = async (db: Db, observation: Observation): Promise<boolean> => {
-  const [existing] = await db
-    .select({ seq: schema.observations.seq })
-    .from(schema.observations)
-    .where(
-      and(
-        eq(schema.observations.kind, observation.kind),
-        eq(schema.observations.key, observation.key),
-      ),
-    )
-    .limit(1);
-  return existing !== undefined;
-};
-
-/** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
-const loadLog = async (db: Db): Promise<readonly Event[]> => {
-  const rows = await db.select().from(schema.events).orderBy(asc(schema.events.seq));
-  return rows.flatMap((row) => {
-    const parsed = parseEvent(toEvent(row));
-    return parsed.ok ? [parsed.value] : [];
-  });
-};
 
 /**
 One instance per user (id = user id): the event log, the materialized state, the SQL
@@ -234,6 +168,15 @@ export class UserStore extends DurableObject {
       await this.#current();
     }
     return inserted;
+  }
+
+  async #state(): Promise<CoreState> {
+    const { state } = await this.#current();
+    return state;
+  }
+
+  async #rearm(now: string): Promise<void> {
+    await rearm(this.ctx.storage, await this.#state(), now);
   }
 
   /** Smoke check used by tests: the schema is in place. */
@@ -370,110 +313,56 @@ export class UserStore extends DurableObject {
     return value;
   }
 
-  async #notifyMemory(): Promise<NotifyMemory> {
-    return (await this.ctx.storage.get<NotifyMemory>(NOTIFY_MEMORY_KEY)) ?? INITIAL_NOTIFY_MEMORY;
-  }
-
-  /** Moves the alarm earlier when the state now calls for an earlier evaluation. */
-  async #rearm(now: string): Promise<void> {
-    if ((await this.ctx.storage.get<string>(NOTIFY_CHAT_KEY)) === undefined) {
-      return;
-    }
-    const { state } = await this.#current();
-    const next = nextAlarmAt(state, { deviceTz: SERVER_TZ, now }, await this.#notifyMemory());
-    const existing = await this.ctx.storage.getAlarm();
-    if (next !== null && (existing === null || Date.parse(next) < existing)) {
-      await this.ctx.storage.setAlarm(Date.parse(next));
-    }
-  }
-
   /** Appends to the decision log (notifications here, parses from the routes and the bot). */
   async logDecisions(entries: readonly DecisionEntry[], now: string): Promise<void> {
-    for (const decision of entries) {
-      await this.db.insert(schema.decisions).values({
-        ...decision,
-        at: now,
-        id: newId(),
-        inputs: JSON.stringify(decision.inputs),
-      });
-    }
+    await insertDecisions(this.db, entries, now);
   }
 
-  /** Notifications go to this chat from now on (the bot and every login call it). */
+  /** The decision log, newest first. */
+  async decisions(query: DecisionQuery): Promise<readonly DecisionRecord[]> {
+    return await listDecisions(this.db, query);
+  }
+
+  /** Notifications go to this chat from now on (the bot and every bot login call it). */
   async notifyTo(chatId: string, now: string): Promise<void> {
-    if ((await this.ctx.storage.get<string>(NOTIFY_CHAT_KEY)) !== chatId) {
-      await this.ctx.storage.put(NOTIFY_CHAT_KEY, chatId);
-    }
+    await setChat(this.ctx.storage, chatId);
     await this.#rearm(now);
   }
 
   /** Silences a task's alerts until `until`. */
   async snoozeTask(taskId: string, until: string, now: string): Promise<void> {
-    await this.ctx.storage.put(NOTIFY_MEMORY_KEY, snooze(await this.#notifyMemory(), taskId, until));
+    await saveMemory(this.ctx.storage, snooze(await memoryOf(this.ctx.storage), taskId, until));
     await this.#rearm(now);
   }
 
   /** What the phone should schedule locally for the next day. */
   async notifyPlan(now: string): Promise<readonly PlannedNotification[]> {
     await this.derive(now);
-    const { state } = await this.#current();
-    return notifyPlan(state, { deviceTz: SERVER_TZ, now }, await this.#notifyMemory());
+    const state = await this.#state();
+    return notifyPlan(state, { deviceTz: SERVER_TZ, now }, await memoryOf(this.ctx.storage));
   }
 
-  /**
-  One pass of the notifier: evaluates the rules, sends what is due to the user's chat,
-  logs every decision and arms the next alarm. Without a chat nothing is evaluated; without
-  a bot (`telegram` null) the decisions are still logged.
-  */
+  /** One pass of the notifier (see `runNotifier`); nothing happens until the chat is known. */
   async runNotifications(now: string, telegram: null | TelegramTarget): Promise<NotifyRun> {
-    const chatId = await this.ctx.storage.get<string>(NOTIFY_CHAT_KEY);
+    const chatId = await chatOf(this.ctx.storage);
     if (chatId === undefined) {
       return { decisions: 0, nextAt: null, sent: 0 };
     }
     await this.derive(now);
-    const { state } = await this.#current();
-    const evaluation = evaluateNotifications(
-      state,
-      { deviceTz: SERVER_TZ, now },
-      await this.#notifyMemory(),
-    );
-    let sent = 0;
-    for (const message of evaluation.messages) {
-      if (
-        telegram !== null &&
-        (await sendTelegramMessage(telegram, chatId, notificationText(message, state, now)))
-      ) {
-        sent += 1;
-      }
-    }
-    await this.logDecisions(evaluation.decisions, now);
-    await this.ctx.storage.put(NOTIFY_MEMORY_KEY, evaluation.memory);
-    await (evaluation.nextAt === null
-      ? this.ctx.storage.deleteAlarm()
-      : this.ctx.storage.setAlarm(Date.parse(evaluation.nextAt)));
-    return { decisions: evaluation.decisions.length, nextAt: evaluation.nextAt, sent };
+    return await runNotifier({
+      chatId,
+      log: async (decisions) => {
+        await this.logDecisions(decisions, now);
+      },
+      now,
+      state: await this.#state(),
+      storage: this.ctx.storage,
+      telegram,
+    });
   }
 
   override async alarm(): Promise<void> {
-    const config = loadConfig(this.env);
-    const token = config.ok ? config.value.telegramBotToken : undefined;
-    await this.runNotifications(
-      new Date().toISOString(),
-      config.ok && token !== undefined
-        ? { apiRoot: config.value.telegramApiRoot, fetch: telegramFetch, token }
-        : null,
-    );
-  }
-
-  /** The decision log, newest first. */
-  async decisions(query: DecisionQuery): Promise<readonly DecisionRecord[]> {
-    const rows = await this.db
-      .select()
-      .from(schema.decisions)
-      .where(and(...decisionFilters(query)))
-      .orderBy(desc(schema.decisions.at))
-      .limit(query.limit);
-    return rows.map((row) => toDecision(row));
+    await this.runNotifications(new Date().toISOString(), telegramOf(this.env));
   }
 
   /**

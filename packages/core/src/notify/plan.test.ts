@@ -35,7 +35,12 @@ describe("notifyPlan", () => {
     expect(notifyPlan(state, { deviceTz: MOSCOW, now: NOW }, INITIAL_NOTIFY_MEMORY)).toEqual([
       { at: "2026-10-06T18:00:00.000Z", kind: "digest" },
       { at: "2026-10-07T06:00:00.000Z", kind: "digest" },
-      { at: "2026-10-07T09:00:00.000Z", kind: "deadline", taskId: "t-report", title: "Write the report" },
+      {
+        at: "2026-10-07T09:00:00.000Z",
+        kind: "deadline",
+        taskId: "t-report",
+        title: "Write the report",
+      },
       { at: "2026-10-07T11:00:00.000Z", kind: "digest" },
     ]);
   });

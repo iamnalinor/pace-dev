@@ -47,7 +47,10 @@ describe("quickInputBodies", () => {
 
   it("adds problems to this week's homework instead of a new task", () => {
     const bodies = bodiesFor("дз по алгебре 8, 9");
-    expect(bodies.map((body) => body.type)).toEqual(["task.subtasks.added", "task.source.attached"]);
+    expect(bodies.map((body) => body.type)).toEqual([
+      "task.subtasks.added",
+      "task.source.attached",
+    ]);
     expect(bodies[0]?.payload).toMatchObject({ taskId: HW_ID });
   });
 });

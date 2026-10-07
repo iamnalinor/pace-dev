@@ -16,7 +16,6 @@ import {
   DecisionsQuerySchema,
   NotifyPlanOutputSchema,
 } from "./schemas/notify.ts";
-import { ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
   OAuthClientInfoQuerySchema,
   OAuthClientInfoSchema,
@@ -26,6 +25,7 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
+import { ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
   SyncObservationsBodySchema,
   SyncObservationsOutputSchema,

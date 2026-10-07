@@ -1,10 +1,9 @@
 import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
-import type { NowItem } from "../queries/now-item.ts";
 
 import { isOpen, taskById } from "../model/task.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
-import { nowItem } from "../queries/now-item.ts";
+import { type NowItem, nowItem } from "../queries/now-item.ts";
 import { nowList } from "../queries/now-list.ts";
 import { reviewItems } from "../review/to-sort.ts";
 import { minutesBetween } from "../time.ts";
@@ -60,9 +59,9 @@ export type Digest = {
 };
 
 export type NotifyMessage =
-  | ({ readonly kind: "critical" } & Critical)
-  | ({ readonly kind: "digest" } & Digest)
-  | ({ readonly kind: "stuck" } & Stuck);
+  | (Critical & { readonly kind: "critical" })
+  | (Digest & { readonly kind: "digest" })
+  | (Stuck & { readonly kind: "stuck" });
 
 export type NotifyOutcome = "sent" | "suppressed";
 
@@ -109,8 +108,15 @@ const digestRow = (item: NowItem): DigestRow => ({
   isLate: item.isLate,
 });
 
+/** One evaluation's inputs: the state, the instant and zone, and what was sent before. */
+type Pass = {
+  readonly state: CoreState;
+  readonly ctx: QueryContext;
+  readonly memory: NotifyMemory;
+};
+
 /** Whether the task already met a critical rule at `at`, judged on what is known now. */
-const wasCriticalAt = (state: CoreState, taskId: string, at: string, ctx: QueryContext): boolean => {
+const wasCriticalAt = ({ ctx, state }: Pass, taskId: string, at: string): boolean => {
   const task = taskById(state.tasks, taskId);
   if (task === undefined || task.createdAt > at) {
     return false;
@@ -125,25 +131,29 @@ const isSnoozed = (memory: NotifyMemory, taskId: string, now: string): boolean =
 type Step = { readonly messages: NotifyMessage[]; readonly decisions: NotifyDecision[] };
 
 const criticalStep = (
-  state: CoreState,
-  ctx: QueryContext,
-  memory: NotifyMemory,
+  pass: Pass,
   items: readonly NowItem[],
 ): Step & { readonly handled: readonly string[] } => {
-  const found = items.flatMap((item) => {
-    if (memory.critical.includes(item.task.id) || isSnoozed(memory, item.task.id, ctx.now)) {
-      return [];
-    }
-    const critical = criticalOf(item, ctx.now);
-    return critical === null ? [] : [{ kind: "critical" as const, ...critical }];
-  });
-  const retro = (message: NotifyMessage & { kind: "critical" }): boolean =>
-    memory.evaluatedAt === null || wasCriticalAt(state, message.taskId, memory.evaluatedAt, ctx);
+  const { ctx, memory } = pass;
+  const found = items
+    .filter(
+      (item) =>
+        !memory.critical.includes(item.task.id) && !isSnoozed(memory, item.task.id, ctx.now),
+    )
+    .map((item) => criticalOf(item, ctx.now))
+    .filter((critical) => critical !== null)
+    .map((critical) => ({ kind: "critical" as const, ...critical }));
+  const isRetro = (message: NotifyMessage & { kind: "critical" }): boolean =>
+    memory.evaluatedAt === null || wasCriticalAt(pass, message.taskId, memory.evaluatedAt);
   return {
-    messages: found.filter((message) => !retro(message)),
+    messages: found.filter((message) => !isRetro(message)),
     decisions: found.map((message) =>
-      retro(message)
-        ? decision(message, "suppressed", "Already critical before the last check: a retro edit, not news.")
+      isRetro(message)
+        ? decision(
+            message,
+            "suppressed",
+            "Already critical before the last check: a retro edit, not news.",
+          )
         : decision(message, "sent", "Crossed a critical threshold since the last check."),
     ),
     handled: found.map((message) => message.taskId),
@@ -164,7 +174,10 @@ const digestOf = (state: CoreState, ctx: QueryContext, window: string): Digest =
 const digestStep = (state: CoreState, ctx: QueryContext, window: string): Step => {
   const digest: NotifyMessage = { kind: "digest", ...digestOf(state, ctx, window) };
   if (minutesBetween(window, ctx.now) > DIGEST_GRACE_MINUTES) {
-    return { messages: [], decisions: [decision(digest, "suppressed", "The window passed while the server was asleep.")] };
+    return {
+      messages: [],
+      decisions: [decision(digest, "suppressed", "The window passed while the server was asleep.")],
+    };
   }
   const isEmpty = digest.top.length === 0 && digest.reviewCount === 0 && digest.inboxCount === 0;
   return isEmpty
@@ -179,14 +192,15 @@ const stuckStep = (
   memory: NotifyMemory,
   items: readonly NowItem[],
 ): Step & { readonly handled: readonly string[] } => {
-  const found = items.flatMap((item) => {
-    const stuck = stuckOf(item.task, item.preset, ctx.now);
-    return stuck === null ||
-      memory.stuck.includes(stuckKey(stuck)) ||
-      isSnoozed(memory, stuck.taskId, ctx.now)
-      ? []
-      : [{ kind: "stuck" as const, ...stuck }];
-  });
+  const found = items
+    .map((item) => stuckOf(item.task, item.preset, ctx.now))
+    .filter(
+      (stuck): stuck is Stuck =>
+        stuck !== null &&
+        !memory.stuck.includes(stuckKey(stuck)) &&
+        !isSnoozed(memory, stuck.taskId, ctx.now),
+    )
+    .map((stuck) => ({ kind: "stuck" as const, ...stuck }));
   return {
     messages: found,
     decisions: found.map((message) => decision(message, "sent", "Stuck past the preset's limit.")),
@@ -197,14 +211,14 @@ const stuckStep = (
 /** Open task ids only, so the memory does not grow with the history. */
 const keepOpen = (state: CoreState, ids: readonly string[]): readonly string[] =>
   ids.filter((id) => {
-    const task = taskById(state.tasks, id.split("@")[0] ?? id);
+    const task = taskById(state.tasks, id.split("@", 1)[0] ?? id);
     return task !== undefined && isOpen(task);
   });
 
 const laterOf = (candidates: readonly (null | string)[], now: string): null | string =>
   candidates
     .filter((at): at is string => at !== null && at > now)
-    .toSorted()
+    .toSorted((a, b) => a.localeCompare(b))
     .at(0) ?? null;
 
 /**
@@ -212,7 +226,11 @@ The next instant worth evaluating: the next digest window, the next deadline cro
 a task not yet alerted, or the end of a snooze. An evaluation that lands in the quiet
 hours sends nothing and re-arms, so a crossing at night is reported in the morning.
 */
-export const nextAlarmAt = (state: CoreState, ctx: QueryContext, memory: NotifyMemory): null | string => {
+export const nextAlarmAt = (
+  state: CoreState,
+  ctx: QueryContext,
+  memory: NotifyMemory,
+): null | string => {
   const zone = accountTz(state, ctx);
   const items = nowList(state, ctx).items;
   const crossings = items
@@ -240,9 +258,10 @@ export const evaluateNotifications = (
     return { messages: [], decisions: [], memory, nextAt: nextAlarmAt(state, ctx, memory) };
   }
   const list = nowList(state, ctx);
-  const critical = criticalStep(state, ctx, memory, list.items);
+  const critical = criticalStep({ ctx, memory, state }, list.items);
   const window = lastDigestWindow(ctx.now, zone, state.settings);
-  const isDigestDue = window !== null && (memory.digestWindow === null || window > memory.digestWindow);
+  const isDigestDue =
+    window !== null && (memory.digestWindow === null || window > memory.digestWindow);
   const digest = isDigestDue ? digestStep(state, ctx, window) : { messages: [], decisions: [] };
   const stuck = isDigestDue
     ? stuckStep(ctx, memory, [...list.items, ...list.waiting])

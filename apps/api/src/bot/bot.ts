@@ -107,10 +107,12 @@ export const createBot = (deps: BotDeps): Bot => {
   const { assistant } = deps;
   if (assistant !== undefined) {
     bot.command("now", async (ctx) => {
-      await ctx.reply(...replyOf(await assistant.now(String(ctx.from?.id ?? ""))));
+      const reply = await assistant.now(String(ctx.from?.id ?? ""));
+      await ctx.reply(...replyOf(reply));
     });
     bot.on("message:text", async (ctx) => {
-      await ctx.reply(...replyOf(await assistant.message(String(ctx.from.id), ctx.message.text)));
+      const reply = await assistant.message(String(ctx.from.id), ctx.message.text);
+      await ctx.reply(...replyOf(reply));
     });
     bot.on("callback_query:data", async (ctx) => {
       const { data } = ctx.callbackQuery;

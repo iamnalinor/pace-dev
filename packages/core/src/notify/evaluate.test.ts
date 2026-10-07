@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import type { Event } from "../events/event-schema.ts";
-import type { CoreState } from "../materialize/core-state.ts";
 
-import { coreReducer, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
+import { coreReducer, type CoreState, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
 import { materializeAt } from "../materialize/materializer.ts";
 import { at } from "../materialize/task-fixture.fake.ts";
 import { addMinutesIso } from "../time.ts";
 import {
   evaluateNotifications,
   INITIAL_NOTIFY_MEMORY,
-  type NotifyMemory,
   nextAlarmAt,
+  type NotifyMemory,
   snooze,
 } from "./evaluate.ts";
 
@@ -75,13 +74,21 @@ describe("critical alerts", () => {
     const result = run(MORNING, [report()], checkedAt("2026-10-07T06:30:00.000Z"));
     expect(result.messages).toEqual([]);
     expect(result.decisions).toEqual([
-      expect.objectContaining({ outcome: "suppressed", rule: "critical.deadline", taskId: "t-report" }),
+      expect.objectContaining({
+        outcome: "suppressed",
+        rule: "critical.deadline",
+        taskId: "t-report",
+      }),
     ]);
     expect(result.memory.critical).toEqual(["t-report"]);
   });
 
   it("alerts for a task created after the last check, and stays silent in the quiet hours", () => {
-    const fresh = run(MORNING, [report("2026-10-07T06:45:00.000Z")], checkedAt("2026-10-07T06:30:00.000Z"));
+    const fresh = run(
+      MORNING,
+      [report("2026-10-07T06:45:00.000Z")],
+      checkedAt("2026-10-07T06:30:00.000Z"),
+    );
     expect(fresh.messages.map((message) => message.kind)).toEqual(["critical"]);
     const night = "2026-10-06T21:00:00.000Z";
     const quiet = run(night, [report()], checkedAt("2026-10-06T16:00:00.000Z", null));
@@ -113,7 +120,11 @@ describe("digests", () => {
     const empty = run(addMinutesIso(TWO_PM, 1), [], checkedAt(MORNING));
     expect(empty.messages).toEqual([]);
     expect(empty.decisions).toEqual([
-      expect.objectContaining({ explanation: "Nothing to report.", outcome: "suppressed", rule: "digest" }),
+      expect.objectContaining({
+        explanation: "Nothing to report.",
+        outcome: "suppressed",
+        rule: "digest",
+      }),
     ]);
     const stale = run(addMinutesIso(TWO_PM, 120), [report()], checkedAt(MORNING));
     expect(stale.messages.filter((message) => message.kind === "digest")).toEqual([]);
@@ -125,11 +136,19 @@ describe("digests", () => {
       type: "task.status.set",
       payload: { taskId: "t-report", status: "waiting" },
     });
-    const result = run(addMinutesIso(TWO_PM, 1), [report("2026-09-27T07:00:00.000Z"), waiting], checkedAt(MORNING));
+    const result = run(
+      addMinutesIso(TWO_PM, 1),
+      [report("2026-09-27T07:00:00.000Z"), waiting],
+      checkedAt(MORNING),
+    );
     expect(result.messages).toContainEqual(
       expect.objectContaining({ days: 9, kind: "stuck", rule: "waiting", taskId: "t-report" }),
     );
-    const next = run(addMinutesIso(TWO_PM, 7 * 60), [report("2026-09-27T07:00:00.000Z"), waiting], result.memory);
+    const next = run(
+      addMinutesIso(TWO_PM, 7 * 60),
+      [report("2026-09-27T07:00:00.000Z"), waiting],
+      result.memory,
+    );
     expect(next.messages.filter((message) => message.kind === "stuck")).toEqual([]);
   });
 });

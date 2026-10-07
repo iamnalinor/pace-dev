@@ -2,9 +2,9 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TelegramTransport } from "../src/shared/telegram-api.ts";
-
 import { newId } from "@pace/core";
+
+import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
 import { echoParse, fakeParseModel } from "../src/shared/llm/fake-model.ts";
@@ -147,13 +147,17 @@ describe("POST /telegram/webhook", () => {
   });
 });
 
-const textUpdate = (telegramId: number, text: string) => {
-  const update = startUpdate(telegramId, text);
+/** The assistant tests talk as one linked user. */
+const ADA = 1002;
+
+const textUpdate = (text: string) => {
+  const update = startUpdate(ADA, text);
   const { entities: _entities, ...message } = update.message;
   return { ...update, message };
 };
 
-const callbackUpdate = (telegramId: number, data: string) => {
+const callbackUpdate = (data: string) => {
+  const telegramId = ADA;
   const updateId = updates.next;
   updates.next += 1;
   return {
@@ -175,6 +179,23 @@ const callbackUpdate = (telegramId: number, data: string) => {
 
 type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
 
+/** The callback data of the preview button labelled `label` in the last message sent. */
+const buttonData = (label: string): string => {
+  const preview = sent.find((call) => call.method === "sendMessage");
+  const keyboard = preview?.body["reply_markup"] as Keyboard | undefined;
+  return keyboard?.inline_keyboard[0]?.find((button) => button.text === label)?.callback_data ?? "";
+};
+
+type Pulled = {
+  events: { type: string; source: string; payload: Record<string, unknown> }[];
+};
+
+/** The last event of `type` the bot wrote for the user. */
+const pulledEvent = async (token: string, type: string) => {
+  const pulled = await json<Pulled>("/api/sync/pull", { token });
+  return pulled.events.findLast((event) => event.type === type && event.source === "bot");
+};
+
 describe("the bot as an assistant", () => {
   beforeEach(() => {
     sent.length = 0;
@@ -182,49 +203,38 @@ describe("the bot as an assistant", () => {
 
   it("previews a message with buttons and writes the task on Accept", async () => {
     const token = await loginAsDev("1002");
-    await webhook(textUpdate(1002, "купить кабель USB-C"));
-    const preview = sent.find((call) => call.method === "sendMessage");
-    expect(preview?.body["text"]).toContain("I read it as:");
-    expect(preview?.body["text"]).toContain("купить кабель USB-C");
-    const keyboard = preview?.body["reply_markup"] as Keyboard;
-    const accept = keyboard.inline_keyboard[0]?.find((button) => button.text === "Accept");
-    expect(accept?.callback_data).toMatch(/^a:/u);
+    await webhook(textUpdate("купить кабель USB-C"));
+    const text = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
+    expect(text).toContain("I read it as:");
+    expect(text).toContain("купить кабель USB-C");
+    const accept = buttonData("Accept");
+    expect(accept).toMatch(/^a:/u);
 
     sent.length = 0;
-    await webhook(callbackUpdate(1002, accept?.callback_data ?? ""));
+    await webhook(callbackUpdate(accept));
     expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
     expect(sent[1]?.body).toMatchObject({ text: "Done ✓" });
-
-    const pulled = await json<{ events: { type: string; source: string; payload: { title?: string } }[] }>(
-      "/api/sync/pull",
-      { token },
-    );
-    expect(pulled.events).toContainEqual(
-      expect.objectContaining({
-        payload: expect.objectContaining({ title: "купить кабель USB-C" }),
-        source: "bot",
-        type: "task.created",
-      }),
-    );
+    expect(await pulledEvent(token, "task.created")).toMatchObject({
+      payload: { title: "купить кабель USB-C" },
+    });
 
     sent.length = 0;
-    await webhook(callbackUpdate(1002, accept?.callback_data ?? ""));
-    expect(sent[1]?.body).toMatchObject({ text: "This preview has expired. Send the message again." });
+    await webhook(callbackUpdate(accept));
+    expect(sent[1]?.body).toMatchObject({
+      text: "This preview has expired. Send the message again.",
+    });
   });
 
   it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {
     const token = await loginAsDev("1002");
-    await webhook(textUpdate(1002, "подумать об отпуске"));
-    const keyboard = sent.find((call) => call.method === "sendMessage")?.body["reply_markup"] as Keyboard;
-    const toInbox = keyboard.inline_keyboard[0]?.find((button) => button.text === "To Inbox");
+    await webhook(textUpdate("подумать об отпуске"));
+    const toInbox = buttonData("To Inbox");
     sent.length = 0;
-    await webhook(callbackUpdate(1002, toInbox?.callback_data ?? ""));
+    await webhook(callbackUpdate(toInbox));
     expect(sent[1]?.body).toMatchObject({ text: "Saved to Inbox." });
-    const pulled = await json<{ events: { payload: { presetId?: string; title?: string } }[] }>(
-      "/api/sync/pull",
-      { token },
-    );
-    expect(pulled.events.at(-1)?.payload).toMatchObject({ presetId: "inbox", title: "подумать об отпуске" });
+    expect(await pulledEvent(token, "task.created")).toMatchObject({
+      payload: { presetId: "inbox", title: "подумать об отпуске" },
+    });
 
     sent.length = 0;
     await webhook(startUpdate(1002, "/now"));
@@ -259,19 +269,15 @@ describe("notification buttons", () => {
       token,
     });
 
-    await webhook(callbackUpdate(1002, `z:${taskId}`));
+    await webhook(callbackUpdate(`z:${taskId}`));
     expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
     expect(sent[1]?.body["text"]).toMatch(/^preview\n\nSnoozed until \d\d:\d\d\.$/u);
 
     sent.length = 0;
-    await webhook(callbackUpdate(1002, `d:${taskId}`));
+    await webhook(callbackUpdate(`d:${taskId}`));
     expect(sent[1]?.body["text"]).toBe("preview\n\nMarked done ✓");
-    const pulled = await json<{ events: { type: string; source: string; payload: { taskId?: string } }[] }>(
-      "/api/sync/pull",
-      { token },
-    );
-    expect(pulled.events).toContainEqual(
-      expect.objectContaining({ payload: expect.objectContaining({ outcome: "done", taskId }), source: "bot", type: "task.closed" }),
-    );
+    expect(await pulledEvent(token, "task.closed")).toMatchObject({
+      payload: { outcome: "done", taskId },
+    });
   });
 });

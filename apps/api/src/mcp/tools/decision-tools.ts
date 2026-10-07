@@ -18,7 +18,7 @@ const DecisionSchema = z.object({
 export const searchDecisions = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
-    "Searches the decision log: every automatic decision Pace made (notifications sent or held back, LLM parses) with the rule, its inputs and a one-line explanation, newest first. Filter by task id, time range (ISO instants) or free text over rule, outcome, explanation and inputs. Use it to answer \"why did (not) I get a reminder?\".",
+    'Searches the decision log: every automatic decision Pace made (notifications sent or held back, LLM parses) with the rule, its inputs and a one-line explanation, newest first. Filter by task id, time range (ISO instants) or free text over rule, outcome, explanation and inputs. Use it to answer "why did (not) I get a reminder?".',
   handler: async (args, ctx) => {
     const decisions = await ctx.store.decisions({ ...args, limit: args.limit ?? 20 });
     return success(

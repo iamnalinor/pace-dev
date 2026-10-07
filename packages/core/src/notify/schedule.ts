@@ -23,7 +23,7 @@ const windowsAround = (now: string, zone: string, schedule: NotifySchedule): rea
   );
   return days
     .flatMap((day) => schedule.digestWindows.map((window) => at(day, window, zone)))
-    .toSorted();
+    .toSorted((a, b) => a.localeCompare(b));
 };
 
 /** The next digest window strictly after `now`; `null` when the account has none. */

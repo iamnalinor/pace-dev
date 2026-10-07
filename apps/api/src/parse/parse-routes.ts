@@ -4,13 +4,12 @@ import { endpoints, ok, verifyParse } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
-import type { ParseProvider } from "../shared/llm/llm.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
-import { mount } from "../shared/mount.ts";
-import { runParse } from "../shared/llm/llm.ts";
+import { type ParseProvider, runParse } from "../shared/llm/llm.ts";
 import { buildParsePrompt } from "../shared/llm/prompt.ts";
+import { mount } from "../shared/mount.ts";
 
 /**
 `POST /api/parse`: the user's state (categories, projects, open tasks) frames the prompt;
@@ -29,7 +28,10 @@ export const mountParseRoutes = (
     const answer = await runParse(providersOf(c.get("config")), prompt);
     if (!answer.ok) {
       const { retryAt } = answer.error;
-      await store.logDecisions([parseDecision(body.text, "api", { retryAt, status: "unavailable" })], now);
+      await store.logDecisions(
+        [parseDecision(body.text, "api", { retryAt, status: "unavailable" })],
+        now,
+      );
       return ok({ retryAt, status: "unavailable" as const });
     }
     const projectNames = Object.values(state.projects.byId).map((project) => project.name);

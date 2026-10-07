@@ -1,31 +1,12 @@
-import {
-  addMinutesIso,
-  type CoreState,
-  type EventBody,
-  type EventInput,
-  type Language,
-  newId,
-  nextDigestAt,
-  nowList,
-  openInstanceOf,
-  planParse,
-  quickInputBodies,
-  t,
-  verifyParse,
-} from "@pace/core";
+import { addMinutesIso, nextDigestAt, nowList, t } from "@pace/core";
+
+import type { ParseProvider } from "../shared/llm/llm.ts";
 
 import { type BotStoreApi, NOTIFY_ACTIONS } from "../shared/contract.ts";
-import type { OutgoingMessage } from "../shared/telegram-api.ts";
+import { choosePreview, preview } from "./preview.ts";
+import { applyBodies, type BotReply, plain, timeOf, type Turn, zoneOf } from "./turn.ts";
 
-import { clockIn } from "../shared/clock.ts";
-import { parseDecision } from "../shared/llm/decision.ts";
-
-import { type ParseProvider, runParse  } from "../shared/llm/llm.ts";
-import { buildParsePrompt } from "../shared/llm/prompt.ts";
-import { describePlan } from "./describe.ts";
-
-/** A reply with its inline keyboard. */
-export type BotReply = OutgoingMessage;
+export type { BotReply } from "./turn.ts";
 
 export type AssistantDeps = {
   /** The Pace user behind a Telegram account, if they ever logged in through the bot. */
@@ -41,50 +22,60 @@ export type Assistant = {
   readonly choose: (telegramId: string, data: string) => Promise<BotReply>;
 };
 
-/** A preview waiting for its button: the text and, when it was understood, what to write. */
-type Pending = { readonly text: string; readonly bodies: null | readonly EventBody[] };
-
-const BOT_DEVICE = "bot";
 /** A snooze without any digest window ahead lasts this long. */
 const SNOOZE_FALLBACK_MINUTES = 3 * 60;
 const NOW_ROWS = 5;
 
-const plain = (text: string): BotReply => ({ buttons: [], text });
+const NOTIFY_ACTION_CODES: readonly string[] = Object.values(NOTIFY_ACTIONS);
 
-const stampAll = (bodies: readonly EventBody[], now: string): readonly EventInput[] =>
-  bodies.map(
-    (body) => ({ ...body, occurredAt: now, precision: "exact", source: "bot" }),
+/** A notification button: snooze the task's alerts until the next digest, or close it from the chat. */
+const notificationAction = async (
+  turn: Turn,
+  action: string,
+  taskId: string,
+): Promise<BotReply> => {
+  const { now, state } = turn;
+  const { language } = state.settings;
+  if (action === NOTIFY_ACTIONS.snooze) {
+    const until =
+      nextDigestAt(now, zoneOf(state), state.settings) ??
+      addMinutesIso(now, SNOOZE_FALLBACK_MINUTES);
+    await turn.store.snoozeTask(taskId, until, now);
+    return plain(t(language, "notify.snoozed", { time: timeOf(until, state) }));
+  }
+  const isDone = action === NOTIFY_ACTIONS.done;
+  const failure = await applyBodies(turn, [
+    { payload: { outcome: isDone ? "done" : "cancelled", taskId }, type: "task.closed" },
+  ]);
+  return plain(failure ?? t(language, isDone ? "notify.closedDone" : "notify.closedCancelled"));
+};
+
+/** The top of Now as a short numbered list. */
+const nowReply = ({ now, state }: Turn): BotReply => {
+  const { language } = state.settings;
+  const titles = nowList(state, { deviceTz: zoneOf(state), now })
+    .items.slice(0, NOW_ROWS)
+    .map((item, index) => `${String(index + 1)}. ${item.task.title}`);
+  return plain(
+    titles.length === 0
+      ? t(language, "bot.nowEmpty")
+      : [t(language, "bot.nowTitle"), ...titles].join("\n"),
   );
+};
 
-const inboxBody = (text: string): EventBody => ({
-  payload: {
-    fields: {},
-    importance: "nice_to_have",
-    presetId: "inbox",
-    sourceText: text,
-    subtasks: [],
-    taskId: newId(),
-    title: text,
-  },
-  type: "task.created",
-});
-
-const buttonsFor = (id: string, language: Language, canAccept: boolean): BotReply["buttons"] => [
-  [
-    ...(canAccept ? [{ data: `a:${id}`, label: t(language, "bot.accept") }] : []),
-    { data: `i:${id}`, label: t(language, "bot.toInbox") },
-    { data: `c:${id}`, label: t(language, "bot.cancel") },
-  ],
-];
-
-const timeOf = (iso: string, state: CoreState): string =>
-  clockIn(iso, state.settings.language, state.settings.timezone ?? "UTC");
+/** `<action>:<id>`; ids may contain colons themselves (homework instances do). */
+const splitData = (data: string): { readonly action: string; readonly id: string } => {
+  const split = data.indexOf(":");
+  return split === -1
+    ? { action: "", id: data }
+    : { action: data.slice(0, split), id: data.slice(split + 1) };
+};
 
 /** The bot's conversation: free text → a preview with buttons; a button writes it. */
 export const createAssistant = (deps: AssistantDeps): Assistant => {
   const withUser = async (
     telegramId: string,
-    run: (store: BotStoreApi, state: CoreState) => Promise<BotReply>,
+    run: (turn: Turn) => BotReply | Promise<BotReply>,
   ): Promise<BotReply> => {
     const userId = await deps.userIdOf(telegramId);
     if (userId === null) {
@@ -95,142 +86,19 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
     // Every conversation tells the store where the user's notifications go.
     await store.notifyTo(telegramId, now);
     const { state } = await store.read(now);
-    return await run(store, state);
-  };
-
-  const apply = async (
-    store: BotStoreApi,
-    bodies: readonly EventBody[],
-    language: Language,
-  ): Promise<null | string> => {
-    const now = deps.now();
-    const result = await store.apply(stampAll(bodies, now), {
-      deviceId: BOT_DEVICE,
-      now,
-      source: "bot",
-    });
-    return result.ok ? null : t(language, "bot.failed", { reason: result.error.code });
-  };
-
-  const preview = async (store: BotStoreApi, state: CoreState, text: string): Promise<BotReply> => {
-    const now = deps.now();
-    const { language } = state.settings;
-    const ctx = { deviceTz: state.settings.timezone ?? "UTC", now };
-    const answer = await runParse(deps.providers, buildParsePrompt(text, { ctx, language, state }));
-    if (!answer.ok) {
-      const { retryAt } = answer.error;
-      await store.logDecisions([parseDecision(text, "bot", { retryAt, status: "unavailable" })], now);
-      const failure = await apply(store, [inboxBody(text)], language);
-      return plain(
-        failure ??
-          (retryAt === null
-            ? t(language, "bot.unavailableSoon")
-            : t(language, "bot.unavailable", { time: timeOf(retryAt, state) })),
-      );
-    }
-    const projectNames = Object.values(state.projects.byId).map((project) => project.name);
-    const verified = verifyParse(answer.value.result, { projectNames, source: text });
-    await store.logDecisions(
-      [
-        parseDecision(text, "bot", {
-          doubtful: verified.doubtful,
-          provider: answer.value.provider,
-          result: verified.result,
-          status: "parsed",
-        }),
-      ],
-      now,
-    );
-    const plan = planParse(verified, text, { ctx, state });
-    const id = newId();
-    if (!plan.ok) {
-      await store.remember(id, { bodies: null, text } satisfies Pending);
-      return { buttons: buttonsFor(id, language, false), text: t(language, "bot.notUnderstood") };
-    }
-    const bodies =
-      plan.value.kind === "update"
-        ? plan.value.bodies
-        : quickInputBodies(plan.value.input, { now, state }, newId);
-    await store.remember(id, { bodies, text } satisfies Pending);
-    const instance =
-      plan.value.kind === "create"
-        ? openInstanceOf(state, plan.value.input.presetId, now)
-        : undefined;
-    return {
-      buttons: buttonsFor(id, language, true),
-      text: describePlan(plan.value, {
-        doubtful: verified.doubtful,
-        instanceTitle: instance?.title ?? null,
-        language,
-        questions: verified.result.questions.map((question) => question.question),
-        state,
-      }),
-    };
-  };
-
-  /** A notification button: snooze the task's alerts, or close it from the chat. */
-  const notificationAction = async (
-    store: BotStoreApi,
-    state: CoreState,
-    action: string,
-    taskId: string,
-  ): Promise<BotReply> => {
-    const now = deps.now();
-    const { language } = state.settings;
-    const zone = state.settings.timezone ?? "UTC";
-    if (action === NOTIFY_ACTIONS.snooze) {
-      const until = nextDigestAt(now, zone, state.settings) ?? addMinutesIso(now, SNOOZE_FALLBACK_MINUTES);
-      await store.snoozeTask(taskId, until, now);
-      return plain(t(language, "notify.snoozed", { time: timeOf(until, state) }));
-    }
-    const isDone = action === NOTIFY_ACTIONS.done;
-    const failure = await apply(
-      store,
-      [{ payload: { outcome: isDone ? "done" : "cancelled", taskId }, type: "task.closed" }],
-      language,
-    );
-    return plain(failure ?? t(language, isDone ? "notify.closedDone" : "notify.closedCancelled"));
+    return await run({ now, state, store });
   };
 
   return {
     choose: async (telegramId, data) =>
-      await withUser(telegramId, async (store, state) => {
-        const { language } = state.settings;
-        const split = data.indexOf(":");
-        const action = data.slice(0, Math.max(split, 0));
-        const id = data.slice(split + 1);
-        if ((Object.values(NOTIFY_ACTIONS) as readonly string[]).includes(action)) {
-          return await notificationAction(store, state, action, id);
-        }
-        const pending = (await store.recall(id)) as Pending | undefined;
-        if (pending === undefined) {
-          return plain(t(language, "bot.expired"));
-        }
-        if (action === "c") {
-          return plain(t(language, "bot.cancelled"));
-        }
-        const isAccept = action === "a" && pending.bodies !== null;
-        const failure = await apply(
-          store,
-          isAccept ? (pending.bodies ?? []) : [inboxBody(pending.text)],
-          language,
-        );
-        return plain(failure ?? t(language, isAccept ? "bot.done" : "bot.savedToInbox"));
+      await withUser(telegramId, async (turn) => {
+        const { action, id } = splitData(data);
+        return NOTIFY_ACTION_CODES.includes(action)
+          ? await notificationAction(turn, action, id)
+          : await choosePreview(turn, action, id);
       }),
     message: async (telegramId, text) =>
-      await withUser(telegramId, async (store, state) => await preview(store, state, text)),
-    now: async (telegramId) =>
-      await withUser(telegramId, async (_store, state) => {
-        const { language, timezone } = state.settings;
-        const list = nowList(state, { deviceTz: timezone ?? "UTC", now: deps.now() });
-        const titles = list.items
-          .slice(0, NOW_ROWS)
-          .map((item, index) => `${String(index + 1)}. ${item.task.title}`);
-        return plain(
-          titles.length === 0
-            ? t(language, "bot.nowEmpty")
-            : [t(language, "bot.nowTitle"), ...titles].join("\n"),
-        );
-      }),
+      await withUser(telegramId, async (turn) => await preview(turn, deps.providers, text)),
+    now: async (telegramId) => await withUser(telegramId, nowReply),
   };
 };

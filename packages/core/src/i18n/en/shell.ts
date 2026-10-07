@@ -171,7 +171,8 @@ export const enShell = {
   "shortcuts.check": "Mark the open task done",
   "shortcuts.close": "Close the task pane",
   "shortcuts.help": "Show this list",
-  "bot.notLinked": "This Telegram account is not linked to Pace yet. Open Pace and log in with the bot first.",
+  "bot.notLinked":
+    "This Telegram account is not linked to Pace yet. Open Pace and log in with the bot first.",
   "bot.preview": "I read it as:",
   "bot.field.title": "Task",
   "bot.field.category": "Category",
@@ -192,7 +193,8 @@ export const enShell = {
   "bot.savedToInbox": "Saved to Inbox.",
   "bot.cancelled": "Cancelled.",
   "bot.expired": "This preview has expired. Send the message again.",
-  "bot.unavailable": "The assistant is out of requests for now (back about {time}). I saved this to your Inbox.",
+  "bot.unavailable":
+    "The assistant is out of requests for now (back about {time}). I saved this to your Inbox.",
   "bot.unavailableSoon": "The assistant is out of requests for now. I saved this to your Inbox.",
   "bot.notUnderstood": "I could not place this. Keep it in your Inbox?",
   "bot.failed": "That did not work: {reason}",

@@ -43,7 +43,6 @@ export {
   OAuthScopeSchema,
   requestedScopes,
 } from "./api/schemas/oauth.ts";
-export { ParseRequestSchema, type ParseResponse, ParseResponseSchema } from "./api/schemas/parse.ts";
 export {
   type Observation,
   ObservationSchema,
@@ -56,6 +55,7 @@ export {
   SyncPushBodySchema,
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
+export * from "./automation.ts";
 export { contrastRatio, parseHex, relativeLuminance, type Rgb } from "./design/contrast.ts";
 export {
   IMPORTANCE_COLORS,
@@ -115,7 +115,6 @@ export {
   newId,
   type Prng,
 } from "./ids.ts";
-export { openInstanceOf, quickInputBodies } from "./input/compose.ts";
 export { parseQuickInput, type QuickInput } from "./input/parse-quick-input.ts";
 export type { QuickSubtask } from "./input/quick-fields.ts";
 export type { QuickSpan, QuickSpanKind } from "./input/quick-spans.ts";
@@ -185,26 +184,6 @@ export {
   type SubtaskOutcome,
   taskOutcome,
 } from "./outcomes/outcome.ts";
-export {
-  type EventBody,
-  findTaskRef,
-  type ParseApplyError,
-  type ParsePlan,
-  parseToQuickInput,
-  planParse,
-  wallClockInstant,
-} from "./parse/apply.ts";
-export { isQuotedFrom, normalizeForEvidence } from "./parse/normalize.ts";
-export {
-  PARSE_FIELDS,
-  PARSE_INTENTS,
-  type ParseField,
-  type ParseIntent,
-  type ParseQuestion,
-  type ParseResult,
-  ParseResultSchema,
-} from "./parse/schema.ts";
-export { type VerifiedParse, verifyParse } from "./parse/verify.ts";
 export {
   BASE_PRESET_IDS,
   BASE_PRESETS,
@@ -315,18 +294,3 @@ export {
   validateEventInput,
   type ValidationState,
 } from "./validation/retro-rules.ts";
-export {
-  type Digest,
-  type DigestRow,
-  evaluateNotifications,
-  INITIAL_NOTIFY_MEMORY,
-  nextAlarmAt,
-  type NotifyDecision,
-  type NotifyEvaluation,
-  type NotifyMemory,
-  type NotifyMessage,
-  snooze,
-} from "./notify/evaluate.ts";
-export { notifyPlan, type PlannedNotification } from "./notify/plan.ts";
-export type { Critical, CriticalRule, Stuck, StuckRule } from "./notify/rules.ts";
-export { nextDigestAt } from "./notify/schedule.ts";

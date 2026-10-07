@@ -1,11 +1,11 @@
 import {
+  accountTz,
   type CoreState,
   formatInZone,
   isOpen,
   type Language,
   PARSE_INTENTS,
   type QueryContext,
-  accountTz,
 } from "@pace/core";
 
 /** Groq's free tier allows 8k tokens a minute: the prompt stays well under half of it. */
@@ -50,6 +50,8 @@ const taskLines = (state: CoreState): string =>
 export type ParsePrompt = { readonly system: string; readonly prompt: string };
 
 /** The instructions plus what the model must know: categories, projects, open tasks, now. */
+const orNone = (lines: string): string => (lines === "" ? "(none)" : lines);
+
 export const buildParsePrompt = (
   text: string,
   world: { readonly state: CoreState; readonly ctx: QueryContext; readonly language: Language },
@@ -60,8 +62,8 @@ export const buildParsePrompt = (
     RULES,
     `Now: ${formatInZone(ctx.now, zone, "yyyy-MM-dd HH:mm, EEEE")} (${zone}). Interface language: ${language}.`,
     `Categories:\n${presetLines(state)}`,
-    `Projects:\n${projectLines(state) || "(none)"}`,
-    `Open tasks:\n${taskLines(state) || "(none)"}`,
+    `Projects:\n${orNone(projectLines(state))}`,
+    `Open tasks:\n${orNone(taskLines(state))}`,
   ].join("\n\n");
   return { prompt: text, system };
 };

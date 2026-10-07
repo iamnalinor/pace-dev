@@ -6,7 +6,7 @@ import type { ParseResponse } from "@pace/core";
 
 import { createApp } from "../src/app.ts";
 import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev } from "./helpers.ts";
+import { json, loginAsDev, readJson } from "./helpers.ts";
 
 const parse = async (token: string, text: string): Promise<ParseResponse> =>
   await json<ParseResponse>("/api/parse", { body: { text }, token });
@@ -55,7 +55,7 @@ describe("POST /api/parse", () => {
       ctx,
     );
     await waitOnExecutionContext(ctx);
-    const answer = (await response.json()) as ParseResponse;
+    const answer = await readJson<ParseResponse>(response);
     expect(answer.status).toBe("unavailable");
     expect(answer.status === "unavailable" ? answer.retryAt : null).toMatch(/T/u);
   });

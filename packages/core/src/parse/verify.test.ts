@@ -31,10 +31,10 @@ describe("normalizeForEvidence", () => {
   });
 });
 
-describe("verifyParse", () => {
-  const verify = (result: Partial<ParseResult>) =>
-    verifyParse({ ...base, ...result }, { projectNames: ["Algebra"], source: SOURCE });
+const verify = (result: Partial<ParseResult>) =>
+  verifyParse({ ...base, ...result }, { projectNames: ["Algebra"], source: SOURCE });
 
+describe("verifyParse", () => {
   it("accepts strings copied from the message and numbers with a quote", () => {
     const verified = verify({
       dueDate: "2026-10-07",

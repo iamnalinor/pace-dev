@@ -77,10 +77,7 @@ const stuckSince = (task: Task): null | { rule: StuckRule; since: string } => {
   if (task.status === "waiting") {
     return { rule: "waiting", since: task.statusSince };
   }
-  if (task.status === "in_progress") {
-    return { rule: "idle", since: task.lastEventAt };
-  }
-  return null;
+  return task.status === "in_progress" ? { rule: "idle", since: task.lastEventAt } : null;
 };
 
 /** A waiting task past `waitingDays`, or an in-progress one untouched past `inProgressIdleDays`. */
@@ -93,6 +90,12 @@ export const stuckOf = (task: Task, preset: ResolvedPreset, now: string): null |
   const limit =
     spell.rule === "waiting" ? preset.notify.waitingDays : preset.notify.inProgressIdleDays;
   return days >= limit
-    ? { rule: spell.rule, taskId: task.id, title: task.title, since: spell.since, days: Math.floor(days) }
+    ? {
+        rule: spell.rule,
+        taskId: task.id,
+        title: task.title,
+        since: spell.since,
+        days: Math.floor(days),
+      }
     : null;
 };

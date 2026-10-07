@@ -3,6 +3,7 @@ import {
   type EventBody,
   formatDuration,
   type Language,
+  type MessageKey,
   type ParseField,
   type ParsePlan,
   presetById,
@@ -24,46 +25,54 @@ const dueText = (input: QuickInput, language: Language): null | string =>
         weekday: "short",
       }).format(new Date(input.dueAt));
 
-type Line = readonly [field: null | ParseField, label: string, value: null | string];
+type Line = {
+  readonly field: null | ParseField;
+  readonly label: string;
+  readonly value: null | string;
+};
 
 const createLines = (input: QuickInput, state: CoreState, language: Language): readonly Line[] => {
   const preset = presetById(state.presets, input.presetId);
   const project =
     input.projectId === null ? undefined : projectById(state.projects, input.projectId);
+  const line = (field: Line["field"], key: MessageKey, value: Line["value"]): Line => ({
+    field,
+    label: t(language, key),
+    value,
+  });
   return [
-    ["title", t(language, "bot.field.title"), input.title === "" ? input.text : input.title],
-    ["category", t(language, "bot.field.category"), preset?.name ?? input.presetId],
-    ["project", t(language, "bot.field.project"), project?.name ?? input.projectName],
-    ["dueDate", t(language, "bot.field.due"), dueText(input, language)],
-    [
+    line("title", "bot.field.title", input.title === "" ? input.text : input.title),
+    line("category", "bot.field.category", preset?.name ?? input.presetId),
+    line("project", "bot.field.project", project?.name ?? input.projectName),
+    line("dueDate", "bot.field.due", dueText(input, language)),
+    line(
       "estimateMinutes",
-      t(language, "bot.field.estimate"),
+      "bot.field.estimate",
       input.estimateMinutes === null ? null : formatDuration(input.estimateMinutes, language),
-    ],
-    [null, t(language, "bot.field.importance"), t(language, `importance.${input.importance}`)],
-    [
+    ),
+    line(null, "bot.field.importance", t(language, `importance.${input.importance}`)),
+    line(
       "subtasks",
-      t(language, "bot.field.problems"),
+      "bot.field.problems",
       input.subtasks.length === 0
         ? null
         : input.subtasks.map((subtask) => subtask.label).join(", "),
-    ],
+    ),
   ];
 };
 
 const problemsOf = (bodies: readonly EventBody[], state: CoreState, taskId: string): string => {
   const task = state.tasks.byId[taskId];
-  return bodies
-    .flatMap((body) => {
-      if (body.type === "task.subtask.solved") {
-        const subtask = task?.subtasks.find((item) => item.id === body.payload.subtaskId);
-        return [subtask?.label ?? body.payload.subtaskId];
-      }
-      return body.type === "task.subtasks.added"
-        ? body.payload.subtasks.map((subtask) => subtask.label)
-        : [];
-    })
-    .join(", ");
+  const labelsOf = (body: EventBody): readonly string[] => {
+    if (body.type === "task.subtask.solved") {
+      const subtask = task?.subtasks.find((item) => item.id === body.payload.subtaskId);
+      return [subtask === undefined ? body.payload.subtaskId : subtask.label];
+    }
+    return body.type === "task.subtasks.added"
+      ? body.payload.subtasks.map((subtask) => subtask.label)
+      : [];
+  };
+  return bodies.flatMap((body) => labelsOf(body)).join(", ");
 };
 
 const updateText = (
@@ -79,7 +88,10 @@ const updateText = (
       title: plan.title,
     });
   }
-  return t(language, first?.type === "task.subtask.solved" ? "bot.markSolved" : "bot.addProblems", { problems, title: plan.title });
+  return t(language, first?.type === "task.subtask.solved" ? "bot.markSolved" : "bot.addProblems", {
+    problems,
+    title: plan.title,
+  });
 };
 
 /** The preview message: what will be written, doubtful fields marked, questions asked. */
@@ -99,11 +111,13 @@ export const describePlan = (
     return [updateText(plan, state, language), ...asked].join("\n");
   }
   const lines = createLines(plan.input, state, language)
-    .filter(([, , value]) => value !== null)
-    .map(([field, label, value]) => {
+    .filter((line) => line.value !== null)
+    .map((line) => {
       const mark =
-        field !== null && doubtful.includes(field) ? ` ${t(language, "bot.doubtful")}` : "";
-      return `${label}: ${value ?? ""}${mark}`;
+        line.field !== null && doubtful.includes(line.field)
+          ? ` ${t(language, "bot.doubtful")}`
+          : "";
+      return `${line.label}: ${line.value ?? ""}${mark}`;
     });
   const header =
     extras.instanceTitle === null

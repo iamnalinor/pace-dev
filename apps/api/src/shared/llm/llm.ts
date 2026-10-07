@@ -1,6 +1,6 @@
 import { generateText, type LanguageModel, Output } from "ai";
 
-import { err, ok, type Result, type ParseResult, ParseResultSchema } from "@pace/core";
+import { err, ok, type ParseResult, ParseResultSchema, type Result } from "@pace/core";
 
 import type { ParsePrompt } from "./prompt.ts";
 
@@ -24,20 +24,22 @@ export type ParseAnswer = {
 
 const DEFAULT_RETRY_MS = 60_000;
 
+type CallFailure = {
+  readonly statusCode?: unknown;
+  readonly responseHeaders?: Readonly<Record<string, string>> | undefined;
+};
+
+const failureOf = (error: unknown): CallFailure =>
+  typeof error === "object" && error !== null ? error : {};
+
 /** A 429 (or a provider's "busy"): another provider may still answer. */
 const retryAtOf = (error: unknown, now: number): null | string => {
-  const headers =
-    typeof error === "object" && error !== null && "responseHeaders" in error
-      ? (error.responseHeaders as Record<string, string> | undefined)
-      : undefined;
-  const status =
-    typeof error === "object" && error !== null && "statusCode" in error
-      ? Number(error.statusCode)
-      : undefined;
+  const { responseHeaders, statusCode } = failureOf(error);
+  const status = Number(statusCode);
   if (status !== 429 && status !== 503) {
     return null;
   }
-  const seconds = Number(headers?.["retry-after"] ?? Number.NaN);
+  const seconds = Number(responseHeaders?.["retry-after"] ?? NaN);
   const delay = Number.isFinite(seconds) ? seconds * 1000 : DEFAULT_RETRY_MS;
   return new Date(now + delay).toISOString();
 };
@@ -67,10 +69,11 @@ export const runParse = async (
       return err({ code: "llm/unavailable", retryAt });
     }
     try {
+      const output = Output.object({ schema: ParseResultSchema });
       const answer = await generateText({
         maxRetries: 0,
         model: provider.model,
-        output: Output.object({ schema: ParseResultSchema }),
+        output,
         prompt: prompt.prompt,
         system: prompt.system,
         ...(provider.providerOptions !== undefined && {
@@ -82,7 +85,8 @@ export const runParse = async (
         ? ok({ provider: provider.name, result: parsed.data })
         : err({ code: "llm/invalid-output", retryAt: null });
     } catch (error) {
-      return await attempt(index + 1, earliest(retryAt, retryAtOf(error, now())));
+      const next = retryAtOf(error, now());
+      return await attempt(index + 1, earliest(retryAt, next));
     }
   };
   return await attempt(0, null);

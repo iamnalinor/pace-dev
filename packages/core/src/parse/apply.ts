@@ -1,25 +1,21 @@
 import { TZDate } from "@date-fns/tz";
 
-import type { EventInput } from "../events/event-schema.ts";
 import type { CoreState } from "../materialize/core-state.ts";
-import type { Task } from "../model/task.ts";
+import type { ParseResult } from "./schema.ts";
 import type { VerifiedParse } from "./verify.ts";
 
+import { type EventBody, subtasksAddedBodies } from "../input/bodies.ts";
 import { parseQuickInput, type QuickInput } from "../input/parse-quick-input.ts";
 import { extractLink } from "../links.ts";
 import { findProjectByName } from "../model/project.ts";
-import { isOpen } from "../model/task.ts";
+import { isOpen, type Task } from "../model/task.ts";
 import { presetById } from "../presets/preset-reducer.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { err, ok, type Result } from "../result.ts";
 
 /** An event without its envelope: the caller stamps it with its source and instant. */
-export type EventBody = EventInput extends infer I
-  ? I extends { readonly type: unknown; readonly payload: unknown }
-    ? Pick<I, "payload" | "type">
-    : never
-  : never;
+export type { EventBody } from "../input/bodies.ts";
 
 export type ParseApplyError =
   | "parse/ambiguous-task"
@@ -43,7 +39,7 @@ const END_OF_DAY = "23:59";
 export const wallClockInstant = (date: string, time: string, zone: string): string => {
   const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
   const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return new Date(new TZDate(year, month - 1, day, hours, minutes, zone).getTime()).toISOString();
+  return new Date(new TZDate(year, month - 1, day, hours, minutes, zone)).toISOString();
 };
 
 const presetOf = (state: CoreState, category: null | string): string | undefined => {
@@ -74,6 +70,33 @@ const projectOf = (
     : { projectId: existing.id, projectName: null };
 };
 
+/** The LLM's date and time read on the account's wall clock; the rules' reading otherwise. */
+const dueOf = (
+  result: ParseResult,
+  rules: QuickInput,
+  zone: string,
+): Pick<QuickInput, "dueAt" | "dueTz"> => {
+  const dueAt =
+    result.dueDate === null
+      ? rules.dueAt
+      : wallClockInstant(result.dueDate, result.dueTime ?? END_OF_DAY, zone);
+  return { dueAt, dueTz: dueAt === null ? null : (rules.dueTz ?? zone) };
+};
+
+/** An importance the LLM or the text named wins; otherwise the category's default. */
+const importanceOf = (
+  result: ParseResult,
+  rules: QuickInput,
+  preset: ReturnType<typeof resolvePreset>,
+): Pick<QuickInput, "importance" | "isImportanceExplicit"> => {
+  const defaultImportance = preset.ok ? preset.value.defaultImportance : rules.importance;
+  return {
+    importance:
+      result.importance ?? (rules.isImportanceExplicit ? rules.importance : defaultImportance),
+    isImportanceExplicit: result.importance !== null || rules.isImportanceExplicit,
+  };
+};
+
 /**
 The LLM's reading as the composer's fields: what it found wins, the rule-based reading
 fills the rest, so the same chips show either way. The source text is kept verbatim.
@@ -85,22 +108,13 @@ export const parseToQuickInput = (
 ): QuickInput => {
   const { result } = verified;
   const rules = parseQuickInput(text, state, ctx);
-  const zone = accountTz(state, ctx);
   const presetId = presetOf(state, result.category) ?? rules.presetId;
-  const preset = resolvePreset(state.presets, presetId);
-  const defaultImportance = preset.ok ? preset.value.defaultImportance : rules.importance;
-  const dueAt =
-    result.dueDate === null
-      ? rules.dueAt
-      : wallClockInstant(result.dueDate, result.dueTime ?? END_OF_DAY, zone);
   return {
     ...rules,
     ...projectOf(state, result.project, rules),
-    dueAt,
-    dueTz: dueAt === null ? null : (rules.dueTz ?? zone),
+    ...dueOf(result, rules, accountTz(state, ctx)),
+    ...importanceOf(result, rules, resolvePreset(state.presets, presetId)),
     estimateMinutes: result.estimateMinutes ?? rules.estimateMinutes,
-    importance: result.importance ?? (rules.isImportanceExplicit ? rules.importance : defaultImportance),
-    isImportanceExplicit: result.importance !== null || rules.isImportanceExplicit,
     link: extractLink(text),
     presetId,
     spans: [],
@@ -132,7 +146,7 @@ export const findTaskRef = (state: CoreState, ref: null | string): Found => {
   return rest.length === 0 ? ok(only) : err("parse/ambiguous-task");
 };
 
-const matchesSubtask = (label: string, subtask: Task["subtasks"][number]): boolean =>
+const isSubtaskNamed = (label: string, subtask: Task["subtasks"][number]): boolean =>
   subtask.label.toLowerCase() === label.toLowerCase() || String(subtask.number) === label;
 
 type UpdateBuilder = (
@@ -143,28 +157,18 @@ type UpdateBuilder = (
 
 const addToTask: UpdateBuilder = (task, { result }, text) =>
   ok([
-    ...(result.subtasks.length === 0
-      ? []
-      : [
-          {
-            type: "task.subtasks.added",
-            payload: {
-              taskId: task.id,
-              subtasks: result.subtasks.map((subtask, index) => ({
-                id: `${task.id}:${String(task.subtasks.length + index + 1)}`,
-                label: subtask.label,
-                ...(subtask.number !== null && { number: subtask.number }),
-              })),
-            },
-          } as const,
-        ]),
+    ...subtasksAddedBodies(
+      task.id,
+      result.subtasks,
+      (index) => `${task.id}:${String(task.subtasks.length + index + 1)}`,
+    ),
     { type: "task.source.attached", payload: { taskId: task.id, sourceText: text } } as const,
   ]);
 
 const markSubtasks: UpdateBuilder = (task, { result }) => {
   const ids = task.subtasks
     .filter((subtask) => subtask.solvedAt === null)
-    .filter((subtask) => result.subtasks.some((wanted) => matchesSubtask(wanted.label, subtask)))
+    .filter((subtask) => result.subtasks.some((wanted) => isSubtaskNamed(wanted.label, subtask)))
     .map((subtask) => subtask.id);
   return ids.length === 0
     ? err("parse/no-subtasks")

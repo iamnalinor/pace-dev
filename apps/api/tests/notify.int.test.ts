@@ -93,10 +93,11 @@ describe("the notifier in the user store", () => {
       expect(await state.storage.getAlarm()).not.toBeNull();
 
       const logged = await instance.decisions({ limit: 10 });
-      expect(logged.map((entry) => [entry.rule, entry.outcome]).toSorted()).toEqual([
-        ["critical.deadline", "suppressed"],
-        ["digest", "sent"],
-      ]);
+      expect(
+        logged
+          .map((entry) => `${entry.rule} ${entry.outcome}`)
+          .toSorted((a, b) => a.localeCompare(b)),
+      ).toEqual(["critical.deadline suppressed", "digest sent"]);
       expect(await instance.decisions({ limit: 10, taskId: "t-report" })).toHaveLength(1);
       expect(await instance.decisions({ limit: 10, q: "retro" })).toHaveLength(1);
     });
@@ -107,7 +108,9 @@ describe("the notifier in the user store", () => {
       await instance.append([setup()], { now: "2026-10-07T10:00:00.000Z" });
       await instance.notifyTo("1002", "2026-10-07T10:00:00.000Z");
       await instance.runNotifications("2026-10-07T10:00:00.000Z", recorder().target);
-      await instance.append([report("2026-10-07T10:30:00.000Z")], { now: "2026-10-07T10:30:00.000Z" });
+      await instance.append([report("2026-10-07T10:30:00.000Z")], {
+        now: "2026-10-07T10:30:00.000Z",
+      });
 
       const telegram = recorder();
       await instance.runNotifications("2026-10-07T10:45:00.000Z", telegram.target);
@@ -135,7 +138,9 @@ describe("the notifier in the user store", () => {
       await instance.append([setup()], { now: "2026-10-07T10:00:00.000Z" });
       await instance.notifyTo("1002", "2026-10-07T10:00:00.000Z");
       await instance.runNotifications("2026-10-07T10:00:00.000Z", recorder().target);
-      await instance.append([report("2026-10-07T10:30:00.000Z")], { now: "2026-10-07T10:30:00.000Z" });
+      await instance.append([report("2026-10-07T10:30:00.000Z")], {
+        now: "2026-10-07T10:30:00.000Z",
+      });
       await instance.snoozeTask("t-report", "2026-10-07T18:00:00.000Z", "2026-10-07T10:40:00.000Z");
       const telegram = recorder();
       await instance.runNotifications("2026-10-07T10:45:00.000Z", telegram.target);
@@ -151,10 +156,13 @@ describe("the notifier in the user store", () => {
 describe("GET /api/notify/plan and /api/decisions", () => {
   it("answers for the signed-in user and refuses without a session", async () => {
     const token = await loginAsDev("1002");
-    const plan = await json<{ items: { kind: string; at: string }[] }>("/api/notify/plan", { token });
+    const plan = await json<{ items: { kind: string; at: string }[] }>("/api/notify/plan", {
+      token,
+    });
     expect(plan.items.length).toBeGreaterThan(0);
     expect(plan.items.every((item) => item.at > new Date().toISOString())).toBe(true);
-    expect(await json("/api/decisions?limit=5", { token })).toEqual({ decisions: expect.any(Array) });
+    const { decisions } = await json<{ decisions: unknown[] }>("/api/decisions?limit=5", { token });
+    expect(Array.isArray(decisions)).toBe(true);
     expect((await call("/api/decisions?limit=0", { token })).status).toBe(422);
     expect((await call("/api/notify/plan")).status).toBe(401);
   });

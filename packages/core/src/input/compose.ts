@@ -1,11 +1,10 @@
 import type { CoreState } from "../materialize/core-state.ts";
-import type { Task } from "../model/task.ts";
-import type { EventBody } from "../parse/apply.ts";
 import type { QuickInput } from "./parse-quick-input.ts";
 
 import { findProjectByName } from "../model/project.ts";
-import { isOpen } from "../model/task.ts";
+import { isOpen, type Task } from "../model/task.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
+import { type EventBody, subtasksAddedBodies } from "./bodies.ts";
 
 const byDue = (a: Task, b: Task): number => (a.dueAt ?? "").localeCompare(b.dueAt ?? "");
 
@@ -28,21 +27,7 @@ export const openInstanceOf = (
 type Ids = () => string;
 
 const instanceBodies = (input: QuickInput, task: Task, newId: Ids): readonly EventBody[] => [
-  ...(input.subtasks.length === 0
-    ? []
-    : [
-        {
-          type: "task.subtasks.added",
-          payload: {
-            taskId: task.id,
-            subtasks: input.subtasks.map((subtask) => ({
-              id: newId(),
-              label: subtask.label,
-              ...(subtask.number !== null && { number: subtask.number }),
-            })),
-          },
-        } as const,
-      ]),
+  ...subtasksAddedBodies(task.id, input.subtasks, () => newId()),
   {
     type: "task.source.attached",
     payload: {

@@ -2,9 +2,9 @@ import type { Hono } from "hono";
 
 import { webhookCallback } from "grammy";
 
-import type { ParseProvider } from "../shared/llm/llm.ts";
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
+import type { ParseProvider } from "../shared/llm/llm.ts";
 import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { d1, type Db } from "../shared/db/d1.ts";

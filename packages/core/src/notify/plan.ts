@@ -1,9 +1,9 @@
 import type { CoreState } from "../materialize/core-state.ts";
+import type { NotifyMemory } from "./evaluate.ts";
 
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { nowList } from "../queries/now-list.ts";
 import { addMinutesIso } from "../time.ts";
-import { type NotifyMemory } from "./evaluate.ts";
 import { deadlineCrossingAt } from "./rules.ts";
 import { isQuietAt, nextDigestAt } from "./schedule.ts";
 
@@ -11,21 +11,22 @@ import { isQuietAt, nextDigestAt } from "./schedule.ts";
 export const PLAN_HORIZON_MINUTES = 24 * 60;
 
 export type PlannedNotification =
-  | { readonly kind: "deadline"; readonly at: string; readonly taskId: string; readonly title: string }
+  | {
+      readonly kind: "deadline";
+      readonly at: string;
+      readonly taskId: string;
+      readonly title: string;
+    }
   | { readonly kind: "digest"; readonly at: string };
 
+/** The instants `next` yields after `from`, up to `until`. */
 const windowsUntil = (
   from: string,
   until: string,
   next: (after: string) => null | string,
 ): readonly string[] => {
-  const found: string[] = [];
-  let cursor = next(from);
-  while (cursor !== null && cursor <= until) {
-    found.push(cursor);
-    cursor = next(cursor);
-  }
-  return found;
+  const cursor = next(from);
+  return cursor === null || cursor > until ? [] : [cursor, ...windowsUntil(cursor, until, next)];
 };
 
 /**
@@ -42,15 +43,22 @@ export const notifyPlan = (
   const until = addMinutesIso(ctx.now, PLAN_HORIZON_MINUTES);
   const isAwake = (at: string): boolean => !isQuietAt(at, zone, state.settings);
   const digests = windowsUntil(ctx.now, until, (after) => nextDigestAt(after, zone, state.settings))
-    .filter(isAwake)
+    .filter((at) => isAwake(at))
     .map((at) => ({ kind: "digest" as const, at }));
-  const deadlines = nowList(state, ctx).items.flatMap((item) => {
-    const at = deadlineCrossingAt(item.task, item.preset);
-    const isAlerted =
-      memory.critical.includes(item.task.id) || (memory.snoozed[item.task.id] ?? "") > ctx.now;
-    return at === null || at <= ctx.now || at > until || isAlerted || !isAwake(at)
-      ? []
-      : [{ kind: "deadline" as const, at, taskId: item.task.id, title: item.task.title }];
-  });
+  const isAlerted = (taskId: string): boolean =>
+    memory.critical.includes(taskId) || (memory.snoozed[taskId] ?? "") > ctx.now;
+  const deadlines = nowList(state, ctx)
+    .items.filter((item) => !isAlerted(item.task.id))
+    .map((item) => ({ at: deadlineCrossingAt(item.task, item.preset), task: item.task }))
+    .filter(
+      (entry): entry is typeof entry & { at: string } =>
+        entry.at !== null && entry.at > ctx.now && entry.at <= until && isAwake(entry.at),
+    )
+    .map((entry) => ({
+      kind: "deadline" as const,
+      at: entry.at,
+      taskId: entry.task.id,
+      title: entry.task.title,
+    }));
   return [...digests, ...deadlines].toSorted((a, b) => a.at.localeCompare(b.at));
 };

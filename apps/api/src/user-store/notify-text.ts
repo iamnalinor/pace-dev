@@ -16,7 +16,11 @@ import { NOTIFY_ACTIONS } from "../shared/contract.ts";
 
 type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
 
-const button = (language: Language, key: "cancelTask" | "markDone" | "snooze" | "stillWaiting", data: string) => ({
+const button = (
+  language: Language,
+  key: "cancelTask" | "markDone" | "snooze" | "stillWaiting",
+  data: string,
+) => ({
   data,
   label: t(language, `notify.${key}`),
 });
@@ -73,8 +77,12 @@ const digestText = (digest: Digest, zoned: Zoned): OutgoingMessage => {
     t(language, "notify.digestTitle", { time: clockIn(digest.window, language, zone) }),
     ...(rows.length === 0 ? [t(language, "bot.nowEmpty")] : rows),
     ...(digest.more > 0 ? [t(language, "notify.digestMore", { count: digest.more })] : []),
-    ...(digest.reviewCount > 0 ? [t(language, "notify.digestReview", { count: digest.reviewCount })] : []),
-    ...(digest.inboxCount > 0 ? [t(language, "notify.digestInbox", { count: digest.inboxCount })] : []),
+    ...(digest.reviewCount > 0
+      ? [t(language, "notify.digestReview", { count: digest.reviewCount })]
+      : []),
+    ...(digest.inboxCount > 0
+      ? [t(language, "notify.digestInbox", { count: digest.inboxCount })]
+      : []),
   ];
   return { buttons: [], text: lines.join("\n") };
 };

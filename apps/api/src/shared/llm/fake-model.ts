@@ -29,7 +29,8 @@ type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" 
 export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageModel => {
   const model: ModelObject = {
     doGenerate: async ({ prompt }) => {
-      const answer = reply(messageOf(prompt as readonly PromptMessage[]));
+      await Promise.resolve();
+      const answer = reply(messageOf(prompt));
       if ("rateLimitedFor" in answer) {
         throw new APICallError({
           message: "Rate limit reached",
@@ -47,6 +48,7 @@ export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageMode
       };
     },
     doStream: async () => {
+      await Promise.resolve();
       throw new Error("The fake parse model does not stream");
     },
     modelId: "fake-parse",

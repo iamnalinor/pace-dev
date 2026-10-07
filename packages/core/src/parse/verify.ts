@@ -31,7 +31,10 @@ const isVerbatim = (value: null | string, source: string): boolean =>
 const isKnownProject = (name: null | string, names: readonly string[]): boolean =>
   name !== null && names.some((known) => known.toLowerCase() === name.toLowerCase());
 
-const textDoubts = (result: ParseResult, { projectNames, source }: Context): readonly ParseField[] => [
+const textDoubts = (
+  result: ParseResult,
+  { projectNames, source }: Context,
+): readonly ParseField[] => [
   ...(isVerbatim(result.title, source) ? [] : ["title" as const]),
   ...(isVerbatim(result.description, source) ? [] : ["description" as const]),
   ...(isKnownProject(result.project, projectNames) || isVerbatim(result.project, source)

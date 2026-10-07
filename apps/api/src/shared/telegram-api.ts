@@ -24,27 +24,30 @@ export type TelegramTarget = {
 Sends `message` to `chatId`; resolves to whether Telegram accepted it. A network failure
 counts as "not accepted" rather than an error: one undelivered message must not stop the rest.
 */
-export const sendTelegramMessage = async (
+export const wasTelegramMessageSent = async (
   target: TelegramTarget,
   chatId: string,
   message: OutgoingMessage,
 ): Promise<boolean> => {
-  const response = await target
-    .fetch(`${target.apiRoot}/bot${target.token}/sendMessage`, {
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message.text,
-        ...(message.buttons.length > 0 && {
-          reply_markup: {
-            inline_keyboard: message.buttons.map((row) =>
-              row.map((button) => ({ callback_data: button.data, text: button.label })),
-            ),
-          },
-        }),
-      }),
+  const body = JSON.stringify({
+    chat_id: chatId,
+    text: message.text,
+    ...(message.buttons.length > 0 && {
+      reply_markup: {
+        inline_keyboard: message.buttons.map((row) =>
+          row.map((button) => ({ callback_data: button.data, text: button.label })),
+        ),
+      },
+    }),
+  });
+  try {
+    const response = await target.fetch(`${target.apiRoot}/bot${target.token}/sendMessage`, {
+      body,
       headers: { "Content-Type": "application/json" },
       method: "POST",
-    })
-    .catch(() => null);
-  return response?.ok ?? false;
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 };

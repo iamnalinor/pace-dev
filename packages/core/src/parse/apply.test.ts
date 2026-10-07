@@ -72,7 +72,10 @@ describe("findTaskRef", () => {
   it("finds an open task by id or by its title", () => {
     expect(findTaskRef(state, HW_ID)).toMatchObject({ ok: true, value: { id: HW_ID } });
     expect(findTaskRef(state, "algebra hw 6")).toMatchObject({ ok: true, value: { id: HW_ID } });
-    expect(findTaskRef(state, "nothing like it")).toEqual({ error: "parse/unknown-task", ok: false });
+    expect(findTaskRef(state, "nothing like it")).toEqual({
+      error: "parse/unknown-task",
+      ok: false,
+    });
   });
 });
 
@@ -111,10 +114,9 @@ describe("planParse", () => {
       text,
       world,
     );
-    expect(plan.ok && plan.value.kind === "update" ? plan.value.bodies.map((b) => b.type) : []).toEqual([
-      "task.subtasks.added",
-      "task.source.attached",
-    ]);
+    expect(
+      plan.ok && plan.value.kind === "update" ? plan.value.bodies.map((b) => b.type) : [],
+    ).toEqual(["task.subtasks.added", "task.source.attached"]);
   });
 
   it("returns a new task as composer fields", () => {
