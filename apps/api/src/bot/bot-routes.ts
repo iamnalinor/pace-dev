@@ -2,12 +2,11 @@ import type { Hono } from "hono";
 
 import { webhookCallback } from "grammy";
 
-import type { ParseProvider } from "../parse/llm.ts";
+import type { ParseProvider } from "../shared/llm/llm.ts";
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
 import type { TelegramTransport } from "../shared/telegram-api.ts";
 
-import { findUserIdByTelegramId } from "../auth/users.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
 import { isIpInCidrs } from "../shared/ip.ts";
 import { createLogger } from "../shared/logger.ts";
@@ -19,6 +18,8 @@ export type BotRouteDeps = {
   readonly telegramFetch: TelegramTransport;
   readonly isAllowed: (telegramId: string, allowedIds: readonly string[]) => boolean;
   readonly bindLogin: (db: Db) => BotDeps["bindLogin"];
+  /** The Pace user behind a Telegram account, if they ever logged in. */
+  readonly userIdOf: (db: Db, telegramId: string) => Promise<null | string>;
   readonly parseProviders: (config: Config) => readonly ParseProvider[];
 };
 
@@ -52,7 +53,7 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
       // Logging in through the bot also opens the chat notifications go to.
       bindLogin: async (user, nonce) => {
         const outcome = await bindLogin(user, nonce);
-        const userId = outcome === "ok" ? await findUserIdByTelegramId(db, user.telegramId) : null;
+        const userId = outcome === "ok" ? await deps.userIdOf(db, user.telegramId) : null;
         if (userId !== null) {
           await storeOf(userId).notifyTo(user.telegramId, new Date().toISOString());
         }
@@ -64,7 +65,7 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
         now: () => new Date().toISOString(),
         providers: deps.parseProviders(config),
         storeOf,
-        userIdOf: async (telegramId) => await findUserIdByTelegramId(db, telegramId),
+        userIdOf: async (telegramId) => await deps.userIdOf(db, telegramId),
       }),
       isAllowed: (telegramId) => deps.isAllowed(telegramId, config.allowedTelegramIds),
       token: config.telegramBotToken,

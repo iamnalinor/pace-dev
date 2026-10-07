@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { ParseResponse } from "@pace/core";
 
 import { createApp } from "../src/app.ts";
-import { fakeParseModel } from "../src/parse/fake-model.ts";
+import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
 import { json, loginAsDev } from "./helpers.ts";
 
 const parse = async (token: string, text: string): Promise<ParseResponse> =>
@@ -24,6 +24,11 @@ describe("POST /api/parse", () => {
     });
     const pulled = await json<{ events: unknown[] }>("/api/sync/pull", { token });
     expect(pulled.events).toEqual([]);
+    const { decisions } = await json<{ decisions: { rule: string; outcome: string }[] }>(
+      "/api/decisions?q=USB-C",
+      { token },
+    );
+    expect(decisions[0]).toMatchObject({ outcome: "parsed", rule: "parse.create_task" });
   });
 
   it("says when no model can answer and when to try again", async () => {

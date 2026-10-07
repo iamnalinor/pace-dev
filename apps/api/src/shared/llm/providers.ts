@@ -1,7 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 
-import type { Config } from "../shared/config.ts";
+import type { Config } from "../config.ts";
 import type { ParseProvider } from "./llm.ts";
 
 import { echoParse, fakeParseModel } from "./fake-model.ts";

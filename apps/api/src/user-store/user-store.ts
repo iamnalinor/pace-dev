@@ -12,7 +12,6 @@ import {
   missingInstanceEvents,
   newId,
   nextAlarmAt,
-  type NotifyDecision,
   type NotifyMemory,
   notifyPlan,
   ok,
@@ -26,6 +25,7 @@ import type {
   ApplyError,
   ApplyMeta,
   ApplyResult,
+  DecisionEntry,
   DecisionQuery,
   DecisionRecord,
   DryRunResult,
@@ -387,8 +387,9 @@ export class UserStore extends DurableObject {
     }
   }
 
-  async #record(decisions: readonly NotifyDecision[], now: string): Promise<void> {
-    for (const decision of decisions) {
+  /** Appends to the decision log (notifications here, parses from the routes and the bot). */
+  async logDecisions(entries: readonly DecisionEntry[], now: string): Promise<void> {
+    for (const decision of entries) {
       await this.db.insert(schema.decisions).values({
         ...decision,
         at: now,
@@ -445,7 +446,7 @@ export class UserStore extends DurableObject {
         sent += 1;
       }
     }
-    await this.#record(evaluation.decisions, now);
+    await this.logDecisions(evaluation.decisions, now);
     await this.ctx.storage.put(NOTIFY_MEMORY_KEY, evaluation.memory);
     await (evaluation.nextAt === null
       ? this.ctx.storage.deleteAlarm()

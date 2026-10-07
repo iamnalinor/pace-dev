@@ -4,12 +4,13 @@ import { endpoints, ok, verifyParse } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
-import type { ParseProvider } from "./llm.ts";
+import type { ParseProvider } from "../shared/llm/llm.ts";
 
 import { requireUser } from "../shared/current-user.ts";
+import { parseDecision } from "../shared/llm/decision.ts";
 import { mount } from "../shared/mount.ts";
-import { runParse } from "./llm.ts";
-import { buildParsePrompt } from "./prompt.ts";
+import { runParse } from "../shared/llm/llm.ts";
+import { buildParsePrompt } from "../shared/llm/prompt.ts";
 
 /**
 `POST /api/parse`: the user's state (categories, projects, open tasks) frames the prompt;
@@ -27,10 +28,23 @@ export const mountParseRoutes = (
     const prompt = buildParsePrompt(body.text, { ctx, language: state.settings.language, state });
     const answer = await runParse(providersOf(c.get("config")), prompt);
     if (!answer.ok) {
-      return ok({ retryAt: answer.error.retryAt, status: "unavailable" as const });
+      const { retryAt } = answer.error;
+      await store.logDecisions([parseDecision(body.text, "api", { retryAt, status: "unavailable" })], now);
+      return ok({ retryAt, status: "unavailable" as const });
     }
     const projectNames = Object.values(state.projects.byId).map((project) => project.name);
     const verified = verifyParse(answer.value.result, { projectNames, source: body.text });
+    await store.logDecisions(
+      [
+        parseDecision(body.text, "api", {
+          doubtful: verified.doubtful,
+          provider: answer.value.provider,
+          result: verified.result,
+          status: "parsed",
+        }),
+      ],
+      now,
+    );
     return ok({
       doubtful: [...verified.doubtful],
       isClean: verified.isClean,

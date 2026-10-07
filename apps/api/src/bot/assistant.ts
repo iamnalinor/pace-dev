@@ -18,9 +18,10 @@ import { type BotStoreApi, NOTIFY_ACTIONS } from "../shared/contract.ts";
 import type { OutgoingMessage } from "../shared/telegram-api.ts";
 
 import { clockIn } from "../shared/clock.ts";
+import { parseDecision } from "../shared/llm/decision.ts";
 
-import { type ParseProvider, runParse  } from "../parse/llm.ts";
-import { buildParsePrompt } from "../parse/prompt.ts";
+import { type ParseProvider, runParse  } from "../shared/llm/llm.ts";
+import { buildParsePrompt } from "../shared/llm/prompt.ts";
 import { describePlan } from "./describe.ts";
 
 /** A reply with its inline keyboard. */
@@ -117,8 +118,9 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
     const ctx = { deviceTz: state.settings.timezone ?? "UTC", now };
     const answer = await runParse(deps.providers, buildParsePrompt(text, { ctx, language, state }));
     if (!answer.ok) {
-      const failure = await apply(store, [inboxBody(text)], language);
       const { retryAt } = answer.error;
+      await store.logDecisions([parseDecision(text, "bot", { retryAt, status: "unavailable" })], now);
+      const failure = await apply(store, [inboxBody(text)], language);
       return plain(
         failure ??
           (retryAt === null
@@ -128,6 +130,17 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
     }
     const projectNames = Object.values(state.projects.byId).map((project) => project.name);
     const verified = verifyParse(answer.value.result, { projectNames, source: text });
+    await store.logDecisions(
+      [
+        parseDecision(text, "bot", {
+          doubtful: verified.doubtful,
+          provider: answer.value.provider,
+          result: verified.result,
+          status: "parsed",
+        }),
+      ],
+      now,
+    );
     const plan = planParse(verified, text, { ctx, state });
     const id = newId();
     if (!plan.ok) {

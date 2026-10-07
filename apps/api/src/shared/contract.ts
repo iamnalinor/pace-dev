@@ -76,6 +76,7 @@ export type UserStoreApi = {
     meta: ApplyMeta,
   ) => Promise<Result<DryRunResult, ApplyError>>;
   readonly find: (id: string) => Promise<StoredEvent | undefined>;
+  readonly decisions: (query: DecisionQuery) => Promise<readonly DecisionRecord[]>;
 };
 
 /** What the bot uses besides reading and writing: previews kept until a button is pressed. */
@@ -86,6 +87,7 @@ export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
   readonly notifyTo: (chatId: string, now: string) => Promise<void>;
   /** Silences a task's alerts until `until`. */
   readonly snoozeTask: (taskId: string, until: string, now: string) => Promise<void>;
+  readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
 };
 
 /** One row of the decision log, as the API returns it. */
@@ -99,6 +101,9 @@ export type DecisionRecord = {
   readonly outcome: string;
   readonly explanation: string;
 };
+
+/** A decision as its maker records it; the store stamps the id and the time. */
+export type DecisionEntry = Omit<DecisionRecord, "at" | "id">;
 
 export type DecisionQuery = {
   readonly taskId?: string | undefined;

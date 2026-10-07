@@ -1,5 +1,4 @@
 import { APICallError, type LanguageModel } from "ai";
-import { MockLanguageModelV4 } from "ai/test";
 
 import type { ParseResult } from "@pace/core";
 
@@ -24,8 +23,11 @@ const messageOf = (prompt: readonly PromptMessage[]): string => {
 A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the process.
 `reply` decides per message; a rate limit throws the 429 a real provider would.
 */
-export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageModel =>
-  new MockLanguageModelV4({
+/** A model object of the current provider specification (`LanguageModel` also admits ids). */
+type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" }>;
+
+export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageModel => {
+  const model: ModelObject = {
     doGenerate: async ({ prompt }) => {
       const answer = reply(messageOf(prompt as readonly PromptMessage[]));
       if ("rateLimitedFor" in answer) {
@@ -44,9 +46,16 @@ export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageMode
         warnings: [],
       };
     },
+    doStream: async () => {
+      throw new Error("The fake parse model does not stream");
+    },
     modelId: "fake-parse",
     provider: "fake",
-  });
+    specificationVersion: "v4",
+    supportedUrls: {},
+  };
+  return model;
+};
 
 /** The plainest reading: one new task titled with the message itself. */
 export const echoParse = (text: string): ParseResult => ({

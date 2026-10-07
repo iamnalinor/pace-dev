@@ -28,6 +28,9 @@ const untouchedStore: UserStoreApi = {
   apply: async () => {
     throw new Error("store not expected");
   },
+  decisions: async () => {
+    throw new Error("store not expected");
+  },
   dryRun: async () => {
     throw new Error("store not expected");
   },
