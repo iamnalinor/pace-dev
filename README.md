@@ -174,7 +174,7 @@ Secrets and variables read by the workflows:
 | `CLOUDFLARE_ACCOUNT_ID` | variable (secret also accepted) | deploy | account the Workers live in |
 | `TELEGRAM_BOT_USERNAME` | variable | deploy | baked into the web build as `VITE_TELEGRAM_BOT` (defaults to `PaceTaskTrackerBot`) |
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
-| `TELEGRAM_WEBHOOK_SECRET` | secret | deploy, Worker | random string Telegram echoes on every webhook call |
+| `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider (stage 2) |
 | `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider (stage 2) |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
