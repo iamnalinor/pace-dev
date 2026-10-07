@@ -27,8 +27,10 @@ changing structure.
   derived by `core`'s materializer — never mutate projections directly.
 - **Errors**: pure code returns `Result<T, E>` with string-literal error codes; HTTP maps
   them with an exhaustive `switch` (no `default`).
-- **Hono routes**: keep chains unbroken (`hc<AppType>` infers the client from them);
-  validate input with `@hono/zod-validator`; read bindings from `c.env`, never at module scope.
+- **API contract first**: every route is a zod `endpoint()` in `packages/core/src/api/endpoints.ts`
+  (shared by the Worker and `@pace/client`); the Worker mounts it with `mount(app, endpoint,
+  handler)` from `apps/api/src/shared/mount.ts`, which validates input and maps `Result`
+  errors. Read bindings from `c.env`, never at module scope.
 - **Database**: change `src/shared/db/d1-schema.ts` (D1) or `src/user-store/schema.ts`
   (Durable Object), then `bun db:generate`; review and commit the SQL. Never edit an
   applied migration or `apps/api/drizzle/**/meta/*` by hand.

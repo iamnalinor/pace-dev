@@ -23,6 +23,7 @@
     "app",
     "src",
     "modules",
+    "plugins",
     "__mocks__",
     "*.ts",
     "*.d.ts",

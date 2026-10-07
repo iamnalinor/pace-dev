@@ -21,20 +21,35 @@ const RELEASE_CONFIG = `        release {
         }
 `;
 
-module.exports = function withReleaseSigning(config) {
-  return withAppBuildGradle(config, (c) => {
-    const gradle = c.modResults.contents;
-    const debugBlock = DEBUG_CONFIG.exec(gradle);
-    if (debugBlock === null || !gradle.includes(RELEASE_ANCHOR)) {
-      throw new Error(
-        "with-release-signing: the Expo build.gradle template changed, update the anchors",
-      );
-    }
-    const withRelease = gradle.replace(debugBlock[0], () => `${debugBlock[0]}${RELEASE_CONFIG}`);
-    const contents = withRelease.replace(
-      RELEASE_ANCHOR,
-      () => "signingConfig signingConfigs.release",
-    );
-    return { ...c, modResults: { ...c.modResults, contents } };
-  });
+const templateChanged = () =>
+  new Error("with-release-signing: the Expo build.gradle template changed, update the anchors");
+
+/**
+ * Pure transform over the generated `android/app/build.gradle` contents.
+ *
+ * The template references `signingConfigs.debug` twice: once in `buildTypes.debug` and once in
+ * `buildTypes.release`. Only the *last* occurrence (the release build type) switches to the
+ * release config; the debug build type keeps the stock debug keystore.
+ *
+ * @param {string} gradle
+ * @returns {string}
+ */
+const applyReleaseSigning = (gradle) => {
+  const debugBlock = DEBUG_CONFIG.exec(gradle);
+  const anchorAt = gradle.lastIndexOf(RELEASE_ANCHOR);
+  if (debugBlock === null || anchorAt === -1) {
+    throw templateChanged();
+  }
+  const withRelease = gradle.replace(debugBlock[0], () => `${debugBlock[0]}${RELEASE_CONFIG}`);
+  // Inserting the release block shifted the anchor; find it again in the new text.
+  const releaseAt = withRelease.lastIndexOf(RELEASE_ANCHOR);
+  return `${withRelease.slice(0, releaseAt)}signingConfig signingConfigs.release${withRelease.slice(releaseAt + RELEASE_ANCHOR.length)}`;
 };
+
+module.exports = function withReleaseSigning(config) {
+  return withAppBuildGradle(config, (c) => ({
+    ...c,
+    modResults: { ...c.modResults, contents: applyReleaseSigning(c.modResults.contents) },
+  }));
+};
+module.exports.applyReleaseSigning = applyReleaseSigning;
