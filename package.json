@@ -32,7 +32,7 @@
     "build": "bun run --cwd apps/web build",
     "lint": "bun run lint:tokens && bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run db:check",
     "lint:format": "biome format --write .",
-    "lint:eslint": "eslint . --fix --max-warnings 0 --cache --cache-location .cache/eslint/",
+    "lint:eslint": "bun scripts/eslint-all.ts --fix",
     "lint:knip": "knip --no-progress",
     "lint:dup": "jscpd",
     "lint:arch": "depcruise apps packages e2e --config .dependency-cruiser.mjs",

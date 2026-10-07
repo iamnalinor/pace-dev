@@ -9,7 +9,7 @@ a stale `tokens.css` or a forgotten migration cannot reach `main`.
 |---|---|---|
 | `lint:tokens` | `bun scripts/generate-tokens.ts` | regenerates `apps/web/src/tokens.css` from `packages/core/src/design/tokens.json` (CSS variables per theme for Tailwind v4); drift shows up as a diff |
 | `lint:format` | **Biome** (formatter only), `biome format --write .` | formatting of TS/TSX/JS/JSON/CSS |
-| `lint:eslint` | **ESLint 10** + plugins, `--fix --max-warnings 0`, cached in `.cache/eslint/` | bugs, unsafe types, complexity, conventions |
+| `lint:eslint` | **ESLint 10** + plugins, `--fix --max-warnings 0`, one process per workspace (`scripts/eslint-all.ts`, memory), cached in `.cache/eslint/<part>/` | bugs, unsafe types, complexity, conventions |
 | `typecheck` | **tsc** (TypeScript 6, strictest) in seven projects: root configs, `packages/core`, `packages/client`, `apps/api`, `apps/web`, `apps/app`, `e2e` | type errors |
 | `lint:knip` | **knip** | unused files, exports, types and dependencies; missing dependencies |
 | `lint:dup` | **jscpd** (threshold 0, 50+ tokens) | copy-paste outside tests, generated code, the i18n catalogs and `shared/ui` |
