@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Event } from "../events/event-schema.ts";
 
-import { INITIAL_TASKS_STATE, progressOf, type Task, type TasksState  } from "../model/task.ts";
+import { INITIAL_TASKS_STATE, progressOf, type Task, type TasksState } from "../model/task.ts";
 import { materialize } from "./materializer.ts";
 import {
   algebraHw6Events,
@@ -41,13 +41,11 @@ const status = (index: number, occurredAt: string, value: Task["status"]): Event
 const closed = (
   index: number,
   occurredAt: string,
-  outcome: "cancelled" | "cancelled_missed" | "done" | "skipped",
-  reason?: string,
-): Event =>
-  at(index, occurredAt, {
-    type: "task.closed",
-    payload: { taskId: HW_ID, outcome, ...(reason !== undefined && { reason }) },
-  });
+  close: {
+    readonly outcome: "cancelled" | "cancelled_missed" | "done" | "skipped";
+    readonly reason?: string;
+  },
+): Event => at(index, occurredAt, { type: "task.closed", payload: { taskId: HW_ID, ...close } });
 
 const reopened = (index: number, occurredAt: string): Event =>
   at(index, occurredAt, { type: "task.reopened", payload: { taskId: HW_ID } });
@@ -142,7 +140,8 @@ describe("taskReducer: dedupe and unknown tasks", () => {
 
   it("ignores events for unknown tasks and non-task events", () => {
     const state = fold([hwCreated(1)]);
-    expect(taskReducer(state, solved(2, T(9), "s1", "nope"))).toBe(state);
+    const foreign = solved(2, T(9), { id: "s1", taskId: "nope" });
+    expect(taskReducer(state, foreign)).toBe(state);
     const settings = at(3, T(9), { type: "settings.updated", payload: { language: "ru" } });
     expect(taskReducer(state, settings)).toBe(state);
   });
@@ -203,7 +202,8 @@ describe("taskReducer: status and waiting", () => {
 
   it("treats setting the current status again as a no-op", () => {
     const state = fold([hwCreated(1), status(2, T(10), "waiting")]);
-    expect(taskReducer(state, status(3, T(11), "waiting"))).toBe(state);
+    const again = status(3, T(11), "waiting");
+    expect(taskReducer(state, again)).toBe(state);
   });
 
   it("lets an explicit status win over the implicit in-progress", () => {
@@ -233,7 +233,7 @@ describe("taskReducer: status and waiting", () => {
     const task = hw([
       hwCreated(1),
       status(2, T(10), "waiting"),
-      closed(3, T(11), "cancelled", "not needed"),
+      closed(3, T(11), { outcome: "cancelled", reason: "not needed" }),
       reopened(4, T(13)),
     ]);
     expect(task).toMatchObject({
@@ -251,8 +251,10 @@ describe("taskReducer: subtasks", () => {
     const task = hw([hwCreated(1), solved(2, T(9), "s3"), solved(3, T(10), "s3")]);
     expect(task.subtasks[2]?.solvedAt).toBe(T(9));
     const state = fold([hwCreated(1), solved(2, T(9), "s3")]);
-    expect(taskReducer(state, solved(3, T(10), "s3"))).toBe(state);
-    expect(taskReducer(state, solved(4, T(10), "nope"))).toBe(state);
+    const again = solved(3, T(10), "s3");
+    const unknown = solved(4, T(10), "nope");
+    expect(taskReducer(state, again)).toBe(state);
+    expect(taskReducer(state, unknown)).toBe(state);
   });
 
   it("un-solves through revocation and reverts the implicit status", () => {
@@ -309,7 +311,8 @@ describe("taskReducer: submission", () => {
     expect(task.submittedAt).toBeNull();
     expect(task.closed).toBeNull();
     const state = fold([hwCreated(1)]);
-    expect(taskReducer(state, submitted(5, T(12), { subtaskIds: ["s2"] }))).toBe(state);
+    const unsolved = submitted(5, T(12), { subtaskIds: ["s2"] });
+    expect(taskReducer(state, unsolved)).toBe(state);
   });
 
   it("closes the task as done in the same event when closes is set", () => {
@@ -335,15 +338,11 @@ describe("taskReducer: submission", () => {
 
 describe("taskReducer: close and reopen", () => {
   it("records the closure with reason, source and event id and keeps touched", () => {
-    const close = at(
-      3,
-      T(11),
-      {
-        type: "task.closed",
-        payload: { taskId: HW_ID, outcome: "cancelled", reason: "superseded" },
-      },
-      { source: "mcp" },
-    );
+    const close = at(3, T(11), {
+      type: "task.closed",
+      payload: { taskId: HW_ID, outcome: "cancelled", reason: "superseded" },
+      source: "mcp",
+    });
     const task = hw([hwCreated(1), solved(2, T(9), "s1"), close]);
     expect(task.closed).toEqual({
       outcome: "cancelled",
@@ -357,13 +356,14 @@ describe("taskReducer: close and reopen", () => {
   });
 
   it("keeps the first closure until the task is reopened", () => {
-    const state = fold([hwCreated(1), closed(2, T(9), "done")]);
-    expect(taskReducer(state, closed(3, T(10), "skipped"))).toBe(state);
+    const state = fold([hwCreated(1), closed(2, T(9), { outcome: "done" })]);
+    const again = closed(3, T(10), { outcome: "skipped" });
+    expect(taskReducer(state, again)).toBe(state);
     const task = hw([
       hwCreated(1),
-      closed(2, T(9), "done"),
+      closed(2, T(9), { outcome: "done" }),
       reopened(3, T(10)),
-      closed(4, T(11), "skipped", "not needed"),
+      closed(4, T(11), { outcome: "skipped", reason: "not needed" }),
     ]);
     expect(task.closed).toMatchObject({ outcome: "skipped", reason: "not needed", at: T(11) });
     expect(task.reopenedAt).toBe(T(10));
@@ -371,7 +371,8 @@ describe("taskReducer: close and reopen", () => {
 
   it("ignores reopening an open task", () => {
     const state = fold([hwCreated(1)]);
-    expect(taskReducer(state, reopened(2, T(9)))).toBe(state);
+    const reopen = reopened(2, T(9));
+    expect(taskReducer(state, reopen)).toBe(state);
   });
 });
 
@@ -500,7 +501,7 @@ describe("taskReducer: order insensitivity", () => {
       status(7, T(9), "waiting"),
       status(8, T(10), "in_progress"),
       submitted(9, T(11), { subtaskIds: ["s3", "s4"] }),
-      closed(10, T(12), "done"),
+      closed(10, T(12), { outcome: "done" }),
       reopened(11, T(13)),
     ];
     const expected = fold(events);

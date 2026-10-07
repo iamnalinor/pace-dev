@@ -10,12 +10,10 @@ export type McpGrant = {
 };
 
 /** The props `completeAuthorization` stored in the token (see oauth/oauth-routes.ts). */
-export const McpPropsSchema = z.object({
+const McpPropsSchema = z.object({
   userId: z.string().min(1),
   telegramId: z.string().min(1),
 });
-
-export type McpProps = z.output<typeof McpPropsSchema>;
 
 /** The part of the provider's `ctx.auth` the MCP server needs: the token's scopes. */
 const AuthSchema = z.object({ scope: z.array(z.string()) });

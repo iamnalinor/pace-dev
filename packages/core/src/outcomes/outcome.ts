@@ -3,7 +3,7 @@ import type { ResolvedPreset } from "../model/preset.ts";
 import type { PresetsState } from "../presets/preset-reducer.ts";
 
 import { autoOutcomeId, type AutoOutcomeKind } from "../ids.ts";
-import { isOpen, type Subtask, type Task, type TasksState  } from "../model/task.ts";
+import { isOpen, type Subtask, type Task, type TasksState } from "../model/task.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
 import { addMinutesIso } from "../time.ts";
 
@@ -49,9 +49,7 @@ const doneOutcome = (
   preset: ResolvedPreset,
 ): "done" | "done_late" => {
   if (preset.submission === "per_subtask" && task.subtasks.length > 0) {
-    const isLate = task.subtasks.some(
-      (item) => subtaskOutcome(item, task.dueAt) === "done_late",
-    );
+    const isLate = task.subtasks.some((item) => subtaskOutcome(item, task.dueAt) === "done_late");
     return isLate ? "done_late" : "done";
   }
   return lateness(closedAt, task.dueAt);

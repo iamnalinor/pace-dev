@@ -226,6 +226,15 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
 Today the bot only handles `/start login_<nonce>` (Android login) and tells everyone
 else "Not allowed"; stage 2 adds task capture, `/now` and digests.
 
+## MCP
+
+Pace is an MCP server: `https://pace-api.nalinor.dev/mcp` (streamable HTTP) behind OAuth 2.1
+with PKCE, dynamic client registration and a branded consent page on the web origin where you
+sign in with Telegram and pick the scopes. Claude (web, desktop, Code), ChatGPT connectors,
+Cursor and MCP Inspector connect with just that URL; the tools say which scope they need and
+whether they change anything. [docs/mcp.md](docs/mcp.md) has the setup per client, the
+scopes table, the consent flow and local testing.
+
 ## LLM providers (planned, stage 2)
 
 Free-text capture ("add homework 5–7 for Thursday") will be parsed by an LLM through the

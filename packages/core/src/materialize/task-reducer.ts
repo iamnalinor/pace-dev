@@ -1,7 +1,14 @@
 import type { Event, EventOf, EventType } from "../events/event-schema.ts";
 import type { Reducer } from "./materializer.ts";
 
-import { type CloseOutcome, type Subtask, type Task, taskById, type TaskFields, type TasksState  } from "../model/task.ts";
+import {
+  type CloseOutcome,
+  type Subtask,
+  type Task,
+  taskById,
+  type TaskFields,
+  type TasksState,
+} from "../model/task.ts";
 import { minutesBetween } from "../time.ts";
 
 /** Events applied to an existing task; `task.created` is the one that needs the state instead. */
@@ -170,7 +177,7 @@ const subtaskSolved: Handler<"task.subtask.solved"> = (task, event) => {
 const submitSubtasks = (task: Task, ids: readonly string[], at: string): Task => {
   const isDue = (item: Subtask): boolean =>
     ids.includes(item.id) && item.solvedAt !== null && item.submittedAt === null;
-  if (!task.subtasks.some((item) => isDue(item))) {
+  if (task.subtasks.every((item) => !isDue(item))) {
     return task;
   }
   const subtasks = task.subtasks.map((item) => (isDue(item) ? { ...item, submittedAt: at } : item));

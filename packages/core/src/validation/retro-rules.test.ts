@@ -23,6 +23,7 @@ import { FUTURE_TOLERANCE_MINUTES, validateEventInput } from "./retro-rules.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
 const T = (hour: number): string => `2026-10-06T${String(hour).padStart(2, "0")}:00:00.000Z`;
+const AT = T(11);
 
 const presets = materialize(
   exampleCoursePresetEvents(HW_CREATED).map((input, index) => event(100 + index, input)),
@@ -56,7 +57,7 @@ const created = (occurredAt: string, presetId: string, taskId = "new"): Event =>
 
 describe("validateEventInput: pass-through", () => {
   it("returns the same input on success", () => {
-    const input = solved(20, T(11), "s5");
+    const input = solved(20, AT, "s5");
     expect(check(input)).toEqual({ ok: true, value: input });
   });
 
@@ -86,22 +87,22 @@ describe("validateEventInput: retro/future", () => {
 
   it("is checked before the task itself", () => {
     const later = addMinutesIso(NOW, 10);
-    expect(errorOf(solved(20, later, "s1", "nope"))).toBe("retro/future");
+    expect(errorOf(solved(20, later, { id: "s1", taskId: "nope" }))).toBe("retro/future");
     expect(errorOf(created(later, "hw"))).toBe("retro/future");
   });
 });
 
 describe("validateEventInput: task.created and task.preset.set", () => {
   it("accepts a known preset and rejects an unknown one", () => {
-    expect(errorOf(created(T(11), "hw.algebra"))).toBe("ok");
-    expect(errorOf(created(T(11), "hw"))).toBe("ok");
-    expect(errorOf(created(T(11), "hw.nope"))).toBe("preset/unknown");
-    const switched = at(20, T(11), {
+    expect(errorOf(created(AT, "hw.algebra"))).toBe("ok");
+    expect(errorOf(created(AT, "hw"))).toBe("ok");
+    expect(errorOf(created(AT, "hw.nope"))).toBe("preset/unknown");
+    const switched = at(20, AT, {
       type: "task.preset.set",
       payload: { taskId: HW_ID, presetId: "work" },
     });
     expect(errorOf(switched)).toBe("ok");
-    const broken = at(21, T(11), {
+    const broken = at(21, AT, {
       type: "task.preset.set",
       payload: { taskId: HW_ID, presetId: "nope" },
     });
@@ -109,14 +110,14 @@ describe("validateEventInput: task.created and task.preset.set", () => {
   });
 
   it("lets a repeated creation through (deterministic instance ids are idempotent)", () => {
-    expect(errorOf(created(T(11), "hw.algebra", HW_ID))).toBe("ok");
+    expect(errorOf(created(AT, "hw.algebra", HW_ID))).toBe("ok");
   });
 });
 
 describe("validateEventInput: task/unknown and retro/before-created", () => {
   it("rejects events on unknown tasks", () => {
-    expect(errorOf(solved(20, T(11), "s1", "nope"))).toBe("task/unknown");
-    const close = at(21, T(11), {
+    expect(errorOf(solved(20, AT, { id: "s1", taskId: "nope" }))).toBe("task/unknown");
+    const close = at(21, AT, {
       type: "task.closed",
       payload: { taskId: "nope", outcome: "done" },
     });
@@ -139,18 +140,18 @@ describe("validateEventInput: task/unknown and retro/before-created", () => {
 
 describe("validateEventInput: retro/task-closed", () => {
   it("rejects work on a closed task without a reopen", () => {
-    const progress = at(20, T(11), {
+    const progress = at(20, AT, {
       type: "task.progress.set",
       payload: { taskId: HW_ID, progress: 3 },
     });
-    const status = at(21, T(11), {
+    const status = at(21, AT, {
       type: "task.status.set",
       payload: { taskId: HW_ID, status: "paused" },
     });
-    const focus = at(22, T(11), { type: "focus.started", payload: { taskId: HW_ID } });
+    const focus = at(22, AT, { type: "focus.started", payload: { taskId: HW_ID } });
     const cases = [
-      solved(23, T(11), "s5"),
-      submitted(24, T(11), { subtaskIds: ["s3"] }),
+      solved(23, AT, "s5"),
+      submitted(24, AT, { subtaskIds: ["s3"] }),
       progress,
       status,
       focus,
@@ -161,9 +162,9 @@ describe("validateEventInput: retro/task-closed", () => {
   });
 
   it("allows reopening, editing and re-closing a closed task", () => {
-    const reopen = at(20, T(11), { type: "task.reopened", payload: { taskId: HW_ID } });
-    const rename = at(21, T(11), { type: "task.updated", payload: { taskId: HW_ID, title: "x" } });
-    const close = at(22, T(11), {
+    const reopen = at(20, AT, { type: "task.reopened", payload: { taskId: HW_ID } });
+    const rename = at(21, AT, { type: "task.updated", payload: { taskId: HW_ID, title: "x" } });
+    const close = at(22, AT, {
       type: "task.closed",
       payload: { taskId: HW_ID, outcome: "done" },
     });
@@ -175,23 +176,23 @@ describe("validateEventInput: retro/task-closed", () => {
 
 describe("validateEventInput: subtasks and submissions", () => {
   it("rejects unknown subtasks", () => {
-    expect(errorOf(solved(20, T(11), "nope"))).toBe("subtask/unknown");
-    expect(errorOf(submitted(21, T(11), { subtaskIds: ["s3", "nope"] }))).toBe("subtask/unknown");
+    expect(errorOf(solved(20, AT, "nope"))).toBe("subtask/unknown");
+    expect(errorOf(submitted(21, AT, { subtaskIds: ["s3", "nope"] }))).toBe("subtask/unknown");
   });
 
   it("rejects a submission with nothing to submit", () => {
-    expect(errorOf(submitted(20, T(11), { subtaskIds: ["s5"] }))).toBe("retro/nothing-to-submit");
-    expect(errorOf(submitted(21, T(11), { subtaskIds: ["s3", "s5"] }))).toBe(
+    expect(errorOf(submitted(20, AT, { subtaskIds: ["s5"] }))).toBe("retro/nothing-to-submit");
+    expect(errorOf(submitted(21, AT, { subtaskIds: ["s3", "s5"] }))).toBe(
       "retro/nothing-to-submit",
     );
-    expect(errorOf(submitted(22, T(11), { subtaskIds: ["s1"] }))).toBe("retro/nothing-to-submit");
-    expect(errorOf(submitted(23, T(11), { subtaskIds: ["s3", "s4"], closes: true }))).toBe("ok");
+    expect(errorOf(submitted(22, AT, { subtaskIds: ["s1"] }))).toBe("retro/nothing-to-submit");
+    expect(errorOf(submitted(23, AT, { subtaskIds: ["s3", "s4"], closes: true }))).toBe("ok");
   });
 
   it("requires a solved subtask for a whole submission of a per-subtask task", () => {
     const fresh = stateOf([algebraHw6Events()[0] ?? solved(0, T(0), "s1")]);
-    expect(errorOf(submitted(20, T(11), {}), fresh)).toBe("retro/nothing-to-submit");
-    expect(errorOf(submitted(21, T(11), {}))).toBe("ok");
-    expect(errorOf(submitted(22, T(11), { closes: true }, TRK_ID))).toBe("ok");
+    expect(errorOf(submitted(20, AT, {}), fresh)).toBe("retro/nothing-to-submit");
+    expect(errorOf(submitted(21, AT, {}))).toBe("ok");
+    expect(errorOf(submitted(22, AT, { closes: true, taskId: TRK_ID }))).toBe("ok");
   });
 });

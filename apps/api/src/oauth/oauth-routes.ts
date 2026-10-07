@@ -111,7 +111,7 @@ const toGrant = (summary: GrantSummary): OAuthGrant => {
   };
 };
 
-export const mountOAuthRoutes = (app: Hono<AppEnv>): void => {
+export const mountOAuthRoutes = (app: Hono<AppEnv>): Hono<AppEnv> => {
   // The authorization endpoint the provider advertises: validate, then hand the person to
   // the consent page on the web origin (the Telegram widget may only run there).
   app.get("/authorize", async (c) => {
@@ -133,11 +133,12 @@ export const mountOAuthRoutes = (app: Hono<AppEnv>): void => {
 
   mount(app, endpoints.oauth.grants.list, async ({ c }) => {
     const { items } = await oauthHelpers(c).listUserGrants(requireUser(c).id, { limit: 100 });
-    return ok({ grants: items.map(toGrant) });
+    return ok({ grants: items.map((item) => toGrant(item)) });
   });
 
   mount(app, endpoints.oauth.grants.revoke, async ({ c, params }) => {
     await oauthHelpers(c).revokeGrant(params.id, requireUser(c).id);
     return ok({ ok: true as const });
   });
+  return app;
 };

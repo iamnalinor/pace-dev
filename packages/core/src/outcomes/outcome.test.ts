@@ -18,7 +18,7 @@ import {
   taskFixture,
 } from "../materialize/task-fixture.fake.ts";
 import { taskReducer } from "../materialize/task-reducer.ts";
-import { type Closure, INITIAL_TASKS_STATE, type Task, type TasksState  } from "../model/task.ts";
+import { type Closure, INITIAL_TASKS_STATE, type Task, type TasksState } from "../model/task.ts";
 import { BASE_PRESETS } from "../presets/base-presets.ts";
 import { INITIAL_PRESETS_STATE, type PresetsState } from "../presets/preset-reducer.ts";
 import { addMinutesIso } from "../time.ts";
@@ -153,15 +153,12 @@ describe("taskOutcome: the spec table", () => {
 });
 
 describe("taskOutcome: retro done before the deadline beats the automatic miss", () => {
-  const missed = at(
-    7,
-    HW_DUE,
-    {
-      type: "task.closed",
-      payload: { taskId: HW_ID, outcome: "cancelled_missed" },
-    },
-    { id: autoOutcomeId(HW_ID, "missed"), source: "system" },
-  );
+  const missed = at(7, HW_DUE, {
+    type: "task.closed",
+    payload: { taskId: HW_ID, outcome: "cancelled_missed" },
+    id: autoOutcomeId(HW_ID, "missed"),
+    source: "system",
+  });
   const doneRetro = at(8, BEFORE, {
     type: "task.closed",
     payload: { taskId: HW_ID, outcome: "done" },

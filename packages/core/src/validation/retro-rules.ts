@@ -1,7 +1,7 @@
 import type { EventInput } from "../events/event-schema.ts";
 
 import { solvedCount, type Task, taskById, type TasksState } from "../model/task.ts";
-import { presetById, type PresetsState  } from "../presets/preset-reducer.ts";
+import { presetById, type PresetsState } from "../presets/preset-reducer.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
 import { err, ok, type Result } from "../result.ts";
 import { addMinutesIso } from "../time.ts";
@@ -93,7 +93,9 @@ const checkTask = (state: ValidationState, input: TaskInput): RetroError | undef
   if (isAfter(task.createdAt, input.occurredAt)) {
     return "retro/before-created";
   }
-  return task.closed !== null && REJECTED_WHEN_CLOSED.has(input.type) ? "retro/task-closed" : checkDetails(state.presets, task, input);
+  return task.closed !== null && REJECTED_WHEN_CLOSED.has(input.type)
+    ? "retro/task-closed"
+    : checkDetails(state.presets, task, input);
 };
 
 /**

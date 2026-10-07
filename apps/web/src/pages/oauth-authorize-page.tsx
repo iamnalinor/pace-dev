@@ -1,17 +1,13 @@
-import { useT } from "#web/i18n.tsx";
-import { Card } from "#web/shared/ui/card.tsx";
-import { PaceMark } from "#web/shared/ui/pace-mark.tsx";
+import { useLocation } from "react-router";
 
-/** The API redirects MCP clients here; the consent flow itself arrives with stage 1 (plan 1.9). */
+import { ConsentFlow } from "#web/features/oauth/consent-flow.tsx";
+
+/** The API's `GET /authorize` redirects MCP clients here with the authorization request intact. */
 export const OAuthAuthorizePage = () => {
-  const t = useT();
+  const { search } = useLocation();
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col justify-center px-4 py-8">
-      <Card className="grid gap-4 px-6 py-8">
-        <PaceMark className="size-10" />
-        <h1 className="text-2xl font-semibold tracking-[-0.02em]">{t("oauth.title")}</h1>
-        <p className="text-sm text-muted">{t("oauth.body")}</p>
-      </Card>
+      <ConsentFlow authQuery={search.slice(1)} />
     </main>
   );
 };

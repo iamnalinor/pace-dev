@@ -92,5 +92,7 @@ export const resolveTelegramIdentity = async (
   if (!profile.ok) {
     return profile;
   }
-  return isAllowed(profile.value.telegramId, config.allowedTelegramIds) ? ok(await upsertTelegramUser(db, profile.value, input.now)) : err(NOT_ALLOWED);
+  return isAllowed(profile.value.telegramId, config.allowedTelegramIds)
+    ? ok(await upsertTelegramUser(db, profile.value, input.now))
+    : err(NOT_ALLOWED);
 };

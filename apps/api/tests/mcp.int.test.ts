@@ -64,10 +64,11 @@ describe("MCP endpoint", () => {
     expect(result.structuredContent).toMatchObject({
       scopes: ["tasks:read", "tasks:write"],
       telegramId: "1001",
-      userId: expect.any(String),
     });
+    expect(typeof result.structuredContent?.["userId"]).toBe("string");
     expect(new Date(String(result.structuredContent?.["serverTime"])).getTime()).not.toBeNaN();
-    expect(JSON.parse(result.content[0]?.text ?? "{}")).toEqual(result.structuredContent);
+    const text: unknown = JSON.parse(result.content[0]?.text ?? "{}");
+    expect(text).toEqual(result.structuredContent);
   });
 
   it("refuses a token whose Telegram id is not on the whitelist with 403", async () => {

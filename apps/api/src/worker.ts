@@ -8,8 +8,8 @@ import { mountOAuthRoutes } from "./oauth/oauth-routes.ts";
 
 export { UserStore } from "./user-store/user-store.ts";
 
-const app = createApp();
-mountOAuthRoutes(app);
+/** The HTTP app plus the consent routes, which only make sense behind the provider. */
+const app = mountOAuthRoutes(createApp());
 
 /** A day: MCP clients refresh silently, and a revoked grant is dead within one request anyway. */
 const ACCESS_TOKEN_TTL_SECONDS = 86_400;
