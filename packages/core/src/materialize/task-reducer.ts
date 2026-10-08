@@ -305,6 +305,15 @@ const put = (state: TasksState, task: Task): TasksState => ({
 const created = (state: TasksState, event: EventOf<"task.created">): TasksState =>
   taskById(state, event.payload.taskId) === undefined ? put(state, fromCreated(event)) : state;
 
+/** Time started on a task is work on it: the task moves to in progress. */
+const focused = (state: TasksState, event: EventOf<"activity.started">): TasksState => {
+  const { taskId } = event.payload;
+  const task = taskId === undefined ? undefined : taskById(state, taskId);
+  return task === undefined
+    ? state
+    : put(state, { ...touched(task, event.occurredAt), lastEventAt: event.occurredAt });
+};
+
 /**
 Folds every task event plus `focus.started` / `focus.ended`. Dumb by design: it records
 what happened and never validates (`validation/retro-rules.ts` does that on input) nor
@@ -314,6 +323,9 @@ reference.
 export const taskReducer: Reducer<TasksState> = (state, event) => {
   if (event.type === "task.created") {
     return created(state, event);
+  }
+  if (event.type === "activity.started") {
+    return focused(state, event);
   }
   if (!isTaskEvent(event)) {
     return state;

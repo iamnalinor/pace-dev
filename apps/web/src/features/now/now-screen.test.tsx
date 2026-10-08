@@ -32,7 +32,7 @@ describe("NowScreen", () => {
     Element.prototype.releasePointerCapture = vi.fn();
   });
 
-  it("draws the artboard header: the date, the inbox counter and a quiet focus row", async () => {
+  it("draws the artboard header: the date, the inbox counter and the idle time bar", async () => {
     await renderBoard();
     expect(await screen.findByRole("heading", { name: "Now" })).toBeInTheDocument();
     expect(screen.getByText("Tue · Oct 6")).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe("NowScreen", () => {
       "href",
       "/inbox",
     );
-    expect(screen.getByText("Nothing running")).toBeInTheDocument();
+    expect(screen.getByText("Nothing running. Tap an activity to start it.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "To sort · 2" })).toHaveAttribute("href", "/review");
   });
 

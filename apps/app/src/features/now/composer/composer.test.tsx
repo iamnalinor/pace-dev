@@ -96,4 +96,46 @@ describe("Composer", () => {
       expect(created).toMatchObject({ estimateMinutes: 90, importance: "asap", presetId: "work" });
     });
   });
+
+  it("reads a pasted homework on its own and adds it on the second tap", async () => {
+    const homework =
+      "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (определитель)";
+    const reading = {
+      doubtful: [],
+      isClean: true,
+      provider: "fake",
+      result: {
+        category: null,
+        description: null,
+        dueDate: null,
+        dueTime: null,
+        estimateMinutes: null,
+        evidence: [],
+        importance: null,
+        intent: "create_task",
+        outcome: null,
+        project: null,
+        questions: [],
+        subtasks: ["290", "292", "293", "365"].map((label) => ({ label, number: Number(label) })),
+        task: null,
+        title: "ДЗ по алгебре: № 290–365",
+      },
+      status: "parsed",
+    };
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => reading } });
+    await renderScreen(<Composer />, runtime);
+    await fireEvent.changeText(line(), homework);
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.add") }));
+    expect(await screen.findByText(en("composer.aiRead"))).toBeOnTheScreen();
+    const added = () =>
+      Object.values(runtime.state.store.getState().tasks.byId).find(
+        (task) => task.sourceText === homework,
+      );
+    expect(added()).toBeUndefined();
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.add") }));
+    await waitFor(() => {
+      expect(added()?.title).toBe("ДЗ по алгебре: № 290–365");
+    });
+    expect(added()?.subtasks).toHaveLength(4);
+  });
 });

@@ -8,6 +8,7 @@ import { type Project, projectById } from "../model/project.ts";
 import { isOpen, progressOf, type Task, taskById, type TaskStatus } from "../model/task.ts";
 import { err, ok, type Result } from "../result.ts";
 import { zonesDiffer } from "../time.ts";
+import { taskTrackedMinutes } from "../tracking/insights.ts";
 import { explain, type Explanation } from "../urgency/explain.ts";
 import { importanceOf, presetOf } from "./classify.ts";
 import { rankWithinCategory, urgencyInputFor } from "./urgency-input.ts";
@@ -29,7 +30,7 @@ export type TaskView = {
   readonly windowElapsed: null | number;
   /** `estimate × (1 − progress)`, whole minutes. */
   readonly workLeftMinutes: number;
-  /** Tracked time arrives with stage 3. */
+  /** Minutes tracked on the task, all time. */
   readonly trackedMinutes: number;
   readonly explanation: Explanation;
   /** Position inside the importance category; `null` when the task does not compete. */
@@ -83,7 +84,7 @@ export const taskView = (
     workLeftMinutes: Math.round(
       input.value.estimateHours * 60 * (1 - progressOf(task, preset.value.progressMode)),
     ),
-    trackedMinutes: 0,
+    trackedMinutes: taskTrackedMinutes(state, task.id, ctx.now),
     explanation,
     rank,
     dueZoneDiffers: isDueZoneDifferent(task, ctx.deviceTz),

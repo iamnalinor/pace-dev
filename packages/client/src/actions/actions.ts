@@ -11,6 +11,7 @@ import { type RankActions, rankActions } from "./rank-actions.ts";
 import { type ReviewActions, reviewActions } from "./review-actions.ts";
 import { type SettingsActions, settingsActions } from "./settings-actions.ts";
 import { type TaskActions, taskActions } from "./task-actions.ts";
+import { type TimeActions, timeActions } from "./time-actions.ts";
 import { type WorkActions, workActions } from "./work-actions.ts";
 
 export type ActionsOptions = {
@@ -29,6 +30,7 @@ export type Actions = ComposerActions &
   ReviewActions &
   SettingsActions &
   TaskActions &
+  TimeActions &
   WorkActions & {
     readonly estimateHints: (presetId: string) => readonly EstimateBucket[];
     readonly revoke: (eventId: string) => ActionResult;
@@ -53,6 +55,7 @@ export const createActions = (options: ActionsOptions): Actions => {
     ...reviewActions(deps),
     ...settingsActions(deps),
     ...taskActions(deps),
+    ...timeActions(deps),
     ...workActions(deps),
     estimateHints: (presetId) => hints.bucketsFor(presetId),
     revoke: async (eventId) => fromStore(await options.state.revoke(eventId)),

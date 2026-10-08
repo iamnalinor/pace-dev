@@ -145,6 +145,18 @@ The live reading of the composer: the rule parse of the text with the user's chi
 top. Picking another category preselects its default importance unless the text or a tap
 named one.
 */
+/** From this length (or a second line) a text is read by the assistant, not just the rules. */
+export const LONG_TEXT_CHARS = 80;
+
+/** How long Enter waits for the assistant before the text goes to Inbox to be sorted later. */
+export const SLOW_READ_MS = 5000;
+
+/** Long or multi-line text: a pasted homework or a forwarded message, for the assistant to read. */
+export const shouldAiRead = (text: string): boolean => {
+  const trimmed = text.trim();
+  return trimmed.length >= LONG_TEXT_CHARS || trimmed.includes("\n");
+};
+
 export const composerModel = (
   state: CoreState,
   draft: ComposerDraft,

@@ -226,8 +226,17 @@ describe("EVENT_TYPES", () => {
     expect(new Set(EVENT_TYPES).size).toBe(EVENT_TYPES.length);
   });
 
-  it("covers every stage-1 type from the plan", () => {
-    expect(EVENT_TYPES).toHaveLength(26);
+  it("covers every stage-1 type from the plan and the stage-3 activity types", () => {
+    expect(EVENT_TYPES).toHaveLength(33);
+    expect(EVENT_TYPES.filter((type) => type.startsWith("activity."))).toEqual([
+      "activity.started",
+      "activity.stopped",
+      "activity.logged",
+      "activity.adjusted",
+      "activity.labelled",
+      "activity.button.set",
+      "activity.button.removed",
+    ]);
   });
 });
 

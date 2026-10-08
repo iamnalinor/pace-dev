@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "#app/screens/placeholder-screen.tsx";
+import { DayScreen } from "#app/features/day/day-screen.tsx";
 
-export default function DayScreen() {
-  return <PlaceholderScreen emptyKey="day.empty" isDated titleKey="nav.day" />;
+export default function DayRoute() {
+  return <DayScreen />;
 }

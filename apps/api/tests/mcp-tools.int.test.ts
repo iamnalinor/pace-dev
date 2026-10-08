@@ -140,7 +140,7 @@ describe("MCP tools catalogue", () => {
     );
     const scopeOf = (name: string) => TOOLS.find((item) => item.name === name)?.scope;
     for (const tool of tools) {
-      expect(tool.annotations?.readOnlyHint).toBe(scopeOf(tool.name) === "tasks:read");
+      expect(tool.annotations?.readOnlyHint).toBe(scopeOf(tool.name)?.endsWith(":read"));
       expect(tool.description?.length ?? 0).toBeGreaterThan(40);
     }
     const writes = tools.filter((tool) => scopeOf(tool.name) === "tasks:write");

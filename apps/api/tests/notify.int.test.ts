@@ -167,3 +167,31 @@ describe("GET /api/notify/plan and /api/decisions", () => {
     expect((await call("/api/notify/plan")).status).toBe(401);
   });
 });
+
+describe("the Limit alert", () => {
+  it("arms for the running activity's Limit and sends the alert once", async () => {
+    /** 10:00 Moscow: no digest window, nothing else to say. */
+    const started = "2026-10-07T07:00:00.000Z";
+    const commute = envelope("activity.started", started, {
+      activityId: "a-commute",
+      category: "commute",
+      label: "Commute",
+      limitMinutes: 60,
+    });
+    await runInDurableObject(freshStore(), async (instance: UserStore) => {
+      await instance.append([setup(), commute], { now: started });
+      await instance.notifyTo("1002", started);
+      const telegram = recorder();
+      // Half an hour in: nothing to say yet, and the next check is the crossing itself.
+      const halfway = await instance.runNotifications("2026-10-07T07:30:00.000Z", telegram.target);
+      expect(halfway).toMatchObject({ nextAt: "2026-10-07T08:00:00.000Z", sent: 0 });
+
+      const crossed = "2026-10-07T08:01:00.000Z";
+      await instance.runNotifications(crossed, telegram.target);
+      const texts = telegram.sent.map((message) => String(message["text"]));
+      expect(texts).toEqual([expect.stringContaining("Commute is over its 1h limit")]);
+      await instance.runNotifications("2026-10-07T08:30:00.000Z", telegram.target);
+      expect(telegram.sent).toHaveLength(1);
+    });
+  });
+});

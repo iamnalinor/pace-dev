@@ -2,8 +2,13 @@ import { createContext, type ReactNode, use, useCallback, useEffect, useState } 
 import { AppState, View } from "react-native";
 import { useStore } from "zustand";
 
-import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
-
+import {
+  type Auth,
+  type AuthState,
+  type AppState as ClientState,
+  type SyncStatus,
+  timeBarModel,
+} from "@pace/client";
 import {
   type Language,
   type MessageKey,
@@ -13,7 +18,7 @@ import {
   type User,
 } from "@pace/core";
 
-import { syncLocalNotifications } from "./platform/notifications.ts";
+import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -34,6 +39,38 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   if (auth.store.getState().status === "signed-in") {
     sync.start({ intervalMs: SYNC_INTERVAL_MS });
   }
+};
+
+/** The running activity and its targets: the timers change only when this does. */
+const timerKey = (runtime: PaceRuntime): string => {
+  const { running } = timeBarModel(runtime.state.store.getState(), {
+    deviceTz: runtime.clock.deviceTz,
+    now: runtime.clock.now(),
+  });
+  return running === null
+    ? ""
+    : [
+        running.activityId,
+        running.startAt,
+        running.label,
+        running.expectMinutes,
+        running.limitMinutes,
+      ].join("|");
+};
+
+/** Reschedules the phone's Expect/Limit timers on every switch, stop or edit of the running activity. */
+const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
+  let last = timerKey(runtime);
+  void syncActivityTimers(runtime);
+  return runtime.state.store.subscribe(() => {
+    const key = timerKey(runtime);
+    if (key === last) {
+      return;
+    }
+
+    last = key;
+    void syncActivityTimers(runtime);
+  });
 };
 
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
@@ -67,9 +104,11 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       await syncLocalNotifications(runtime);
     })();
   });
+  const stopTimers = followActivityTimers(runtime);
   return () => {
     unsubscribe();
     subscription.remove();
+    stopTimers();
     sync.stop();
   };
 };

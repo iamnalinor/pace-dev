@@ -2,7 +2,8 @@ import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { ColorBar } from "#app/ui/color.tsx";
+import { inkClass, washClass } from "#app/ui/color.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
@@ -27,15 +28,21 @@ export const ProjectsScreen = () => {
           <Pressable
             accessibilityLabel={project.name}
             accessibilityRole="link"
-            className="min-h-14 flex-row items-center gap-3 border-b border-line px-1 active:opacity-70"
+            className={cx(
+              "mb-2 min-h-14 flex-row items-center gap-3 rounded-xl border px-4 active:opacity-70",
+              washClass(project.color),
+            )}
             key={project.id}
             onPress={() => {
               router.push(`/project/${project.id}`);
             }}
           >
-            <ColorBar color={project.color} />
-            <Text className="flex-1 font-sans text-[15px] text-fg">{project.name}</Text>
-            <Text className="font-mono text-[13px] text-muted">{openCount(project.id)}</Text>
+            <Text
+              className={cx("flex-1 font-sans text-[15px] font-medium", inkClass(project.color))}
+            >
+              {project.name}
+            </Text>
+            <Text className="font-mono text-[13px] text-fg2">{openCount(project.id)}</Text>
           </Pressable>
         ))}
       </View>

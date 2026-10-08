@@ -1,5 +1,6 @@
 import { tz, tzOffset } from "@date-fns/tz";
 import {
+  addDays,
   addMinutes,
   differenceInMinutes,
   endOfDay,
@@ -28,6 +29,10 @@ export const endOfDayIn = (atIso: string, zone: string): string =>
 /** First millisecond of the calendar day containing `atIso` in `zone`, as a UTC instant. */
 export const startOfDayIn = (atIso: string, zone: string): string =>
   toIso(startOfDay(atIso, { in: tz(zone) }));
+
+/** The same wall-clock time `days` calendar days later in `zone` (DST-safe), as a UTC instant. */
+export const addDaysIn = (atIso: string, days: number, zone: string): string =>
+  toIso(addDays(atIso, days, { in: tz(zone) }));
 
 /** Monday 00:00 of the week containing `atIso` in `zone`, as a UTC instant. */
 export const startOfWeekIn = (atIso: string, zone: string): string =>

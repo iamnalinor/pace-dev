@@ -32,6 +32,7 @@ const traceAge = (input: UrgencyInput, at: string): PolicyTrace => {
   const u = bounded(AGE_SAT * (1 - Math.exp(-ageDays / AGE_TAU_DAYS)));
   return {
     formula: `${U_FLOOR} + ${AGE_SAT} · (1 − e^(−d / ${AGE_TAU_DAYS}))`,
+    legend: [{ key: "ageDays", symbol: "d" }],
     inputs: [{ key: "ageDays", value: ageDays, unit: "days" }],
     steps: [{ key: "urgency", value: u }],
     u,
@@ -50,7 +51,11 @@ const paceTowards = (input: UrgencyInput, at: string, { target, work }: Aim): Po
   const workLeft = (1 - work.progress) * work.estimateHours * input.calibration;
   const u = bounded(workLeft / Math.max(hoursLeft, PACE_MIN_HOURS));
   return {
-    formula: `${U_FLOOR} + (1 − p) · E / max(h, ${PACE_MIN_HOURS})`,
+    formula: `${U_FLOOR} + W / max(h, ${PACE_MIN_HOURS})`,
+    legend: [
+      { key: "workLeft", symbol: "W" },
+      { key: "hoursLeft", symbol: "h" },
+    ],
     inputs: [
       { key: "progress", value: percent(work.progress), unit: "percent" },
       { key: "workLeft", value: workLeft, unit: "hours" },
@@ -78,6 +83,10 @@ const traceLag = (input: UrgencyInput, at: string): PolicyTrace => {
   const u = bounded(LAG_GAIN * behind);
   return {
     formula: `${U_FLOOR} + ${LAG_GAIN} · max(0, r − p)`,
+    legend: [
+      { key: "windowElapsed", symbol: "r" },
+      { key: "progress", symbol: "p" },
+    ],
     inputs: [
       { key: "windowElapsed", value: percent(elapsed), unit: "percent" },
       { key: "progress", value: percent(input.progress), unit: "percent" },
@@ -98,6 +107,7 @@ const softWindow = (
 
 const finalPassed = (finalAt: string): PolicyTrace => ({
   formula: String(U_MAX),
+  legend: [],
   inputs: [{ key: "finalAt", value: finalAt }],
   steps: [{ key: "finalPassed", value: 1 }],
   u: U_MAX,
@@ -109,6 +119,10 @@ const afterSoftTarget = (input: UrgencyInput, at: string, soft: string): PolicyT
   const u = Math.min(U_MAX, atSoft.u + RESUBMISSION_GROWTH_PER_DAY * daysAfter);
   return {
     formula: `u(soft) + ${RESUBMISSION_GROWTH_PER_DAY} · d`,
+    legend: [
+      { key: "urgencyAtSoftTarget", symbol: "u(soft)" },
+      { key: "daysAfterSoftTarget", symbol: "d" },
+    ],
     inputs: [
       { key: "softTarget", value: soft },
       { key: "daysAfterSoftTarget", value: daysAfter, unit: "days" },

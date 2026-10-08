@@ -67,6 +67,13 @@ describe("verifyParse", () => {
     expect(verified.isClean).toBe(false);
   });
 
+  it("accepts a short composed title in the message's language", () => {
+    const verified = verify({ title: "Домашка по алгебре: 290–534" });
+    expect(verified.doubtful).not.toContain("title");
+    const tooLong = verify({ title: "Домашка ".repeat(12) });
+    expect(tooLong.doubtful).toContain("title");
+  });
+
   it("is not clean while it asks a question", () => {
     const verified = verify({
       questions: [{ field: "subtasks", options: ["5", "5а"], question: "5 or 5а?" }],

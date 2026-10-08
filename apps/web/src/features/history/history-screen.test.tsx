@@ -21,6 +21,21 @@ describe("HistoryScreen", () => {
     }
     await user.click(firstUndo);
     // The revocation is recorded as a new change of its own.
-    expect(await within(events).findAllByRole("listitem")).toHaveLength(before + 1);
+    const after = await within(events).findAllByRole("listitem");
+    expect(after).toHaveLength(before + 1);
+    // Written down when it happened: the second, identical "recorded" time is left out.
+    expect(after[0]).not.toHaveTextContent(/recorded/u);
+  });
+
+  it("says when a retro entry was written down", async () => {
+    const { services } = await artboardServices();
+    const at = new Date(Date.parse(services.clock.now()) - 3 * 3_600_000).toISOString();
+    await services.actions.captureInbox("Call the dentist", at);
+    renderWithProviders(<HistoryScreen />, { route: "/history", services });
+    const events = await screen.findByRole("region", { name: "Events" });
+    const recorded = within(events)
+      .getAllByRole("listitem")
+      .filter((item) => item.textContent.includes("recorded"));
+    expect(recorded).toHaveLength(1);
   });
 });

@@ -30,13 +30,13 @@ stays `/task/:id`). Below that a task is a page of its own and Now is just the l
 export const NowSplit = ({ pane, ...nowProps }: Props) => {
   const hasPane = pane !== undefined;
   return (
-    <div className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
+    <div className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(26rem,1fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
       <div className={cn("flex-1 flex-col", hasPane ? "hidden lg:flex" : "flex")}>
         <NowScreen {...nowProps} />
       </div>
       <div
         className={cn(
-          "flex-1 flex-col lg:sticky lg:top-0 lg:flex lg:max-h-dvh lg:min-h-[60dvh] lg:overflow-y-auto lg:py-2",
+          "flex-1 flex-col lg:sticky lg:top-0 lg:flex lg:max-h-dvh lg:min-h-[40dvh] lg:overflow-y-auto lg:py-2",
           hasPane ? "flex" : "hidden",
         )}
       >

@@ -47,13 +47,16 @@ export type HistoryOptions = {
 /** The task an event is about: its own, or, for a correction, its target's. */
 const taskIdOf = (event: Event, log: readonly Event[]): null | string => {
   if ("taskId" in event.payload) {
-    return event.payload.taskId;
+    // Activities name a task only when the time was spent on one.
+    return event.payload.taskId ?? null;
   }
   if (!isCorrection(event)) {
     return null;
   }
   const target = log.find((candidate) => candidate.id === event.payload.targetId);
-  return target !== undefined && "taskId" in target.payload ? target.payload.taskId : null;
+  return target !== undefined && "taskId" in target.payload
+    ? (target.payload.taskId ?? null)
+    : null;
 };
 
 const titleOf = (state: HistorySource, event: Event, taskId: null | string): null | string => {

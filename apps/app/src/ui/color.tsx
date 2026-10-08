@@ -80,20 +80,3 @@ export const ColorTag = ({
     </Text>
   </View>
 );
-
-/** A short upright bar in the color: marks a project in lists and headers. */
-export const ColorBar = ({
-  color,
-  tall = false,
-}: {
-  readonly color: null | ProjectColorName;
-  readonly tall?: boolean;
-}) => (
-  <View
-    className={cx(
-      "w-1 rounded-full",
-      tall ? "h-7" : "h-5",
-      color === null ? "bg-faint" : PROJECT_FILL[color],
-    )}
-  />
-);

@@ -21,7 +21,7 @@ import { TaskMenu } from "./task-menu.tsx";
 import { TaskStats } from "./task-stats.tsx";
 import { TaskSummary } from "./task-summary.tsx";
 
-type Sheet = "close" | "edit" | "menu" | null;
+type Sheet = "close" | "edit" | "menu" | "move" | null;
 
 /** The close sheet a check on Now asked for (`?close=1`), as the task's primary action allows. */
 const requestedMode = (view: TaskViewModel): CloseMode => {
@@ -55,6 +55,9 @@ const TaskDetails = ({ view }: { readonly view: TaskViewModel }) => {
         onMore={() => {
           setSheet("menu");
         }}
+        onProject={() => {
+          setSheet("move");
+        }}
         project={view.project}
       />
       <ZoneBanner />
@@ -82,12 +85,13 @@ const TaskDetails = ({ view }: { readonly view: TaskViewModel }) => {
         view={view}
       />
       <TaskMenu
-        isOpen={sheet === "menu"}
+        isMoveOnly={sheet === "move"}
+        isOpen={sheet === "menu" || sheet === "move"}
         onEdit={() => {
           setSheet("edit");
         }}
         onOpenChange={(isOpen) => {
-          setSheet(isOpen ? "menu" : null);
+          setSheet(isOpen ? (sheet ?? "menu") : null);
         }}
         view={view}
       />

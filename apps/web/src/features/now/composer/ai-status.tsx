@@ -8,6 +8,8 @@ import { chipClass } from "#web/shared/ui/chip-group.tsx";
 
 type Props = {
   readonly state: AiState;
+  /** Enter was pressed on a long text: it waits for the reading. */
+  readonly isWaiting: boolean;
   /** An answer to one of the assistant's questions goes into the line. */
   readonly onAnswer: (answer: string) => void;
 };
@@ -42,14 +44,20 @@ const Questions = ({
 };
 
 /** What the assistant made of the line: done (and what to check), its questions, or why not. */
-export const AiStatus = ({ onAnswer, state }: Props) => {
+export const AiStatus = ({ isWaiting, onAnswer, state }: Props) => {
   const t = useT();
   const language = useLanguage();
   const { deviceTz } = useServices().hooks.useClock();
   switch (state.status) {
-    case "idle":
-    case "reading": {
+    case "idle": {
       return null;
+    }
+    case "reading": {
+      return (
+        <p className="animate-pulse px-1 text-[13px] text-fg" role="status">
+          {t(isWaiting ? "composer.aiWaiting" : "composer.aiReadingStatus")}
+        </p>
+      );
     }
     case "failed": {
       return (

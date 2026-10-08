@@ -100,9 +100,9 @@ export const enInput = {
   "close.submittedToast": "{title} · {count} sent",
   "close.closedToast": "{title} · {outcome}",
   "composer.label": "New task",
-  "composer.placeholder": "Add a task: “sync on the dashboard tomorrow 15:00 1h”",
+  "composer.placeholder": "Add a task or paste a message",
   "composer.hint":
-    "Enter adds the task. The chips below show how the line was read; tap one to change it.",
+    "Enter adds the task, Shift+Enter starts a new line. Long or pasted text is read by the assistant first; the chips show how it was read.",
   "composer.add": "Add",
   "composer.addTo": "Add to {title}",
   "composer.addedTo": "Added to {title}",
@@ -127,7 +127,11 @@ export const enInput = {
   "composer.projectNamed": "Project {name}",
   "composer.ai": "Read with AI",
   "composer.aiReading": "Reading…",
-  "composer.aiRead": "Read by the assistant.",
+  "composer.aiRead": "Read by the assistant. Check the chips, then add.",
+  "composer.aiReadingStatus": "The assistant is reading it…",
+  "composer.aiWaiting":
+    "Waiting for the assistant: you will see its reading before anything is added…",
+  "composer.aiSlow": "The assistant is slow: saved to Inbox, sort it there later.",
   "composer.aiCheck": "Check: {fields}",
   "composer.aiUnavailable":
     "The assistant is out of requests until about {time}. The chips show the rule-based reading; To Inbox keeps the line for later.",

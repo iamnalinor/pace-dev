@@ -3,10 +3,10 @@ import * as Notifications from "expo-notifications";
 import { createApiClient, createAppState, createMemoryEventStore } from "@pace/client";
 import { createFakeFetch } from "@pace/client/testing";
 
-import { syncLocalNotifications } from "./notifications.ts";
+import { syncActivityTimers, syncLocalNotifications } from "./notifications.ts";
 
 jest.mock("expo-notifications", () => ({
-  AndroidImportance: { DEFAULT: 3 },
+  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
   SchedulableTriggerInputTypes: { DATE: "date" },
   cancelScheduledNotificationAsync: jest.fn(async () => undefined),
   getAllScheduledNotificationsAsync: jest.fn(async () => [
@@ -59,5 +59,31 @@ describe("syncLocalNotifications", () => {
     await syncLocalNotifications(await client({}));
     expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
     expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncActivityTimers", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("schedules the running activity's timers and leaves the plan's reminders alone", async () => {
+    const { state } = await client({});
+    const clock = { deviceTz: "Europe/Moscow", now: () => "2026-10-06T12:00:00.000Z" };
+    const started = await state.dispatch({
+      occurredAt: "2026-10-06T12:00:00.000Z",
+      payload: { activityId: "a1", category: "commute", expectMinutes: 45, label: "Commute" },
+      precision: "exact",
+      source: "app",
+      type: "activity.started",
+    });
+    expect(started.ok).toBe(true);
+    await syncActivityTimers({ clock, state });
+    expect(Notifications.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
+      content: { body: "Commute is past its usual 45m.", title: "Pace" },
+      identifier: "pace:activity:a1:expect",
+      trigger: { channelId: "timers", date: new Date("2026-10-06T12:45:00.000Z"), type: "date" },
+    });
   });
 });

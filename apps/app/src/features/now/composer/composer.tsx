@@ -10,7 +10,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { useAiRead } from "@pace/client/react";
+import { useAiRead, useAutoAiRead, useReadFirst } from "@pace/client/react";
 import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, isBuiltInPreset } from "@pace/core";
 
 import { AiStatus } from "./ai-status.tsx";
@@ -198,7 +198,19 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
   const run = useRunAction();
   const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
   const model = hooks.useComposer({ edits, text });
+  useAutoAiRead(ai, text, onReading);
+  const toInbox = async (message = t("add.toInboxDone")): Promise<void> => {
+    if (await run(actions.captureInbox(text), { success: message, undo: true })) {
+      reset();
+    }
+  };
+  const readFirst = useReadFirst(ai, async () => {
+    await toInbox(t("composer.aiSlow"));
+  });
   const add = async (): Promise<void> => {
+    if (readFirst.isPending(text, onReading)) {
+      return;
+    }
     const success =
       model.target.kind === "instance"
         ? t("composer.addedTo", { title: model.target.title })
@@ -207,25 +219,18 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
       reset();
     }
   };
-  const toInbox = async (): Promise<void> => {
-    if (await run(actions.captureInbox(text), { success: t("add.toInboxDone"), undo: true })) {
-      reset();
-    }
-  };
   return (
     <View className="mx-4 mb-3 rounded-xl border border-line bg-surface p-2">
       <TextInput
         accessibilityHint={t("composer.hint")}
         accessibilityLabel={t("composer.label")}
-        className="min-h-11 px-2 font-sans text-[15px] text-fg"
+        // Grows with a pasted message up to about eight lines; Add (below) stores it.
+        className="max-h-48 min-h-11 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
+        multiline
         onChangeText={onText}
-        onSubmitEditing={() => {
-          void add();
-        }}
         placeholder={t("composer.placeholder")}
         placeholderTextColor={palette.muted}
-        returnKeyType="done"
-        submitBehavior="blurAndSubmit"
+        textAlignVertical="top"
         value={text}
       />
       {model.isEmpty ? null : (
@@ -237,6 +242,7 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
             }}
           />
           <AiStatus
+            isWaiting={readFirst.isWaiting}
             onAnswer={(answer) => {
               onText(`${text.trimEnd()} ${answer}`);
             }}

@@ -27,6 +27,8 @@ import {
 import { closeTask, markSubtasks, reopen, submit } from "./tools/progress-tools.ts";
 import { fetchDocument, search } from "./tools/search-tools.ts";
 import { captureInbox, taskCreation, updateTask } from "./tools/task-tools.ts";
+import { dayTool, listActivityButtons, summaryTime } from "./tools/time-read-tools.ts";
+import { logActivity, startActivity, stopActivity } from "./tools/time-write-tools.ts";
 import { whoami } from "./tools/whoami.ts";
 
 const SERVER_INFO = { name: "pace", version: "0.1.0" };
@@ -34,7 +36,8 @@ const SERVER_INFO = { name: "pace", version: "0.1.0" };
 const INSTRUCTIONS = [
   "Pace is a personal task and time tracker. Every tool acts as the person who authorized this connection.",
   "Read tools (tasks:read): whoami, list_now, get_task, list_projects, list_project_tasks, list_presets, list_inbox, list_review, search, fetch, search_decisions (why a reminder was or was not sent).",
-  "Mutating tools (tasks:write) take `at` (ISO instant, default now; use the past to record retroactively), `precision` (exact|approx) and `dryRun` (true = validate and preview the events, write nothing).",
+  "Time tools: list_activity_buttons, get_day and summary_time (time:read); start_activity, stop_activity and log_activity (time:write).",
+  "Mutating tools (tasks:write, time:write) take `at` (ISO instant, default now; use the past to record retroactively), `precision` (exact|approx) and `dryRun` (true = validate and preview the events, write nothing).",
   "Ids are opaque strings; find them with list_now, search or get_task. Times are ISO 8601 UTC; deadlines carry the IANA zone they were set in.",
   "A refusal is a tool error whose text starts with a code such as task/unknown, retro/task-closed or preset/exists.",
 ].join(" ");
@@ -69,6 +72,12 @@ export const TOOLS: readonly Tool[] = [
   presetCreation,
   updatePreset,
   archivePreset,
+  listActivityButtons,
+  dayTool,
+  summaryTime,
+  startActivity,
+  stopActivity,
+  logActivity,
 ];
 
 /** One server per request: the Worker keeps no MCP session, so the context is baked in here. */

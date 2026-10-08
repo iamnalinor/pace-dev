@@ -7,6 +7,7 @@ import type { TaskViewModel } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { ordinal } from "#app/format/numbers.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import { whyLines } from "./why-lines.ts";
@@ -54,12 +55,40 @@ export const WhyCard = ({
           <Text className="font-sans text-[12px] text-muted">
             {`${policyName} · ${t("task.whyFormula")}: ${view.why.formula}`}
           </Text>
-          {whyLines(view.why.rows, view.overrideSheet.importance, viewer).map((line) => (
-            <View className="flex-row justify-between gap-3" key={line.id}>
-              <Text className="flex-shrink font-sans text-[13px] text-muted">{line.label}</Text>
-              <Text className="font-mono text-[13px] text-fg">{line.value}</Text>
-            </View>
-          ))}
+          {view.why.legend.length > 0 ? (
+            <Text className="font-sans text-[11px] text-muted">
+              {view.why.legend
+                .map((symbol) =>
+                  t("task.whySymbol", { name: t(`explain.${symbol.key}`), symbol: symbol.symbol }),
+                )
+                .join(" · ")}
+            </Text>
+          ) : null}
+          {whyLines(view.why.rows, view.overrideSheet.importance, viewer).map((line) => {
+            // The score is the total the board sorts by: a heavy rule and bold set it apart.
+            const isTotal = line.id.startsWith("score:");
+            return (
+              <View
+                className={cx(
+                  "flex-row justify-between gap-3",
+                  isTotal && "mt-1 border-t-2 border-fg pt-1.5",
+                )}
+                key={line.id}
+              >
+                <Text
+                  className={cx(
+                    "flex-shrink font-sans text-[13px]",
+                    isTotal ? "font-semibold text-fg" : "text-muted",
+                  )}
+                >
+                  {line.label}
+                </Text>
+                <Text className={cx("font-mono text-[13px] text-fg", isTotal && "font-semibold")}>
+                  {line.value}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       ) : null}
     </View>

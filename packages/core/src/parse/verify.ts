@@ -28,6 +28,20 @@ const hasEvidence = (result: ParseResult, field: ParseField, source: string): bo
 const isVerbatim = (value: null | string, source: string): boolean =>
   value === null || isQuotedFrom(value, source);
 
+const CYRILLIC = /\p{Script=Cyrillic}/u;
+
+/** Longer than this a "title" is the message again, not a name for it. */
+const TITLE_MAX_CHARS = 80;
+
+/**
+A title may be composed (a short name for a long message), but in the message's own
+language: a Russian message never gets an English title, nor the other way round.
+*/
+const isFittingTitle = (title: null | string, source: string): boolean =>
+  title === null ||
+  isQuotedFrom(title, source) ||
+  (title.length <= TITLE_MAX_CHARS && CYRILLIC.test(title) === CYRILLIC.test(source));
+
 const isKnownProject = (name: null | string, names: readonly string[]): boolean =>
   name !== null && names.some((known) => known.toLowerCase() === name.toLowerCase());
 
@@ -35,7 +49,7 @@ const textDoubts = (
   result: ParseResult,
   { projectNames, source }: Context,
 ): readonly ParseField[] => [
-  ...(isVerbatim(result.title, source) ? [] : ["title" as const]),
+  ...(isFittingTitle(result.title, source) ? [] : ["title" as const]),
   ...(isVerbatim(result.description, source) ? [] : ["description" as const]),
   ...(isKnownProject(result.project, projectNames) || isVerbatim(result.project, source)
     ? []
@@ -53,7 +67,8 @@ const numberDoubts = (result: ParseResult, source: string): readonly ParseField[
 
 /**
 Checks a parse against its message: copied strings must occur in it (normalized compare),
-numbers and dates need a quote from it. Invented values come back as doubtful.
+the title may be a short name in the message's language, numbers and dates need a quote
+from it. Invented values come back as doubtful.
 */
 export const verifyParse = (result: ParseResult, context: Context): VerifiedParse => {
   const doubtful = [...textDoubts(result, context), ...numberDoubts(result, context.source)];

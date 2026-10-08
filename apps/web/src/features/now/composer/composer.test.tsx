@@ -147,4 +147,59 @@ describe("Composer", () => {
     expect(await screen.findByText(/out of requests for now/u)).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Personal" })).toBeChecked();
   });
+
+  it("reads pasted homework on its own and adds it only after the reading is shown", async () => {
+    const homework =
+      "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (вычислить определитель)";
+    const reading = {
+      doubtful: [],
+      isClean: true,
+      provider: "fake",
+      result: {
+        category: null,
+        description: null,
+        dueDate: null,
+        dueTime: null,
+        estimateMinutes: null,
+        evidence: [],
+        importance: null,
+        intent: "create_task",
+        outcome: null,
+        project: null,
+        questions: [],
+        subtasks: ["290", "292", "293", "365"].map((label) => ({ label, number: Number(label) })),
+        task: null,
+        title: "ДЗ по алгебре: № 290–365",
+      },
+      status: "parsed",
+    };
+    const { services, user } = await setup({}, { routes: { "POST /api/parse": () => reading } });
+    await user.click(line());
+    await user.paste(homework);
+    expect(await screen.findByText(/Read by the assistant/u)).toBeInTheDocument();
+    expect(tasks(services).some((task) => task.sourceText === homework)).toBe(false);
+    await user.click(line());
+    await user.keyboard("{Enter}");
+    const added = tasks(services).find((task) => task.sourceText === homework);
+    expect(added?.title).toBe("ДЗ по алгебре: № 290–365");
+    expect(added?.subtasks.map((subtask) => subtask.label)).toEqual(["290", "292", "293", "365"]);
+  });
+
+  it("keeps a long text in Inbox when the assistant is slow", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const text =
+      "Forwarded: the landlord asks to send the meter readings and the photos of the kitchen tap";
+    const { services, user } = await setup(
+      {},
+      { routes: { "POST /api/parse": async () => await new Promise(() => undefined) } },
+    );
+    await user.click(line());
+    await user.paste(text);
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText(/Waiting for the assistant/u)).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(await screen.findByText(/saved to Inbox/u)).toBeInTheDocument();
+    expect(tasks(services).find((task) => task.title === text)?.presetId).toBe("inbox");
+    vi.useRealTimers();
+  });
 });

@@ -11,6 +11,7 @@ import type { CloseMode } from "./close-model.ts";
 
 import { CloseSheet } from "./close-sheet.tsx";
 import { ProblemsList } from "./problems-list.tsx";
+import { ProjectSheet } from "./project-sheet.tsx";
 import { SourceText } from "./source-text.tsx";
 import { TaskFooter } from "./task-footer.tsx";
 import { TaskHeader } from "./task-header.tsx";
@@ -22,7 +23,7 @@ import { WorkProgress } from "./work-progress.tsx";
 /** "Close as…" from the menu opens on Cancelled · Skipped. */
 const CLOSE_AS: CloseMode = "other";
 
-type Open = "close" | "close-as" | "edit" | "menu" | null;
+type Open = "close" | "close-as" | "edit" | "menu" | "project" | null;
 
 const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
   const { hooks } = usePace();
@@ -40,6 +41,32 @@ const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
     </View>
   );
 };
+
+/** The sheet over the task, if one is open: close, menu, edit or project. */
+const OpenSheet = ({
+  onDismiss: dismiss,
+  onOpen: setOpen,
+  open,
+  view: task,
+}: {
+  readonly open: Open;
+  readonly view: TaskViewModel;
+  readonly onOpen: (open: Open) => void;
+  readonly onDismiss: () => void;
+}) => (
+  <>
+    {open === "close" || open === "close-as" ? (
+      <CloseSheet
+        onClose={dismiss}
+        {...(open === "close-as" && { startMode: CLOSE_AS })}
+        view={task}
+      />
+    ) : null}
+    {open === "menu" ? <TaskMenuSheet onChoose={setOpen} onClose={dismiss} view={task} /> : null}
+    {open === "edit" ? <EditTextSheet onClose={dismiss} view={task} /> : null}
+    {open === "project" ? <ProjectSheet onClose={dismiss} view={task} /> : null}
+  </>
+);
 
 /**
 The task (artboards 2 and 3): summary, progress or problems, why it sits where it does on
@@ -90,6 +117,9 @@ export const TaskScreen = ({
               onMenu={() => {
                 setOpen("menu");
               }}
+              onProject={() => {
+                setOpen("project");
+              }}
               project={task.project}
             />
           }
@@ -97,15 +127,7 @@ export const TaskScreen = ({
           <TaskBody view={task} />
         </Screen>
       </View>
-      {open === "close" || open === "close-as" ? (
-        <CloseSheet
-          onClose={dismiss}
-          {...(open === "close-as" && { startMode: CLOSE_AS })}
-          view={task}
-        />
-      ) : null}
-      {open === "menu" ? <TaskMenuSheet onChoose={setOpen} onClose={dismiss} view={task} /> : null}
-      {open === "edit" ? <EditTextSheet onClose={dismiss} view={task} /> : null}
+      <OpenSheet onDismiss={dismiss} onOpen={setOpen} open={open} view={task} />
     </>
   );
 };

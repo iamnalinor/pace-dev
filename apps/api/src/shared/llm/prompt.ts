@@ -19,7 +19,9 @@ const TITLE_CHARS = 60;
 
 const RULES = `You turn one message from a personal task tracker's owner into JSON.
 Rules:
-- Copy every string you extract (title, project, description, subtask labels) verbatim from the message, in its language. Never translate, fix or rephrase it.
+- title: a short name for the task (at most 60 characters) in the message's language, e.g. "ДЗ по алгебре: №290–534" for a pasted homework. Never translate it. The full message is kept as the task's source.
+- Copy every other string you extract (project, description, subtask labels) verbatim from the message. Never translate, fix or rephrase it.
+- Homework: every problem number is one subtask (label = the number as written, e.g. "290", "5а"); a task described in words ("Задача на листе") is one subtask with those words as its label.
 - Never invent numbers or dates. For dueDate, dueTime and estimateMinutes add an evidence entry quoting the exact words they come from.
 - category is an id from the list below; leave it null when unsure. Do not guess what a category defines.
 - project: a name from the list, or a new name only when the message names one.

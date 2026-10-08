@@ -23,6 +23,8 @@ const EventRow = ({ entry, tz }: { readonly entry: HistoryEntry; readonly tz: st
   const run = useRunAction();
   const { actions } = useServices();
   const label = t(`event.${entry.type}` as MessageKey);
+  const occurred = formatDateTime(entry.occurredAt, tz, language);
+  const recorded = formatDateTime(entry.recordedAt, tz, language);
   return (
     <li className="flex items-start justify-between gap-3 border-t border-line py-2.5 text-sm">
       <div className="min-w-0">
@@ -31,8 +33,9 @@ const EventRow = ({ entry, tz }: { readonly entry: HistoryEntry; readonly tz: st
           {entry.taskTitle !== null && <span className="text-fg2"> · {entry.taskTitle}</span>}
         </p>
         <p className="font-mono text-xs text-muted">
-          {formatDateTime(entry.occurredAt, tz, language)} · {t(`source.${entry.source}`)} ·{" "}
-          {t("history.recordedAt", { at: formatDateTime(entry.recordedAt, tz, language) })}
+          {occurred} · {t(`source.${entry.source}`)}
+          {/* Only a retro entry says when it was written down; otherwise it repeats the time. */}
+          {recorded !== occurred && ` · ${t("history.recordedAt", { at: recorded })}`}
         </p>
       </div>
       {entry.revocable ? (
