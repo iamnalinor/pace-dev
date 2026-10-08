@@ -31,7 +31,7 @@ const savePreset = async (
   if (!definition.ok) {
     return err("preset/invalid-definition");
   }
-  const { id, name } = input;
+  const { id, name, order } = input;
   const parent = input.extends;
   return await emit(deps, [
     stamp(
@@ -44,11 +44,18 @@ const savePreset = async (
               name,
               ...(parent !== null && { extends: parent }),
               definition: definition.value,
+              ...(order !== undefined && { order }),
             },
           }
         : {
             type: "preset.updated",
-            payload: { id, name, extends: parent, definition: definition.value },
+            payload: {
+              id,
+              name,
+              extends: parent,
+              definition: definition.value,
+              ...(order !== undefined && { order }),
+            },
           },
     ),
   ]);
@@ -61,7 +68,7 @@ const archivePreset =
     if (preset === undefined) {
       return err("preset/unknown");
     }
-    if (preset.builtIn) {
+    if (preset.id === "inbox") {
       return err("preset/built-in");
     }
     return preset.archived

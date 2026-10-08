@@ -44,9 +44,9 @@ describe("DayScreen", () => {
     expect(screen.getByRole("button", { name: "Next day" })).toBeDisabled();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
-      expect(screen.getByText("Mon · Oct 5")).toBeOnTheScreen();
+      expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
     });
     await fireEvent.press(screen.getByRole("button", { name: "Today" }));
-    expect(await screen.findByText("Tue · Oct 6")).toBeOnTheScreen();
+    expect(await screen.findByText("Tuesday · Oct 6")).toBeOnTheScreen();
   });
 });

@@ -40,6 +40,21 @@ describe("time actions", () => {
     ]);
   });
 
+  it("starts a button with the details sheet's changes, even on the running one", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.tapButton("btn:work"));
+    world.setNow(later(5));
+    unwrap(
+      await world.actions.tapButton("btn:work", { expectMinutes: 90, label: "Write the report" }),
+    );
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(10)));
+    expect(bar.running).toMatchObject({ expectMinutes: 90, label: "Write the report" });
+    expect(bar.buttons.find((button) => button.id === "btn:work")).toMatchObject({
+      isRunning: true,
+      shouldAskDetails: true,
+    });
+  });
+
   it("marks a block as one where the messengers were the point, and stops at a past instant", async () => {
     const world = await setupActions();
     unwrap(await world.actions.tapButton("btn:work"));
@@ -78,7 +93,7 @@ describe("time actions", () => {
         limitMinutes: 90,
       }),
     );
-    unwrap(await world.actions.removeButton("btn:sleep"));
+    unwrap(await world.actions.removeButton("btn:chores"));
     const bar = timeBarModel(world.state.store.getState(), ctx(NOW));
     expect(bar.buttons.map((button) => button.label)).toEqual([
       "Work",
@@ -87,7 +102,6 @@ describe("time actions", () => {
       "Commute",
       "Rest",
       "Sport",
-      "Chores",
       "Reading",
     ]);
     expect(bar.buttons.find((button) => button.label === "Reading")).toMatchObject({

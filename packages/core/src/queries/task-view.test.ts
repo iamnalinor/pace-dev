@@ -84,7 +84,8 @@ describe("taskView", () => {
   it("has no rank and nothing to close for a closed task", () => {
     const sheet = view(sheetId(1), NOW);
     expect(sheet.rank).toBeNull();
-    expect(sheet.submitPreview).toEqual({ kind: "per_subtask", subtaskIds: [] });
+    // The closed sheet has no subtasks, so it is tracked and closed as a whole.
+    expect(sheet.submitPreview).toEqual({ canClose: false, kind: "whole" });
     const state = artboardState(NOW, [
       at(84, "2026-10-06T10:00:00.000Z", {
         type: "task.closed",

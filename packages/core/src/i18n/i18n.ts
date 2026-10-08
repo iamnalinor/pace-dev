@@ -1,4 +1,4 @@
-import { minutesBetween, startOfDayIn } from "../time.ts";
+import { addDaysIn, minutesBetween, startOfDayIn } from "../time.ts";
 import { en } from "./en.ts";
 import { ru } from "./ru.ts";
 
@@ -85,8 +85,9 @@ export type RelativeDayContext = {
 };
 
 /**
-`today` / `tomorrow` / `yesterday`, the weekday within the next six days, otherwise a
-short date (with the year when it differs). Days are the zone's calendar days.
+`today` / `tomorrow` / `yesterday`, otherwise the exact date with its weekday ("Tue Oct 13",
+"вт 13 окт."; the year is added when it differs). Never a bare weekday: "Tuesday" a week
+away is ambiguous. Days are the zone's calendar days.
 */
 export const formatRelativeDay = (
   atIso: string,
@@ -101,9 +102,6 @@ export const formatRelativeDay = (
     return named;
   }
   const date = new Date(atIso);
-  if (days > 1 && days < 7) {
-    return new Intl.DateTimeFormat(language, { timeZone: zone, weekday: "long" }).format(date);
-  }
   const isSameYear =
     new Intl.DateTimeFormat("en", { timeZone: zone, year: "numeric" }).format(date) ===
     new Intl.DateTimeFormat("en", { timeZone: zone, year: "numeric" }).format(new Date(nowIso));
@@ -111,6 +109,94 @@ export const formatRelativeDay = (
     day: "numeric",
     month: "short",
     timeZone: zone,
+    weekday: "short",
     ...(!isSameYear && { year: "numeric" }),
-  }).format(date);
+  })
+    .formatToParts(date)
+    .filter((part) => part.type !== "literal")
+    .map((part) => part.value)
+    .join(" ");
+};
+
+const SPAN_UNITS: Readonly<
+  Record<
+    Language,
+    { readonly mo: string; readonly d: string; readonly h: string; readonly m: string }
+  >
+> = {
+  en: { d: "d", h: "h", m: "m", mo: "mo" },
+  ru: { d: " д", h: " ч", m: " м", mo: " мес" },
+};
+
+const DAYS_PER_MONTH = 30;
+
+type SpanUnit = readonly [amount: number, unit: string];
+
+/** `6d 12h`, or `6d` when the smaller unit is zero. */
+const spanPair = ([big, bigUnit]: SpanUnit, [small, smallUnit]: SpanUnit): string =>
+  small > 0 ? `${big}${bigUnit} ${small}${smallUnit}` : `${big}${bigUnit}`;
+
+/**
+A span of time, rounded down, in at most two units: over a month → months and days, over a
+week → days, over a day → days and hours, over an hour → hours and minutes, else minutes.
+`9390` → `6d 12h`; the sign is ignored (callers say "left" or "late").
+*/
+export const formatSpan = (minutes: number, language: Language): string => {
+  const total = Math.floor(Math.abs(minutes));
+  const units = SPAN_UNITS[language];
+  const days = Math.floor(total / MINUTES_PER_DAY);
+  if (days >= DAYS_PER_MONTH) {
+    return spanPair(
+      [Math.floor(days / DAYS_PER_MONTH), units.mo],
+      [days % DAYS_PER_MONTH, units.d],
+    );
+  }
+  if (days >= 7) {
+    return `${days}${units.d}`;
+  }
+  if (days >= 1) {
+    return spanPair([days, units.d], [Math.floor((total % MINUTES_PER_DAY) / 60), units.h]);
+  }
+  return total >= 60
+    ? spanPair([Math.floor(total / 60), units.h], [total % 60, units.m])
+    : `${total}${units.m}`;
+};
+
+const dateParts = (
+  atIso: string,
+  language: Language,
+  options: Intl.DateTimeFormatOptions & { readonly timeZone: string },
+): Readonly<Partial<Record<Intl.DateTimeFormatPartTypes, string>>> =>
+  Object.fromEntries(
+    new Intl.DateTimeFormat(language, options)
+      .formatToParts(new Date(atIso))
+      .map((part) => [part.type, part.value]),
+  );
+
+/** `Thursday · Oct 8` / `четверг · 8 окт.`: the eyebrow over a page title, on the zone's calendar. */
+export const formatEyebrow = (atIso: string, zone: string, language: Language): string => {
+  const parts = dateParts(atIso, language, {
+    day: "numeric",
+    month: "short",
+    timeZone: zone,
+    weekday: "long",
+  });
+  const day = language === "ru" ? `${parts.day} ${parts.month}` : `${parts.month} ${parts.day}`;
+  return `${parts.weekday} · ${day}`;
+};
+
+/** `Oct 5 – 11`, `Sep 28 – Oct 4` / `5 – 11 окт.`: the seven days from `weekStartIso`. */
+export const formatWeekRange = (weekStartIso: string, zone: string, language: Language): string => {
+  const options = { day: "numeric", month: "short", timeZone: zone } as const;
+  const first = dateParts(weekStartIso, language, options);
+  const last = dateParts(addDaysIn(weekStartIso, 6, zone), language, options);
+  const isSameMonth = first.month === last.month;
+  if (language === "ru") {
+    return isSameMonth
+      ? `${first.day} – ${last.day} ${last.month}`
+      : `${first.day} ${first.month} – ${last.day} ${last.month}`;
+  }
+  return isSameMonth
+    ? `${first.month} ${first.day} – ${last.day}`
+    : `${first.month} ${first.day} – ${last.month} ${last.day}`;
 };

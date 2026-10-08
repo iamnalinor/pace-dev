@@ -3,7 +3,7 @@ import { ScrollView, Text, TextInput, View } from "react-native";
 
 import type { AiOutcome, AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime, zonedText } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -12,7 +12,7 @@ import { Chip } from "#app/ui/chip.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 import { useAiRead, useAutoAiRead, useReadFirst } from "@pace/client/react";
-import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, isBuiltInPreset } from "@pace/core";
+import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 
 import { AiStatus } from "./ai-status.tsx";
 
@@ -64,6 +64,7 @@ const ComposerChips = ({
   readonly onEdit: (edits: ComposerEdits) => void;
 }) => {
   const t = useT();
+  const language = useLanguage();
   const facts = useFacts(model);
   return (
     <View className="gap-2 pt-2">
@@ -77,7 +78,7 @@ const ComposerChips = ({
             }}
             selected={preset.id === model.preset.id}
           >
-            {isBuiltInPreset(preset.id) ? t(`preset.base.${preset.id}`) : preset.name}
+            {presetLabel(preset, language)}
           </Chip>
         ))}
       </ChipRow>

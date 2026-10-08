@@ -2,15 +2,14 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import type { InsightBar, OnTimeView } from "@pace/client";
-import type { EstimateRow } from "@pace/core";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMinutes } from "#web/shared/format/duration.ts";
-import { formatEyebrow } from "#web/shared/lib/eyebrow.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { fillClass } from "#web/shared/ui/color-tag.tsx";
 import { PageHeader } from "#web/shared/ui/page-header.tsx";
+import { type EstimateRow, formatWeekRange } from "@pace/core";
 
 import { FocusSleepCard, FragmentationCard, HoursChart } from "./patterns.tsx";
 
@@ -146,9 +145,7 @@ export const InsightsScreen = () => {
             </Button>
           </div>
         }
-        eyebrow={t("insights.week", {
-          date: formatEyebrow(new Date(week.weekStart), language, deviceTz),
-        })}
+        eyebrow={formatWeekRange(week.weekStart, week.zone, language)}
         title={t("insights.title")}
       />
       <div className="grid gap-3 px-5 lg:grid-cols-2">

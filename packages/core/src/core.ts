@@ -92,18 +92,7 @@ export {
 } from "./events/payloads.ts";
 export { sortEvents } from "./events/sort.ts";
 export { en } from "./i18n/en.ts";
-export {
-  formatDuration,
-  formatRelativeDay,
-  type Language,
-  LANGUAGES,
-  type MessageKey,
-  type MessageParams,
-  plural,
-  type PluralForms,
-  type RelativeDayContext,
-  t,
-} from "./i18n/i18n.ts";
+export * from "./i18n/i18n.ts";
 export { ru } from "./i18n/ru.ts";
 export {
   autoOutcomeId,
@@ -196,6 +185,7 @@ export {
   exampleCoursePresetEvents,
   type ExamplePresetId,
 } from "./presets/example-presets.ts";
+export { byPresetOrder, presetLabel } from "./presets/preset-label.ts";
 export {
   INITIAL_PRESETS_STATE,
   presetById,
@@ -215,6 +205,8 @@ export {
   type PresetInputMode,
   type PresetValidationError,
   resolvePreset,
+  shapeForTask,
+  taskPreset,
   validatePresetInput,
 } from "./presets/resolve-preset.ts";
 export { importanceOf, presetOf } from "./queries/classify.ts";

@@ -6,7 +6,7 @@ import type { MetaPart, NowRow } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { metaTexts, type MetaTone } from "#app/format/meta.ts";
 import { ColorTag } from "#app/ui/color.tsx";
-import { IMPORTANCE_COLORS, isBuiltInPreset } from "@pace/core";
+import { IMPORTANCE_COLORS, type Language, presetLabel } from "@pace/core";
 
 import { useViewer } from "./use-viewer.ts";
 
@@ -16,12 +16,9 @@ const TONE: Readonly<Record<MetaTone, string>> = {
   warn: "text-warn",
 };
 
-/** The project's name, else the category's (a built-in one in the interface language). */
-const rowTagLabel = (tag: NowRow["tag"], t: ReturnType<typeof useT>): string => {
-  return tag.kind === "project" || !isBuiltInPreset(tag.presetId)
-    ? tag.name
-    : t(`preset.base.${tag.presetId}`);
-};
+/** The project's name, else the category's (a default one in the interface language). */
+const rowTagLabel = (tag: NowRow["tag"], language: Language): string =>
+  tag.kind === "project" ? tag.name : presetLabel({ id: tag.presetId, name: tag.name }, language);
 
 /**
 A row's meta line: the project (else the category) and the importance as coloured tags, then
@@ -39,7 +36,7 @@ export const MetaLine = ({
   const importances = parts.flatMap((part) => (part.kind === "importance" ? [part] : []));
   const rest = parts.filter((part) => part.kind !== "importance");
   const texts = metaTexts(rest, viewer);
-  const tagLabel = tag === null ? null : rowTagLabel(tag.tag, t);
+  const tagLabel = tag === null ? null : rowTagLabel(tag.tag, viewer.language);
   return (
     <View className="flex-row flex-wrap items-center gap-x-1.5 gap-y-1">
       {tag === null || tagLabel === null ? null : <ColorTag color={tag.color}>{tagLabel}</ColorTag>}

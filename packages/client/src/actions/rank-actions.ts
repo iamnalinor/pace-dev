@@ -1,4 +1,4 @@
-import { err, type Importance, rankWithinCategory, resolvePreset, type Task } from "@pace/core";
+import { err, type Importance, rankWithinCategory, type Task, taskPreset } from "@pace/core";
 
 import type { AppState } from "../state.ts";
 
@@ -10,7 +10,7 @@ export type RankActions = {
 };
 
 const importanceOf = (state: AppState, task: Task): Importance | undefined => {
-  const preset = resolvePreset(state.presets, task.presetId, task.overrides ?? undefined);
+  const preset = taskPreset(state.presets, task);
   return preset.ok ? (task.importance ?? preset.value.defaultImportance) : undefined;
 };
 

@@ -7,7 +7,7 @@ import { zonedText } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { isBuiltInPreset, presetById, projectById } from "@pace/core";
+import { presetById, presetLabel, projectById } from "@pace/core";
 
 /** The guess in words: category · project · due · importance. */
 const useGuess = (card: InboxCard): string => {
@@ -21,9 +21,7 @@ const useGuess = (card: InboxCard): string => {
   const project =
     suggestion.projectId === null ? undefined : projectById(projects, suggestion.projectId);
   const presetName =
-    preset !== undefined && isBuiltInPreset(preset.id)
-      ? t(`preset.base.${preset.id}`)
-      : (preset?.name ?? suggestion.presetId);
+    preset === undefined ? suggestion.presetId : presetLabel(preset, viewer.language);
   return [
     presetName,
     project?.name ?? t("task.noProject"),

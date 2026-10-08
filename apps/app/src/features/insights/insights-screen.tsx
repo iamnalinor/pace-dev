@@ -5,13 +5,12 @@ import { Text, View } from "react-native";
 import type { InsightBar, InsightsModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { eyebrowDate } from "#app/format/date.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { formatDuration } from "@pace/core";
+import { formatDuration, formatWeekRange } from "@pace/core";
 
 import { Card } from "./card.tsx";
 import { Patterns } from "./patterns.tsx";
@@ -113,7 +112,7 @@ export const InsightsScreen = () => {
   const week = hooks.useInsights(weekOf);
   const header = (
     <ScreenHeader
-      eyebrow={t("insights.week", { date: eyebrowDate(week.weekStart, deviceTz, language) })}
+      eyebrow={formatWeekRange(week.weekStart, week.zone, language)}
       right={<WeekNav onWeek={setWeekOf} week={week} />}
       title={t("insights.title")}
     />

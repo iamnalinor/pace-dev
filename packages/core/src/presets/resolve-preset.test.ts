@@ -10,6 +10,7 @@ import {
   presetChain,
   type PresetInput,
   resolvePreset,
+  taskPreset,
   validatePresetInput,
 } from "./resolve-preset.ts";
 
@@ -21,6 +22,7 @@ const user = (id: string, parent: null | string, definition: PresetDefinition): 
   extends: parent,
   id,
   name: id,
+  order: 100,
 });
 
 const stateWith = (...presets: readonly Preset[]): PresetsState => ({
@@ -56,6 +58,19 @@ const input = (patch: Partial<PresetInput>): PresetInput => ({
 });
 
 describe("resolvePreset", () => {
+  it("resolves an edited default over its built-in values, and its children inherit the edit", () => {
+    const edited = { ...BASE_PRESETS.hw, definition: { color: "pink" } } satisfies Preset;
+    const state = stateWith(edited, user("hw.algebra", "hw", {}));
+    expect(resolvePreset(state, "hw")).toEqual({
+      ok: true,
+      value: { ...BASE_PRESETS.hw.definition, color: "pink" },
+    });
+    expect(resolvePreset(state, "hw.algebra")).toMatchObject({
+      ok: true,
+      value: { color: "pink" },
+    });
+  });
+
   it("returns a built-in preset's definition as is", () => {
     for (const id of BASE_PRESET_IDS) {
       expect(resolvePreset(INITIAL_PRESETS_STATE, id)).toEqual({
@@ -246,12 +261,16 @@ describe("validatePresetInput", () => {
     });
   });
 
-  it("rejects a built-in id in both modes", () => {
+  it("rejects creating a default id but lets a default be edited without a parent", () => {
     expect(validatePresetInput(state, input({ id: "hw" }), "create")).toEqual({
       error: "preset/built-in",
       ok: false,
     });
-    expect(validatePresetInput(state, input({ id: "hw" }), "update")).toEqual({
+    expect(validatePresetInput(state, input({ extends: null, id: "hw" }), "update")).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(validatePresetInput(state, input({ extends: "work", id: "hw" }), "update")).toEqual({
       error: "preset/built-in",
       ok: false,
     });
@@ -314,6 +333,30 @@ describe("validatePresetInput", () => {
     expect(validatePresetInput(state, input({ definition: { color: "red" } }), "create")).toEqual({
       error: "preset/invalid-definition",
       ok: false,
+    });
+  });
+});
+
+describe("taskPreset", () => {
+  const subtask = { id: "s1", label: "1", number: 1, solvedAt: null, submittedAt: null } as const;
+  const task = (presetId: string, subtasks: readonly (typeof subtask)[]) =>
+    ({ overrides: null, presetId, subtasks }) as const;
+
+  it("tracks subtasks when there are some, with the preset's submission", () => {
+    expect(taskPreset(INITIAL_PRESETS_STATE, task("hw", [subtask]))).toMatchObject({
+      value: { progressMode: "subtasks", submission: "per_subtask" },
+    });
+    expect(taskPreset(INITIAL_PRESETS_STATE, task("work", [subtask]))).toMatchObject({
+      value: { progressMode: "subtasks", submission: "whole" },
+    });
+  });
+
+  it("falls back to the bar and a whole submission without subtasks", () => {
+    expect(taskPreset(INITIAL_PRESETS_STATE, task("hw", []))).toMatchObject({
+      value: { progressMode: "slider", submission: "whole" },
+    });
+    expect(taskPreset(INITIAL_PRESETS_STATE, task("deferred", []))).toMatchObject({
+      value: { progressMode: "none" },
     });
   });
 });

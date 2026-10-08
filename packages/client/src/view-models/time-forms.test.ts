@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { tapToast, type TimeButtonView } from "./time-bar.ts";
-import { activityFormOf, buttonFormOf, buttonSaveOf, withCategory } from "./time-forms.ts";
+import type { TimeButtonView } from "./time-bar.ts";
+
+import {
+  activityFormOf,
+  buttonFormOf,
+  buttonSaveOf,
+  typeTime,
+  withCategory,
+} from "./time-forms.ts";
 
 const commute: TimeButtonView = {
   category: "commute",
@@ -12,7 +19,7 @@ const commute: TimeButtonView = {
   label: "Commute",
   limitMinutes: null,
   taskId: null,
-  toast: { key: "time.started", params: { label: "Commute" } },
+  shouldAskDetails: false,
 };
 
 /** `HH:mm` of a UTC instant, standing in for a platform's time input. */
@@ -53,21 +60,6 @@ describe("time forms", () => {
     expect(withCategory(form, "food")).toMatchObject({ expect: "30", limit: "40" });
   });
 
-  it("words the tap: started, switched or stopped", () => {
-    expect(tapToast(commute, undefined)).toEqual({
-      key: "time.started",
-      params: { label: "Commute" },
-    });
-    expect(tapToast(commute, "Work")).toEqual({
-      key: "time.switched",
-      params: { from: "Work", to: "Commute" },
-    });
-    expect(tapToast({ ...commute, isRunning: true }, "Commute")).toEqual({
-      key: "time.stopped",
-      params: { label: "Commute" },
-    });
-  });
-
   it("opens the Day sheet on the block's own fields", () => {
     expect(
       activityFormOf(
@@ -88,5 +80,20 @@ describe("time forms", () => {
         clock,
       ),
     ).toEqual({ category: "other", from: "09:00", label: "", to: "10:00" });
+  });
+});
+
+describe("typeTime", () => {
+  it("puts the colon in and says when the minutes are in", () => {
+    expect(typeTime("14")).toEqual({ isComplete: false, text: "14" });
+    expect(typeTime("140")).toEqual({ isComplete: false, text: "14:0" });
+    expect(typeTime("1405")).toEqual({ isComplete: true, text: "14:05" });
+    expect(typeTime("14:05")).toEqual({ isComplete: true, text: "14:05" });
+    expect(typeTime("140512")).toEqual({ isComplete: true, text: "14:05" });
+  });
+
+  it("reads a first digit above 2 as a whole hour and refuses impossible times", () => {
+    expect(typeTime("9")).toEqual({ isComplete: false, text: "09" });
+    expect(typeTime("2575")).toEqual({ isComplete: false, text: "25:75" });
   });
 });

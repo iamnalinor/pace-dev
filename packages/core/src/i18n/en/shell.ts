@@ -195,6 +195,8 @@ export const enShell = {
   "color.pink": "Pink",
   "color.teal": "Teal",
   "color.slate": "Slate",
+  "color.orange": "Orange",
+  "color.yellow": "Yellow",
   "settings.timezone.differs": "The account zone differs from this device.",
   "settings.more": "More",
   "nav.inbox": "Inbox",

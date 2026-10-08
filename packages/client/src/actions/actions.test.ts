@@ -464,7 +464,7 @@ describe("presets", () => {
     await expect(
       world.actions.updatePreset({ definition, extends: "hw", id: "hw.nope", name: "X" }),
     ).resolves.toEqual({ error: "preset/unknown", ok: false });
-    await expect(world.actions.archivePreset("hw")).resolves.toEqual({
+    await expect(world.actions.archivePreset("inbox")).resolves.toEqual({
       error: "preset/built-in",
       ok: false,
     });

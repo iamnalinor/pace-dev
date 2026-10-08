@@ -3,7 +3,7 @@ import type { Importance, ResolvedPreset } from "../model/preset.ts";
 import type { Result } from "../result.ts";
 
 import { isOpen, type Task } from "../model/task.ts";
-import { type PresetError, resolvePreset } from "../presets/resolve-preset.ts";
+import { type PresetError, taskPreset } from "../presets/resolve-preset.ts";
 
 /** Predicates the queries share: what kind of task this is, as the screens see it. */
 
@@ -28,6 +28,6 @@ export const isCompeting = (task: Task): boolean =>
 export const importanceOf = (task: Task, preset: ResolvedPreset): Importance =>
   task.importance ?? preset.defaultImportance;
 
-/** The task's preset chain with its own overrides on top. */
+/** The task's preset chain with its own overrides on top, shaped by its subtasks. */
 export const presetOf = (state: CoreState, task: Task): Result<ResolvedPreset, PresetError> =>
-  resolvePreset(state.presets, task.presetId, task.overrides ?? undefined);
+  taskPreset(state.presets, task);

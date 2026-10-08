@@ -61,7 +61,7 @@ describe("InboxView", () => {
     const chips = within(sync)
       .getAllByRole("button", { name: /tap to change/ })
       .map((chip) => chip.textContent);
-    expect(chips).toEqual(["Work", "Work", "Due Friday 23:59", "Prioritized"]);
+    expect(chips).toEqual(["Work", "Work", "Due Fri Oct 9 23:59", "Prioritized"]);
     expect(
       within(cable).getByRole("button", { name: "Project: No project, tap to change" }),
     ).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("InboxView", () => {
       within(sync).getByRole("button", { name: "Importance: ASAP, tap to change" }),
     ).toBeInTheDocument();
     await user.click(
-      within(sync).getByRole("button", { name: "Due: Due Friday 23:59, tap to change" }),
+      within(sync).getByRole("button", { name: "Due: Due Fri Oct 9 23:59, tap to change" }),
     );
     const due = within(sync).getByLabelText("Due");
     expect(due).toHaveValue("2026-10-09T23:59");
@@ -121,7 +121,7 @@ describe("InboxView", () => {
 
     const sync = at(cardsNow(), 1);
     await user.click(
-      within(sync).getByRole("button", { name: "Due: Due Friday 23:59, tap to change" }),
+      within(sync).getByRole("button", { name: "Due: Due Fri Oct 9 23:59, tap to change" }),
     );
     await user.click(within(sync).getByRole("button", { name: "No deadline" }));
     expect(

@@ -105,11 +105,7 @@ export const TimeBar = () => {
   const run = useRunAction();
   const bar = hooks.useTimeBar();
   const [editing, setEditing] = useState<EditorTarget | null>(null);
-  const tap = (button: TimeButtonView): void => {
-    void run(actions.tapButton(button.id), {
-      undo: t(button.toast.key, button.toast.params),
-    });
-  };
+  const tap = ({ id }: TimeButtonView): void => void run(actions.tapButton(id));
   return (
     <section aria-label={t("time.bar")} className="border-t border-line bg-bg px-3 py-2.5">
       <div className="flex min-h-9 items-center gap-2">
@@ -119,9 +115,7 @@ export const TimeBar = () => {
           ) : (
             <RunningRow
               onStop={() => {
-                void run(actions.stopActivity(), {
-                  undo: t("time.stopped", { label: bar.running?.label ?? "" }),
-                });
+                void run(actions.stopActivity());
               }}
               running={bar.running}
             />

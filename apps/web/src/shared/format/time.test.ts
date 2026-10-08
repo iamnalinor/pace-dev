@@ -27,16 +27,16 @@ describe("zoneLabel", () => {
 });
 
 describe("formatDayTime", () => {
-  it("uses the relative day word, the weekday within the week, else the date", () => {
+  it("uses the relative day word, else the exact date with its weekday", () => {
     expect(formatDayTime({ at: HW_DUE, tz: MOSCOW }, { language: "en", now: NOW })).toBe(
       "tomorrow 23:59",
     );
     expect(formatDayTime({ at: TRK_DUE, tz: "UTC" }, { language: "en", now: NOW })).toBe(
-      "Friday 18:00",
+      "Fri Oct 9 18:00",
     );
     expect(
       formatDayTime({ at: "2026-10-20T06:00:00.000Z", tz: MOSCOW }, { language: "en", now: NOW }),
-    ).toBe("Oct 20 09:00");
+    ).toBe("Tue Oct 20 09:00");
     expect(formatDayTime({ at: HW_DUE, tz: MOSCOW }, { language: "ru", now: NOW })).toBe(
       "завтра 23:59",
     );

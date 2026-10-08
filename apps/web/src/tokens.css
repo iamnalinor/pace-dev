@@ -26,6 +26,8 @@
   --pace-ink-pink: #ff8ac8;
   --pace-ink-teal: #5fd6d0;
   --pace-ink-slate: #9aa4b8;
+  --pace-ink-orange: #ff9e45;
+  --pace-ink-yellow: #e2cf55;
 }
 
 :root[data-theme="light"] {
@@ -54,6 +56,8 @@
   --pace-ink-pink: #a12a66;
   --pace-ink-teal: #0d6b66;
   --pace-ink-slate: #495366;
+  --pace-ink-orange: #9a4600;
+  --pace-ink-yellow: #6a5d00;
 }
 
 @media (prefers-color-scheme: light) {
@@ -83,6 +87,8 @@
     --pace-ink-pink: #a12a66;
     --pace-ink-teal: #0d6b66;
     --pace-ink-slate: #495366;
+    --pace-ink-orange: #9a4600;
+    --pace-ink-yellow: #6a5d00;
   }
 }
 
@@ -113,6 +119,8 @@
   --color-ink-pink: var(--pace-ink-pink);
   --color-ink-teal: var(--pace-ink-teal);
   --color-ink-slate: var(--pace-ink-slate);
+  --color-ink-orange: var(--pace-ink-orange);
+  --color-ink-yellow: var(--pace-ink-yellow);
   --color-project-blue: #7aa2ff;
   --color-project-violet: #b49cff;
   --color-project-green: #6fd49a;
@@ -121,6 +129,8 @@
   --color-project-pink: #ff8ac8;
   --color-project-teal: #5fd6d0;
   --color-project-slate: #9aa4b8;
+  --color-project-orange: #ff9e45;
+  --color-project-yellow: #e2cf55;
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 12px;

@@ -38,7 +38,7 @@ const requestedMode = (view: TaskViewModel): CloseMode => {
   }
 };
 
-const TaskDetails = ({ view }: { readonly view: TaskViewModel }) => {
+const TshouldAskDetails = ({ view }: { readonly view: TaskViewModel }) => {
   const [params, setParams] = useSearchParams();
   const isCloseRequested = params.has(CLOSE_SHEET_PARAM) && view.closed === null;
   const [sheet, setSheet] = useState<Sheet>(isCloseRequested ? "close" : null);
@@ -122,5 +122,5 @@ export const TaskScreen = ({ taskId }: { readonly taskId: string }) => {
       </main>
     );
   }
-  return <TaskDetails view={view.value} />;
+  return <TshouldAskDetails view={view.value} />;
 };

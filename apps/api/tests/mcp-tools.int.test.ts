@@ -536,7 +536,7 @@ describe("presets", () => {
       archived: true,
       name: "Operations",
     });
-    expect(await errorText(token, "archive_preset", { id: "hw" })).toContain("preset/built-in");
+    expect(await errorText(token, "archive_preset", { id: "inbox" })).toContain("preset/built-in");
   });
 });
 
@@ -645,7 +645,7 @@ const refusals = (
   fixture: Fixture,
 ): Record<string, readonly [Record<string, unknown>, string]> => ({
   add_subtasks: [{ labels: ["3"], taskId: "ghost" }, "task/unknown"],
-  archive_preset: [{ id: "hw" }, "preset/built-in"],
+  archive_preset: [{ id: "inbox" }, "preset/built-in"],
   capture_inbox: [{ text: " ".repeat(3) }, "inbox/empty"],
   close_task: [{ outcome: "done", taskId: "ghost" }, "task/unknown"],
   create_preset: [

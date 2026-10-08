@@ -19,7 +19,7 @@ const checks = (): readonly string[] =>
 describe("NowScreen", () => {
   it("lists the artboard rows in score order with their meta lines", async () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
-    expect(screen.getByText("Tue · Oct 6")).toBeOnTheScreen();
+    expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
@@ -27,15 +27,19 @@ describe("NowScreen", () => {
       "Mark Flaky latency test in nightly done",
       "Mark Algebra HW 6 done",
       "Mark Return library books done",
+      "Mark Prepare demo for Friday done",
+      "Mark RFC: dedicated runner pool done",
     ]);
-    expect(screen.getByText("Due tomorrow 23:59 · 4/7 solved · 2 sent")).toBeOnTheScreen();
+    expect(
+      screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
+    ).toBeOnTheScreen();
     // The project (else the category) and the importance are coloured tags before the meta text.
     expect(screen.getByText("by end of day")).toBeOnTheScreen();
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
-    expect(screen.getByText("1 day late · 2 problems left")).toBeOnTheScreen();
-    expect(screen.getByText("12 days old")).toBeOnTheScreen();
+    expect(screen.getByText("15h 1m late · 2 problems left")).toBeOnTheScreen();
+    expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
-    expect(screen.getByText("Due Friday 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
+    expect(screen.getByText("Due Fri Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
     expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
     expect(screen.getByText(en("time.idle"))).toBeOnTheScreen();
   });
@@ -71,14 +75,19 @@ describe("NowScreen", () => {
     expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toBeNull();
   });
 
-  it("filters by project and folds the later and waiting tasks", async () => {
+  it("filters by project and lists the waiting tasks under a divider", async () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
     const chips = screen.getByLabelText("Filter by project");
     await fireEvent.press(within(chips).getByRole("button", { name: "Work" }));
-    expect(checks()).toEqual(["Mark Flaky latency test in nightly done"]);
+    expect(checks()).toEqual([
+      "Mark Flaky latency test in nightly done",
+      "Mark Prepare demo for Friday done",
+      "Mark RFC: dedicated runner pool done",
+    ]);
     await fireEvent.press(screen.getByRole("button", { name: "All" }));
-    expect(checks()).toHaveLength(5);
-    await fireEvent.press(screen.getByText("+ 6 later · 2 waiting"));
+    expect(checks()).toHaveLength(7);
+    expect(screen.getByRole("header", { name: "Waiting" })).toBeOnTheScreen();
+    expect(screen.getByText("+ 6 later")).toBeOnTheScreen();
     expect(screen.getByText("Prepare demo for Friday")).toBeOnTheScreen();
     expect(screen.getByText("RFC: dedicated runner pool")).toBeOnTheScreen();
   });

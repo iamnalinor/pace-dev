@@ -4,6 +4,7 @@ export type QuickSpanKind =
   | "estimate"
   | "importance"
   | "link"
+  | "preset"
   | "project"
   | "subtasks"
   | "time";

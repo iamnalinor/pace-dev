@@ -6,6 +6,170 @@ bg `#0b0b0c`, surface `#141416`, raised `#1c1c1f`, text `#ececee`, muted `#8a8a9
 `#d4ff3a`, project colors `#7aa2ff/#b49cff/#6fd49a`, warn `#ff8a5c`, question `#f2c14e`).
 Logo: canvas «Pace — logo options», board 08 «Step» (two chevrons + dot; lime favicon tile).
 
+## Stage 5 plan (current — dependabot PRs + the feedback document; 2026-10-08)
+
+### Context
+
+The user asked: (1) sort out the open PRs, (2) apply every remark from the feedback document
+(27 remarks over 15 screenshots of the web: due labels, Now/Waiting, task page, "Why it's on
+top", log-past dialog, time bar, toasts, Day page, composer chips, presets, task menu, SW
+updates, animations, and "everything said about the web applies to the app — keep them in
+sync"). Answers taken: **web moves to react-native-web** (one UI codebase for Android and web),
+**Errands merges into Chores**. Working agreements from `context/`: one thread, no subagents;
+plans are not sent for approval; PRs from fresh `main` on `claude/stoic-goodall-26jj51`, driven
+to green, merged with a merge commit, deploy verified, APK released via `release.yml` dispatch
+(`v0.x`, never `v1.0.0`); no model ids in commits/PRs. Record this round in
+`context/user-messages.md` and `context/plan.md`.
+
+### Part 1 — open PRs (all dependabot)
+
+| PR | Finding | Action |
+|---|---|---|
+| #16 lucide-react 1.51→1.52 | green, mergeable; matches the app's lucide-react-native 1.52 | merge (merge commit) |
+| #14 lint group (@eslint-react 5.24.4, better-tailwindcss 4.8) | red only because its base is stale: the failure is the urgency property-test float flake already fixed on main by `50bed4a` | `update_pull_request_branch` → CI green → merge. If bun.lock conflicts, apply the bump on my branch (`bun install`, `bun lint`) and close #14 as superseded |
+| #13 expo group → SDK 58 | SDK 58 is still npm `next` (latest = 57.0.27); the PR moves half the SDK (jest-expo, expo-font… stay 57) → jest can't resolve `@react-native/assets-registry`, eslint can't find `expo/tsconfig.base` | close with a comment; `dependabot.yml`: ignore semver-major for the expo group (SDK upgrades by hand with `expo install --fix` once 58 is stable) |
+| #15 jest 30, @types/jest 30, test-renderer 1.3 | green, but jest-expo 57 depends on Jest 29 internals (babel-jest/jsdom env ^29) — the documented decision is "jest-expo 57 (Jest 29)" | close with a comment; ignore semver-major of `jest`/`@types/jest`; take test-renderer 1.3.0 on my branch |
+| #17 @types/node 22→26 | runtime is Node 22; v26 types advertise APIs that don't exist there | close with a comment; ignore semver-major of `@types/node` |
+
+The `dependabot.yml` change rides in PR A. Comments carry the Claude Code footer.
+
+### Part 2 — three PRs, one release
+
+The PRs are merged one after another (each green, deployed); a single APK release `v0.6.0`
+is cut after PR C, not one per PR.
+
+#### PR A — shared logic (core + client), both current UIs pick it up
+
+TDD in `packages/core` / `packages/client` (`bun test:unit`), then wire both UIs minimally.
+
+1. **Time formats** (`core/src/i18n/i18n.ts`, EN+RU):
+   - `formatDue`: "Today 23:59" / "Tomorrow 23:59", otherwise the exact date "Thu Oct 13 23:59"
+     (year only if different); never a bare weekday. Zone suffix only when it differs from the
+     viewing zone — fixes the composer chip (`apps/web/.../composer/field-chips.tsx:44`, app
+     `composer.tsx`) which always appends it.
+   - `formatSpan(minutes)` with floor rounding: > 1 month → "1mo 5d"; > 7 d → "12d"; > 1 d →
+     "6d 12h"; > 1 h → "12h 34m"; else "34m". Used for "6d 12h left" next to Due (new
+     `left` field in `now.ts duePart` / task view), "3d old" (`agePart`, replaces "0 days old";
+     under a day it shows hours/minutes), overdue "2d 3h late", and Hours left in the why card.
+   - Eyebrows: full weekday ("Thursday · Oct 8"); Insights eyebrow becomes the week range
+     "Oct 5 – 11" (no "Week of Mon"), computed in the account zone.
+2. **Now list**: `core/queries/now-list.ts` + `client/view-models/now.ts` return one ordered
+   list: active rows, then waiting rows with a `divider` marker only when both groups are
+   non-empty (no fold). New `nowHelp` strings for a "?" sheet explaining the sections (score =
+   importance × urgency; Waiting = waiting on someone, urgency frozen; Later = start in the
+   future or homework not assigned yet; Paused stays in the list).
+3. **Progress rule** (`core` task view): a task with subtasks tracks subtasks (and only then
+   per-subtask submission and its "Subtasks" badge); a task without subtasks gets the 0–10
+   progress bar, whatever the preset's mode (except `none`). The "Submit per problem" tag
+   disappears when there are no subtasks.
+4. **Why card**: `explain.ts` / `client task.ts whyRows` → grouped sections (Work: progress,
+   work left · Time: due in, hours left · Importance: Normal ×3, rank 2 of 2, rank bonus ·
+   Result: urgency, **score**) and the formula as segments with values substituted
+   (`0.25 + 1h / max(130h 15m, 0.5h) = 0.26`), values flagged so UIs render them in the
+   accent mono font.
+5. **Presets are editable defaults** (`core/src/presets/`): `preset.updated` accepted for base
+   ids (stored as an override layer on the built-in definition, incl. name/color),
+   `preset.archived` accepted for base ids except `inbox` (hidden from pickers, tasks keep
+   resolving; revocable from History). New `order` field; default order Homework, Work,
+   Personal, Deferred; composer/editor sort by `order`, not by name. Palette gains `orange`
+   and `yellow` (muted, contrast-checked in the tokens test): Personal orange, Work violet,
+   Homework yellow, Deferred slate, Inbox teal. Update `docs/presets.md`, the reducer tests,
+   client `preset-actions.ts` (drop `preset/built-in` for update/archive).
+6. **Quick input**: "hw", "дз", "домашка", "homework" pick the Homework preset (or the
+   best-matching user preset extending `hw`, e.g. "hw algebra" → `hw.algebra`) and the keyword
+   is removed from the title (`queries/suggest.ts` `PRESET_OF_FAMILY.hw`, `parse-quick-input.ts`).
+7. **Time tracking model** (`core/src/tracking/`):
+   - `errands` folds into `chores`: the payload enum still parses old events, the reducer
+     normalizes to `chores`; the category disappears from pickers.
+   - Default buttons: drop Sleep (sleep comes from screen-off detection; the `sleep` category
+     stays for detected/logged sleep). Buttons get `askDetails` (default on for Work and
+     Study) → tap opens the details sheet instead of starting blind.
+   - `tapButton` applies the learned median like `startActivity` (current quirk).
+   - Details suggestions view-model: Work → open Work-preset tasks; Study → open Homework tasks
+     + today's calendar classes (app, from observations); plus recent labels; free text.
+   - Day rows / running row expose `expectText` ("of ~30m", "limit 1h") and end "now" for a
+     running block; the label tag is omitted when the label equals the category name.
+   - Shared time-mask helper (`client/view-models/time-forms.ts`): digits → "HH:MM", auto ":",
+     signals "move to end field" after start minutes; log-past defaults the day to the viewed
+     day (today) and asks only for times.
+8. **No more toasts**: client actions stop returning success/undo toast texts; undo lives in
+   History (exists). Errors go to an inline error banner component per UI.
+
+#### PR B — web on react-native-web: `apps/app` becomes the one UI
+
+- Expo web (`expo export --platform web`, Metro, NativeWind 4.2 works on web). Platform files
+  `*.web.ts` in `apps/app/src/platform/`: IndexedDB event store (move
+  `apps/web/src/platform/idb-event-store.ts`), localStorage session, device id, api base,
+  theme (`prefers-color-scheme`), Excel export (move `platform/xlsx.ts`), Telegram Login
+  Widget + return page; phone data, background tasks, local notifications, DND → no-ops.
+- Port the web-only screens to RN (`app/` routes + `src/screens/`): presets list + editor
+  (`apps/web/src/features/presets/*`, logic already in client), OAuth authorize page +
+  connected apps, settings parts the app lacks (export, account zone/language), share target.
+  Responsive layout: phone = bottom tabs; ≥ 1024 px = sidebar + list/detail panes (current
+  web desktop layout).
+- PWA: manifest/icons/share_target in `apps/app/public/`; `scripts/build-web.ts` runs the export
+  then `workbox-build generateSW` (navigate fallback, denylist `/api`, `/oauth`,
+  `/.well-known`); `src/platform/sw.web.ts` registers it and, when a new worker is waiting,
+  shows a top banner "We changed a few things — Reload" (postMessage skipWaiting → reload),
+  like olympagg.github.io.
+- Deploy: `pace-web` wrangler config moves to `apps/app/wrangler.web.jsonc` (assets
+  `./dist`, SPA fallback); `deploy.yml` builds via the new script. e2e: Playwright webServer
+  serves `apps/app/dist`; selectors move to roles/labels/testID (`data-testid`); axe stays.
+- Delete `apps/web`; port its RTL tests that have no app counterpart to RNTL (jest-expo);
+  update `docs/architecture.md`, `docs/testing.md`, `CLAUDE.md` (drop `#web/*`/shadcn rules),
+  knip, dependency-cruiser, eslint, stryker (web → app), README.
+
+#### PR C — the redesign from the document, once, in the unified UI
+
+One design language from tokens; no `bg-inverse` black surfaces in light theme; shared chip,
+button, icon-button, dropdown, calendar, sheet primitives in `apps/app/src/ui/`.
+- **Chips**: unselected = default surface + thicker (2 px) colored outline; selected = color
+  fill; neutral chips (Normal, open field chips) selected = raised surface + 2 px fg outline,
+  never black. Preset chips in the new order and colors.
+- **Composer**: deadline chip "Thu Oct 13 23:59"; deadline panel = themed calendar + masked
+  time input, zone line only when it differs; estimate as a compact dropdown on desktop.
+- **Now**: waiting rows inline under a divider; "?" help sheet; due rows "Due Thu Oct 13
+  23:59 · 6d 12h left"; age "3d old".
+- **Task page**: header = project dropdown (popover with search + new project), preset
+  dropdown, icon buttons pencil (edit), pause, trash (confirm); no actions menu, no big Pause
+  button (footer: Focus · Waiting · primary). Progress bar when no subtasks; why card grouped,
+  formula with substituted values.
+- **Time bar**: a "What are you doing?" field (free text, recent labels) + compact
+  auto-width chips (not a full-width row of 8 on desktop); tap starts, `askDetails` buttons
+  (highlighted with a chevron) open the details sheet (title, link to task / class, Expect,
+  Limit); chevron / long press opens it for any button. Running row: label, elapsed, "of ~30m"
+  or "limit 1h" with progress. No toasts.
+- **Log past activity**: day chip (today) + masked "14:05 → 14:35" inputs with auto-advance;
+  categories without Errands/Sleep clutter.
+- **Day**: nav cluster `[Today] [‹] [📅] [›]` with Today on the left, always occupying its
+  slot (disabled on today) so arrows never move; 📅 opens the themed month calendar (days
+  with tracked time marked); rows vertically centered, pencil icon instead of "Edit",
+  "14:06 – now", expected/limit shown, no "[Food] Food".
+- **Animations** (reanimated, works on web): list enter/exit + layout transitions on Now and
+  Day, chip/button press scale, sheet/popover slide+fade, running-row pulse, progress-bar
+  tweens; respects reduced motion.
+- **Web↔app parity going forward**: one codebase; plus a parity e2e that screenshots Now,
+  Task, Day at 390 and 1440 px in both themes on the same seed.
+
+### Verification
+
+- Every PR: `bun lint` exit 0; `bun test:unit`, `bun test:api`, `bun test:app`,
+  `bun test:e2e`; Playwright screenshots at 390 and 1440 px, light + dark, of every touched
+  screen, looked at before pushing (alignment, nothing shifting, no black surfaces in light).
+- CI green on the PR (dispatch the Android APK job on the branch for PR B/C), merge commit,
+  deploy healthy (`/api/health`, web 200, SW update banner seen after a second deploy),
+  after PR C one release `v0.6.0` via `release.yml` dispatch, APK link checked.
+- Part 1: #16 and #14 merged with green CI; #13/#15/#17 closed with reasons; dependabot
+  ignores in place.
+- User device checklist after PR C: time bar details flow and long press, Day calendar,
+  log-past time entry, no toasts, animations.
+</content>
+</invoke>
+
+Later in the session: breaking changes are welcome when they simplify; every composer line is
+read by the LLM after a typing pause (drafts are not logged); several keys per provider rotate
+on rate limits.
+
 ## Phase 1 completion plan (current — supersedes the old resume notes)
 
 ### Context

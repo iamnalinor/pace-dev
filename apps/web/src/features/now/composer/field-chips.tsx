@@ -8,6 +8,7 @@ import { formatMinutes } from "#web/shared/format/duration.ts";
 import { formatDayTime, zoneLabel } from "#web/shared/format/time.ts";
 import { chipClass } from "#web/shared/ui/chip-group.tsx";
 import { ColorTag } from "#web/shared/ui/color-tag.tsx";
+import { zonesDiffer } from "@pace/core";
 
 export type ComposerField = "due" | "estimate" | "link" | "project";
 
@@ -44,14 +45,15 @@ const FieldChip = ({
 const useDueText = (due: ComposerModel["due"]): null | string => {
   const t = useT();
   const language = useLanguage();
-  const { now } = useServices().hooks.useClock();
+  const { deviceTz, now } = useServices().hooks.useClock();
   if (due === null) {
     return null;
   }
-  return t("composer.dueChip", {
-    when: formatDayTime(due, { language, now }),
-    zone: zoneLabel(due.at, due.tz, language),
-  });
+  const when = formatDayTime(due, { language, now });
+  // The zone is named only when it is not the one the person is in.
+  return zonesDiffer(due, { at: due.at, tz: deviceTz })
+    ? t("composer.dueChip", { when, zone: zoneLabel(due.at, due.tz, language) })
+    : when;
 };
 
 const ProjectChip = ({ model, ...shared }: Props) => {

@@ -28,6 +28,14 @@ describe("loadConfig", () => {
     expect(result.value.botInfo).toBeUndefined();
   });
 
+  it("reads several LLM keys, comma or newline separated, and none when unset", () => {
+    const result = loadConfig({ ...base, GEMINI_API_KEY: "g1", GROQ_API_KEY: "k1, k2\nk3" });
+    expect(result.ok && result.value.groqApiKeys).toEqual(["k1", "k2", "k3"]);
+    expect(result.ok && result.value.geminiApiKeys).toEqual(["g1"]);
+    const unset = loadConfig(base);
+    expect(unset.ok && unset.value.groqApiKeys).toEqual([]);
+  });
+
   it("rejects an invalid web origin and an unknown environment", () => {
     expect(loadConfig({ ...base, WEB_ORIGIN: "pace.test" }).ok).toBe(false);
     expect(loadConfig({ ...base, ENVIRONMENT: "staging" }).ok).toBe(false);

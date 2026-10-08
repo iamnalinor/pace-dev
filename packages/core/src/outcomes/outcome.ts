@@ -4,7 +4,7 @@ import type { PresetsState } from "../presets/preset-reducer.ts";
 
 import { autoOutcomeId, type AutoOutcomeKind } from "../ids.ts";
 import { isOpen, type Subtask, type Task, type TasksState } from "../model/task.ts";
-import { resolvePreset } from "../presets/resolve-preset.ts";
+import { taskPreset } from "../presets/resolve-preset.ts";
 import { addMinutesIso } from "../time.ts";
 
 /** The spec's outcome table; `done` vs `done_late` is derived from instants, never chosen. */
@@ -154,7 +154,7 @@ export const autoOutcomeEvents = (input: AutoOutcomeInput): readonly EventInput[
   Object.values(input.tasks.byId)
     .filter(isOpen)
     .flatMap((task) => {
-      const preset = resolvePreset(input.presets, task.presetId, task.overrides ?? undefined);
+      const preset = taskPreset(input.presets, task);
       const event = preset.ok ? autoOutcome(task, preset.value, input.now) : undefined;
       return event === undefined || input.existingEventIds.has(event.id) ? [] : [event];
     })

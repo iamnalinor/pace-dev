@@ -35,7 +35,7 @@ describe("NowScreen", () => {
   it("draws the artboard header: the date, the inbox counter and the idle time bar", async () => {
     await renderBoard();
     expect(await screen.findByRole("heading", { name: "Now" })).toBeInTheDocument();
-    expect(screen.getByText("Tue · Oct 6")).toBeInTheDocument();
+    expect(screen.getByText("Tuesday · Oct 6")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inbox, 3 unsorted" })).toHaveAttribute(
       "href",
       "/inbox",
@@ -56,27 +56,23 @@ describe("NowScreen", () => {
     ]);
     const meta = (title: string) =>
       screen.getAllByRole("link").find((link) => link.textContent.startsWith(title))?.textContent;
-    expect(meta("Calculus HW 5")).toContain("1 day late · 2 problems left");
+    expect(meta("Calculus HW 5")).toContain("15h 1m late · 2 problems left");
     expect(meta("Reply to course curator")).toMatch(/PersonalASAPby end of day/u);
-    expect(meta("Algebra HW 6")).toContain("Due tomorrow 23:59 · 4/7 solved · 2 sent");
-    expect(meta("Return library books")).toMatch(/Nice-to-have12 days old/u);
+    expect(meta("Algebra HW 6")).toContain("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent");
+    expect(meta("Return library books")).toMatch(/Nice-to-have12d old/u);
     expect(meta("Flaky latency test in nightly")).toMatch(
-      /WorkPrioritizedDue Friday 18:00 (?:UTC|GMT) \(your time 21:00\)/,
+      /WorkPrioritizedDue Fri Oct 9 18:00 (?:UTC|GMT) \(your time 21:00\)/,
     );
-    expect(screen.getByText("1 day late")).toHaveClass("text-warn");
+    expect(screen.getByText("15h 1m late")).toHaveClass("text-warn");
     expect(screen.getByText("ASAP")).toHaveClass("font-medium");
   });
 
-  it("unfolds the waiting tasks from the footer", async () => {
-    const { user } = await renderBoard();
-    const footer = await screen.findByRole("button", { name: "+ 6 later · 2 waiting" });
-    expect(footer).toHaveAttribute("aria-expanded", "false");
-    await user.click(footer);
-    const waiting = screen.getByRole("region", { name: "Waiting" });
+  it("lists the waiting tasks under a divider, then the later count", async () => {
+    await renderBoard();
+    const waiting = await screen.findByRole("region", { name: "Waiting" });
     expect(within(waiting).getByText("Prepare demo for Friday")).toBeInTheDocument();
     expect(within(waiting).getByText("RFC: dedicated runner pool")).toBeInTheDocument();
-    await user.click(footer);
-    expect(screen.queryByRole("region", { name: "Waiting" })).not.toBeInTheDocument();
+    expect(screen.getByText("+ 6 later")).toBeInTheDocument();
   });
 
   it("filters by project through the URL", async () => {

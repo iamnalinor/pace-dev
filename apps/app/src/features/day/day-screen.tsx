@@ -6,7 +6,6 @@ import { Pressable, Text, View } from "react-native";
 import type { DayEntry, DayModel, DayRowProps } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { eyebrowDate } from "#app/format/date.ts";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -15,7 +14,7 @@ import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { formatDuration } from "@pace/core";
+import { formatDuration, formatEyebrow } from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import {
@@ -207,7 +206,7 @@ export const DayScreen = () => {
   const phone = useDayPhone(day, now);
   const header = (
     <ScreenHeader
-      eyebrow={eyebrowDate(day.date, day.zone, language)}
+      eyebrow={formatEyebrow(day.date, day.zone, language)}
       right={<DayNav day={day} onDate={setDate} />}
       title={t("day.title")}
     />

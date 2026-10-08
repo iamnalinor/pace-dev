@@ -84,6 +84,7 @@ const buttonSet = (state: TimeState, event: EventOf<"activity.button.set">): Tim
         limitMinutes: payload.limitMinutes ?? null,
         order: payload.order,
         taskId: payload.taskId ?? null,
+        shouldAskDetails: payload.shouldAskDetails ?? false,
       },
     },
     hasCustomButtons: true,

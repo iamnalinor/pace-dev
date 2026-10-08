@@ -34,7 +34,7 @@ const parseJson = (text: string, ctx: z.RefinementCtx): unknown => {
 
 const csv = (text: string): readonly string[] =>
   text
-    .split(",")
+    .split(/[\s,]+/u)
     .map((item) => item.trim())
     .filter((item) => item !== "");
 
@@ -61,8 +61,9 @@ const EnvSchema = z.object({
   TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
   TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
   BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
-  GROQ_API_KEY: z.string().min(1).optional(),
-  GEMINI_API_KEY: z.string().min(1).optional(),
+  // Several keys (comma or newline separated) are rotated: a key that hits its limit rests.
+  GROQ_API_KEY: z.string().default("").transform(csv),
+  GEMINI_API_KEY: z.string().default("").transform(csv),
   LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
 });
 
@@ -77,8 +78,9 @@ export type Config = {
   readonly telegramWebhookAllowedCidrs: readonly string[];
   readonly telegramApiRoot: string;
   readonly botInfo: undefined | UserFromGetMe;
-  readonly groqApiKey: string | undefined;
-  readonly geminiApiKey: string | undefined;
+  /** Every key of the provider, tried in turn; empty without one. */
+  readonly groqApiKeys: readonly string[];
+  readonly geminiApiKeys: readonly string[];
   /** `fake` answers from inside the Worker (tests, e2e); `auto` uses the providers with a key. */
   readonly llmProvider: "auto" | "fake";
 };
@@ -101,8 +103,8 @@ export const loadConfig = (env: object): Result<Config, string> => {
     telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
     telegramApiRoot: value.TELEGRAM_API_ROOT,
     botInfo: value.BOT_INFO,
-    groqApiKey: value.GROQ_API_KEY,
-    geminiApiKey: value.GEMINI_API_KEY,
+    groqApiKeys: value.GROQ_API_KEY,
+    geminiApiKeys: value.GEMINI_API_KEY,
     llmProvider: value.LLM_PROVIDER,
   });
 };

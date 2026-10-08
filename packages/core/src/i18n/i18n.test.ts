@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { en } from "./en.ts";
 import {
   formatDuration,
+  formatEyebrow,
   formatRelativeDay,
+  formatSpan,
+  formatWeekRange,
   LANGUAGES,
   type MessageKey,
   plural,
@@ -150,6 +153,33 @@ describe("formatDuration", () => {
   });
 });
 
+describe("formatSpan", () => {
+  const HOUR = 60;
+  const DAY = 24 * HOUR;
+
+  it("keeps the two largest meaningful units, rounding down", () => {
+    expect(formatSpan(34.9, "en")).toBe("34m");
+    expect(formatSpan(12 * HOUR + 34.9, "en")).toBe("12h 34m");
+    expect(formatSpan(6 * DAY + 12 * HOUR + 59, "en")).toBe("6d 12h");
+    expect(formatSpan(12 * DAY + 23 * HOUR, "en")).toBe("12d");
+    expect(formatSpan(45 * DAY + 5 * HOUR, "en")).toBe("1mo 15d");
+  });
+
+  it("drops a zero second unit", () => {
+    expect(formatSpan(2 * HOUR, "en")).toBe("2h");
+    expect(formatSpan(3 * DAY + 20, "en")).toBe("3d");
+    expect(formatSpan(60 * DAY, "en")).toBe("2mo");
+    expect(formatSpan(0, "en")).toBe("0m");
+  });
+
+  it("uses the absolute value and the language's units", () => {
+    expect(formatSpan(-(DAY + 3 * HOUR), "en")).toBe("1d 3h");
+    expect(formatSpan(6 * DAY + 12 * HOUR, "ru")).toBe("6 д 12 ч");
+    expect(formatSpan(40 * DAY, "ru")).toBe("1 мес 10 д");
+    expect(formatSpan(5, "ru")).toBe("5 м");
+  });
+});
+
 describe("formatRelativeDay", () => {
   const now = "2026-10-06T12:00:00.000Z"; // Tuesday 15:00 in Moscow
   const MOSCOW = "Europe/Moscow";
@@ -176,30 +206,36 @@ describe("formatRelativeDay", () => {
     );
   });
 
-  it("uses the weekday within the next six days", () => {
-    expect(formatRelativeDay("2026-10-08T10:00:00.000Z", now, { language: "en", tz: MOSCOW })).toBe(
-      "Thursday",
+  it("names the exact date with its weekday otherwise, never a bare weekday", () => {
+    const en = (at: string) => formatRelativeDay(at, now, { language: "en", tz: MOSCOW });
+    expect(en("2026-10-08T10:00:00.000Z")).toBe("Thu Oct 8");
+    expect(en("2026-10-13T10:00:00.000Z")).toBe("Tue Oct 13");
+    expect(en("2026-10-01T10:00:00.000Z")).toBe("Thu Oct 1");
+    expect(en("2027-01-05T10:00:00.000Z")).toBe("Tue Jan 5 2027");
+    expect(formatRelativeDay("2026-10-13T10:00:00.000Z", now, { language: "ru", tz: MOSCOW })).toBe(
+      "вт 13 окт.",
     );
-    expect(formatRelativeDay("2026-10-12T10:00:00.000Z", now, { language: "en", tz: MOSCOW })).toBe(
-      "Monday",
+  });
+});
+
+describe("page header dates", () => {
+  it("spells the weekday out in the eyebrow, on the zone's calendar", () => {
+    expect(formatEyebrow("2026-10-08T12:00:00.000Z", "Europe/Moscow", "en")).toBe(
+      "Thursday · Oct 8",
     );
-    expect(formatRelativeDay("2026-10-08T10:00:00.000Z", now, { language: "ru", tz: MOSCOW })).toBe(
-      "четверг",
+    expect(formatEyebrow("2026-10-07T22:30:00.000Z", "Europe/Moscow", "en")).toBe(
+      "Thursday · Oct 8",
+    );
+    expect(formatEyebrow("2026-10-08T12:00:00.000Z", "Europe/Moscow", "ru")).toBe(
+      "четверг · 8 окт.",
     );
   });
 
-  it("falls back to a date further away or in the past", () => {
-    expect(formatRelativeDay("2026-10-13T10:00:00.000Z", now, { language: "en", tz: MOSCOW })).toBe(
-      "Oct 13",
+  it("names a week by its dates", () => {
+    expect(formatWeekRange("2026-10-04T21:00:00.000Z", "Europe/Moscow", "en")).toBe("Oct 5 – 11");
+    expect(formatWeekRange("2026-09-27T21:00:00.000Z", "Europe/Moscow", "en")).toBe(
+      "Sep 28 – Oct 4",
     );
-    expect(formatRelativeDay("2026-10-01T10:00:00.000Z", now, { language: "en", tz: MOSCOW })).toBe(
-      "Oct 1",
-    );
-    expect(formatRelativeDay("2027-01-05T10:00:00.000Z", now, { language: "en", tz: MOSCOW })).toBe(
-      "Jan 5, 2027",
-    );
-    expect(formatRelativeDay("2026-10-13T10:00:00.000Z", now, { language: "ru", tz: MOSCOW })).toBe(
-      "13 окт.",
-    );
+    expect(formatWeekRange("2026-10-04T21:00:00.000Z", "Europe/Moscow", "ru")).toBe("5 – 11 окт.");
   });
 });

@@ -64,6 +64,7 @@ const userPreset = (id: string, definition: Preset["definition"]): Preset => ({
   archived: false,
   definition,
   createdAt: HW_CREATED,
+  order: 100,
 });
 
 const presets: PresetsState = {

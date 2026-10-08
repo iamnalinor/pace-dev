@@ -16,7 +16,8 @@ import { type DueRelative, relativeDay } from "./relative-day.ts";
 
 /** One piece of a row's meta line; the UI translates each kind. */
 export type MetaPart =
-  | { readonly kind: "age"; readonly days: number }
+  /** How long an undated task has been open. */
+  | { readonly kind: "age"; readonly minutes: number }
   | { readonly kind: "behind-pace"; readonly percent: number }
   | {
       readonly kind: "due";
@@ -29,6 +30,8 @@ export type MetaPart =
   | { readonly kind: "end-of-day" }
   | { readonly kind: "importance"; readonly importance: Importance }
   | { readonly kind: "late"; readonly minutes: number }
+  /** Time until the due, shown next to it: "6d 12h left". */
+  | { readonly kind: "left"; readonly minutes: number }
   | { readonly kind: "problems-left"; readonly count: number }
   | { readonly kind: "sent"; readonly submitted: number }
   | { readonly kind: "solved"; readonly solved: number; readonly total: number };
@@ -66,13 +69,10 @@ export type NowViewModel = {
   readonly rows: readonly NowRow[];
   readonly waiting: readonly NowRow[];
   readonly laterCount: number;
-  readonly waitingCount: number;
   readonly inboxCount: number;
   /** Projects with open tasks, by name. */
   readonly projects: readonly ProjectChip[];
 };
-
-const MINUTES_PER_DAY = 24 * 60;
 
 const importancePart = (item: NowItem): readonly MetaPart[] =>
   item.importance === "normal" ? [] : [{ kind: "importance", importance: item.importance }];
@@ -92,6 +92,9 @@ const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
         relative: relativeDay(task.dueAt, ctx),
         zoneDiffers: zonesDiffer(due, { at: task.dueAt, tz: ctx.deviceTz }),
       },
+      ...(item.task.status === "waiting"
+        ? []
+        : [{ kind: "left" as const, minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) }]),
     ];
   }
   return item.importance === "asap" ? [{ kind: "end-of-day" }] : [];
@@ -110,8 +113,9 @@ const progressParts = (item: NowItem): readonly MetaPart[] => {
       ...(item.submitted > 0 ? [{ kind: "sent" as const, submitted: item.submitted }] : []),
     ];
   }
+  // Only against a deadline the person set: an ASAP's end of day is no schedule to lag behind.
   const behind =
-    item.preset.progressMode === "slider" && item.paceExpected !== null
+    item.preset.progressMode === "slider" && item.task.dueAt !== null && item.paceExpected !== null
       ? Math.round((item.paceExpected - item.progress) * PERCENT)
       : 0;
   return behind > 0 ? [{ kind: "behind-pace", percent: behind }] : [];
@@ -119,12 +123,7 @@ const progressParts = (item: NowItem): readonly MetaPart[] => {
 
 const agePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
   item.dueAt === null
-    ? [
-        {
-          kind: "age",
-          days: Math.floor(minutesBetween(item.task.createdAt, ctx.now) / MINUTES_PER_DAY),
-        },
-      ]
+    ? [{ kind: "age", minutes: Math.max(0, minutesBetween(item.task.createdAt, ctx.now)) }]
     : [];
 
 /** A row of the Now list or of a project's open list. */
@@ -183,7 +182,6 @@ export const nowViewModel = (
     rows: list.items.map((item) => nowRow(item, ctx)),
     waiting: list.waiting.map((item) => nowRow(item, ctx)),
     laterCount: list.laterCount,
-    waitingCount: list.waiting.length,
     inboxCount: list.inboxCount,
     projects: projectChips(state),
   };

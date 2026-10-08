@@ -98,7 +98,7 @@ describe("tokens", () => {
   it("exposes fonts, radii and the project palette", () => {
     expect(tokens.fonts).toEqual({ mono: "Geist Mono", sans: "Geist" });
     expect(tokens.radius.pill).toBe(999);
-    expect(Object.keys(tokens.project)).toHaveLength(8);
+    expect(Object.keys(tokens.project)).toHaveLength(10);
   });
 });
 

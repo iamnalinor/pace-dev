@@ -60,7 +60,6 @@ describe("taskViewModel", () => {
     expect(trk.tags).toEqual([
       { importance: "prioritized", kind: "importance" },
       { kind: "status", status: "in_progress" },
-      { kind: "submission", submission: "whole" },
     ]);
     expect(trk.stats).toMatchObject({
       dueAt: TRK_DUE,
@@ -75,7 +74,18 @@ describe("taskViewModel", () => {
     expect(trk.progress.value).toBeCloseTo(0.4, 10);
     expect(trk.rank).toEqual({ position: 2, size: 3 });
     expect(trk.why.policy).toBe("lag");
-    const rows = Object.fromEntries(trk.why.rows.map((entry) => [entry.key, entry]));
+    expect(trk.why.groups.map((group) => group.name)).toEqual([
+      "work",
+      "time",
+      "importance",
+      "result",
+    ]);
+    const rows = Object.fromEntries(
+      trk.why.groups.flatMap((group) => group.rows).map((entry) => [entry.key, entry]),
+    );
+    expect(
+      trk.why.formula.map((part) => (part.kind === "text" ? part.text : part.row.key)),
+    ).toEqual(["0.25 + 1.5 · max(0, ", "windowElapsed", " − ", "progress", ")", " = ", "urgency"]);
     expect(rows["windowElapsed"]).toMatchObject({ unit: "percent" });
     expect(rows["windowElapsed"]?.value).toBeCloseTo(65, 10);
     expect(rows["progress"]?.value).toBeCloseTo(40, 10);

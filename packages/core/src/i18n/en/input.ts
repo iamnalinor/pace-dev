@@ -38,7 +38,8 @@ export const enInput = {
   "actionError.preset/cycle": "A preset cannot extend one of its own children.",
   "actionError.preset/invalid-overrides": "The task's overrides are not valid.",
   "actionError.preset/bad-id": "Use a lowercase slug: letters, digits, '.' and '-'.",
-  "actionError.preset/built-in": "Built-in presets cannot be changed.",
+  "actionError.preset/built-in":
+    "A default preset keeps its id and has no parent; the inbox cannot be deleted.",
   "actionError.preset/exists": "A preset with this id already exists.",
   "actionError.preset/invalid-definition": "Some values are not valid.",
   "actionError.preset/no-base": "Choose what the preset extends.",

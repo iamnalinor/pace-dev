@@ -42,6 +42,8 @@ export type OnTimeView = {
 export type InsightsModel = {
   /** Monday 00:00 of the week in the account zone. */
   readonly weekStart: string;
+  /** The account zone the week is cut in. */
+  readonly zone: string;
   readonly previous: string;
   /** `null` for the current week. */
   readonly next: null | string;
@@ -119,6 +121,7 @@ export const insightsModel = (
     focusSleep: withDayShares(focusVsSleep(state.time, zoned)),
     fragmentation: fragmentation(state.time, zoned),
     hours: { minutes: hours, peak: peakOf(hours) },
+    zone,
     next: from >= thisWeek ? null : addDaysIn(from, 7, zone),
     onTime: onTimeByProject(state, range).map((row) => ({
       ...row,

@@ -23,8 +23,8 @@ export type TimeButtonView = {
   readonly limitMinutes: null | number;
   /** Its activity is the one running now. */
   readonly isRunning: boolean;
-  /** What a tap on it does, worded for the toast: start, switch or stop. */
-  readonly toast: MessageText;
+  /** A tap opens the details sheet first (shown with a chevron). */
+  readonly shouldAskDetails: boolean;
 };
 
 export type RunningView = {
@@ -89,10 +89,7 @@ export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext):
       label: candidate.label,
       limitMinutes: candidate.limitMinutes,
       taskId: candidate.taskId,
-      toast: tapToast(
-        { isRunning: active !== null && active.buttonId === candidate.id, label: candidate.label },
-        running?.label,
-      ),
+      shouldAskDetails: candidate.shouldAskDetails,
     })),
     running,
   };
@@ -108,17 +105,4 @@ export const PACE_STATUS_TEXT: Readonly<Record<PaceStatus, MessageKey | null>> =
   ok: null,
   "over-expect": "time.overExpect",
   "over-limit": "time.overLimit",
-};
-
-/** The toast after a tap on a button: stopped, started, or switched from the previous activity. */
-export const tapToast = (
-  button: Pick<TimeButtonView, "isRunning" | "label">,
-  previous: string | undefined,
-): MessageText => {
-  if (button.isRunning) {
-    return { key: "time.stopped", params: { label: button.label } };
-  }
-  return previous === undefined
-    ? { key: "time.started", params: { label: button.label } }
-    : { key: "time.switched", params: { from: previous, to: button.label } };
 };

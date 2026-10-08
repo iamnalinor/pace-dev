@@ -1,9 +1,8 @@
 name: Mutation testing
 
-# Slow by nature: weekly and on demand, not on every push.
+# Slow by nature: on demand, never on every push.
 on:
-  schedule:
-    - cron: "17 3 * * 1"
+  # On demand only: a weekly schedule cost more minutes than the private repo can spare.
   workflow_dispatch:
 
 permissions:

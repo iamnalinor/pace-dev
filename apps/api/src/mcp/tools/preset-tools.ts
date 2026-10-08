@@ -133,7 +133,7 @@ export const presetCreation = defineTool({
 export const updatePreset = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: false },
   description:
-    "Changes a user preset's name, parent or definition (a definition replaces the stored one entirely: pass every key the preset should keep). Built-in presets cannot be changed.",
+    "Changes a preset's name, parent or definition (a definition replaces the stored one entirely: pass every key the preset should keep). The default presets (hw, work, personal, deferred, inbox) can be edited too, but keep no parent: their definition is read on top of their shipped values.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forPreset(args.id, (scope, when, current) => {
@@ -179,11 +179,11 @@ export const updatePreset = defineTool({
 export const archivePreset = defineTool({
   annotations: { destructiveHint: true, idempotentHint: true, readOnlyHint: false },
   description:
-    "Archives a user preset: no new instances are created and it leaves the pickers, while its existing tasks keep working. Revoke the archiving event to bring it back. Built-ins cannot be archived.",
+    "Archives (deletes) a preset: no new instances are created and it leaves the pickers, while its existing tasks keep working. Revoke the archiving event to bring it back. Any preset but the inbox can be archived, the defaults included.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forPreset(args.id, (_scope, when, current) =>
-        current.builtIn
+        current.id === "inbox"
           ? presetFailure("preset/built-in")
           : ok([stamp(when, { payload: { id: args.id }, type: "preset.archived" })]),
       ),

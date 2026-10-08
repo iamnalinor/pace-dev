@@ -5,6 +5,7 @@ import { artboardState, ctx } from "@pace/core/testing";
 import { echoParse, fakeParseModel } from "./fake-model.ts";
 import { availability, runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
+import { parseProviders } from "./providers.ts";
 
 const NOW = Date.parse("2026-10-06T12:00:00.000Z");
 const prompt = buildParsePrompt("купить кабель", {
@@ -97,5 +98,33 @@ describe("availability", () => {
         now,
       ),
     ).toEqual({ available: false, retryAt: "2026-10-06T12:03:00.000Z" });
+  });
+});
+
+describe("parseProviders", () => {
+  it("makes one provider per key, Groq keys first, so a limited key rests while the next answers", () => {
+    const providers = parseProviders({
+      geminiApiKeys: ["g1"],
+      groqApiKeys: ["k1", "k2", "k3"],
+      llmProvider: "auto",
+    });
+    expect(providers.map((provider) => provider.name)).toEqual([
+      "groq",
+      "groq-2",
+      "groq-3",
+      "gemini",
+    ]);
+  });
+
+  it("rotates to the second key of the same provider on a rate limit", async () => {
+    const result = await runParse(
+      [
+        { model: fakeParseModel(() => ({ rateLimitedFor: 20 })), name: "groq" },
+        { model: fakeParseModel(echoParse), name: "groq-2" },
+      ],
+      prompt,
+      { now: () => NOW },
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "groq-2" } });
   });
 });

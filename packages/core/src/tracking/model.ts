@@ -33,6 +33,8 @@ export type ActivityButton = {
   readonly expectMinutes: null | number;
   readonly limitMinutes: null | number;
   readonly order: number;
+  /** A tap opens the details sheet (what exactly, which task) instead of starting blind. */
+  readonly shouldAskDetails: boolean;
 };
 
 export type TimeState = {

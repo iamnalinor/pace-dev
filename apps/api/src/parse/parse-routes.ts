@@ -53,17 +53,20 @@ export const mountParseRoutes = (
     }
     const projectNames = Object.values(state.projects.byId).map((project) => project.name);
     const verified = verifyParse(answer.value.result, { projectNames, source: body.text });
-    await store.logDecisions(
-      [
-        parseDecision(body.text, "api", {
-          doubtful: verified.doubtful,
-          provider: answer.value.provider,
-          result: verified.result,
-          status: "parsed",
-        }),
-      ],
-      now,
-    );
+    // Readings while typing come every pause: only the ones the person acts on are logged.
+    if (body.draft !== true) {
+      await store.logDecisions(
+        [
+          parseDecision(body.text, "api", {
+            doubtful: verified.doubtful,
+            provider: answer.value.provider,
+            result: verified.result,
+            status: "parsed",
+          }),
+        ],
+        now,
+      );
+    }
     return ok({
       doubtful: [...verified.doubtful],
       isClean: verified.isClean,

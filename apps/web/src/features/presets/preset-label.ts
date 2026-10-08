@@ -1,7 +1,7 @@
 import type { Translate } from "#web/i18n.tsx";
+import type { Preset } from "@pace/core";
 
-import { isBuiltInPreset, type Preset } from "@pace/core";
+import { presetLabel as sharedLabel } from "#web/shared/lib/preset-label.ts";
 
-/** Built-in presets are part of the interface and get translated; a user preset keeps its own name. */
-export const presetLabel = (preset: Preset, t: Translate): string =>
-  isBuiltInPreset(preset.id) ? t(`preset.base.${preset.id}`) : preset.name;
+/** The presets screens take the preset first. */
+export const presetLabel = (preset: Preset, t: Translate): string => sharedLabel(t, preset);

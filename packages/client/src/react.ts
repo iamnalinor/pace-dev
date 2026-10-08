@@ -23,6 +23,7 @@ import {
   type ComposerDraft,
   composerModel,
   type ComposerModel,
+  requiresAiFirst,
   shouldAiRead,
   SLOW_READ_MS,
 } from "./view-models/composer.ts";
@@ -127,8 +128,15 @@ export type AiState =
 
 export type AiRead = {
   readonly state: AiState;
-  /** Asks the assistant; `onReading` receives the chips it filled. A reset meanwhile drops the answer. */
-  readonly read: (text: string, onReading: (reading: AiReading) => void) => Promise<void>;
+  /**
+  Asks the assistant; `onReading` receives the chips it filled. A reset meanwhile drops the
+  answer. A `draft` reading (while typing) stays out of the decision log.
+  */
+  readonly read: (
+    text: string,
+    onReading: (reading: AiReading) => void,
+    options?: { readonly draft?: boolean },
+  ) => Promise<void>;
   /**
   "Read it when it's back": the line is kept on the server and written once the assistant can
   read it. Resolves to `queued` (the composer can clear), or to a reading if it is back already.
@@ -148,13 +156,13 @@ export const useAiRead = (assistant: Assistant): AiRead => {
   const ask = async (
     text: string,
     onReading: (reading: AiReading) => void,
-    shouldDefer: boolean,
+    options: { readonly defer?: boolean; readonly draft?: boolean },
   ): Promise<AiOutcome> => {
     generation.current += 1;
     const mine = generation.current;
     setState({ status: "reading" });
     const reading = (async (): Promise<AiOutcome> => {
-      const outcome = await assistant.read(text, { defer: shouldDefer });
+      const outcome = await assistant.read(text, options);
       if (mine !== generation.current) {
         return outcome;
       }
@@ -168,10 +176,10 @@ export const useAiRead = (assistant: Assistant): AiRead => {
     return await reading;
   };
   return {
-    read: async (text, onReading) => {
-      await ask(text, onReading, false);
+    read: async (text, onReading, options = {}) => {
+      await ask(text, onReading, options);
     },
-    readLater: async (text, onReading) => await ask(text, onReading, true),
+    readLater: async (text, onReading) => await ask(text, onReading, { defer: true }),
     reset: () => {
       generation.current += 1;
       setState({ status: "idle" });
@@ -192,12 +200,12 @@ export const useAiRead = (assistant: Assistant): AiRead => {
   };
 };
 
-/** A pause in typing before a long text is sent to the assistant on its own. */
-const AUTO_READ_DELAY_MS = 900;
+/** A pause in typing before the line is sent to the assistant on its own. */
+const AUTO_READ_DELAY_MS = 700;
 
 /**
-Reads long or multi-line text (a pasted homework, a forwarded message) with the assistant as
-soon as typing pauses, so its reading is on the chips before the user presses Enter.
+Reads whatever is typed with the assistant as soon as typing pauses, so its reading is on the
+chips before the user presses Enter (the rules fill them until then).
 */
 export const useAutoAiRead = (
   ai: AiRead,
@@ -210,7 +218,7 @@ export const useAutoAiRead = (
       return;
     }
     const timer = setTimeout(() => {
-      void ai.read(text, onReading);
+      void ai.read(text, onReading, { draft: true });
     }, AUTO_READ_DELAY_MS);
     return () => {
       clearTimeout(timer);
@@ -291,7 +299,7 @@ export const useReadFirst = (ai: AiRead, toInbox: (text: string) => Promise<void
   return {
     isWaiting,
     isPending: (text: string, onReading: (reading: AiReading) => void): boolean => {
-      if (!shouldAiRead(text) || ai.state.status === "read" || ai.state.status === "failed") {
+      if (!requiresAiFirst(text) || ai.state.status === "read" || ai.state.status === "failed") {
         return false;
       }
       if (ai.state.status === "idle") {

@@ -195,6 +195,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "color.pink": "Розовый",
   "color.teal": "Бирюзовый",
   "color.slate": "Серый",
+  "color.orange": "Оранжевый",
+  "color.yellow": "Жёлтый",
   "settings.timezone.differs": "Пояс аккаунта не совпадает с поясом устройства.",
   "settings.more": "Ещё",
   "nav.inbox": "Входящие",

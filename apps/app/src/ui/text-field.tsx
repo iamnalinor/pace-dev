@@ -1,3 +1,5 @@
+import type { Ref } from "react";
+
 import { Text, TextInput, type TextInputProps, View } from "react-native";
 
 import { cx } from "./cx.ts";
@@ -9,8 +11,10 @@ export const TextField = ({
   hint,
   label,
   multiline = false,
+  ref,
   ...input
 }: Omit<TextInputProps, "accessibilityLabel" | "className" | "placeholderTextColor"> & {
+  readonly ref?: Ref<TextInput> | undefined;
   readonly error?: null | string;
   readonly hint?: string;
   readonly label: string;
@@ -28,6 +32,7 @@ export const TextField = ({
         )}
         multiline={multiline}
         placeholderTextColor={palette.faint}
+        ref={ref}
         textAlignVertical={multiline ? "top" : "center"}
         {...input}
       />

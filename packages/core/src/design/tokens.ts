@@ -12,10 +12,12 @@ export type PaletteName =
   | "ink-blue"
   | "ink-coral"
   | "ink-green"
+  | "ink-orange"
   | "ink-pink"
   | "ink-slate"
   | "ink-teal"
   | "ink-violet"
+  | "ink-yellow"
   | "inverse"
   | "inverseFg"
   | "line"
@@ -31,10 +33,12 @@ export type ProjectColorName =
   | "blue"
   | "coral"
   | "green"
+  | "orange"
   | "pink"
   | "slate"
   | "teal"
-  | "violet";
+  | "violet"
+  | "yellow";
 
 export type RadiusName = "lg" | "md" | "pill" | "sm" | "xl";
 

@@ -9,11 +9,11 @@ import { TimeBar } from "#web/shared/tracking/time-bar.tsx";
 import { Dock } from "#web/shared/ui/dock.tsx";
 import { PageHeader } from "#web/shared/ui/page-header.tsx";
 
-import { FoldedFooter } from "./folded-footer.tsx";
 import { NowHeaderActions } from "./inbox-counter.tsx";
 import { NowList } from "./now-list.tsx";
 import { ProjectChips } from "./project-chips.tsx";
 import { ReviewLink } from "./review-link.tsx";
+import { WaitingSection } from "./waiting-section.tsx";
 
 const PROJECT_PARAM = "project";
 
@@ -58,7 +58,12 @@ export const NowScreen = ({ composeText, isComposerExpanded = false }: Props) =>
         selected={projectId}
       />
       <NowList onCheck={check} rows={board.rows} />
-      <FoldedFooter laterCount={board.laterCount} onCheck={check} waiting={board.waiting} />
+      <WaitingSection
+        hasActive={board.rows.length > 0}
+        laterCount={board.laterCount}
+        onCheck={check}
+        waiting={board.waiting}
+      />
       <Dock>
         <TimeBar />
       </Dock>

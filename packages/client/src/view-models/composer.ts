@@ -1,4 +1,5 @@
 import {
+  byPresetOrder,
   type CoreState,
   type Importance,
   isHttpUrl,
@@ -71,11 +72,11 @@ export type ComposerModel = {
 const presetOptions = (state: CoreState): readonly ComposerOption[] =>
   Object.values(state.presets.byId)
     .filter((preset) => !preset.archived && preset.id !== "inbox")
+    .toSorted(byPresetOrder)
     .map((preset) => {
       const resolved = resolvePreset(state.presets, preset.id);
       return { color: resolved.ok ? resolved.value.color : null, id: preset.id, name: preset.name };
-    })
-    .toSorted((a, b) => a.name.localeCompare(b.name));
+    });
 
 const projectOptions = (state: CoreState): readonly ComposerOption[] =>
   Object.values(state.projects.byId)
@@ -145,14 +146,20 @@ The live reading of the composer: the rule parse of the text with the user's chi
 top. Picking another category preselects its default importance unless the text or a tap
 named one.
 */
-/** From this length (or a second line) a text is read by the assistant, not just the rules. */
+/** From this length (or a second line) Enter waits for the assistant instead of the rules alone. */
 export const LONG_TEXT_CHARS = 80;
+
+/** Shorter than this there is nothing for the assistant to read yet. */
+const MIN_AI_CHARS = 3;
 
 /** How long Enter waits for the assistant before the text goes to Inbox to be sorted later. */
 export const SLOW_READ_MS = 5000;
 
-/** Long or multi-line text: a pasted homework or a forwarded message, for the assistant to read. */
-export const shouldAiRead = (text: string): boolean => {
+/** Every line is read by the assistant once typing pauses; the rules fill the chips meanwhile. */
+export const shouldAiRead = (text: string): boolean => text.trim().length >= MIN_AI_CHARS;
+
+/** Long or multi-line text (a pasted homework, a forwarded message) is never added on the rules alone. */
+export const requiresAiFirst = (text: string): boolean => {
   const trimmed = text.trim();
   return trimmed.length >= LONG_TEXT_CHARS || trimmed.includes("\n");
 };
