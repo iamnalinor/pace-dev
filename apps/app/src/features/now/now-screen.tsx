@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
@@ -11,6 +12,7 @@ import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
 import { useCheckTask } from "#app/shared/use-check-task.ts";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { Screen } from "#app/ui/screen.tsx";
 
 import { DraggableRow } from "./draggable-row.tsx";
@@ -47,7 +49,13 @@ const Rows = ({
           />
         );
         return (
-          <View key={row.id} role="listitem">
+          <Animated.View
+            entering={ROW_ENTER}
+            exiting={ROW_EXIT}
+            key={row.id}
+            layout={ROW_LAYOUT}
+            role="listitem"
+          >
             {draggable ? (
               <DraggableRow
                 onDrag={(rowsMoved) => {
@@ -63,7 +71,7 @@ const Rows = ({
             ) : (
               item
             )}
-          </View>
+          </Animated.View>
         );
       })}
     </View>

@@ -1,4 +1,4 @@
-import { Hourglass, Pause, Square, Timer } from "lucide-react-native";
+import { Hourglass, Square, Timer } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -50,10 +50,14 @@ const StatusButtons = ({ view }: { readonly view: TaskViewModel }) => {
   const { actions } = usePace();
   const run = useRunAction();
   const status = statusOf(view);
+  // A paused task resumes from the header's play button.
+  if (status === "paused") {
+    return null;
+  }
   const set = (next: TaskStatus): void => {
     void run(actions.setStatus(view.id, next));
   };
-  if (status === "paused" || status === "waiting") {
+  if (status === "waiting") {
     return (
       <Button
         onPress={() => {
@@ -66,28 +70,18 @@ const StatusButtons = ({ view }: { readonly view: TaskViewModel }) => {
     );
   }
   return (
-    <>
-      <IconButton
-        icon={Pause}
-        label={t("task.pause")}
-        onPress={() => {
-          set("paused");
-        }}
-        variant="raised"
-      />
-      <IconButton
-        icon={Hourglass}
-        label={t("task.waiting")}
-        onPress={() => {
-          set("waiting");
-        }}
-        variant="raised"
-      />
-    </>
+    <IconButton
+      icon={Hourglass}
+      label={t("task.waiting")}
+      onPress={() => {
+        set("waiting");
+      }}
+      variant="raised"
+    />
   );
 };
 
-/** Focus (stage 3), Pause / Waiting / Resume, and the primary Done or "Submit 3 and 4". */
+/** Focus, Waiting / Resume, and the primary Done or "Submit 3 and 4" (pausing is in the header). */
 export const TaskFooter = ({
   onClose,
   view,

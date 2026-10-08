@@ -40,6 +40,33 @@ describe("time actions", () => {
     ]);
   });
 
+  it("starts what was typed: a label used before keeps its category, a button's name taps it", async () => {
+    const world = await setupActions();
+    unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: later(-30),
+        label: "Lecture",
+        startAt: later(-90),
+      }),
+    );
+    unwrap(await world.actions.startTyped(" lecture "));
+    const running = (minute: number) =>
+      timeBarModel(world.state.store.getState(), ctx(later(minute))).running;
+    expect(running(1)).toMatchObject({ category: "study", label: "lecture" });
+    world.setNow(later(5));
+    unwrap(await world.actions.startTyped("work"));
+    const { buttons } = timeBarModel(world.state.store.getState(), ctx(later(6)));
+    expect(buttons.find((button) => button.isRunning)?.id).toBe("btn:work");
+    world.setNow(later(10));
+    unwrap(await world.actions.startTyped("Walk the dog"));
+    expect(running(11)).toMatchObject({ category: "other", label: "Walk the dog" });
+    await expect(world.actions.startTyped("  ")).resolves.toEqual({
+      error: "action/empty-text",
+      ok: false,
+    });
+  });
+
   it("starts a button with the details sheet's changes, even on the running one", async () => {
     const world = await setupActions();
     unwrap(await world.actions.tapButton("btn:work"));

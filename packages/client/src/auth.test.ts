@@ -199,6 +199,25 @@ describe("createAuth logout", () => {
   });
 });
 
+describe("createAuth deleteAccount", () => {
+  it("deletes the account on the server, then signs the device out", async () => {
+    const { auth, calls, session } = await setup(
+      { "DELETE /api/me": () => ({ deleted: true }) },
+      "stored",
+    );
+    await expect(auth.deleteAccount()).resolves.toEqual({ ok: true, value: true });
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual(["DELETE /api/me"]);
+    await expect(session.get()).resolves.toBeNull();
+    expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
+  it("keeps the device signed in when the server could not delete it", async () => {
+    const { auth } = await setup({ "DELETE /api/me": () => problem(500, "boom") }, "stored");
+    await expect(auth.deleteAccount()).resolves.toEqual({ error: "boom", ok: false });
+    expect(auth.token()).toBe("stored");
+  });
+});
+
 describe("adoptToken", () => {
   it("stores a token minted elsewhere and loads the user behind it", async () => {
     const { auth, calls, session } = await setup({ "GET /api/me": () => fakeUser });

@@ -3,7 +3,7 @@ import { exports } from "cloudflare:workers";
 export const api = exports.default;
 
 export type RequestOptions = {
-  readonly method?: "GET" | "POST";
+  readonly method?: "DELETE" | "GET" | "POST";
   readonly token?: string;
   readonly body?: unknown;
   readonly headers?: Record<string, string>;

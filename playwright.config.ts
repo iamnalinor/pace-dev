@@ -1,6 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
 
+import {
+  DEV_TELEGRAM_ID,
+  README_TELEGRAM_ID,
+  TEST_ID_BASE,
+  TEST_IDS_PER_WORKER,
+  TEST_WORKERS,
+} from "./e2e/support/login.ts";
+
 const API_PORT = 8787;
 const WEB_PORT = 4173;
 // Set E2E_BASE_URL to test an already running stack instead of starting the API and web here.
@@ -10,9 +18,15 @@ const isCi = process.env["CI"] !== undefined;
 // Wrangler's local state for the e2e Worker lives outside apps/api so a run never reuses
 // yesterday's events. Absolute: the commands below run from the root and from apps/api.
 const E2E_STATE_DIR = path.resolve(import.meta.dirname, ".cache/e2e-state");
-// Every e2e test signs in with its own Telegram id (see e2e/support/login.ts) so parallel tests
-// never share account state (language, time zone) through the server.
-const E2E_TELEGRAM_IDS = "1919230638,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012";
+// Every e2e test signs in with an account of its own, deleted first (e2e/support/login.ts), so
+// parallel tests and reruns never share state through the server: a block of ids per worker.
+const E2E_TELEGRAM_IDS = [
+  DEV_TELEGRAM_ID,
+  README_TELEGRAM_ID,
+  ...Array.from({ length: TEST_WORKERS * TEST_IDS_PER_WORKER }, (_, index) =>
+    String(TEST_ID_BASE + index),
+  ),
+].join(",");
 
 // Optional: a pre-installed Chromium instead of `playwright install` (e.g. sandboxes).
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
@@ -24,6 +38,7 @@ against the real Worker running locally in wrangler dev (workerd with local D1/K
 export default defineConfig({
   forbidOnly: isCi,
   fullyParallel: true,
+  workers: isCi ? 2 : TEST_WORKERS,
   projects: [
     {
       name: "chromium",

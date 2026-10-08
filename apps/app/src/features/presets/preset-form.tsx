@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
 import { Button } from "#app/ui/button.tsx";
+import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { definitionIssues, inheritedOf, type PresetDraft, slugify } from "@pace/client";
 import { byPresetOrder, presetById, presetLabel, resolvePreset } from "@pace/core";
@@ -107,21 +108,14 @@ const DeleteButton = ({
   return (
     <View className="mx-4 mt-4 gap-2 rounded-xl border border-line bg-surface p-3.5">
       <Text className="font-sans text-[14px] text-fg">{t("presets.deleteConfirm", { name })}</Text>
-      <View className="flex-row gap-2">
-        <View className="flex-1">
-          <Button
-            onPress={() => {
-              setIsConfirming(false);
-            }}
-            variant="secondary"
-          >
-            {t("common.cancel")}
-          </Button>
-        </View>
-        <View className="flex-1">
-          <Button onPress={onDelete}>{t("common.delete")}</Button>
-        </View>
-      </View>
+      <SheetActions
+        cancelLabel={t("common.cancel")}
+        onCancel={() => {
+          setIsConfirming(false);
+        }}
+        onPrimary={onDelete}
+        primaryLabel={t("common.delete")}
+      />
     </View>
   );
 };

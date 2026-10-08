@@ -1,22 +1,65 @@
-import { ChevronDown, Ellipsis } from "lucide-react-native";
-import { Pressable } from "react-native";
+import { ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
-import { useT } from "#app/app-state.tsx";
+import { usePace, useT } from "#app/app-state.tsx";
 import { useTaskBack } from "#app/shared/task-opener.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { BackHeader } from "#app/ui/back-header.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
-/** Back, the project (tap to move the task), and the "more" menu. */
+/** Edit, pause or resume, delete: the task's actions as icons, no menu in between. */
+const TaskActions = ({
+  onDelete,
+  onEdit,
+  view,
+}: {
+  readonly view: TaskViewModel;
+  readonly onEdit: () => void;
+  /** Opens the close sheet on Cancelled · Skipped, which is the confirmation. */
+  readonly onDelete: () => void;
+}) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  const isOpen = view.closed === null;
+  const isPaused = view.tags.some((tag) => tag.kind === "status" && tag.status === "paused");
+  return (
+    <View className="flex-row">
+      <IconButton icon={Pencil} label={t("task.edit")} onPress={onEdit} variant="plain" />
+      {isOpen ? (
+        <IconButton
+          icon={isPaused ? Play : Pause}
+          label={t(isPaused ? "task.resume" : "task.pause")}
+          onPress={() => {
+            void run(actions.setStatus(view.id, isPaused ? "in_progress" : "paused"));
+          }}
+          variant="plain"
+        />
+      ) : null}
+      {isOpen ? (
+        <IconButton icon={Trash2} label={t("task.delete")} onPress={onDelete} variant="plain" />
+      ) : null}
+    </View>
+  );
+};
+
+export type TaskHeaderActions = {
+  readonly view: TaskViewModel;
+  readonly onEdit: () => void;
+  readonly onDelete: () => void;
+};
+
+/** Back, the project (tap to move the task), and the task's actions. */
 export const TaskHeader = ({
-  onMenu,
+  actions,
   onProject,
   project,
 }: {
-  readonly onMenu?: () => void;
+  readonly actions?: TaskHeaderActions;
   /** Opens the project picker: the chip is how a task changes project. */
   readonly onProject?: () => void;
   readonly project: TaskViewModel["project"];
@@ -28,11 +71,7 @@ export const TaskHeader = ({
     <BackHeader
       backLabel={t("common.back")}
       onBack={back}
-      right={
-        onMenu === undefined ? null : (
-          <IconButton icon={Ellipsis} label={t("task.more")} onPress={onMenu} variant="plain" />
-        )
-      }
+      right={actions === undefined ? null : <TaskActions {...actions} />}
     >
       <Pressable
         accessibilityLabel={t("task.changeProject", {

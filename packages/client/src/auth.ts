@@ -41,6 +41,11 @@ export type Auth = {
   readonly startBotLogin: () => Promise<BotLogin>;
   /** Tells the server, then forgets the token even when the server could not be reached. */
   readonly logout: () => Promise<void>;
+  /**
+  Deletes the account on the server (its log, sessions, grants), then signs this device out.
+  When the server refuses or cannot be reached the account stays, and so does the session.
+  */
+  readonly deleteAccount: () => Promise<Result<true, string>>;
   /** Fetches the signed-in user; a 401 signs out locally. */
   readonly me: () => Promise<Result<User, string>>;
   /**
@@ -141,6 +146,19 @@ const waitForToken =
     return err("timeout");
   };
 
+/** The account goes on the server first; only then is this device signed out. */
+const deleteAccount =
+  (api: ApiClient, session: { readonly signOut: () => Promise<void> }) =>
+  async (): Promise<Result<true, string>> => {
+    try {
+      await api.call(endpoints.deleteMe, {});
+    } catch (error) {
+      return err(errorCode(error));
+    }
+    await session.signOut();
+    return ok(true);
+  };
+
 export const createAuth = (options: {
   readonly api: ApiClient;
   readonly session: SessionStore;
@@ -180,6 +198,7 @@ export const createAuth = (options: {
     },
     loginWithDev: async (telegramId) =>
       await login(async () => await api.call(endpoints.auth.dev, { body: { telegramId } })),
+    deleteAccount: deleteAccount(api, session),
     loginWithTelegram: async (payload) =>
       await login(async () => await api.call(endpoints.auth.telegram, { body: payload })),
     logout: async () => {

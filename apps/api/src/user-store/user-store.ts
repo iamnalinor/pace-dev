@@ -180,6 +180,17 @@ export class UserStore extends DurableObject {
     await rearm(this.ctx.storage, await this.#state(), now);
   }
 
+  /**
+  Deletes the account's data: the event log, every projection, reminders and the alarm.
+  The empty store migrates again, so it serves the next login of the same person from scratch.
+  */
+  async wipe(): Promise<void> {
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.#cache = undefined;
+    await migrate(this.db, migrations);
+  }
+
   /** Smoke check used by tests: the schema is in place. */
   async countEvents(): Promise<number> {
     return await countEvents(this.db);

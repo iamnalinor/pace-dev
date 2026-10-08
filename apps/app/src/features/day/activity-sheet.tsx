@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { ScrollView, Text, type TextInput, View } from "react-native";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Chip } from "#app/ui/chip.tsx";
@@ -26,6 +26,7 @@ import {
   addDaysIn,
   CATEGORY_COLORS,
   FOCUS_CATEGORIES,
+  formatEyebrow,
 } from "@pace/core";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
@@ -157,6 +158,7 @@ const ActivityFields = ({
 export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => {
   const t = useT();
   const { actions, state } = usePace();
+  const language = useLanguage();
   const run = useRunAction();
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
@@ -191,6 +193,8 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
     <Sheet
       closeLabel={t("common.close")}
       onClose={onClose}
+      // The block's day, taken from the day on screen: only the times are typed.
+      subtitle={formatEyebrow(target.startAt, zone, language)}
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
       visible
     >

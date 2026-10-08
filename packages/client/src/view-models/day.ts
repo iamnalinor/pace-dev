@@ -5,10 +5,13 @@ import {
   addMinutesIso,
   CATEGORY_COLORS,
   type CoreState,
+  formatInZone,
   type Gap,
+  LANGUAGES,
   type ProjectColorName,
   type QueryContext,
   startOfDayIn,
+  t,
   taskById,
   timeline,
 } from "@pace/core";
@@ -29,6 +32,10 @@ export type DayRow = {
   readonly taskTitle: null | string;
   /** The activity's Expect, when it has one. */
   readonly expectMinutes: null | number;
+  /** The activity's Limit, when it has one. */
+  readonly limitMinutes: null | number;
+  /** `false` when the label only repeats the category ("Food" in Food): the tag says it. */
+  readonly showsLabel: boolean;
   /** Messaging was part of it: no phone penalty. */
   readonly messengersOnPurpose: boolean;
 };
@@ -39,7 +46,28 @@ export type DayEntry = { readonly key: string; readonly target: ActivityTarget }
   | { readonly kind: "gap"; readonly gap: Gap }
 );
 
-const editTargetOf = (row: Omit<DayRow, "color" | "taskTitle">): ActivityTarget => ({
+/** A label that is just the category's name, in any interface language. */
+const isCategoryName = (label: string, category: ActivityCategory): boolean => {
+  const key = label.trim().toLowerCase();
+  return (
+    key === category ||
+    LANGUAGES.some((language) => t(language, `category.${category}`).toLowerCase() === key)
+  );
+};
+
+/** The days (`YYYY-MM-DD` on the account's calendar) that have tracked time: the calendar's dots. */
+export const trackedDates = (state: CoreState, ctx: QueryContext): ReadonlySet<string> => {
+  const zone = accountTz(state, ctx);
+  return new Set(
+    Object.values(state.time.activities).map((activity) =>
+      formatInZone(activity.startAt, zone, "yyyy-MM-dd"),
+    ),
+  );
+};
+
+const editTargetOf = (
+  row: Pick<DayRow, "activityId" | "category" | "endAt" | "isRunning" | "label" | "startAt">,
+): ActivityTarget => ({
   activityId: row.activityId,
   category: row.category,
   endAt: row.isRunning ? null : row.endAt,
@@ -86,6 +114,8 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
     row: {
       ...segment,
       color: CATEGORY_COLORS[segment.category],
+      limitMinutes: state.time.activities[segment.activityId]?.limitMinutes ?? null,
+      showsLabel: !isCategoryName(segment.label, segment.category),
       taskTitle:
         segment.taskId === null ? null : (taskById(state.tasks, segment.taskId)?.title ?? null),
     },

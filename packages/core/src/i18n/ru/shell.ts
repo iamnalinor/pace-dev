@@ -114,6 +114,12 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.quietHours": "Тихие часы",
   "settings.connectedApps": "Подключённые приложения",
   "settings.logout": "Выйти",
+  "settings.deleteAccount": "Удалить аккаунт",
+  "settings.deleteAccount.warning":
+    "Аккаунт удалится навсегда: задачи, время, пресеты, журнал решений и все подключённые приложения. Отменить это нельзя.",
+  "settings.deleteAccount.confirm": "Удалить навсегда",
+  "settings.deleteAccount.failed":
+    "Не удалось удалить аккаунт. Попробуйте ещё раз, когда будет сеть.",
   "common.save": "Сохранить",
   "common.cancel": "Отмена",
   "common.undo": "Отменить",

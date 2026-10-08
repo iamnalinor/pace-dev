@@ -66,15 +66,12 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
             accessibilityLabel={descriptors[route.key]?.options.title ?? route.name}
             accessibilityRole="tab"
             aria-selected={isFocused}
-            className={cx(
-              "h-11 w-14 items-center justify-center",
-              isAdd && "rounded-lg bg-inverse",
-            )}
+            className={cx("h-11 w-14 items-center justify-center", isAdd && "rounded-lg bg-accent")}
             key={route.key}
             onPress={onPress}
           >
             <Icon
-              color={isAdd ? palette.inverseFg : activeColor}
+              color={isAdd ? palette.accentFg : activeColor}
               size={ICON_SIZE}
               strokeWidth={STROKE}
             />

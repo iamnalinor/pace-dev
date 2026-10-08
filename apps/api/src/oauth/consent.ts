@@ -5,23 +5,14 @@ import {
   type AuthRequest,
   CimdFetchError,
   type ConsentDescription,
-  type OAuthHelpers,
 } from "@cloudflare/workers-oauth-provider";
-import { HTTPException } from "hono/http-exception";
 
 import { err, ok, type Result } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Problem } from "../shared/mount.ts";
 
-/** The helpers the provider attaches to every request it routes to the Hono app. */
-export const oauthHelpers = (c: Context<AppEnv>): OAuthHelpers => {
-  const helpers = c.env.OAUTH_PROVIDER;
-  if (helpers === undefined) {
-    throw new HTTPException(500, { message: "OAuth provider is not mounted" });
-  }
-  return helpers;
-};
+import { oauthHelpers } from "../shared/oauth-helpers.ts";
 
 /** An authorization request the provider refused, as the consent page should report it. */
 export type AuthProblem = Problem & {

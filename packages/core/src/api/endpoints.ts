@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { endpoint, type EndpointShape } from "./endpoint.ts";
 import {
+  AccountDeletedSchema,
   AuthSessionSchema,
   DevLoginSchema,
   LogoutSchema,
@@ -47,6 +48,13 @@ export const endpoints = {
     auth: true,
     method: "GET",
     output: UserSchema,
+    path: "/api/me",
+  }),
+  /** Deletes the account: its event log, sessions, OAuth grants and the user itself. */
+  deleteMe: endpoint({
+    auth: true,
+    method: "DELETE",
+    output: AccountDeletedSchema,
     path: "/api/me",
   }),
   auth: {

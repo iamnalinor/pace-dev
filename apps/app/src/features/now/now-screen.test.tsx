@@ -41,7 +41,7 @@ describe("NowBoard", () => {
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
     expect(screen.getByText("Due Fri Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
     expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
-    expect(screen.getByText(en("time.idle"))).toBeOnTheScreen();
+    expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
   });
 
   it("opens the inbox from the counter and a task from its row", async () => {

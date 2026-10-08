@@ -8,6 +8,8 @@ import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatEyebrow } from "@pace/core";
 
+import { NowHelp } from "./now-help.tsx";
+
 const CounterButton = ({
   count,
   label,
@@ -37,7 +39,7 @@ const CounterButton = ({
   );
 };
 
-/** Date eyebrow and "Now"; on the right "To sort" (when anything waits), Inbox and Settings. */
+/** Date eyebrow and "Now"; on the right "To sort" (when anything waits), Inbox, help, Settings. */
 export const NowHeader = ({ inboxCount }: { readonly inboxCount: number }) => {
   const t = useT();
   const router = useRouter();
@@ -67,6 +69,7 @@ export const NowHeader = ({ inboxCount }: { readonly inboxCount: number }) => {
               router.push("/inbox");
             }}
           />
+          <NowHelp />
           <IconButton
             icon={Settings}
             label={t("nav.settings")}

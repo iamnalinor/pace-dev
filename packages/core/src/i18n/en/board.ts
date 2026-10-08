@@ -18,6 +18,15 @@ export const enBoard = {
   "now.markDone": "Mark {title} done",
   "now.reorder": "Reorder {title}",
   "now.waiting": "Waiting",
+  "now.help.title": "How Now is ordered",
+  "now.help.score":
+    "Tasks are sorted by score: importance × urgency. Urgency grows as the deadline nears and as the work left outgrows the time left.",
+  "now.help.waiting":
+    "Waiting: you are waiting on someone else. Urgency is frozen, and these tasks are listed under a divider.",
+  "now.help.later":
+    "Later: tasks that start in the future, and homework that is not assigned yet. They show up on their own when their time comes.",
+  "now.help.paused": "Paused tasks stay in the list, lower down.",
+  "now.help.why": "Open a task to see why it is where it is.",
   "now.doneToast": "{title} · done",
   "now.toSort": "To sort · {count}",
   "now.later": "+ {count} later",

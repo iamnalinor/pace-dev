@@ -46,3 +46,6 @@ export const DevLoginSchema = z.object({
 });
 
 export const LogoutSchema = z.object({ ok: z.literal(true) });
+
+/** The answer to deleting the account: everything of it is gone. */
+export const AccountDeletedSchema = z.object({ deleted: z.literal(true) });

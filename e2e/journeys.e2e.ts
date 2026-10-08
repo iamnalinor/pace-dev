@@ -23,8 +23,7 @@ for (const size of SIZES) {
     test.use({ viewport: { height: size.height, width: size.width } });
 
     test("checks a task off and brings it back from History", async ({ page }) => {
-      // An account of its own: History lists every synced event, and Undo takes the newest.
-      await loginViaApi(page, size.name === "phone" ? "1011" : "1012");
+      await loginViaApi(page);
       await page.goto("/");
       const title = `water the plants ${size.name} ${unique()}`;
       await add(page, title);
@@ -33,13 +32,17 @@ for (const size of SIZES) {
       await expect(board.getByText(title)).toHaveCount(0);
       // No toast: the change is in History, undone from there.
       await page.goto("/history");
+      // The newest change is the close; the undo is stored once its correction is listed, and
+      // navigating sooner can reload the page before the write.
+      await expect(page.getByText(`Task closed · ${title}`)).toBeVisible();
       await page.getByRole("button", { name: "Undo" }).first().click();
+      await expect(page.getByText("Correction: revoked")).toBeVisible();
       await page.goto("/");
       await expect(page.getByRole("list", { name: "Tasks" }).getByText(title)).toBeVisible();
     });
 
     test("sends a line to Inbox and sorts it there", async ({ page }) => {
-      await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
+      await loginViaApi(page);
       await page.goto("/");
       const text = `ask about the ${size.name} invoice ${unique()}`;
       const line = page.getByRole("textbox", { name: "New task" });
@@ -57,7 +60,7 @@ for (const size of SIZES) {
     });
 
     test("history, settings and an unknown page explain themselves", async ({ page }) => {
-      await loginViaApi(page, "1003");
+      await loginViaApi(page);
       await page.goto("/history");
       await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
       await expectNoA11yViolations(page);

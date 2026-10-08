@@ -155,3 +155,7 @@ react-native-web (one UI codebase for Android and web); Errands merges into Chor
 While the web was being ported (PR B):
 
 > кст для lateness можно не выводить минуты если время час или больше (минуты ток для жестких дедлайнов, для софтовых минуты тож не нужны)
+
+While the redesign (PR C) was in progress:
+
+> кстати можно сделать фичу удаления аккаунта. и для тестов будет полезно

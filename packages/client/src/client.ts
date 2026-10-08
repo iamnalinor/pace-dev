@@ -82,7 +82,14 @@ export {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-client.ts";
+export {
+  type DetailsModel,
+  detailsModel,
+  type DetailsTask,
+  recentLabels,
+} from "./view-models/activity-details.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
+export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
   type ComposerDraft,
@@ -102,6 +109,7 @@ export {
   dayModel,
   type DayRow,
   type DayTotal,
+  trackedDates,
 } from "./view-models/day.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
 export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
@@ -192,7 +200,6 @@ export {
   type TimeButtonView,
 } from "./view-models/time-bar.ts";
 export {
-  type ActivityButtonProps,
   type ActivityForm,
   activityFormOf,
   type ActivityRange,

@@ -1,11 +1,12 @@
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { loginViaApi } from "./support/login.ts";
+import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
 
 test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
+  await resetAccount(DEV_TELEGRAM_ID);
   await page.goto("/login");
   await expectNoA11yViolations(page);
 
-  await page.getByLabel("Telegram id").fill("1919230638");
+  await page.getByLabel("Telegram id").fill(DEV_TELEGRAM_ID);
   await page.getByRole("button", { name: "Sign in as dev" }).click();
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
   await expect(page).toHaveURL(/\/$/u);
@@ -37,7 +38,7 @@ test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
 });
 
 test("the theme choice is kept per device and paints the page", async ({ page }) => {
-  await loginViaApi(page, "1001");
+  await loginViaApi(page);
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/settings");
   // The heading's ink follows the theme (dark text on light, light text on dark).

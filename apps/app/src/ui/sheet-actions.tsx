@@ -2,15 +2,17 @@ import { View } from "react-native";
 
 import { Button } from "./button.tsx";
 
-/** A sheet's closing row: Cancel on the left, the primary action twice as wide. */
+/** A sheet's (or a confirmation's) closing row: Cancel on the left, the action twice as wide. */
 export const SheetActions = ({
   cancelLabel,
+  isBusy = false,
   isDisabled = false,
   onCancel,
   onPrimary,
   primaryLabel,
 }: {
   readonly cancelLabel: string;
+  readonly isBusy?: boolean;
   readonly isDisabled?: boolean;
   readonly onCancel: () => void;
   readonly onPrimary: () => void;
@@ -23,7 +25,7 @@ export const SheetActions = ({
       </Button>
     </View>
     <View className="flex-[2]">
-      <Button disabled={isDisabled} onPress={onPrimary}>
+      <Button busy={isBusy} disabled={isDisabled} onPress={onPrimary}>
         {primaryLabel}
       </Button>
     </View>

@@ -4,47 +4,9 @@ import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { Button } from "#app/ui/button.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-
-export type MenuChoice = "close-as" | "edit";
-
-/** The "more" menu: edit the text, or close the task as cancelled or skipped. */
-export const TaskMenuSheet = ({
-  onChoose,
-  onClose,
-  view,
-}: {
-  readonly view: TaskViewModel;
-  readonly onClose: () => void;
-  readonly onChoose: (choice: MenuChoice) => void;
-}) => {
-  const t = useT();
-  return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} title={t("task.menuTitle")} visible>
-      <Button
-        onPress={() => {
-          onChoose("edit");
-        }}
-        variant="secondary"
-      >
-        {t("task.edit")}
-      </Button>
-      {view.closed === null ? (
-        <Button
-          onPress={() => {
-            onChoose("close-as");
-          }}
-          variant="secondary"
-        >
-          {t("close.other")}
-        </Button>
-      ) : null}
-    </Sheet>
-  );
-};
 
 /** Title and description as the user typed them; the rest is edited on the web. */
 export const EditTextSheet = ({

@@ -66,6 +66,11 @@ export type TimeActions = ButtonActions & {
   if it is the one running. With `details` (the sheet behind the button) it always starts.
   */
   readonly tapButton: (buttonId: string, details?: ButtonStart) => ActionResult;
+  /**
+  "What are you doing?": a button's name taps that button; a label used before starts in
+  its category again; anything else starts as Other.
+  */
+  readonly startTyped: (label: string) => ActionResult;
   readonly startActivity: (input: ActivityInput, when?: When) => ActionResult;
   /** Time on a task: its title as the label, its estimate as the Expect. */
   readonly focusTask: (taskId: string) => ActionResult;
@@ -281,6 +286,21 @@ const saveActivity = async (
       });
 };
 
+const startTyped = async (deps: ActionDeps, typed: string): ActionResult => {
+  const label = typed.trim();
+  const key = label.toLowerCase();
+  const time = timeOf(deps);
+  const button = effectiveButtons(time).find((candidate) => candidate.label.toLowerCase() === key);
+  if (button !== undefined) {
+    return await tapButton(deps, button.id);
+  }
+  const before = Object.values(time.activities)
+    .filter((activity) => activity.label.trim().toLowerCase() === key)
+    .toSorted((a, b) => b.startAt.localeCompare(a.startAt))[0];
+  // No Expect or Limit given: the ones learned for this label apply.
+  return await startActivity(deps, { category: before?.category ?? "other", label });
+};
+
 export const timeActions = (deps: ActionDeps): TimeActions => ({
   ...buttonActions(deps),
   ...editActions(deps),
@@ -299,6 +319,7 @@ export const timeActions = (deps: ActionDeps): TimeActions => ({
   },
   logPast: async (activity) => await logPast(deps, activity),
   startActivity: async (input, when) => await startActivity(deps, input, when),
+  startTyped: async (label) => await startTyped(deps, label),
   stopActivity: async (when) => await stopActivity(deps, when),
   tapButton: async (buttonId, details) => await tapButton(deps, buttonId, details),
 });

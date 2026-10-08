@@ -120,9 +120,8 @@ describe("TaskScreen — work", () => {
     expect(screen.getByRole("button", { name: en("task.resume") })).toBeOnTheScreen();
   });
 
-  it("edits the title through the menu", async () => {
+  it("edits the title from the header's pencil", async () => {
     const runtime = await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.more") }));
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
     const title = screen.getByLabelText(en("edit.taskTitle"));
     await fireEvent.changeText(title, "Flaky p99 test");
@@ -130,6 +129,12 @@ describe("TaskScreen — work", () => {
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.title).toBe("Flaky p99 test");
     });
+  });
+
+  it("deletes from the header's trash: the close sheet opens on Cancelled · Skipped", async () => {
+    await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+    expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeOnTheScreen();
   });
 
   it("says so when the task does not exist", async () => {

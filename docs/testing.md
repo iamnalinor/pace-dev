@@ -79,6 +79,10 @@ role and state the way a screen reader sees it: chips and segments are `radio`s
    `EXPO_PUBLIC_API_URL=http://localhost:8787` and `EXPO_PUBLIC_DEV_LOGIN=1`), served as a
    single-page app by `scripts/serve-web.ts` (port 4173).
 
+Every test starts on an account of its own: `loginViaApi` (`e2e/support/login.ts`) takes the
+next id of the worker's whitelisted block and deletes that account first (`DELETE /api/me`),
+so parallel tests, `--repeat-each` and reruns against a reused server never share state.
+
 Tests are in `e2e/*.e2e.ts`; `e2e/support/fixtures.ts` adds `expectNoA11yViolations`
 (axe, WCAG 2.2 AA, fails on serious/critical). Every page gets a scan. Failures keep a
 trace and a screenshot; CI uploads `playwright-report/`.
@@ -87,9 +91,9 @@ trace and a screenshot; CI uploads `playwright-report/`.
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium` to use an installed one (sandboxes).
 - `E2E_BASE_URL=https://pace.nalinor.dev bun test:e2e` runs the suite against a deployed
   stack without starting anything.
-- Locally the servers are reused if already running (`reuseExistingServer`). A reused API
-  keeps its data between runs (CI always starts clean), so a rerun can meet yesterday's
-  tasks and settings: stop it, or delete `.cache/e2e-state`, for a clean run.
+- Locally the servers are reused if already running (`reuseExistingServer`); the accounts
+  are reset at each login, so a reused API is fine. A reused web build is not rebuilt: stop
+  the server (or `bun run build`) after changing the app.
 
 ## Mutation testing
 

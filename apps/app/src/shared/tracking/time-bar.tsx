@@ -1,22 +1,25 @@
-import { Plus, Square } from "lucide-react-native";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { ChevronDown, Plus, Square } from "lucide-react-native";
+import { useMemo, useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ColorTag, inkClass, PROJECT_FILL, washClass } from "#app/ui/color.tsx";
+import { Chip } from "#app/ui/chip.tsx";
+import { ColorTag, inkClass, OUTLINE, PROJECT_FILL } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { PulseDot } from "#app/ui/pulse-dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import {
-  type ActivityButtonProps,
   PACE_STATUS_TEXT,
+  recentLabels,
   type RunningView,
   type TimeButtonView,
 } from "@pace/client";
 import { formatDuration } from "@pace/core";
 
 import { ButtonEditor, type EditorTarget } from "./button-editor.tsx";
+import { DetailsSheet } from "./details-sheet.tsx";
 
 const percent = (share: number): `${number}%` => `${Math.round(share * 100)}%`;
 
@@ -37,6 +40,7 @@ const RunningRow = ({
     <View className="flex-row items-center gap-2.5">
       <View accessibilityLiveRegion="polite" className="flex-1 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
+          <PulseDot className={PROJECT_FILL[running.color]} />
           <ColorTag color={running.color}>{running.label}</ColorTag>
           <Text className="font-mono text-[13px] text-fg">
             {formatDuration(running.minutes, language)}
@@ -85,33 +89,48 @@ const RunningRow = ({
   );
 };
 
-const ActivityButton = ({ button, onEdit, onTap }: ActivityButtonProps) => {
+type ButtonProps = {
+  readonly button: TimeButtonView;
+  readonly onTap: (button: TimeButtonView) => void;
+  readonly onDetails: (button: TimeButtonView) => void;
+};
+
+/**
+A compact activity chip: the surface in its color's outline, filled while it runs. A button
+that asks for details (a chevron) opens them on a tap; any opens them on a long press.
+*/
+const ActivityButton = ({ button, onDetails, onTap }: ButtonProps) => {
   const t = useT();
-  const edit = (): void => {
-    onEdit({ button, kind: "edit" });
+  const { palette } = useTheme();
+  const details = (): void => {
+    onDetails(button);
   };
+  const isAsks = button.shouldAskDetails && !button.isRunning;
   return (
     <Pressable
-      accessibilityActions={[
-        { label: t("time.editButton", { label: button.label }), name: "longpress" },
-      ]}
+      accessibilityActions={[{ label: t("time.details.what"), name: "longpress" }]}
       accessibilityHint={t("time.buttonHint")}
       accessibilityLabel={button.label}
       accessibilityRole="switch"
       aria-checked={button.isRunning}
       className={cx(
-        "h-11 w-[23.5%] items-center justify-center rounded-lg border px-1 active:opacity-80",
-        button.isRunning ? PROJECT_FILL[button.color] : washClass(button.color),
+        "h-10 flex-row items-center gap-1 rounded-pill border-2 px-3.5 active:opacity-80",
+        OUTLINE[button.color],
+        button.isRunning ? PROJECT_FILL[button.color] : "bg-surface",
       )}
       delayLongPress={450}
       onAccessibilityAction={(event) => {
         if (event.nativeEvent.actionName === "longpress") {
-          edit();
+          details();
         }
       }}
-      onLongPress={edit}
+      onLongPress={details}
       onPress={() => {
-        onTap(button);
+        if (isAsks) {
+          details();
+        } else {
+          onTap(button);
+        }
       }}
     >
       <Text
@@ -123,7 +142,55 @@ const ActivityButton = ({ button, onEdit, onTap }: ActivityButtonProps) => {
       >
         {button.label}
       </Text>
+      {isAsks ? <ChevronDown color={palette.muted} size={14} strokeWidth={2} /> : null}
     </Pressable>
+  );
+};
+
+/** "What are you doing?": a free line that starts at Enter, and the last few labels at a tap. */
+const TypedStart = () => {
+  const t = useT();
+  const { actions } = usePace();
+  const { palette } = useTheme();
+  const run = useRunAction();
+  const time = useAppState((state) => state.time);
+  const recent = useMemo(() => recentLabels(time, undefined, 3), [time]);
+  const [text, setText] = useState("");
+  const start = async (label: string): Promise<void> => {
+    if (await run(actions.startTyped(label))) {
+      setText("");
+    }
+  };
+  return (
+    <View className="gap-2">
+      <TextInput
+        accessibilityLabel={t("time.whatDoing")}
+        className="h-10 rounded-lg border border-line bg-surface px-3 font-sans text-[14px] text-fg"
+        onChangeText={setText}
+        onSubmitEditing={() => {
+          if (text.trim() !== "") {
+            void start(text);
+          }
+        }}
+        placeholder={t("time.whatDoing")}
+        placeholderTextColor={palette.muted}
+        returnKeyType="go"
+        value={text}
+      />
+      {recent.length === 0 ? null : (
+        <View className="flex-row flex-wrap gap-1.5">
+          {recent.map((label) => (
+            <Chip
+              key={label}
+              label={`${t("time.start")}: ${label}`}
+              onPress={() => void start(label)}
+            >
+              {label}
+            </Chip>
+          ))}
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -138,6 +205,7 @@ export const TimeBar = () => {
   const run = useRunAction();
   const { buttons, running } = hooks.useTimeBar();
   const [editing, setEditing] = useState<EditorTarget | null>(null);
+  const [details, setDetails] = useState<null | TimeButtonView>(null);
   const tap = (button: TimeButtonView): void => {
     void run(actions.tapButton(button.id));
   };
@@ -150,7 +218,7 @@ export const TimeBar = () => {
       <View className="min-h-9 flex-row items-center gap-2">
         <View className="flex-1">
           {running === null ? (
-            <Text className="font-sans text-[12px] text-muted">{t("time.idle")}</Text>
+            <TypedStart />
           ) : (
             <RunningRow
               onStop={() => {
@@ -172,11 +240,23 @@ export const TimeBar = () => {
           <Plus color={palette.fg2} size={18} />
         </Pressable>
       </View>
-      <View className="mt-2 flex-row flex-wrap gap-[2%]">
+      <View className="mt-2 flex-row flex-wrap gap-1.5">
         {buttons.map((button) => (
-          <ActivityButton button={button} key={button.id} onEdit={setEditing} onTap={tap} />
+          <ActivityButton button={button} key={button.id} onDetails={setDetails} onTap={tap} />
         ))}
       </View>
+      {details === null ? null : (
+        <DetailsSheet
+          button={details}
+          onClose={() => {
+            setDetails(null);
+          }}
+          onEditButton={() => {
+            setDetails(null);
+            setEditing({ button: details, kind: "edit" });
+          }}
+        />
+      )}
       {editing === null ? null : (
         <ButtonEditor
           onClose={() => {

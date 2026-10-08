@@ -9,7 +9,7 @@ test("a visitor is sent to the login card", async ({ page }) => {
 });
 
 test("a signed-in session lands on Now", async ({ page }) => {
-  await loginViaApi(page, "1002");
+  await loginViaApi(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
   await expectNoA11yViolations(page);
