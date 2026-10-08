@@ -130,6 +130,8 @@ import must resolve and be declared in the importing workspace's `package.json`.
   pinned once in the root `catalog` (TypeScript, Vite/Vitest, zod, hono, drizzle-orm,
   wrangler, zustand, date-fns, ulidx, fast-check).
 - `bun audit --audit-level=high` runs in CI.
-- Dependabot opens weekly grouped updates: Expo SDK packages, Cloudflare, lint tools and
-  test tools each move together; GitHub Actions are updated too. The generated Gradle
-  project is not tracked.
+- Dependabot opens monthly grouped updates, at most three at a time: Expo SDK packages,
+  Cloudflare, lint tools and test tools each move together, and every other minor or patch
+  bump shares one PR; GitHub Actions are updated together too. Majors tied to the Expo SDK
+  (expo, react-native, jest) and `@types/node` are left for deliberate upgrades. The
+  generated Gradle project is not tracked.

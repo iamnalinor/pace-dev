@@ -11,10 +11,10 @@ Every level tests what the others cannot. Behaviour changes start with a failing
 | API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
 | App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |
 | End-to-end | Playwright + axe | the production web build against `wrangler dev` in Chromium | `e2e/*.e2e.ts` | `bun test:e2e` |
-| Mutation | Stryker | the core and web tests themselves | `packages/core`, `apps/web` | `bun test:mutation` (weekly in CI) |
+| Mutation | Stryker | the core and web tests themselves | `packages/core`, `apps/web` | `bun test:mutation` (on demand in CI) |
 | LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
-`bun test` runs unit → api → app → e2e. CI runs them as separate jobs (`ci.yml`).
+`bun test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
 
 ## Unit tests (core, client)
 

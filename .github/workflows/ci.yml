@@ -1,32 +1,38 @@
 name: CI
 
+# Minutes are rationed (private repo): one run per change, nothing for docs-only changes,
+# two jobs instead of six (every job pays its own checkout + install and is billed rounded
+# up to the minute), e2e only once the fast checks pass, and the Gradle build on demand.
 on:
   pull_request:
+    paths-ignore: ["**/*.md", "docs/**", "context/**", "LICENSE"]
   push:
-    # claude/** are the agent working branches: run the pipeline on them too (no deploy).
-    branches: [main, "claude/**"]
+    # Branches are checked through their pull request; main runs once more for the deploy.
+    branches: [main]
+    paths-ignore: ["**/*.md", "docs/**", "context/**", "LICENSE"]
   workflow_dispatch:
 
 # Least privilege by default; jobs ask for more only when needed.
 permissions:
   contents: read
 
+# A newer push to the same branch makes the running check moot; main always finishes.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # The Expo CLI and jest run under Node through their shebang when invoked via `bun run`
-# (never `bun --bun`); Playwright starts wrangler dev + vite preview itself (playwright.config.ts).
+# (never `bun --bun`); Playwright starts its servers itself (playwright.config.ts).
 env:
   CI: 1
   # Typed ESLint over seven tsconfig projects outgrew Node's default heap on the runners.
   NODE_OPTIONS: --max-old-space-size=4096
 
 jobs:
-  lint:
-    name: Lint (format, eslint, types, knip, jscpd, architecture, migrations)
+  checks:
+    name: Checks (lint, audit, unit, app, API)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -38,42 +44,32 @@ jobs:
             git diff
             exit 1
           fi
-
-  unit:
-    name: Unit tests (core, client, web)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      # Two advisories have no patched release yet and sit in dev-only tooling (metro/jest/
+      # tailwind 3 → micromatch → braces; @expo/cli → node-forge); nothing of them ships to
+      # the Worker or the app bundle. Drop the ignores once upstream publishes fixes.
+      - run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm --ignore GHSA-86w9-cpqp-85rv
       - run: bun test:unit
-
-  api:
-    name: API tests (workerd)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - run: bun test:api
-
-  app:
-    name: Mobile app tests (jest)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
       - run: bun test:app
+      - run: bun test:api
 
   e2e:
     name: End-to-end (Playwright)
+    # Only worth its minutes once the fast checks pass.
+    needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - run: bunx playwright install --with-deps chromium
+      - uses: actions/cache@v6
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
       - run: bun test:e2e
       - uses: actions/upload-artifact@v7
         if: failure()
@@ -84,22 +80,10 @@ jobs:
             test-results/
           retention-days: 7
 
-  audit:
-    name: Dependency audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      # Two advisories have no patched release yet and sit in dev-only tooling (metro/jest/
-      # tailwind 3 → micromatch → braces; @expo/cli → node-forge); nothing of them ships to
-      # the Worker or the app bundle. Drop the ignores once upstream publishes fixes.
-      - run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm --ignore GHSA-86w9-cpqp-85rv
-
   android-debug:
     name: Android debug APK (arm64)
-    # The repo is private today, so Gradle minutes are rationed: main + manual runs only.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Gradle is the costliest job by far: on demand only (release.yml builds the shipped APK).
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

@@ -124,7 +124,7 @@ the route exists).
 | `bun test:app` | jest-expo + React Native Testing Library |
 | `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
 | `bun test` | the four above, in that order |
-| `bun test:mutation` | Stryker on core and web (slow; weekly in CI) |
+| `bun test:mutation` | Stryker on core and web (slow; on demand in CI) |
 | `bun test:llm` | LLM parsing regression set (stage 2; the runner does not exist yet) |
 | `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |
 | `bun db:check` | fails when a schema changed without a migration (part of `bun lint`) |
@@ -181,11 +181,11 @@ either run `bunx wrangler deploy` in `apps/api` and `apps/web` or let the workfl
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ci.yml` | pull requests, pushes to `main` and `claude/**`, manual | lint (and a clean tree afterwards), unit, api, app, e2e, `bun audit`; on `main`/manual also an arm64 **debug APK** artifact |
+| `ci.yml` | pull requests and pushes to `main` (not for docs-only changes), manual | one checks job (lint with a clean tree afterwards, `bun audit`, unit, app, api), then e2e once it passes; manual runs also build an arm64 **debug APK** artifact |
 | `deploy.yml` | after a green CI on `main`, or manual | builds the web app with `VITE_API_URL=https://pace-api.nalinor.dev`, applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
 | `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk` |
-| `mutation.yml` | weekly, manual | Stryker on core and web |
-| `llm-regression.yml` | weekly, manual | `bun test:llm` with real providers (stage 2) |
+| `mutation.yml` | manual | Stryker on core and web |
+| `llm-regression.yml` | manual | `bun test:llm` with real providers (stage 2) |
 
 Secrets and variables read by the workflows:
 
