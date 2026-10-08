@@ -18,6 +18,8 @@ import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatDuration } from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
+import { CalendarSection, SleepCard, UsageAccessHint, UsageLine } from "./phone-section.tsx";
+import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
 const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
   const t = useT();
@@ -81,19 +83,25 @@ const GapRow = ({ minutes, onLog }: { readonly minutes: number; readonly onLog: 
 const EntryRow = ({
   entry,
   onOpen,
+  phone,
   zone,
 }: {
   readonly entry: DayEntry;
   readonly zone: string;
+  readonly phone: DayPhone;
   readonly onOpen: (target: SheetTarget) => void;
 }) => {
   const open = (): void => {
     onOpen(entry.target);
   };
-  return entry.kind === "gap" ? (
-    <GapRow minutes={entry.gap.minutes} onLog={open} />
-  ) : (
-    <ActivityRow onEdit={open} row={entry.row} zone={zone} />
+  if (entry.kind === "gap") {
+    return <GapRow minutes={entry.gap.minutes} onLog={open} />;
+  }
+  return (
+    <>
+      <ActivityRow onEdit={open} row={entry.row} zone={zone} />
+      <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
+    </>
   );
 };
 
@@ -101,15 +109,17 @@ const EntryRow = ({
 const Entries = ({
   entries,
   onOpen,
+  phone,
   zone,
 }: {
   readonly entries: readonly DayEntry[];
   readonly zone: string;
+  readonly phone: DayPhone;
   readonly onOpen: (target: SheetTarget) => void;
 }) => (
   <View className="px-5">
     {entries.map((entry) => (
-      <EntryRow entry={entry} key={entry.key} onOpen={onOpen} zone={zone} />
+      <EntryRow entry={entry} key={entry.key} onOpen={onOpen} phone={phone} zone={zone} />
     ))}
   </View>
 );
@@ -186,6 +196,8 @@ export const DayScreen = () => {
   const [date, setDate] = useState<null | string>(null);
   const [sheet, setSheet] = useState<null | SheetTarget>(null);
   const day = hooks.useDay(date);
+  const { now } = hooks.useClock();
+  const phone = useDayPhone(day, now);
   const header = (
     <ScreenHeader
       eyebrow={eyebrowDate(day.date, day.zone, language)}
@@ -196,11 +208,13 @@ export const DayScreen = () => {
   return (
     <Screen header={header}>
       <Totals day={day} />
+      {phone.hasUsageAccess ? <SleepCard phone={phone} zone={day.zone} /> : <UsageAccessHint />}
       {day.entries.length === 0 ? (
         <Text className="px-5 py-6 font-sans text-[14px] text-muted">{t("day.empty")}</Text>
       ) : (
-        <Entries entries={day.entries} onOpen={setSheet} zone={day.zone} />
+        <Entries entries={day.entries} onOpen={setSheet} phone={phone} zone={day.zone} />
       )}
+      <CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
       <Pressable
         accessibilityRole="button"
         className="mx-5 mt-4 h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line active:opacity-70"
