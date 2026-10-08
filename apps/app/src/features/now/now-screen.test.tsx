@@ -29,12 +29,14 @@ describe("NowScreen", () => {
       "Mark Return library books done",
     ]);
     expect(screen.getByText("Due tomorrow 23:59 · 4/7 solved · 2 sent")).toBeOnTheScreen();
-    expect(screen.getByText("ASAP · by end of day")).toBeOnTheScreen();
+    // The project (else the category) and the importance are coloured tags before the meta text.
+    expect(screen.getByText("by end of day")).toBeOnTheScreen();
+    expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.getByText("1 day late · 2 problems left")).toBeOnTheScreen();
-    expect(screen.getByText("Nice-to-have · 12 days old")).toBeOnTheScreen();
-    expect(
-      screen.getByText("Prioritized · Due Friday 18:00 UTC (your time 21:00)"),
-    ).toBeOnTheScreen();
+    expect(screen.getByText("12 days old")).toBeOnTheScreen();
+    expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
+    expect(screen.getByText("Due Friday 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
+    expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
     expect(screen.getByText(en("now.nothingRunning"))).toBeOnTheScreen();
   });
 

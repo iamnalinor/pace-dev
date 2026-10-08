@@ -6,8 +6,8 @@ import type { InboxCard as Card } from "@pace/client";
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ImportanceDot } from "#web/shared/ui/importance-mark.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { tagClass } from "#web/shared/ui/color-tag.tsx";
+import { IMPORTANCE_COLORS, type ProjectColorName } from "@pace/core";
 
 import { formatAge } from "./age.ts";
 import { ChipPicker } from "./chip-picker.tsx";
@@ -40,6 +40,23 @@ export const InboxCard = ({ card, edits, onAccept, onDelete, onEdit }: Props) =>
   const chips = useChipText();
   const [open, setOpen] = useState<ChipField | null>(null);
   const suggestion = editedSuggestion(card.suggestion, edits);
+  /** Each guessed field in its own colour: the project's, the category's, the importance's. */
+  const colorOf = (field: ChipField): null | ProjectColorName => {
+    switch (field) {
+      case "importance": {
+        return IMPORTANCE_COLORS[suggestion.importance];
+      }
+      case "preset": {
+        return chips.presetColor(suggestion);
+      }
+      case "project": {
+        return suggestion.projectId === null ? null : chips.color(suggestion);
+      }
+      case "due": {
+        return null;
+      }
+    }
+  };
   return (
     <li
       className={cn(
@@ -62,7 +79,8 @@ export const InboxCard = ({ card, edits, onAccept, onDelete, onEdit }: Props) =>
               aria-expanded={open === field}
               aria-label={t(CHANGE_KEY[field], { value: text })}
               className={cn(
-                "flex h-9 items-center gap-1.5 rounded-md bg-raised px-2.5 text-xs text-fg2 outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
+                "flex h-9 items-center gap-1.5 rounded-md px-2.5 text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
+                tagClass(colorOf(field)),
                 open === field && "ring-1 ring-fg2",
               )}
               key={field}
@@ -71,11 +89,6 @@ export const InboxCard = ({ card, edits, onAccept, onDelete, onEdit }: Props) =>
               }}
               type="button"
             >
-              {field === "project" && suggestion.projectId !== null && (
-                <ProjectDot color={chips.color(suggestion)} />
-              )}
-              {field === "preset" && <ProjectDot color={chips.presetColor(suggestion)} />}
-              {field === "importance" && <ImportanceDot importance={suggestion.importance} />}
               {text}
             </button>
           );

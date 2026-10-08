@@ -6,7 +6,7 @@ import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { BackHeader } from "#app/ui/back-header.tsx";
-import { Dot } from "#app/ui/dot.tsx";
+import { ColorTag } from "#app/ui/color.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 
 /** Back, the project (a link to its page), and the "more" menu. */
@@ -37,13 +37,12 @@ export const TaskHeader = ({
         <Pressable
           accessibilityLabel={project.name}
           accessibilityRole="link"
-          className="h-11 flex-row items-center gap-2 active:opacity-70"
+          className="h-11 flex-row items-center active:opacity-70"
           onPress={() => {
             router.push(`/project/${project.id}`);
           }}
         >
-          <Dot color={project.color} />
-          <Text className="font-sans text-[13px] text-fg2">{project.name}</Text>
+          <ColorTag color={project.color}>{project.name}</ColorTag>
         </Pressable>
       )}
     </BackHeader>

@@ -7,7 +7,7 @@ import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { ColorBar } from "#web/shared/ui/color-tag.tsx";
 import { EXAMPLE_PRESET_IDS, type Preset, presetById, resolvePreset } from "@pace/core";
 
 import { CONTROL_CLASS } from "./control-class.ts";
@@ -39,7 +39,7 @@ const PresetRow = ({ preset }: { readonly preset: Preset }) => {
   const resolved = resolvePreset(presets, preset.id);
   const body = (
     <>
-      <ProjectDot color={resolved.ok ? resolved.value.color : null} />
+      <ColorBar color={resolved.ok ? resolved.value.color : null} />
       <span className="min-w-0 flex-1 truncate text-[15px]">{presetLabel(preset, t)}</span>
       {preset.archived && <Badge tone="quiet">{t("presets.archivedBadge")}</Badge>}
       <Badge>{t(preset.builtIn ? "presets.builtIn" : "presets.yours")}</Badge>

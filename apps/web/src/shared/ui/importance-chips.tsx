@@ -19,7 +19,6 @@ export const ImportanceChips = ({ className, onChange, value }: Props) => {
       onChange={onChange}
       options={ImportanceSchema.options.map((importance) => ({
         color: IMPORTANCE_COLORS[importance],
-        hasDot: true,
         label: t(`importance.${importance}`),
         value: importance,
       }))}

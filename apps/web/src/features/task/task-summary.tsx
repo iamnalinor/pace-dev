@@ -2,8 +2,9 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 
 import { type Translate, useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
-import { ImportanceDot } from "#web/shared/ui/importance-mark.tsx";
+import { tagClass } from "#web/shared/ui/color-tag.tsx";
 import { LinkChip } from "#web/shared/ui/link-chip.tsx";
+import { IMPORTANCE_COLORS } from "@pace/core";
 
 const tagText = (t: Translate, tag: TaskTag): string => {
   switch (tag.kind) {
@@ -31,12 +32,13 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
         {view.tags.map((tag) => (
           <li
             className={cn(
-              "flex items-center gap-1.5 rounded-sm bg-raised px-2 py-1 text-xs",
-              tag.kind === "importance" ? "text-fg" : "text-fg2",
+              "flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs",
+              tag.kind === "importance"
+                ? cn("font-medium", tagClass(IMPORTANCE_COLORS[tag.importance]))
+                : "bg-raised text-fg2",
             )}
             key={tag.kind}
           >
-            {tag.kind === "importance" && <ImportanceDot importance={tag.importance} />}
             {tagText(t, tag)}
           </li>
         ))}

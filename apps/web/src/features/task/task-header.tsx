@@ -5,7 +5,7 @@ import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#web/i18n.tsx";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 
 type Props = {
   readonly project: TaskViewModel["project"];
@@ -39,11 +39,12 @@ export const TaskHeader = ({ onMore, project }: Props) => {
         <span className="text-xs text-muted">{t("task.noProject")}</span>
       ) : (
         <Link
-          className="flex min-h-11 items-center gap-1.5 rounded-sm px-2 text-xs text-muted no-underline outline-none hover:text-fg focus-visible:ring-[3px] focus-visible:ring-accent/40"
+          className="flex min-h-11 items-center rounded-sm px-1 no-underline outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40"
           to={`/projects/${project.id}`}
         >
-          <ProjectDot color={project.color} />
-          {project.name}
+          <ColorTag className="text-xs" color={project.color}>
+            {project.name}
+          </ColorTag>
         </Link>
       )}
       <Button

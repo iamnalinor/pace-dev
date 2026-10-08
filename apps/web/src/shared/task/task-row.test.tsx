@@ -11,6 +11,7 @@ import { TaskRow } from "./task-row.tsx";
 
 const hw: NowRow = {
   color: "blue",
+  tag: { kind: "project", name: "Algebra" },
   dimmed: false,
   id: "t-hw",
   importance: "normal",
@@ -64,7 +65,8 @@ describe("TaskRow", () => {
     const item = await screen.findByRole("listitem");
     // Quiet by a lighter title, not by transparency: the text keeps its AA contrast.
     expect(screen.getByText("Return library books")).toHaveClass("text-fg2");
-    expect(item).toHaveTextContent("Nice-to-have · 12 days old");
+    // The category and the importance are tags in their colours, then the plain meta.
+    expect(item).toHaveTextContent(/Nice-to-have12 days old/u);
     expect(screen.queryByTestId("pace-marker")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useLanguage } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { ColorBar } from "#web/shared/ui/color-tag.tsx";
 import { plural } from "@pace/core";
 
 import { NewProjectForm } from "./new-project-form.tsx";
@@ -27,7 +27,7 @@ const SummaryRow = ({ project }: { readonly project: ProjectSummary }) => {
         )}
         to={`/projects/${project.id}`}
       >
-        <ProjectDot className="size-3 rounded-sm" color={project.color} />
+        <ColorBar color={project.color} />
         <span className="min-w-0 flex-1 truncate text-[15px]">{project.name}</span>
         <span className="font-mono text-xs text-muted">
           {project.archived ? t("project.archived") : open}

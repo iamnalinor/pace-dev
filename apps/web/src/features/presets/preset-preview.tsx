@@ -2,8 +2,8 @@ import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMeta } from "#web/shared/format/meta.ts";
 import { cn } from "#web/shared/lib/cn.ts";
+import { ColorBar } from "#web/shared/ui/color-tag.tsx";
 import { PaceBar } from "#web/shared/ui/pace-bar.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 import { type MetaPart, relativeDay } from "@pace/client";
 import {
   addMinutesIso,
@@ -110,7 +110,7 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
         />
         <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
           <span className="flex items-center gap-2">
-            <ProjectDot color={resolved.value.color} />
+            <ColorBar className="h-4" color={resolved.value.color} />
             <span
               className={cn(
                 "truncate text-[15px] font-medium",

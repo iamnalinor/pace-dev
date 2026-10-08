@@ -52,7 +52,7 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
               router.push(`/task/${row.id}`);
             }}
             row={row}
-            withDot={false}
+            withTag={false}
           />
         ))}
       </View>
