@@ -34,6 +34,7 @@ const started = (state: TimeState, event: EventOf<"activity.started">): TimeStat
       isLogged: false,
       label: payload.label,
       limitMinutes: payload.limitMinutes ?? null,
+      messengersOnPurpose: false,
       startAt: event.occurredAt,
       taskId: payload.taskId ?? null,
     },
@@ -53,6 +54,7 @@ const logged = (state: TimeState, event: EventOf<"activity.logged">): TimeState 
         isLogged: true,
         label: payload.label,
         limitMinutes: null,
+        messengersOnPurpose: false,
         startAt: payload.startAt,
         taskId: payload.taskId ?? null,
       });
@@ -121,11 +123,12 @@ const HANDLERS: Handlers = {
     }));
   },
   "activity.labelled": (state, event) => {
-    const { category, label, taskId } = event.payload;
+    const { category, label, messengersOnPurpose, taskId } = event.payload;
     return patch(state, event.payload.activityId, (activity) => ({
       ...activity,
       category: category ?? activity.category,
       label: label ?? activity.label,
+      messengersOnPurpose: messengersOnPurpose ?? activity.messengersOnPurpose,
       taskId: taskId === undefined ? activity.taskId : taskId,
     }));
   },

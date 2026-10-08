@@ -36,6 +36,9 @@ const mockEvents = [
   { className: null, eventType: 16, packageName: "android", timestamp: utc("06T09:30") },
 ];
 
+/** The night above; a test may add events after it. */
+const NIGHT_EVENTS = mockEvents.length;
+
 const mockAccess = { granted: true };
 
 jest.mock("../../../modules/pace-native/index.ts", () => ({
@@ -55,6 +58,7 @@ const calendar = Calendar as unknown as FakeCalendar;
 beforeEach(() => {
   // What a test waved away stays on its fake phone only.
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  mockEvents.splice(NIGHT_EVENTS);
   mockAccess.granted = true;
   calendar.state.status = "granted";
   calendar.state.events = [
@@ -83,7 +87,8 @@ describe("Day with the phone's data", () => {
     await renderScreen(<DayScreen />, runtime);
 
     expect(await screen.findByText("Slept 23:50–07:40 · 7h 50m · woke up 1×")).toBeOnTheScreen();
-    expect(await screen.findByText("Phone 20m: Telegram 20m")).toBeOnTheScreen();
+    // A study block: a quarter of the Telegram time is taken off what it counts.
+    expect(await screen.findByText("Phone 20m: Telegram 20m · counted 35m")).toBeOnTheScreen();
     const seminar = await screen.findByText("Seminar");
     expect(seminar).toBeOnTheScreen();
 
@@ -136,5 +141,89 @@ describe("Day with the phone's data", () => {
     ).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Show my calendar's events here" }));
     expect(await screen.findByText("Seminar")).toBeOnTheScreen();
+  });
+
+  it("offers to end an overrun activity when the phone was picked up", async () => {
+    // Lunch from 14:00 Moscow (Expect 30m); the phone came out at 14:40 and is still in hand.
+    mockEvents.push({
+      className: null,
+      eventType: 15,
+      packageName: "android",
+      timestamp: utc("06T11:40"),
+    });
+    const runtime = await createTestRuntime();
+    await runtime.actions.startActivity(
+      { category: "food", expectMinutes: 30, label: "Lunch" },
+      { at: "2026-10-06T11:00:00.000Z" },
+    );
+    await renderScreen(<DayScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: "Ended at 14:40?" }));
+    await waitFor(() => {
+      expect(activities(runtime).find((activity) => activity.label === "Lunch")).toMatchObject({
+        endAt: "2026-10-06T11:40:00.000Z",
+      });
+    });
+  });
+
+  it("remembers a repeating event's answer for the whole series", async () => {
+    calendar.state.events = [
+      {
+        allDay: false,
+        calendarId: "cal-1",
+        endDate: "2026-10-06T07:15:00.000Z",
+        id: "standup-6",
+        recurrenceRule: { frequency: "daily" },
+        startDate: "2026-10-06T07:00:00.000Z",
+        title: "Standup",
+      },
+    ];
+    const runtime = await createTestRuntime();
+    await renderScreen(<DayScreen />, runtime);
+    const list = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(list).getByRole("button", { name: "Attended" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Every time" }));
+    expect(await screen.findByText("Will do the same every time")).toBeOnTheScreen();
+    expect(
+      JSON.parse(
+        (SecureStore as unknown as FakeSecureStore).values.get("pace.phone.rules") ?? "[]",
+      ),
+    ).toEqual([{ rule: "attended", series: "cal-1:Standup", title: "Standup" }]);
+  });
+
+  it("logs an always-attended series by itself and hides an always-skipped one", async () => {
+    (SecureStore as unknown as FakeSecureStore).values.set(
+      "pace.phone.rules",
+      JSON.stringify([
+        { rule: "attended", series: "cal-1:Standup", title: "Standup" },
+        { rule: "skip", series: "cal-1:Gym", title: "Gym" },
+      ]),
+    );
+    const daily = { frequency: "daily" };
+    calendar.state.events = [
+      {
+        allDay: false,
+        calendarId: "cal-1",
+        endDate: "2026-10-06T07:15:00.000Z",
+        id: "standup-6",
+        recurrenceRule: daily,
+        startDate: "2026-10-06T07:00:00.000Z",
+        title: "Standup",
+      },
+      {
+        allDay: false,
+        calendarId: "cal-1",
+        endDate: "2026-10-06T06:00:00.000Z",
+        id: "gym-6",
+        recurrenceRule: daily,
+        startDate: "2026-10-06T05:00:00.000Z",
+        title: "Gym",
+      },
+    ];
+    const runtime = await createTestRuntime();
+    await renderScreen(<DayScreen />, runtime);
+    await waitFor(() => {
+      expect(activities(runtime).map((activity) => activity.label)).toEqual(["Standup"]);
+    });
+    expect(screen.queryByText("Gym")).toBeNull();
   });
 });

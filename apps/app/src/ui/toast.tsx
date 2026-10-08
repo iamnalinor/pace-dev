@@ -40,8 +40,9 @@ const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toa
         accessibilityRole="button"
         className="h-11 justify-center rounded-md px-3 active:opacity-70"
         onPress={() => {
-          toast.action?.onPress();
+          // Closed first, so the action may show a toast of its own.
           onDone();
+          toast.action?.onPress();
         }}
       >
         <Text className="font-sans text-[14px] font-semibold text-inverseFg">

@@ -40,6 +40,21 @@ describe("time actions", () => {
     ]);
   });
 
+  it("marks a block as one where the messengers were the point, and stops at a past instant", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.tapButton("btn:work"));
+    const day = dayModel(world.state.store.getState(), null, ctx(later(10)));
+    const running = day.entries.find((entry) => entry.kind === "activity");
+    const activityId = running?.kind === "activity" ? running.row.activityId : "";
+    unwrap(await world.actions.relabelActivity(activityId, { messengersOnPurpose: true }));
+    world.setNow(later(90));
+    unwrap(await world.actions.stopActivity({ at: later(60) }));
+    const after = dayModel(world.state.store.getState(), null, ctx(later(95)));
+    expect(after.entries.find((entry) => entry.kind === "activity")).toMatchObject({
+      row: { isRunning: false, messengersOnPurpose: true, minutes: 60 },
+    });
+  });
+
   it("leaves a day with nothing on it empty instead of one long gap", async () => {
     const world = await setupActions();
     expect(dayModel(world.state.store.getState(), null, ctx(NOW)).entries).toEqual([]);

@@ -1,19 +1,22 @@
+import { useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 
 import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
-import type { DayEntry } from "@pace/client";
+import type { DayEntry, DayRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { openUsageAccessSettings } from "#app/platform/phone-data.ts";
+import { calendarKey, sleepKey } from "#app/platform/phone-memory.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { inkClass, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { CATEGORY_COLORS, formatDuration } from "@pace/core";
+import { useToast } from "#app/ui/toast.tsx";
+import { CATEGORY_COLORS, countedMinutes, FOCUS_CATEGORIES, formatDuration } from "@pace/core";
 
-import { calendarKey, type DayPhone, type NamedApp, sleepKey } from "./use-day-phone.ts";
+import { type DayPhone, isCalendarLogged, type NamedApp } from "./use-day-phone.ts";
 
 /** Sleep is drawn in the sleep category's color, like its blocks on the day. */
 const SLEEP_COLOR = CATEGORY_COLORS.sleep;
@@ -52,6 +55,7 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
         <View className="flex-1">
           <Button
             onPress={() => {
+              phone.answered(sleepKey(sleep));
               void run(
                 actions.logPast({
                   category: "sleep",
@@ -81,8 +85,17 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
   );
 };
 
-/** "Phone 23m: Telegram 15m, YouTube 8m" under a block, when the phone was used in it. */
-export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
+/**
+"Phone 23m: Telegram 15m, YouTube 8m" under a block, when the phone was used in it. A focus
+block also says what it counts once a quarter of the messenger time is taken off.
+*/
+export const UsageLine = ({
+  apps,
+  row,
+}: {
+  readonly apps: readonly NamedApp[];
+  readonly row: Pick<DayRow, "category" | "messengersOnPurpose" | "minutes">;
+}) => {
   const t = useT();
   const { language } = useViewer();
   if (apps.length === 0) {
@@ -93,10 +106,53 @@ export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
     .slice(0, TOP_APPS)
     .map((app) => `${app.name} ${formatDuration(app.minutes, language)}`)
     .join(", ");
+  const { counted } = countedMinutes(row.minutes, apps, { onPurpose: row.messengersOnPurpose });
+  const parts = [
+    t("phone.usage", { apps: named, duration: formatDuration(total, language) }),
+    ...(FOCUS_CATEGORIES.has(row.category) && counted !== row.minutes
+      ? [t("phone.counted", { duration: formatDuration(counted, language) })]
+      : []),
+  ];
   return (
-    <Text className="pb-2 pl-[98px] font-sans text-[12px] text-muted" numberOfLines={1}>
-      {t("phone.usage", { apps: named, duration: formatDuration(total, language) })}
+    <Text className="pb-2 pl-[98px] font-sans text-[12px] text-muted" numberOfLines={2}>
+      {parts.join(" · ")}
     </Text>
+  );
+};
+
+/** Under a running block that is past its Expect: end it when the phone was picked up. */
+export const EndedAtPrompt = ({
+  phone,
+  row,
+  zone,
+}: {
+  readonly phone: DayPhone;
+  readonly row: DayRow;
+  readonly zone: string;
+}) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  const { pickupAt } = phone;
+  const isOverExpect = row.expectMinutes !== null && row.minutes > row.expectMinutes;
+  if (pickupAt === null || !isOverExpect || !row.isRunning || pickupAt <= row.startAt) {
+    return null;
+  }
+  const time = clockTime(pickupAt, zone);
+  return (
+    <View className="pb-2 pl-[98px]">
+      <Button
+        onPress={() => {
+          void run(actions.stopActivity({ at: pickupAt }), {
+            success: t("time.stopped", { label: row.label }),
+            undo: true,
+          });
+        }}
+        variant="ghost"
+      >
+        {t("phone.endedAt", { time })}
+      </Button>
+    </View>
   );
 };
 
@@ -112,20 +168,10 @@ export const UsageAccessHint = () => {
   );
 };
 
-const isLogged = (
-  entries: readonly DayEntry[],
-  event: { readonly title: string; readonly startAt: string; readonly endAt: string },
-): boolean =>
-  entries.some(
-    (entry) =>
-      entry.kind === "activity" &&
-      entry.row.label === event.title &&
-      entry.row.startAt < event.endAt &&
-      entry.row.endAt > event.startAt,
-  );
-
-/** The phone calendar's events of the day: mark one attended (it becomes a block) or skip it. */
-/** One event: its time and title, then Attended / Skip, or "logged" once it is on the day. */
+/**
+One event: its time and title, then Attended (it becomes a block) / Skip, or "logged" once it
+is on the day. A repeating event's toast offers "Every time" for the whole series.
+*/
 const CalendarRow = ({
   entries,
   event,
@@ -140,6 +186,18 @@ const CalendarRow = ({
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
+  const toast = useToast();
+  const { series } = event;
+  const everyTime = (rule: "attended" | "skip") =>
+    series === null
+      ? undefined
+      : {
+          label: t("phone.everyTime"),
+          onPress: () => {
+            phone.remember({ rule, series, title: event.title });
+            toast.show({ message: t("phone.ruleSaved") });
+          },
+        };
   return (
     <View className="flex-row items-center gap-2 border-t border-line py-2">
       <Text className="w-[86px] font-mono text-[12px] text-muted">
@@ -148,12 +206,13 @@ const CalendarRow = ({
       <Text className="flex-1 font-sans text-[14px] text-fg" numberOfLines={2}>
         {event.title}
       </Text>
-      {isLogged(entries, event) ? (
+      {isCalendarLogged(entries, event) ? (
         <Text className="font-sans text-[12px] text-muted">{t("phone.logged")}</Text>
       ) : (
         <View className="flex-row">
           <Button
             onPress={() => {
+              phone.answered(calendarKey(event));
               void run(
                 actions.logPast({
                   category: "other",
@@ -161,7 +220,11 @@ const CalendarRow = ({
                   label: event.title,
                   startAt: event.startAt,
                 }),
-                { success: t("phone.attendedDone", { title: event.title }), undo: true },
+                {
+                  action: everyTime("attended"),
+                  success: t("phone.attendedDone", { title: event.title }),
+                  undo: true,
+                },
               );
             }}
             variant="ghost"
@@ -171,6 +234,10 @@ const CalendarRow = ({
           <Button
             onPress={() => {
               phone.dismiss(calendarKey(event));
+              const action = everyTime("skip");
+              if (action !== undefined) {
+                toast.show({ action, message: t("day.skipped") });
+              }
             }}
             variant="ghost"
           >
@@ -180,6 +247,28 @@ const CalendarRow = ({
       )}
     </View>
   );
+};
+
+/** Logs the ended events of "always attended" series once each, as the person asked. */
+const useSeriesAutoLog = (phone: DayPhone): void => {
+  const { actions } = usePace();
+  const loggedRef = useRef(new Set<string>());
+  const { autoLog } = phone.calendar;
+  useEffect(() => {
+    for (const event of autoLog) {
+      const key = calendarKey(event);
+      if (loggedRef.current.has(key)) {
+        continue;
+      }
+      loggedRef.current.add(key);
+      void actions.logPast({
+        category: "other",
+        endAt: event.endAt,
+        label: event.title,
+        startAt: event.startAt,
+      });
+    }
+  }, [actions, autoLog]);
 };
 
 export const CalendarSection = ({
@@ -192,6 +281,7 @@ export const CalendarSection = ({
   readonly zone: string;
 }) => {
   const t = useT();
+  useSeriesAutoLog(phone);
   const { access, events } = phone.calendar;
   if (access === "undetermined") {
     return (

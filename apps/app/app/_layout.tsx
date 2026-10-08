@@ -7,10 +7,14 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider } from "#app/app-state.tsx";
+import { useNotificationLinks } from "#app/platform/notification-links.ts";
+// Defines the background phone check before Android may run it.
+import "#app/platform/phone-background.ts";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 
 const Navigator = () => {
   const { palette, scheme } = useTheme();
+  useNotificationLinks();
   return (
     <>
       <Stack screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}>
@@ -23,6 +27,8 @@ const Navigator = () => {
         <Stack.Screen name="inbox" />
         <Stack.Screen name="review" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="permissions" />
+        <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
       </Stack>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
     </>

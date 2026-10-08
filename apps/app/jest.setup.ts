@@ -1,4 +1,5 @@
 import type * as RouterFake from "./src/test/router.ts";
+import type * as BackgroundFake from "./src/testing/background-task.fake.ts";
 import type * as CalendarFake from "./src/testing/calendar.fake.ts";
 import type * as NotificationsFake from "./src/testing/notifications.fake.ts";
 import type * as SecureStoreFake from "./src/testing/secure-store.fake.ts";
@@ -28,6 +29,16 @@ jest.mock("expo-notifications", () =>
   jest
     .requireActual<typeof NotificationsFake>("./src/testing/notifications.fake.ts")
     .createFakeNotifications(),
+);
+jest.mock("expo-background-task", () =>
+  jest
+    .requireActual<typeof BackgroundFake>("./src/testing/background-task.fake.ts")
+    .createFakeBackgroundTask(),
+);
+jest.mock("expo-task-manager", () =>
+  jest
+    .requireActual<typeof BackgroundFake>("./src/testing/background-task.fake.ts")
+    .createFakeTaskManager(),
 );
 jest.mock("expo-router", () =>
   jest.requireActual<typeof RouterFake>("./src/test/router.ts").routerModule(),

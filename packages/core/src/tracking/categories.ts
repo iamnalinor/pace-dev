@@ -5,6 +5,9 @@ import { ActivityCategorySchema } from "../events/payloads.ts";
 
 export const ACTIVITY_CATEGORIES: readonly ActivityCategory[] = ActivityCategorySchema.options;
 
+/** Where attention is the point: phone penalties and productivity charts look at these. */
+export const FOCUS_CATEGORIES: ReadonlySet<ActivityCategory> = new Set(["work", "study", "task"]);
+
 /** Each category's color in tags, buttons and charts. */
 export const CATEGORY_COLORS: Readonly<Record<ActivityCategory, ProjectColorName>> = {
   work: "blue",

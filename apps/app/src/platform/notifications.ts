@@ -10,7 +10,7 @@ import {
   scheduleChanges,
   timeBarModel,
 } from "@pace/client";
-import { t } from "@pace/core";
+import { type Language, t } from "@pace/core";
 
 /** The Android channel the reminders go to (users can silence it in system settings). */
 const CHANNEL_ID = "reminders";
@@ -18,14 +18,13 @@ const CHANNEL_ID = "reminders";
 /** Activity timers: louder than reminders, since they are about the thing being done now. */
 const TIMERS_CHANNEL_ID = "timers";
 
-/** Asks once; a refusal is respected (no reminders, nothing else changes). */
+/**
+Never asks: the onboarding and Settings → Permissions do, with the reason shown first. Without
+the permission nothing is scheduled and nothing else changes.
+*/
 const hasPermission = async (): Promise<boolean> => {
   const current = await Notifications.getPermissionsAsync();
-  if (current.granted || !current.canAskAgain) {
-    return current.granted;
-  }
-  const asked = await Notifications.requestPermissionsAsync();
-  return asked.granted;
+  return current.granted;
 };
 
 /** Cancels what this sync owns but no longer wants and schedules what is missing. */
@@ -76,6 +75,36 @@ export const syncLocalNotifications = async (
     name: t(language, "notify.channel"),
   });
   await apply(localNotifications(plan, language), { channelId: CHANNEL_ID });
+};
+
+/** A notification shown now; a tap opens `url` in the app. */
+export type PhoneNotice = {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly url: string;
+};
+
+/** Shows the notices on the reminders channel at once (nothing without the permission). */
+export const showNow = async (
+  notices: readonly PhoneNotice[],
+  language: Language,
+): Promise<number> => {
+  if (notices.length === 0 || !(await hasPermission())) {
+    return 0;
+  }
+  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+    importance: Notifications.AndroidImportance.DEFAULT,
+    name: t(language, "notify.channel"),
+  });
+  for (const notice of notices) {
+    await Notifications.scheduleNotificationAsync({
+      content: { body: notice.body, data: { url: notice.url }, title: notice.title },
+      identifier: notice.id,
+      trigger: { channelId: CHANNEL_ID },
+    });
+  }
+  return notices.length;
 };
 
 /**

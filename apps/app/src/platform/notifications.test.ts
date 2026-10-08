@@ -13,7 +13,7 @@ jest.mock("expo-notifications", () => ({
     { identifier: "pace:digest:2026-10-06T11:00:00.000Z" },
     { identifier: "someone-else" },
   ]),
-  getPermissionsAsync: jest.fn(async () => ({ canAskAgain: true, granted: false })),
+  getPermissionsAsync: jest.fn(async () => ({ canAskAgain: true, granted: true })),
   requestPermissionsAsync: jest.fn(async () => ({ canAskAgain: true, granted: true })),
   scheduleNotificationAsync: jest.fn(async () => "id"),
   setNotificationChannelAsync: jest.fn(async () => null),
@@ -41,9 +41,9 @@ describe("syncLocalNotifications", () => {
     jest.clearAllMocks();
   });
 
-  it("asks for permission, replaces stale reminders and schedules the plan", async () => {
+  it("replaces stale reminders and schedules the plan", async () => {
     await syncLocalNotifications(await client({ "GET /api/notify/plan": () => plan }));
-    expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
       "pace:digest:2026-10-06T11:00:00.000Z",
     );
@@ -53,6 +53,15 @@ describe("syncLocalNotifications", () => {
       identifier: "pace:digest:2026-10-06T18:00:00.000Z",
       trigger: { channelId: "reminders", date: new Date("2026-10-06T18:00:00.000Z"), type: "date" },
     });
+  });
+
+  it("never asks: without the permission nothing is scheduled", async () => {
+    jest
+      .mocked(Notifications.getPermissionsAsync)
+      .mockResolvedValueOnce({ canAskAgain: true, granted: false } as never);
+    await syncLocalNotifications(await client({ "GET /api/notify/plan": () => plan }));
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
   it("leaves the scheduled reminders alone when offline", async () => {

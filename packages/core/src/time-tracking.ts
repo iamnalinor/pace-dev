@@ -5,6 +5,7 @@ export {
   CATEGORY_COLORS,
   CATEGORY_DEFAULTS,
   type ExpectLimit,
+  FOCUS_CATEGORIES,
 } from "./tracking/categories.ts";
 export {
   type Defaults,
@@ -35,9 +36,13 @@ export {
 export {
   type AppMinutes,
   appUsage,
+  type Counted,
+  countedMinutes,
   detectSleep,
   type Interval,
+  MESSENGER_PACKAGES,
   type PhoneEvent,
+  phonePickupAt,
   screenOnIntervals,
   type SleepCandidate,
 } from "./tracking/phone.ts";
