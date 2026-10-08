@@ -1,5 +1,4 @@
-import { Check, Clock, Play, RotateCcw, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { Check, Clock, Play, RotateCcw, Square, Upload } from "lucide-react";
 
 import type { TaskViewModel } from "@pace/client";
 
@@ -84,12 +83,14 @@ const usePrimary = (view: TaskViewModel) => {
   })();
 };
 
-/** Focus (stage 3), the status switch, and the primary action: Submit, Done or Reopen. */
+/** Focus (time on this task, from the time bar's ledger), the status switch, and the primary action: Submit, Done or Reopen. */
 export const TaskActionsBar = ({ onClose, view }: Props) => {
   const t = useT();
   const { actions } = useServices();
   const run = useRunAction();
   const primary = usePrimary(view);
+  const running = useServices().hooks.useTimeBar().running;
+  const isFocused = running?.taskId === view.id;
   if (view.closed !== null) {
     return <ClosedBar view={view} />;
   }
@@ -106,16 +107,21 @@ export const TaskActionsBar = ({ onClose, view }: Props) => {
   return (
     <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2 px-4 pt-3 pb-6">
       <Button
-        aria-disabled="true"
-        className={`${BUTTON} opacity-60`}
+        aria-pressed={isFocused}
+        className={BUTTON}
         onClick={() => {
-          toast(t("task.focusLater"));
+          void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id), {
+            undo: t(isFocused ? "time.stopped" : "time.started", { label: view.title }),
+          });
         }}
-        title={t("task.focusLater")}
-        variant="secondary"
+        variant={isFocused ? "accent" : "secondary"}
       >
-        <Play aria-hidden="true" strokeWidth={1.75} />
-        {t("task.focus")}
+        {isFocused ? (
+          <Square aria-hidden="true" strokeWidth={1.75} />
+        ) : (
+          <Play aria-hidden="true" strokeWidth={1.75} />
+        )}
+        {t(isFocused ? "time.focusing" : "task.focus")}
       </Button>
       {isOnHold ? (
         <Button

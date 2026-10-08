@@ -264,3 +264,17 @@ describe("TaskScreen — edges", () => {
     expect(await screen.findByText("This task does not exist.")).toBeInTheDocument();
   });
 });
+
+describe("TaskScreen — focus", () => {
+  it("starts time on the task with Focus and stops it with a second tap", async () => {
+    const { services, user } = await renderTask(HW_ID);
+    await user.click(await screen.findByRole("button", { name: "Focus" }));
+    const running = () =>
+      Object.values(services.state.store.getState().time.activities).filter(
+        (activity) => activity.endAt === null,
+      );
+    expect(running()).toEqual([expect.objectContaining({ category: "task", taskId: HW_ID })]);
+    await user.click(await screen.findByRole("button", { name: "Focusing", pressed: true }));
+    expect(running()).toEqual([]);
+  });
+});

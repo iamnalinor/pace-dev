@@ -5,6 +5,7 @@ import type { UrgencyInput } from "../urgency/input.ts";
 import type { QueryContext } from "./context.ts";
 
 import { type Project, projectById } from "../model/project.ts";
+import { taskTrackedMinutes } from "../tracking/insights.ts";
 import { isOpen, progressOf, type Task, taskById, type TaskStatus } from "../model/task.ts";
 import { err, ok, type Result } from "../result.ts";
 import { zonesDiffer } from "../time.ts";
@@ -83,7 +84,7 @@ export const taskView = (
     workLeftMinutes: Math.round(
       input.value.estimateHours * 60 * (1 - progressOf(task, preset.value.progressMode)),
     ),
-    trackedMinutes: 0,
+    trackedMinutes: taskTrackedMinutes(state, task.id, ctx.now),
     explanation,
     rank,
     dueZoneDiffers: isDueZoneDifferent(task, ctx.deviceTz),

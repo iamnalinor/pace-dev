@@ -1,3 +1,3 @@
-import { PlaceholderPage } from "./placeholder-page.tsx";
+import { DayScreen } from "#web/features/day/day-screen.tsx";
 
-export const DayPage = () => <PlaceholderPage emptyKey="day.empty" titleKey="nav.day" />;
+export const DayPage = () => <DayScreen />;

@@ -1,5 +1,3 @@
-import { PlaceholderPage } from "./placeholder-page.tsx";
+import { InsightsScreen } from "#web/features/insights/insights-screen.tsx";
 
-export const InsightsPage = () => (
-  <PlaceholderPage emptyKey="insights.empty" titleKey="nav.insights" />
-);
+export const InsightsPage = () => <InsightsScreen />;
