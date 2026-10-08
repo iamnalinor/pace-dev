@@ -1,7 +1,12 @@
 import { Plus, Square } from "lucide-react";
 import { useState } from "react";
 
-import type { RunningView, TimeButtonView } from "@pace/client";
+import {
+  type ActivityButtonProps,
+  PACE_STATUS_TEXT,
+  type RunningView,
+  type TimeButtonView,
+} from "@pace/client";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
@@ -9,35 +14,37 @@ import { formatMinutes } from "#web/shared/format/duration.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ColorTag, colorChipClass, fillClass } from "#web/shared/ui/color-tag.tsx";
+import { colorChipClass, ColorTag, fillClass } from "#web/shared/ui/color-tag.tsx";
 
 import { ButtonEditor, type EditorTarget } from "./button-editor.tsx";
 import { useLongPress } from "./use-long-press.ts";
 
-const STATUS_TEXT = {
-  "near-limit": "time.nearLimit",
-  "over-expect": "time.overExpect",
-  "over-limit": "time.overLimit",
-} as const;
-
 /** What is running: its tag, the time so far against its Expect/Limit, and Stop. */
-const RunningRow = ({ onStop, running }: { readonly running: RunningView; readonly onStop: () => void }) => {
+const RunningRow = ({
+  onStop,
+  running,
+}: {
+  readonly running: RunningView;
+  readonly onStop: () => void;
+}) => {
   const t = useT();
   const language = useLanguage();
   const target = running.expectMinutes ?? running.limitMinutes;
   const isOver = running.status === "over-limit" || running.status === "over-expect";
-  const statusKey = running.status in STATUS_TEXT ? STATUS_TEXT[running.status as keyof typeof STATUS_TEXT] : null;
+  const statusKey = PACE_STATUS_TEXT[running.status];
   return (
     <div aria-live="polite" className="flex items-center gap-2.5">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="flex items-center gap-2 text-sm">
           <ColorTag color={running.color}>{running.label}</ColorTag>
-          <span className="font-mono text-[13px] text-fg">{formatMinutes(running.minutes, language)}</span>
+          <span className="font-mono text-[13px] text-fg">
+            {formatMinutes(running.minutes, language)}
+          </span>
           {target !== null && (
             <span className="text-xs text-muted">
-              {running.expectMinutes === null
-                ? t("time.limitOf", { duration: formatMinutes(target, language) })
-                : t("time.expectOf", { duration: formatMinutes(target, language) })}
+              {t(running.expectMinutes === null ? "time.limitOf" : "time.expectOf", {
+                duration: formatMinutes(target, language),
+              })}
             </span>
           )}
           {statusKey !== null && (
@@ -63,25 +70,24 @@ const RunningRow = ({ onStop, running }: { readonly running: RunningView; readon
   );
 };
 
-const ActivityButton = ({
-  button,
-  onEdit,
-  onTap,
-}: {
-  readonly button: TimeButtonView;
-  readonly onTap: () => void;
-  readonly onEdit: () => void;
-}) => {
+const ActivityButton = ({ button, onEdit, onTap }: ActivityButtonProps) => {
   const t = useT();
-  const handlers = useLongPress(onTap, onEdit);
+  const handlers = useLongPress(
+    () => {
+      onTap(button);
+    },
+    () => {
+      onEdit({ button, kind: "edit" });
+    },
+  );
   return (
     <button
-      aria-description={t("time.buttonHint")}
       aria-pressed={button.isRunning}
       className={cn(
-        "flex h-10 min-w-0 touch-manipulation items-center justify-center rounded-md border px-2 text-[13px] select-none outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-accent/40",
+        "flex h-10 min-w-0 touch-manipulation items-center justify-center rounded-md border px-2 text-[13px] transition-colors outline-none select-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
         colorChipClass(button.color, button.isRunning),
       )}
+      title={t("time.buttonHint")}
       type="button"
       {...handlers}
     >
@@ -101,16 +107,12 @@ export const TimeBar = () => {
   const bar = hooks.useTimeBar();
   const [editing, setEditing] = useState<EditorTarget | null>(null);
   const tap = (button: TimeButtonView): void => {
-    const previous = bar.running?.label;
-    const message = button.isRunning
-      ? t("time.stopped", { label: button.label })
-      : previous === undefined
-        ? t("time.started", { label: button.label })
-        : t("time.switched", { from: previous, to: button.label });
-    void run(actions.tapButton(button.id), { undo: message });
+    void run(actions.tapButton(button.id), {
+      undo: t(button.toast.key, button.toast.params),
+    });
   };
   return (
-    <section aria-label={t("time.bar")} className="border-t border-line bg-bg px-3 pt-2.5 pb-2.5">
+    <section aria-label={t("time.bar")} className="border-t border-line bg-bg px-3 py-2.5">
       <div className="flex min-h-9 items-center gap-2">
         <div className="min-w-0 flex-1">
           {bar.running === null ? (
@@ -137,18 +139,13 @@ export const TimeBar = () => {
           <Plus aria-hidden="true" className="size-4" />
         </Button>
       </div>
-      <div aria-label={t("time.bar")} className="mt-2 grid grid-cols-4 gap-1.5 lg:grid-cols-8" role="group">
+      <div
+        aria-label={t("time.bar")}
+        className="mt-2 grid grid-cols-4 gap-1.5 lg:grid-cols-8"
+        role="group"
+      >
         {bar.buttons.map((button) => (
-          <ActivityButton
-            button={button}
-            key={button.id}
-            onEdit={() => {
-              setEditing({ button, kind: "edit" });
-            }}
-            onTap={() => {
-              tap(button);
-            }}
-          />
+          <ActivityButton button={button} key={button.id} onEdit={setEditing} onTap={tap} />
         ))}
       </div>
       {editing !== null && (

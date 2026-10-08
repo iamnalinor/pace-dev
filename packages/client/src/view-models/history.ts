@@ -54,7 +54,9 @@ const taskIdOf = (event: Event, log: readonly Event[]): null | string => {
     return null;
   }
   const target = log.find((candidate) => candidate.id === event.payload.targetId);
-  return target !== undefined && "taskId" in target.payload ? (target.payload.taskId ?? null) : null;
+  return target !== undefined && "taskId" in target.payload
+    ? (target.payload.taskId ?? null)
+    : null;
 };
 
 const titleOf = (state: HistorySource, event: Event, taskId: null | string): null | string => {

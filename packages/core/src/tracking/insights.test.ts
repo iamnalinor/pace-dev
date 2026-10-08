@@ -15,7 +15,10 @@ import { act, start, T } from "./tracking.fake.ts";
 
 const world = materialize(
   [
-    at(1, T("00:00"), { payload: { color: "blue", name: "Algebra", projectId: "p-alg" }, type: "project.created" }),
+    at(1, T("00:00"), {
+      payload: { color: "blue", name: "Algebra", projectId: "p-alg" },
+      type: "project.created",
+    }),
     at(2, T("00:00"), {
       payload: {
         dueAt: T("23:00"),
@@ -29,8 +32,8 @@ const world = materialize(
       },
       type: "task.created",
     }),
-    start("08:00", "a1", "Sheet 7", { category: "study", taskId: "t-sheet" }),
-    start("10:00", "a2", "Lunch", { category: "food" }),
+    start("08:00", { activityId: "a1", label: "Sheet 7", category: "study", taskId: "t-sheet" }),
+    start("10:00", { activityId: "a2", label: "Lunch", category: "food" }),
     act("10:30", { payload: { activityId: "a2" }, type: "activity.stopped" }),
     at(3, T("11:00"), { payload: { outcome: "done", taskId: "t-sheet" }, type: "task.closed" }),
   ],
@@ -60,6 +63,8 @@ describe("insights", () => {
 
   it("rates projects on time and spreads their hours over the weeks", () => {
     expect(onTimeByProject(world, DAY)).toEqual([{ onTime: 1, projectId: "p-alg", total: 1 }]);
-    expect(weeklyProjectMinutes(world, "p-alg", { now: T("12:00"), weeks: 3, zone: "UTC" })).toEqual([0, 0, 120]);
+    expect(
+      weeklyProjectMinutes(world, "p-alg", { now: T("12:00"), weeks: 3, zone: "UTC" }),
+    ).toEqual([0, 0, 120]);
   });
 });

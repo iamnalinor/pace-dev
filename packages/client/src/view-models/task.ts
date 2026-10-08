@@ -2,6 +2,7 @@ import {
   type Closure,
   type CoreState,
   type ExplainKey,
+  type FormulaSymbol,
   type ExplainUnit,
   extractLink,
   type Importance,
@@ -121,6 +122,8 @@ export type TaskViewModel = {
   readonly why: {
     readonly policy: UrgencyPolicy;
     readonly formula: string;
+    /** Each letter of the formula and the row it stands for. */
+    readonly legend: readonly FormulaSymbol[];
     readonly rows: readonly WhyRow[];
   };
   readonly rank: null | { readonly position: number; readonly size: number };
@@ -238,6 +241,7 @@ export const taskViewModel = (
       why: {
         policy: view.explanation.policy,
         formula: view.explanation.formula,
+        legend: view.explanation.legend,
         rows: whyRows(view),
       },
       rank: view.rank,

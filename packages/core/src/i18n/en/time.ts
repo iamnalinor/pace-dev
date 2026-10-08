@@ -57,6 +57,7 @@ export const enTime = {
   "day.edit": "Edit {label}",
   "day.editTitle": "Edit activity",
   "day.badRange": "The end must be after the start.",
+  "day.total": "{category} · {duration}",
   "day.running": "running",
   "day.calendar": "From your calendar",
   "day.attended": "Attended",

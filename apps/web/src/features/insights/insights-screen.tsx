@@ -1,7 +1,8 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
-import type { InsightBar } from "@pace/client";
+import type { InsightBar, OnTimeView } from "@pace/client";
+import type { EstimateRow } from "@pace/core";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
@@ -33,9 +34,15 @@ const Bars = ({
           const name = nameOf(bar);
           const value = formatMinutes(bar.minutes, language);
           return (
-            <li className="grid grid-cols-[minmax(6rem,9rem)_1fr_auto] items-center gap-3 text-xs" key={bar.key ?? "none"}>
+            <li
+              className="grid grid-cols-[minmax(6rem,9rem)_1fr_auto] items-center gap-3 text-xs"
+              key={bar.key ?? "none"}
+            >
               <span className="truncate text-fg2">{name}</span>
-              <span className="h-2.5 overflow-hidden rounded-r bg-track" title={`${name}: ${value}`}>
+              <span
+                className="h-2.5 overflow-hidden rounded-r bg-track"
+                title={`${name}: ${value}`}
+              >
                 <span
                   className={`block h-full rounded-r ${bar.color === null ? "bg-faint" : fillClass(bar.color)}`}
                   style={{ width: `${String(Math.max(2, Math.round(bar.share * 100)))}%` }}
@@ -45,6 +52,56 @@ const Bars = ({
             </li>
           );
         })}
+      </ul>
+    </section>
+  );
+};
+
+/** Per project: how many of the tasks closed this week met their deadline. */
+const OnTimeCard = ({ rows }: { readonly rows: readonly OnTimeView[] }) => {
+  const t = useT();
+  return rows.length === 0 ? null : (
+    <section
+      aria-label={t("insights.onTime")}
+      className="rounded-xl border border-line bg-surface p-4"
+    >
+      <h2 className="mb-3 text-sm font-medium text-fg">{t("insights.onTime")}</h2>
+      <ul className="grid gap-2 text-xs">
+        {rows.map((row) => (
+          <li className="flex justify-between gap-3" key={row.projectId ?? "none"}>
+            <span className="truncate text-fg2">{row.name ?? t("insights.noProject")}</span>
+            <span className="font-mono text-fg">
+              {t("insights.onTimeRow", { onTime: row.onTime, total: row.total })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
+/** Plan against fact for the tasks closed this week. */
+const EstimatesCard = ({ rows }: { readonly rows: readonly EstimateRow[] }) => {
+  const t = useT();
+  const language = useLanguage();
+  return rows.length === 0 ? null : (
+    <section
+      aria-label={t("insights.estimates")}
+      className="rounded-xl border border-line bg-surface p-4"
+    >
+      <h2 className="mb-3 text-sm font-medium text-fg">{t("insights.estimates")}</h2>
+      <ul className="grid gap-2 text-xs">
+        {rows.map((row) => (
+          <li className="flex justify-between gap-3" key={row.taskId}>
+            <span className="truncate text-fg2">{row.title}</span>
+            <span className="shrink-0 font-mono text-fg">
+              {t("insights.estimateRow", {
+                estimate: formatMinutes(row.estimateMinutes, language),
+                tracked: formatMinutes(row.trackedMinutes, language),
+              })}
+            </span>
+          </li>
+        ))}
       </ul>
     </section>
   );
@@ -64,13 +121,22 @@ export const InsightsScreen = () => {
       <PageHeader
         action={
           <div className="flex items-center gap-1">
-            <Button aria-label={t("insights.previous")} onClick={() => setWeekOf(week.previous)} size="icon" variant="ghost">
+            <Button
+              aria-label={t("insights.previous")}
+              onClick={() => {
+                setWeekOf(week.previous);
+              }}
+              size="icon"
+              variant="ghost"
+            >
               <ChevronLeft aria-hidden="true" />
             </Button>
             <Button
               aria-label={t("insights.next")}
               disabled={week.next === null}
-              onClick={() => setWeekOf(week.next)}
+              onClick={() => {
+                setWeekOf(week.next);
+              }}
               size="icon"
               variant="ghost"
             >
@@ -78,7 +144,9 @@ export const InsightsScreen = () => {
             </Button>
           </div>
         }
-        eyebrow={t("insights.week", { date: formatEyebrow(new Date(week.weekStart), language, deviceTz) })}
+        eyebrow={t("insights.week", {
+          date: formatEyebrow(new Date(week.weekStart), language, deviceTz),
+        })}
         title={t("insights.title")}
       />
       <div className="grid gap-3 px-5 lg:grid-cols-2">
@@ -101,37 +169,8 @@ export const InsightsScreen = () => {
         ) : (
           <p className="text-sm text-muted lg:col-span-2">{t("insights.nothing")}</p>
         )}
-        {week.onTime.length > 0 && (
-          <section aria-label={t("insights.onTime")} className="rounded-xl border border-line bg-surface p-4">
-            <h2 className="mb-3 text-sm font-medium text-fg">{t("insights.onTime")}</h2>
-            <ul className="grid gap-2 text-xs">
-              {week.onTime.map((row) => (
-                <li className="flex justify-between gap-3" key={row.projectId ?? "none"}>
-                  <span className="truncate text-fg2">{row.name ?? t("insights.noProject")}</span>
-                  <span className="font-mono text-fg">{t("insights.onTimeRow", { onTime: row.onTime, total: row.total })}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {week.estimates.length > 0 && (
-          <section aria-label={t("insights.estimates")} className="rounded-xl border border-line bg-surface p-4">
-            <h2 className="mb-3 text-sm font-medium text-fg">{t("insights.estimates")}</h2>
-            <ul className="grid gap-2 text-xs">
-              {week.estimates.map((row) => (
-                <li className="flex justify-between gap-3" key={row.taskId}>
-                  <span className="truncate text-fg2">{row.title}</span>
-                  <span className="shrink-0 font-mono text-fg">
-                    {t("insights.estimateRow", {
-                      estimate: formatMinutes(row.estimateMinutes, language),
-                      tracked: formatMinutes(row.trackedMinutes, language),
-                    })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <OnTimeCard rows={week.onTime} />
+        <EstimatesCard rows={week.estimates} />
       </div>
     </main>
   );

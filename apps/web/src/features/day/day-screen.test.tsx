@@ -14,7 +14,10 @@ const at = (hhmm: string): string => {
 
 const setup = async () => {
   const { services } = await artboardServices();
-  await services.actions.startActivity({ category: "work", label: "Deep work" }, { at: at("09:00") });
+  await services.actions.startActivity(
+    { category: "work", label: "Deep work" },
+    { at: at("09:00") },
+  );
   await services.actions.startActivity({ category: "food", label: "Lunch" }, { at: at("12:30") });
   await services.actions.stopActivity({ at: at("13:00") });
   const view = renderWithProviders(<DayScreen />, { services });
@@ -38,12 +41,20 @@ describe("DayScreen", () => {
   it("logs what filled a gap", async () => {
     const { services, user } = await setup();
     const gaps = await screen.findAllByRole("button", { name: "Log it" });
-    await user.click(gaps.at(-1) ?? gaps[0]!);
+    const last = gaps.at(-1);
+    if (last === undefined) {
+      throw new Error("no gap to log");
+    }
+    await user.click(last);
     await user.type(await screen.findByRole("textbox", { name: "What" }), "Gym");
     await user.click(screen.getByRole("radio", { name: "Sport" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Gym")).toBeInTheDocument();
-    expect(Object.values(services.state.store.getState().time.activities).find((activity) => activity.label === "Gym")).toMatchObject({
+    expect(
+      Object.values(services.state.store.getState().time.activities).find(
+        (activity) => activity.label === "Gym",
+      ),
+    ).toMatchObject({
       category: "sport",
       endAt: at("15:00"),
       startAt: at("13:00"),

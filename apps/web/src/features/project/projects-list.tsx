@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useLanguage } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
-import { ColorBar } from "#web/shared/ui/color-tag.tsx";
+import { cardClass } from "#web/shared/ui/color-tag.tsx";
 import { plural } from "@pace/core";
 
 import { NewProjectForm } from "./new-project-form.tsx";
@@ -22,14 +22,13 @@ const SummaryRow = ({ project }: { readonly project: ProjectSummary }) => {
     <li>
       <Link
         className={cn(
-          "flex min-h-14 items-center gap-3 border-b border-line px-1 outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
-          project.archived && "text-muted",
+          "flex min-h-14 items-center gap-3 rounded-xl border px-4 outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40",
+          project.archived ? "border-line bg-surface text-muted" : cardClass(project.color),
         )}
         to={`/projects/${project.id}`}
       >
-        <ColorBar color={project.color} />
-        <span className="min-w-0 flex-1 truncate text-[15px]">{project.name}</span>
-        <span className="font-mono text-xs text-muted">
+        <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{project.name}</span>
+        <span className="font-mono text-xs text-fg2">
           {project.archived ? t("project.archived") : open}
           {project.onTime.total > 0 &&
             ` · ${t("projects.onTime", { done: project.onTime.done, total: project.onTime.total })}`}
@@ -48,7 +47,7 @@ export const ProjectsList = () => {
       {projects.length === 0 ? (
         <p className="px-1 py-4 text-sm text-muted">{t("projects.empty")}</p>
       ) : (
-        <ul aria-label={t("nav.projects")}>
+        <ul aria-label={t("nav.projects")} className="grid gap-2">
           {projects.map((project) => (
             <SummaryRow key={project.id} project={project} />
           ))}

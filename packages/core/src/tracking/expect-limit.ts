@@ -1,7 +1,6 @@
-import type { ExpectLimit } from "./categories.ts";
 import type { ActivityCategory, TimeState } from "./model.ts";
 
-import { CATEGORY_DEFAULTS } from "./categories.ts";
+import { CATEGORY_DEFAULTS, type ExpectLimit } from "./categories.ts";
 
 /** "Near the limit" starts this many minutes before it. */
 export const NEAR_LIMIT_MINUTES = 10;
@@ -11,7 +10,10 @@ export const MEDIAN_SAMPLES = 3;
 export type PaceStatus = "near-limit" | "none" | "ok" | "over-expect" | "over-limit";
 
 /** Where a running activity stands against what it expects and what it may take. */
-export const paceStatus = (minutes: number, { expectMinutes, limitMinutes }: ExpectLimit): PaceStatus => {
+export const paceStatus = (
+  minutes: number,
+  { expectMinutes, limitMinutes }: ExpectLimit,
+): PaceStatus => {
   if (limitMinutes !== null) {
     if (minutes >= limitMinutes) {
       return "over-limit";
@@ -50,7 +52,10 @@ export const defaultsFor = (
   const key = label.trim().toLowerCase();
   const durations = Object.values(time.activities)
     .filter((activity) => activity.endAt !== null && activity.label.trim().toLowerCase() === key)
-    .map((activity) => (Date.parse(activity.endAt ?? activity.startAt) - Date.parse(activity.startAt)) / 60_000)
+    .map(
+      (activity) =>
+        (Date.parse(activity.endAt ?? activity.startAt) - Date.parse(activity.startAt)) / 60_000,
+    )
     .filter((minutes) => minutes > 0);
   const fallback = CATEGORY_DEFAULTS[category];
   return durations.length >= MEDIAN_SAMPLES

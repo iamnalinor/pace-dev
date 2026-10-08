@@ -1,5 +1,4 @@
 import type { CoreState } from "../materialize/core-state.ts";
-import type { QueryContext } from "./context.ts";
 
 import { type Project, projectById } from "../model/project.ts";
 import { isOpen, type Task } from "../model/task.ts";
@@ -7,7 +6,7 @@ import { type Outcome, taskOutcome } from "../outcomes/outcome.ts";
 import { err, ok, type Result } from "../result.ts";
 import { weeklyProjectMinutes } from "../tracking/insights.ts";
 import { isEmptyInstance, presetOf } from "./classify.ts";
-import { accountTz } from "./context.ts";
+import { accountTz, type QueryContext } from "./context.ts";
 import { compareNowItems, type NowItem, nowItem } from "./now-item.ts";
 
 export type DoneItem = {
@@ -21,7 +20,7 @@ export type ProjectStats = {
   readonly onTime: { readonly done: number; readonly total: number };
   /** Closed after the deadline (`done_late`) or because it passed (`cancelled_missed`). */
   readonly late: number;
-  /** Tracked time arrives with stage 3; until then both stay at zero. */
+  /** Tracked on the project's tasks this week (ISO week, account zone). */
   readonly hoursThisWeek: number;
   /** The last six weeks, oldest first. */
   readonly weeklyHours: readonly number[];
@@ -110,19 +109,16 @@ export const projectView = (
     .filter((task) => !isOpen(task))
     .flatMap((task) => doneItem(state, task))
     .toSorted(newestFirst);
+  const weeklyMinutes = weeklyProjectMinutes(state, projectId, {
+    now: ctx.now,
+    weeks: WEEKS_SHOWN,
+    zone: accountTz(state, ctx),
+  });
   return ok({
     project,
     open,
     awaiting: tasks.filter((task) => isOpen(task) && isEmptyInstance(task)).toSorted(byDue),
     done,
-    stats: stats(
-      open,
-      done,
-      weeklyProjectMinutes(state, projectId, {
-        now: ctx.now,
-        weeks: WEEKS_SHOWN,
-        zone: accountTz(state, ctx),
-      }),
-    ),
+    stats: stats(open, done, weeklyMinutes),
   });
 };

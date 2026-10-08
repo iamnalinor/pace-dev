@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react-nativ
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { ALGEBRA_ID, HW_ID, HW_VIEW_NOW, TRK_ID, TRK_NOW } from "@pace/core/testing";
+import { HW_ID, HW_VIEW_NOW, TRK_ID, TRK_NOW } from "@pace/core/testing";
 
 import { TaskScreen } from "./task-screen.tsx";
 
@@ -30,6 +30,23 @@ describe("TaskScreen — homework", () => {
     expect(screen.getByRole("button", { name: "Submit 3 and 4" })).toBeOnTheScreen();
   });
 
+  it("focuses on the task from the footer and stops again", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Focus" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Focusing", selected: true })).toBeOnTheScreen();
+    });
+    const running = () =>
+      Object.values(runtime.state.store.getState().time.activities).filter(
+        (activity) => activity.endAt === null,
+      );
+    expect(running().map((activity) => activity.taskId)).toEqual([HW_ID]);
+    await fireEvent.press(screen.getByRole("button", { name: "Focusing" }));
+    await waitFor(() => {
+      expect(running()).toEqual([]);
+    });
+  });
+
   it("toggles a problem solved and back", async () => {
     const runtime = await hwScreen();
     const problem = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
@@ -47,10 +64,13 @@ describe("TaskScreen — homework", () => {
     expect(task?.subtasks.find((item) => item.id === "s5")?.solvedAt).toBeNull();
   });
 
-  it("goes back and opens the project", async () => {
-    await hwScreen();
-    await fireEvent.press(screen.getByRole("link", { name: "Algebra" }));
-    expect(router.push).toHaveBeenCalledWith(`/project/${ALGEBRA_ID}`);
+  it("goes back, and moves the task to another project from the header chip", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Project: Algebra. Change" }));
+    await fireEvent.press(await screen.findByRole("radio", { name: "No project" }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[HW_ID]?.projectId).toBeNull();
+    });
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(router.back).toHaveBeenCalled();
   });

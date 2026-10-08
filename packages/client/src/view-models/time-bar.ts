@@ -3,6 +3,8 @@ import {
   type ActivityCategory,
   CATEGORY_COLORS,
   type CoreState,
+  type MessageKey,
+  type MessageParams,
   effectiveButtons,
   paceStatus,
   type PaceStatus,
@@ -21,6 +23,8 @@ export type TimeButtonView = {
   readonly limitMinutes: null | number;
   /** Its activity is the one running now. */
   readonly isRunning: boolean;
+  /** What a tap on it does, worded for the toast: start, switch or stop. */
+  readonly toast: MessageText;
 };
 
 export type RunningView = {
@@ -85,7 +89,37 @@ export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext):
       label: candidate.label,
       limitMinutes: candidate.limitMinutes,
       taskId: candidate.taskId,
+      toast: tapToast(
+        { isRunning: active !== null && active.buttonId === candidate.id, label: candidate.label },
+        running?.label,
+      ),
     })),
     running,
   };
 };
+
+/** A message in the account language, still to be translated by the UI. */
+export type MessageText = { readonly key: MessageKey; readonly params?: MessageParams };
+
+/** What the running row says about its pace; nothing while it is within its targets. */
+export const PACE_STATUS_TEXT: Readonly<Record<PaceStatus, MessageKey | null>> = {
+  "near-limit": "time.nearLimit",
+  none: null,
+  ok: null,
+  "over-expect": "time.overExpect",
+  "over-limit": "time.overLimit",
+};
+
+/** The toast after a tap on a button: stopped, started, or switched from the previous activity. */
+export const tapToast = (
+  button: Pick<TimeButtonView, "isRunning" | "label">,
+  previous: string | undefined,
+): MessageText => {
+  if (button.isRunning) {
+    return { key: "time.stopped", params: { label: button.label } };
+  }
+  return previous === undefined
+    ? { key: "time.started", params: { label: button.label } }
+    : { key: "time.switched", params: { from: previous, to: button.label } };
+};
+

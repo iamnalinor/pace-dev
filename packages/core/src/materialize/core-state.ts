@@ -8,10 +8,10 @@ import {
   presetReducer,
   type PresetsState,
 } from "../presets/preset-reducer.ts";
-import { projectReducer } from "./project-reducer.ts";
-import { settingsReducer } from "./settings-reducer.ts";
 import { INITIAL_TIME_STATE, type TimeState } from "../tracking/model.ts";
 import { timeReducer } from "../tracking/time-reducer.ts";
+import { projectReducer } from "./project-reducer.ts";
+import { settingsReducer } from "./settings-reducer.ts";
 import { taskReducer } from "./task-reducer.ts";
 
 /**

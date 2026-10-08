@@ -22,13 +22,13 @@ import { type Clock, queryContext, systemClock } from "./clock.ts";
 import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
-import { type InsightsModel, insightsModel } from "./view-models/insights.ts";
-import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
+import { type InsightsModel, insightsModel } from "./view-models/insights.ts";
 import { type NowViewModel, nowViewModel } from "./view-models/now.ts";
 import { type ProjectViewModel, projectViewModel } from "./view-models/project.ts";
 import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
+import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 
 export { useStore } from "zustand";
 
@@ -170,4 +170,13 @@ export const useDecisions = (api: ApiClient, search: string): DecisionsState => 
     };
   }, [api, search]);
   return loaded;
+};
+
+/** A form's fields as state, and a setter that merges the changed ones in. */
+export const useDraft = <T extends object>(initial: () => T): readonly [T, (next: Partial<T>) => void] => {
+  const [draft, setDraft] = useState(initial);
+  const patch = (next: Partial<T>): void => {
+    setDraft((current) => ({ ...current, ...next }));
+  };
+  return [draft, patch];
 };

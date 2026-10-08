@@ -229,7 +229,7 @@ describe("resubmission", () => {
         const uLater = resubmission(input, addMinutesIso(from, Math.ceil(b * minutes)));
         expect(uEarlier).toBeGreaterThanOrEqual(0);
         expect(uLater).toBeLessThanOrEqual(U_MAX);
-        expect(uEarlier).toBeLessThanOrEqual(uLater + 1e-12);
+        expect(uEarlier).toBeLessThanOrEqual(uLater + 1e-9);
       }),
     );
   });

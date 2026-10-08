@@ -10,6 +10,7 @@ import {
   INITIAL_PRESETS_STATE,
   INITIAL_PROJECTS_STATE,
   INITIAL_TASKS_STATE,
+  INITIAL_TIME_STATE,
   materialize,
   newId,
   ok,
@@ -25,10 +26,9 @@ import {
   shouldRematerialize,
   sortEvents,
   taskReducer,
-  timeReducer,
-  INITIAL_TIME_STATE,
-  type TimeState,
   type TasksState,
+  timeReducer,
+  type TimeState,
 } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";

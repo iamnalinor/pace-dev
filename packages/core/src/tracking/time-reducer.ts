@@ -1,4 +1,4 @@
-import type { Event, EventOf } from "../events/event-schema.ts";
+import type { Event, EventOf, EventType } from "../events/event-schema.ts";
 import type { Reducer } from "../materialize/materializer.ts";
 import type { Activity, TimeState } from "./model.ts";
 
@@ -8,10 +8,7 @@ const withActivity = (state: TimeState, activity: Activity): TimeState => ({
 });
 
 /** A start closes every live activity still running before it (one primary at a time). */
-const closeRunning = (
-  activities: TimeState["activities"],
-  at: string,
-): TimeState["activities"] =>
+const closeRunning = (activities: TimeState["activities"], at: string): TimeState["activities"] =>
   Object.fromEntries(
     Object.entries(activities).map(([id, activity]) => [
       id,
@@ -97,45 +94,53 @@ const buttonRemoved = (state: TimeState, buttonId: string): TimeState => ({
   hasCustomButtons: true,
 });
 
-/** Folds the activity events; every other event leaves the state (and its reference) alone. */
-export const timeReducer: Reducer<TimeState> = (state, event: Event) => {
-  switch (event.type) {
-    case "activity.started": {
-      return started(state, event);
-    }
-    case "activity.stopped": {
-      return patch(state, event.payload.activityId, (activity) =>
-        activity.endAt === null ? { ...activity, endAt: event.occurredAt } : activity,
-      );
-    }
-    case "activity.logged": {
-      return logged(state, event);
-    }
-    case "activity.adjusted": {
-      const { endAt, startAt } = event.payload;
-      return patch(state, event.payload.activityId, (activity) => ({
-        ...activity,
-        endAt: endAt ?? activity.endAt,
-        startAt: startAt ?? activity.startAt,
-      }));
-    }
-    case "activity.labelled": {
-      const { category, label, taskId } = event.payload;
-      return patch(state, event.payload.activityId, (activity) => ({
-        ...activity,
-        category: category ?? activity.category,
-        label: label ?? activity.label,
-        taskId: taskId === undefined ? activity.taskId : taskId,
-      }));
-    }
-    case "activity.button.set": {
-      return buttonSet(state, event);
-    }
-    case "activity.button.removed": {
-      return buttonRemoved(state, event.payload.buttonId);
-    }
-    default: {
-      return state;
-    }
-  }
+type ActivityEventType = Extract<EventType, `activity.${string}`>;
+
+/** Indexing a mapped type by its own key keeps `type` and `payload` correlated. */
+type ActivityEvent<K extends ActivityEventType = ActivityEventType> = {
+  readonly [P in K]: EventOf<P>;
+}[K];
+
+type Handlers = {
+  readonly [T in ActivityEventType]: (state: TimeState, event: EventOf<T>) => TimeState;
 };
+
+const HANDLERS: Handlers = {
+  "activity.started": started,
+  "activity.stopped": (state, event) =>
+    patch(state, event.payload.activityId, (activity) =>
+      activity.endAt === null ? { ...activity, endAt: event.occurredAt } : activity,
+    ),
+  "activity.logged": logged,
+  "activity.adjusted": (state, event) => {
+    const { endAt, startAt } = event.payload;
+    return patch(state, event.payload.activityId, (activity) => ({
+      ...activity,
+      endAt: endAt ?? activity.endAt,
+      startAt: startAt ?? activity.startAt,
+    }));
+  },
+  "activity.labelled": (state, event) => {
+    const { category, label, taskId } = event.payload;
+    return patch(state, event.payload.activityId, (activity) => ({
+      ...activity,
+      category: category ?? activity.category,
+      label: label ?? activity.label,
+      taskId: taskId === undefined ? activity.taskId : taskId,
+    }));
+  },
+  "activity.button.set": buttonSet,
+  "activity.button.removed": (state, event) => buttonRemoved(state, event.payload.buttonId),
+};
+
+const isActivityEvent = (event: Event): event is ActivityEvent =>
+  Object.hasOwn(HANDLERS, event.type);
+
+const applyActivityEvent = <K extends ActivityEventType>(
+  state: TimeState,
+  event: ActivityEvent<K>,
+): TimeState => HANDLERS[event.type](state, event);
+
+/** Folds the activity events; every other event leaves the state (and its reference) alone. */
+export const timeReducer: Reducer<TimeState> = (state, event: Event) =>
+  isActivityEvent(event) ? applyActivityEvent(state, event) : state;

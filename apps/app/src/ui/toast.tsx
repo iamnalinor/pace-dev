@@ -29,7 +29,12 @@ const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toa
     accessibilityRole="alert"
     className="absolute inset-x-4 bottom-24 flex-row items-center gap-3 rounded-lg bg-inverse py-1 pl-4 pr-1"
   >
-    <Text className="flex-1 py-2.5 font-sans text-[14px] text-inverseFg">{toast.message}</Text>
+    {/* Two lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
+    <Pressable className="flex-1" onPress={onDone}>
+      <Text className="py-2.5 font-sans text-[14px] text-inverseFg" numberOfLines={2}>
+        {toast.message}
+      </Text>
+    </Pressable>
     {toast.action === undefined ? null : (
       <Pressable
         accessibilityRole="button"

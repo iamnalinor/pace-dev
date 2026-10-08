@@ -247,14 +247,15 @@ export {
   reviewItems,
   type ReviewKind,
 } from "./review/to-sort.ts";
+export * from "./time-tracking.ts";
 export {
+  addDaysIn,
   addMinutesIso,
   endOfDayIn,
   formatInZone,
   isoWeekKey,
   isValidTimeZone,
   minutesBetween,
-  addDaysIn,
   startOfDayIn,
   startOfWeekIn,
   type ZonedInstant,
@@ -286,6 +287,7 @@ export {
 export {
   type ExplainInput,
   type ExplainKey,
+  type FormulaSymbol,
   type ExplainStep,
   type ExplainUnit,
 } from "./urgency/trace.ts";
@@ -295,4 +297,3 @@ export {
   validateEventInput,
   type ValidationState,
 } from "./validation/retro-rules.ts";
-export * from "./time-tracking.ts";

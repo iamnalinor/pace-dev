@@ -191,7 +191,11 @@ export const ActivityCategorySchema = z.enum([
   "other",
 ]);
 
-const minutes = z.number().int().positive().max(24 * 60);
+const minutes = z
+  .number()
+  .int()
+  .positive()
+  .max(24 * 60);
 
 const activityFields = {
   label: z.string().trim().min(1).max(80),

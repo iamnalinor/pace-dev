@@ -36,7 +36,13 @@ type Piece = { readonly activity: Activity; readonly start: number; readonly end
 
 const toIso = (ms: number): string => new Date(ms).toISOString();
 
-const clip = (activity: Activity, from: number, until: number, now: number): null | Piece => {
+/** Total minutes of a list of rows. */
+export const sumMinutes = (rows: readonly { readonly minutes: number }[]): number =>
+  rows.reduce((sum, row) => sum + row.minutes, 0);
+
+type Window = { readonly from: number; readonly until: number; readonly now: number };
+
+const clip = (activity: Activity, { from, now, until }: Window): null | Piece => {
   const start = Math.max(Date.parse(activity.startAt), from);
   const end = Math.min(activity.endAt === null ? now : Date.parse(activity.endAt), until);
   return end > start ? { activity, end, start } : null;
@@ -44,7 +50,9 @@ const clip = (activity: Activity, from: number, until: number, now: number): nul
 
 /** Among pieces of one kind a later start wins: the earlier one ends where the next begins. */
 const trimOverlaps = (pieces: readonly Piece[]): readonly Piece[] => {
-  const sorted = pieces.toSorted((a, b) => a.start - b.start || a.end - b.end);
+  const sorted = pieces.toSorted((a, b) =>
+    a.start === b.start ? a.end - b.end : a.start - b.start,
+  );
   return sorted
     .map((piece, index) => {
       const next = sorted[index + 1];
@@ -63,6 +71,7 @@ const cutOne = (piece: Piece, cut: Piece): readonly Piece[] =>
 
 /** A live piece minus every logged block over it (a logged block may split it in two). */
 const subtract = (piece: Piece, cuts: readonly Piece[]): readonly Piece[] =>
+  // eslint-disable-next-line unicorn/no-array-reduce -- each block cuts what the previous ones left
   cuts.reduce<readonly Piece[]>(
     (pieces, cut) => pieces.flatMap((current) => cutOne(current, cut)),
     [piece],
@@ -81,18 +90,18 @@ const toSegment = (piece: Piece, now: number): Segment => ({
 });
 
 const gapsBetween = (pieces: readonly Piece[], from: number, until: number): readonly Gap[] => {
-  const bounds = [
-    { end: from, start: from },
-    ...pieces,
-    { end: until, start: until },
-  ];
-  return bounds.slice(1).flatMap((piece, index) => {
-    const previousEnd = bounds[index]?.end ?? from;
-    const minutes = Math.floor((piece.start - previousEnd) / MS_PER_MINUTE);
-    return minutes >= GAP_MINUTES
-      ? [{ endAt: toIso(piece.start), minutes, startAt: toIso(previousEnd) }]
-      : [];
-  });
+  const bounds = [{ end: from, start: from }, ...pieces, { end: until, start: until }];
+  return bounds
+    .slice(1)
+    .map((piece, index) => {
+      const previousEnd = bounds[index]?.end ?? from;
+      return {
+        endAt: toIso(piece.start),
+        minutes: Math.floor((piece.start - previousEnd) / MS_PER_MINUTE),
+        startAt: toIso(previousEnd),
+      };
+    })
+    .filter((gap) => gap.minutes >= GAP_MINUTES);
 };
 
 /**
@@ -105,36 +114,32 @@ export const timeline = (time: TimeState, { from, now, to }: Range): Timeline =>
   const nowMs = Date.parse(now);
   const untilMs = Math.min(Date.parse(to), nowMs);
   const clipped = Object.values(time.activities).flatMap((activity) => {
-    const piece = clip(activity, fromMs, untilMs, nowMs);
+    const piece = clip(activity, { from: fromMs, now: nowMs, until: untilMs });
     return piece === null ? [] : [piece];
   });
   const logged = trimOverlaps(clipped.filter((piece) => piece.activity.isLogged));
-  const live = trimOverlaps(clipped.filter((piece) => !piece.activity.isLogged)).flatMap(
-    (piece) => subtract(piece, logged),
+  const live = trimOverlaps(clipped.filter((piece) => !piece.activity.isLogged)).flatMap((piece) =>
+    subtract(piece, logged),
   );
   const pieces = [...live, ...logged].toSorted((a, b) => a.start - b.start);
   const segments = pieces.map((piece) => toSegment(piece, nowMs));
-  const totals = segments.reduce<Partial<Record<ActivityCategory, number>>>(
-    (sums, segment) => ({
-      ...sums,
-      [segment.category]: (sums[segment.category] ?? 0) + segment.minutes,
-    }),
-    {},
+  const totals: Partial<Record<ActivityCategory, number>> = Object.fromEntries(
+    Object.entries(Object.groupBy(segments, (segment) => segment.category)).map(
+      ([category, group]) => [category, sumMinutes(group)],
+    ),
   );
   return {
     gaps: gapsBetween(pieces, fromMs, untilMs),
     running: segments.find((segment) => segment.isRunning) ?? null,
     segments,
     totals,
-    trackedMinutes: segments.reduce((sum, segment) => sum + segment.minutes, 0),
+    trackedMinutes: sumMinutes(segments),
   };
 };
 
 /** The live activity running now (whatever the day), or null. */
 export const runningActivity = (time: TimeState, now: string): Activity | null =>
   Object.values(time.activities)
-    .filter(
-      (activity) => !activity.isLogged && activity.endAt === null && activity.startAt <= now,
-    )
+    .filter((activity) => !activity.isLogged && activity.endAt === null && activity.startAt <= now)
     .toSorted((a, b) => b.startAt.localeCompare(a.startAt))
     .at(0) ?? null;

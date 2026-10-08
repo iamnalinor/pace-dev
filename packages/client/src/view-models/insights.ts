@@ -86,7 +86,10 @@ export const insightsModel = (
     ),
     estimates: estimateVsTracked(state, range),
     next: from >= thisWeek ? null : addDaysIn(from, 7, zone),
-    onTime: onTimeByProject(state, range).map((row) => ({ ...row, ...projectLabel(state, row.projectId) })),
+    onTime: onTimeByProject(state, range).map((row) => ({
+      ...row,
+      ...projectLabel(state, row.projectId),
+    })),
     previous: addDaysIn(from, -7, zone),
     totalMinutes: categories.reduce((sum, row) => sum + row.minutes, 0),
     weekStart: from,

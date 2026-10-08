@@ -51,7 +51,8 @@ describe("explain", () => {
       estimateHours: 8,
     });
     const why = explain(input, TRK_NOW);
-    expect(why.formula).toBe(`${U_FLOOR} + (1 − p) · E / max(h, ${PACE_MIN_HOURS})`);
+    expect(why.formula).toBe(`${U_FLOOR} + W / max(h, ${PACE_MIN_HOURS})`);
+    expect(why.legend.map((row) => row.symbol)).toEqual(["W", "h"]);
     expect(inputValue(why, "progress")).toBe(25);
     expect(inputValue(why, "workLeft")).toBe(6);
     expect(inputUnit(why, "workLeft")).toBe("hours");

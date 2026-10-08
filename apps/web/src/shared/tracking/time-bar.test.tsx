@@ -20,7 +20,9 @@ const setup = async () => {
 };
 
 const running = (services: Awaited<ReturnType<typeof setup>>["services"]) =>
-  Object.values(services.state.store.getState().time.activities).filter((activity) => activity.endAt === null);
+  Object.values(services.state.store.getState().time.activities).filter(
+    (activity) => activity.endAt === null,
+  );
 
 describe("TimeBar", () => {
   beforeEach(() => {

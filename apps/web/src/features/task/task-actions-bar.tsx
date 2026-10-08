@@ -83,18 +83,22 @@ const usePrimary = (view: TaskViewModel) => {
   })();
 };
 
+/** The task the running activity is spent on, if any. */
+const useFocusedTaskId = (): null | string =>
+  useServices().hooks.useTimeBar().running?.taskId ?? null;
+
 /** Focus (time on this task, from the time bar's ledger), the status switch, and the primary action: Submit, Done or Reopen. */
 export const TaskActionsBar = ({ onClose, view }: Props) => {
   const t = useT();
   const { actions } = useServices();
   const run = useRunAction();
   const primary = usePrimary(view);
-  const running = useServices().hooks.useTimeBar().running;
-  const isFocused = running?.taskId === view.id;
+  const focusedTaskId = useFocusedTaskId();
   if (view.closed !== null) {
     return <ClosedBar view={view} />;
   }
 
+  const isFocused = focusedTaskId === view.id;
   const status = view.tags.find((tag) => tag.kind === "status");
   const isOnHold =
     status?.kind === "status" && (status.status === "waiting" || status.status === "paused");

@@ -2,7 +2,7 @@ import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMeta } from "#web/shared/format/meta.ts";
 import { cn } from "#web/shared/lib/cn.ts";
-import { ColorBar } from "#web/shared/ui/color-tag.tsx";
+import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 import { PaceBar } from "#web/shared/ui/pace-bar.tsx";
 import { type MetaPart, relativeDay } from "@pace/client";
 import {
@@ -110,7 +110,6 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
         />
         <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
           <span className="flex items-center gap-2">
-            <ColorBar className="h-4" color={resolved.value.color} />
             <span
               className={cn(
                 "truncate text-[15px] font-medium",
@@ -120,7 +119,10 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
               {draft.name.trim() === "" ? t("presets.sampleTitle") : `${draft.name} 1`}
             </span>
           </span>
-          <p className="text-xs text-muted">
+          <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            <ColorTag color={resolved.value.color}>
+              {draft.name.trim() === "" ? t("presets.sampleTitle") : draft.name}
+            </ColorTag>
             {formatMeta(meta, { deviceTz: ctx.deviceTz, language, now: ctx.now }).map(
               (segment, index) => (
                 <span

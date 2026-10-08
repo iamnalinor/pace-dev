@@ -7,7 +7,8 @@ import { insightsModel } from "../view-models/insights.ts";
 import { timeBarModel } from "../view-models/time-bar.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
-const later = (minutes: number): string => new Date(Date.parse(NOW) + minutes * 60_000).toISOString();
+const later = (minutes: number): string =>
+  new Date(Date.parse(NOW) + minutes * 60_000).toISOString();
 const ctx = (now: string) => ({ deviceTz: "Europe/Moscow", now });
 
 describe("time actions", () => {
@@ -17,23 +18,51 @@ describe("time actions", () => {
     world.setNow(later(50));
     unwrap(await world.actions.tapButton("btn:food"));
     const bar = timeBarModel(world.state.store.getState(), ctx(later(80)));
-    expect(bar.running).toMatchObject({ expectMinutes: 30, label: "Food", minutes: 30, status: "ok" });
+    expect(bar.running).toMatchObject({
+      expectMinutes: 30,
+      label: "Food",
+      minutes: 30,
+      status: "ok",
+    });
     expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("btn:food");
 
     world.setNow(later(90));
     unwrap(await world.actions.tapButton("btn:food"));
-    expect(timeBarModel(world.state.store.getState(), ctx(later(95))).running).toBeNull();
-    const day = dayModel(world.state.store.getState(), null, ctx(later(95)));
-    expect(day.entries.flatMap((entry) => (entry.kind === "activity" ? [[entry.row.label, entry.row.minutes]] : []))).toEqual([
+    const after = world.state.store.getState();
+    const at = ctx(later(95));
+    expect(timeBarModel(after, at).running).toBeNull();
+    const day = dayModel(after, null, at);
+    const rowOf = (entry: (typeof day.entries)[number]) =>
+      entry.kind === "activity" ? [[entry.row.label, entry.row.minutes]] : [];
+    expect(day.entries.flatMap((entry) => rowOf(entry))).toEqual([
       ["Work", 50],
       ["Food", 40],
     ]);
   });
 
+  it("leaves a day with nothing on it empty instead of one long gap", async () => {
+    const world = await setupActions();
+    expect(dayModel(world.state.store.getState(), null, ctx(NOW)).entries).toEqual([]);
+  });
+
   it("turns the default buttons into the account's own on the first edit", async () => {
     const world = await setupActions();
-    unwrap(await world.actions.saveButton("btn:food", { category: "food", expectMinutes: 20, label: "Обед", limitMinutes: null }));
-    unwrap(await world.actions.saveButton(null, { category: "study", expectMinutes: 45, label: "Reading", limitMinutes: 90 }));
+    unwrap(
+      await world.actions.saveButton("btn:food", {
+        category: "food",
+        expectMinutes: 20,
+        label: "Обед",
+        limitMinutes: null,
+      }),
+    );
+    unwrap(
+      await world.actions.saveButton(null, {
+        category: "study",
+        expectMinutes: 45,
+        label: "Reading",
+        limitMinutes: 90,
+      }),
+    );
     unwrap(await world.actions.removeButton("btn:sleep"));
     const bar = timeBarModel(world.state.store.getState(), ctx(NOW));
     expect(bar.buttons.map((button) => button.label)).toEqual([
@@ -46,8 +75,18 @@ describe("time actions", () => {
       "Chores",
       "Reading",
     ]);
-    expect(bar.buttons.find((button) => button.label === "Reading")).toMatchObject({ color: "violet", limitMinutes: 90 });
-    expect(await world.actions.saveButton(null, { category: "rest", expectMinutes: null, label: " ", limitMinutes: null })).toEqual({
+    expect(bar.buttons.find((button) => button.label === "Reading")).toMatchObject({
+      color: "violet",
+      limitMinutes: 90,
+    });
+    expect(
+      await world.actions.saveButton(null, {
+        category: "rest",
+        expectMinutes: null,
+        label: " ",
+        limitMinutes: null,
+      }),
+    ).toEqual({
       error: "action/empty-text",
       ok: false,
     });
@@ -55,18 +94,33 @@ describe("time actions", () => {
 
   it("focuses a task, logs the past and adjusts a block", async () => {
     const world = await setupActions();
-    const taskId = Object.values(world.state.store.getState().tasks.byId).find((task) => task.title === "Algebra HW 6")?.id ?? "";
+    const taskId =
+      Object.values(world.state.store.getState().tasks.byId).find(
+        (task) => task.title === "Algebra HW 6",
+      )?.id ?? "";
     unwrap(await world.actions.focusTask(taskId));
     world.setNow(later(60));
     unwrap(await world.actions.stopActivity());
     unwrap(
-      await world.actions.logPast({ category: "food", endAt: later(-30), label: "Breakfast", startAt: later(-60) }),
+      await world.actions.logPast({
+        category: "food",
+        endAt: later(-30),
+        label: "Breakfast",
+        startAt: later(-60),
+      }),
     );
     expect(
-      await world.actions.logPast({ category: "food", endAt: later(-60), label: "Bad", startAt: later(-30) }),
+      await world.actions.logPast({
+        category: "food",
+        endAt: later(-60),
+        label: "Bad",
+        startAt: later(-30),
+      }),
     ).toEqual({ error: "action/invalid-input", ok: false });
     const state = world.state.store.getState();
-    const focus = Object.values(state.time.activities).find((activity) => activity.taskId === taskId);
+    const focus = Object.values(state.time.activities).find(
+      (activity) => activity.taskId === taskId,
+    );
     expect(focus).toMatchObject({ category: "task", label: "Algebra HW 6" });
     unwrap(await world.actions.adjustActivity(focus?.id ?? "", { startAt: later(-10) }));
     const day = dayModel(world.state.store.getState(), null, ctx(later(61)));
@@ -77,5 +131,39 @@ describe("time actions", () => {
       ["food", 30],
     ]);
     expect(week.byProject[0]).toMatchObject({ minutes: 70, name: "Algebra" });
+  });
+
+  it("saves the Day sheet: a logged block, then a move and a rename in one go", async () => {
+    const world = await setupActions();
+    const logged = unwrap(
+      await world.actions.saveActivity(
+        { endAt: later(-60), kind: "log", startAt: later(-120) },
+        { category: "study", endAt: later(-60), label: "Lecture", startAt: later(-120) },
+      ),
+    );
+    const [event] = logged;
+    const activityId = event?.type === "activity.logged" ? event.payload.activityId : "";
+    const edited = unwrap(
+      await world.actions.saveActivity(
+        { activityId, category: "study", endAt: later(-60), kind: "edit", label: "Lecture", startAt: later(-120) },
+        { category: "work", endAt: later(-50), label: "Seminar", startAt: later(-120) },
+      ),
+    );
+    expect(edited.map((item) => item.type)).toEqual(["activity.adjusted", "activity.labelled"]);
+    expect(world.state.store.getState().time.activities[activityId]).toMatchObject({
+      category: "work",
+      endAt: later(-50),
+      label: "Seminar",
+    });
+    const unchanged = await world.actions.saveActivity(
+      { activityId, category: "work", endAt: later(-50), kind: "edit", label: "Seminar", startAt: later(-120) },
+      { category: "work", endAt: later(-50), label: "Seminar", startAt: later(-120) },
+    );
+    expect(unwrap(unchanged)).toEqual([]);
+    const noEnd = await world.actions.saveActivity(
+      { endAt: later(-60), kind: "log", startAt: later(-120) },
+      { category: "work", endAt: null, label: "x", startAt: later(-120) },
+    );
+    expect(noEnd).toEqual({ error: "action/invalid-input", ok: false });
   });
 });

@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
-import type { ActivityCategorySchema } from "../events/payloads.ts";
 import type { ProjectColorName } from "../design/tokens.ts";
+import type { ActivityCategorySchema } from "../events/payloads.ts";
 
 export type ActivityCategory = z.output<typeof ActivityCategorySchema>;
 

@@ -1,9 +1,8 @@
 import type { Event, EventInput } from "../events/event-schema.ts";
-import type { TimeState } from "./model.ts";
 
 import { materialize } from "../materialize/materializer.ts";
 import { event } from "../materialize/task-fixture.fake.ts";
-import { INITIAL_TIME_STATE } from "./model.ts";
+import { INITIAL_TIME_STATE, type TimeState } from "./model.ts";
 import { timeReducer } from "./time-reducer.ts";
 
 type Body<I = EventInput> = I extends { readonly type: unknown; readonly payload: unknown }
@@ -21,14 +20,15 @@ export const act = (hhmm: string, body: Body): Event => {
   return event(counter.next, { occurredAt: T(hhmm), precision: "exact", source: "app", ...body });
 };
 
+type StartedPayload = Extract<Body, { type: "activity.started" }>["payload"];
+
+/** A live start at `hhmm`; the category defaults to work. */
 export const start = (
   hhmm: string,
-  activityId: string,
-  label: string,
-  extra: Partial<Extract<Body, { type: "activity.started" }>["payload"]> = {},
+  activity: Partial<StartedPayload> & Pick<StartedPayload, "activityId" | "label">,
 ): Event =>
   act(hhmm, {
-    payload: { activityId, category: "work", label, ...extra },
+    payload: { category: "work", ...activity },
     type: "activity.started",
   });
 

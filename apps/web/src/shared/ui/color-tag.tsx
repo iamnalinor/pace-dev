@@ -63,7 +63,14 @@ export const colorChipClass = (color: ProjectColorName, isChecked: boolean): str
     ? `${SOLID[color]} font-medium text-accentFg`
     : `${WASH[color]} ${INK[color]} ${EDGE[color]}`;
 
-/** The solid color (a color picker's swatch, a row's edge). */
+/**
+A whole surface in the color: the wash with a soft edge and the name in ink. Lists of
+projects and categories use it, so the color reads as an area, never as a thin mark.
+*/
+export const cardClass = (color: null | ProjectColorName): string =>
+  color === null ? "border-line bg-surface text-fg" : `${WASH[color]} ${EDGE[color]} ${INK[color]}`;
+
+/** The solid color (a color picker's swatch, a filled chip). */
 export const fillClass = (color: ProjectColorName): string => SOLID[color];
 
 /** A name in its color: a project, a category, an importance. */
@@ -85,22 +92,4 @@ export const ColorTag = ({
   >
     {children}
   </span>
-);
-
-/** A short upright bar in the color: marks a project or category in lists and headers. */
-export const ColorBar = ({
-  className,
-  color,
-}: {
-  readonly color: null | ProjectColorName;
-  readonly className?: string | undefined;
-}) => (
-  <span
-    aria-hidden="true"
-    className={cn(
-      "h-5 w-1 shrink-0 rounded-full",
-      color === null ? "bg-faint" : fillClass(color),
-      className,
-    )}
-  />
 );

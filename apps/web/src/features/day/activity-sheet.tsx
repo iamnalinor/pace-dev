@@ -1,5 +1,14 @@
 import { type SyntheticEvent, useId, useState } from "react";
 
+import {
+  type ActivityForm,
+  activityFormOf,
+  type ActivitySheetProps,
+  type ActivityTarget,
+  hasEnd,
+} from "@pace/client";
+import { useDraft } from "@pace/client/react";
+
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
@@ -7,22 +16,12 @@ import { isoToWallClock, wallClockToIso } from "#web/shared/time/wall-clock.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { ChipGroup } from "#web/shared/ui/chip-group.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "#web/shared/ui/sheet.tsx";
-import { ACTIVITY_CATEGORIES, type ActivityCategory, CATEGORY_COLORS } from "@pace/core";
+import { ACTIVITY_CATEGORIES, CATEGORY_COLORS } from "@pace/core";
 
-/** What the sheet edits: an existing block (adjust and relabel) or a new past one. */
-export type SheetTarget =
-  | {
-      readonly kind: "edit";
-      readonly activityId: string;
-      readonly label: string;
-      readonly category: ActivityCategory;
-      readonly startAt: string;
-      /** `null` while it runs: only the start can move. */
-      readonly endAt: null | string;
-    }
-  | { readonly kind: "log"; readonly startAt: string; readonly endAt: string };
+/** What the sheet edits: an existing block (move and rename) or a new past one. */
+export type SheetTarget = ActivityTarget;
 
-type Draft = { readonly label: string; readonly category: ActivityCategory; readonly from: string; readonly to: string };
+type Draft = ActivityForm;
 
 const TimeField = ({
   label,
@@ -50,62 +49,97 @@ const TimeField = ({
   );
 };
 
-/** Log a past block, or move and rename one already on the day. */
-export const ActivitySheet = ({
-  onClose,
-  target,
-  zone,
+type Range = { readonly startAt: string; readonly endAt: null | string };
+
+/** The typed boundaries as instants; `null` when one is missing or the end is not after the start. */
+const rangeOf = (draft: Draft, target: SheetTarget, zone: string): null | Range => {
+  const startAt = wallClockToIso(draft.from, zone);
+  const endAt = draft.to === "" ? null : wallClockToIso(draft.to, zone);
+  if (startAt === null || (endAt !== null && endAt <= startAt)) {
+    return null;
+  }
+  return endAt === null && target.kind === "log" ? null : { endAt, startAt };
+};
+
+/** What it was, its category and its boundaries (the end only once it has one). */
+const ActivityFields = ({
+  draft,
+  isEndEditable,
+  patch,
 }: {
-  readonly target: SheetTarget;
-  readonly zone: string;
-  readonly onClose: () => void;
+  readonly draft: Draft;
+  readonly isEndEditable: boolean;
+  readonly patch: (next: Partial<Draft>) => void;
 }) => {
   const t = useT();
+  const labelId = useId();
+  return (
+    <>
+      <label className="grid gap-1 text-xs text-muted" htmlFor={labelId}>
+        {t("day.what")}
+        <input
+          className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-fg"
+          id={labelId}
+          maxLength={80}
+          onChange={(event) => {
+            patch({ label: event.target.value });
+          }}
+          required
+          value={draft.label}
+        />
+      </label>
+      <ChipGroup
+        label={t("editor.category")}
+        onChange={(category) => {
+          patch({ category });
+        }}
+        options={ACTIVITY_CATEGORIES.map((category) => ({
+          color: CATEGORY_COLORS[category],
+          label: t(`category.${category}`),
+          value: category,
+        }))}
+        value={draft.category}
+      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <TimeField
+          label={t("day.from")}
+          onChange={(from) => {
+            patch({ from });
+          }}
+          value={draft.from}
+        />
+        {isEndEditable && (
+          <TimeField
+            label={t("day.to")}
+            onChange={(to) => {
+              patch({ to });
+            }}
+            value={draft.to}
+          />
+        )}
+      </div>
+    </>
+  );
+};
+
+/** Log a past block, or move and rename one already on the day. */
+export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => {
+  const t = useT();
+  const [error, setError] = useState<null | string>(null);
   const { actions } = useServices();
   const run = useRunAction();
-  const labelId = useId();
-  const [error, setError] = useState<null | string>(null);
-  const [draft, setDraft] = useState<Draft>(() => ({
-    category: target.kind === "edit" ? target.category : "other",
-    from: isoToWallClock(target.startAt, zone),
-    label: target.kind === "edit" ? target.label : "",
-    to: target.endAt === null ? "" : isoToWallClock(target.endAt, zone),
-  }));
-  const patch = (next: Partial<Draft>): void => {
-    setDraft((current) => ({ ...current, ...next }));
-  };
-  const save = async (): Promise<boolean> => {
-    const startAt = wallClockToIso(draft.from, zone);
-    const endAt = draft.to === "" ? null : wallClockToIso(draft.to, zone);
-    if (startAt === null || (target.kind === "log" && endAt === null) || (endAt !== null && endAt <= startAt)) {
-      setError(t("day.badRange"));
-      return false;
-    }
-    if (target.kind === "log") {
-      return (
-        (await run(
-          actions.logPast({ category: draft.category, endAt: endAt ?? startAt, label: draft.label, startAt }),
-        )) !== null
-      );
-    }
-    const moved =
-      startAt !== target.startAt || (endAt !== null && endAt !== target.endAt)
-        ? await run(
-            actions.adjustActivity(target.activityId, {
-              startAt,
-              ...(endAt !== null && target.endAt !== null && { endAt }),
-            }),
-          )
-        : [];
-    const renamed =
-      draft.label.trim() !== target.label || draft.category !== target.category
-        ? await run(actions.relabelActivity(target.activityId, { category: draft.category, label: draft.label }))
-        : [];
-    return moved !== null && renamed !== null;
-  };
+  const [draft, patch] = useDraft(() =>
+    activityFormOf(target, (atIso) => isoToWallClock(atIso, zone)),
+  );
   const onSubmit = async (event: SyntheticEvent): Promise<void> => {
     event.preventDefault();
-    if (await save()) {
+    const range = rangeOf(draft, target, zone);
+    if (range === null) {
+      setError(t("day.badRange"));
+      return;
+    }
+    const entry = { category: draft.category, label: draft.label, ...range };
+    if ((await run(actions.saveActivity(target, entry))) !== null) {
       onClose();
     }
   };
@@ -123,49 +157,7 @@ export const ActivitySheet = ({
           <SheetTitle>{t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}</SheetTitle>
         </SheetHeader>
         <form className="grid gap-4" onSubmit={(event) => void onSubmit(event)}>
-          <label className="grid gap-1 text-xs text-muted" htmlFor={labelId}>
-            {t("day.what")}
-            <input
-              className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-fg"
-              id={labelId}
-              maxLength={80}
-              onChange={(event) => {
-                patch({ label: event.target.value });
-              }}
-              required
-              value={draft.label}
-            />
-          </label>
-          <ChipGroup
-            label={t("editor.category")}
-            onChange={(category) => {
-              patch({ category });
-            }}
-            options={ACTIVITY_CATEGORIES.map((category) => ({
-              color: CATEGORY_COLORS[category],
-              label: t(`category.${category}`),
-              value: category,
-            }))}
-            value={draft.category}
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TimeField
-              label={t("day.from")}
-              onChange={(from) => {
-                patch({ from });
-              }}
-              value={draft.from}
-            />
-            {(target.kind === "log" || target.endAt !== null) && (
-              <TimeField
-                label={t("day.to")}
-                onChange={(to) => {
-                  patch({ to });
-                }}
-                value={draft.to}
-              />
-            )}
-          </div>
+          <ActivityFields draft={draft} isEndEditable={hasEnd(target)} patch={patch} />
           {error !== null && (
             <p className="text-xs text-warn" role="alert">
               {error}

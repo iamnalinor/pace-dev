@@ -1,7 +1,8 @@
 import {
   accountTz,
-  addDaysIn,
+  addMinutesIso,
   type ActivityCategory,
+  addDaysIn,
   CATEGORY_COLORS,
   type CoreState,
   type Gap,
@@ -11,6 +12,8 @@ import {
   taskById,
   timeline,
 } from "@pace/core";
+
+import type { ActivityTarget } from "../actions/time-actions.ts";
 
 export type DayRow = {
   readonly activityId: string;
@@ -26,9 +29,20 @@ export type DayRow = {
   readonly taskTitle: null | string;
 };
 
-export type DayEntry =
+/** A line of the day: an activity or a gap, with its list key and what tapping it opens. */
+export type DayEntry = { readonly key: string; readonly target: ActivityTarget } & (
   | { readonly kind: "activity"; readonly row: DayRow }
-  | { readonly kind: "gap"; readonly gap: Gap };
+  | { readonly kind: "gap"; readonly gap: Gap }
+);
+
+const editTargetOf = (row: Omit<DayRow, "color" | "taskTitle">): ActivityTarget => ({
+  activityId: row.activityId,
+  category: row.category,
+  endAt: row.isRunning ? null : row.endAt,
+  kind: "edit",
+  label: row.label,
+  startAt: row.startAt,
+});
 
 export type DayTotal = {
   readonly category: ActivityCategory;
@@ -47,31 +61,45 @@ export type DayModel = {
   readonly entries: readonly DayEntry[];
   readonly totals: readonly DayTotal[];
   readonly trackedMinutes: number;
+  /** "Log past activity": the last half hour of the day, or of today so far. */
+  readonly logTarget: ActivityTarget;
 };
 
+/** How long a block "Log past activity" proposes. */
+const LOG_MINUTES = 30;
+
 /** One day of the ledger in the account zone: activities and the gaps between them, in order. */
-export const dayModel = (
-  state: CoreState,
-  date: null | string,
-  ctx: QueryContext,
-): DayModel => {
+export const dayModel = (state: CoreState, date: null | string, ctx: QueryContext): DayModel => {
   const zone = accountTz(state, ctx);
   const today = startOfDayIn(ctx.now, zone);
   const from = date === null ? today : startOfDayIn(date, zone);
   const to = addDaysIn(from, 1, zone);
   const day = timeline(state.time, { from, now: ctx.now, to });
   const rows: readonly DayEntry[] = day.segments.map((segment) => ({
+    key: `${segment.activityId}-${segment.startAt}`,
     kind: "activity",
+    target: editTargetOf(segment),
     row: {
       ...segment,
       color: CATEGORY_COLORS[segment.category],
-      taskTitle: segment.taskId === null ? null : (taskById(state.tasks, segment.taskId)?.title ?? null),
+      taskTitle:
+        segment.taskId === null ? null : (taskById(state.tasks, segment.taskId)?.title ?? null),
     },
   }));
-  const gaps: readonly DayEntry[] = day.gaps.map((gap) => ({ gap, kind: "gap" }));
-  const startOf = (entry: DayEntry): string => (entry.kind === "gap" ? entry.gap.startAt : entry.row.startAt);
+  // A day with nothing on it is empty, not one gap from midnight to now.
+  const gaps: readonly DayEntry[] =
+    rows.length === 0 ? [] : day.gaps.map((gap) => ({
+          gap,
+          key: `gap-${gap.startAt}`,
+          kind: "gap",
+          target: { endAt: gap.endAt, kind: "log", startAt: gap.startAt },
+        }));
+  const startOf = (entry: DayEntry): string =>
+    entry.kind === "gap" ? entry.gap.startAt : entry.row.startAt;
+  const until = Date.parse(to) > Date.parse(ctx.now) ? ctx.now : to;
   return {
     date: from,
+    logTarget: { endAt: until, kind: "log", startAt: addMinutesIso(until, -LOG_MINUTES) },
     entries: [...rows, ...gaps].toSorted((a, b) => Date.parse(startOf(a)) - Date.parse(startOf(b))),
     isToday: from === today,
     next: from >= today ? null : addDaysIn(from, 1, zone),

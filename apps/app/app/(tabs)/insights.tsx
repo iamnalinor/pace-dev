@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "#app/screens/placeholder-screen.tsx";
+import { InsightsScreen } from "#app/features/insights/insights-screen.tsx";
 
-export default function InsightsScreen() {
-  return <PlaceholderScreen emptyKey="insights.empty" titleKey="nav.insights" />;
+export default function InsightsRoute() {
+  return <InsightsScreen />;
 }

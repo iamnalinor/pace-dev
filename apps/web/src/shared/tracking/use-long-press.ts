@@ -19,24 +19,26 @@ menu key) runs `onLongPress` instead. A touch hold also raises a context menu on
 it opens the editor once, and the click that may follow the hold is swallowed.
 */
 export const useLongPress = (onTap: () => void, onLongPress: () => void): LongPressHandlers => {
-  const timer = useRef<null | ReturnType<typeof setTimeout>>(null);
-  const heldAt = useRef(0);
+  const timerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
+  const heldAtRef = useRef(0);
   const clear = (): void => {
-    if (timer.current !== null) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  const hold = (): void => {
-    if (Date.now() - heldAt.current < SWALLOW_CLICK_MS) {
+    if (timerRef.current === null) {
       return;
     }
-    heldAt.current = Date.now();
+
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
+  const hold = (): void => {
+    if (Date.now() - heldAtRef.current < SWALLOW_CLICK_MS) {
+      return;
+    }
+    heldAtRef.current = Date.now();
     onLongPress();
   };
   return {
     onClick: () => {
-      if (Date.now() - heldAt.current < SWALLOW_CLICK_MS) {
+      if (Date.now() - heldAtRef.current < SWALLOW_CLICK_MS) {
         return;
       }
       onTap();
@@ -51,7 +53,7 @@ export const useLongPress = (onTap: () => void, onLongPress: () => void): LongPr
         return;
       }
       clear();
-      timer.current = setTimeout(hold, LONG_PRESS_MS);
+      timerRef.current = setTimeout(hold, LONG_PRESS_MS);
     },
     onPointerLeave: clear,
     onPointerUp: clear,

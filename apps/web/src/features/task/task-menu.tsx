@@ -114,11 +114,14 @@ type Props = {
   readonly onOpenChange: (isOpen: boolean) => void;
   /** Leaves the menu for the override sheet. */
   readonly onEdit: () => void;
+  /** Opens straight on the project picker (the header's project chip). */
+  readonly isMoveOnly?: boolean;
 };
 
 /** The "more" menu: edit, preset, project, pause or reopen, delete. */
-export const TaskMenu = ({ isOpen, onEdit, onOpenChange, view }: Props) => {
-  const [panel, setPanel] = useState<Panel>("menu");
+export const TaskMenu = ({ isMoveOnly = false, isOpen, onEdit, onOpenChange, view }: Props) => {
+  const [chosen, setPanel] = useState<Panel>("menu");
+  const panel = isMoveOnly ? "move" : chosen;
   const close = (): void => {
     setPanel("menu");
     onOpenChange(false);

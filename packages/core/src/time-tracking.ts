@@ -14,6 +14,18 @@ export {
   type PaceStatus,
 } from "./tracking/expect-limit.ts";
 export {
+  type CategoryRow,
+  type EstimateRow,
+  estimateVsTracked,
+  onTimeByProject,
+  type OnTimeRow,
+  type ProjectRow,
+  taskTrackedMinutes,
+  timeByCategory,
+  timeByProject,
+  weeklyProjectMinutes,
+} from "./tracking/insights.ts";
+export {
   type Activity,
   type ActivityButton,
   type ActivityCategory,
@@ -30,15 +42,3 @@ export {
   timeline,
   type Timeline,
 } from "./tracking/timeline.ts";
-export {
-  type CategoryRow,
-  type EstimateRow,
-  estimateVsTracked,
-  type OnTimeRow,
-  onTimeByProject,
-  type ProjectRow,
-  taskTrackedMinutes,
-  timeByCategory,
-  timeByProject,
-  weeklyProjectMinutes,
-} from "./tracking/insights.ts";

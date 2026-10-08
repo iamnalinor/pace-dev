@@ -14,6 +14,7 @@ import { ProblemsList } from "./problems-list.tsx";
 import { SourceText } from "./source-text.tsx";
 import { TaskFooter } from "./task-footer.tsx";
 import { TaskHeader } from "./task-header.tsx";
+import { ProjectSheet } from "./project-sheet.tsx";
 import { EditTextSheet, TaskMenuSheet } from "./task-sheets.tsx";
 import { TaskSummary } from "./task-summary.tsx";
 import { WhyCard } from "./why-card.tsx";
@@ -22,7 +23,7 @@ import { WorkProgress } from "./work-progress.tsx";
 /** "Close as…" from the menu opens on Cancelled · Skipped. */
 const CLOSE_AS: CloseMode = "other";
 
-type Open = "close" | "close-as" | "edit" | "menu" | null;
+type Open = "close" | "close-as" | "edit" | "menu" | "project" | null;
 
 const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
   const { hooks } = usePace();
@@ -90,6 +91,9 @@ export const TaskScreen = ({
               onMenu={() => {
                 setOpen("menu");
               }}
+              onProject={() => {
+                setOpen("project");
+              }}
               project={task.project}
             />
           }
@@ -106,6 +110,7 @@ export const TaskScreen = ({
       ) : null}
       {open === "menu" ? <TaskMenuSheet onChoose={setOpen} onClose={dismiss} view={task} /> : null}
       {open === "edit" ? <EditTextSheet onClose={dismiss} view={task} /> : null}
+      {open === "project" ? <ProjectSheet onClose={dismiss} view={task} /> : null}
     </>
   );
 };
