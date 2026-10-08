@@ -40,10 +40,11 @@ The three product stages are each meant to be usable daily before the next one s
 ## Architecture
 
 ```
-apps/app (Expo, Android) ─┐                         ┌─ Telegram (webhook: bot login, later digests)
-apps/web (Vite + React) ──┼─► packages/client ─► apps/api (Cloudflare Worker, Hono)
-   served by Worker       │   (typed API client,   │  /api/auth  /api/sync  /telegram/webhook
-   pace-web (assets)      │    store — planned)    │
+apps/app (Expo: Android ──┐                         ┌─ Telegram (webhook: bot login, digests)
+  and the web, through     ├─► packages/client ─► apps/api (Cloudflare Worker, Hono)
+  react-native-web; the   │   (typed API client,   │  /api/auth  /api/sync  /telegram/webhook
+  web build is served by  │    store, view-models) │
+  Worker pace-web)        │                        │
 packages/core ◄───────────┘                        ├─ D1 "pace": users, sessions, login_nonces
   events + payload schemas, sort, materialize,     ├─ Durable Object UserStore (SQLite, one per user):
   settings reducer, i18n (en/ru), design tokens,   │    events, observations, decisions, meta
@@ -58,7 +59,9 @@ packages/core ◄───────────┘                        ├
   on Android). View-models land here in stage 1.
 - `apps/api` mounts the contract on Hono, verifies Telegram logins, serves the bot
   webhook and keeps one Durable Object per user as the server copy of the event log.
-- `apps/web` and `apps/app` are thin UIs over the client.
+- `apps/app` is the one UI over the client: the same screens run on Android and, through
+  react-native-web, as the web app (a PWA). Phone-only modules have web stand-ins in
+  `src/platform/web/`, and a file can have a `.web.tsx` sibling the web build uses instead.
 
 [docs/architecture.md](docs/architecture.md) has the details: the event envelope,
 corrections, deterministic ids, the sync protocol and the recipes for adding an endpoint
@@ -89,10 +92,10 @@ apps/
     drizzle/d1, drizzle/do   committed migrations (D1 and Durable Object)
     tests/              integration tests inside workerd
     wrangler.jsonc      bindings, vars, dev environment
-  web/                  Vite + React 19 + Tailwind v4 (PWA); wrangler.jsonc = Worker pace-web
-  app/                  Expo SDK 57 (expo-router, NativeWind); app.config.ts, plugins/, keystores/
+  app/                  Expo SDK 57 (expo-router, NativeWind, react-native-web): Android and the web
+                        app; public/ (web shell, manifest, _headers), wrangler.web.jsonc = Worker pace-web
 e2e/                    Playwright + axe
-scripts/                generate-tokens.ts (tokens.json → tokens.css), generate-icons.ts
+scripts/                build-web.ts (Expo web export + service worker), serve-web.ts, generate-icons.ts
 assets/logo/            source SVGs of the mark, wordmark and favicon
 .github/workflows/      ci, deploy, release, mutation, llm-regression
 docs/                   architecture, testing, linting, presets
@@ -105,9 +108,10 @@ Worker, D1, KV and the Durable Object run locally in `wrangler dev` (workerd).
 
 ```sh
 bun install                                   # also installs the git hooks (lefthook)
-cp .env.example apps/web/.env                 # optional: the defaults already point at the local Worker
+cp .env.example apps/app/.env                 # optional: the defaults already point at the local Worker
 cp apps/api/.dev.vars.example apps/api/.dev.vars   # optional: only needed for a real Telegram login
-bun dev                                       # API on http://localhost:8787, web on http://localhost:5173
+bun dev                                       # API on http://localhost:8787
+bun dev:web                                   # the app in the browser (Expo, port 8081)
 ```
 
 Without a bot token the API still starts; `POST /api/auth/telegram` answers 503 and the
@@ -117,18 +121,19 @@ the route exists).
 
 | Command | What it does |
 |---|---|
-| `bun dev` | `wrangler dev` (API, port 8787) and Vite (web, port 5173) together |
-| `bun lint` | every static check with auto-fix: tokens → Biome → ESLint → tsc (7 projects) → knip → jscpd → dependency-cruiser → migration drift. See [docs/linting.md](docs/linting.md) |
-| `bun test:unit` | Vitest in `packages/core`, `packages/client`, `apps/web` (with coverage thresholds) |
+| `bun dev` | `wrangler dev` (API, port 8787) |
+| `bun dev:web` | the app in the browser (`expo start --web`) |
+| `bun lint` | every static check with auto-fix: Biome → ESLint → tsc (6 projects) → knip → jscpd → dependency-cruiser → migration drift. See [docs/linting.md](docs/linting.md) |
+| `bun test:unit` | Vitest in `packages/core` and `packages/client` (with coverage thresholds) |
 | `bun test:api` | Vitest inside workerd with real D1 / KV / Durable Object bindings |
 | `bun test:app` | jest-expo + React Native Testing Library |
 | `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
 | `bun test` | the four above, in that order |
-| `bun test:mutation` | Stryker on core and web (slow; on demand in CI) |
+| `bun test:mutation` | Stryker on core (slow; on demand in CI) |
 | `bun test:llm` | LLM parsing regression set (stage 2; the runner does not exist yet) |
 | `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |
 | `bun db:check` | fails when a schema changed without a migration (part of `bun lint`) |
-| `bun run build` | production build of the web app (`apps/web/dist`) |
+| `bun run build` | production build of the web app (`apps/app/dist`, with the service worker) |
 | `bun run --cwd apps/app android` | `expo run:android` on a connected device or emulator |
 
 Playwright needs a browser: `bunx playwright install --with-deps chromium`, or point
@@ -168,21 +173,22 @@ Deployments for other people: edit `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAM
 | Resource | Name / binding | Notes |
 |---|---|---|
 | Worker | `pace-api` | custom domain `pace-api.nalinor.dev`, `nodejs_compat`, observability on |
-| Worker (static assets) | `pace-web` | `apps/web/wrangler.jsonc`, serves `apps/web/dist` with SPA fallback, custom domain `pace.nalinor.dev` |
+| Worker (static assets) | `pace-web` | `apps/app/wrangler.web.jsonc`, serves `apps/app/dist` with SPA fallback, custom domain `pace.nalinor.dev` |
 | D1 | `pace` → binding `DB` | migrations in `apps/api/drizzle/d1`; `database_id` in `wrangler.jsonc` is a placeholder until `wrangler d1 create pace` |
 | KV | binding `OAUTH_KV` | the MCP OAuth provider's clients, grants and tokens |
 | Durable Object | class `UserStore` → binding `USER_STORE` | SQLite-backed, migration tag `v1` |
 
 Create them once (`bunx wrangler d1 create pace`, `bunx wrangler kv namespace create OAUTH_KV`),
 put the ids into `apps/api/wrangler.jsonc`, change the two custom domains to yours, and
-either run `bunx wrangler deploy` in `apps/api` and `apps/web` or let the workflow do it.
+either run `bunx wrangler deploy` in `apps/api` and `bun run build && bun run --cwd apps/app deploy:web`, or let
+the workflow do it.
 
 ### GitHub Actions
 
 | Workflow | Trigger | Does |
 |---|---|---|
 | `ci.yml` | pull requests and pushes to `main` (not for docs-only changes), manual | one checks job (lint with a clean tree afterwards, `bun audit`, unit, app, api), then e2e once it passes; manual runs also build an arm64 **debug APK** artifact |
-| `deploy.yml` | after a green CI on `main`, or manual | builds the web app with `VITE_API_URL=https://pace-api.nalinor.dev`, applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
+| `deploy.yml` | after a green CI on `main`, or manual | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
 | `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk` |
 | `mutation.yml` | manual | Stryker on core and web |
 | `llm-regression.yml` | manual | `bun test:llm` with real providers (stage 2) |
@@ -193,7 +199,7 @@ Secrets and variables read by the workflows:
 |---|---|---|---|
 | `CLOUDFLARE_API_TOKEN` | secret | deploy | Workers Scripts, D1, KV, custom domains for the account |
 | `CLOUDFLARE_ACCOUNT_ID` | variable (secret also accepted) | deploy | account the Workers live in |
-| `TELEGRAM_BOT_USERNAME` | variable | deploy | baked into the web build as `VITE_TELEGRAM_BOT` (defaults to `PaceTaskTrackerBot`) |
+| `TELEGRAM_BOT_USERNAME` | variable | deploy | baked into the web build as `EXPO_PUBLIC_TELEGRAM_BOT` (defaults to `PaceTaskTrackerBot`) |
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
@@ -224,7 +230,7 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
   tag a release. The plugin reads them as Gradle properties `PACE_STORE_FILE`,
   `PACE_STORE_PASSWORD`, `PACE_KEY_ALIAS`, `PACE_KEY_PASSWORD`. Users must uninstall the
   debug-signed app once; the signature changes.
-- **App Links**: `apps/web/public/.well-known/assetlinks.json` lists the SHA-256 of the
+- **App Links**: `apps/app/public/.well-known/assetlinks.json` lists the SHA-256 of the
   signing certificate for package `dev.nalinor.pace`, so `https://pace.nalinor.dev/app/*`
   opens in the app (intent filter with `autoVerify` in `app.config.ts`). After switching
   keystores, replace the fingerprint (`keytool -list -v -keystore release.keystore`) and

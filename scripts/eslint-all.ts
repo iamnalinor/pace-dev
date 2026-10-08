@@ -6,7 +6,6 @@ process outgrows the CI runner's memory. Each part keeps its own cache; extra ar
 const PARTS: readonly (readonly [string, readonly string[]])[] = [
   ["packages", ["packages"]],
   ["api", ["apps/api"]],
-  ["web", ["apps/web"]],
   ["app", ["apps/app"]],
   ["root", [".", "--ignore-pattern", "apps/**", "--ignore-pattern", "packages/**"]],
 ];

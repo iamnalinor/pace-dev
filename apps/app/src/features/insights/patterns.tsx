@@ -46,6 +46,7 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
       <View
         accessibilityLabel={described}
         className="h-24 flex-row items-end gap-0.5 border-b border-line"
+        role="group"
       >
         {hours.minutes.map((minutes, hour) => (
           <View className="h-full flex-1 justify-end" key={hourLabel(hour)}>
@@ -85,6 +86,7 @@ const FragmentationCard = ({
             accessibilityLabel={`${t(tile.key)}: ${tile.value}`}
             className="flex-1 gap-1 rounded-lg bg-raised p-3"
             key={tile.key}
+            role="group"
           >
             <Text className="font-sans text-[11px] text-fg2">{t(tile.key)}</Text>
             <Text className="font-mono text-[16px] text-fg">{tile.value}</Text>

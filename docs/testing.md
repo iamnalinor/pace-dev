@@ -7,11 +7,10 @@ Every level tests what the others cannot. Behaviour changes start with a failing
 |---|---|---|---|---|
 | Core unit | Vitest, fast-check | pure functions: schemas, materializer, reducers, i18n, tokens | `packages/core/src/**/*.test.ts` | `bun test:unit` |
 | Client unit | Vitest | API client, auth, app state and sync on memory adapters and the fake `fetch` from `@pace/client/testing` | `packages/client/src/**/*.test.ts` | `bun test:unit` |
-| Web component | Vitest, React Testing Library, jsdom | components with logic | `apps/web/src/**/*.test.{ts,tsx}` | `bun test:unit` |
 | API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
 | App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |
 | End-to-end | Playwright + axe | the production web build against `wrangler dev` in Chromium | `e2e/*.e2e.ts` | `bun test:e2e` |
-| Mutation | Stryker | the core and web tests themselves | `packages/core`, `apps/web` | `bun test:mutation` (on demand in CI) |
+| Mutation | Stryker | the core tests themselves | `packages/core` | `bun test:mutation` (on demand in CI) |
 | LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
 `bun test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
@@ -29,13 +28,6 @@ revocations, amendments that would break the schema, `materializeAt`,
 `formatRelativeDay`, catalog parity (`en` and `ru` have the same keys, placeholders and
 no empty strings), palette contrast ratios, time-zone helpers, deterministic ids.
 Order-insensitivity and similar invariants use **fast-check** properties.
-
-## Web component tests
-
-React Testing Library in jsdom, by role and label. `src/test/render.tsx` renders with the
-providers; `src/test/setup.ts` registers jest-dom. Thresholds: 90% lines/statements, 85%
-functions, 75% branches — measured on logic only: `main.tsx`, `router.tsx`, pages,
-layouts, `shared/ui/**` and `platform/**` are excluded because Playwright covers them.
 
 ## API tests (workerd)
 
@@ -72,7 +64,10 @@ Vitest cannot render React Native). It runs under Node through the binary's sheb
 never with `bun --bun`. `jest.setup.ts` registers the RNTL matchers; `.bun` is in
 `transformIgnorePatterns` so workspace packages are transformed. Native modules are
 mocked at the Expo module boundary; the pure logic they drive lives in `@pace/client`
-and is tested there.
+and is tested there. The same screens are the web app, so these tests cover both; jest
+renders the native files, and the `.web.tsx` variants are covered by the e2e run. Query by
+role and state the way a screen reader sees it: chips and segments are `radio`s
+(`checked`), time-bar activities `switch`es, the row check a `checkbox`.
 
 ## End-to-end
 
@@ -80,8 +75,9 @@ and is tested there.
 
 1. the API: `bun run --cwd apps/api dev -- --env dev --var ENVIRONMENT:test --var
    WEB_ORIGIN:<web url>` (wrangler dev, port 8787, local D1/KV/DO, dev login enabled);
-2. the web: `bun run --cwd apps/web build && bun run --cwd apps/web preview` (port 4173)
-   with `VITE_API_URL=http://localhost:8787`.
+2. the web: `bun run --cwd apps/app build:web` (Expo web export + service worker, with
+   `EXPO_PUBLIC_API_URL=http://localhost:8787` and `EXPO_PUBLIC_DEV_LOGIN=1`), served as a
+   single-page app by `scripts/serve-web.ts` (port 4173).
 
 Tests are in `e2e/*.e2e.ts`; `e2e/support/fixtures.ts` adds `expectNoA11yViolations`
 (axe, WCAG 2.2 AA, fails on serious/critical). Every page gets a scan. Failures keep a
@@ -91,13 +87,14 @@ trace and a screenshot; CI uploads `playwright-report/`.
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium` to use an installed one (sandboxes).
 - `E2E_BASE_URL=https://pace.nalinor.dev bun test:e2e` runs the suite against a deployed
   stack without starting anything.
-- Locally the servers are reused if already running (`reuseExistingServer`), so `bun dev`
-  plus `bun test:e2e` works — but note `bun dev` serves Vite, not the production preview.
+- Locally the servers are reused if already running (`reuseExistingServer`). A reused API
+  keeps its data between runs (CI always starts clean), so a rerun can meet yesterday's
+  tasks and settings: stop it, or delete `.cache/e2e-state`, for a clean run.
 
 ## Mutation testing
 
 Coverage shows what ran, not what was checked. Stryker (`stryker.config.json` in
-`packages/core` and `apps/web`) mutates the code and expects the tests to fail. It is
+`packages/core`) mutates the code and expects the tests to fail. It is
 slow, so `mutation.yml` runs it weekly and on demand; reports land in `reports/`.
 
 ## LLM regression (planned)

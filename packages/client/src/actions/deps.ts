@@ -22,6 +22,9 @@ Every action answers with the events it appended or one of these codes: the core
 validation codes pass through untouched, `action/*` are the client's, and a store refusal
 keeps its message behind `dispatch/`.
 */
+/** Why a project name cannot be used: empty, or another active project carries it. */
+export type ProjectNameError = "project/name-required" | "project/name-taken";
+
 export type ActionError =
   | "action/empty-text"
   | "action/invalid-input"
@@ -35,6 +38,7 @@ export type ActionError =
   | `dispatch/${string}`
   | PresetError
   | PresetValidationError
+  | ProjectNameError
   | RetroError;
 
 export type ActionResult = Promise<Result<readonly Event[], ActionError>>;

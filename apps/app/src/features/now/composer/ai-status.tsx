@@ -68,6 +68,7 @@ export const AiStatus = ({ isWaiting, onAnswer, onLater, state }: Props) => {
               <View
                 accessibilityLabel={t("composer.aiQuestion")}
                 className="flex-row flex-wrap gap-1.5"
+                role="group"
               >
                 {question.options.map((option) => (
                   <Chip

@@ -136,6 +136,8 @@ export const enShell = {
   "errors.httpStatus": "{status} {text}",
   "errors.details": "Technical details",
   "errors.reload": "Reload",
+  "update.ready": "We changed a few things",
+  "update.reload": "Reload",
   "errors.syncFailed": "Sync failed: {reason}",
   "common.and": "and",
   "common.close": "Close",

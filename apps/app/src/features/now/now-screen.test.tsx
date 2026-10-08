@@ -5,7 +5,7 @@ import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { HW_ID, TRK_ID } from "@pace/core/testing";
 
-import { NowScreen } from "./now-screen.tsx";
+import { NowBoard } from "./now-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -13,12 +13,12 @@ beforeEach(() => {
 
 const checks = (): readonly string[] =>
   screen
-    .getAllByRole("button", { name: /^Mark .* done$/ })
+    .getAllByRole("checkbox", { name: /^Mark .* done$/ })
     .map((button) => String(button.props["accessibilityLabel"]));
 
-describe("NowScreen", () => {
+describe("NowBoard", () => {
   it("lists the artboard rows in score order with their meta lines", async () => {
-    await renderScreen(<NowScreen />, await createTestRuntime());
+    await renderScreen(<NowBoard />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
     expect(checks()).toEqual([
@@ -36,7 +36,7 @@ describe("NowScreen", () => {
     // The project (else the category) and the importance are coloured tags before the meta text.
     expect(screen.getByText("by end of day")).toBeOnTheScreen();
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
-    expect(screen.getByText("15h 1m late · 2 problems left")).toBeOnTheScreen();
+    expect(screen.getByText("15h late · 2 problems left")).toBeOnTheScreen();
     expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
     expect(screen.getByText("Due Fri Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
@@ -45,23 +45,24 @@ describe("NowScreen", () => {
   });
 
   it("opens the inbox from the counter and a task from its row", async () => {
-    await renderScreen(<NowScreen />, await createTestRuntime());
+    await renderScreen(<NowBoard />, await createTestRuntime());
     await fireEvent.press(screen.getByRole("button", { name: "Inbox, 3 unsorted" }));
     expect(router.push).toHaveBeenCalledWith("/inbox");
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
   });
 
-  it("checks a task off at once and brings it back with Undo", async () => {
-    await renderScreen(<NowScreen />, await createTestRuntime());
+  it("checks a task off at once, without a toast (History undoes it)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<NowBoard />, runtime);
     await fireEvent.press(
-      screen.getByRole("button", { name: "Mark Reply to course curator done" }),
+      screen.getByRole("checkbox", { name: "Mark Reply to course curator done" }),
     );
     await waitFor(() => {
       expect(screen.queryByText("Reply to course curator")).toBeNull();
     });
-    expect(screen.getByText("Reply to course curator · done")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    await runtime.actions.undoLast();
     await waitFor(() => {
       expect(screen.getByText("Reply to course curator")).toBeOnTheScreen();
     });
@@ -69,22 +70,22 @@ describe("NowScreen", () => {
 
   it("opens the submit sheet for a per-problem task instead of closing it", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<NowScreen />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: "Mark Algebra HW 6 done" }));
+    await renderScreen(<NowBoard />, runtime);
+    await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}?close=1`);
     expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toBeNull();
   });
 
   it("filters by project and lists the waiting tasks under a divider", async () => {
-    await renderScreen(<NowScreen />, await createTestRuntime());
+    await renderScreen(<NowBoard />, await createTestRuntime());
     const chips = screen.getByLabelText("Filter by project");
-    await fireEvent.press(within(chips).getByRole("button", { name: "Work" }));
+    await fireEvent.press(within(chips).getByRole("radio", { name: "Work" }));
     expect(checks()).toEqual([
       "Mark Flaky latency test in nightly done",
       "Mark Prepare demo for Friday done",
       "Mark RFC: dedicated runner pool done",
     ]);
-    await fireEvent.press(screen.getByRole("button", { name: "All" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "All" }));
     expect(checks()).toHaveLength(7);
     expect(screen.getByRole("header", { name: "Waiting" })).toBeOnTheScreen();
     expect(screen.getByText("+ 6 later")).toBeOnTheScreen();
@@ -94,7 +95,7 @@ describe("NowScreen", () => {
 
   it("moves a task inside its importance category", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<NowScreen />, runtime);
+    await renderScreen(<NowBoard />, runtime);
     const row = screen.getByTestId(`now-row-${TRK_ID}`);
     await act(async () => {
       await fireEvent(row, "accessibilityAction", { nativeEvent: { actionName: "moveUp" } });
@@ -106,7 +107,7 @@ describe("NowScreen", () => {
 
   it("offers the device zone when the account sits in another one", async () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC" });
-    await renderScreen(<NowScreen />, runtime);
+    await renderScreen(<NowBoard />, runtime);
     expect(
       screen.getByText(en("zone.banner", { account: "Europe/Moscow", device: "UTC" })),
     ).toBeOnTheScreen();
@@ -118,7 +119,7 @@ describe("NowScreen", () => {
   });
 
   it("shows the empty state on a fresh account", async () => {
-    await renderScreen(<NowScreen />, await createTestRuntime({ world: "empty" }));
+    await renderScreen(<NowBoard />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Inbox, 0 unsorted" })).toBeOnTheScreen();
   });

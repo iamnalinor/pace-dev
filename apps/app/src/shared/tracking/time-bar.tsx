@@ -97,8 +97,8 @@ const ActivityButton = ({ button, onEdit, onTap }: ActivityButtonProps) => {
       ]}
       accessibilityHint={t("time.buttonHint")}
       accessibilityLabel={button.label}
-      accessibilityRole="button"
-      accessibilityState={{ selected: button.isRunning }}
+      accessibilityRole="switch"
+      aria-checked={button.isRunning}
       className={cx(
         "h-11 w-[23.5%] items-center justify-center rounded-lg border px-1 active:opacity-80",
         button.isRunning ? PROJECT_FILL[button.color] : washClass(button.color),
@@ -145,6 +145,7 @@ export const TimeBar = () => {
     <View
       accessibilityLabel={t("time.bar")}
       className="border-t border-line bg-bg px-3 pb-2.5 pt-2.5"
+      role="region"
     >
       <View className="min-h-9 flex-row items-center gap-2">
         <View className="flex-1">

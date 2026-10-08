@@ -1,10 +1,10 @@
-import { useRouter } from "expo-router";
 import { ChevronDown, Ellipsis } from "lucide-react-native";
 import { Pressable } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { useTaskBack } from "#app/shared/task-opener.tsx";
 import { BackHeader } from "#app/ui/back-header.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
@@ -22,14 +22,12 @@ export const TaskHeader = ({
   readonly project: TaskViewModel["project"];
 }) => {
   const t = useT();
-  const router = useRouter();
+  const back = useTaskBack();
   const { palette } = useTheme();
   return (
     <BackHeader
       backLabel={t("common.back")}
-      onBack={() => {
-        router.back();
-      }}
+      onBack={back}
       right={
         onMenu === undefined ? null : (
           <IconButton icon={Ellipsis} label={t("task.more")} onPress={onMenu} variant="plain" />

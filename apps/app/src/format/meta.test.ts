@@ -30,10 +30,10 @@ describe("metaTexts", () => {
     ).toEqual(["strong:Prioritized", "plain:25% behind pace"]);
     expect(
       texts([
-        { kind: "late", minutes: 901 },
+        { isSoft: false, kind: "late", minutes: 901 },
         { count: 2, kind: "problems-left" },
       ]),
-    ).toEqual(["warn:15h 1m late", "plain:2 problems left"]);
+    ).toEqual(["warn:15h late", "plain:2 problems left"]);
     expect(
       texts([
         { importance: "nice_to_have", kind: "importance" },
@@ -42,9 +42,11 @@ describe("metaTexts", () => {
     ).toEqual(["plain:Nice-to-have", "plain:12d old"]);
   });
 
-  it("keeps a short lateness in hours and minutes", () => {
-    expect(texts([{ kind: "late", minutes: 100 }])).toEqual(["warn:1h 40m late"]);
-    expect(texts([{ kind: "late", minutes: 3000 }])).toEqual(["warn:2d 2h late"]);
+  it("tells lateness in minutes only under an hour, and never for a soft deadline", () => {
+    expect(texts([{ isSoft: false, kind: "late", minutes: 40 }])).toEqual(["warn:40m late"]);
+    expect(texts([{ isSoft: false, kind: "late", minutes: 100 }])).toEqual(["warn:1h late"]);
+    expect(texts([{ isSoft: false, kind: "late", minutes: 3000 }])).toEqual(["warn:2d 2h late"]);
+    expect(texts([{ isSoft: true, kind: "late", minutes: 40 }])).toEqual(["warn:<1h late"]);
   });
 
   it("follows the account language with the right plural forms", () => {

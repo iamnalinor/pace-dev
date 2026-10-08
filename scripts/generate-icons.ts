@@ -78,14 +78,14 @@ export const LOGO_FILES: readonly LogoFile[] = [
   { path: "assets/logo/pace-mark-light.svg", svg: markSvg(LIGHT) },
   { path: "assets/logo/pace-wordmark.svg", svg: wordmarkSvg() },
   { path: "assets/logo/favicon.svg", svg: FAVICON },
-  { path: "apps/web/public/favicon.svg", svg: FAVICON },
+  { path: "apps/app/public/favicon.svg", svg: FAVICON },
 ];
 
 export const ICONS: readonly IconSpec[] = [
   // Web: the lime tile; the chevrons stay inside the central 80% (maskable-safe).
-  { path: "apps/web/public/icon-192.png", size: 192, svg: FAVICON },
-  { path: "apps/web/public/icon-512.png", size: 512, svg: FAVICON },
-  { path: "apps/web/public/apple-touch-icon.png", size: 180, svg: FAVICON },
+  { path: "apps/app/public/icon-192.png", size: 192, svg: FAVICON },
+  { path: "apps/app/public/icon-512.png", size: 512, svg: FAVICON },
+  { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: FAVICON },
   // Expo: dark iOS icon, Android adaptive foreground (central 66% safe zone), themed mono.
   { path: "apps/app/assets/icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.6, DARK_BG) },
   { path: "apps/app/assets/adaptive-icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.56) },

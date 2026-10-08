@@ -9,8 +9,9 @@ import { type AppHooks, createAppHooks } from "@pace/client/react";
 
 import { API_BASE_URL } from "./platform/api-base.ts";
 import { loadDeviceId } from "./platform/device-id.ts";
+import { IS_PHONE } from "./platform/device.ts";
+import { createEventStore } from "./platform/event-store.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
-import { createSqliteEventStore } from "./platform/sqlite-event-store.ts";
 
 /** Everything the screens need, wired once per app launch. */
 export type PaceRuntime = PaceClient & {
@@ -33,7 +34,7 @@ export type RuntimeOptions = {
 
 /** Builds the client stack on the platform adapters; options override them (tests). */
 export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceRuntime> => {
-  const eventStore = options.eventStore ?? createSqliteEventStore();
+  const eventStore = options.eventStore ?? createEventStore();
   const deviceId = await (options.deviceId ?? loadDeviceId)();
   const client = createPaceClient({
     baseUrl: options.baseUrl ?? API_BASE_URL,
@@ -42,7 +43,8 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     ...(options.fetch !== undefined && { fetch: options.fetch }),
     ...(options.now !== undefined && { now: options.now }),
     session: options.session ?? createSecureSessionStore(),
-    source: "app",
+    // The event log tells which shell a change came from.
+    source: IS_PHONE ? "app" : "web",
     store: eventStore,
   });
   return {

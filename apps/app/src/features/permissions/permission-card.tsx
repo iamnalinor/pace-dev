@@ -59,6 +59,7 @@ export const PermissionCard = ({
     <View
       accessibilityLabel={t(`permissions.${permission.id}`)}
       className="gap-2 border-t border-line px-5 py-4"
+      role="group"
     >
       <PermissionText id={permission.id} />
       <View className="flex-row items-center justify-between gap-3">

@@ -160,7 +160,7 @@ Claude, Cursor and the Inspector as usual.
    A request the provider refuses is redirected back to the client with the OAuth error when
    the client and its redirect URI were valid, and answered with `400 oauth/invalid-request`
    otherwise (never a redirect to an unverified URI).
-4. The consent page (`apps/web/src/features/oauth`) asks the API what to show
+4. The consent page (`apps/app/src/features/oauth`, shown on the web build at `/oauth/authorize`) asks the API what to show
    (`GET /api/oauth/client-info?authQuery=<query>`): the client's name and logo, its domain for
    a metadata-document client ("registered itself; not verified" otherwise), the redirect host,
    a warning when that host is loopback, and the requested scopes with plain-language lines.
@@ -206,7 +206,7 @@ apps/api/src/user-store/state.ts    the DO's materialized CoreState cache (by se
 apps/api/src/user-store/projections.ts  tasks / subtasks / projects / presets SQL rows (touched rows, or all after a rebuild)
 apps/api/src/shared/contract.ts     the DO ↔ Worker types (RpcState, ApplyMeta, ApplyError, UserStoreApi)
 packages/core/src/api/schemas/oauth.ts  OAUTH_SCOPES, requestedScopes, grantedScopes, the consent contract
-apps/web/src/features/oauth/        the consent page
+apps/app/src/features/oauth/        the consent page (screens/oauth-screen.web.tsx on the web)
 ```
 
 Adding a tool: `defineTool` in `apps/api/src/mcp/tools/<group>.ts` (a read tool wraps
@@ -257,4 +257,4 @@ the scope guard with an in-memory client. `bun test:api` runs them.
 - KV free tier: 1 000 writes a day. A consent writes a grant and a code, an exchange writes a
   token, a refresh rewrites the grant and a token. One person with a few connectors is far
   from the limit; `purgeExpiredData` can run from a cron trigger when needed.
-- Web CSP (`apps/web/public/_headers`): `img-src https:` so client logos render.
+- Web CSP (`apps/app/public/_headers`): `img-src https:` so client logos render.

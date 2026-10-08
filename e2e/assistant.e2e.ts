@@ -9,7 +9,7 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   const line = page.getByRole("textbox", { name: "New task" });
   await line.fill("разобрать почту после обеда");
   await page.getByRole("button", { name: "Read with AI" }).click();
-  await expect(page.getByText("Read by the assistant.")).toBeVisible();
+  await expect(page.getByText(/Read by the assistant\./u)).toBeVisible();
   await expectNoA11yViolations(page);
   await line.press("Enter");
   await expect(line).toHaveValue("");

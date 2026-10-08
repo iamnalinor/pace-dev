@@ -28,6 +28,7 @@ const SeriesRules = () => {
     <View
       accessibilityLabel={t("permissions.rules")}
       className="gap-1 border-t border-line px-5 py-4"
+      role="group"
     >
       <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
         {t("permissions.rules")}

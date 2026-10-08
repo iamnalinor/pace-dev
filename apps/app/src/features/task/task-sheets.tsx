@@ -71,7 +71,7 @@ export const EditTextSheet = ({
       onClose();
       return;
     }
-    if (await run(actions.updateTask(view.id, patch), { success: t("edit.saved"), undo: true })) {
+    if (await run(actions.updateTask(view.id, patch))) {
       onClose();
     }
   };

@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -6,6 +5,7 @@ import type { HistoryEntry } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
+import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { TaskRow } from "#app/shared/task-row.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -38,7 +38,7 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
       {entry.revocable ? (
         <Button
           onPress={() => {
-            void run(actions.revoke(entry.id), { success: t("history.revoked") });
+            void run(actions.revoke(entry.id));
           }}
           variant="ghost"
         >
@@ -52,7 +52,7 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
 /** The board as it was on a chosen day, and every change, each one undoable. */
 export const HistoryScreen = () => {
   const t = useT();
-  const router = useRouter();
+  const openTask = useOpenTask();
   const { hooks } = usePace();
   const { now } = hooks.useClock();
   const [at, setAt] = useState<null | string>(null);
@@ -94,7 +94,7 @@ export const HistoryScreen = () => {
           <TaskRow
             key={row.id}
             onOpen={() => {
-              router.push(`/task/${row.id}`);
+              openTask(row.id);
             }}
             row={row}
           />

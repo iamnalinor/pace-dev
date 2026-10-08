@@ -29,10 +29,22 @@ export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
   );
 };
 
-/** Mark + wordmark, as on the login card. */
-export const PaceLogo = ({ wordmark }: { readonly wordmark: string }) => (
+/** Mark + wordmark, as on the login card; the wordmark is the page heading, `heading` its name. */
+export const PaceLogo = ({
+  heading,
+  wordmark,
+}: {
+  readonly heading: string;
+  readonly wordmark: string;
+}) => (
   <View className="items-center gap-4">
     <PaceMark />
-    <Text className="font-sans text-[34px] font-semibold tracking-tight text-fg">{wordmark}</Text>
+    <Text
+      accessibilityLabel={heading}
+      accessibilityRole="header"
+      className="font-sans text-[34px] font-semibold tracking-tight text-fg"
+    >
+      {wordmark}
+    </Text>
   </View>
 );

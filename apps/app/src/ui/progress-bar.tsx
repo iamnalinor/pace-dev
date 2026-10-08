@@ -19,7 +19,9 @@ export const ProgressBar = ({
   <View
     accessibilityLabel={label}
     accessibilityRole="progressbar"
-    accessibilityValue={{ max: PERCENT, min: 0, now: Math.round(value * PERCENT) }}
+    aria-valuemax={PERCENT}
+    aria-valuemin={0}
+    aria-valuenow={Math.round(value * PERCENT)}
     className="h-[3px] rounded-sm bg-track"
   >
     <View className="h-[3px] rounded-sm bg-fg" style={{ width: share(value) }} />

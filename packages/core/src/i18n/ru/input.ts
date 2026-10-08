@@ -25,6 +25,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.action/not-auto-outcome": "Эта задача не была закрыта автоматически.",
   "actionError.action/nothing-to-do": "Менять нечего.",
   "actionError.action/unknown-project": "Этого проекта больше нет.",
+  "actionError.project/name-required": "Дайте проекту название.",
+  "actionError.project/name-taken": "Проект с таким названием уже есть.",
   "actionError.action/unknown-review-action": "Это действие больше недоступно.",
   "actionError.event/duplicate": "Это уже записано.",
   "actionError.event/not-found": "Этой записи больше нет.",

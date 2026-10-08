@@ -27,7 +27,7 @@ const ChoiceRow = ({
   <Pressable
     accessibilityLabel={choice.name}
     accessibilityRole="radio"
-    accessibilityState={{ checked: isCurrent }}
+    aria-checked={isCurrent}
     className={cx(
       "min-h-12 flex-row items-center rounded-lg border px-3 active:opacity-70",
       isCurrent ? "border-fg" : "border-line",
@@ -59,12 +59,7 @@ export const ProjectSheet = ({
   ];
   const move = async (projectId: null | string): Promise<void> => {
     const target = projectId === null ? null : { projectId };
-    if (
-      await run(actions.setProject(view.id, target), {
-        success: t("task.moved", { title: view.title }),
-        undo: true,
-      })
-    ) {
+    if (await run(actions.setProject(view.id, target))) {
       onClose();
     }
   };

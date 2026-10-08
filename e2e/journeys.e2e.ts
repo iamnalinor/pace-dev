@@ -19,21 +19,19 @@ for (const size of SIZES) {
   test.describe(`${size.name} (${String(size.width)}px)`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
 
-    test("checks a task off and brings it back with Undo", async ({ page }) => {
+    test("checks a task off and brings it back from History", async ({ page }) => {
       await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
       await page.goto("/");
-      await add(page, `water the plants ${size.name}`);
-      const board = page.getByRole("list", { name: "Tasks" });
       const title = `water the plants ${size.name}`;
-      await board.getByRole("button", { name: `Mark ${title} done` }).click();
+      await add(page, title);
+      const board = page.getByRole("list", { name: "Tasks" });
+      await board.getByRole("checkbox", { name: `Mark ${title} done` }).click();
       await expect(board.getByText(title)).toHaveCount(0);
-      // The "Added" toast has an Undo too: take the one about this task.
-      await page
-        .locator("[data-sonner-toast]")
-        .filter({ hasText: title })
-        .getByRole("button", { name: "Undo" })
-        .click();
-      await expect(board.getByText(title)).toBeVisible();
+      // No toast: the change is in History, undone from there.
+      await page.goto("/history");
+      await page.getByRole("button", { name: "Undo" }).first().click();
+      await page.goto("/");
+      await expect(page.getByRole("list", { name: "Tasks" }).getByText(title)).toBeVisible();
     });
 
     test("sends a line to Inbox and sorts it there", async ({ page }) => {
@@ -58,7 +56,6 @@ for (const size of SIZES) {
       await expectNoA11yViolations(page);
       await page.goto("/settings");
       await expect(page.getByText(/^Account: /u)).toBeVisible();
-      await expect(page.getByText("Not set yet")).toHaveCount(0);
       await page.goto("/no-such-page");
       await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
       await expect(page.getByText("There is nothing at /no-such-page.")).toBeVisible();

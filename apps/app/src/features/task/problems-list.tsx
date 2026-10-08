@@ -49,7 +49,8 @@ const Problem = ({
     <Pressable
       accessibilityLabel={problem.label}
       accessibilityRole="checkbox"
-      accessibilityState={{ checked: problem.state !== "pending", disabled: isSent }}
+      aria-checked={problem.state !== "pending"}
+      aria-disabled={isSent}
       className="min-h-[52px] flex-row items-center gap-3 border-b border-line px-1 active:opacity-70"
       disabled={isSent}
       onPress={() => {

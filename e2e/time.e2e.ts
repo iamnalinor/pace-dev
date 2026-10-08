@@ -24,6 +24,14 @@ const shoot = async (
 
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
+/** A press held until `opened` shows, as a finger does it (the long press fires while held). */
+const hold = async (page: Page, target: Locator, opened: Locator): Promise<void> => {
+  await target.hover();
+  await page.mouse.down();
+  await expect(opened).toBeVisible();
+  await page.mouse.up();
+};
+
 for (const size of SIZES) {
   test.describe(`time tracking, ${size.name} (${String(size.width)}px)`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
@@ -34,22 +42,20 @@ for (const size of SIZES) {
       await loginViaApi(page, size.account);
       await page.goto("/");
       const bar = timeBar(page);
-      await bar.getByRole("button", { name: "Work" }).click();
+      await bar.getByRole("switch", { name: "Work" }).click();
       await expect(bar.getByRole("button", { name: "Stop" })).toBeVisible();
-      await expect(bar.getByRole("button", { name: "Work", pressed: true })).toBeVisible();
-      await bar.getByRole("button", { name: "Food" }).click();
+      await expect(bar.getByRole("switch", { name: "Work" })).toBeChecked();
+      await bar.getByRole("switch", { name: "Food" }).click();
       await expect(bar.getByText(/of ~30m/u)).toBeVisible();
-      await expect(bar.getByRole("button", { name: "Work", pressed: false })).toBeVisible();
+      await expect(bar.getByRole("switch", { name: "Work" })).not.toBeChecked();
       await shoot(page, `now-running-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
 
-      // A touch hold raises the context menu, as a right click does: both open the editor.
-      await bar.getByRole("button", { name: "Commute" }).click({ button: "right" });
       const name = page.getByRole("textbox", { name: "Name" });
-      await expect(name).toBeVisible();
+      await hold(page, bar.getByRole("switch", { name: "Commute" }), name);
       await name.fill("Metro");
       await page.getByRole("button", { name: "Save" }).click();
-      await expect(bar.getByRole("button", { name: "Metro" })).toBeVisible();
+      await expect(bar.getByRole("switch", { name: "Metro" })).toBeVisible();
       await bar.getByRole("button", { name: "Stop" }).click();
       await expect(bar.getByText("Nothing running. Tap an activity to start it.")).toBeVisible();
     });
@@ -66,7 +72,7 @@ for (const size of SIZES) {
       await shoot(page, `day-${size.name}`, (shot) => info.outputPath(shot));
       await expectNoA11yViolations(page);
       await page.goto("/insights");
-      await expect(page.getByRole("region", { name: "Time by category" })).toBeVisible();
+      await expect(page.getByRole("group", { name: "Time by category" })).toBeVisible();
       await expect(page.getByText(/Study/u).first()).toBeVisible();
       await shoot(page, `insights-${size.name}`, (shot) => info.outputPath(shot));
       await expectNoA11yViolations(page);
@@ -84,7 +90,7 @@ const boxOf = async (locator: Locator): Promise<{ left: number; right: number; w
 };
 
 for (const width of [1440, 1920]) {
-  test(`uses a ${String(width)}px screen: wide list, rows inside the panels, no sideways scroll`, async ({
+  test(`uses a ${String(width)}px screen: wide list, rows inside it, no sideways scroll`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ height: 960, width });
@@ -94,13 +100,12 @@ for (const width of [1440, 1920]) {
     await line.fill(`renew the passport ${String(width)}`);
     await line.press("Enter");
     await expect(line).toHaveValue("");
-    const composer = await boxOf(page.getByRole("region", { name: "New task" }));
-    const row = await boxOf(
-      page.getByRole("list", { name: "Tasks" }).getByRole("listitem").first(),
-    );
-    expect(composer.width).toBeGreaterThan(480);
-    expect(row.left).toBeGreaterThanOrEqual(composer.left - 1);
-    expect(row.right).toBeLessThanOrEqual(composer.right + 1);
+    const list = page.getByRole("list", { name: "Tasks" });
+    const box = await boxOf(list);
+    const row = await boxOf(list.getByRole("listitem").first());
+    expect(box.width).toBeGreaterThan(480);
+    expect(row.left).toBeGreaterThanOrEqual(box.left - 1);
+    expect(row.right).toBeLessThanOrEqual(box.right + 1);
     const scrollWidth = await page.locator("html").evaluate((element) => element.scrollWidth);
     expect(scrollWidth).toBeLessThanOrEqual(width);
     await shoot(page, `now-${String(width)}`, (shot) => info.outputPath(shot));

@@ -32,7 +32,8 @@ export const Button = ({
 }) => (
   <Pressable
     accessibilityRole="button"
-    accessibilityState={{ busy, disabled: disabled || busy }}
+    aria-busy={busy}
+    aria-disabled={disabled || busy}
     className={cx(
       "h-12 items-center justify-center rounded-md px-4 active:opacity-80",
       CONTAINER[variant],

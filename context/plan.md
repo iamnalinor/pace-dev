@@ -119,6 +119,14 @@ TDD in `packages/core` / `packages/client` (`bun test:unit`), then wire both UIs
   update `docs/architecture.md`, `docs/testing.md`, `CLAUDE.md` (drop `#web/*`/shadcn rules),
   knip, dependency-cruiser, eslint, stryker (web → app), README.
 
+Done as planned, with these differences: the web build's tree shaking is on (Metro would
+otherwise ship every lucide icon: 5.6 → 3.3 MB, ~730 KB gzipped); fonts are the two Latin
+variable files only; app states go through `aria-*` props (react-native-web ignores
+`accessibilityState`): chips and segments are radios, time-bar activities switches, the row
+check a checkbox; presets can be moved in the pickers (`movePreset`); projects got client
+actions (`createProject`/`updateProject`); lateness drops minutes from an hour on and never
+shows them for soft deadlines (user request, `formatLate`).
+
 #### PR C — the redesign from the document, once, in the unified UI
 
 One design language from tokens; no `bg-inverse` black surfaces in light theme; shared chip,

@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+Geist on the web build (the phone embeds the TTFs through expo-font). Variable fonts: one file
+covers every weight; letters outside Latin fall back to the system sans, glyph by glyph.
+*/
+@font-face {
+  font-family: "Geist";
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/fonts/geist-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/fonts/geist-mono-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+/* Text fields draw their own focused state; the browser's black box is not part of the design. */
+input:focus,
+textarea:focus {
+  outline: none;
+}
+
+/*
+Tailwind's preflight paints an empty field's own text in its gray while the placeholder shows,
+below the AA contrast; our fields color their placeholders themselves.
+*/
+:is(input:placeholder-shown, textarea:placeholder-shown) {
+  color: var(--pace-fg);
+}

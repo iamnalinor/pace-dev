@@ -19,7 +19,10 @@ export const ScreenHeader = ({
           {eyebrow}
         </Text>
       )}
-      <Text className="mt-1 font-sans text-[30px] font-semibold tracking-tight text-fg">
+      <Text
+        accessibilityRole="header"
+        className="mt-1 font-sans text-[30px] font-semibold tracking-tight text-fg"
+      >
         {title}
       </Text>
     </View>

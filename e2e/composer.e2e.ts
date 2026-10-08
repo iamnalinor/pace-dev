@@ -44,7 +44,7 @@ for (const [width, height, size] of [
       const line = page.getByRole("textbox", { name: "New task" });
       await line.fill(LINES[0] ?? "");
       await expect(page.getByRole("radio", { exact: true, name: "Work" })).toBeChecked();
-      await expect(page.getByRole("button", { name: "Link" })).toContainText("example.com");
+      await expect(page.getByText(/example\.com ↗/u)).toBeVisible();
       await shoot(page, `composer-${size}-${theme}`);
       await expectNoA11yViolations(page);
       await line.press("Enter");
@@ -60,7 +60,7 @@ for (const [width, height, size] of [
       await expectNoA11yViolations(page);
 
       await board.getByRole("link", { name: /синк по дашборду/u }).click();
-      await expect(page.getByRole("heading", { name: "синк по дашборду" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /синк по дашборду/u })).toBeVisible();
       await shoot(page, `task-${size}-${theme}`);
       await expectNoA11yViolations(page);
     });

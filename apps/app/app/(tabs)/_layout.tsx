@@ -2,6 +2,7 @@ import { Redirect, Tabs } from "expo-router";
 
 import { useAuth, useT } from "#app/app-state.tsx";
 import { useOnboarded } from "#app/features/permissions/use-onboarded.ts";
+import { useIsWide } from "#app/ui/layout.ts";
 import { TabBar } from "#app/ui/tab-bar.tsx";
 
 /**
@@ -12,6 +13,7 @@ export default function TabsLayout() {
   const t = useT();
   const { status } = useAuth();
   const isOnboarded = useOnboarded();
+  const isWide = useIsWide();
   if (status === "loading" || (status === "signed-in" && isOnboarded === null)) {
     return null;
   }
@@ -22,7 +24,10 @@ export default function TabsLayout() {
     return <Redirect href="/onboarding" />;
   }
   return (
-    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} />}>
+    <Tabs
+      screenOptions={{ headerShown: false, tabBarPosition: isWide ? "left" : "bottom" }}
+      tabBar={(props) => <TabBar {...props} />}
+    >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />
       <Tabs.Screen name="day" options={{ title: t("nav.day") }} />
       <Tabs.Screen name="add" options={{ title: t("nav.add") }} />

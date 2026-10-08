@@ -1,17 +1,21 @@
-import { formatSpan, type Language, plural, t } from "@pace/core";
+import { formatLate, formatSpan, type Language, plural, t } from "@pace/core";
 
 import type { MetaPart } from "./now.ts";
 
 /** Meta parts whose text needs no zone or color: everything but the due and the importance. */
 export type PlainMetaPart = Exclude<MetaPart, { readonly kind: "due" | "importance" }>;
 
-/** "6d 12h left", "15h 1m late", "2 problems left", "4/7 solved" … */
+/** "6d 12h left", "15h late", "2 problems left", "4/7 solved" … */
 export const plainMetaText = (part: PlainMetaPart, language: Language): string => {
   switch (part.kind) {
     case "age":
-    case "late":
     case "left": {
       return t(language, `meta.${part.kind}`, { span: formatSpan(part.minutes, language) });
+    }
+    case "late": {
+      return t(language, "meta.late", {
+        span: formatLate(part.minutes, language, part.isSoft),
+      });
     }
     case "behind-pace": {
       return t(language, "meta.behindPace", { percent: part.percent });

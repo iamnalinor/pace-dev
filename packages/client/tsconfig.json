@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // Platform-agnostic: adapters live in apps/web and apps/app. `fetch`/`crypto` come from lib.dom types only.
+    // Platform-agnostic: adapters live in apps/app (its platform/ folder, with web variants). `fetch`/`crypto` come from lib.dom types only.
     "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
     "types": []

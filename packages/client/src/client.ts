@@ -12,6 +12,12 @@ export {
 export type { InboxActions } from "./actions/inbox-actions.ts";
 export type { InstanceActions } from "./actions/instances.ts";
 export type { PresetActions } from "./actions/preset-actions.ts";
+export {
+  type ProjectActions,
+  type ProjectDraft,
+  projectNameError,
+  type ProjectPatch,
+} from "./actions/project-actions.ts";
 export type { ProjectTarget } from "./actions/projects.ts";
 export type { RankActions } from "./actions/rank-actions.ts";
 export type { ReviewActions } from "./actions/review-actions.ts";
@@ -136,6 +142,29 @@ export {
   type ProjectChip,
   type RowTag,
 } from "./view-models/now.ts";
+export { SCOPE_KEYS } from "./view-models/oauth-scopes.ts";
+export {
+  definitionIssues,
+  editorDraft,
+  inheritedOf,
+  isOverridden,
+  isSubOverridden,
+  newDraft,
+  type PresetDraft,
+  setSub,
+  setValue,
+  slugify,
+  type SubKey,
+  toggleOverride,
+  toggleSubOverride,
+  type WholeKey,
+} from "./view-models/preset-draft.ts";
+export {
+  presetPreview,
+  type PresetPreviewModel,
+  PREVIEW_SAMPLE,
+  type PreviewContext,
+} from "./view-models/preset-preview.ts";
 export {
   type AwaitingRow,
   type DoneRow,

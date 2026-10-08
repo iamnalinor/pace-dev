@@ -87,7 +87,7 @@ describe("nowViewModel", () => {
   it("describes Calculus HW 5 as 1 day late · 2 problems left", () => {
     const calc = row(board.rows, CALC_HW5_ID);
     expect(calc.meta).toEqual([
-      { kind: "late", minutes: 15 * 60 + 1 },
+      { isSoft: false, kind: "late", minutes: 15 * 60 + 1 },
       { count: 2, kind: "problems-left" },
     ]);
     expect(calc.paceExpected).toBe(1);

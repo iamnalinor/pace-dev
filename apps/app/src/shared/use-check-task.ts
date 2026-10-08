@@ -1,9 +1,9 @@
-import { useRouter } from "expo-router";
 import { useCallback } from "react";
 
 import type { NowRow } from "@pace/client";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { usePace } from "#app/app-state.tsx";
+import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { resolvePreset } from "@pace/core";
 
 import { useRunAction } from "./use-run-action.ts";
@@ -14,9 +14,8 @@ when); anything else is closed as done at once, with Undo in the toast.
 */
 export const useCheckTask = (): ((row: NowRow) => void) => {
   const { actions, state } = usePace();
-  const router = useRouter();
+  const openTask = useOpenTask();
   const run = useRunAction();
-  const t = useT();
   return useCallback(
     (row: NowRow) => {
       const current = state.store.getState();
@@ -27,14 +26,11 @@ export const useCheckTask = (): ((row: NowRow) => void) => {
           : resolvePreset(current.presets, task.presetId, task.overrides ?? undefined);
       const hasProblems = (task?.subtasks.length ?? 0) > 0;
       if (hasProblems && preset?.ok === true && preset.value.submission === "per_subtask") {
-        router.push(`/task/${row.id}?close=1`);
+        openTask(row.id, { close: true });
         return;
       }
-      void run(actions.closeTask({ outcome: "done", taskId: row.id }), {
-        success: t("now.doneToast", { title: row.title }),
-        undo: true,
-      });
+      void run(actions.closeTask({ outcome: "done", taskId: row.id }));
     },
-    [actions, router, run, state, t],
+    [actions, openTask, run, state],
   );
 };
