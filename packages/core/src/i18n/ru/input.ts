@@ -102,9 +102,9 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.submittedToast": "{title} · отправлено: {count}",
   "close.closedToast": "{title} · {outcome}",
   "composer.label": "Новая задача",
-  "composer.placeholder": "Добавить задачу: «дз 7 по алгебре 1, 3, 5а до среды»",
+  "composer.placeholder": "Задача или вставьте сообщение",
   "composer.hint":
-    "Enter добавляет задачу. Чипы ниже показывают, как прочитана строка; нажмите, чтобы изменить.",
+    "Enter добавляет задачу, Shift+Enter — новая строка. Длинный или вставленный текст сначала разбирает ассистент; чипы показывают, как он прочитан.",
   "composer.add": "Добавить",
   "composer.addTo": "Добавить в {title}",
   "composer.addedTo": "Добавлено в {title}",
@@ -129,7 +129,10 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "composer.projectNamed": "Проект {name}",
   "composer.ai": "Разобрать с ИИ",
   "composer.aiReading": "Разбираю…",
-  "composer.aiRead": "Разобрано ассистентом.",
+  "composer.aiRead": "Разобрано ассистентом. Проверьте чипы и добавьте.",
+  "composer.aiReadingStatus": "Ассистент разбирает текст…",
+  "composer.aiWaiting": "Жду ассистента: сначала покажу, как он разобрал, потом добавите…",
+  "composer.aiSlow": "Ассистент долго думает: сохранено во «Входящие», разберёте там позже.",
   "composer.aiCheck": "Проверьте: {fields}",
   "composer.aiUnavailable":
     "У ассистента закончились запросы примерно до {time}. Чипы показывают разбор по правилам; «Во входящие» сохранит строку на потом.",

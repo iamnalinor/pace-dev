@@ -85,6 +85,9 @@ export {
   type ComposerModel,
   type ComposerOption,
   type ComposerTarget,
+  LONG_TEXT_CHARS,
+  shouldAiRead,
+  SLOW_READ_MS,
 } from "./view-models/composer.ts";
 export {
   type DayEntry,

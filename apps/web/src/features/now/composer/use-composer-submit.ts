@@ -20,12 +20,12 @@ export const useComposerSubmit = (onSaved: () => void) => {
       onSaved();
     }
   };
-  const sendToInbox = async (text: string): Promise<void> => {
+  const sendToInbox = async (text: string, message = t("add.toInboxDone")): Promise<void> => {
     if (text.trim() === "") {
       toast.error(t("composer.empty"));
       return;
     }
-    if ((await run(actions.captureInbox(text), { undo: t("add.toInboxDone") })) !== null) {
+    if ((await run(actions.captureInbox(text), { undo: message })) !== null) {
       onSaved();
     }
   };

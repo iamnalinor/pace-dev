@@ -1,5 +1,5 @@
 /** React bindings for @pace/client (works in React DOM and React Native). */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import {
@@ -19,7 +19,13 @@ import type { AppState, AppStateHandle } from "./state.ts";
 import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
-import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
+import {
+  type ComposerDraft,
+  composerModel,
+  type ComposerModel,
+  shouldAiRead,
+  SLOW_READ_MS,
+} from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
@@ -114,28 +120,83 @@ export type AiState =
 
 export type AiRead = {
   readonly state: AiState;
-  /** Asks the assistant; `onReading` receives the chips it filled. */
+  /** Asks the assistant; `onReading` receives the chips it filled. A reset meanwhile drops the answer. */
   readonly read: (text: string, onReading: (reading: AiReading) => void) => Promise<void>;
+  /** Waits for the reading in flight, up to `ms`: `slow` when it is still not back. */
+  readonly settle: (ms: number) => Promise<"done" | "slow">;
   readonly reset: () => void;
 };
 
-/** "Read with AI" in a composer: one request per press, nothing written until the user adds. */
+/** "Read with AI" in a composer: nothing is written until the user adds. */
 export const useAiRead = (assistant: Assistant): AiRead => {
   const [state, setState] = useState<AiState>({ status: "idle" });
-  return {
-    read: async (text, onReading) => {
-      setState({ status: "reading" });
+  // Each read and reset starts a new generation: a late answer to an older one is dropped.
+  const generation = useRef(0);
+  const pending = useRef<Promise<void>>(Promise.resolve());
+  const read = async (text: string, onReading: (reading: AiReading) => void): Promise<void> => {
+    generation.current += 1;
+    const mine = generation.current;
+    setState({ status: "reading" });
+    const reading = (async () => {
       const outcome = await assistant.read(text);
+      if (mine !== generation.current) {
+        return;
+      }
       if (outcome.status === "read") {
         onReading(outcome.reading);
       }
       setState(outcome);
-    },
+    })();
+    pending.current = reading;
+    await reading;
+  };
+  return {
+    read,
     reset: () => {
+      generation.current += 1;
       setState({ status: "idle" });
+    },
+    settle: async (ms) => {
+      const done = async (): Promise<"done"> => {
+        await pending.current;
+        return "done";
+      };
+      const slow = new Promise<"slow">((resolve) => {
+        setTimeout(() => {
+          resolve("slow");
+        }, ms);
+      });
+      return await Promise.race([done(), slow]);
     },
     state,
   };
+};
+
+/** A pause in typing before a long text is sent to the assistant on its own. */
+const AUTO_READ_DELAY_MS = 900;
+
+/**
+Reads long or multi-line text (a pasted homework, a forwarded message) with the assistant as
+soon as typing pauses, so its reading is on the chips before the user presses Enter.
+*/
+export const useAutoAiRead = (
+  ai: AiRead,
+  text: string,
+  onReading: (reading: AiReading) => void,
+): void => {
+  const isWanted = shouldAiRead(text) && ai.state.status === "idle";
+  useEffect(() => {
+    if (!isWanted) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void ai.read(text, onReading);
+    }, AUTO_READ_DELAY_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+    // Only a new text (or a reset) restarts the pause; the callbacks change every render.
+  }, [isWanted, text]);
 };
 
 const DECISIONS_LIMIT = 100;
@@ -181,4 +242,43 @@ export const useDraft = <T extends object>(
     setDraft((current) => ({ ...current, ...next }));
   };
   return [draft, patch];
+};
+
+/**
+A long text is never added on the rules alone: Enter (Add) first waits for the assistant's reading
+(shown on the chips, for a second press), and when the assistant is slow the text goes to
+Inbox so nothing is lost and nothing waits.
+*/
+export type ReadFirst = {
+  readonly isWaiting: boolean;
+  /** Starts or awaits the reading when the text needs one; `false` when it may be added now. */
+  readonly isPending: (text: string, onReading: (reading: AiReading) => void) => boolean;
+};
+
+export const useReadFirst = (ai: AiRead, toInbox: (text: string) => Promise<void>): ReadFirst => {
+  const [isWaiting, setIsWaiting] = useState(false);
+  const wait = async (text: string): Promise<void> => {
+    setIsWaiting(true);
+    const settled = await ai.settle(SLOW_READ_MS);
+    setIsWaiting(false);
+    if (settled !== "slow") {
+      return;
+    }
+
+    ai.reset();
+    await toInbox(text);
+  };
+  return {
+    isWaiting,
+    isPending: (text: string, onReading: (reading: AiReading) => void): boolean => {
+      if (!shouldAiRead(text) || ai.state.status === "read" || ai.state.status === "failed") {
+        return false;
+      }
+      if (ai.state.status === "idle") {
+        void ai.read(text, onReading);
+      }
+      void wait(text);
+      return true;
+    },
+  };
 };
