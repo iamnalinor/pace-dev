@@ -20,7 +20,10 @@ import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
 import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
+import { type DayModel, dayModel } from "./view-models/day.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
+import { type InsightsModel, insightsModel } from "./view-models/insights.ts";
+import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
 import { type NowViewModel, nowViewModel } from "./view-models/now.ts";
 import { type ProjectViewModel, projectViewModel } from "./view-models/project.ts";
@@ -43,6 +46,12 @@ export type AppHooks = {
   readonly useHistory: (atIso: string) => HistoryViewModel;
   /** The composer's live chips for the typed line and the user's taps. */
   readonly useComposer: (draft: ComposerDraft) => ComposerModel;
+  /** The time bar: buttons and the running activity (refreshed with the clock). */
+  readonly useTimeBar: () => TimeBarModel;
+  /** One day of the ledger; `null` is today. */
+  readonly useDay: (date: null | string) => DayModel;
+  /** One week of insights; `null` is this week. */
+  readonly useInsights: (weekOf: null | string) => InsightsModel;
 };
 
 /** Relative times ("5 h ago", "due today") drift slowly: half a minute is fine. */
@@ -73,6 +82,10 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
   return {
     useAppState: (selector) => useStore(state.store, selector),
     useClock,
+    useDay: (date) => useView((current, ctx) => dayModel(current, date, ctx), date ?? ""),
+    useInsights: (weekOf) =>
+      useView((current, ctx) => insightsModel(current, weekOf, ctx), weekOf ?? ""),
+    useTimeBar: () => useView(timeBarModel),
     useComposer: (draft) =>
       useView((current, ctx) => composerModel(current, draft, ctx), JSON.stringify(draft)),
     useHistory: (atIso) =>

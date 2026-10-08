@@ -254,6 +254,7 @@ export {
   isoWeekKey,
   isValidTimeZone,
   minutesBetween,
+  addDaysIn,
   startOfDayIn,
   startOfWeekIn,
   type ZonedInstant,

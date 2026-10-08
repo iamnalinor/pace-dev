@@ -23,6 +23,12 @@ export type {
   TaskFieldsForm,
   TaskPatch,
 } from "./actions/task-actions.ts";
+export type {
+  ActivityInput,
+  ButtonDraft,
+  PastActivity,
+  TimeActions,
+} from "./actions/time-actions.ts";
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
@@ -76,6 +82,25 @@ export {
   type ComposerTarget,
 } from "./view-models/composer.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
+export {
+  type DayEntry,
+  type DayModel,
+  dayModel,
+  type DayRow,
+  type DayTotal,
+} from "./view-models/day.ts";
+export {
+  type InsightBar,
+  type InsightsModel,
+  insightsModel,
+  type OnTimeView,
+} from "./view-models/insights.ts";
+export {
+  type RunningView,
+  type TimeBarModel,
+  timeBarModel,
+  type TimeButtonView,
+} from "./view-models/time-bar.ts";
 export {
   type HistoryEntry,
   type HistoryOptions,
