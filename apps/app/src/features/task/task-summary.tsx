@@ -5,8 +5,8 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { inkClass, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { Dot } from "#app/ui/dot.tsx";
 import { ProgressBar } from "#app/ui/progress-bar.tsx";
 import { formatDuration, IMPORTANCE_COLORS } from "@pace/core";
 
@@ -49,16 +49,18 @@ const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
     <View className="flex-row flex-wrap gap-1.5">
       {tags.map((tag) => (
         <View
-          className="flex-row items-center gap-1.5 rounded-sm bg-raised px-2 py-1"
+          className={cx(
+            "flex-row items-center gap-1.5 rounded-sm px-2 py-1",
+            tag.kind === "importance" ? washClass(IMPORTANCE_COLORS[tag.importance]) : "bg-raised",
+          )}
           key={tag.kind}
         >
-          {tag.kind === "importance" && IMPORTANCE_COLORS[tag.importance] !== null ? (
-            <Dot color={IMPORTANCE_COLORS[tag.importance]} />
-          ) : null}
           <Text
             className={cx(
               "font-sans text-[11px]",
-              tag.kind === "importance" ? "font-medium text-fg" : "text-fg2",
+              tag.kind === "importance"
+                ? cx("font-medium", inkClass(IMPORTANCE_COLORS[tag.importance]))
+                : "text-fg2",
             )}
           >
             {t(tagKey(tag))}

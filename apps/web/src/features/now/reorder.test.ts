@@ -8,6 +8,7 @@ const row = (id: string, importance: NowRow["importance"]): NowRow => ({
   color: "blue",
   dimmed: false,
   id,
+  tag: { kind: "preset", name: "Work", presetId: "work" },
   importance,
   meta: [],
   paceExpected: null,

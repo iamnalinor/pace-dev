@@ -1,6 +1,6 @@
 import type { MetaPart } from "@pace/client";
 
-import { type Importance, t } from "@pace/core";
+import { type Importance, IMPORTANCE_COLORS, type ProjectColorName, t } from "@pace/core";
 
 import { formatAge, formatLate } from "./duration.ts";
 import { formatCount } from "./plural.ts";
@@ -9,16 +9,21 @@ import { formatDue, type Viewer } from "./time.ts";
 /** How a piece of the meta line is drawn: stressed (ASAP), a warning (late) or quiet. */
 export type MetaTone = "plain" | "strong" | "warn";
 
-export type MetaSegment = { readonly text: string; readonly tone: MetaTone };
+export type MetaSegment = {
+  readonly text: string;
+  readonly tone: MetaTone;
+  /** Drawn as a tag in this color (the importance's). */
+  readonly color?: ProjectColorName | undefined;
+};
 
 const segment = (text: string, tone: MetaTone = "plain"): MetaSegment => ({ text, tone });
 
-/** A quiet Nice-to-have stays quiet; the two urgent categories stand out. */
-const importanceSegment = (importance: Importance, { language }: Viewer): MetaSegment =>
-  segment(
-    t(language, `importance.${importance}`),
-    importance === "nice_to_have" ? "plain" : "strong",
-  );
+/** The importance as a tag in its color: coral ASAP, amber Prioritized, slate Nice-to-have. */
+const importanceSegment = (importance: Importance, { language }: Viewer): MetaSegment => ({
+  color: IMPORTANCE_COLORS[importance] ?? undefined,
+  text: t(language, `importance.${importance}`),
+  tone: importance === "nice_to_have" ? "plain" : "strong",
+});
 
 const formatPart = (part: MetaPart, viewer: Viewer): MetaSegment => {
   const { language } = viewer;

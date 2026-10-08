@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { Dot } from "#app/ui/dot.tsx";
+import { ColorBar } from "#app/ui/color.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
@@ -33,7 +33,7 @@ export const ProjectsScreen = () => {
               router.push(`/project/${project.id}`);
             }}
           >
-            <Dot color={project.color} />
+            <ColorBar color={project.color} />
             <Text className="flex-1 font-sans text-[15px] text-fg">{project.name}</Text>
             <Text className="font-mono text-[13px] text-muted">{openCount(project.id)}</Text>
           </Pressable>

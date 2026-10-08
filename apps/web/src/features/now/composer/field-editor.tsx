@@ -31,7 +31,7 @@ const ProjectEditor = ({ model, onEdit }: Props) => {
         onEdit({ projectId: value === NONE ? null : value });
       }}
       options={[
-        { hasDot: false, label: t("composer.noProject"), value: NONE },
+        { label: t("composer.noProject"), value: NONE },
         ...model.projects.map((project) => ({
           color: project.color,
           label: project.name,

@@ -4,6 +4,7 @@ import type { PresetError } from "../presets/resolve-preset.ts";
 
 import { type Project, projectById } from "../model/project.ts";
 import { progressOf, solvedCount, submittedCount, type Task } from "../model/task.ts";
+import { presetById } from "../presets/preset-reducer.ts";
 import { err, ok, type Result } from "../result.ts";
 import { minutesBetween } from "../time.ts";
 import { compareScores, type Ranked, type Score, scoreTask } from "../urgency/score.ts";
@@ -16,6 +17,8 @@ import { windowElapsedOf } from "./window.ts";
 export type NowItem = {
   readonly task: Task;
   readonly preset: ResolvedPreset;
+  /** The category's name as stored (built-in ones are translated by the UI). */
+  readonly presetName: string;
   readonly project: null | Project;
   readonly score: Score;
   readonly importance: Importance;
@@ -72,6 +75,7 @@ export const nowItem = (
   return ok({
     task,
     preset: preset.value,
+    presetName: presetById(state.presets, task.presetId)?.name ?? task.presetId,
     project: task.projectId === null ? null : (projectById(state.projects, task.projectId) ?? null),
     score,
     importance: importanceOf(task, preset.value),

@@ -96,6 +96,7 @@ export {
   type NowViewModel,
   nowViewModel,
   type ProjectChip,
+  type RowTag,
 } from "./view-models/now.ts";
 export {
   type AwaitingRow,

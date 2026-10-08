@@ -4,6 +4,7 @@ import { categorySteps } from "./reorder.ts";
 
 const row = (id: string, importance: NowRow["importance"]): NowRow => ({
   color: "blue",
+  tag: { kind: "preset", name: "Work", presetId: "work" },
   dimmed: false,
   id,
   importance,

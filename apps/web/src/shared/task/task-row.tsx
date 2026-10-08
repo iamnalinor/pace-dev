@@ -8,9 +8,10 @@ import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMeta, type MetaTone } from "#web/shared/format/meta.ts";
 import { cn } from "#web/shared/lib/cn.ts";
+import { presetLabel } from "#web/shared/lib/preset-label.ts";
+import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 import { ImportanceEdge } from "#web/shared/ui/importance-mark.tsx";
 import { PaceBar } from "#web/shared/ui/pace-bar.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
 
 const TONE_CLASS: Readonly<Record<MetaTone, string>> = {
   plain: "",
@@ -18,24 +19,38 @@ const TONE_CLASS: Readonly<Record<MetaTone, string>> = {
   warn: "text-warn",
 };
 
-/** `Due tomorrow 23:59 · 4/7 solved · 2 sent`, with ASAP stressed and lateness in warn. */
+/** The project (else the category) in its color, then `Due tomorrow 23:59 · 4/7 solved`. */
 const MetaLine = ({ now, row }: { readonly row: NowRow; readonly now: string | undefined }) => {
+  const t = useT();
   const language = useLanguage();
   const ctx = useServices().hooks.useClock();
   const segments = formatMeta(row.meta, { deviceTz: ctx.deviceTz, language, now: now ?? ctx.now });
-  if (segments.length === 0) {
-    return null;
-  }
+  const tags = segments.filter((segment) => segment.color !== undefined);
+  const plain = segments.filter((segment) => segment.color === undefined);
   return (
-    <p className="text-xs text-muted">
-      {segments.map((segment, index) => (
-        // The parts are positional and never reorder within a row.
-        // eslint-disable-next-line @eslint-react/no-array-index-key -- positional, never reordered
-        <span key={index}>
-          {index > 0 && " · "}
-          <span className={TONE_CLASS[segment.tone]}>{segment.text}</span>
-        </span>
+    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
+      <ColorTag color={row.color}>
+        {row.tag.kind === "project"
+          ? row.tag.name
+          : presetLabel(t, { id: row.tag.presetId, name: row.tag.name })}
+      </ColorTag>
+      {tags.map((segment) => (
+        <ColorTag color={segment.color ?? null} key={segment.text}>
+          {segment.text}
+        </ColorTag>
       ))}
+      {plain.length > 0 && (
+        <span>
+          {plain.map((segment, index) => (
+            // The parts are positional and never reorder within a row.
+            // eslint-disable-next-line @eslint-react/no-array-index-key -- positional, never reordered
+            <span key={index}>
+              {index > 0 && " · "}
+              <span className={TONE_CLASS[segment.tone]}>{segment.text}</span>
+            </span>
+          ))}
+        </span>
+      )}
     </p>
   );
 };
@@ -53,8 +68,9 @@ type Props = Omit<ComponentProps<"li">, "children"> & {
 };
 
 /**
-One task as the Now board draws it (artboard 1): check circle, colour dot, title, meta
-line and the progress bar with its pace marker. The project page reuses it for open tasks.
+One task as the Now board draws it (artboard 1): importance edge, check circle, title, the
+project (or category) and importance as colored tags with the meta line, and the progress bar
+with its pace marker. The project page reuses it for open tasks.
 */
 export const TaskRow = ({
   className,
@@ -95,14 +111,11 @@ export const TaskRow = ({
         className="flex min-w-0 flex-1 flex-col gap-[5px] rounded-sm text-inherit no-underline outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40"
         to={`/task/${row.id}`}
       >
-        <span className="flex items-center gap-2">
-          <ProjectDot color={row.color} />
-          <span
-            className={cn("truncate text-[15px]", row.dimmed ? "text-fg2" : "font-medium")}
-            data-testid="task-title"
-          >
-            {row.title}
-          </span>
+        <span
+          className={cn("truncate text-[15px]", row.dimmed ? "text-fg2" : "font-medium")}
+          data-testid="task-title"
+        >
+          {row.title}
         </span>
         <MetaLine now={now} row={row} />
         {hasBar && <PaceBar pace={row.paceExpected} value={row.progress} />}

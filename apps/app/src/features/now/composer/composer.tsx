@@ -9,7 +9,6 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { Dot } from "#app/ui/dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useAiRead } from "@pace/client/react";
 import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, isBuiltInPreset } from "@pace/core";
@@ -70,8 +69,8 @@ const ComposerChips = ({
       <ChipRow label={t("composer.category")}>
         {model.presets.map((preset) => (
           <Chip
+            color={preset.color}
             key={preset.id}
-            leading={<Dot color={preset.color} />}
             onPress={() => {
               onEdit({ importance: undefined, presetId: preset.id });
             }}
@@ -84,8 +83,8 @@ const ComposerChips = ({
       <ChipRow label={t("edit.importance")}>
         {ImportanceSchema.options.map((importance) => (
           <Chip
+            color={IMPORTANCE_COLORS[importance]}
             key={importance}
-            leading={<Dot color={IMPORTANCE_COLORS[importance]} />}
             onPress={() => {
               onEdit({ importance });
             }}
@@ -106,9 +105,9 @@ const ComposerChips = ({
         </Chip>
         {model.projects.map((project) => (
           <Chip
+            color={project.color}
             key={project.id}
             label={t("composer.projectNamed", { name: project.name })}
-            leading={<Dot color={project.color} />}
             onPress={() => {
               onEdit({ projectId: project.id });
             }}

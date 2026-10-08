@@ -8,6 +8,14 @@ export type PaletteName =
   | "faint"
   | "fg2"
   | "fg"
+  | "ink-amber"
+  | "ink-blue"
+  | "ink-coral"
+  | "ink-green"
+  | "ink-pink"
+  | "ink-slate"
+  | "ink-teal"
+  | "ink-violet"
   | "inverse"
   | "inverseFg"
   | "line"
@@ -48,9 +56,9 @@ export type Tokens = {
 export const tokens: Tokens = tokensJson;
 
 /**
-Each importance's marker color from the project palette: hot for ASAP, warm for
-Prioritized, none for Normal, cool for Nice-to-have. Shown as a dot or edge, never as text,
-so the contrast stays with the neutral label next to it.
+Each importance's color from the project palette: hot for ASAP, warm for Prioritized, none
+for Normal, cool for Nice-to-have. Shown as a tinted tag (`ink-*` text on a light wash of
+the color) and as the row's edge.
 */
 export const IMPORTANCE_COLORS: Readonly<
   Record<"asap" | "nice_to_have" | "normal" | "prioritized", null | ProjectColorName>
@@ -60,3 +68,9 @@ export const IMPORTANCE_COLORS: Readonly<
   normal: null,
   nice_to_have: "slate",
 };
+
+/** The text color of a tag in `color`: the project color itself on dark, a deeper shade on light. */
+export const inkOf = (color: ProjectColorName): PaletteName => `ink-${color}`;
+
+/** How strong the wash behind a colored tag is (the `ink-*` contrast is checked against it). */
+export const TAG_TINT = 0.16;
