@@ -34,7 +34,7 @@ const books: NowRow = {
   importance: "nice_to_have",
   meta: [
     { importance: "nice_to_have", kind: "importance" },
-    { days: 12, kind: "age" },
+    { kind: "age", minutes: 12 * 24 * 60 },
   ],
   paceExpected: null,
   progress: 0,
@@ -66,7 +66,7 @@ describe("TaskRow", () => {
     // Quiet by a lighter title, not by transparency: the text keeps its AA contrast.
     expect(screen.getByText("Return library books")).toHaveClass("text-fg2");
     // The category and the importance are tags in their colours, then the plain meta.
-    expect(item).toHaveTextContent(/Nice-to-have12 days old/u);
+    expect(item).toHaveTextContent(/Nice-to-have12d old/u);
     expect(screen.queryByTestId("pace-marker")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

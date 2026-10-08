@@ -39,7 +39,7 @@ describe("ProjectView", () => {
       "href",
       `/task/${HW_ID}`,
     );
-    expect(rows[0]).toHaveTextContent("Due tomorrow 23:59 · 4/7 solved · 2 sent");
+    expect(rows[0]).toHaveTextContent("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent");
   });
 
   it("lists done tasks newest first with their outcome, folded after five", async () => {
@@ -67,10 +67,10 @@ describe("ProjectView", () => {
       "href",
       `/task/${CALC_HW5_ID}`,
     );
-    expect(within(open).getByText(/1 day late/)).toBeInTheDocument();
+    expect(within(open).getByText(/15h 1m late/)).toBeInTheDocument();
     const awaiting = screen.getByRole("list", { name: "Awaiting assignment" });
     expect(awaiting).toHaveTextContent("Calculus HW 6");
-    expect(awaiting).toHaveTextContent("Due Monday 23:59");
+    expect(awaiting).toHaveTextContent("Due Mon Oct 12 23:59");
     expect(
       within(awaiting).getByRole("link", { name: "Add problems to Calculus HW 6" }),
     ).toHaveAttribute("href", `/task/${CALC_W41_ID}`);

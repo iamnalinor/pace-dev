@@ -111,7 +111,7 @@ describe("PresetEditor", () => {
     await user.selectOptions(within(row("Default importance")).getByRole("combobox"), "ASAP");
     const preview = screen.getByRole("region", { name: "Preview" });
     expect(preview).toHaveTextContent("ASAP");
-    expect(preview).toHaveTextContent(/Due Monday 23:59/);
+    expect(preview).toHaveTextContent(/Due Mon Oct 12 23:59/);
   });
 
   it("edits the resubmission deadline with its final date and zone", async () => {

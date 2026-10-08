@@ -3,10 +3,10 @@ import { Inbox, Settings } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { eyebrowDate } from "#app/format/date.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { formatEyebrow } from "@pace/core";
 
 const CounterButton = ({
   count,
@@ -47,7 +47,7 @@ export const NowHeader = ({ inboxCount }: { readonly inboxCount: number }) => {
   const review = hooks.useReview();
   return (
     <ScreenHeader
-      eyebrow={eyebrowDate(now, deviceTz, language)}
+      eyebrow={formatEyebrow(now, deviceTz, language)}
       right={
         <View className="flex-row gap-2">
           {review.count === 0 ? null : (

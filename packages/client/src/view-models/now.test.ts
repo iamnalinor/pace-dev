@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { minutesBetween } from "@pace/core";
 import {
   ALGEBRA_ID,
   artboardState,
@@ -47,6 +48,7 @@ describe("nowViewModel", () => {
     const hw = row(board.rows, HW_ID);
     expect(hw.meta).toEqual([
       { at: HW_DUE, kind: "due", relative: "tomorrow", tz: MOSCOW, zoneDiffers: false },
+      { kind: "left", minutes: minutesBetween(ctx().now, HW_DUE) },
       { kind: "solved", solved: 4, total: 7 },
       { kind: "sent", submitted: 2 },
     ]);
@@ -71,11 +73,13 @@ describe("nowViewModel", () => {
     expect(row(board.rows, TRK_ID).meta).toEqual([
       { importance: "prioritized", kind: "importance" },
       { at: TRK_DUE, kind: "due", relative: "later", tz: "UTC", zoneDiffers: true },
+      { kind: "left", minutes: minutesBetween(ctx().now, TRK_DUE) },
     ]);
     const thursday = nowViewModel(artboardState(TRK_NOW), ctx(TRK_NOW, "UTC"));
     expect(row(thursday.rows, TRK_ID).meta).toEqual([
       { importance: "prioritized", kind: "importance" },
       { at: TRK_DUE, kind: "due", relative: "tomorrow", tz: "UTC", zoneDiffers: false },
+      { kind: "left", minutes: minutesBetween(TRK_NOW, TRK_DUE) },
       { kind: "behind-pace", percent: 25 },
     ]);
   });
@@ -90,12 +94,14 @@ describe("nowViewModel", () => {
     expect(CALC_HW5_DUE < ctx().now).toBe(true);
   });
 
-  it("dims the library books: Nice-to-have · 12 days old", () => {
+  it("dims the library books: Nice-to-have · 12d old", () => {
     const books = row(board.rows, BOOKS_ID);
     expect(books.meta).toEqual([
       { importance: "nice_to_have", kind: "importance" },
-      { days: 12, kind: "age" },
+      { kind: "age", minutes: expect.any(Number) as number },
     ]);
+    const age = books.meta[1];
+    expect(age?.kind === "age" && Math.floor(age.minutes / (24 * 60))).toBe(12);
     expect(books).toMatchObject({ color: "green", dimmed: true, paceExpected: null });
   });
 

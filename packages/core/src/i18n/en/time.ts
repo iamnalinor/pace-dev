@@ -86,7 +86,6 @@ export const enTime = {
   "phone.calendarDenied": "Calendar access is off: turn it on for Pace in Android settings.",
   "phone.usageAsk": "Allow usage access to see your sleep and phone time here",
   "insights.title": "Insights",
-  "insights.week": "Week of {date}",
   "insights.previous": "Previous week",
   "insights.next": "Next week",
   "insights.byCategory": "Time by category",

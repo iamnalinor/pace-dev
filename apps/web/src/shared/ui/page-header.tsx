@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { useLanguage, useServices } from "#web/app-state.tsx";
-import { formatEyebrow } from "#web/shared/lib/eyebrow.ts";
+import { formatEyebrow } from "@pace/core";
 
 type Props = {
   readonly title: string;
@@ -19,7 +19,7 @@ export const PageHeader = ({ action, eyebrow, title }: Props) => {
     <header className="flex items-end justify-between px-5 pt-6 pb-3">
       <div>
         <p className="font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
-          {eyebrow ?? formatEyebrow(new Date(now), language, deviceTz)}
+          {eyebrow ?? formatEyebrow(now, deviceTz, language)}
         </p>
         <h1 className="mt-1 text-3xl font-semibold tracking-[-0.02em]">{title}</h1>
       </div>

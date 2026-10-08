@@ -50,7 +50,7 @@ describe("formatMeta", () => {
         viewer,
       ),
     ).toEqual([
-      { text: "1 day late", tone: "warn" },
+      { text: "15h 1m late", tone: "warn" },
       { text: "2 problems left", tone: "plain" },
     ]);
   });
@@ -61,12 +61,12 @@ describe("formatMeta", () => {
         formatMeta(
           [
             { importance: "nice_to_have", kind: "importance" },
-            { days: 12, kind: "age" },
+            { kind: "age", minutes: 12 * 24 * 60 },
           ],
           viewer,
         ),
       ),
-    ).toBe("Nice-to-have · 12 days old");
+    ).toBe("Nice-to-have · 12d old");
     expect(formatMeta([{ importance: "nice_to_have", kind: "importance" }], viewer)[0]?.tone).toBe(
       "plain",
     );
@@ -77,7 +77,7 @@ describe("formatMeta", () => {
       [{ at: TRK_DUE, kind: "due", relative: "later", tz: "UTC", zoneDiffers: true }],
       viewer,
     );
-    expect(due?.text).toMatch(/^Due Friday 18:00 (?:UTC|GMT) \(your time 21:00\)$/);
+    expect(due?.text).toMatch(/^Due Fri Oct 9 18:00 (?:UTC|GMT) \(your time 21:00\)$/);
   });
 
   it("speaks Russian", () => {
@@ -91,6 +91,6 @@ describe("formatMeta", () => {
           { ...viewer, language: "ru" },
         ),
       ),
-    ).toBe("опоздание 3 дня · осталось 3 задачи");
+    ).toBe("опоздание 3 д · осталось 3 задачи");
   });
 });

@@ -16,7 +16,7 @@ export const zoneLabel = (atIso: string, tz: string, language: Language): string
     .formatToParts(new Date(atIso))
     .find((part) => part.type === "timeZoneName")?.value ?? tz;
 
-/** `tomorrow 23:59`, `Friday 18:00`, `Oct 20 09:00`: the day as the zone's calendar sees it. */
+/** `tomorrow 23:59`, `Fri Oct 9 18:00`: the day as the zone's calendar sees it. */
 export const formatDayTime = (
   { at, tz }: { readonly at: string; readonly tz: string },
   { language, now }: Pick<Viewer, "language" | "now">,

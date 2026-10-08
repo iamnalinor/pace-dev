@@ -89,7 +89,6 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
     "Доступ к календарю выключен: включите его для Pace в настройках Android.",
   "phone.usageAsk": "Разрешите доступ к статистике, чтобы видеть здесь сон и время в телефоне",
   "insights.title": "Аналитика",
-  "insights.week": "Неделя с {date}",
   "insights.previous": "Предыдущая неделя",
   "insights.next": "Следующая неделя",
   "insights.byCategory": "Время по категориям",

@@ -19,7 +19,7 @@ const checks = (): readonly string[] =>
 describe("NowScreen", () => {
   it("lists the artboard rows in score order with their meta lines", async () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
-    expect(screen.getByText("Tue · Oct 6")).toBeOnTheScreen();
+    expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
@@ -28,14 +28,16 @@ describe("NowScreen", () => {
       "Mark Algebra HW 6 done",
       "Mark Return library books done",
     ]);
-    expect(screen.getByText("Due tomorrow 23:59 · 4/7 solved · 2 sent")).toBeOnTheScreen();
+    expect(
+      screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
+    ).toBeOnTheScreen();
     // The project (else the category) and the importance are coloured tags before the meta text.
     expect(screen.getByText("by end of day")).toBeOnTheScreen();
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
-    expect(screen.getByText("1 day late · 2 problems left")).toBeOnTheScreen();
-    expect(screen.getByText("12 days old")).toBeOnTheScreen();
+    expect(screen.getByText("15h 1m late · 2 problems left")).toBeOnTheScreen();
+    expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
-    expect(screen.getByText("Due Friday 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
+    expect(screen.getByText("Due Fri Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
     expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
     expect(screen.getByText(en("time.idle"))).toBeOnTheScreen();
   });

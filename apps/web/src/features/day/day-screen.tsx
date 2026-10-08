@@ -8,10 +8,10 @@ import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMinutes } from "#web/shared/format/duration.ts";
 import { formatTime } from "#web/shared/format/time.ts";
-import { formatEyebrow } from "#web/shared/lib/eyebrow.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 import { PageHeader } from "#web/shared/ui/page-header.tsx";
+import { formatEyebrow } from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 
@@ -150,7 +150,7 @@ export const DayScreen = () => {
     <main className="flex flex-1 flex-col gap-3 pb-6 lg:max-w-3xl">
       <PageHeader
         action={<DayNav day={day} onDate={setDate} />}
-        eyebrow={formatEyebrow(new Date(day.date), language, day.zone)}
+        eyebrow={formatEyebrow(day.date, day.zone, language)}
         title={t("day.title")}
       />
       <section className="flex flex-wrap items-center gap-1.5 px-5">

@@ -125,6 +125,7 @@ export {
   insightsModel,
   type OnTimeView,
 } from "./view-models/insights.ts";
+export { type PlainMetaPart, plainMetaText } from "./view-models/meta-text.ts";
 export {
   type MetaPart,
   type NowRow,
