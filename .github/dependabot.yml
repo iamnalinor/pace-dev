@@ -36,13 +36,18 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react-native-*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # React must match the renderer React Native bundles (0.86: 19.2.3): it moves with the SDK.
+      # Expo pins React exactly (SDK 57: 19.2.3), the version React Native's renderer is built
+      # against: it moves with the SDK (`expo install --fix`), patches included.
       - dependency-name: "react"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@types/react"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # NativeWind 4 is built on Tailwind 3; Tailwind 4 comes with NativeWind 5, by hand.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      # A TypeScript major waits until typescript-eslint and knip support it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
       # jest-expo pins the Jest major (jest-expo 57 is built on Jest 29).
       - dependency-name: "jest"
         update-types: ["version-update:semver-major"]
