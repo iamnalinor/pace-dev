@@ -4,7 +4,8 @@ Pace — a personal task & time tracker. Bun workspaces: `packages/core` (pure s
 `packages/client` (local-first store + sync + view-models), `apps/api` (Cloudflare Worker:
 Hono + Durable Objects + D1), `apps/web` (React + Vite + shadcn/ui, PWA), `apps/app` (Expo,
 Android), `e2e/` (Playwright). Read [docs/architecture.md](docs/architecture.md) before
-changing structure.
+changing structure. Product background (the spec, decisions taken with the user, the
+build history) is in [context/](context/README.md).
 
 ## Rules
 
