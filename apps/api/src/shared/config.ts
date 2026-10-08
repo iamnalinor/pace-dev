@@ -61,6 +61,9 @@ const EnvSchema = z.object({
   TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
   TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
   BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
+  GROQ_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
 });
 
 export type Config = {
@@ -74,6 +77,10 @@ export type Config = {
   readonly telegramWebhookAllowedCidrs: readonly string[];
   readonly telegramApiRoot: string;
   readonly botInfo: undefined | UserFromGetMe;
+  readonly groqApiKey: string | undefined;
+  readonly geminiApiKey: string | undefined;
+  /** `fake` answers from inside the Worker (tests, e2e); `auto` uses the providers with a key. */
+  readonly llmProvider: "auto" | "fake";
 };
 
 /** Reads and validates the Worker's vars and secrets; a failure names the offending variable. */
@@ -94,5 +101,8 @@ export const loadConfig = (env: object): Result<Config, string> => {
     telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
     telegramApiRoot: value.TELEGRAM_API_ROOT,
     botInfo: value.BOT_INFO,
+    groqApiKey: value.GROQ_API_KEY,
+    geminiApiKey: value.GEMINI_API_KEY,
+    llmProvider: value.LLM_PROVIDER,
   });
 };

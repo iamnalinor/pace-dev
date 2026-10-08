@@ -41,7 +41,7 @@ tool error (`isError: true`, explaining which scope is missing) instead of runni
 
 | Scope | Lets a client | Tools (stage 1) |
 |---|---|---|
-| `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch` |
+| `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch`, `search_decisions` |
 | `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
 | `time:read` | see the time ledger and focus sessions | stage 3 |
 | `time:write` | start, stop and log activities | stage 3 |
@@ -78,6 +78,7 @@ shows.
 | `list_review` | read | the "to sort" block: finished-looking tasks, passed deadlines, stale inbox items, automatic outcomes to confirm, with their action keys | — |
 | `search` | read | full-text over titles, descriptions, source texts, subtask labels and project names → `{ results: [{ id, title, url }] }` | `query` |
 | `fetch` | read | the task or project document → `{ id, title, text, url, metadata }` | `id` |
+| `search_decisions` | read | the decision log, newest first: notifications sent or held back and LLM parses, each with `rule`, `inputs`, `outcome`, `explanation` | `taskId?`, `from?`, `to?`, `q?`, `limit?` |
 | `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
 | `capture_inbox` | write | a verbatim text into the inbox (`inbox/empty` for blank text) | `text` |
 | `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted); already solved ones are reported, not repeated | `taskId`, `subtaskIds?` or `numbers?` |

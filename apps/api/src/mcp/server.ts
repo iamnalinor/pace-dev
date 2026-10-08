@@ -7,6 +7,7 @@ import { isAllowed } from "../shared/telegram-identity.ts";
 import { readGrant } from "./grant.ts";
 import { registerTools, type Tool, type ToolContext } from "./registry.ts";
 import { reviewAction, revokeEvent } from "./tools/correction-tools.ts";
+import { searchDecisions } from "./tools/decision-tools.ts";
 import { importanceTool, rankTool, statusTool, subtasksTool } from "./tools/edit-tools.ts";
 import { taskTool } from "./tools/get-task.ts";
 import {
@@ -32,7 +33,7 @@ const SERVER_INFO = { name: "pace", version: "0.1.0" };
 
 const INSTRUCTIONS = [
   "Pace is a personal task and time tracker. Every tool acts as the person who authorized this connection.",
-  "Read tools (tasks:read): whoami, list_now, get_task, list_projects, list_project_tasks, list_presets, list_inbox, list_review, search, fetch.",
+  "Read tools (tasks:read): whoami, list_now, get_task, list_projects, list_project_tasks, list_presets, list_inbox, list_review, search, fetch, search_decisions (why a reminder was or was not sent).",
   "Mutating tools (tasks:write) take `at` (ISO instant, default now; use the past to record retroactively), `precision` (exact|approx) and `dryRun` (true = validate and preview the events, write nothing).",
   "Ids are opaque strings; find them with list_now, search or get_task. Times are ISO 8601 UTC; deadlines carry the IANA zone they were set in.",
   "A refusal is a tool error whose text starts with a code such as task/unknown, retro/task-closed or preset/exists.",
@@ -50,6 +51,7 @@ export const TOOLS: readonly Tool[] = [
   listReview,
   search,
   fetchDocument,
+  searchDecisions,
   taskCreation,
   captureInbox,
   markSubtasks,

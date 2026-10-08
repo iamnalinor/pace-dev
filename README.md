@@ -11,9 +11,9 @@ phone, in the browser and on the server.
 
 | Stage | Scope | State |
 |---|---|---|
-| 0 — Foundation | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets | **done** — the web and Android shells are placeholders until the login screens land |
-| 1 — Tasks | presets (edited in the web UI), tasks and subtasks, urgency and the Now list, projects, inbox, history, MCP minimum with OAuth | planned |
-| 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | planned |
+| 0 — Foundation | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets | **done** |
+| 1 — Tasks | presets (edited in the web UI), tasks and subtasks, urgency and the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
+| 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **ready** — in review |
 | 3 — Time | time ledger and focus sessions, calendars, sleep and phone-usage observations, analytics, MCP analytics | planned |
 
 The three product stages are each meant to be usable daily before the next one starts.
@@ -236,8 +236,26 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
    delivers the webhook to `wrangler dev`. When Telegram changes its subnets, update the
    var and redeploy.
 
-Today the bot only handles `/start login_<nonce>` (Android login) and tells everyone
-else "Not allowed"; stage 2 adds task capture, `/now` and digests.
+What the bot does, in the account language:
+
+- `/start login_<nonce>` logs the app in (and opens the chat notifications go to).
+- Any text is read by the assistant and answered with a preview — "I read it as: …" with
+  the fields and anything it could not verify marked — and **Accept** / **To Inbox** /
+  **Cancel**. Accept writes exactly the previewed events; nothing is written before. When no
+  model has requests left, the text goes straight to the Inbox and the reply says when the
+  assistant is back.
+- `/now` lists the top five of Now.
+- Notifications: digests at the account's digest times (09:00, 14:00, 21:00 by default)
+  with the top of Now, what is left to sort and the Inbox count; a **critical** alert once
+  per task when its deadline is within the preset's `criticalHours` and progress is below
+  `criticalProgress`, or its score passes `criticalScore` (buttons: Snooze until the next
+  digest, Done); a **stuck** report with the digest when a task waits longer than
+  `waitingDays` or sits in progress untouched for `inProgressIdleDays` (Still waiting /
+  Snooze, Cancel task). Nothing is sent in the quiet hours (23:00–08:00 by default): a
+  crossing at night is reported in the morning. A deadline that was already critical before
+  the previous check — a back-dated edit, or anything before notifications started — is
+  logged as held back instead of sent; the digest shows it. The Durable Object's alarm
+  drives all of it and re-arms itself after every write.
 
 ## MCP
 
@@ -246,7 +264,7 @@ with PKCE, dynamic client registration and a branded consent page on the web ori
 sign in with Telegram and pick the scopes. Claude (web, desktop, Code), ChatGPT connectors,
 Cursor and MCP Inspector connect with just that URL. The stage-1 tools cover the whole task
 loop: `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`,
-`list_presets`, `list_inbox`, `list_review`, `search` and `fetch` (the pair ChatGPT needs)
+`list_presets`, `list_inbox`, `list_review`, `search_decisions`, `search` and `fetch` (the pair ChatGPT needs)
 to read (`tasks:read`); `create_task`, `capture_inbox`, `mark_subtasks`, `submit`,
 `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`,
 `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`,
@@ -258,13 +276,29 @@ the state the apps sync: this week's homework instances and automatic outcomes a
 before every read and after every write. [docs/mcp.md](docs/mcp.md) has
 the setup per client, the tools table, the scopes, the consent flow and local testing.
 
-## LLM providers (planned, stage 2)
+## LLM providers
 
-Free-text capture ("add homework 5–7 for Thursday") will be parsed by an LLM through the
-Vercel AI SDK: **Groq** (`openai/gpt-oss-120b`) by default, **Gemini** as the fallback, a
-fake provider in tests. The API keys are already wired as secrets so the deploy does not
-change later; nothing in the code uses them yet. The LLM never rewrites your text: source
-text is stored verbatim and extracted fields must quote it.
+Free text ("дз 7 по алгебре 1, 3, 5а до среды 23:59") is read by an LLM through the Vercel
+AI SDK: **Groq** (`openai/gpt-oss-120b`, strict JSON schema) first, **Gemini**
+(`gemini-flash-latest`) when Groq is rate limited, and a **fake** provider
+(`LLM_PROVIDER=fake`) in tests and the e2e Worker. Keys come from the `GROQ_API_KEY` and
+`GEMINI_API_KEY` secrets; a provider without a key is skipped, and with none the assistant
+reports itself unavailable. The prompt (categories, projects, open tasks, now, zone) stays
+under 3k tokens, the free tier's per-minute budget.
+
+The LLM never rewrites your text: the line is stored verbatim, every extracted string must
+be a literal quote of it, and numbers and dates need a quote as evidence — anything else
+comes back marked "check this". Where it is used:
+
+- `POST /api/parse` — the composer's **Read with AI** (web and app) fills the same chips
+  the rule-based reading does; questions show as one-tap answers.
+- The bot's previews (above).
+- `GET /api/decisions` and the **Decision log** page (Settings), plus the MCP tool
+  `search_decisions`: every parse and every notification sent or held back, with the rule,
+  its inputs and a one-line explanation.
+
+The Android app mirrors `GET /api/notify/plan` into local reminders (digest windows and
+deadline crossings for the next day) after every sync; it has no rules of its own.
 
 ## License
 

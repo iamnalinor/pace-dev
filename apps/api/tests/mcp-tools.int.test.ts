@@ -118,6 +118,7 @@ describe("MCP tools catalogue", () => {
         "list_review",
         "search",
         "fetch",
+        "search_decisions",
         "create_task",
         "capture_inbox",
         "mark_subtasks",
@@ -735,5 +736,17 @@ describe("every write tool", () => {
       }).toMatchObject({ code, isError: true, name, structured: { error: { code } } });
     }
     expect(await log.count()).toBe(before);
+  });
+});
+
+describe("search_decisions", () => {
+  it("answers the decision log, empty for a new account", async () => {
+    const token = await readWriteToken();
+    const result = await mcpResult<{ structuredContent: { decisions: unknown[] } }>(
+      token,
+      "tools/call",
+      { arguments: { q: "digest" }, name: "search_decisions" },
+    );
+    expect(result.structuredContent).toEqual({ decisions: [] });
   });
 });

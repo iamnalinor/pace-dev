@@ -3,11 +3,14 @@ import type { Hono } from "hono";
 import { webhookCallback } from "grammy";
 
 import type { AppEnv } from "../shared/app-env.ts";
-import type { TelegramTransport } from "./telegram-api.ts";
+import type { Config } from "../shared/config.ts";
+import type { ParseProvider } from "../shared/llm/llm.ts";
+import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { d1, type Db } from "../shared/db/d1.ts";
 import { isIpInCidrs } from "../shared/ip.ts";
 import { createLogger } from "../shared/logger.ts";
+import { createAssistant } from "./assistant.ts";
 import { type BotDeps, createBot } from "./bot.ts";
 
 /** What the bot needs from the rest of the Worker; `app.ts` composes it with the auth feature. */
@@ -15,6 +18,9 @@ export type BotRouteDeps = {
   readonly telegramFetch: TelegramTransport;
   readonly isAllowed: (telegramId: string, allowedIds: readonly string[]) => boolean;
   readonly bindLogin: (db: Db) => BotDeps["bindLogin"];
+  /** The Pace user behind a Telegram account, if they ever logged in. */
+  readonly userIdOf: (db: Db, telegramId: string) => Promise<null | string>;
+  readonly parseProviders: (config: Config) => readonly ParseProvider[];
 };
 
 /**
@@ -39,11 +45,28 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
     if (config.telegramBotToken === undefined || config.telegramWebhookSecret === undefined) {
       return c.json({ code: "bot/not-configured", message: "Telegram bot is not configured" }, 503);
     }
+    const db = d1(c.env.DB);
+    const storeOf = (userId: string) => c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId));
+    const bindLogin = deps.bindLogin(db);
     const bot = createBot({
       apiRoot: config.telegramApiRoot,
-      bindLogin: deps.bindLogin(d1(c.env.DB)),
+      // Logging in through the bot also opens the chat notifications go to.
+      bindLogin: async (user, nonce) => {
+        const outcome = await bindLogin(user, nonce);
+        const userId = outcome === "ok" ? await deps.userIdOf(db, user.telegramId) : null;
+        if (userId !== null) {
+          await storeOf(userId).notifyTo(user.telegramId, new Date().toISOString());
+        }
+        return outcome;
+      },
       botInfo: config.botInfo,
       fetch: deps.telegramFetch,
+      assistant: createAssistant({
+        now: () => new Date().toISOString(),
+        providers: deps.parseProviders(config),
+        storeOf,
+        userIdOf: async (telegramId) => await deps.userIdOf(db, telegramId),
+      }),
       isAllowed: (telegramId) => deps.isAllowed(telegramId, config.allowedTelegramIds),
       token: config.telegramBotToken,
     });

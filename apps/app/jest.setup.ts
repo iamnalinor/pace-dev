@@ -1,4 +1,5 @@
 import type * as RouterFake from "./src/test/router.ts";
+import type * as NotificationsFake from "./src/testing/notifications.fake.ts";
 import type * as SecureStoreFake from "./src/testing/secure-store.fake.ts";
 
 // RNTL v14 registers its Jest matchers when imported.
@@ -18,6 +19,11 @@ jest.mock("expo-secure-store", () =>
   jest
     .requireActual<typeof SecureStoreFake>("./src/testing/secure-store.fake.ts")
     .createFakeSecureStore(),
+);
+jest.mock("expo-notifications", () =>
+  jest
+    .requireActual<typeof NotificationsFake>("./src/testing/notifications.fake.ts")
+    .createFakeNotifications(),
 );
 jest.mock("expo-router", () =>
   jest.requireActual<typeof RouterFake>("./src/test/router.ts").routerModule(),

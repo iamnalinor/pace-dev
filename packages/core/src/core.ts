@@ -55,6 +55,7 @@ export {
   SyncPushBodySchema,
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
+export * from "./automation.ts";
 export { contrastRatio, parseHex, relativeLuminance, type Rgb } from "./design/contrast.ts";
 export {
   IMPORTANCE_COLORS,

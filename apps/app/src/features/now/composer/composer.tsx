@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";
 
-import type { ComposerEdits, ComposerModel } from "@pace/client";
+import type { AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
@@ -11,7 +11,10 @@ import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { Dot } from "#app/ui/dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { useAiRead } from "@pace/client/react";
 import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, isBuiltInPreset } from "@pace/core";
+
+import { AiStatus } from "./ai-status.tsx";
 
 const ChipRow = ({
   children,
@@ -123,12 +126,16 @@ const ComposerChips = ({
 };
 
 const ComposerActions = ({
+  isReading,
   submitLabel,
   onAdd,
+  onAi,
   onInbox,
 }: {
+  readonly isReading: boolean;
   readonly submitLabel: string;
   readonly onAdd: () => void;
+  readonly onAi: () => void;
   readonly onInbox: () => void;
 }) => {
   const t = useT();
@@ -140,10 +147,45 @@ const ComposerActions = ({
         </Button>
       </View>
       <View className="flex-1">
+        <Button busy={isReading} onPress={onAi} variant="secondary">
+          {t(isReading ? "composer.aiReading" : "composer.ai")}
+        </Button>
+      </View>
+      <View className="flex-1">
         <Button onPress={onAdd}>{submitLabel}</Button>
       </View>
     </View>
   );
+};
+
+/** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
+const useDraft = (initialText: string, assistant: Assistant) => {
+  const [text, setText] = useState(initialText);
+  const [edits, setEdits] = useState<ComposerEdits>({});
+  const ai = useAiRead(assistant);
+  return {
+    ai,
+    edits,
+    /** The assistant's chips go over the taps so far. */
+    onReading: (reading: AiReading): void => {
+      setEdits((current) => ({ ...current, ...reading.edits }));
+    },
+    /** New text makes the assistant's reading stale: its title and problems give way to the rules. */
+    onText: (next: string): void => {
+      if (ai.state.status === "read") {
+        setEdits(({ projectName: _name, subtasks: _subtasks, title: _title, ...rest }) => rest);
+      }
+      setText(next);
+      ai.reset();
+    },
+    reset: (): void => {
+      setText("");
+      setEdits({});
+      ai.reset();
+    },
+    setEdits,
+    text,
+  };
 };
 
 /**
@@ -152,16 +194,11 @@ adds the problems to this week's homework), To Inbox keeps the raw line for late
 */
 export const Composer = ({ initialText = "" }: { readonly initialText?: string | undefined }) => {
   const t = useT();
-  const { actions, hooks } = usePace();
+  const { actions, assistant, hooks } = usePace();
   const { palette } = useTheme();
   const run = useRunAction();
-  const [text, setText] = useState(initialText);
-  const [edits, setEdits] = useState<ComposerEdits>({});
+  const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
   const model = hooks.useComposer({ edits, text });
-  const reset = (): void => {
-    setText("");
-    setEdits({});
-  };
   const add = async (): Promise<void> => {
     const success =
       model.target.kind === "instance"
@@ -182,7 +219,7 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
         accessibilityHint={t("composer.hint")}
         accessibilityLabel={t("composer.label")}
         className="min-h-11 px-2 font-sans text-[15px] text-fg"
-        onChangeText={setText}
+        onChangeText={onText}
         onSubmitEditing={() => {
           void add();
         }}
@@ -200,9 +237,19 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
               setEdits((current) => ({ ...current, ...next }));
             }}
           />
+          <AiStatus
+            onAnswer={(answer) => {
+              onText(`${text.trimEnd()} ${answer}`);
+            }}
+            state={ai.state}
+          />
           <ComposerActions
+            isReading={ai.state.status === "reading"}
             onAdd={() => {
               void add();
+            }}
+            onAi={() => {
+              void ai.read(text, onReading);
             }}
             onInbox={() => {
               void toInbox();

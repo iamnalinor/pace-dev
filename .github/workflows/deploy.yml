@@ -61,13 +61,21 @@ jobs:
         working-directory: apps/web
         run: bunx wrangler deploy
 
+      # The bot token as pasted into GitHub may carry a trailing newline or spaces; every later
+      # step (Worker secret, webhook secret, Bot API URLs) uses this trimmed copy.
+      - name: Normalize TELEGRAM_BOT_TOKEN
+        env:
+          RAW: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          TOKEN="$(printf '%s' "$RAW" | tr -d '[:space:]')"
+          if [ -n "$TOKEN" ]; then echo "::add-mask::$TOKEN"; fi
+          echo "BOT_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
       # Worker secrets are pushed only when the GitHub secret is set, so a fork or a fresh
       # deployment without a bot token still deploys (login stays disabled until it is added).
       - name: Secret TELEGRAM_BOT_TOKEN
         working-directory: apps/api
-        env:
-          VALUE: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        run: if [ -n "$VALUE" ]; then echo "$VALUE" | bunx wrangler secret put TELEGRAM_BOT_TOKEN; fi
+        run: if [ -n "$BOT_TOKEN" ]; then printf '%s' "$BOT_TOKEN" | bunx wrangler secret put TELEGRAM_BOT_TOKEN; fi
 
       # The webhook secret is what Telegram echoes in X-Telegram-Bot-Api-Secret-Token. An
       # explicit TELEGRAM_WEBHOOK_SECRET wins; otherwise it is derived from the bot token
@@ -75,48 +83,48 @@ jobs:
       - name: Resolve TELEGRAM_WEBHOOK_SECRET
         env:
           EXPLICIT: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
+          EXPLICIT="$(printf '%s' "$EXPLICIT" | tr -d '[:space:]')"
           if [ -n "$EXPLICIT" ]; then SECRET="$EXPLICIT";
-          elif [ -n "$TOKEN" ]; then SECRET="$(printf '%s' "$TOKEN" | sha256sum | cut -c1-64)";
+          elif [ -n "$BOT_TOKEN" ]; then SECRET="$(printf '%s' "$BOT_TOKEN" | sha256sum | cut -c1-64)";
           else SECRET=""; fi
           if [ -n "$SECRET" ]; then echo "::add-mask::$SECRET"; fi
           echo "WEBHOOK_SECRET=$SECRET" >> "$GITHUB_ENV"
 
       - name: Secret TELEGRAM_WEBHOOK_SECRET
         working-directory: apps/api
-        run: if [ -n "$WEBHOOK_SECRET" ]; then echo "$WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
+        run: if [ -n "$WEBHOOK_SECRET" ]; then printf '%s' "$WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
 
       - name: Secret GROQ_API_KEY
         working-directory: apps/api
         env:
           VALUE: ${{ secrets.GROQ_API_KEY }}
-        run: if [ -n "$VALUE" ]; then echo "$VALUE" | bunx wrangler secret put GROQ_API_KEY; fi
+        run: |
+          VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+          if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GROQ_API_KEY; fi
 
       - name: Secret GEMINI_API_KEY
         working-directory: apps/api
         env:
           VALUE: ${{ secrets.GEMINI_API_KEY }}
-        run: if [ -n "$VALUE" ]; then echo "$VALUE" | bunx wrangler secret put GEMINI_API_KEY; fi
+        run: |
+          VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+          if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GEMINI_API_KEY; fi
 
       # BOT_INFO is the JSON of getMe, stored at deploy time so the bot never calls Telegram
       # on a cold start. Stored as a secret (same mechanism, not committed to wrangler.jsonc).
       - name: Store BOT_INFO (getMe)
         working-directory: apps/api
-        env:
-          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          if [ -z "$TOKEN" ]; then echo "TELEGRAM_BOT_TOKEN not set, skipping getMe"; exit 0; fi
-          BOT_INFO="$(curl --fail --silent --show-error "https://api.telegram.org/bot${TOKEN}/getMe" | jq -c '.result')"
+          if [ -z "$BOT_TOKEN" ]; then echo "TELEGRAM_BOT_TOKEN not set, skipping getMe"; exit 0; fi
+          BOT_INFO="$(curl --fail --silent --show-error "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | jq -c '.result')"
           test -n "$BOT_INFO"
           echo "$BOT_INFO" | bunx wrangler secret put BOT_INFO
 
       - name: Set Telegram webhook
-        env:
-          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          if [ -z "$TOKEN" ]; then echo "TELEGRAM_BOT_TOKEN not set, skipping setWebhook"; exit 0; fi
-          curl --fail --silent --show-error --request POST "https://api.telegram.org/bot${TOKEN}/setWebhook" \
+          if [ -z "$BOT_TOKEN" ]; then echo "TELEGRAM_BOT_TOKEN not set, skipping setWebhook"; exit 0; fi
+          curl --fail --silent --show-error --request POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
             --data-urlencode "url=https://pace-api.nalinor.dev/telegram/webhook" \
             --data-urlencode "secret_token=${WEBHOOK_SECRET}" \
             --data-urlencode "allowed_updates=[\"message\",\"callback_query\"]" \

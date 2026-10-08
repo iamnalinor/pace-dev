@@ -13,6 +13,7 @@ import {
   type User,
 } from "@pace/core";
 
+import { syncLocalNotifications } from "./platform/notifications.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -23,10 +24,12 @@ const RuntimeContext = createContext<null | PaceRuntime>(null);
 A signed-in start: this week's homework instances, a first sync, then the account's time
 zone from the device when it has none yet (never "not set").
 */
-const bootstrap = async ({ actions, auth, sync }: PaceRuntime): Promise<void> => {
+const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
+  const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
+  await syncLocalNotifications(runtime);
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status === "signed-in") {
     sync.start({ intervalMs: SYNC_INTERVAL_MS });
@@ -59,7 +62,10 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     }
 
     void actions.ensureInstances();
-    void sync.syncNow();
+    void (async () => {
+      await sync.syncNow();
+      await syncLocalNotifications(runtime);
+    })();
   });
   return () => {
     unsubscribe();

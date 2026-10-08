@@ -12,6 +12,11 @@ import {
 } from "./schemas/auth.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import {
+  DecisionsOutputSchema,
+  DecisionsQuerySchema,
+  NotifyPlanOutputSchema,
+} from "./schemas/notify.ts";
+import {
   OAuthClientInfoQuerySchema,
   OAuthClientInfoSchema,
   OAuthCompleteBodySchema,
@@ -20,6 +25,7 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
+import { ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
   SyncObservationsBodySchema,
   SyncObservationsOutputSchema,
@@ -103,6 +109,35 @@ export const endpoints = {
       method: "POST",
       output: SyncObservationsOutputSchema,
       path: "/api/sync/observations",
+    }),
+  },
+  parse: {
+    /** Free text read by the LLM into a task, or changes to one; nothing is saved. */
+    run: endpoint({
+      auth: true,
+      body: ParseRequestSchema,
+      method: "POST",
+      output: ParseResponseSchema,
+      path: "/api/parse",
+    }),
+  },
+  notify: {
+    /** The next day's local reminders for the phone: digest windows and deadline crossings. */
+    plan: endpoint({
+      auth: true,
+      method: "GET",
+      output: NotifyPlanOutputSchema,
+      path: "/api/notify/plan",
+    }),
+  },
+  decisions: {
+    /** The decision log (notifications sent or held back, and why), newest first. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: DecisionsOutputSchema,
+      path: "/api/decisions",
+      query: DecisionsQuerySchema,
     }),
   },
   links: {

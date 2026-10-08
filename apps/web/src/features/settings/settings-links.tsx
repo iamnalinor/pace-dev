@@ -40,6 +40,7 @@ export const SettingsLinks = () => {
       <Row hintKey="settings.presets.hint" titleKey="settings.presets" to="/settings/presets" />
       <Row count={count} hintKey="settings.review.hint" titleKey="settings.review" to="/review" />
       <Row hintKey="settings.history.hint" titleKey="settings.history" to="/history" />
+      <Row hintKey="settings.decisions.hint" titleKey="settings.decisions" to="/decisions" />
     </ul>
   );
 };

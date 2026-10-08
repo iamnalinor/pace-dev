@@ -100,16 +100,12 @@ export const ICONS: readonly IconSpec[] = [
     size: 96,
     svg: canvas(faviconShapes(WHITE), 0.9),
   },
-  // Telegram crops profile photos to a circle: a full lime square with the chevrons well
-  // inside the inscribed circle. Set once through the Bot API (setMyProfilePhoto).
+  // Telegram crops profile photos to a circle: the dark app icon (the default look), the
+  // mark well inside the inscribed circle. Set through the Bot API (setMyProfilePhoto).
   {
     path: "assets/logo/bot-avatar.png",
     size: 640,
-    svg: canvas(
-      faviconShapes({ accent: DARK_BG, fg: DARK_BG, track: "rgba(0,0,0,.3)" }),
-      0.62,
-      LIME,
-    ),
+    svg: canvas(markShapes(DARK), 0.56, DARK_BG),
   },
 ];
 
