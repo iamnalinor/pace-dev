@@ -20,7 +20,7 @@ describe("composerModel", () => {
 
   it("routes homework problems to this week's instance of the course", () => {
     expect(model("дз по алгебре 1, 3, 5а")).toMatchObject({
-      preset: { id: "hw.algebra", name: "Algebra HW", color: "blue" },
+      preset: { id: "hw.algebra", name: "Algebra HW", color: "yellow" },
       project: { id: ALGEBRA_ID },
       subtasks: [{ label: "1" }, { label: "3" }, { label: "5а" }],
       target: { kind: "instance", taskId: HW_ID },

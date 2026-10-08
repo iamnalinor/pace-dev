@@ -156,7 +156,7 @@ describe("PresetEditor", () => {
 
   it("refuses to edit a built-in preset or an unknown one", async () => {
     renderWithProviders(<PresetEditor from={null} presetId="hw" />);
-    expect(await screen.findByText("Built-in presets cannot be changed.")).toBeInTheDocument();
+    expect(await screen.findByText(/A default preset keeps its id/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New preset from Homework" })).toHaveAttribute(
       "href",
       "/settings/presets/new?from=hw",

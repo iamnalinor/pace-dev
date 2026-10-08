@@ -152,7 +152,6 @@ export {
   type TaskTag,
   type TaskViewModel,
   taskViewModel,
-  type WhyRow,
 } from "./view-models/task.ts";
 export {
   type MessageText,
@@ -179,3 +178,20 @@ export {
   hasEnd,
   withCategory,
 } from "./view-models/time-forms.ts";
+export {
+  type FormulaRun,
+  type WhyLine,
+  whyText,
+  type WhyText,
+  type WhyTextContext,
+  type WhyTextGroup,
+  whyValueText,
+} from "./view-models/why-text.ts";
+export {
+  type FormulaPart,
+  type WhyGroup,
+  type WhyGroupName,
+  type WhyModel,
+  whyModel,
+  type WhyRow,
+} from "./view-models/why.ts";

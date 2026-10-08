@@ -42,7 +42,7 @@ describe("BASE_PRESETS", () => {
 
   it("hw: pace, per-subtask homework with a weekly rhythm slot left open", () => {
     expect(BASE_PRESETS.hw.definition).toEqual({
-      color: "blue",
+      color: "yellow",
       deadlinePolicy: { kind: "hard" },
       defaultEstimateMinutes: 60,
       defaultImportance: "normal",
@@ -72,7 +72,7 @@ describe("BASE_PRESETS", () => {
 
   it("personal: age policy with subtasks and no extra fields", () => {
     expect(BASE_PRESETS.personal.definition).toEqual({
-      color: "green",
+      color: "orange",
       deadlinePolicy: { kind: "hard" },
       defaultEstimateMinutes: 30,
       defaultImportance: "normal",
@@ -102,7 +102,7 @@ describe("BASE_PRESETS", () => {
 
   it("inbox: quick capture, nice-to-have, nothing else", () => {
     expect(BASE_PRESETS.inbox.definition).toEqual({
-      color: "amber",
+      color: "teal",
       deadlinePolicy: { kind: "hard" },
       defaultEstimateMinutes: 15,
       defaultImportance: "nice_to_have",

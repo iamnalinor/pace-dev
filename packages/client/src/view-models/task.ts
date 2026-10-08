@@ -1,10 +1,7 @@
 import {
   type Closure,
   type CoreState,
-  type ExplainKey,
-  type ExplainUnit,
   extractLink,
-  type FormulaSymbol,
   type Importance,
   linkHost,
   type Outcome,
@@ -26,6 +23,7 @@ import {
 } from "@pace/core";
 
 import { type QuickTime, quickTimes } from "../clock.ts";
+import { type WhyModel, whyModel } from "./why.ts";
 
 export type TaskTag =
   | { readonly kind: "importance"; readonly importance: Importance }
@@ -41,13 +39,6 @@ export type ProblemRow = {
   readonly state: ProblemState;
   readonly solvedAt: null | string;
   readonly submittedAt: null | string;
-};
-
-/** One line of the "why it's Nth" card; the UI translates the key and formats by unit. */
-export type WhyRow = {
-  readonly key: ExplainKey;
-  readonly value: null | number | string;
-  readonly unit: ExplainUnit | null;
 };
 
 export type PrimaryAction =
@@ -119,13 +110,7 @@ export type TaskViewModel = {
     readonly slider: null | number;
   };
   readonly problems: readonly ProblemRow[];
-  readonly why: {
-    readonly policy: UrgencyPolicy;
-    readonly formula: string;
-    /** Each letter of the formula and the row it stands for. */
-    readonly legend: readonly FormulaSymbol[];
-    readonly rows: readonly WhyRow[];
-  };
+  readonly why: WhyModel;
   readonly rank: null | { readonly position: number; readonly size: number };
   readonly primaryAction: PrimaryAction;
   readonly quickTimes: readonly QuickTime[];
@@ -146,7 +131,10 @@ const tags = (view: TaskView): readonly TaskTag[] => [
     ? []
     : [{ kind: "importance" as const, importance: view.importance }]),
   { kind: "status", status: view.status },
-  { kind: "submission", submission: view.preset.submission },
+  // Only a task with subtasks can be submitted piece by piece; "whole" goes without saying.
+  ...(view.preset.submission === "per_subtask"
+    ? [{ kind: "submission" as const, submission: view.preset.submission }]
+    : []),
 ];
 
 const primaryAction = (preview: SubmitPreview): PrimaryAction => {
@@ -157,15 +145,6 @@ const primaryAction = (preview: SubmitPreview): PrimaryAction => {
   }
   return { kind: preview.canClose ? "done" : "none" };
 };
-
-const whyRows = (view: TaskView): readonly WhyRow[] => [
-  ...view.explanation.inputs.map((row) => ({
-    key: row.key,
-    value: row.value,
-    unit: row.unit ?? null,
-  })),
-  ...view.explanation.steps.map((row) => ({ key: row.key, value: row.value, unit: null })),
-];
 
 const overrideSheet = (state: CoreState, view: TaskView): OverrideSheet => {
   const { task, preset } = view;
@@ -238,12 +217,7 @@ export const taskViewModel = (
         slider: task.slider,
       },
       problems: problems(task),
-      why: {
-        policy: view.explanation.policy,
-        formula: view.explanation.formula,
-        legend: view.explanation.legend,
-        rows: whyRows(view),
-      },
+      why: whyModel(view.explanation),
       rank: view.rank,
       primaryAction: primaryAction(view.submitPreview),
       quickTimes: quickTimes({ deviceTz: ctx.deviceTz, now: () => ctx.now }, task),

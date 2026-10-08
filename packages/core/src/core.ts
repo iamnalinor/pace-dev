@@ -185,6 +185,7 @@ export {
   exampleCoursePresetEvents,
   type ExamplePresetId,
 } from "./presets/example-presets.ts";
+export { byPresetOrder, presetLabel } from "./presets/preset-label.ts";
 export {
   INITIAL_PRESETS_STATE,
   presetById,
@@ -204,6 +205,8 @@ export {
   type PresetInputMode,
   type PresetValidationError,
   resolvePreset,
+  shapeForTask,
+  taskPreset,
   validatePresetInput,
 } from "./presets/resolve-preset.ts";
 export { importanceOf, presetOf } from "./queries/classify.ts";

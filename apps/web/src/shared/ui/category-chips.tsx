@@ -1,7 +1,7 @@
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { presetLabel } from "#web/shared/lib/preset-label.ts";
-import { type Importance, resolvePreset } from "@pace/core";
+import { byPresetOrder, type Importance, resolvePreset } from "@pace/core";
 
 import { ChipGroup } from "./chip-group.tsx";
 
@@ -18,7 +18,7 @@ export const CategoryChips = ({ className, onChange, value }: Props) => {
   const presets = useServices().hooks.useAppState((state) => state.presets);
   const options = Object.values(presets.byId)
     .filter((preset) => !preset.archived && (preset.id !== "inbox" || preset.id === value))
-    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .toSorted(byPresetOrder)
     .map((preset) => {
       const resolved = resolvePreset(presets, preset.id);
       return {

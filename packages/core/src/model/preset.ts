@@ -97,10 +97,13 @@ export type ResolvedPreset = {
 export type Preset = {
   readonly id: string;
   readonly name: string;
-  /** Parent preset id; `null` only for the built-in base presets. */
+  /** Parent preset id; `null` only for the default (base) presets. */
   readonly extends: null | string;
+  /** A default preset: shipped with the app, editable and archivable, never re-created. */
   readonly builtIn: boolean;
   readonly archived: boolean;
   readonly definition: PresetDefinition;
   readonly createdAt: string;
+  /** Position in pickers, ascending; ties by name. */
+  readonly order: number;
 };

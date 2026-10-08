@@ -67,16 +67,12 @@ describe("NowScreen", () => {
     expect(screen.getByText("ASAP")).toHaveClass("font-medium");
   });
 
-  it("unfolds the waiting tasks from the footer", async () => {
-    const { user } = await renderBoard();
-    const footer = await screen.findByRole("button", { name: "+ 6 later · 2 waiting" });
-    expect(footer).toHaveAttribute("aria-expanded", "false");
-    await user.click(footer);
-    const waiting = screen.getByRole("region", { name: "Waiting" });
+  it("lists the waiting tasks under a divider, then the later count", async () => {
+    await renderBoard();
+    const waiting = await screen.findByRole("region", { name: "Waiting" });
     expect(within(waiting).getByText("Prepare demo for Friday")).toBeInTheDocument();
     expect(within(waiting).getByText("RFC: dedicated runner pool")).toBeInTheDocument();
-    await user.click(footer);
-    expect(screen.queryByRole("region", { name: "Waiting" })).not.toBeInTheDocument();
+    expect(screen.getByText("+ 6 later")).toBeInTheDocument();
   });
 
   it("filters by project through the URL", async () => {

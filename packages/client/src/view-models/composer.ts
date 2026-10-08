@@ -1,4 +1,5 @@
 import {
+  byPresetOrder,
   type CoreState,
   type Importance,
   isHttpUrl,
@@ -71,11 +72,11 @@ export type ComposerModel = {
 const presetOptions = (state: CoreState): readonly ComposerOption[] =>
   Object.values(state.presets.byId)
     .filter((preset) => !preset.archived && preset.id !== "inbox")
+    .toSorted(byPresetOrder)
     .map((preset) => {
       const resolved = resolvePreset(state.presets, preset.id);
       return { color: resolved.ok ? resolved.value.color : null, id: preset.id, name: preset.name };
-    })
-    .toSorted((a, b) => a.name.localeCompare(b.name));
+    });
 
 const projectOptions = (state: CoreState): readonly ComposerOption[] =>
   Object.values(state.projects.byId)

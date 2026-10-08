@@ -34,7 +34,8 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   "fetch/not-found": "No task or project with this id.",
   "inbox/empty": "The text is empty.",
   "preset/bad-id": "A preset id is a lowercase slug (a-z, 0-9, '.', '-').",
-  "preset/built-in": "Built-in presets (hw, work, personal, deferred, inbox) cannot be changed.",
+  "preset/built-in":
+    "The default presets (hw, work, personal, deferred, inbox) cannot be re-created or re-parented, and the inbox cannot be archived.",
   "preset/cycle": "The preset would extend itself through its parents.",
   "preset/exists": "A preset with this id already exists.",
   "preset/invalid-definition": "The definition has a key or value the preset schema does not know.",

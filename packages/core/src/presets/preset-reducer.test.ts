@@ -38,6 +38,7 @@ const updated = (
     readonly name?: string;
     readonly extends?: null | string;
     readonly definition?: unknown;
+    readonly order?: number;
   },
 ): Event =>
   event(index, {
@@ -79,6 +80,7 @@ describe("presetReducer: preset.created", () => {
       extends: "hw",
       id: "hw.algebra",
       name: "hw.algebra",
+      order: 100,
     });
   });
 
@@ -167,9 +169,16 @@ describe("presetReducer: preset.updated", () => {
     });
   });
 
-  it("ignores an update to a built-in preset", () => {
-    const state = fold([updated(1, { definition: { color: "pink" }, id: "hw", name: "Nope" })]);
-    expect(state).toBe(INITIAL_PRESETS_STATE);
+  it("edits a default preset: name, color and any field, but never its parent", () => {
+    const state = fold([
+      updated(1, { definition: { color: "pink" }, extends: "work", id: "hw", name: "Homework+" }),
+    ]);
+    expect(state.byId["hw"]).toMatchObject({
+      builtIn: true,
+      definition: { color: "pink" },
+      extends: null,
+      name: "Homework+",
+    });
   });
 
   it("ignores an update to an unknown preset", () => {
@@ -198,11 +207,15 @@ describe("presetReducer: preset.archived", () => {
     expect(fold([base, archived(2, "hw.algebra")]).byId["hw.algebra"]?.archived).toBe(true);
   });
 
-  it("is a no-op on an archived, unknown or built-in preset", () => {
+  it("archives a default preset too, except the inbox", () => {
+    expect(fold([archived(1, "deferred")]).byId["deferred"]?.archived).toBe(true);
+    expect(fold([archived(1, "inbox")])).toBe(INITIAL_PRESETS_STATE);
+  });
+
+  it("is a no-op on an archived or unknown preset", () => {
     const once = fold([base, archived(2, "hw.algebra")]);
     expect(presetReducer(once, archived(3, "hw.algebra"))).toBe(once);
     expect(presetReducer(once, archived(3, "ghost"))).toBe(once);
-    expect(presetReducer(once, archived(3, "hw"))).toBe(once);
   });
 });
 
@@ -232,5 +245,19 @@ describe("example seed", () => {
       "hw.history",
     ]);
     expect(examples.every((preset) => preset.createdAt === at(1))).toBe(true);
+  });
+});
+
+describe("presetReducer: order", () => {
+  it("lists the defaults Homework, Work, Personal, Deferred, and new presets after them", () => {
+    const state = fold([created(1, { definition: {}, extends: "hw", id: "hw.algebra" })]);
+    const order = Object.values(state.byId)
+      .toSorted((a, b) => a.order - b.order)
+      .map((preset) => preset.id);
+    expect(order).toEqual(["hw", "work", "personal", "deferred", "inbox", "hw.algebra"]);
+  });
+
+  it("takes a new order from an update", () => {
+    expect(fold([updated(1, { id: "deferred", order: 0 })]).byId["deferred"]?.order).toBe(0);
   });
 });

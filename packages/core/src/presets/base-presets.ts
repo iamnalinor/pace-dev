@@ -36,6 +36,7 @@ const basePreset = (id: BasePresetId, name: string, definition: ResolvedPreset):
   archived: false,
   definition,
   createdAt: BUILT_IN_CREATED_AT,
+  order: BASE_PRESET_IDS.indexOf(id) + 1,
 });
 
 export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
@@ -50,7 +51,7 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     // Homework is short and dense: half a day of warning is what makes a difference.
     notify: { ...DEFAULT_NOTIFY, criticalHours: 12 },
     defaultEstimateMinutes: 60,
-    color: "blue",
+    color: "yellow",
   }),
   work: basePreset("work", "Work", {
     urgencyPolicy: "lag",
@@ -74,7 +75,7 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     fields: NO_FIELDS,
     notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 30,
-    color: "green",
+    color: "orange",
   }),
   deferred: basePreset("deferred", "Deferred", {
     urgencyPolicy: "age",
@@ -98,6 +99,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     fields: NO_FIELDS,
     notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 15,
-    color: "amber",
+    color: "teal",
   }),
 };

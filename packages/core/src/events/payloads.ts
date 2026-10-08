@@ -23,6 +23,8 @@ export const ProjectColorSchema = z.enum([
   "pink",
   "teal",
   "slate",
+  "orange",
+  "yellow",
 ]);
 
 export const SubtaskSchema = z.object({
@@ -158,12 +160,14 @@ export const PresetCreatedPayload = z.object({
   name: z.string().min(1),
   extends: z.string().min(1).optional(),
   definition: OpaqueRecordSchema,
+  order: z.number().int().optional(),
 });
 export const PresetUpdatedPayload = z.object({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
   extends: z.string().min(1).nullable().optional(),
   definition: OpaqueRecordSchema.optional(),
+  order: z.number().int().optional(),
 });
 export const PresetArchivedPayload = z.object({ id: z.string().min(1) });
 

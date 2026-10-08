@@ -1,5 +1,5 @@
 import { type MetaPart, plainMetaText } from "@pace/client";
-import { type Language, plural, t } from "@pace/core";
+import { t } from "@pace/core";
 
 import { type Viewer, zonedText } from "./time.ts";
 
@@ -7,18 +7,6 @@ import { type Viewer, zonedText } from "./time.ts";
 export type MetaTone = "plain" | "strong" | "warn";
 
 export type MetaText = { readonly text: string; readonly tone: MetaTone };
-
-/** Message groups that carry the four CLDR forms. */
-export type Countable = "meta.problemsLeft" | "projects.open" | "unit.days";
-
-/** `count` with the form its language needs: "1 problem left", "осталось 3 задачи". */
-export const countText = (language: Language, count: number, base: Countable): string =>
-  plural(language, count, {
-    one: t(language, `${base}.one`),
-    other: t(language, `${base}.other`),
-    few: t(language, `${base}.few`),
-    many: t(language, `${base}.many`),
-  });
 
 const partText = (part: MetaPart, viewer: Viewer): string => {
   const { language } = viewer;

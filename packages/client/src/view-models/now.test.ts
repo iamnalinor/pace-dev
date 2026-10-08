@@ -40,7 +40,7 @@ describe("nowViewModel", () => {
       HW_ID,
       BOOKS_ID,
     ]);
-    expect(board).toMatchObject({ inboxCount: 3, laterCount: 6, waitingCount: 2 });
+    expect(board).toMatchObject({ inboxCount: 3, laterCount: 6 });
     expect(board.waiting.map((entry) => entry.id)).toHaveLength(2);
   });
 
@@ -102,7 +102,7 @@ describe("nowViewModel", () => {
     ]);
     const age = books.meta[1];
     expect(age?.kind === "age" && Math.floor(age.minutes / (24 * 60))).toBe(12);
-    expect(books).toMatchObject({ color: "green", dimmed: true, paceExpected: null });
+    expect(books).toMatchObject({ color: "orange", dimmed: true, paceExpected: null });
   });
 
   it("offers a chip per project with open tasks", () => {
@@ -113,7 +113,7 @@ describe("nowViewModel", () => {
     ]);
     const work = nowViewModel(artboardState(), ctx(), { projectId: WORK_ID });
     expect(work.rows.map((entry) => entry.id)).toEqual([TRK_ID]);
-    expect(work.waitingCount).toBe(2);
+    expect(work.waiting).toHaveLength(2);
     expect(work.inboxCount).toBe(3);
   });
 });

@@ -40,7 +40,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.preset/cycle": "Пресет не может наследовать своего потомка.",
   "actionError.preset/invalid-overrides": "Переопределения задачи некорректны.",
   "actionError.preset/bad-id": "Нужен слаг строчными буквами: буквы, цифры, «.» и «-».",
-  "actionError.preset/built-in": "Встроенные пресеты менять нельзя.",
+  "actionError.preset/built-in":
+    "У стандартного пресета нельзя поменять id и родителя; Inbox удалить нельзя.",
   "actionError.preset/exists": "Пресет с таким id уже есть.",
   "actionError.preset/invalid-definition": "Некоторые значения некорректны.",
   "actionError.preset/no-base": "Выберите, что наследует пресет.",

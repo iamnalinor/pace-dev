@@ -93,10 +93,11 @@ describe("TaskScreen — work", () => {
     await fireEvent.press(toggle);
     const card = screen.getByTestId("why-card");
     expect(within(card).getByText("Window elapsed")).toBeOnTheScreen();
-    expect(within(card).getByText("65%")).toBeOnTheScreen();
+    // 65 % shows in its row and again in the filled-in formula.
+    expect(within(card).getAllByText("65%")).toHaveLength(2);
     expect(within(card).getByText("Your rank in Prioritized")).toBeOnTheScreen();
     expect(within(card).getByText("2 of 3")).toBeOnTheScreen();
-    expect(within(card).getByText("5×")).toBeOnTheScreen();
+    expect(within(card).getByText("× 5")).toBeOnTheScreen();
   });
 
   it("moves the progress slider and pauses the task", async () => {

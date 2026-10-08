@@ -31,6 +31,7 @@ const withDraft = (presets: PresetsState, draft: PresetDraft, now: string): Pres
       archived: false,
       builtIn: false,
       createdAt: now,
+      order: 0,
       definition: draft.definition,
       extends: draft.extends,
       id: PREVIEW_ID,

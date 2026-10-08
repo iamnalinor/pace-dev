@@ -69,7 +69,6 @@ export type NowViewModel = {
   readonly rows: readonly NowRow[];
   readonly waiting: readonly NowRow[];
   readonly laterCount: number;
-  readonly waitingCount: number;
   readonly inboxCount: number;
   /** Projects with open tasks, by name. */
   readonly projects: readonly ProjectChip[];
@@ -114,8 +113,9 @@ const progressParts = (item: NowItem): readonly MetaPart[] => {
       ...(item.submitted > 0 ? [{ kind: "sent" as const, submitted: item.submitted }] : []),
     ];
   }
+  // Only against a deadline the person set: an ASAP's end of day is no schedule to lag behind.
   const behind =
-    item.preset.progressMode === "slider" && item.paceExpected !== null
+    item.preset.progressMode === "slider" && item.task.dueAt !== null && item.paceExpected !== null
       ? Math.round((item.paceExpected - item.progress) * PERCENT)
       : 0;
   return behind > 0 ? [{ kind: "behind-pace", percent: behind }] : [];
@@ -182,7 +182,6 @@ export const nowViewModel = (
     rows: list.items.map((item) => nowRow(item, ctx)),
     waiting: list.waiting.map((item) => nowRow(item, ctx)),
     laterCount: list.laterCount,
-    waitingCount: list.waiting.length,
     inboxCount: list.inboxCount,
     projects: projectChips(state),
   };

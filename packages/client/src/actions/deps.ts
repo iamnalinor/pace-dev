@@ -6,11 +6,11 @@ import {
   type PresetError,
   type PresetValidationError,
   type ResolvedPreset,
-  resolvePreset,
   type Result,
   type RetroError,
   type Task,
   taskById,
+  taskPreset,
   validateEventInput,
 } from "@pace/core";
 
@@ -107,6 +107,6 @@ export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unk
   return task === undefined ? err("task/unknown") : ok(task);
 };
 
-/** The task's preset chain with its own overrides on top. */
+/** The task's preset chain with its own overrides on top, shaped by its subtasks. */
 export const presetOf = (deps: ActionDeps, task: Task): Result<ResolvedPreset, PresetError> =>
-  resolvePreset(deps.state.store.getState().presets, task.presetId, task.overrides ?? undefined);
+  taskPreset(deps.state.store.getState().presets, task);

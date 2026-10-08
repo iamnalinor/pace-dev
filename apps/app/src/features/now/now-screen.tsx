@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import type { NowRow } from "@pace/client";
 
@@ -73,9 +73,8 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
   const t = useT();
   const { hooks } = usePace();
   const [projectId, setProjectId] = useState<null | string>(null);
-  const [isWaitingShown, setIsWaitingShown] = useState(false);
   const board = hooks.useNow(projectId === null ? undefined : { projectId });
-  const isEmpty = board.rows.length === 0 && board.waitingCount === 0;
+  const isEmpty = board.rows.length === 0 && board.waiting.length === 0;
   return (
     <Screen footer={<TimeBar />} header={<NowHeader inboxCount={board.inboxCount} />}>
       <Composer initialText={composeText} key={composeText ?? ""} />
@@ -83,21 +82,20 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={projectId} />
       {isEmpty ? <EmptyState>{t("now.empty")}</EmptyState> : null}
       <Rows draggable rows={board.rows} />
-      {board.laterCount + board.waitingCount === 0 ? null : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: isWaitingShown }}
-          className="min-h-11 justify-center px-5"
-          onPress={() => {
-            setIsWaitingShown((shown) => !shown);
-          }}
+      {board.waiting.length > 0 && board.rows.length > 0 ? (
+        <Text
+          accessibilityRole="header"
+          className="mx-5 mt-2 border-t border-line pb-1 pt-3 font-sans text-[13px] text-muted"
         >
-          <Text className="font-sans text-[12px] text-faint">
-            {t("now.folded", { later: board.laterCount, waiting: board.waitingCount })}
-          </Text>
-        </Pressable>
-      )}
-      {isWaitingShown ? <Rows draggable={false} rows={board.waiting} /> : null}
+          {t("now.waiting")}
+        </Text>
+      ) : null}
+      <Rows draggable={false} rows={board.waiting} />
+      {board.laterCount > 0 ? (
+        <Text className="px-5 pt-1 font-sans text-[12px] text-faint">
+          {t("now.later", { count: board.laterCount })}
+        </Text>
+      ) : null}
     </Screen>
   );
 };

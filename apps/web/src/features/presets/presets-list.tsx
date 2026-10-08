@@ -8,13 +8,16 @@ import { cn } from "#web/shared/lib/cn.ts";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { ColorTag } from "#web/shared/ui/color-tag.tsx";
-import { EXAMPLE_PRESET_IDS, type Preset, presetById, resolvePreset } from "@pace/core";
+import {
+  byPresetOrder,
+  EXAMPLE_PRESET_IDS,
+  type Preset,
+  presetById,
+  resolvePreset,
+} from "@pace/core";
 
 import { CONTROL_CLASS } from "./control-class.ts";
 import { presetLabel } from "./preset-label.ts";
-
-const byKindThenName = (a: Preset, b: Preset): number =>
-  a.builtIn === b.builtIn ? a.name.localeCompare(b.name) : Number(b.builtIn) - Number(a.builtIn);
 
 const Badge = ({
   children,
@@ -113,7 +116,7 @@ export const PresetsList = () => {
   const [isShowingArchived, setIsShowingArchived] = useState(false);
   const all = Object.values(presets.byId)
     .filter((preset) => preset.id !== "inbox")
-    .toSorted(byKindThenName);
+    .toSorted(byPresetOrder);
   const shown = all.filter((preset) => isShowingArchived || !preset.archived);
   const hasExamples = EXAMPLE_PRESET_IDS.some((id) => presetById(presets, id) !== undefined);
 

@@ -1,16 +1,15 @@
 import { useState } from "react";
 
-import type { TaskViewModel } from "@pace/client";
-
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMinutes } from "#web/shared/format/duration.ts";
-import { formatDayTime } from "#web/shared/format/time.ts";
+import { formatDateTime, formatDayTime } from "#web/shared/format/time.ts";
 import { cn } from "#web/shared/lib/cn.ts";
 import { ZonedTime } from "#web/shared/time/zoned-time.tsx";
 import { percent } from "#web/shared/ui/pace-bar.tsx";
+import { type TaskViewModel, whyText } from "@pace/client";
 
-import { whyLines, whyTitle } from "./why-lines.ts";
+import { whyTitle } from "./why-lines.ts";
 
 const Stat = ({
   children,
@@ -58,17 +57,18 @@ type WhyProps = {
   readonly title: string;
 };
 
-/** The explanation card: what went into the score, in words and units. */
+/** The explanation card: what went into the score in four short blocks, then the formula filled in. */
 const WhyCard = ({ title, view }: WhyProps) => {
   const t = useT();
   const language = useLanguage();
   const { deviceTz } = useServices().hooks.useClock();
   const settings = useServices().hooks.useSettings();
-  const lines = whyLines(view.why.rows, {
+  const tz = settings.timezone ?? deviceTz;
+  const text = whyText(view.why, {
     importance: view.overrideSheet.importance,
+    instant: (iso) => formatDateTime(iso, tz, language),
     language,
     rank: view.rank,
-    tz: settings.timezone ?? deviceTz,
   });
   return (
     <section
@@ -76,39 +76,46 @@ const WhyCard = ({ title, view }: WhyProps) => {
       className="mx-4 mt-3 rounded-xl border border-line p-3.5"
       id="why"
     >
-      <h2 className="mb-1.5 text-[13px] font-medium" id="why-title">
+      <h2 className="mb-1 text-[13px] font-medium" id="why-title">
         {title}
       </h2>
-      <dl>
-        {lines.map((line) => (
-          <div
-            className={cn(
-              "flex items-baseline justify-between gap-3 py-[7px] text-[13px]",
-              // The score is the total the board sorts by: a heavy rule and bold set it apart.
-              line.key === "score"
-                ? "mt-1 border-t-2 border-fg font-semibold"
-                : "border-t border-line",
-            )}
-            key={line.key}
-          >
-            <dt className={line.key === "score" ? "text-fg" : "text-muted"}>{line.label}</dt>
-            <dd className={cn("font-mono", line.tone === "warn" && "text-warn")}>{line.value}</dd>
-          </div>
+      <div className="grid gap-x-6 sm:grid-cols-2">
+        {text.groups.map((group) => (
+          <dl className={cn("pt-2", group.name === "result" && "sm:col-span-2")} key={group.name}>
+            <p className="pb-0.5 font-mono text-[11px] tracking-[0.06em] text-faint uppercase">
+              {group.title}
+            </p>
+            {group.lines.map((line) => (
+              <div
+                className={cn(
+                  "flex items-baseline justify-between gap-3 py-[5px] text-[13px]",
+                  // The score is the total the board sorts by: a heavy rule and bold set it apart.
+                  line.tone === "total"
+                    ? "mt-1 border-t-2 border-fg font-semibold"
+                    : "border-t border-line",
+                )}
+                key={line.id}
+              >
+                <dt className={line.tone === "total" ? "text-fg" : "text-muted"}>{line.label}</dt>
+                <dd className={cn("font-mono", line.tone === "warn" && "text-warn")}>
+                  {line.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         ))}
-      </dl>
-      <p className="mt-2 border-t border-line pt-2 font-mono text-[11px] wrap-break-word text-muted">
+      </div>
+      <p className="mt-3 border-t border-line pt-2 text-[12px] wrap-break-word text-muted">
         <span className="sr-only">{t("task.whyFormula")}: </span>
-        {view.why.formula}
+        {text.formula.map((run) => (
+          <span
+            className={cn("font-mono", run.isValue && "font-medium text-accentText")}
+            key={run.id}
+          >
+            {run.text}
+          </span>
+        ))}
       </p>
-      {view.why.legend.length > 0 && (
-        <p className="mt-1 text-[11px] text-muted">
-          {view.why.legend
-            .map((symbol) =>
-              t("task.whySymbol", { name: t(`explain.${symbol.key}`), symbol: symbol.symbol }),
-            )
-            .join(" · ")}
-        </p>
-      )}
     </section>
   );
 };

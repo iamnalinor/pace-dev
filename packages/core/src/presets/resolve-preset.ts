@@ -1,4 +1,5 @@
 import type { Preset, PresetDefinition, ResolvedPreset } from "../model/preset.ts";
+import type { Task } from "../model/task.ts";
 
 import { err, ok, type Result } from "../result.ts";
 import { BASE_PRESETS, type BasePreset, isBuiltInPreset } from "./base-presets.ts";
@@ -24,6 +25,8 @@ export type PresetInput = {
   readonly name: string;
   readonly extends: null | string;
   readonly definition: unknown;
+  /** Position in pickers; left as it is when absent. */
+  readonly order?: number;
 };
 
 export type PresetInputMode = "create" | "update";
@@ -119,6 +122,31 @@ export const resolvePreset = (
   return ok(foldChain(chain.value.base.definition, deltas));
 };
 
+/**
+How a task actually tracks progress, whatever its preset prefers: with subtasks, by subtasks
+(and per-subtask submission only then); without, on the 0–10 bar and submitted whole. A
+preset without progress stays without.
+*/
+export const shapeForTask = (preset: ResolvedPreset, hasSubtasks: boolean): ResolvedPreset => {
+  if (hasSubtasks) {
+    return preset.progressMode === "subtasks" ? preset : { ...preset, progressMode: "subtasks" };
+  }
+  return {
+    ...preset,
+    submission: "whole",
+    progressMode: preset.progressMode === "none" ? "none" : "slider",
+  };
+};
+
+/** The task's preset chain with its own overrides on top, shaped by whether it has subtasks. */
+export const taskPreset = (
+  state: PresetsState,
+  task: Pick<Task, "overrides" | "presetId" | "subtasks">,
+): Result<ResolvedPreset, PresetError> => {
+  const resolved = resolvePreset(state, task.presetId, task.overrides ?? undefined);
+  return resolved.ok ? ok(shapeForTask(resolved.value, task.subtasks.length > 0)) : resolved;
+};
+
 const validateId = (
   state: PresetsState,
   id: string,
@@ -128,7 +156,7 @@ const validateId = (
     return "preset/bad-id";
   }
   if (isBuiltInPreset(id)) {
-    return "preset/built-in";
+    return mode === "create" ? "preset/built-in" : undefined;
   }
   const isExists = presetById(state, id) !== undefined;
   if (mode === "create" && isExists) {
@@ -142,6 +170,10 @@ const validateParent = (
   id: string,
   parent: null | string,
 ): PresetValidationError | undefined => {
+  if (isBuiltInPreset(id)) {
+    // A default preset is a root: it has no parent to change.
+    return parent === null ? undefined : "preset/built-in";
+  }
   if (parent === null) {
     return "preset/no-base";
   }

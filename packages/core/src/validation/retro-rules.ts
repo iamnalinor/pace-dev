@@ -2,7 +2,7 @@ import type { EventInput } from "../events/event-schema.ts";
 
 import { solvedCount, type Task, taskById, type TasksState } from "../model/task.ts";
 import { presetById, type PresetsState } from "../presets/preset-reducer.ts";
-import { resolvePreset } from "../presets/resolve-preset.ts";
+import { taskPreset } from "../presets/resolve-preset.ts";
 import { err, ok, type Result } from "../result.ts";
 import { addMinutesIso } from "../time.ts";
 
@@ -44,7 +44,7 @@ const checkPreset = (presets: PresetsState, presetId: string): RetroError | unde
 
 /** A whole submission of a per-subtask task needs at least one solved problem to send. */
 const isWholeSubmittable = (presets: PresetsState, task: Task): boolean => {
-  const preset = resolvePreset(presets, task.presetId, task.overrides ?? undefined);
+  const preset = taskPreset(presets, task);
   return !preset.ok || preset.value.submission === "whole" || solvedCount(task) > 0;
 };
 

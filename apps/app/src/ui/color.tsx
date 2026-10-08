@@ -14,10 +14,12 @@ export const PROJECT_FILL: Readonly<Record<ProjectColorName, string>> = {
   blue: "bg-project-blue",
   coral: "bg-project-coral",
   green: "bg-project-green",
+  orange: "bg-project-orange",
   pink: "bg-project-pink",
   slate: "bg-project-slate",
   teal: "bg-project-teal",
   violet: "bg-project-violet",
+  yellow: "bg-project-yellow",
 };
 
 const WASH: Readonly<Record<ProjectColorName, string>> = {
@@ -25,10 +27,12 @@ const WASH: Readonly<Record<ProjectColorName, string>> = {
   blue: "bg-project-blue/16",
   coral: "bg-project-coral/16",
   green: "bg-project-green/16",
+  orange: "bg-project-orange/16",
   pink: "bg-project-pink/16",
   slate: "bg-project-slate/16",
   teal: "bg-project-teal/16",
   violet: "bg-project-violet/16",
+  yellow: "bg-project-yellow/16",
 };
 
 const EDGE: Readonly<Record<ProjectColorName, string>> = {
@@ -36,10 +40,12 @@ const EDGE: Readonly<Record<ProjectColorName, string>> = {
   blue: "border-project-blue/45",
   coral: "border-project-coral/45",
   green: "border-project-green/45",
+  orange: "border-project-orange/45",
   pink: "border-project-pink/45",
   slate: "border-project-slate/45",
   teal: "border-project-teal/45",
   violet: "border-project-violet/45",
+  yellow: "border-project-yellow/45",
 };
 
 export const INK: Readonly<Record<ProjectColorName, string>> = {
@@ -47,10 +53,12 @@ export const INK: Readonly<Record<ProjectColorName, string>> = {
   blue: "text-ink-blue",
   coral: "text-ink-coral",
   green: "text-ink-green",
+  orange: "text-ink-orange",
   pink: "text-ink-pink",
   slate: "text-ink-slate",
   teal: "text-ink-teal",
   violet: "text-ink-violet",
+  yellow: "text-ink-yellow",
 };
 
 /** A washed container in the color (soft border included); neutral without a color. */

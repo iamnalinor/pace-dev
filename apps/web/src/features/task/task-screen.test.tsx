@@ -45,7 +45,7 @@ describe("TaskScreen — Algebra HW 6 (per problem)", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Project: Algebra. Change" })).toBeInTheDocument();
     expect(screen.getByText("In progress")).toBeInTheDocument();
-    expect(screen.getByText("Submit per problem")).toBeInTheDocument();
+    expect(screen.getByText("Per-subtask submission")).toBeInTheDocument();
     expect(screen.getByText("today 23:59")).toBeInTheDocument();
     expect(screen.getByText("~1h 43m")).toBeInTheDocument();
     expect(screen.getByText("82% of window gone")).toBeInTheDocument();
