@@ -20,6 +20,7 @@ const world = materialize(
       payload: {
         dueAt: T("23:00"),
         estimateMinutes: 90,
+        fields: {},
         presetId: "personal",
         projectId: "p-alg",
         subtasks: [],
