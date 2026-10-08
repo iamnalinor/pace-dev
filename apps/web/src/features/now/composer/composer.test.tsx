@@ -148,6 +148,30 @@ describe("Composer", () => {
     expect(screen.getByRole("radio", { name: "Personal" })).toBeChecked();
   });
 
+  it("keeps the line for the assistant to read when it is back, and clears", async () => {
+    const asked: unknown[] = [];
+    const { user } = await setup(
+      {},
+      {
+        routes: {
+          "POST /api/parse": ({ body }) => {
+            asked.push(body);
+            const isDeferred = (body as { defer?: boolean }).defer === true;
+            return { retryAt: null, status: isDeferred ? "queued" : "unavailable" };
+          },
+        },
+      },
+    );
+    await user.type(line(), "renew the passport");
+    await user.click(screen.getByRole("button", { name: "Read with AI" }));
+    await user.click(await screen.findByRole("button", { name: "Read it when it's back" }));
+    expect(
+      await screen.findByText("Saved: the assistant reads it as soon as it is back and adds it."),
+    ).toBeInTheDocument();
+    expect(line()).toHaveValue("");
+    expect(asked.at(-1)).toEqual({ defer: true, text: "renew the passport" });
+  });
+
   it("reads pasted homework on its own and adds it only after the reading is shown", async () => {
     const homework =
       "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (вычислить определитель)";

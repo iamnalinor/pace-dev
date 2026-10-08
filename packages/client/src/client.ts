@@ -97,6 +97,7 @@ export {
   type DayTotal,
 } from "./view-models/day.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
+export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
 export {
   type HistoryEntry,
   type HistoryOptions,

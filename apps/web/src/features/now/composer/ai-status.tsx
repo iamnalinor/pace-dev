@@ -12,6 +12,8 @@ type Props = {
   readonly isWaiting: boolean;
   /** An answer to one of the assistant's questions goes into the line. */
   readonly onAnswer: (answer: string) => void;
+  /** "Read it when it's back": the server keeps the line and adds it once it can read it. */
+  readonly onLater: () => void;
 };
 
 const Questions = ({
@@ -44,12 +46,14 @@ const Questions = ({
 };
 
 /** What the assistant made of the line: done (and what to check), its questions, or why not. */
-export const AiStatus = ({ isWaiting, onAnswer, state }: Props) => {
+export const AiStatus = ({ isWaiting, onAnswer, onLater, state }: Props) => {
   const t = useT();
   const language = useLanguage();
   const { deviceTz } = useServices().hooks.useClock();
   switch (state.status) {
-    case "idle": {
+    // Queued: the composer has cleared and said so in a toast.
+    case "idle":
+    case "queued": {
       return null;
     }
     case "reading": {
@@ -68,11 +72,18 @@ export const AiStatus = ({ isWaiting, onAnswer, state }: Props) => {
     }
     case "unavailable": {
       return (
-        <p className="px-1 text-[13px] text-fg" role="status">
-          {state.retryAt === null
-            ? t("composer.aiUnavailableSoon")
-            : t("composer.aiUnavailable", { time: formatTime(state.retryAt, deviceTz, language) })}
-        </p>
+        <div className="grid justify-items-start gap-1.5 px-1" role="status">
+          <p className="text-[13px] text-fg">
+            {state.retryAt === null
+              ? t("composer.aiUnavailableSoon")
+              : t("composer.aiUnavailable", {
+                  time: formatTime(state.retryAt, deviceTz, language),
+                })}
+          </p>
+          <button className={chipClass(false)} onClick={onLater} type="button">
+            {t("composer.aiLater")}
+          </button>
+        </div>
       );
     }
     case "read": {

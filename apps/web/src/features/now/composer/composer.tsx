@@ -237,6 +237,11 @@ export const Composer = ({ className, initialText, isInitiallyExpanded = false }
           onAnswer={(answer) => {
             onText(`${draft.text.trimEnd()} ${answer}`);
           }}
+          onLater={() => {
+            void (async () => {
+              submit.readLater(await ai.readLater(draft.text, onReading));
+            })();
+          }}
           state={ai.state}
         />
         {!model.isEmpty && (

@@ -11,11 +11,12 @@ import {
   verifyParse,
 } from "@pace/core";
 
+import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
 import { type ParseProvider, runParse } from "../shared/llm/llm.ts";
 import { buildParsePrompt } from "../shared/llm/prompt.ts";
 import { describePlan } from "./describe.ts";
-import { applyBodies, type BotReply, inboxBody, plain, timeOf, type Turn, zoneOf } from "./turn.ts";
+import { applyBodies, type BotReply, plain, timeOf, type Turn, zoneOf } from "./turn.ts";
 
 /** A preview waiting for its button: the text and, when it was understood, what to write. */
 export type Pending = { readonly text: string; readonly bodies: null | readonly EventBody[] };
@@ -33,17 +34,17 @@ const buttonsFor = (id: string, language: Language, canAccept: boolean): BotRepl
   ],
 ];
 
-/** No model answers: the text goes to the Inbox and the reply says when to expect the assistant. */
+/**
+No model answers: the text waits in the store and is read (and written) once one is back,
+with a message then; the reply says when to expect that.
+*/
 const unavailable = async (turn: Turn, text: string, retryAt: null | string): Promise<BotReply> => {
   const { language } = turn.state.settings;
   await turn.store.logDecisions(
     [parseDecision(text, "bot", { retryAt, status: "unavailable" })],
     turn.now,
   );
-  const failure = await applyBodies(turn, [inboxBody(text)]);
-  if (failure !== null) {
-    return plain(failure);
-  }
+  await turn.store.enqueueParse({ channel: "bot", retryAt, text }, turn.now);
   return plain(
     retryAt === null
       ? t(language, "bot.unavailableSoon")
@@ -97,7 +98,10 @@ export const preview = async (
   const { now, state } = turn;
   const ctx = { deviceTz: zoneOf(state), now };
   const prompt = buildParsePrompt(text, { ctx, language: state.settings.language, state });
-  const answer = await runParse(providers, prompt);
+  const answer = await runParse(providers, prompt, {
+    cooldowns: await turn.store.llmCooldowns(now),
+  });
+  await turn.store.noteLlmLimits(answer.ok ? answer.value.limited : answer.error.limited, now);
   if (!answer.ok) {
     return await unavailable(turn, text, answer.error.retryAt);
   }

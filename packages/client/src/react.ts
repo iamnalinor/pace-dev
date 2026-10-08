@@ -129,6 +129,11 @@ export type AiRead = {
   readonly state: AiState;
   /** Asks the assistant; `onReading` receives the chips it filled. A reset meanwhile drops the answer. */
   readonly read: (text: string, onReading: (reading: AiReading) => void) => Promise<void>;
+  /**
+  "Read it when it's back": the line is kept on the server and written once the assistant can
+  read it. Resolves to `queued` (the composer can clear), or to a reading if it is back already.
+  */
+  readonly readLater: (text: string, onReading: (reading: AiReading) => void) => Promise<AiOutcome>;
   /** Waits for the reading in flight, up to `ms`: `slow` when it is still not back. */
   readonly settle: (ms: number) => Promise<"done" | "slow">;
   readonly reset: () => void;
@@ -139,26 +144,34 @@ export const useAiRead = (assistant: Assistant): AiRead => {
   const [state, setState] = useState<AiState>({ status: "idle" });
   // Each read and reset starts a new generation: a late answer to an older one is dropped.
   const generation = useRef(0);
-  const pending = useRef<Promise<void>>(Promise.resolve());
-  const read = async (text: string, onReading: (reading: AiReading) => void): Promise<void> => {
+  const pending = useRef<Promise<unknown>>(Promise.resolve());
+  const ask = async (
+    text: string,
+    onReading: (reading: AiReading) => void,
+    shouldDefer: boolean,
+  ): Promise<AiOutcome> => {
     generation.current += 1;
     const mine = generation.current;
     setState({ status: "reading" });
-    const reading = (async () => {
-      const outcome = await assistant.read(text);
+    const reading = (async (): Promise<AiOutcome> => {
+      const outcome = await assistant.read(text, { defer: shouldDefer });
       if (mine !== generation.current) {
-        return;
+        return outcome;
       }
       if (outcome.status === "read") {
         onReading(outcome.reading);
       }
       setState(outcome);
+      return outcome;
     })();
     pending.current = reading;
-    await reading;
+    return await reading;
   };
   return {
-    read,
+    read: async (text, onReading) => {
+      await ask(text, onReading, false);
+    },
+    readLater: async (text, onReading) => await ask(text, onReading, true),
     reset: () => {
       generation.current += 1;
       setState({ status: "idle" });
