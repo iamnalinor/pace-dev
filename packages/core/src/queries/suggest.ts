@@ -116,6 +116,9 @@ const hasKeyword = (tokens: readonly string[], keywords: readonly string[]): boo
 
 const ASAP_WORDS = ["asap", "urgent", "срочно"];
 
+/** Words that say "homework" outright: they pick the Homework preset when no course is named. */
+const HOMEWORK_WORDS = ["hw", "дз", "домашк", "домашн", "homework"];
+
 /** The families the lexicon knows; study words only point at a course, work words at the preset too. */
 const FAMILIES = ["work", "hw"] as const;
 
@@ -201,6 +204,10 @@ const byUserFirst = (a: Preset, b: Preset): number => {
   }
   return a.id < b.id ? -1 : 1;
 };
+
+/** A preset that is there and not archived (a default can be archived too). */
+const isPresetLive = (state: CoreState, id: string): boolean =>
+  state.presets.byId[id]?.archived === false;
 
 const presetByName = (state: CoreState, tokens: readonly string[]): Preset | undefined =>
   Object.values(state.presets.byId)
@@ -321,9 +328,13 @@ export const suggestFor = (state: CoreState, text: string, ctx: QueryContext): S
   const family = familyOfText(tokens);
   const ahead = daysAhead(tokens, ctx.now, zone);
   const dueAt = ahead === undefined ? null : endOfDayAhead(ctx.now, zone, ahead);
+  const isHomework = hasKeyword(tokens, HOMEWORK_WORDS) && isPresetLive(state, "hw");
   return {
     presetId:
-      preset?.id ?? (family === undefined ? null : PRESET_OF_FAMILY[family]) ?? DEFAULT_PRESET,
+      preset?.id ??
+      (isHomework ? "hw" : null) ??
+      (family === undefined ? null : PRESET_OF_FAMILY[family]) ??
+      DEFAULT_PRESET,
     projectId: projectFor(state, tokens, { preset, family }),
     importance: importanceFor(tokens, dueAt, ctx.now),
     dueAt,

@@ -12,7 +12,6 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "category.chores": "Дела по дому",
   "category.social": "Общение",
   "category.sport": "Спорт",
-  "category.errands": "Поручения",
   "category.sleep": "Сон",
   "category.other": "Другое",
   "time.bar": "Время",

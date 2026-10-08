@@ -1,5 +1,5 @@
 /** The time-tracking layer of @pace/core: activities, the time bar's buttons, the timeline. */
-export { DEFAULT_BUTTONS, effectiveButtons } from "./tracking/buttons.ts";
+export { BUTTON_CATEGORIES, DEFAULT_BUTTONS, effectiveButtons } from "./tracking/buttons.ts";
 export {
   ACTIVITY_CATEGORIES,
   CATEGORY_COLORS,

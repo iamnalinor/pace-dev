@@ -139,10 +139,7 @@ export const TimeBar = () => {
   const { buttons, running } = hooks.useTimeBar();
   const [editing, setEditing] = useState<EditorTarget | null>(null);
   const tap = (button: TimeButtonView): void => {
-    void run(actions.tapButton(button.id), {
-      success: t(button.toast.key, button.toast.params),
-      undo: true,
-    });
+    void run(actions.tapButton(button.id));
   };
   return (
     <View
@@ -156,10 +153,7 @@ export const TimeBar = () => {
           ) : (
             <RunningRow
               onStop={() => {
-                void run(actions.stopActivity(), {
-                  success: t("time.stopped", { label: running.label }),
-                  undo: true,
-                });
+                void run(actions.stopActivity());
               }}
               running={running}
             />

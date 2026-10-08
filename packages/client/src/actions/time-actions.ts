@@ -52,9 +52,20 @@ export type PastActivity = {
   readonly taskId?: string | undefined;
 };
 
+/** What the details sheet may change before a button's activity starts. */
+export type ButtonStart = {
+  readonly label?: string | undefined;
+  readonly taskId?: null | string | undefined;
+  readonly expectMinutes?: null | number | undefined;
+  readonly limitMinutes?: null | number | undefined;
+};
+
 export type TimeActions = ButtonActions & {
-  /** One tap on the time bar: starts the button's activity (ending the running one), or stops it if it is the one running. */
-  readonly tapButton: (buttonId: string) => ActionResult;
+  /**
+  One tap on the time bar: starts the button's activity (ending the running one), or stops it
+  if it is the one running. With `details` (the sheet behind the button) it always starts.
+  */
+  readonly tapButton: (buttonId: string, details?: ButtonStart) => ActionResult;
   readonly startActivity: (input: ActivityInput, when?: When) => ActionResult;
   /** Time on a task: its title as the label, its estimate as the Expect. */
   readonly focusTask: (taskId: string) => ActionResult;
@@ -124,24 +135,50 @@ const stopActivity = async (deps: ActionDeps, when: When = {}): ActionResult => 
       ]);
 };
 
-const tapButton = async (deps: ActionDeps, buttonId: string): ActionResult => {
+/** The button's own values, the sheet's changes on top; a missing Expect/Limit is learned. */
+const startOfButton = (
+  deps: ActionDeps,
+  button: ReturnType<typeof effectiveButtons>[number],
+  details: ButtonStart,
+): ActivityInput => {
+  const label = details.label?.trim() ?? button.label;
+  const taskId = details.taskId === undefined ? button.taskId : details.taskId;
+  const learned = defaultsFor(timeOf(deps), { category: button.category, label });
+  return {
+    category: button.category,
+    expectMinutes: details.expectMinutes ?? button.expectMinutes ?? learned.expectMinutes,
+    label: label === "" ? button.label : label,
+    limitMinutes: details.limitMinutes ?? button.limitMinutes ?? learned.limitMinutes,
+    taskId: taskId ?? undefined,
+  };
+};
+
+const tapButton = async (
+  deps: ActionDeps,
+  buttonId: string,
+  details?: ButtonStart,
+): ActionResult => {
   const button = effectiveButtons(timeOf(deps)).find((candidate) => candidate.id === buttonId);
   if (button === undefined) {
     return err("action/nothing-to-do");
   }
-  if (runningActivity(timeOf(deps), deps.clock.now())?.buttonId === buttonId) {
+  const isRunning = runningActivity(timeOf(deps), deps.clock.now())?.buttonId === buttonId;
+  if (isRunning && details === undefined) {
     return await stopActivity(deps);
   }
+  const input = startOfButton(deps, button, details ?? {});
+  const expectMinutes = positive(input.expectMinutes);
+  const limitMinutes = positive(input.limitMinutes);
   return await emit(deps, [
     stamp(deps, {
       payload: {
         activityId: newId(),
         buttonId,
-        category: button.category,
-        label: button.label,
-        ...(button.taskId !== null && { taskId: button.taskId }),
-        ...(button.expectMinutes !== null && { expectMinutes: button.expectMinutes }),
-        ...(button.limitMinutes !== null && { limitMinutes: button.limitMinutes }),
+        category: input.category,
+        label: input.label,
+        ...(input.taskId !== undefined && { taskId: input.taskId }),
+        ...(expectMinutes !== undefined && { expectMinutes }),
+        ...(limitMinutes !== undefined && { limitMinutes }),
       },
       type: "activity.started",
     }),
@@ -263,5 +300,5 @@ export const timeActions = (deps: ActionDeps): TimeActions => ({
   logPast: async (activity) => await logPast(deps, activity),
   startActivity: async (input, when) => await startActivity(deps, input, when),
   stopActivity: async (when) => await stopActivity(deps, when),
-  tapButton: async (buttonId) => await tapButton(deps, buttonId),
+  tapButton: async (buttonId, details) => await tapButton(deps, buttonId, details),
 });

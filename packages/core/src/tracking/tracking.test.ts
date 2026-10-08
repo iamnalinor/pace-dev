@@ -1,7 +1,8 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_BUTTONS, effectiveButtons } from "./buttons.ts";
+import { ActivityCategorySchema } from "../events/payloads.ts";
+import { BUTTON_CATEGORIES, DEFAULT_BUTTONS, effectiveButtons } from "./buttons.ts";
 import { defaultsFor, paceStatus } from "./expect-limit.ts";
 import { runningActivity, timeline } from "./timeline.ts";
 import { act, start, T, timeOf } from "./tracking.fake.ts";
@@ -70,6 +71,33 @@ describe("the time reducer", () => {
     });
     expect(effectiveButtons(time).map((button) => button.label)).toEqual(["Read"]);
     expect(effectiveButtons(timeOf([]))).toEqual(DEFAULT_BUTTONS);
+  });
+});
+
+describe("categories and buttons", () => {
+  it("reads the retired errands category as chores", () => {
+    expect(ActivityCategorySchema.parse("errands")).toBe("chores");
+    expect(ActivityCategorySchema.parse("food")).toBe("food");
+  });
+
+  it("starts with Work and Study asking for details, and never shows a sleep button", () => {
+    expect(
+      DEFAULT_BUTTONS.filter((button) => button.shouldAskDetails).map((button) => button.id),
+    ).toEqual(["btn:work", "btn:study"]);
+    expect(BUTTON_CATEGORIES).not.toContain("sleep");
+    const time = timeOf([
+      act("10:00", {
+        payload: {
+          buttonId: "btn:sleep",
+          category: "sleep",
+          color: "violet",
+          label: "Sleep",
+          order: 0,
+        },
+        type: "activity.button.set",
+      }),
+    ]);
+    expect(effectiveButtons(time)).toEqual([]);
   });
 });
 

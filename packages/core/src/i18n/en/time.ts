@@ -10,7 +10,6 @@ export const enTime = {
   "category.chores": "Chores",
   "category.social": "Social",
   "category.sport": "Sport",
-  "category.errands": "Errands",
   "category.sleep": "Sleep",
   "category.other": "Other",
   "time.bar": "Time",

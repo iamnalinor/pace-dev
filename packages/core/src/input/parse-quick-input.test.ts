@@ -26,6 +26,12 @@ describe("parseQuickInput", () => {
     });
   });
 
+  it("drops a leading hw tag from the title, but keeps a numbered one", () => {
+    expect(parse("hw Algebra")).toMatchObject({ presetId: "hw.algebra", title: "Algebra" });
+    expect(parse("дз по физике")).toMatchObject({ presetId: "hw", title: "по физике" });
+    expect(parse("дз 7 по физике").title).toBe("дз 7 по физике");
+  });
+
   it("reads a work sync with a time, an estimate and a link", () => {
     const result = parse("синк по дашборду завтра 15:00 1ч https://meet.example.com/abc");
     expect(result).toMatchObject({

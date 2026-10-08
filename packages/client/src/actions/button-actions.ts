@@ -18,6 +18,7 @@ export type ButtonDraft = {
   readonly taskId?: null | string | undefined;
   readonly expectMinutes: null | number;
   readonly limitMinutes: null | number;
+  readonly shouldAskDetails?: boolean | undefined;
 };
 
 export type ButtonActions = {
@@ -39,6 +40,7 @@ const buttonBody = (button: ActivityButton): Body => ({
     label: button.label,
     limitMinutes: button.limitMinutes,
     order: button.order,
+    shouldAskDetails: button.shouldAskDetails,
     ...(button.taskId !== null && { taskId: button.taskId }),
   },
   type: "activity.button.set",
@@ -59,12 +61,17 @@ const writeButtons = async (
     ),
   ]);
 
+/** The draft's choice, else what the button had. */
+const shouldAskOf = (draft: ButtonDraft, existing: ActivityButton | undefined): boolean =>
+  draft.shouldAskDetails ?? existing?.shouldAskDetails ?? false;
+
 /** The draft as a button: an existing one keeps its id and place, a new one goes last. */
 const buttonOf = (
   draft: ButtonDraft,
   current: readonly ActivityButton[],
   existing?: ActivityButton,
 ): ActivityButton => ({
+  shouldAskDetails: shouldAskOf(draft, existing),
   category: draft.category,
   color: draft.color ?? CATEGORY_COLORS[draft.category],
   expectMinutes: positive(draft.expectMinutes) ?? null,

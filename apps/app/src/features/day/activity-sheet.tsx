@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { ScrollView, Text, type TextInput, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
@@ -17,6 +17,7 @@ import {
   type ActivityTarget,
   type FormPartProps,
   hasEnd,
+  typeTime,
 } from "@pace/client";
 import { useDraft } from "@pace/client/react";
 import {
@@ -96,6 +97,7 @@ const ActivityFields = ({
   readonly isEndEditable: boolean;
 }) => {
   const t = useT();
+  const toFieldRef = useRef<TextInput>(null);
   return (
     <>
       <TextField
@@ -116,11 +118,16 @@ const ActivityFields = ({
         <View className="flex-1">
           <TextField
             error={error}
-            keyboardType="numbers-and-punctuation"
+            keyboardType="number-pad"
             label={t("day.from")}
             maxLength={5}
             onChangeText={(from) => {
-              patch({ from });
+              // Digits only: the colon comes by itself, and the end takes over after the minutes.
+              const typed = typeTime(from);
+              patch({ from: typed.text });
+              if (typed.isComplete) {
+                toFieldRef.current?.focus();
+              }
             }}
             placeholder="09:00"
             value={draft.from}
@@ -129,13 +136,14 @@ const ActivityFields = ({
         {isEndEditable ? (
           <View className="flex-1">
             <TextField
-              keyboardType="numbers-and-punctuation"
+              keyboardType="number-pad"
               label={t("day.to")}
               maxLength={5}
               onChangeText={(to) => {
-                patch({ to });
+                patch({ to: typeTime(to).text });
               }}
               placeholder="10:30"
+              ref={toFieldRef}
               value={draft.to}
             />
           </View>

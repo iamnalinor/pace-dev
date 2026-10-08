@@ -157,7 +157,6 @@ export {
   type MessageText,
   PACE_STATUS_TEXT,
   type RunningView,
-  tapToast,
   type TimeBarModel,
   timeBarModel,
   type TimeButtonView,
@@ -176,6 +175,8 @@ export {
   type EditorTarget,
   type FormPartProps,
   hasEnd,
+  type TypedTime,
+  typeTime,
   withCategory,
 } from "./view-models/time-forms.ts";
 export {

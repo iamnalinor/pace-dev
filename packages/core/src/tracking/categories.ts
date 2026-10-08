@@ -1,9 +1,7 @@
 import type { ProjectColorName } from "../design/tokens.ts";
 import type { ActivityCategory } from "./model.ts";
 
-import { ActivityCategorySchema } from "../events/payloads.ts";
-
-export const ACTIVITY_CATEGORIES: readonly ActivityCategory[] = ActivityCategorySchema.options;
+export { ACTIVITY_CATEGORIES } from "../events/payloads.ts";
 
 /** Where attention is the point: phone penalties and productivity charts look at these. */
 export const FOCUS_CATEGORIES: ReadonlySet<ActivityCategory> = new Set(["work", "study", "task"]);
@@ -20,7 +18,6 @@ export const CATEGORY_COLORS: Readonly<Record<ActivityCategory, ProjectColorName
   chores: "slate",
   social: "pink",
   sport: "green",
-  errands: "coral",
   sleep: "violet",
   other: "slate",
 };
@@ -44,7 +41,6 @@ export const CATEGORY_DEFAULTS: Readonly<Record<ActivityCategory, ExpectLimit>> 
   chores: { expectMinutes: null, limitMinutes: null },
   social: { expectMinutes: null, limitMinutes: null },
   sport: { expectMinutes: 60, limitMinutes: null },
-  errands: { expectMinutes: null, limitMinutes: null },
   sleep: { expectMinutes: 480, limitMinutes: null },
   other: { expectMinutes: null, limitMinutes: null },
 };

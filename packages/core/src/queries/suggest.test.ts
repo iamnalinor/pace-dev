@@ -71,7 +71,7 @@ describe("suggestFor", () => {
     );
   });
 
-  it("ignores archived presets", () => {
+  it("ignores archived presets: homework words then pick the default Homework", () => {
     const archived = artboardState(NOW, [
       at(80, "2026-10-06T10:00:00.000Z", {
         type: "preset.archived",
@@ -79,7 +79,15 @@ describe("suggestFor", () => {
         source: "web",
       }),
     ]);
-    expect(suggestFor(archived, "алгебра дз 7", ctx()).presetId).toBe("personal");
+    expect(suggestFor(archived, "алгебра дз 7", ctx()).presetId).toBe("hw");
+  });
+
+  it("reads hw, дз, домашка and homework as the Homework preset, but not a grade question", () => {
+    for (const text of ["hw geometry", "дз по физике", "домашка по физике", "physics homework"]) {
+      expect(suggestFor(state, text, ctx()).presetId).toBe("hw");
+    }
+    expect(suggestFor(state, "hw algebra", ctx()).presetId).toBe("hw.algebra");
+    expect(suggestFor(state, "check the exam grade", ctx()).presetId).toBe("personal");
   });
 
   it("reads urgency words as ASAP", () => {
