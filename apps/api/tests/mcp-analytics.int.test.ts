@@ -69,6 +69,10 @@ describe("MCP analytics tools", () => {
       sql: "SELECT count(*) AS n FROM tasks WHERE title = 'Keep me' AND title <> 'update; drop'",
     });
     expect(quoted["rows"]).toEqual([[1]]);
+    const replaced = await ok(token, "query_sql", {
+      sql: "SELECT replace(title, 'Keep', 'Kept') AS t FROM tasks WHERE title = 'Keep me'",
+    });
+    expect(replaced["rows"]).toEqual([["Kept me"]]);
   });
 
   it("replays the reminders over a range and ranks Now with other weights", async () => {

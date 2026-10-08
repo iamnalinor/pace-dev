@@ -31,8 +31,12 @@ export const ROW_LIMIT = 500;
 const FORBIDDEN =
   /\b(?:alter|analyze|attach|begin|commit|create|delete|detach|drop|insert|pragma|reindex|release|replace|rollback|savepoint|update|upsert|vacuum)\b/iu;
 
-/** String literals are data: a quoted 'update' must not trip the keyword check. */
-const withoutStrings = (sql: string): string => sql.replaceAll(/'(?:[^']|'')*'/gu, "''");
+/**
+String literals are data: a quoted 'update' must not trip the keyword check. Nor does the
+string function `replace(…)`, unlike the REPLACE statement.
+*/
+const withoutStrings = (sql: string): string =>
+  sql.replaceAll(/'(?:[^']|'')*'/gu, "''").replaceAll(/\breplace\s*\(/giu, "fn(");
 
 /**
 Only one `SELECT` (or `WITH … SELECT`): no second statement, no write or schema keyword,
