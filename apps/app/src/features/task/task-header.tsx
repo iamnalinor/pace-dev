@@ -37,7 +37,9 @@ export const TaskHeader = ({
       }
     >
       <Pressable
-        accessibilityLabel={t("task.changeProject", { project: project?.name ?? t("task.noProject") })}
+        accessibilityLabel={t("task.changeProject", {
+          project: project?.name ?? t("task.noProject"),
+        })}
         accessibilityRole="button"
         className="h-11 flex-row items-center gap-1 active:opacity-70"
         disabled={onProject === undefined}

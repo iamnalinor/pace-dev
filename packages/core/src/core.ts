@@ -287,9 +287,9 @@ export {
 export {
   type ExplainInput,
   type ExplainKey,
-  type FormulaSymbol,
   type ExplainStep,
   type ExplainUnit,
+  type FormulaSymbol,
 } from "./urgency/trace.ts";
 export {
   FUTURE_TOLERANCE_MINUTES,

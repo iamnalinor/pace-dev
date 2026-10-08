@@ -173,7 +173,9 @@ export const useDecisions = (api: ApiClient, search: string): DecisionsState => 
 };
 
 /** A form's fields as state, and a setter that merges the changed ones in. */
-export const useDraft = <T extends object>(initial: () => T): readonly [T, (next: Partial<T>) => void] => {
+export const useDraft = <T extends object>(
+  initial: () => T,
+): readonly [T, (next: Partial<T>) => void] => {
   const [draft, setDraft] = useState(initial);
   const patch = (next: Partial<T>): void => {
     setDraft((current) => ({ ...current, ...next }));

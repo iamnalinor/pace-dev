@@ -58,7 +58,9 @@ export const WhyCard = ({
           {view.why.legend.length > 0 ? (
             <Text className="font-sans text-[11px] text-muted">
               {view.why.legend
-                .map((symbol) => t("task.whySymbol", { name: t(`explain.${symbol.key}`), symbol: symbol.symbol }))
+                .map((symbol) =>
+                  t("task.whySymbol", { name: t(`explain.${symbol.key}`), symbol: symbol.symbol }),
+                )
                 .join(" · ")}
             </Text>
           ) : null}
@@ -67,7 +69,10 @@ export const WhyCard = ({
             const isTotal = line.id.startsWith("score:");
             return (
               <View
-                className={cx("flex-row justify-between gap-3", isTotal && "mt-1 border-t-2 border-fg pt-1.5")}
+                className={cx(
+                  "flex-row justify-between gap-3",
+                  isTotal && "mt-1 border-t-2 border-fg pt-1.5",
+                )}
                 key={line.id}
               >
                 <Text

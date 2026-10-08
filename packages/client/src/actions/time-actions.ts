@@ -1,28 +1,18 @@
 import {
-  type ActivityButton,
   type ActivityCategory,
-  CATEGORY_COLORS,
   defaultsFor,
   effectiveButtons,
   err,
   newId,
   ok,
-  type ProjectColorName,
   runningActivity,
   taskById,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, type Body, emit, stamp, type When } from "./deps.ts";
+import { buttonActions, type ButtonActions, positive } from "./button-actions.ts";
+import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
-/** What the button editor sends: the label and the defaults an activity started from it gets. */
-export type ButtonDraft = {
-  readonly label: string;
-  readonly category: ActivityCategory;
-  readonly color?: ProjectColorName | undefined;
-  readonly taskId?: null | string | undefined;
-  readonly expectMinutes: null | number;
-  readonly limitMinutes: null | number;
-};
+export type { ButtonDraft } from "./button-actions.ts";
 
 export type ActivityInput = {
   readonly label: string;
@@ -62,7 +52,7 @@ export type PastActivity = {
   readonly taskId?: string | undefined;
 };
 
-export type TimeActions = {
+export type TimeActions = ButtonActions & {
   /** One tap on the time bar: starts the button's activity (ending the running one), or stops it if it is the one running. */
   readonly tapButton: (buttonId: string) => ActionResult;
   readonly startActivity: (input: ActivityInput, when?: When) => ActionResult;
@@ -85,26 +75,7 @@ export type TimeActions = {
     },
   ) => ActionResult;
   /** Saves a button (`null` adds one). The first edit writes the default buttons as the account's own. */
-  readonly saveButton: (buttonId: null | string, draft: ButtonDraft) => ActionResult;
-  readonly removeButton: (buttonId: string) => ActionResult;
 };
-
-const positive = (minutes: null | number | undefined): number | undefined =>
-  minutes === null || minutes === undefined || minutes <= 0 ? undefined : Math.round(minutes);
-
-const buttonBody = (button: ActivityButton): Body => ({
-  payload: {
-    buttonId: button.id,
-    category: button.category,
-    color: button.color,
-    expectMinutes: button.expectMinutes,
-    label: button.label,
-    limitMinutes: button.limitMinutes,
-    order: button.order,
-    ...(button.taskId !== null && { taskId: button.taskId }),
-  },
-  type: "activity.button.set",
-});
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 
@@ -151,64 +122,6 @@ const stopActivity = async (deps: ActionDeps, when: When = {}): ActionResult => 
         stamp(deps, { payload: { activityId: running.id }, type: "activity.stopped" }, when),
       ]);
 };
-
-/** The bar as it stands; the first edit turns the defaults into the account's own buttons. */
-const writeButtons = async (
-  deps: ActionDeps,
-  buttons: readonly ActivityButton[],
-  removed: readonly string[],
-): ActionResult =>
-  await emit(deps, [
-    ...buttons.map((button) => stamp(deps, buttonBody(button))),
-    ...removed.map((buttonId) =>
-      stamp(deps, { payload: { buttonId }, type: "activity.button.removed" }),
-    ),
-  ]);
-
-/** The draft as a button: an existing one keeps its id and place, a new one goes last. */
-const buttonOf = (
-  draft: ButtonDraft,
-  current: readonly ActivityButton[],
-  existing?: ActivityButton,
-): ActivityButton => ({
-  category: draft.category,
-  color: draft.color ?? CATEGORY_COLORS[draft.category],
-  expectMinutes: positive(draft.expectMinutes) ?? null,
-  id: existing?.id ?? `btn:${newId()}`,
-  label: draft.label,
-  limitMinutes: positive(draft.limitMinutes) ?? null,
-  order: existing?.order ?? Math.max(-1, ...current.map((button) => button.order)) + 1,
-  taskId: draft.taskId ?? null,
-});
-
-const buttonActions = (deps: ActionDeps): Pick<TimeActions, "removeButton" | "saveButton"> => ({
-  removeButton: async (buttonId) => {
-    const current = effectiveButtons(timeOf(deps));
-    if (current.every((button) => button.id !== buttonId)) {
-      return err("action/nothing-to-do");
-    }
-    return timeOf(deps).hasCustomButtons
-      ? await writeButtons(deps, [], [buttonId])
-      : await writeButtons(
-          deps,
-          current.filter((button) => button.id !== buttonId),
-          [],
-        );
-  },
-  saveButton: async (buttonId, draft) => {
-    const label = draft.label.trim();
-    if (label === "") {
-      return err("action/empty-text");
-    }
-    const current = effectiveButtons(timeOf(deps));
-    const existing = current.find((button) => button.id === buttonId);
-    const saved = buttonOf({ ...draft, label }, current, existing);
-    const others = timeOf(deps).hasCustomButtons
-      ? []
-      : current.filter((button) => button.id !== saved.id);
-    return await writeButtons(deps, [...others, saved], []);
-  },
-});
 
 const tapButton = async (deps: ActionDeps, buttonId: string): ActionResult => {
   const button = effectiveButtons(timeOf(deps)).find((candidate) => candidate.id === buttonId);
@@ -291,7 +204,8 @@ const saveEdit = async (
   entry: ActivityEntry,
 ): ActionResult => {
   const edits = editActions(deps);
-  const isMoved = entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
+  const isMoved =
+    entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
   const moved = isMoved
     ? await edits.adjustActivity(target.activityId, {
         startAt: entry.startAt,
@@ -303,18 +217,30 @@ const saveEdit = async (
   }
   const isRenamed = entry.label.trim() !== target.label || entry.category !== target.category;
   const renamed = isRenamed
-    ? await edits.relabelActivity(target.activityId, { category: entry.category, label: entry.label.trim() })
+    ? await edits.relabelActivity(target.activityId, {
+        category: entry.category,
+        label: entry.label.trim(),
+      })
     : ok([]);
   return renamed.ok ? ok([...moved.value, ...renamed.value]) : renamed;
 };
 
-const saveActivity = async (deps: ActionDeps, target: ActivityTarget, entry: ActivityEntry): ActionResult => {
+const saveActivity = async (
+  deps: ActionDeps,
+  target: ActivityTarget,
+  entry: ActivityEntry,
+): ActionResult => {
   if (target.kind === "edit") {
     return await saveEdit(deps, target, entry);
   }
   return entry.endAt === null
     ? err("action/invalid-input")
-    : await logPast(deps, { category: entry.category, endAt: entry.endAt, label: entry.label, startAt: entry.startAt });
+    : await logPast(deps, {
+        category: entry.category,
+        endAt: entry.endAt,
+        label: entry.label,
+        startAt: entry.startAt,
+      });
 };
 
 export const timeActions = (deps: ActionDeps): TimeActions => ({

@@ -1,19 +1,9 @@
 import { type SyntheticEvent, useId } from "react";
 
-import {
-  type ButtonForm,
-  buttonFormOf,
-  buttonSaveOf,
-  type EditorProps,
-  withCategory,
-} from "@pace/client";
-import { useDraft } from "@pace/client/react";
-
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ChipGroup } from "#web/shared/ui/chip-group.tsx";
 import {
   Sheet,
   SheetContent,
@@ -21,83 +11,51 @@ import {
   SheetHeader,
   SheetTitle,
 } from "#web/shared/ui/sheet.tsx";
-import { ACTIVITY_CATEGORIES, CATEGORY_COLORS } from "@pace/core";
+import {
+  type ButtonForm,
+  buttonFormOf,
+  buttonSaveOf,
+  type EditorProps,
+  type FormPartProps,
+  withCategory,
+} from "@pace/client";
+import { useDraft } from "@pace/client/react";
+
+import { CategoryChips, MonoField } from "./fields.tsx";
 
 export type { EditorTarget } from "@pace/client";
 
 type Draft = ButtonForm;
 
-const NumberField = ({
-  hint,
-  label,
-  onChange,
-  value,
-}: {
-  readonly label: string;
-  readonly hint: string;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-}) => {
-  const id = useId();
-  return (
-    <label className="grid gap-1 text-xs text-muted" htmlFor={id}>
-      {label}
-      <input
-        aria-describedby={`${id}-hint`}
-        className="h-10 rounded-md border border-line bg-surface px-3 font-mono text-sm text-fg"
-        id={id}
-        inputMode="numeric"
-        min={1}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-        type="number"
-        value={value}
-      />
-      <span id={`${id}-hint`}>{hint}</span>
-    </label>
-  );
-};
-
 /** Category, Expect, Limit and the linked task: what an activity started from the button gets. */
-const DefaultsFields = ({
-  draft,
-  patch,
-}: {
-  readonly draft: Draft;
-  readonly patch: (next: Partial<Draft>) => void;
-}) => {
+const DefaultsFields = ({ draft, patch }: FormPartProps<Draft>) => {
   const t = useT();
   const tasks = useServices().hooks.useNow().rows;
   return (
     <>
-      <ChipGroup
-        label={t("editor.category")}
+      <CategoryChips
         onChange={(category) => {
           patch(withCategory(draft, category));
         }}
-        options={ACTIVITY_CATEGORIES.map((category) => ({
-          color: CATEGORY_COLORS[category],
-          label: t(`category.${category}`),
-          value: category,
-        }))}
         value={draft.category}
       />
       <div className="grid grid-cols-2 gap-3">
-        <NumberField
+        <MonoField
           hint={t("editor.expectHint")}
           label={t("editor.expect")}
           onChange={(expect) => {
             patch({ expect });
           }}
+          type="number"
           value={draft.expect}
         />
-        <NumberField
+        <MonoField
           hint={t("editor.limitHint")}
           label={t("editor.limit")}
           onChange={(limit) => {
             patch({ limit });
           }}
+          type="number"
           value={draft.limit}
         />
       </div>

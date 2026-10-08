@@ -145,7 +145,14 @@ describe("time actions", () => {
     const activityId = event?.type === "activity.logged" ? event.payload.activityId : "";
     const edited = unwrap(
       await world.actions.saveActivity(
-        { activityId, category: "study", endAt: later(-60), kind: "edit", label: "Lecture", startAt: later(-120) },
+        {
+          activityId,
+          category: "study",
+          endAt: later(-60),
+          kind: "edit",
+          label: "Lecture",
+          startAt: later(-120),
+        },
         { category: "work", endAt: later(-50), label: "Seminar", startAt: later(-120) },
       ),
     );
@@ -156,7 +163,14 @@ describe("time actions", () => {
       label: "Seminar",
     });
     const unchanged = await world.actions.saveActivity(
-      { activityId, category: "work", endAt: later(-50), kind: "edit", label: "Seminar", startAt: later(-120) },
+      {
+        activityId,
+        category: "work",
+        endAt: later(-50),
+        kind: "edit",
+        label: "Seminar",
+        startAt: later(-120),
+      },
       { category: "work", endAt: later(-50), label: "Seminar", startAt: later(-120) },
     );
     expect(unwrap(unchanged)).toEqual([]);

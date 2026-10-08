@@ -3,9 +3,9 @@ import {
   type ActivityCategory,
   CATEGORY_COLORS,
   type CoreState,
+  effectiveButtons,
   type MessageKey,
   type MessageParams,
-  effectiveButtons,
   paceStatus,
   type PaceStatus,
   type ProjectColorName,
@@ -122,4 +122,3 @@ export const tapToast = (
     ? { key: "time.started", params: { label: button.label } }
     : { key: "time.switched", params: { from: previous, to: button.label } };
 };
-

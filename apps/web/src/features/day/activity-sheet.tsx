@@ -1,58 +1,30 @@
 import { type SyntheticEvent, useId, useState } from "react";
 
-import {
-  type ActivityForm,
-  activityFormOf,
-  type ActivitySheetProps,
-  type ActivityTarget,
-  hasEnd,
-} from "@pace/client";
-import { useDraft } from "@pace/client/react";
-
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { isoToWallClock, wallClockToIso } from "#web/shared/time/wall-clock.ts";
+import { CategoryChips, MonoField } from "#web/shared/tracking/fields.tsx";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ChipGroup } from "#web/shared/ui/chip-group.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "#web/shared/ui/sheet.tsx";
-import { ACTIVITY_CATEGORIES, CATEGORY_COLORS } from "@pace/core";
+import {
+  type ActivityForm,
+  activityFormOf,
+  type ActivityRange,
+  type ActivitySheetProps,
+  type ActivityTarget,
+  type FormPartProps,
+  hasEnd,
+} from "@pace/client";
+import { useDraft } from "@pace/client/react";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
 export type SheetTarget = ActivityTarget;
 
 type Draft = ActivityForm;
 
-const TimeField = ({
-  label,
-  onChange,
-  value,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-}) => {
-  const id = useId();
-  return (
-    <label className="grid gap-1 text-xs text-muted" htmlFor={id}>
-      {label}
-      <input
-        className="h-10 rounded-md border border-line bg-surface px-3 font-mono text-sm text-fg"
-        id={id}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-        type="datetime-local"
-        value={value}
-      />
-    </label>
-  );
-};
-
-type Range = { readonly startAt: string; readonly endAt: null | string };
-
 /** The typed boundaries as instants; `null` when one is missing or the end is not after the start. */
-const rangeOf = (draft: Draft, target: SheetTarget, zone: string): null | Range => {
+const rangeOf = (draft: Draft, target: SheetTarget, zone: string): ActivityRange | null => {
   const startAt = wallClockToIso(draft.from, zone);
   const endAt = draft.to === "" ? null : wallClockToIso(draft.to, zone);
   if (startAt === null || (endAt !== null && endAt <= startAt)) {
@@ -66,10 +38,8 @@ const ActivityFields = ({
   draft,
   isEndEditable,
   patch,
-}: {
-  readonly draft: Draft;
+}: FormPartProps<Draft> & {
   readonly isEndEditable: boolean;
-  readonly patch: (next: Partial<Draft>) => void;
 }) => {
   const t = useT();
   const labelId = useId();
@@ -88,32 +58,28 @@ const ActivityFields = ({
           value={draft.label}
         />
       </label>
-      <ChipGroup
-        label={t("editor.category")}
+      <CategoryChips
         onChange={(category) => {
           patch({ category });
         }}
-        options={ACTIVITY_CATEGORIES.map((category) => ({
-          color: CATEGORY_COLORS[category],
-          label: t(`category.${category}`),
-          value: category,
-        }))}
         value={draft.category}
       />
       <div className="grid gap-3 sm:grid-cols-2">
-        <TimeField
+        <MonoField
           label={t("day.from")}
           onChange={(from) => {
             patch({ from });
           }}
+          type="datetime-local"
           value={draft.from}
         />
         {isEndEditable && (
-          <TimeField
+          <MonoField
             label={t("day.to")}
             onChange={(to) => {
               patch({ to });
             }}
+            type="datetime-local"
             value={draft.to}
           />
         )}

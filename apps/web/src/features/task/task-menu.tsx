@@ -120,24 +120,24 @@ type Props = {
 
 /** The "more" menu: edit, preset, project, pause or reopen, delete. */
 export const TaskMenu = ({ isMoveOnly = false, isOpen, onEdit, onOpenChange, view }: Props) => {
-  const [chosen, setPanel] = useState<Panel>("menu");
-  const panel = isMoveOnly ? "move" : chosen;
+  const [chosenPanel, setChosenPanel] = useState<Panel>("menu");
+  const panel = isMoveOnly ? "move" : chosenPanel;
   const close = (): void => {
-    setPanel("menu");
+    setChosenPanel("menu");
     onOpenChange(false);
   };
   const panelProps = { close, view };
   return (
     <Sheet
       onOpenChange={(next) => {
-        setPanel("menu");
+        setChosenPanel("menu");
         onOpenChange(next);
       }}
       open={isOpen}
     >
       {/* Only the delete confirmation carries a description. */}
       <SheetContent {...(panel !== "delete" && { "aria-describedby": undefined })}>
-        {panel === "menu" && <MenuPanel {...panelProps} onEdit={onEdit} onPanel={setPanel} />}
+        {panel === "menu" && <MenuPanel {...panelProps} onEdit={onEdit} onPanel={setChosenPanel} />}
         {panel === "preset" && <PresetPanel {...panelProps} />}
         {panel === "move" && <MovePanel {...panelProps} />}
         {panel === "delete" && <DeletePanel {...panelProps} />}

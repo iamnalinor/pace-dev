@@ -1,20 +1,20 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import {
-  type ButtonForm,
-  buttonFormOf,
-  buttonSaveOf,
-  type EditorProps,
-  withCategory,
-} from "@pace/client";
-import { useDraft } from "@pace/client/react";
-
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import {
+  type ButtonForm,
+  buttonFormOf,
+  buttonSaveOf,
+  type EditorProps,
+  type FormPartProps,
+  withCategory,
+} from "@pace/client";
+import { useDraft } from "@pace/client/react";
 import { ACTIVITY_CATEGORIES, CATEGORY_COLORS } from "@pace/core";
 
 export type { EditorTarget } from "@pace/client";
@@ -22,13 +22,7 @@ export type { EditorTarget } from "@pace/client";
 type Draft = ButtonForm;
 
 /** Category, Expect and Limit: what an activity started from the button gets. */
-const DefaultsFields = ({
-  draft,
-  patch,
-}: {
-  readonly draft: Draft;
-  readonly patch: (next: Partial<Draft>) => void;
-}) => {
+const DefaultsFields = ({ draft, patch }: FormPartProps<Draft>) => {
   const t = useT();
   return (
     <>

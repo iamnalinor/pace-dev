@@ -59,7 +59,12 @@ export const ProjectSheet = ({
   ];
   const move = async (projectId: null | string): Promise<void> => {
     const target = projectId === null ? null : { projectId };
-    if (await run(actions.setProject(view.id, target), { success: t("task.moved", { title: view.title }), undo: true })) {
+    if (
+      await run(actions.setProject(view.id, target), {
+        success: t("task.moved", { title: view.title }),
+        undo: true,
+      })
+    ) {
       onClose();
     }
   };

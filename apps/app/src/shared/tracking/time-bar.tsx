@@ -2,19 +2,18 @@ import { Plus, Square } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import {
-  type ActivityButtonProps,
-  PACE_STATUS_TEXT,
-  type RunningView,
-  type TimeButtonView,
-} from "@pace/client";
-
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { ColorTag, inkClass, PROJECT_FILL, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import {
+  type ActivityButtonProps,
+  PACE_STATUS_TEXT,
+  type RunningView,
+  type TimeButtonView,
+} from "@pace/client";
 import { formatDuration } from "@pace/core";
 
 import { ButtonEditor, type EditorTarget } from "./button-editor.tsx";
@@ -137,7 +136,7 @@ export const TimeBar = () => {
   const { actions, hooks } = usePace();
   const { palette } = useTheme();
   const run = useRunAction();
-  const bar = hooks.useTimeBar();
+  const { buttons, running } = hooks.useTimeBar();
   const [editing, setEditing] = useState<EditorTarget | null>(null);
   const tap = (button: TimeButtonView): void => {
     void run(actions.tapButton(button.id), {
@@ -152,17 +151,17 @@ export const TimeBar = () => {
     >
       <View className="min-h-9 flex-row items-center gap-2">
         <View className="flex-1">
-          {bar.running === null ? (
+          {running === null ? (
             <Text className="font-sans text-[12px] text-muted">{t("time.idle")}</Text>
           ) : (
             <RunningRow
               onStop={() => {
                 void run(actions.stopActivity(), {
-                  success: t("time.stopped", { label: bar.running?.label ?? "" }),
+                  success: t("time.stopped", { label: running.label }),
                   undo: true,
                 });
               }}
-              running={bar.running}
+              running={running}
             />
           )}
         </View>
@@ -179,7 +178,7 @@ export const TimeBar = () => {
         </Pressable>
       </View>
       <View className="mt-2 flex-row flex-wrap gap-[2%]">
-        {bar.buttons.map((button) => (
+        {buttons.map((button) => (
           <ActivityButton button={button} key={button.id} onEdit={setEditing} onTap={tap} />
         ))}
       </View>

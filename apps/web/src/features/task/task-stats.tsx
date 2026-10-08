@@ -85,7 +85,9 @@ const WhyCard = ({ title, view }: WhyProps) => {
             className={cn(
               "flex items-baseline justify-between gap-3 py-[7px] text-[13px]",
               // The score is the total the board sorts by: a heavy rule and bold set it apart.
-              line.key === "score" ? "mt-1 border-t-2 border-fg font-semibold" : "border-t border-line",
+              line.key === "score"
+                ? "mt-1 border-t-2 border-fg font-semibold"
+                : "border-t border-line",
             )}
             key={line.key}
           >
@@ -101,7 +103,9 @@ const WhyCard = ({ title, view }: WhyProps) => {
       {view.why.legend.length > 0 && (
         <p className="mt-1 text-[11px] text-muted">
           {view.why.legend
-            .map((symbol) => t("task.whySymbol", { name: t(`explain.${symbol.key}`), symbol: symbol.symbol }))
+            .map((symbol) =>
+              t("task.whySymbol", { name: t(`explain.${symbol.key}`), symbol: symbol.symbol }),
+            )
             .join(" · ")}
         </p>
       )}

@@ -1,12 +1,8 @@
-import {
-  type ActivityCategory,
-  CATEGORY_DEFAULTS,
-} from "@pace/core";
+import { type ActivityCategory, CATEGORY_DEFAULTS } from "@pace/core";
 
-import type { ActivityTarget, ButtonDraft } from "../actions/time-actions.ts";
+import type { ActivityEntry, ActivityTarget, ButtonDraft } from "../actions/time-actions.ts";
 import type { DayRow } from "./day.ts";
 import type { TimeButtonView } from "./time-bar.ts";
-
 
 /** What the button editor opens on: an existing button, or a new one. */
 export type EditorTarget =
@@ -69,7 +65,8 @@ export const buttonSaveOf = (
 });
 
 /** The block's end can be typed: a new block always, an existing one once it has ended. */
-export const hasEnd = (target: ActivityTarget): boolean => target.kind === "log" || target.endAt !== null;
+export const hasEnd = (target: ActivityTarget): boolean =>
+  target.kind === "log" || target.endAt !== null;
 
 /** The Day sheet's fields as typed; times stay text in the platform's own format. */
 export type ActivityForm = {
@@ -80,7 +77,10 @@ export type ActivityForm = {
 };
 
 /** The sheet's starting fields; `clock` writes an instant the way the platform's time input reads it. */
-export const activityFormOf = (target: ActivityTarget, clock: (atIso: string) => string): ActivityForm => ({
+export const activityFormOf = (
+  target: ActivityTarget,
+  clock: (atIso: string) => string,
+): ActivityForm => ({
   category: target.kind === "edit" ? target.category : "other",
   from: clock(target.startAt),
   label: target.kind === "edit" ? target.label : "",
@@ -113,3 +113,12 @@ export type DayRowProps = {
   readonly zone: string;
   readonly onEdit: () => void;
 };
+
+/** A part of a form: the fields it shows and the setter that merges the edited ones in. */
+export type FormPartProps<T> = {
+  readonly draft: T;
+  readonly patch: (next: Partial<T>) => void;
+};
+
+/** The sheet's typed times as instants; the end is `null` for a block still running. */
+export type ActivityRange = Pick<ActivityEntry, "endAt" | "startAt">;

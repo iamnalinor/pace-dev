@@ -90,10 +90,11 @@ const EntryRow = ({
   const open = (): void => {
     onOpen(entry.target);
   };
-  if (entry.kind === "gap") {
-    return <GapRow minutes={entry.gap.minutes} onLog={open} />;
-  }
-  return <ActivityRow onEdit={open} row={entry.row} zone={zone} />;
+  return entry.kind === "gap" ? (
+    <GapRow minutes={entry.gap.minutes} onLog={open} />
+  ) : (
+    <ActivityRow onEdit={open} row={entry.row} zone={zone} />
+  );
 };
 
 /** The day's blocks and the gaps between them, in time order. */

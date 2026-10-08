@@ -1,13 +1,6 @@
 import { Plus, Square } from "lucide-react";
 import { useState } from "react";
 
-import {
-  type ActivityButtonProps,
-  PACE_STATUS_TEXT,
-  type RunningView,
-  type TimeButtonView,
-} from "@pace/client";
-
 import { useLanguage, useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { formatMinutes } from "#web/shared/format/duration.ts";
@@ -15,6 +8,12 @@ import { cn } from "#web/shared/lib/cn.ts";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
 import { colorChipClass, ColorTag, fillClass } from "#web/shared/ui/color-tag.tsx";
+import {
+  type ActivityButtonProps,
+  PACE_STATUS_TEXT,
+  type RunningView,
+  type TimeButtonView,
+} from "@pace/client";
 
 import { ButtonEditor, type EditorTarget } from "./button-editor.tsx";
 import { useLongPress } from "./use-long-press.ts";

@@ -6,8 +6,8 @@ import type { ProjectViewModel } from "@pace/client";
 
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
-import { Button } from "#web/shared/ui/button.tsx";
 import { cn } from "#web/shared/lib/cn.ts";
+import { Button } from "#web/shared/ui/button.tsx";
 import { cardClass } from "#web/shared/ui/color-tag.tsx";
 import { projectById } from "@pace/core";
 

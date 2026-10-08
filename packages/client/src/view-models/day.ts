@@ -1,8 +1,8 @@
 import {
   accountTz,
-  addMinutesIso,
   type ActivityCategory,
   addDaysIn,
+  addMinutesIso,
   CATEGORY_COLORS,
   type CoreState,
   type Gap,
@@ -88,7 +88,9 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
   }));
   // A day with nothing on it is empty, not one gap from midnight to now.
   const gaps: readonly DayEntry[] =
-    rows.length === 0 ? [] : day.gaps.map((gap) => ({
+    rows.length === 0
+      ? []
+      : day.gaps.map((gap) => ({
           gap,
           key: `gap-${gap.startAt}`,
           kind: "gap",
