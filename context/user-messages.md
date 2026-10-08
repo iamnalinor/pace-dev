@@ -159,3 +159,14 @@ While the web was being ported (PR B):
 While the redesign (PR C) was in progress:
 
 > кстати можно сделать фичу удаления аккаунта. и для тестов будет полезно
+
+> там еще мров появилось, их тоже пофикси
+
+Asked whether to drop the `Claude-Session` commit trailer and whether to move the APK to a
+real signing key now that the debug keystore is public:
+
+> no & no
+
+After the v0.6.0 release:
+
+> тебе осталось что делать? ты с депендаботом еще не разобрался
