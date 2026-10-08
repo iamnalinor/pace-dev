@@ -111,6 +111,14 @@ export {
   inboxViewModel,
 } from "./view-models/inbox.ts";
 export {
+  type FocusSleepRow,
+  focusSleepRows,
+  type FragmentationTile,
+  fragmentationTiles,
+  HOUR_TICKS,
+  hourLabel,
+} from "./view-models/insights-text.ts";
+export {
   type InsightBar,
   type InsightsModel,
   insightsModel,

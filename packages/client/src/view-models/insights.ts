@@ -6,7 +6,12 @@ import {
   type CoreState,
   type EstimateRow,
   estimateVsTracked,
+  type FocusSleepDay,
+  focusVsSleep,
+  type Fragmentation,
+  fragmentation,
   onTimeByProject,
+  productiveHours,
   projectById,
   type ProjectColorName,
   type QueryContext,
@@ -45,6 +50,30 @@ export type InsightsModel = {
   readonly byProject: readonly InsightBar[];
   readonly onTime: readonly OnTimeView[];
   readonly estimates: readonly EstimateRow[];
+  /** Focus minutes by local hour of day (24 values) and the busiest hour, if any. */
+  readonly hours: { readonly minutes: readonly number[]; readonly peak: null | number };
+  readonly fragmentation: Fragmentation;
+  /** Each day of the week so far: the night before against the day's focus, with bar shares. */
+  readonly focusSleep: readonly (FocusSleepDay & {
+    readonly sleepShare: number;
+    readonly focusShare: number;
+  })[];
+};
+
+const peakOf = (minutes: readonly number[]): null | number => {
+  const most = Math.max(...minutes);
+  return most > 0 ? minutes.indexOf(most) : null;
+};
+
+/** Each measure scaled to its own largest value: two charts side by side, never one shared axis. */
+const withDayShares = (days: readonly FocusSleepDay[]): InsightsModel["focusSleep"] => {
+  const sleepMost = Math.max(1, ...days.map((day) => day.sleepMinutes ?? 0));
+  const focusMost = Math.max(1, ...days.map((day) => day.focusMinutes));
+  return days.map((day) => ({
+    ...day,
+    focusShare: day.focusMinutes / focusMost,
+    sleepShare: (day.sleepMinutes ?? 0) / sleepMost,
+  }));
 };
 
 const withShares = (bars: readonly Omit<InsightBar, "share">[]): readonly InsightBar[] => {
@@ -68,6 +97,8 @@ export const insightsModel = (
   const from = weekOf === null ? thisWeek : startOfWeekIn(weekOf, zone);
   const range = { from, now: ctx.now, to: addDaysIn(from, 7, zone) };
   const categories = timeByCategory(state, range);
+  const zoned = { ...range, zone };
+  const hours = productiveHours(state.time, zoned);
   return {
     byCategory: withShares(
       categories.map((row) => ({
@@ -85,6 +116,9 @@ export const insightsModel = (
       })),
     ),
     estimates: estimateVsTracked(state, range),
+    focusSleep: withDayShares(focusVsSleep(state.time, zoned)),
+    fragmentation: fragmentation(state.time, zoned),
+    hours: { minutes: hours, peak: peakOf(hours) },
     next: from >= thisWeek ? null : addDaysIn(from, 7, zone),
     onTime: onTimeByProject(state, range).map((row) => ({
       ...row,

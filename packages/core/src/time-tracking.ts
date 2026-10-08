@@ -34,6 +34,14 @@ export {
   type TimeState,
 } from "./tracking/model.ts";
 export {
+  type FocusSleepDay,
+  focusVsSleep,
+  type Fragmentation,
+  fragmentation,
+  productiveHours,
+  SHORT_FOCUS_MINUTES,
+} from "./tracking/patterns.ts";
+export {
   type AppMinutes,
   appUsage,
   type Counted,

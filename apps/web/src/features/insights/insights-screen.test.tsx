@@ -39,6 +39,30 @@ describe("InsightsScreen", () => {
     ).toEqual(["Algebra2h", "No project30m"]);
   });
 
+  it("shows focus by hour, how broken up it was, and sleep against focus", async () => {
+    const { services } = await artboardServices();
+    await services.actions.logPast({
+      category: "sleep",
+      endAt: at("07:00"),
+      label: "Sleep",
+      startAt: "2026-10-05T20:00:00.000Z",
+    });
+    await services.actions.logPast({
+      category: "work",
+      endAt: at("11:00"),
+      label: "Report",
+      startAt: at("09:00"),
+    });
+    renderWithProviders(<InsightsScreen />, { services });
+    const hours = await screen.findByRole("region", { name: "Focus by hour of day" });
+    expect(within(hours).getByText("Most focus between 09:00 and 10:00")).toBeInTheDocument();
+    const broken = screen.getByRole("region", { name: "How broken up the time was" });
+    expect(within(broken).getAllByRole("term")[0]).toHaveTextContent("Typical focus block");
+    expect(within(broken).getAllByRole("definition")[0]).toHaveTextContent("2h");
+    const sleep = screen.getByRole("region", { name: "Sleep and focus" });
+    expect(within(sleep).getByText("8h")).toBeInTheDocument();
+  });
+
   it("says when nothing was tracked", async () => {
     const { services } = await artboardServices();
     renderWithProviders(<InsightsScreen />, { services });
