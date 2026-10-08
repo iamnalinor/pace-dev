@@ -1,6 +1,6 @@
 import type { UrgencyPolicy } from "../model/preset.ts";
 import type { UrgencyInput } from "./input.ts";
-import type { ExplainInput, ExplainKey, ExplainStep } from "./trace.ts";
+import type { ExplainInput, ExplainKey, ExplainStep, FormulaSymbol } from "./trace.ts";
 
 import { evaluate, type Evaluation, type Score, toScore } from "./score.ts";
 
@@ -8,6 +8,8 @@ import { evaluate, type Evaluation, type Score, toScore } from "./score.ts";
 export type Explanation = {
   readonly policy: UrgencyPolicy;
   readonly formula: string;
+  /** What each letter of the formula stands for. */
+  readonly legend: readonly FormulaSymbol[];
   readonly inputs: readonly ExplainInput[];
   readonly steps: readonly ExplainStep[];
   readonly score: Score;
@@ -54,6 +56,7 @@ export const explain = (input: UrgencyInput, now: string): Explanation => {
   return {
     policy: input.policy,
     formula: evaluation.policy.formula,
+    legend: evaluation.policy.legend,
     inputs: [
       ...evaluation.policy.inputs,
       { key: "multiplier", value: score.multiplier, unit: "x" },

@@ -48,6 +48,8 @@ for (const [width, height, size] of [
       await shoot(page, `composer-${size}-${theme}`);
       await expectNoA11yViolations(page);
       await line.press("Enter");
+      // Saving clears the line: type the next one only after that, or the clearing eats it.
+      await expect(line).toHaveValue("");
       for (const text of LINES.slice(1)) {
         await addLine(page, text);
       }

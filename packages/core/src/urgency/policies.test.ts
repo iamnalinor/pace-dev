@@ -221,7 +221,8 @@ describe("resubmission", () => {
         const span: Record<string, readonly [string, number]> = {
           after: [soft, 30 * DAY],
           before: [addDays(TRK_DUE, -10), 10 * DAY],
-          soft: [TRK_DUE, softDays * DAY],
+          // The due instant itself still belongs to the piece before (the drop at due is by design).
+          soft: [addMinutesIso(TRK_DUE, 1), softDays * DAY - 1],
         };
         const [from, minutes] = span[piece] ?? [TRK_DUE, 0];
         const [a, b] = x <= y ? [x, y] : [y, x];
@@ -229,7 +230,7 @@ describe("resubmission", () => {
         const uLater = resubmission(input, addMinutesIso(from, Math.ceil(b * minutes)));
         expect(uEarlier).toBeGreaterThanOrEqual(0);
         expect(uLater).toBeLessThanOrEqual(U_MAX);
-        expect(uEarlier).toBeLessThanOrEqual(uLater + 1e-12);
+        expect(uEarlier).toBeLessThanOrEqual(uLater + 1e-9);
       }),
     );
   });

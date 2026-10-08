@@ -5,16 +5,21 @@ import { HTTPException } from "hono/http-exception";
 import { endpoints, ok } from "@pace/core";
 
 import type { AppEnv } from "./shared/app-env.ts";
+import type { ParseProvider } from "./shared/llm/llm.ts";
 
 import { mountAuthRoutes } from "./auth/auth-routes.ts";
 import { bindBotLogin } from "./auth/bot-login.ts";
+import { findUserIdByTelegramId } from "./auth/users.ts";
 import { isAllowed } from "./auth/whitelist.ts";
 import { mountBotRoutes } from "./bot/bot-routes.ts";
-import { telegramFetch, type TelegramTransport } from "./bot/telegram-api.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
-import { loadConfig } from "./shared/config.ts";
+import { mountNotifyRoutes } from "./notify/notify-routes.ts";
+import { mountParseRoutes } from "./parse/parse-routes.ts";
+import { type Config, loadConfig } from "./shared/config.ts";
+import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
+import { telegramFetch, type TelegramTransport } from "./shared/telegram-api.ts";
 import { mountSyncRoutes } from "./sync/sync-routes.ts";
 
 const isAllowedOrigin = (origin: string, webOrigin: string): boolean =>
@@ -26,6 +31,8 @@ export type AppDeps = {
   readonly telegramFetch: TelegramTransport;
   /** Outbound fetch for link previews; tests pass a fake. */
   readonly fetch: (input: string, init: RequestInit) => Promise<Response>;
+  /** The LLMs the parse may ask; tests script their answers. */
+  readonly parseProviders: (config: Config) => readonly ParseProvider[];
 };
 
 /**
@@ -34,6 +41,7 @@ Builds the HTTP app. No bindings are read at module scope: everything comes from
 */
 const PLATFORM_DEPS: AppDeps = {
   fetch: async (input, init) => await fetch(input, init),
+  parseProviders,
   telegramFetch,
 };
 
@@ -71,8 +79,16 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
 
   mount(app, endpoints.health, () => ok({ status: "ok" as const }));
   mountAuthRoutes(app);
-  mountBotRoutes(app, { bindLogin: bindBotLogin, isAllowed, telegramFetch: deps.telegramFetch });
+  mountBotRoutes(app, {
+    bindLogin: bindBotLogin,
+    isAllowed,
+    parseProviders: deps.parseProviders,
+    telegramFetch: deps.telegramFetch,
+    userIdOf: findUserIdByTelegramId,
+  });
   mountSyncRoutes(app);
   mountLinkRoutes(app, deps.fetch);
+  mountParseRoutes(app, deps.parseProviders);
+  mountNotifyRoutes(app);
   return app;
 };

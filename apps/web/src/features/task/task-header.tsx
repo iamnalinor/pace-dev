@@ -1,19 +1,21 @@
-import { ChevronLeft, MoreHorizontal } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { ChevronDown, ChevronLeft, MoreHorizontal } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#web/i18n.tsx";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 
 type Props = {
   readonly project: TaskViewModel["project"];
   readonly onMore: () => void;
+  /** Opens the project picker: the chip is how a task changes project. */
+  readonly onProject: () => void;
 };
 
-/** Back, the project the task belongs to, and the task's menu. */
-export const TaskHeader = ({ onMore, project }: Props) => {
+/** Back, the project the task belongs to (tap to change it), and the task's menu. */
+export const TaskHeader = ({ onMore, onProject, project }: Props) => {
   const t = useT();
   const navigate = useNavigate();
   // A deep link has no page to go back to: it falls back to Now.
@@ -35,17 +37,17 @@ export const TaskHeader = ({ onMore, project }: Props) => {
       >
         <ChevronLeft aria-hidden="true" className="size-[18px]" strokeWidth={1.75} />
       </Button>
-      {project === null ? (
-        <span className="text-xs text-muted">{t("task.noProject")}</span>
-      ) : (
-        <Link
-          className="flex min-h-11 items-center gap-1.5 rounded-sm px-2 text-xs text-muted no-underline outline-none hover:text-fg focus-visible:ring-[3px] focus-visible:ring-accent/40"
-          to={`/projects/${project.id}`}
-        >
-          <ProjectDot color={project.color} />
-          {project.name}
-        </Link>
-      )}
+      <button
+        aria-label={t("task.changeProject", { project: project?.name ?? t("task.noProject") })}
+        className="flex min-h-11 items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40"
+        onClick={onProject}
+        type="button"
+      >
+        <ColorTag className="text-xs" color={project?.color ?? null}>
+          {project?.name ?? t("task.noProject")}
+        </ColorTag>
+        <ChevronDown aria-hidden="true" className="size-3.5 text-muted" />
+      </button>
       <Button
         aria-label={t("task.more")}
         className="text-fg2"

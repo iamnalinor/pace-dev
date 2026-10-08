@@ -4,6 +4,8 @@ import { Text, View } from "react-native";
 import { usePace, useT } from "#app/app-state.tsx";
 import { TaskRow } from "#app/shared/task-row.tsx";
 import { useCheckTask } from "#app/shared/use-check-task.ts";
+import { washClass } from "#app/ui/color.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 
 import { PushedScreen } from "./pushed-screen.tsx";
@@ -32,7 +34,12 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
   const { stats } = project;
   return (
     <PushedScreen title={project.name}>
-      <View className="mx-4 mb-4 flex-row gap-2 rounded-xl border border-line bg-surface p-3.5">
+      <View
+        className={cx(
+          "mx-4 mb-4 flex-row gap-2 rounded-xl border p-3.5",
+          project.color === null ? "border-line bg-surface" : washClass(project.color),
+        )}
+      >
         <Figure label={t("project.stat.open")} value={String(stats.open)} />
         <Figure
           label={t("project.stat.onTime")}
@@ -52,7 +59,7 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
               router.push(`/task/${row.id}`);
             }}
             row={row}
-            withDot={false}
+            withTag={false}
           />
         ))}
       </View>

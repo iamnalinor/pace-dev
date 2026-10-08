@@ -55,6 +55,7 @@ export {
   SyncPushBodySchema,
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
+export * from "./automation.ts";
 export { contrastRatio, parseHex, relativeLuminance, type Rgb } from "./design/contrast.ts";
 export {
   IMPORTANCE_COLORS,
@@ -246,7 +247,9 @@ export {
   reviewItems,
   type ReviewKind,
 } from "./review/to-sort.ts";
+export * from "./time-tracking.ts";
 export {
+  addDaysIn,
   addMinutesIso,
   endOfDayIn,
   formatInZone,
@@ -286,6 +289,7 @@ export {
   type ExplainKey,
   type ExplainStep,
   type ExplainUnit,
+  type FormulaSymbol,
 } from "./urgency/trace.ts";
 export {
   FUTURE_TOLERANCE_MINUTES,

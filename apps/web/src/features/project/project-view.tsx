@@ -6,8 +6,9 @@ import type { ProjectViewModel } from "@pace/client";
 
 import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
+import { cn } from "#web/shared/lib/cn.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { cardClass } from "#web/shared/ui/color-tag.tsx";
 import { projectById } from "@pace/core";
 
 import { ProjectForm } from "./project-form.tsx";
@@ -84,8 +85,14 @@ const Header = ({
         </Button>
       </div>
       <div className="flex items-center gap-2.5 px-5">
-        <ProjectDot className="size-3 rounded-sm" color={project.color} />
-        <h1 className="text-[28px] font-semibold tracking-[-0.02em]">{project.name}</h1>
+        <h1
+          className={cn(
+            "rounded-lg border px-3 py-1 text-[26px] font-semibold tracking-[-0.02em]",
+            cardClass(project.color),
+          )}
+        >
+          {project.name}
+        </h1>
         {archived && (
           <span className="rounded-sm bg-raised px-2 py-0.5 text-xs text-muted">
             {t("project.archived")}

@@ -174,6 +174,77 @@ export const SettingsUpdatedPayload = z.object({
   quietHours: z.object({ from: ClockSchema, to: ClockSchema }).optional(),
 });
 
+/** What an activity is about: one of a fixed set, so totals and defaults can group it. */
+export const ActivityCategorySchema = z.enum([
+  "work",
+  "study",
+  "task",
+  "food",
+  "commute",
+  "hygiene",
+  "rest",
+  "chores",
+  "social",
+  "sport",
+  "errands",
+  "sleep",
+  "other",
+]);
+
+const minutes = z
+  .number()
+  .int()
+  .positive()
+  .max(24 * 60);
+
+const activityFields = {
+  label: z.string().trim().min(1).max(80),
+  category: ActivityCategorySchema,
+  taskId: z.string().min(1).optional(),
+};
+
+/** A new primary activity from `occurredAt`; whatever ran until then stops there. */
+export const ActivityStartedPayload = z.object({
+  activityId: z.string().min(1),
+  ...activityFields,
+  buttonId: z.string().min(1).optional(),
+  expectMinutes: minutes.optional(),
+  limitMinutes: minutes.optional(),
+});
+export const ActivityStoppedPayload = z.object({ activityId: z.string().min(1) });
+/** A block recorded afterwards; it takes precedence over the live activities it overlaps. */
+export const ActivityLoggedPayload = z
+  .object({
+    activityId: z.string().min(1),
+    ...activityFields,
+    startAt: InstantSchema,
+    endAt: InstantSchema,
+  })
+  .refine((value) => value.endAt > value.startAt, { message: "endAt must be after startAt" });
+export const ActivityAdjustedPayload = z.object({
+  activityId: z.string().min(1),
+  startAt: InstantSchema.optional(),
+  endAt: InstantSchema.optional(),
+});
+export const ActivityLabelledPayload = z.object({
+  activityId: z.string().min(1),
+  label: activityFields.label.optional(),
+  category: ActivityCategorySchema.optional(),
+  taskId: z.string().min(1).nullable().optional(),
+  /** Messaging was the point of it (a call, a chat about work): no phone penalty. */
+  messengersOnPurpose: z.boolean().optional(),
+});
+/** One button of the time bar, with the defaults an activity started from it gets. */
+export const ActivityButtonSetPayload = z.object({
+  buttonId: z.string().min(1),
+  ...activityFields,
+  color: ProjectColorSchema,
+  expectMinutes: minutes.nullable().optional(),
+  limitMinutes: minutes.nullable().optional(),
+  order: z.number().int().nonnegative(),
+});
+export const ActivityButtonRemovedPayload = z.object({ buttonId: z.string().min(1) });
+
 export const FocusStartedPayload = z.object(taskRef);
 export const FocusEndedPayload = z.object(taskRef);
 

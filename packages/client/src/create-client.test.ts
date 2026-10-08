@@ -4,7 +4,13 @@ import { endpoints } from "@pace/core";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createPaceClient, type PaceClient } from "./create-client.ts";
-import { createFakeFetch, emptySyncRoutes, type FakeRoute, fakeUser } from "./fake-fetch.fake.ts";
+import {
+  createFakeFetch,
+  emptySyncRoutes,
+  type FakeRoute,
+  fakeUser,
+  problem,
+} from "./fake-fetch.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 
 const setup = async (
@@ -85,5 +91,49 @@ describe("createPaceClient", () => {
       setTimeout(resolve, 0);
     });
     expect(api.calls).toEqual([]);
+  });
+});
+
+describe("client.assistant", () => {
+  const parsed = {
+    doubtful: [],
+    isClean: true,
+    provider: "fake",
+    result: {
+      category: null,
+      description: null,
+      dueDate: null,
+      dueTime: null,
+      estimateMinutes: 90,
+      evidence: [{ field: "estimateMinutes", quote: "полтора часа" }],
+      importance: null,
+      intent: "create_task",
+      outcome: null,
+      project: null,
+      questions: [],
+      subtasks: [],
+      task: null,
+      title: "разобрать почту",
+    },
+    status: "parsed",
+  };
+
+  it("turns the parse into composer edits", async () => {
+    const { client } = await setup({ "POST /api/parse": () => parsed });
+    const outcome = await client.assistant.read("разобрать почту, полтора часа");
+    expect(outcome).toMatchObject({
+      reading: { edits: { estimateMinutes: 90, title: "разобрать почту" }, provider: "fake" },
+      status: "read",
+    });
+  });
+
+  it("passes on when the assistant is out of requests, and a failure as failed", async () => {
+    const retryAt = "2026-10-06T12:05:00.000Z";
+    const { client } = await setup({
+      "POST /api/parse": () => ({ retryAt, status: "unavailable" }),
+    });
+    expect(await client.assistant.read("что-то")).toEqual({ retryAt, status: "unavailable" });
+    const broken = await setup({ "POST /api/parse": () => problem(500, "internal") });
+    expect(await broken.client.assistant.read("что-то")).toEqual({ status: "failed" });
   });
 });

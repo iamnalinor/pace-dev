@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { contrastRatio, parseHex, relativeLuminance } from "./contrast.ts";
-import { IMPORTANCE_COLORS, type PaletteName, THEMES, tokens } from "./tokens.ts";
+import {
+  IMPORTANCE_COLORS,
+  inkOf,
+  type PaletteName,
+  type ProjectColorName,
+  TAG_TINT,
+  THEMES,
+  tokens,
+} from "./tokens.ts";
 
 describe("parseHex", () => {
   it("parses 6-digit and 3-digit hex", () => {
@@ -35,6 +43,22 @@ describe("contrastRatio", () => {
   });
 });
 
+const COLORS = Object.keys(tokens.project) as ProjectColorName[];
+
+/** `color` laid over `background` at `alpha`, as the browser composites a tinted tag. */
+const wash = (color: string, background: string, alpha: number): string => {
+  const top = parseHex(color);
+  const bottom = parseHex(background);
+  if (top === null || bottom === null) {
+    return "";
+  }
+  const mix = (a: number, b: number): string =>
+    Math.round(a * alpha + b * (1 - alpha))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix(top.r, bottom.r)}${mix(top.g, bottom.g)}${mix(top.b, bottom.b)}`;
+};
+
 describe("tokens", () => {
   const TEXT: readonly PaletteName[] = ["fg", "fg2", "muted", "accentText", "warn", "question"];
   const BACKGROUNDS: readonly PaletteName[] = ["bg", "surface"];
@@ -54,6 +78,22 @@ describe("tokens", () => {
   it.each(THEMES)("%s accentFg reaches 4.5:1 on accent", (theme) => {
     expect(contrastRatio(tokens[theme].accentFg, tokens[theme].accent)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it.each(THEMES)(
+    "%s colored tags reach 4.5:1: ink on its wash, dark text on the solid color",
+    (theme) => {
+      const palette = tokens[theme];
+      const failures = COLORS.flatMap((color) =>
+        (["surface", "raised"] as const).map((background) => {
+          const tinted = wash(tokens.project[color], palette[background], TAG_TINT);
+          const ink = contrastRatio(palette[inkOf(color)], tinted) ?? 0;
+          const solid = contrastRatio(palette.accentFg, tokens.project[color]) ?? 0;
+          return { background, color, ink, solid };
+        }),
+      ).filter(({ ink, solid }) => ink < 4.5 || solid < 4.5);
+      expect(failures).toEqual([]);
+    },
+  );
 
   it("exposes fonts, radii and the project palette", () => {
     expect(tokens.fonts).toEqual({ mono: "Geist Mono", sans: "Geist" });

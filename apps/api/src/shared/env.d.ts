@@ -17,6 +17,11 @@ declare global {
       TELEGRAM_WEBHOOK_ALLOWED_CIDRS?: string;
       /** JSON of `getMe`, stored at deploy time so the bot never calls Telegram on cold start. */
       BOT_INFO?: string;
+      /** Groq and Gemini keys for the LLM parse; without either the parse reports unavailable. */
+      GROQ_API_KEY?: string;
+      GEMINI_API_KEY?: string;
+      /** `fake` keeps the LLM inside the Worker (tests, e2e). */
+      LLM_PROVIDER?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
       /**

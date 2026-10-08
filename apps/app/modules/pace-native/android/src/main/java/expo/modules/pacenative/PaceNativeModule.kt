@@ -7,6 +7,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Process
@@ -109,6 +110,18 @@ class PaceNativeModule : Module() {
         )
       }
       result
+    }
+
+    // Readable names for package ids (the launcher label); an unknown package keeps its id.
+    AsyncFunction("appLabels") { packages: List<String> ->
+      val manager = context.packageManager
+      packages.associateWith { name ->
+        try {
+          manager.getApplicationLabel(manager.getApplicationInfo(name, 0)).toString()
+        } catch (error: PackageManager.NameNotFoundException) {
+          name
+        }
+      }
     }
 
     AsyncFunction("queryUsageStats") { beginMs: Double, endMs: Double ->

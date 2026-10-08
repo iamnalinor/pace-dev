@@ -2,8 +2,8 @@ import {
   type CoreState,
   type Importance,
   isHttpUrl,
-  isOpen,
   linkHost,
+  openInstanceOf,
   parseQuickInput,
   presetById,
   projectById,
@@ -12,7 +12,6 @@ import {
   type QuickSpan,
   type QuickSubtask,
   resolvePreset,
-  type Task,
 } from "@pace/core";
 
 import type { TaskLink } from "./task.ts";
@@ -28,6 +27,11 @@ export type ComposerEdits = {
   readonly due?: null | undefined | { readonly at: string; readonly tz: string };
   readonly estimateMinutes?: null | number | undefined;
   readonly link?: null | string | undefined;
+  /** A project to create by name (the assistant named one that does not exist yet). */
+  readonly projectName?: null | string | undefined;
+  /** The assistant's reading of the title and the problems, over the rules' one. */
+  readonly title?: string | undefined;
+  readonly subtasks?: readonly QuickSubtask[] | undefined;
 };
 
 export type ComposerOption = {
@@ -82,20 +86,6 @@ const projectOptions = (state: CoreState): readonly ComposerOption[] =>
 const optionOf = (options: readonly ComposerOption[], id: null | string): ComposerOption | null =>
   options.find((option) => option.id === id) ?? null;
 
-const byDue = (a: Task, b: Task): number => (a.dueAt ?? "").localeCompare(b.dueAt ?? "");
-
-/** The open homework of a recurring course closest to its due: problems typed for it go there. */
-const instanceOf = (state: CoreState, presetId: string, now: string): Task | undefined => {
-  const resolved = resolvePreset(state.presets, presetId);
-  if (!resolved.ok || resolved.value.recurrence === null) {
-    return undefined;
-  }
-  const open = Object.values(state.tasks.byId)
-    .filter((task) => task.presetId === presetId && isOpen(task) && task.id.startsWith("hw:"))
-    .toSorted(byDue);
-  return open.find((task) => task.dueAt !== null && task.dueAt >= now) ?? open.at(-1);
-};
-
 const defaultImportanceOf = (state: CoreState, presetId: string): Importance => {
   const resolved = resolvePreset(state.presets, presetId);
   return resolved.ok ? resolved.value.defaultImportance : "normal";
@@ -135,8 +125,16 @@ const projectOf = (
     ? null
     : optionOf(projects, projectId);
 
+/** A picked project wins over any name; otherwise a name the assistant gave, then the text's `#name`. */
+const newProjectNameOf = (parsed: Parsed, edits: ComposerEdits): null | string => {
+  if (edits.projectId !== undefined) {
+    return null;
+  }
+  return edits.projectName === undefined ? parsed.projectName : edits.projectName;
+};
+
 const targetOf = (state: CoreState, presetId: string, now: string): ComposerTarget => {
-  const instance = instanceOf(state, presetId, now);
+  const instance = openInstanceOf(state, presetId, now);
   return instance === undefined
     ? { kind: "new" }
     : { kind: "instance", taskId: instance.id, title: instance.title };
@@ -147,6 +145,18 @@ The live reading of the composer: the rule parse of the text with the user's chi
 top. Picking another category preselects its default importance unless the text or a tap
 named one.
 */
+/** From this length (or a second line) a text is read by the assistant, not just the rules. */
+export const LONG_TEXT_CHARS = 80;
+
+/** How long Enter waits for the assistant before the text goes to Inbox to be sorted later. */
+export const SLOW_READ_MS = 5000;
+
+/** Long or multi-line text: a pasted homework or a forwarded message, for the assistant to read. */
+export const shouldAiRead = (text: string): boolean => {
+  const trimmed = text.trim();
+  return trimmed.length >= LONG_TEXT_CHARS || trimmed.includes("\n");
+};
+
 export const composerModel = (
   state: CoreState,
   draft: ComposerDraft,
@@ -167,15 +177,15 @@ export const composerModel = (
     importance: edits.importance ?? textImportance ?? defaultImportance,
     isEmpty: text.trim() === "",
     link: linkOf(parsed, edits),
-    newProjectName: edits.projectId === undefined ? parsed.projectName : null,
+    newProjectName: newProjectNameOf(parsed, edits),
     preset: optionOf(presets, presetId) ?? { color: null, id: presetId, name: presetId },
     presets,
     project: projectOf(state, projects, pick(edits.projectId, parsed.projectId)),
     projects,
     spans: parsed.spans,
-    subtasks: parsed.subtasks,
+    subtasks: edits.subtasks ?? parsed.subtasks,
     target: targetOf(state, presetId, ctx.now),
     text,
-    title: parsed.title,
+    title: edits.title ?? parsed.title,
   };
 };

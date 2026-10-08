@@ -7,7 +7,10 @@ const envString = (name: string): string | undefined => {
 };
 
 // Release builds are tagged vX.Y.Z; the tag drives both the version and the versionCode.
-const tag = /^v(\d+)\.(\d+)\.(\d+)$/.exec(envString("GITHUB_REF_NAME") ?? "");
+// PACE_RELEASE_TAG is set by release.yml (a run by hand releases from a branch, not a tag ref).
+const tag = /^v(\d+)\.(\d+)\.(\d+)$/.exec(
+  envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
+);
 const version = tag === null ? "0.0.0" : `${tag[1]}.${tag[2]}.${tag[3]}`;
 const versionCode =
   tag === null

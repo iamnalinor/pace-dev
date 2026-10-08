@@ -43,10 +43,7 @@ describe("TaskScreen — Algebra HW 6 (per problem)", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Algebra HW 6" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Algebra" })).toHaveAttribute(
-      "href",
-      "/projects/p-algebra",
-    );
+    expect(screen.getByRole("button", { name: "Project: Algebra. Change" })).toBeInTheDocument();
     expect(screen.getByText("In progress")).toBeInTheDocument();
     expect(screen.getByText("Submit per problem")).toBeInTheDocument();
     expect(screen.getByText("today 23:59")).toBeInTheDocument();
@@ -262,5 +259,19 @@ describe("TaskScreen — edges", () => {
   it("says when the task does not exist", async () => {
     await renderTask("t-nope");
     expect(await screen.findByText("This task does not exist.")).toBeInTheDocument();
+  });
+});
+
+describe("TaskScreen — focus", () => {
+  it("starts time on the task with Focus and stops it with a second tap", async () => {
+    const { services, user } = await renderTask(HW_ID);
+    await user.click(await screen.findByRole("button", { name: "Focus" }));
+    const running = () =>
+      Object.values(services.state.store.getState().time.activities).filter(
+        (activity) => activity.endAt === null,
+      );
+    expect(running()).toEqual([expect.objectContaining({ category: "task", taskId: HW_ID })]);
+    await user.click(await screen.findByRole("button", { name: "Focusing", pressed: true }));
+    expect(running()).toEqual([]);
   });
 });

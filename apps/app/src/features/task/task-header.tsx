@@ -1,24 +1,29 @@
 import { useRouter } from "expo-router";
-import { Ellipsis } from "lucide-react-native";
-import { Pressable, Text } from "react-native";
+import { ChevronDown, Ellipsis } from "lucide-react-native";
+import { Pressable } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { BackHeader } from "#app/ui/back-header.tsx";
-import { Dot } from "#app/ui/dot.tsx";
+import { ColorTag } from "#app/ui/color.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { useTheme } from "#app/ui/theme-provider.tsx";
 
-/** Back, the project (a link to its page), and the "more" menu. */
+/** Back, the project (tap to move the task), and the "more" menu. */
 export const TaskHeader = ({
   onMenu,
+  onProject,
   project,
 }: {
   readonly onMenu?: () => void;
+  /** Opens the project picker: the chip is how a task changes project. */
+  readonly onProject?: () => void;
   readonly project: TaskViewModel["project"];
 }) => {
   const t = useT();
   const router = useRouter();
+  const { palette } = useTheme();
   return (
     <BackHeader
       backLabel={t("common.back")}
@@ -31,21 +36,18 @@ export const TaskHeader = ({
         )
       }
     >
-      {project === null ? (
-        <Text className="font-sans text-[13px] text-muted">{t("task.noProject")}</Text>
-      ) : (
-        <Pressable
-          accessibilityLabel={project.name}
-          accessibilityRole="link"
-          className="h-11 flex-row items-center gap-2 active:opacity-70"
-          onPress={() => {
-            router.push(`/project/${project.id}`);
-          }}
-        >
-          <Dot color={project.color} />
-          <Text className="font-sans text-[13px] text-fg2">{project.name}</Text>
-        </Pressable>
-      )}
+      <Pressable
+        accessibilityLabel={t("task.changeProject", {
+          project: project?.name ?? t("task.noProject"),
+        })}
+        accessibilityRole="button"
+        className="h-11 flex-row items-center gap-1 active:opacity-70"
+        disabled={onProject === undefined}
+        onPress={onProject}
+      >
+        <ColorTag color={project?.color ?? null}>{project?.name ?? t("task.noProject")}</ColorTag>
+        {onProject === undefined ? null : <ChevronDown color={palette.muted} size={14} />}
+      </Pressable>
     </BackHeader>
   );
 };

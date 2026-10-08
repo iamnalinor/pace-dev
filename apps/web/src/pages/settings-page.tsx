@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { useAuth } from "#web/app-state.tsx";
 import { ConnectedApps } from "#web/features/oauth/connected-apps.tsx";
 import { DigestWindowsControl } from "#web/features/settings/digest-windows-control.tsx";
+import { ExportControl } from "#web/features/settings/export-control.tsx";
 import { LanguageControl } from "#web/features/settings/language-control.tsx";
 import { QuietHoursControl } from "#web/features/settings/quiet-hours-control.tsx";
 import { SettingsLinks } from "#web/features/settings/settings-links.tsx";
@@ -45,6 +46,10 @@ export const SettingsPage = () => {
         <Card className="grid gap-1">
           <CardTitle>{t("settings.more")}</CardTitle>
           <SettingsLinks />
+        </Card>
+        <Card className="grid gap-3">
+          <CardTitle>{t("settings.export")}</CardTitle>
+          <ExportControl />
         </Card>
         <Card className="grid gap-3">
           <CardTitle>{t("settings.connectedApps")}</CardTitle>

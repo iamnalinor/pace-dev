@@ -39,13 +39,13 @@ Telegram account that signs in there, and it must be on the deployment's whiteli
 Tools declare the scope they need; a tool called with a grant that lacks it answers an MCP
 tool error (`isError: true`, explaining which scope is missing) instead of running.
 
-| Scope | Lets a client | Tools (stage 1) |
+| Scope | Lets a client | Tools |
 |---|---|---|
-| `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch` |
+| `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch`, `search_decisions` |
 | `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
-| `time:read` | see the time ledger and focus sessions | stage 3 |
-| `time:write` | start, stop and log activities | stage 3 |
-| `analytics:read` | see analytics | stage 3 |
+| `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons | `list_activity_buttons`, `get_day`, `summary_time` |
+| `time:write` | start, stop and log activities | `start_activity`, `stop_activity`, `log_activity` |
+| `analytics:read` | query the store read-only, replay the reminder rules, export the log | `describe_schema`, `query_sql`, `simulate`, `export_all` |
 | `offline_access` | keep a refresh token, so the connection survives the 24 h access token | — |
 
 The catalogue is advertised as `scopes_supported` in the authorization server metadata.
@@ -78,6 +78,7 @@ shows.
 | `list_review` | read | the "to sort" block: finished-looking tasks, passed deadlines, stale inbox items, automatic outcomes to confirm, with their action keys | — |
 | `search` | read | full-text over titles, descriptions, source texts, subtask labels and project names → `{ results: [{ id, title, url }] }` | `query` |
 | `fetch` | read | the task or project document → `{ id, title, text, url, metadata }` | `id` |
+| `search_decisions` | read | the decision log, newest first: notifications sent or held back and LLM parses, each with `rule`, `inputs`, `outcome`, `explanation` | `taskId?`, `from?`, `to?`, `q?`, `limit?` |
 | `create_task` | write | a task; project by id or name (created on the fly); subtasks as labels or `{ label, number }`; `dueTz` defaults to the account zone | `title`, `presetId?` (default `personal`), `projectId?`/`projectName?`, `importance?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `subtasks?`, `description?`, `sourceText?` |
 | `capture_inbox` | write | a verbatim text into the inbox (`inbox/empty` for blank text) | `text` |
 | `mark_subtasks` | write | marks subtasks solved by id or problem number (solved ≠ submitted); already solved ones are reported, not repeated | `taskId`, `subtaskIds?` or `numbers?` |
@@ -95,6 +96,16 @@ shows.
 | `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
 | `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
 | `archive_preset` | write | archives a user preset; its tasks keep working (`preset/built-in` for built-ins) | `id` |
+| `list_activity_buttons` | time read | the time bar's buttons in order: id, label, category, Expect/Limit minutes, linked task | — |
+| `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running | `date?` (YYYY-MM-DD, default today) |
+| `summary_time` | time read | minutes per category and per project (through the task) over a range, largest first | `from`, `to` |
+| `start_activity` | time write | starts an activity; the running one ends at the same instant. A button's defaults, or a label and category; `taskId` counts the time as work on the task | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `limitMinutes?`, `at?` |
+| `stop_activity` | time write | stops what is running (`activity/none-running` otherwise) | `at?` |
+| `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |
+| `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `observations`) with their CREATE statements | — |
+| `query_sql` | analytics | one read-only SQLite `SELECT` (or `WITH … SELECT`), at most 500 rows, run in a transaction that always rolls back; a second statement, `PRAGMA`, `ATTACH` or any write is refused (`sql/forbidden`, `sql/not-select`) | `sql` |
+| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and Limit alert they would send; ranks Now at `to`, optionally with other importance multipliers (`simulate/range` for a bad range) | `from`, `to`, `multipliers?` |
+| `export_all` | analytics | the event log as NDJSON (one event per line, corrections included), a page at a time | `since?`, `limit?` (default 1000, max 5000) |
 
 ### Writes: `at`, `precision`, `dryRun`
 

@@ -114,7 +114,7 @@ export const NowList = ({ onCheck, rows }: Props) => {
       sensors={sensors}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <ul aria-label={t("now.tasks")} className="flex flex-col px-2">
+        <ul aria-label={t("now.tasks")} className="flex flex-col px-4">
           {rows.map((row, index) => (
             <SortableTaskRow isTop={index === 0} key={row.id} onCheck={onCheck} row={row} />
           ))}

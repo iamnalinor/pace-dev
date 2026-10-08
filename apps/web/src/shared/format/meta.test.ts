@@ -26,7 +26,7 @@ describe("formatMeta", () => {
     expect(
       formatMeta([{ importance: "asap", kind: "importance" }, { kind: "end-of-day" }], viewer),
     ).toEqual([
-      { text: "ASAP", tone: "strong" },
+      { color: "coral", text: "ASAP", tone: "strong" },
       { text: "by end of day", tone: "plain" },
     ]);
     expect(
@@ -38,7 +38,7 @@ describe("formatMeta", () => {
         viewer,
       ),
     ).toEqual([
-      { text: "Prioritized", tone: "strong" },
+      { color: "amber", text: "Prioritized", tone: "strong" },
       { text: "25% behind pace", tone: "plain" },
     ]);
     expect(

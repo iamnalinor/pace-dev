@@ -32,7 +32,7 @@ describe("NowScreen", () => {
     Element.prototype.releasePointerCapture = vi.fn();
   });
 
-  it("draws the artboard header: the date, the inbox counter and a quiet focus row", async () => {
+  it("draws the artboard header: the date, the inbox counter and the idle time bar", async () => {
     await renderBoard();
     expect(await screen.findByRole("heading", { name: "Now" })).toBeInTheDocument();
     expect(screen.getByText("Tue · Oct 6")).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe("NowScreen", () => {
       "href",
       "/inbox",
     );
-    expect(screen.getByText("Nothing running")).toBeInTheDocument();
+    expect(screen.getByText("Nothing running. Tap an activity to start it.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "To sort · 2" })).toHaveAttribute("href", "/review");
   });
 
@@ -57,11 +57,11 @@ describe("NowScreen", () => {
     const meta = (title: string) =>
       screen.getAllByRole("link").find((link) => link.textContent.startsWith(title))?.textContent;
     expect(meta("Calculus HW 5")).toContain("1 day late · 2 problems left");
-    expect(meta("Reply to course curator")).toContain("ASAP · by end of day");
+    expect(meta("Reply to course curator")).toMatch(/PersonalASAPby end of day/u);
     expect(meta("Algebra HW 6")).toContain("Due tomorrow 23:59 · 4/7 solved · 2 sent");
-    expect(meta("Return library books")).toContain("Nice-to-have · 12 days old");
+    expect(meta("Return library books")).toMatch(/Nice-to-have12 days old/u);
     expect(meta("Flaky latency test in nightly")).toMatch(
-      /Prioritized · Due Friday 18:00 (?:UTC|GMT) \(your time 21:00\)/,
+      /WorkPrioritizedDue Friday 18:00 (?:UTC|GMT) \(your time 21:00\)/,
     );
     expect(screen.getByText("1 day late")).toHaveClass("text-warn");
     expect(screen.getByText("ASAP")).toHaveClass("font-medium");

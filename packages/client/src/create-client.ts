@@ -3,6 +3,7 @@ import type { SessionStore } from "./session.ts";
 
 import { type Actions, createActions } from "./actions/actions.ts";
 import { type ApiClient, createApiClient } from "./api-client.ts";
+import { type Assistant, createAssistant } from "./assistant.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { type Clock, systemClock } from "./clock.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
@@ -11,6 +12,8 @@ import { createSyncClient, type SyncClient } from "./sync-client.ts";
 export type PaceClient = {
   readonly actions: Actions;
   readonly api: ApiClient;
+  /** The LLM reading of free text (needs the network; nothing is written). */
+  readonly assistant: Assistant;
   readonly auth: Auth;
   readonly clock: Clock;
   readonly state: AppStateHandle;
@@ -66,5 +69,6 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     }
   })();
 
-  return { actions, api, auth, clock, state, sync };
+  const assistant = createAssistant({ api, clock, state });
+  return { actions, api, assistant, auth, clock, state, sync };
 };

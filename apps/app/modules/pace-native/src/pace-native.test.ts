@@ -9,6 +9,9 @@ describe("PaceNative", () => {
     expect(PaceNative.setDnd(true)).toBe(false);
     await expect(PaceNative.queryUsageEvents(0, 1)).resolves.toEqual([]);
     await expect(PaceNative.queryUsageStats(0, 1)).resolves.toEqual([]);
+    await expect(PaceNative.appLabels(["org.telegram.messenger"])).resolves.toEqual({
+      "org.telegram.messenger": "org.telegram.messenger",
+    });
     expect(() => {
       PaceNative.openExactAlarmSettings();
       PaceNative.openUsageAccessSettings();

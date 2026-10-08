@@ -23,9 +23,18 @@ export type {
   TaskFieldsForm,
   TaskPatch,
 } from "./actions/task-actions.ts";
+export type {
+  ActivityEntry,
+  ActivityInput,
+  ActivityTarget,
+  ButtonDraft,
+  PastActivity,
+  TimeActions,
+} from "./actions/time-actions.ts";
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
+export type { AiOutcome, Assistant } from "./assistant.ts";
 export {
   type Auth,
   type AuthState,
@@ -43,6 +52,16 @@ export {
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export type { EventStore } from "./event-store.ts";
+export {
+  activityNotifications,
+  fetchNotificationPlan,
+  isActivityId,
+  type LocalNotification,
+  localNotifications,
+  type RunningTimer,
+  scheduleChanges,
+  type ScheduleChanges,
+} from "./local-notifications.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {
   type AppState,
@@ -57,6 +76,7 @@ export {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-client.ts";
+export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
   type ComposerDraft,
@@ -65,7 +85,19 @@ export {
   type ComposerModel,
   type ComposerOption,
   type ComposerTarget,
+  LONG_TEXT_CHARS,
+  shouldAiRead,
+  SLOW_READ_MS,
 } from "./view-models/composer.ts";
+export {
+  type DayEntry,
+  type DayModel,
+  dayModel,
+  type DayRow,
+  type DayTotal,
+} from "./view-models/day.ts";
+export { decisionLabelKey } from "./view-models/decisions.ts";
+export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
 export {
   type HistoryEntry,
   type HistoryOptions,
@@ -80,12 +112,27 @@ export {
   inboxViewModel,
 } from "./view-models/inbox.ts";
 export {
+  type FocusSleepRow,
+  focusSleepRows,
+  type FragmentationTile,
+  fragmentationTiles,
+  HOUR_TICKS,
+  hourLabel,
+} from "./view-models/insights-text.ts";
+export {
+  type InsightBar,
+  type InsightsModel,
+  insightsModel,
+  type OnTimeView,
+} from "./view-models/insights.ts";
+export {
   type MetaPart,
   type NowRow,
   nowRow,
   type NowViewModel,
   nowViewModel,
   type ProjectChip,
+  type RowTag,
 } from "./view-models/now.ts";
 export {
   type AwaitingRow,
@@ -106,3 +153,28 @@ export {
   taskViewModel,
   type WhyRow,
 } from "./view-models/task.ts";
+export {
+  type MessageText,
+  PACE_STATUS_TEXT,
+  type RunningView,
+  tapToast,
+  type TimeBarModel,
+  timeBarModel,
+  type TimeButtonView,
+} from "./view-models/time-bar.ts";
+export {
+  type ActivityButtonProps,
+  type ActivityForm,
+  activityFormOf,
+  type ActivityRange,
+  type ActivitySheetProps,
+  type ButtonForm,
+  buttonFormOf,
+  buttonSaveOf,
+  type DayRowProps,
+  type EditorProps,
+  type EditorTarget,
+  type FormPartProps,
+  hasEnd,
+  withCategory,
+} from "./view-models/time-forms.ts";

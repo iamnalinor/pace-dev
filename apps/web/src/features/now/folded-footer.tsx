@@ -43,7 +43,7 @@ export const FoldedFooter = ({ laterCount, onCheck, waiting }: Props) => {
           <h2 className="px-5 pb-1 text-[13px] font-medium text-muted" id="now-waiting-title">
             {t("now.waiting")}
           </h2>
-          <ul className="flex flex-col px-2">
+          <ul className="flex flex-col px-4">
             {waiting.map((row) => (
               <TaskRow key={row.id} onCheck={onCheck} row={row} />
             ))}

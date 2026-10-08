@@ -33,12 +33,18 @@ export type MetaPart =
   | { readonly kind: "sent"; readonly submitted: number }
   | { readonly kind: "solved"; readonly solved: number; readonly total: number };
 
+export type RowTag =
+  | { readonly kind: "preset"; readonly presetId: string; readonly name: string }
+  | { readonly kind: "project"; readonly name: string };
+
 export type NowRow = {
   readonly id: string;
   readonly title: string;
   readonly projectId: null | string;
   /** The project's color, else the preset's. */
   readonly color: ProjectColorName;
+  /** What the color stands for, shown as a colored tag: the project, else the category. */
+  readonly tag: RowTag;
   readonly importance: Importance;
   /** 0..1 in the preset's progress mode. */
   readonly progress: number;
@@ -127,6 +133,10 @@ export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
   title: item.task.title,
   projectId: item.task.projectId,
   color: item.project?.color ?? item.preset.color,
+  tag:
+    item.project === null
+      ? { kind: "preset", name: item.presetName, presetId: item.task.presetId }
+      : { kind: "project", name: item.project.name },
   importance: item.importance,
   progress: item.progress,
   paceExpected: item.paceExpected,

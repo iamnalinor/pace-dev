@@ -2,8 +2,13 @@ import { createContext, type ReactNode, use, useCallback, useEffect, useState } 
 import { AppState, View } from "react-native";
 import { useStore } from "zustand";
 
-import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
-
+import {
+  type Auth,
+  type AuthState,
+  type AppState as ClientState,
+  type SyncStatus,
+  timeBarModel,
+} from "@pace/client";
 import {
   type Language,
   type MessageKey,
@@ -13,6 +18,8 @@ import {
   type User,
 } from "@pace/core";
 
+import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
+import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -23,14 +30,55 @@ const RuntimeContext = createContext<null | PaceRuntime>(null);
 A signed-in start: this week's homework instances, a first sync, then the account's time
 zone from the device when it has none yet (never "not set").
 */
-const bootstrap = async ({ actions, auth, sync }: PaceRuntime): Promise<void> => {
+/** The account's language and zone, for the background phone check that runs without a store. */
+const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
+  const { settings } = runtime.state.store.getState();
+  return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
+};
+
+const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
+  const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
+  await syncLocalNotifications(runtime);
+  await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status === "signed-in") {
     sync.start({ intervalMs: SYNC_INTERVAL_MS });
   }
+};
+
+/** The running activity and its targets: the timers change only when this does. */
+const timerKey = (runtime: PaceRuntime): string => {
+  const { running } = timeBarModel(runtime.state.store.getState(), {
+    deviceTz: runtime.clock.deviceTz,
+    now: runtime.clock.now(),
+  });
+  return running === null
+    ? ""
+    : [
+        running.activityId,
+        running.startAt,
+        running.label,
+        running.expectMinutes,
+        running.limitMinutes,
+      ].join("|");
+};
+
+/** Reschedules the phone's Expect/Limit timers on every switch, stop or edit of the running activity. */
+const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
+  let last = timerKey(runtime);
+  void syncActivityTimers(runtime);
+  return runtime.state.store.subscribe(() => {
+    const key = timerKey(runtime);
+    if (key === last) {
+      return;
+    }
+
+    last = key;
+    void syncActivityTimers(runtime);
+  });
 };
 
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
@@ -59,11 +107,17 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     }
 
     void actions.ensureInstances();
-    void sync.syncNow();
+    void (async () => {
+      await sync.syncNow();
+      await syncLocalNotifications(runtime);
+      await startPhoneChecks(phoneContextOf(runtime));
+    })();
   });
+  const stopTimers = followActivityTimers(runtime);
   return () => {
     unsubscribe();
     subscription.remove();
+    stopTimers();
     sync.stop();
   };
 };

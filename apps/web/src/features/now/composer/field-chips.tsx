@@ -7,7 +7,7 @@ import { useT } from "#web/i18n.tsx";
 import { formatMinutes } from "#web/shared/format/duration.ts";
 import { formatDayTime, zoneLabel } from "#web/shared/format/time.ts";
 import { chipClass } from "#web/shared/ui/chip-group.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 
 export type ComposerField = "due" | "estimate" | "link" | "project";
 
@@ -65,11 +65,13 @@ const ProjectChip = ({ model, ...shared }: Props) => {
   return (
     <FieldChip {...shared} field="project" label={t("composer.project")}>
       {project === null ? (
-        <Hash aria-hidden="true" className="size-3.5" />
+        <>
+          <Hash aria-hidden="true" className="size-3.5" />
+          {text}
+        </>
       ) : (
-        <ProjectDot color={project.color} />
+        <ColorTag color={project.color}>{text}</ColorTag>
       )}
-      {text}
     </FieldChip>
   );
 };

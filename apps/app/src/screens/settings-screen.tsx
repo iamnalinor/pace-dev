@@ -6,6 +6,7 @@ import { type Language, LANGUAGES } from "@pace/core";
 import type { ThemePreference } from "../platform/theme.ts";
 
 import { useAuth, usePace, useSettings, useT } from "../app-state.tsx";
+import { usePermissions } from "../features/permissions/use-permissions.ts";
 import { Button } from "../ui/button.tsx";
 import { ScreenHeader } from "../ui/screen-header.tsx";
 import { Segmented } from "../ui/segmented.tsx";
@@ -29,6 +30,28 @@ const Row = ({
   </View>
 );
 
+/** "Permissions · 2 of 4 on", opening the screen with each one. */
+const PermissionsRow = () => {
+  const t = useT();
+  const router = useRouter();
+  const { list } = usePermissions();
+  const on = (list ?? []).filter((permission) => permission.state === "on").length;
+  return (
+    <Row label={t("settings.permissions")}>
+      <Button
+        onPress={() => {
+          router.push("/permissions");
+        }}
+        variant="secondary"
+      >
+        {list === null
+          ? t("settings.permissions")
+          : t("settings.permissions.summary", { on, total: list.length })}
+      </Button>
+    </Row>
+  );
+};
+
 /** History and logout. */
 const SettingsFooter = () => {
   const t = useT();
@@ -43,6 +66,14 @@ const SettingsFooter = () => {
         variant="secondary"
       >
         {t("history.title")}
+      </Button>
+      <Button
+        onPress={() => {
+          router.push("/decisions");
+        }}
+        variant="secondary"
+      >
+        {t("decisions.title")}
       </Button>
       <Button onPress={() => void auth.logout()} variant="secondary">
         {t("settings.logout")}
@@ -101,6 +132,7 @@ export const SettingsScreen = () => {
           value={settings.language}
         />
       </Row>
+      <PermissionsRow />
       <Row label={t("settings.timezone")}>
         <Text className="font-sans text-[15px] text-fg">{settings.timezone ?? deviceZone}</Text>
         <Text className="font-sans text-[13px] text-muted">

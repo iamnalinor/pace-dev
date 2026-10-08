@@ -28,13 +28,28 @@ const untouchedStore: UserStoreApi = {
   apply: async () => {
     throw new Error("store not expected");
   },
+  decisions: async () => {
+    throw new Error("store not expected");
+  },
+  describeSchema: async () => {
+    throw new Error("store not expected");
+  },
   dryRun: async () => {
     throw new Error("store not expected");
   },
   find: async () => {
     throw new Error("store not expected");
   },
+  list: async () => {
+    throw new Error("store not expected");
+  },
+  querySql: async () => {
+    throw new Error("store not expected");
+  },
   read: async () => {
+    throw new Error("store not expected");
+  },
+  simulate: async () => {
     throw new Error("store not expected");
   },
 };

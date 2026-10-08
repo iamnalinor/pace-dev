@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";
 
-import type { ComposerEdits, ComposerModel } from "@pace/client";
+import type { AiOutcome, AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { zonedText } from "#app/format/time.ts";
+import { clockTime, zonedText } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { Dot } from "#app/ui/dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { useToast } from "#app/ui/toast.tsx";
+import { useAiRead, useAutoAiRead, useReadFirst } from "@pace/client/react";
 import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, isBuiltInPreset } from "@pace/core";
+
+import { AiStatus } from "./ai-status.tsx";
 
 const ChipRow = ({
   children,
@@ -67,8 +70,8 @@ const ComposerChips = ({
       <ChipRow label={t("composer.category")}>
         {model.presets.map((preset) => (
           <Chip
+            color={preset.color}
             key={preset.id}
-            leading={<Dot color={preset.color} />}
             onPress={() => {
               onEdit({ importance: undefined, presetId: preset.id });
             }}
@@ -81,8 +84,8 @@ const ComposerChips = ({
       <ChipRow label={t("edit.importance")}>
         {ImportanceSchema.options.map((importance) => (
           <Chip
+            color={IMPORTANCE_COLORS[importance]}
             key={importance}
-            leading={<Dot color={IMPORTANCE_COLORS[importance]} />}
             onPress={() => {
               onEdit({ importance });
             }}
@@ -103,9 +106,9 @@ const ComposerChips = ({
         </Chip>
         {model.projects.map((project) => (
           <Chip
+            color={project.color}
             key={project.id}
             label={t("composer.projectNamed", { name: project.name })}
-            leading={<Dot color={project.color} />}
             onPress={() => {
               onEdit({ projectId: project.id });
             }}
@@ -123,12 +126,16 @@ const ComposerChips = ({
 };
 
 const ComposerActions = ({
+  isReading,
   submitLabel,
   onAdd,
+  onAi,
   onInbox,
 }: {
+  readonly isReading: boolean;
   readonly submitLabel: string;
   readonly onAdd: () => void;
+  readonly onAi: () => void;
   readonly onInbox: () => void;
 }) => {
   const t = useT();
@@ -140,10 +147,65 @@ const ComposerActions = ({
         </Button>
       </View>
       <View className="flex-1">
+        <Button busy={isReading} onPress={onAi} variant="secondary">
+          {t(isReading ? "composer.aiReading" : "composer.ai")}
+        </Button>
+      </View>
+      <View className="flex-1">
         <Button onPress={onAdd}>{submitLabel}</Button>
       </View>
     </View>
   );
+};
+
+/** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
+const useDraft = (initialText: string, assistant: Assistant) => {
+  const [text, setText] = useState(initialText);
+  const [edits, setEdits] = useState<ComposerEdits>({});
+  const ai = useAiRead(assistant);
+  return {
+    ai,
+    edits,
+    /** The assistant's chips go over the taps so far. */
+    onReading: (reading: AiReading): void => {
+      setEdits((current) => ({ ...current, ...reading.edits }));
+    },
+    /** New text makes the assistant's reading stale: its title and problems give way to the rules. */
+    onText: (next: string): void => {
+      if (ai.state.status === "read") {
+        setEdits(({ projectName: _name, subtasks: _subtasks, title: _title, ...rest }) => rest);
+      }
+      setText(next);
+      ai.reset();
+    },
+    reset: (): void => {
+      setText("");
+      setEdits({});
+      ai.reset();
+    },
+    setEdits,
+    text,
+  };
+};
+
+/** "Read it when it's back" went through: the server keeps the line, so the composer clears. */
+const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
+  const t = useT();
+  const toast = useToast();
+  const { deviceTz } = useViewer();
+  return async (): Promise<void> => {
+    const outcome = await ask();
+    if (outcome.status !== "queued") {
+      return;
+    }
+    toast.show({
+      message:
+        outcome.retryAt === null
+          ? t("composer.aiQueuedSoon")
+          : t("composer.aiQueued", { time: clockTime(outcome.retryAt, deviceTz) }),
+    });
+    onSaved();
+  };
 };
 
 /**
@@ -152,17 +214,25 @@ adds the problems to this week's homework), To Inbox keeps the raw line for late
 */
 export const Composer = ({ initialText = "" }: { readonly initialText?: string | undefined }) => {
   const t = useT();
-  const { actions, hooks } = usePace();
+  const { actions, assistant, hooks } = usePace();
   const { palette } = useTheme();
   const run = useRunAction();
-  const [text, setText] = useState(initialText);
-  const [edits, setEdits] = useState<ComposerEdits>({});
+  const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
   const model = hooks.useComposer({ edits, text });
-  const reset = (): void => {
-    setText("");
-    setEdits({});
+  useAutoAiRead(ai, text, onReading);
+  const toInbox = async (message = t("add.toInboxDone")): Promise<void> => {
+    if (await run(actions.captureInbox(text), { success: message, undo: true })) {
+      reset();
+    }
   };
+  const readLater = useReadLater(async () => await ai.readLater(text, onReading), reset);
+  const readFirst = useReadFirst(ai, async () => {
+    await toInbox(t("composer.aiSlow"));
+  });
   const add = async (): Promise<void> => {
+    if (readFirst.isPending(text, onReading)) {
+      return;
+    }
     const success =
       model.target.kind === "instance"
         ? t("composer.addedTo", { title: model.target.title })
@@ -171,25 +241,18 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
       reset();
     }
   };
-  const toInbox = async (): Promise<void> => {
-    if (await run(actions.captureInbox(text), { success: t("add.toInboxDone"), undo: true })) {
-      reset();
-    }
-  };
   return (
     <View className="mx-4 mb-3 rounded-xl border border-line bg-surface p-2">
       <TextInput
         accessibilityHint={t("composer.hint")}
         accessibilityLabel={t("composer.label")}
-        className="min-h-11 px-2 font-sans text-[15px] text-fg"
-        onChangeText={setText}
-        onSubmitEditing={() => {
-          void add();
-        }}
+        // Grows with a pasted message up to about eight lines; Add (below) stores it.
+        className="max-h-48 min-h-11 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
+        multiline
+        onChangeText={onText}
         placeholder={t("composer.placeholder")}
         placeholderTextColor={palette.muted}
-        returnKeyType="done"
-        submitBehavior="blurAndSubmit"
+        textAlignVertical="top"
         value={text}
       />
       {model.isEmpty ? null : (
@@ -200,9 +263,21 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
               setEdits((current) => ({ ...current, ...next }));
             }}
           />
+          <AiStatus
+            isWaiting={readFirst.isWaiting}
+            onAnswer={(answer) => {
+              onText(`${text.trimEnd()} ${answer}`);
+            }}
+            onLater={() => void readLater()}
+            state={ai.state}
+          />
           <ComposerActions
+            isReading={ai.state.status === "reading"}
             onAdd={() => {
               void add();
+            }}
+            onAi={() => {
+              void ai.read(text, onReading);
             }}
             onInbox={() => {
               void toInbox();

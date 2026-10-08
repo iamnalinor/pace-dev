@@ -5,11 +5,12 @@ import { Composer } from "#web/features/now/composer/composer.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useCompleteTask } from "#web/shared/task/use-complete-task.ts";
 import { ZoneBanner } from "#web/shared/time/zone-banner.tsx";
+import { TimeBar } from "#web/shared/tracking/time-bar.tsx";
+import { Dock } from "#web/shared/ui/dock.tsx";
 import { PageHeader } from "#web/shared/ui/page-header.tsx";
 
 import { FoldedFooter } from "./folded-footer.tsx";
 import { NowHeaderActions } from "./inbox-counter.tsx";
-import { NothingRunning } from "./nothing-running.tsx";
 import { NowList } from "./now-list.tsx";
 import { ProjectChips } from "./project-chips.tsx";
 import { ReviewLink } from "./review-link.tsx";
@@ -22,7 +23,10 @@ type Props = {
   readonly isComposerExpanded?: boolean | undefined;
 };
 
-/** Artboard 1: what to do now, in score order, filterable by project; the composer on top. */
+/**
+Artboard 1: what to do now, in score order, filterable by project; the composer on top and
+the time bar docked at the bottom (thumb reach).
+*/
 export const NowScreen = ({ composeText, isComposerExpanded = false }: Props) => {
   const t = useT();
   const [params, setParams] = useSearchParams();
@@ -46,7 +50,6 @@ export const NowScreen = ({ composeText, isComposerExpanded = false }: Props) =>
       />
       <ZoneBanner />
       <ReviewLink />
-      <NothingRunning />
       <ProjectChips
         onSelect={(selected) => {
           setParams(selected === null ? {} : { [PROJECT_PARAM]: selected });
@@ -56,6 +59,9 @@ export const NowScreen = ({ composeText, isComposerExpanded = false }: Props) =>
       />
       <NowList onCheck={check} rows={board.rows} />
       <FoldedFooter laterCount={board.laterCount} onCheck={check} waiting={board.waiting} />
+      <Dock>
+        <TimeBar />
+      </Dock>
     </main>
   );
 };

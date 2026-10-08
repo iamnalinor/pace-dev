@@ -4,7 +4,6 @@ import type { ProjectChip } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { Dot } from "#app/ui/dot.tsx";
 
 /** "All" and one chip per project with open tasks; the selected one filters the list. */
 export const ProjectChips = ({
@@ -34,8 +33,8 @@ export const ProjectChips = ({
       </Chip>
       {chips.map((chip) => (
         <Chip
+          color={chip.color}
           key={chip.id}
-          leading={<Dot color={chip.color} />}
           onPress={() => {
             onSelect(chip.id);
           }}

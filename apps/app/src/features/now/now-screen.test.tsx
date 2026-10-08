@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -29,13 +29,15 @@ describe("NowScreen", () => {
       "Mark Return library books done",
     ]);
     expect(screen.getByText("Due tomorrow 23:59 · 4/7 solved · 2 sent")).toBeOnTheScreen();
-    expect(screen.getByText("ASAP · by end of day")).toBeOnTheScreen();
+    // The project (else the category) and the importance are coloured tags before the meta text.
+    expect(screen.getByText("by end of day")).toBeOnTheScreen();
+    expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.getByText("1 day late · 2 problems left")).toBeOnTheScreen();
-    expect(screen.getByText("Nice-to-have · 12 days old")).toBeOnTheScreen();
-    expect(
-      screen.getByText("Prioritized · Due Friday 18:00 UTC (your time 21:00)"),
-    ).toBeOnTheScreen();
-    expect(screen.getByText(en("now.nothingRunning"))).toBeOnTheScreen();
+    expect(screen.getByText("12 days old")).toBeOnTheScreen();
+    expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
+    expect(screen.getByText("Due Friday 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
+    expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
+    expect(screen.getByText(en("time.idle"))).toBeOnTheScreen();
   });
 
   it("opens the inbox from the counter and a task from its row", async () => {
@@ -71,7 +73,8 @@ describe("NowScreen", () => {
 
   it("filters by project and folds the later and waiting tasks", async () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("button", { name: "Work" }));
+    const chips = screen.getByLabelText("Filter by project");
+    await fireEvent.press(within(chips).getByRole("button", { name: "Work" }));
     expect(checks()).toEqual(["Mark Flaky latency test in nightly done"]);
     await fireEvent.press(screen.getByRole("button", { name: "All" }));
     expect(checks()).toHaveLength(5);

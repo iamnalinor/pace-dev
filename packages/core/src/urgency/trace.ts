@@ -40,8 +40,12 @@ export type ExplainStep = {
 };
 
 /** A policy's urgency together with how it was computed. */
+/** A letter of a formula and the input it stands for, so the card can spell it out. */
+export type FormulaSymbol = { readonly symbol: string; readonly key: ExplainKey };
+
 export type PolicyTrace = {
   readonly formula: string;
+  readonly legend: readonly FormulaSymbol[];
   readonly inputs: readonly ExplainInput[];
   readonly steps: readonly ExplainStep[];
   readonly u: number;

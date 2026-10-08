@@ -1,20 +1,30 @@
 name: Release
 
-# Push a tag vX.Y.Z: gate on the fast checks, build the Android release APK (arm64-v8a) and
-# publish a GitHub Release with it. app.config.ts derives version/versionCode from GITHUB_REF_NAME.
+# Push a tag vX.Y.Z, or run it by hand on a branch with the tag to create: gate on the fast
+# checks, build the Android release APK (arm64-v8a) and publish a GitHub Release with it (the
+# release step creates the tag on the commit when it does not exist yet). app.config.ts derives
+# version/versionCode from PACE_RELEASE_TAG.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create on this commit, e.g. v0.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 env:
   CI: 1
+  # The tag being released: the pushed one, or the one asked for by hand.
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   checks:
@@ -22,6 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Tag must look like vX.Y.Z
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Not a release tag: $TAG"
+            exit 1
+          fi
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: bun lint
@@ -43,16 +59,17 @@ jobs:
     env:
       EXPO_NO_GIT_STATUS: 1
       EXPO_NO_TELEMETRY: 1
+      PACE_RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
       - name: Install NDK + CMake (the runner image already has the SDK)
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: false
 
@@ -91,13 +108,13 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p release
-          cp apps/app/android/app/build/outputs/apk/release/app-release.apk "release/pace-${{ github.ref_name }}.apk"
+          cp apps/app/android/app/build/outputs/apk/release/app-release.apk "release/pace-${{ env.TAG }}.apk"
           ls -l release
 
       - uses: actions/upload-artifact@v7
         with:
-          name: pace-${{ github.ref_name }}-apk
-          path: release/pace-${{ github.ref_name }}.apk
+          name: pace-${{ env.TAG }}-apk
+          path: release/pace-${{ env.TAG }}.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -106,7 +123,7 @@ jobs:
           SIGNING: ${{ steps.keystore.outputs.signing }}
         run: |
           {
-            echo "Android APK: \`pace-${{ github.ref_name }}.apk\` (arm64-v8a)."
+            echo "Android APK: \`pace-${{ env.TAG }}.apk\` (arm64-v8a)."
             echo
             if [ "$SIGNING" = "debug" ]; then
               echo "> **debug-signed**: built with the committed debug keystore (no release keystore secret configured)."
@@ -115,10 +132,12 @@ jobs:
             fi
           } > release/notes.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
-          name: Pace ${{ github.ref_name }}
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Pace ${{ env.TAG }}
           generate_release_notes: true
           body_path: release/notes.md
-          files: release/pace-${{ github.ref_name }}.apk
+          files: release/pace-${{ env.TAG }}.apk
           fail_on_unmatched_files: true

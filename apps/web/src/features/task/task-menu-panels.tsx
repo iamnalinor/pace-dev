@@ -8,7 +8,7 @@ import { useServices } from "#web/app-state.tsx";
 import { useT } from "#web/i18n.tsx";
 import { useRunAction } from "#web/shared/lib/use-run-action.ts";
 import { Button } from "#web/shared/ui/button.tsx";
-import { ProjectDot } from "#web/shared/ui/project-dot.tsx";
+import { ColorTag } from "#web/shared/ui/color-tag.tsx";
 import {
   SheetClose,
   SheetDescription,
@@ -111,8 +111,7 @@ export const MovePanel = ({ close, view }: PanelProps) => {
             move(null);
           }}
         >
-          <ProjectDot color={null} />
-          {t("task.noProject")}
+          <ColorTag color={null}>{t("task.noProject")}</ColorTag>
         </Choice>
         {projects.map((project) => (
           <Choice
@@ -122,8 +121,9 @@ export const MovePanel = ({ close, view }: PanelProps) => {
               move({ projectId: project.id });
             }}
           >
-            <ProjectDot color={project.color} />
-            <span className="truncate">{project.name}</span>
+            <ColorTag className="text-[13px]" color={project.color}>
+              {project.name}
+            </ColorTag>
           </Choice>
         ))}
       </ul>

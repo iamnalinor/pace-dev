@@ -1,11 +1,12 @@
 import type { CoreState } from "../materialize/core-state.ts";
-import type { QueryContext } from "./context.ts";
 
 import { type Project, projectById } from "../model/project.ts";
 import { isOpen, type Task } from "../model/task.ts";
 import { type Outcome, taskOutcome } from "../outcomes/outcome.ts";
 import { err, ok, type Result } from "../result.ts";
+import { weeklyProjectMinutes } from "../tracking/insights.ts";
 import { isEmptyInstance, presetOf } from "./classify.ts";
+import { accountTz, type QueryContext } from "./context.ts";
 import { compareNowItems, type NowItem, nowItem } from "./now-item.ts";
 
 export type DoneItem = {
@@ -19,7 +20,7 @@ export type ProjectStats = {
   readonly onTime: { readonly done: number; readonly total: number };
   /** Closed after the deadline (`done_late`) or because it passed (`cancelled_missed`). */
   readonly late: number;
-  /** Tracked time arrives with stage 3; until then both stay at zero. */
+  /** Tracked on the project's tasks this week (ISO week, account zone). */
   readonly hoursThisWeek: number;
   /** The last six weeks, oldest first. */
   readonly weeklyHours: readonly number[];
@@ -67,15 +68,23 @@ const doneItem = (state: CoreState, task: Task): readonly DoneItem[] => {
   return outcome === null ? [] : [{ task, outcome }];
 };
 
-const stats = (open: readonly NowItem[], done: readonly DoneItem[]): ProjectStats => ({
+const MINUTES_PER_HOUR = 60;
+
+const toHours = (minutes: number): number => Math.round((minutes / MINUTES_PER_HOUR) * 10) / 10;
+
+const stats = (
+  open: readonly NowItem[],
+  done: readonly DoneItem[],
+  weeklyMinutes: readonly number[],
+): ProjectStats => ({
   open: open.length,
   onTime: {
     done: done.filter((entry) => entry.outcome === "done").length,
     total: done.filter((entry) => DEADLINE_OUTCOMES.has(entry.outcome)).length,
   },
   late: done.filter((entry) => LATE_OUTCOMES.has(entry.outcome)).length,
-  hoursThisWeek: 0,
-  weeklyHours: Array.from({ length: WEEKS_SHOWN }, () => 0),
+  hoursThisWeek: toHours(weeklyMinutes.at(-1) ?? 0),
+  weeklyHours: weeklyMinutes.map((minutes) => toHours(minutes)),
 });
 
 /** The project page: its open, awaiting and done lists with the header figures. */
@@ -100,11 +109,16 @@ export const projectView = (
     .filter((task) => !isOpen(task))
     .flatMap((task) => doneItem(state, task))
     .toSorted(newestFirst);
+  const weeklyMinutes = weeklyProjectMinutes(state, projectId, {
+    now: ctx.now,
+    weeks: WEEKS_SHOWN,
+    zone: accountTz(state, ctx),
+  });
   return ok({
     project,
     open,
     awaiting: tasks.filter((task) => isOpen(task) && isEmptyInstance(task)).toSorted(byDue),
     done,
-    stats: stats(open, done),
+    stats: stats(open, done, weeklyMinutes),
   });
 };
