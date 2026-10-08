@@ -2,7 +2,7 @@
   "name": "@pace/app",
   "version": "0.0.0",
   "private": true,
-  "main": "expo-router/entry",
+  "main": "entry.ts",
   "imports": {
     "#app/*": "./src/*"
   },

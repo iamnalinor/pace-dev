@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import * as fc from "fast-check";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { en } from "./en.ts";
 import {
@@ -22,6 +23,10 @@ const placeholders = (text: string): readonly string[] =>
     .toArray();
 
 const byName = (a: string, b: string): number => a.localeCompare(b);
+
+/** The platform's CLDR answer, which `plural` must match without `Intl.PluralRules`. */
+const pluralReference = (language: (typeof LANGUAGES)[number], count: number): string =>
+  new Intl.PluralRules(language).select(count);
 
 describe("catalogs", () => {
   it("have the same keys in en and ru", () => {
@@ -132,6 +137,33 @@ describe("plural", () => {
 
   it("falls back to other when a form is missing", () => {
     expect(plural("ru", 3, { one: "{count} день", other: "{count} дней" })).toBe("3 дней");
+  });
+
+  describe("without Intl.PluralRules (Hermes on Android has none)", () => {
+    const forms = { few: "few", many: "many", one: "one", other: "other" };
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("agrees with the CLDR rules for whole and fractional counts", () => {
+      const counts = fc.oneof(
+        fc.integer({ max: 100_000, min: -100_000 }),
+        // Hundredths: Intl.PluralRules itself rounds to three fraction digits.
+        fc.integer({ max: 100_000, min: -100_000 }).map((hundredths) => hundredths / 100),
+      );
+      fc.assert(
+        fc.property(fc.constantFrom(...LANGUAGES), counts, (language, count) => {
+          const expected = pluralReference(language, count);
+          vi.stubGlobal("Intl", { ...Intl, PluralRules: undefined });
+          try {
+            expect(plural(language, count, forms)).toBe(expected);
+          } finally {
+            vi.unstubAllGlobals();
+          }
+        }),
+      );
+    });
   });
 });
 

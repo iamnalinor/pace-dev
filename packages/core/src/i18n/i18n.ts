@@ -29,9 +29,38 @@ export type PluralForms = {
   readonly other: string;
 };
 
+/** Russian CLDR cardinal rule for a whole number: 1, 21 → one; 2–4, 22 → few; 0, 5–20 → many. */
+const russianCategory = (whole: number): keyof PluralForms => {
+  const lastDigit = whole % 10;
+  const lastTwo = whole % 100;
+  if (lastDigit === 1 && lastTwo !== 11) {
+    return "one";
+  }
+  return lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14) ? "few" : "many";
+};
+
+/**
+The CLDR cardinal category of `count`, written out for the two catalogs: Hermes on Android
+has no `Intl.PluralRules`. Fractions are "other" in both languages.
+*/
+const pluralCategory = (language: Language, count: number): keyof PluralForms => {
+  if (!Number.isSafeInteger(count)) {
+    return "other";
+  }
+  const whole = Math.abs(count);
+  switch (language) {
+    case "en": {
+      return whole === 1 ? "one" : "other";
+    }
+    case "ru": {
+      return russianCategory(whole);
+    }
+  }
+};
+
 /** Chooses the CLDR plural form for `count` and fills `{count}` in it. */
 export const plural = (language: Language, count: number, forms: PluralForms): string => {
-  const category = new Intl.PluralRules(language).select(count);
+  const category = pluralCategory(language, count);
   const chosen = (): string => {
     switch (category) {
       case "one": {
@@ -43,8 +72,6 @@ export const plural = (language: Language, count: number, forms: PluralForms): s
       case "many": {
         return forms.many ?? forms.other;
       }
-      case "zero":
-      case "two":
       case "other": {
         return forms.other;
       }
