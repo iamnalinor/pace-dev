@@ -4,8 +4,8 @@ import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
 const SIZES = [
-  { account: "1005", height: 844, name: "phone", width: 390 },
-  { account: "1006", height: 900, name: "desktop", width: 1440 },
+  { height: 844, name: "phone", width: 390 },
+  { height: 900, name: "desktop", width: 1440 },
 ] as const;
 
 /** Screenshots for review land here when set (the run's output folder otherwise). */
@@ -39,10 +39,15 @@ for (const size of SIZES) {
     test("switches activities from Now and edits a button by press and hold", async ({
       page,
     }, info) => {
-      await loginViaApi(page, size.account);
+      await loginViaApi(page);
       await page.goto("/");
       const bar = timeBar(page);
+      // Work asks for details first: what exactly, which task; Start begins it.
       await bar.getByRole("switch", { name: "Work" }).click();
+      // A sheet renders outside the app's root: it must still carry the theme (contrast).
+      await expect(page.getByRole("button", { name: "Start" })).toBeVisible();
+      await expectNoA11yViolations(page);
+      await page.getByRole("button", { name: "Start" }).click();
       await expect(bar.getByRole("button", { name: "Stop" })).toBeVisible();
       await expect(bar.getByRole("switch", { name: "Work" })).toBeChecked();
       await bar.getByRole("switch", { name: "Food" }).click();
@@ -51,17 +56,19 @@ for (const size of SIZES) {
       await shoot(page, `now-running-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
 
+      const change = page.getByRole("button", { name: "Change the button" });
+      await hold(page, bar.getByRole("switch", { name: "Commute" }), change);
+      await change.click();
       const name = page.getByRole("textbox", { name: "Name" });
-      await hold(page, bar.getByRole("switch", { name: "Commute" }), name);
       await name.fill("Metro");
       await page.getByRole("button", { name: "Save" }).click();
       await expect(bar.getByRole("switch", { name: "Metro" })).toBeVisible();
       await bar.getByRole("button", { name: "Stop" }).click();
-      await expect(bar.getByText("Nothing running. Tap an activity to start it.")).toBeVisible();
+      await expect(bar.getByRole("textbox", { name: "What are you doing?" })).toBeVisible();
     });
 
     test("logs a past block on Day and sees it in Insights", async ({ page }, info) => {
-      await loginViaApi(page, size.name === "phone" ? "1007" : "1008");
+      await loginViaApi(page);
       await page.goto("/day");
       await expect(page.getByRole("heading", { level: 1, name: "Day" })).toBeVisible();
       await page.getByRole("button", { name: "Log past activity" }).click();
@@ -94,7 +101,7 @@ for (const width of [1440, 1920]) {
     page,
   }, info) => {
     await page.setViewportSize({ height: 960, width });
-    await loginViaApi(page, "1009");
+    await loginViaApi(page);
     await page.goto("/");
     const line = page.getByRole("textbox", { name: "New task" });
     await line.fill(`renew the passport ${String(width)}`);

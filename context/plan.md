@@ -159,7 +159,17 @@ button, icon-button, dropdown, calendar, sheet primitives in `apps/app/src/ui/`.
 - **Web↔app parity going forward**: one codebase; plus a parity e2e that screenshots Now,
   Task, Day at 390 and 1440 px in both themes on the same seed.
 
-### Verification
+#PR C as built: chips and segments outlined (filled when chosen, never black); the composer's
+due and estimate are chips opening a themed month calendar with a masked time, or a list;
+Now has a "?" help sheet; the task header carries edit / pause / delete icons (no menu, no
+big Pause); the time bar has "What are you doing?" (`startTyped`), compact buttons, and a
+details sheet (task to link, recent labels) behind Work/Study and any long press; Day has
+[Today] [‹] [calendar] [›], centered rows with "– now", Expect/Limit and a pencil, and no
+"[Food] Food"; rows animate in and out, the running block pulses. Added on request: account
+deletion (`DELETE /api/me`, Settings), which also gives every e2e test a clean account. Found
+on the way: web sheets lost the theme (modals render outside the root): fixed in `Sheet`.
+
+## Verification
 
 - Every PR: `bun lint` exit 0; `bun test:unit`, `bun test:api`, `bun test:app`,
   `bun test:e2e`; Playwright screenshots at 390 and 1440 px, light + dark, of every touched

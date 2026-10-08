@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./support/fixtures.ts";
-import { API_URL, createDevSession } from "./support/login.ts";
+import { API_URL, createDevSession, README_TELEGRAM_ID, resetAccount } from "./support/login.ts";
 
 /**
 The README's screenshots, with a week of believable data. Off by default; run with
@@ -117,7 +117,8 @@ if (SHOT_DIR !== undefined) {
     test.setTimeout(120_000);
 
     test("Now, Day and Insights on a desktop and a phone", async ({ browser }) => {
-      const { token } = await createDevSession("1010");
+      await resetAccount(README_TELEGRAM_ID);
+      const { token } = await createDevSession(README_TELEGRAM_ID);
       await seed(token);
 
       const desktop = await browser.newPage({ viewport: { height: 860, width: 1440 } });

@@ -10,6 +10,7 @@ export {
 } from "./api/endpoint.ts";
 export { endpointList, endpoints } from "./api/endpoints.ts";
 export {
+  AccountDeletedSchema,
   AuthSessionSchema,
   DevLoginSchema,
   LogoutSchema,

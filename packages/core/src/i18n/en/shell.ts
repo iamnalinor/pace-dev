@@ -114,6 +114,12 @@ export const enShell = {
   "settings.quietHours": "Quiet hours",
   "settings.connectedApps": "Connected apps",
   "settings.logout": "Log out",
+  "settings.deleteAccount": "Delete account",
+  "settings.deleteAccount.warning":
+    "This deletes the account for good: tasks, time, presets, the decision log and every connected app. It cannot be undone.",
+  "settings.deleteAccount.confirm": "Delete for good",
+  "settings.deleteAccount.failed":
+    "The account could not be deleted. Try again when you are online.",
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.undo": "Undo",

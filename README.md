@@ -159,7 +159,10 @@ account may sign in.
   once `{ status: "ready", token, user }` (the nonce is consumed in that call). Nonces live
   five minutes.
 - **Sessions** are bearer tokens: 32 random bytes, only the SHA-256 is stored in D1, valid
-  for 90 days, revoked by `POST /api/auth/logout`. `GET /api/me` returns the current user.
+  for 90 days, revoked by `POST /api/auth/logout`. `GET /api/me` returns the current user;
+  `DELETE /api/me` (Settings → Delete account) deletes the account for good: its event log,
+  every session and the MCP clients' grants. A later login of the same Telegram id starts a
+  new, empty account.
 - **Local and tests** — `POST /api/auth/dev { telegramId }` exists only when
   `ENVIRONMENT` is not `production`.
 

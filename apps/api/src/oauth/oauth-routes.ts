@@ -19,8 +19,9 @@ import type { AppEnv } from "../shared/app-env.ts";
 import { requireUser } from "../shared/current-user.ts";
 import { d1 } from "../shared/db/d1.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
+import { oauthHelpers } from "../shared/oauth-helpers.ts";
 import { resolveTelegramIdentity } from "../shared/telegram-identity.ts";
-import { loadConsent, oauthHelpers, parseAuthorization } from "./consent.ts";
+import { loadConsent, parseAuthorization } from "./consent.ts";
 
 /** What consent stores on the grant: shown in "Connected apps" without a client lookup. */
 const GrantMetadataSchema = z.object({

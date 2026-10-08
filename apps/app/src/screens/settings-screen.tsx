@@ -6,6 +6,7 @@ import type { ThemePreference } from "#app/platform/theme.ts";
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
+import { DeleteAccount } from "#app/features/settings/delete-account.tsx";
 import { ExportRow } from "#app/features/settings/export-row.tsx";
 import { DigestWindows, QuietHours } from "#app/features/settings/notification-settings.tsx";
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
@@ -138,10 +139,11 @@ export const SettingsScreen = () => {
       <Row label={t("settings.connectedApps")}>
         <ConnectedApps />
       </Row>
-      <View className="px-5 py-6">
+      <View className="gap-3 px-5 py-6">
         <Button onPress={() => void logout()} variant="secondary">
           {t("settings.logout")}
         </Button>
+        <DeleteAccount />
       </View>
     </Screen>
   );

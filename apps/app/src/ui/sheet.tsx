@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { paletteVars } from "../platform/theme.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 /**
@@ -24,11 +25,13 @@ export const Sheet = ({
   readonly title: string;
   readonly visible: boolean;
 }) => {
-  const { palette } = useTheme();
+  const { palette, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <View className="flex-1 justify-end">
+      {/* A modal renders outside the app's root (a portal on the web): the theme's variables
+      are declared again here, or the sheet would lose its surface and ink. */}
+      <View className="flex-1 justify-end" style={paletteVars(scheme)}>
         <Pressable
           accessibilityLabel={closeLabel}
           accessibilityRole="button"

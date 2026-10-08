@@ -1,21 +1,25 @@
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react-native";
-import { useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react-native";
+import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 
-import type { DayEntry, DayModel, DayRowProps } from "@pace/client";
-
-import { usePace, useT } from "#app/app-state.tsx";
-import { clockTime } from "#app/format/time.ts";
+import { useAppState, usePace, useT } from "#app/app-state.tsx";
+import { clockTime, fromWallClock } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { Calendar } from "#app/ui/calendar.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
+import { Sheet } from "#app/ui/sheet.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { formatDuration, formatEyebrow } from "@pace/core";
+import { type DayEntry, type DayModel, type DayRowProps, trackedDates } from "@pace/client";
+import { formatDuration, formatEyebrow, formatInZone, type Language } from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import {
@@ -27,27 +31,47 @@ import {
 } from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
+/** "of ~30m" or "limit 1h", when the block has either. */
+const targetText = (
+  row: DayRowProps["row"],
+  t: ReturnType<typeof useT>,
+  language: Language,
+): null | string => {
+  if (row.expectMinutes !== null) {
+    return t("time.expectOf", { duration: formatDuration(row.expectMinutes, language) });
+  }
+  return row.limitMinutes === null
+    ? null
+    : t("time.limitOf", { duration: formatDuration(row.limitMinutes, language) });
+};
+
+/**
+A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category tag and the
+label when it says more than the tag, its task, then the duration against its Expect or
+Limit and a pencil. The whole row opens the edit sheet.
+*/
 const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
   const t = useT();
   const openTask = useOpenTask();
   const { language } = useViewer();
-  const range = `${clockTime(row.startAt, zone)}–${row.isRunning ? "" : clockTime(row.endAt, zone)}`;
+  const { palette } = useTheme();
+  const range = `${clockTime(row.startAt, zone)} – ${row.isRunning ? t("day.now") : clockTime(row.endAt, zone)}`;
+  const target = targetText(row, t, language);
   return (
     <Pressable
       accessibilityHint={t("day.edit", { label: row.label })}
       accessibilityRole="button"
-      className="flex-row items-start gap-3 border-t border-line py-2.5 active:opacity-70"
+      className="min-h-14 flex-row items-center gap-3 border-t border-line py-2 active:opacity-70"
       onPress={onEdit}
     >
-      <Text className="w-[86px] pt-0.5 font-mono text-[12px] text-muted">{range}</Text>
+      <Text className="w-[104px] font-mono text-[12px] text-muted">{range}</Text>
       <View className="flex-1 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
-          <Text className="font-sans text-[14px] font-medium text-fg" numberOfLines={1}>
-            {row.label}
-          </Text>
-          {row.isRunning ? (
-            <Text className="font-sans text-[12px] text-accentText">{t("day.running")}</Text>
+          {row.showsLabel ? (
+            <Text className="font-sans text-[14px] font-medium text-fg" numberOfLines={1}>
+              {row.label}
+            </Text>
           ) : null}
         </View>
         {row.taskId !== null && row.taskTitle !== null ? (
@@ -63,9 +87,17 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
           </Text>
         ) : null}
       </View>
-      <Text className="pt-0.5 font-mono text-[12px] text-fg2">
-        {formatDuration(row.minutes, language)}
-      </Text>
+      <View className="items-end">
+        <Text
+          className={cx("font-mono text-[13px]", row.isRunning ? "text-accentText" : "text-fg")}
+        >
+          {formatDuration(row.minutes, language)}
+        </Text>
+        {target === null ? null : (
+          <Text className="font-sans text-[11px] text-muted">{target}</Text>
+        )}
+      </View>
+      <Pencil color={palette.muted} size={16} strokeWidth={1.75} />
     </Pressable>
   );
 };
@@ -126,12 +158,17 @@ const Entries = ({
 }) => (
   <View className="px-5">
     {entries.map((entry) => (
-      <EntryRow entry={entry} key={entry.key} onOpen={onOpen} phone={phone} zone={zone} />
+      <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
+        <EntryRow entry={entry} onOpen={onOpen} phone={phone} zone={zone} />
+      </Animated.View>
     ))}
   </View>
 );
 
-/** Previous day, back to today, next day (none past today). */
+/**
+[Today] [‹] [calendar] [›]: Today keeps its place (disabled on today) so the arrows never
+move under the thumb; the calendar jumps to any past day, days with time on them dotted.
+*/
 const DayNav = ({
   day,
   onDate,
@@ -140,8 +177,25 @@ const DayNav = ({
   readonly onDate: (date: null | string) => void;
 }) => {
   const t = useT();
+  const { hooks } = usePace();
+  const { language, now } = useViewer();
+  const ctx = hooks.useClock();
+  const state = useAppState((current) => current);
+  const marked = useMemo(() => trackedDates(state, ctx), [ctx, state]);
+  const [isPicking, setIsPicking] = useState(false);
+  const shown = formatInZone(day.date, day.zone, "yyyy-MM-dd");
+  const today = formatInZone(now, day.zone, "yyyy-MM-dd");
   return (
     <View className="flex-row items-center gap-1">
+      <Button
+        disabled={day.isToday}
+        onPress={() => {
+          onDate(null);
+        }}
+        variant="secondary"
+      >
+        {t("day.today")}
+      </Button>
       <IconButton
         icon={ChevronLeft}
         label={t("day.previous")}
@@ -150,16 +204,14 @@ const DayNav = ({
         }}
         variant="plain"
       />
-      {day.isToday ? null : (
-        <Button
-          onPress={() => {
-            onDate(null);
-          }}
-          variant="ghost"
-        >
-          {t("day.today")}
-        </Button>
-      )}
+      <IconButton
+        icon={CalendarDays}
+        label={t("day.pick")}
+        onPress={() => {
+          setIsPicking(true);
+        }}
+        variant="plain"
+      />
       <IconButton
         disabled={day.next === null}
         icon={ChevronRight}
@@ -169,6 +221,27 @@ const DayNav = ({
         }}
         variant="plain"
       />
+      <Sheet
+        closeLabel={t("common.close")}
+        onClose={() => {
+          setIsPicking(false);
+        }}
+        title={t("day.pick")}
+        visible={isPicking}
+      >
+        <Calendar
+          labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
+          language={language}
+          marked={marked}
+          max={today}
+          onPick={(date) => {
+            setIsPicking(false);
+            onDate(date === today ? null : fromWallClock({ date, time: "00:00", tz: day.zone }));
+          }}
+          selected={shown}
+          today={today}
+        />
+      </Sheet>
     </View>
   );
 };

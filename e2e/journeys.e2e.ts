@@ -23,8 +23,7 @@ for (const size of SIZES) {
     test.use({ viewport: { height: size.height, width: size.width } });
 
     test("checks a task off and brings it back from History", async ({ page }) => {
-      // An account of its own: History lists every synced event, and Undo takes the newest.
-      await loginViaApi(page, size.name === "phone" ? "1011" : "1012");
+      await loginViaApi(page);
       await page.goto("/");
       const title = `water the plants ${size.name} ${unique()}`;
       await add(page, title);
@@ -39,7 +38,7 @@ for (const size of SIZES) {
     });
 
     test("sends a line to Inbox and sorts it there", async ({ page }) => {
-      await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
+      await loginViaApi(page);
       await page.goto("/");
       const text = `ask about the ${size.name} invoice ${unique()}`;
       const line = page.getByRole("textbox", { name: "New task" });
@@ -57,7 +56,7 @@ for (const size of SIZES) {
     });
 
     test("history, settings and an unknown page explain themselves", async ({ page }) => {
-      await loginViaApi(page, "1003");
+      await loginViaApi(page);
       await page.goto("/history");
       await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
       await expectNoA11yViolations(page);

@@ -48,6 +48,20 @@ const EDGE: Readonly<Record<ProjectColorName, string>> = {
   yellow: "border-project-yellow/45",
 };
 
+/** A full-strength outline in the color: an unselected chip of that color. */
+export const OUTLINE: Readonly<Record<ProjectColorName, string>> = {
+  amber: "border-project-amber",
+  blue: "border-project-blue",
+  coral: "border-project-coral",
+  green: "border-project-green",
+  orange: "border-project-orange",
+  pink: "border-project-pink",
+  slate: "border-project-slate",
+  teal: "border-project-teal",
+  violet: "border-project-violet",
+  yellow: "border-project-yellow",
+};
+
 export const INK: Readonly<Record<ProjectColorName, string>> = {
   amber: "text-ink-amber",
   blue: "text-ink-blue",

@@ -20,18 +20,18 @@ type ToastHandle = { readonly show: (toast: ToastInput) => void };
 
 const ToastContext = createContext<null | ToastHandle>(null);
 
-/** Long enough to reach for "Undo", short enough not to cover the next row for long. */
+/** Long enough to read a refusal or reach for its offer, short enough not to cover a row for long. */
 const VISIBLE_MS = 5000;
 
 const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toast: Shown }) => (
   <View
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
-    className="absolute inset-x-4 bottom-24 flex-row items-center gap-3 rounded-lg bg-inverse py-1 pl-4 pr-1"
+    className="absolute inset-x-4 bottom-24 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg"
   >
     {/* Two lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
     <Pressable className="flex-1" onPress={onDone}>
-      <Text className="py-2.5 font-sans text-[14px] text-inverseFg" numberOfLines={2}>
+      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={2}>
         {toast.message}
       </Text>
     </Pressable>
@@ -45,7 +45,7 @@ const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toa
           toast.action?.onPress();
         }}
       >
-        <Text className="font-sans text-[14px] font-semibold text-inverseFg">
+        <Text className="font-sans text-[14px] font-semibold text-accentText">
           {toast.action.label}
         </Text>
       </Pressable>

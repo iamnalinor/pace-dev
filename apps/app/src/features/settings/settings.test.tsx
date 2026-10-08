@@ -53,4 +53,21 @@ describe("SettingsScreen", () => {
       expect(router.replace).toHaveBeenCalledWith("/login");
     });
   });
+
+  it("deletes the account after a second confirmation and goes to the login card", async () => {
+    const deleted = jest.fn(() => ({ deleted: true }));
+    await renderScreen(
+      <SettingsScreen />,
+      await createTestRuntime({ routes: { "DELETE /api/me": deleted }, world: "empty" }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
+    expect(deleted).not.toHaveBeenCalled();
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
+    );
+    await waitFor(() => {
+      expect(router.replace).toHaveBeenCalledWith("/login");
+    });
+    expect(deleted).toHaveBeenCalledTimes(1);
+  });
 });

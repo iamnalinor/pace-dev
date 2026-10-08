@@ -31,11 +31,7 @@ for (const [width, height, size] of [
 ] as const) {
   for (const theme of ["dark", "light"] as const) {
     test(`composer adds tasks with chips (${size}, ${theme})`, async ({ page }) => {
-      const id = {
-        dark: { desktop: "1001", phone: "1003" },
-        light: { desktop: "1002", phone: "1919230638" },
-      }[theme][size];
-      await loginViaApi(page, id);
+      await loginViaApi(page);
       await page.addInitScript((value) => {
         localStorage.setItem("pace.theme", value);
       }, theme);

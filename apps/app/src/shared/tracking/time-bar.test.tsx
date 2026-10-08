@@ -16,12 +16,12 @@ describe("TimeBar", () => {
   it("starts an activity with one tap, switches with the next and stops with a second tap", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    expect(screen.getByText("Nothing running. Tap an activity to start it.")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("switch", { name: "Work" }));
+    expect(screen.getByLabelText("What are you doing?")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("switch", { name: "Rest" }));
     await waitFor(() => {
-      expect(running(runtime)).toEqual(["Work"]);
+      expect(running(runtime)).toEqual(["Rest"]);
     });
-    expect(screen.getByRole("switch", { checked: true, name: "Work" })).toBeOnTheScreen();
+    expect(screen.getByRole("switch", { checked: true, name: "Rest" })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("switch", { name: "Food" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Food"]);
@@ -36,17 +36,18 @@ describe("TimeBar", () => {
   it("stops the running activity from the Stop button", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("switch", { name: "Study" }));
+    await fireEvent.press(screen.getByRole("switch", { name: "Sport" }));
     await fireEvent.press(await screen.findByRole("button", { name: "Stop" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual([]);
     });
   });
 
-  it("opens the editor on press and hold and saves the new defaults", async () => {
+  it("opens the details on press and hold, and the button editor from there", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
     await fireEvent(screen.getByRole("switch", { name: "Commute" }), "longPress");
+    await fireEvent.press(await screen.findByRole("button", { name: "Change the button" }));
     const name = await screen.findByLabelText("Name");
     await fireEvent.changeText(name, "Метро");
     await fireEvent.changeText(screen.getByLabelText("Expect, minutes"), "35");
@@ -57,6 +58,35 @@ describe("TimeBar", () => {
       label: "Метро",
     });
     expect(running(runtime)).toEqual([]);
+  });
+
+  it("asks Study for details first: a picked homework names and links the block", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.press(screen.getByRole("switch", { name: "Study" }));
+    expect(running(runtime)).toEqual([]);
+    await fireEvent.press(await screen.findByRole("radio", { name: "Algebra HW 6" }));
+    expect(screen.getByLabelText("What exactly")).toHaveDisplayValue("Algebra HW 6");
+    await fireEvent.press(screen.getByRole("button", { name: "Start" }));
+    await waitFor(() => {
+      expect(running(runtime)).toEqual(["Algebra HW 6"]);
+    });
+    const started = Object.values(runtime.state.store.getState().time.activities).find(
+      (activity) => activity.endAt === null,
+    );
+    expect(started).toMatchObject({ category: "study" });
+    expect(started?.taskId).not.toBeNull();
+  });
+
+  it("starts what is typed in “What are you doing?”", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Walk the dog");
+    await fireEvent(field, "submitEditing");
+    await waitFor(() => {
+      expect(running(runtime)).toEqual(["Walk the dog"]);
+    });
   });
 
   it("adds a button from the plus", async () => {

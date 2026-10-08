@@ -4,7 +4,7 @@ import { ScrollView, Text, TextInput, type TextInputKeyPressEvent, View } from "
 import type { AiOutcome, AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { clockTime, zonedText } from "#app/format/time.ts";
+import { clockTime } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -12,9 +12,10 @@ import { Chip } from "#app/ui/chip.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 import { useAiRead, useAutoAiRead, useReadFirst } from "@pace/client/react";
-import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
+import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 
 import { AiStatus } from "./ai-status.tsx";
+import { ComposerFields } from "./composer-fields.tsx";
 
 const ChipRow = ({
   children,
@@ -35,17 +36,10 @@ const ChipRow = ({
   </ScrollView>
 );
 
-/** Due, estimate, link, problems and a new project, read from the line, in words. */
+/** The link, the problems and a new project, read from the line, in words. */
 const useFacts = (model: ComposerModel): readonly string[] => {
   const t = useT();
-  const viewer = useViewer();
   return [
-    ...(model.due === null
-      ? []
-      : [zonedText({ at: model.due.at, mode: "due", tz: model.due.tz }, viewer)]),
-    ...(model.estimateMinutes === null
-      ? []
-      : [formatDuration(model.estimateMinutes, viewer.language)]),
     ...(model.link === null ? [] : [`${model.link.host} ↗`]),
     ...(model.subtasks.length === 0
       ? []
@@ -69,6 +63,7 @@ const ComposerChips = ({
   const facts = useFacts(model);
   return (
     <View className="gap-2 pt-2">
+      <ComposerFields model={model} onEdit={onEdit} />
       <ChipRow label={t("composer.category")}>
         {model.presets.map((preset) => (
           <Chip

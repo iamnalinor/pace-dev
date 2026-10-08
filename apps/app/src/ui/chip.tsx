@@ -4,19 +4,26 @@ import { Pressable, Text } from "react-native";
 
 import type { ProjectColorName } from "@pace/core";
 
-import { inkClass, PROJECT_FILL, washClass } from "./color.tsx";
+import { inkClass, OUTLINE, PROJECT_FILL } from "./color.tsx";
 import { cx } from "./cx.ts";
 
+/**
+Unselected: the page's surface inside a 2px outline (in the chip's color, else a hairline
+gray). Selected: filled with the color; a neutral chip gets the raised surface and an ink
+outline instead — never a black pill.
+*/
 const chipFill = (color: null | ProjectColorName, isSelected: boolean): string => {
   if (color === null) {
-    return isSelected ? "bg-inverse" : "border border-line";
+    return isSelected ? "border-2 border-fg bg-raised" : "border-2 border-line bg-surface";
   }
-  return isSelected ? PROJECT_FILL[color] : `border ${washClass(color)}`;
+  return isSelected
+    ? `border-2 ${OUTLINE[color]} ${PROJECT_FILL[color]}`
+    : `border-2 ${OUTLINE[color]} bg-surface`;
 };
 
 const chipText = (color: null | ProjectColorName, isSelected: boolean): string => {
   if (isSelected) {
-    return color === null ? "font-medium text-inverseFg" : "font-medium text-accentFg";
+    return color === null ? "font-medium text-fg" : "font-medium text-accentFg";
   }
   return color === null ? "text-fg2" : inkClass(color);
 };

@@ -88,12 +88,6 @@ export const activityFormOf = (
 });
 
 /** What a time-bar button needs from the bar: its tap and its "press and hold". */
-export type ActivityButtonProps = {
-  readonly button: TimeButtonView;
-  readonly onTap: (button: TimeButtonView) => void;
-  readonly onEdit: (target: EditorTarget) => void;
-};
-
 /** The Day sheet's inputs: what it edits, the zone its times are typed in, and how it closes. */
 export type ActivitySheetProps = {
   readonly target: ActivityTarget;

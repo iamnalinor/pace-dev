@@ -15,15 +15,15 @@ import { ProjectSheet } from "./project-sheet.tsx";
 import { SourceText } from "./source-text.tsx";
 import { TaskFooter } from "./task-footer.tsx";
 import { TaskHeader } from "./task-header.tsx";
-import { EditTextSheet, TaskMenuSheet } from "./task-sheets.tsx";
+import { EditTextSheet } from "./task-sheets.tsx";
 import { TaskSummary } from "./task-summary.tsx";
 import { WhyCard } from "./why-card.tsx";
 import { WorkProgress } from "./work-progress.tsx";
 
-/** "Close as…" from the menu opens on Cancelled · Skipped. */
+/** Delete opens the close sheet on Cancelled · Skipped. */
 const CLOSE_AS: CloseMode = "other";
 
-type Open = "close" | "close-as" | "edit" | "menu" | "project" | null;
+type Open = "close" | "close-as" | "edit" | "project" | null;
 
 const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
   const { hooks } = usePace();
@@ -42,16 +42,14 @@ const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
   );
 };
 
-/** The sheet over the task, if one is open: close, menu, edit or project. */
+/** The sheet over the task, if one is open: close, edit or project. */
 const OpenSheet = ({
   onDismiss: dismiss,
-  onOpen: setOpen,
   open,
   view: task,
 }: {
   readonly open: Open;
   readonly view: TaskViewModel;
-  readonly onOpen: (open: Open) => void;
   readonly onDismiss: () => void;
 }) => (
   <>
@@ -62,7 +60,6 @@ const OpenSheet = ({
         view={task}
       />
     ) : null}
-    {open === "menu" ? <TaskMenuSheet onChoose={setOpen} onClose={dismiss} view={task} /> : null}
     {open === "edit" ? <EditTextSheet onClose={dismiss} view={task} /> : null}
     {open === "project" ? <ProjectSheet onClose={dismiss} view={task} /> : null}
   </>
@@ -114,8 +111,14 @@ export const TaskScreen = ({
           }
           header={
             <TaskHeader
-              onMenu={() => {
-                setOpen("menu");
+              actions={{
+                onDelete: () => {
+                  setOpen("close-as");
+                },
+                onEdit: () => {
+                  setOpen("edit");
+                },
+                view: task,
               }}
               onProject={() => {
                 setOpen("project");
@@ -127,7 +130,7 @@ export const TaskScreen = ({
           <TaskBody view={task} />
         </Screen>
       </View>
-      <OpenSheet onDismiss={dismiss} onOpen={setOpen} open={open} view={task} />
+      <OpenSheet onDismiss={dismiss} open={open} view={task} />
     </>
   );
 };
