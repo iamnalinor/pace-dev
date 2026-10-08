@@ -23,7 +23,7 @@ otherwise.
   the user id taken from the session — never from the request.
 - **Bot webhook**: every call must carry the `X-Telegram-Bot-Api-Secret-Token` header
   matching `TELEGRAM_WEBHOOK_SECRET` (checked by grammY, 401 otherwise).
-- **Web headers** (`apps/web/public/_headers`): a CSP that only allows scripts from the
+- **Web headers** (`apps/app/public/_headers`): a CSP that only allows scripts from the
   app and `telegram.org`, frames from `oauth.telegram.org`, connections to the API host;
   `X-Frame-Options: DENY`, `nosniff`, a strict referrer policy.
 - **Errors** never leak internals: unhandled exceptions become `{ code: "internal" }`

@@ -14,7 +14,7 @@ export const SourceText = ({ text }: { readonly text: null | string }) => {
     <View className="mx-4 gap-2">
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ expanded: isShown }}
+        aria-expanded={isShown}
         className="min-h-11 justify-center"
         onPress={() => {
           setIsShown((shown) => !shown);

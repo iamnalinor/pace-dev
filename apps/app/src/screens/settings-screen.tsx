@@ -1,21 +1,24 @@
 import { useRouter } from "expo-router";
 import { Text, View } from "react-native";
 
-import { type Language, LANGUAGES } from "@pace/core";
+import type { ThemePreference } from "#app/platform/theme.ts";
 
-import type { ThemePreference } from "../platform/theme.ts";
-
-import { useAuth, usePace, useSettings, useT } from "../app-state.tsx";
-import { usePermissions } from "../features/permissions/use-permissions.ts";
-import { Button } from "../ui/button.tsx";
-import { ScreenHeader } from "../ui/screen-header.tsx";
-import { Segmented } from "../ui/segmented.tsx";
-import { useTheme } from "../ui/theme-provider.tsx";
+import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
+import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
+import { usePermissions } from "#app/features/permissions/use-permissions.ts";
+import { ExportRow } from "#app/features/settings/export-row.tsx";
+import { DigestWindows, QuietHours } from "#app/features/settings/notification-settings.tsx";
+import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
+import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
+import { IS_PHONE } from "#app/platform/device.ts";
+import { Button } from "#app/ui/button.tsx";
+import { ScreenHeader } from "#app/ui/screen-header.tsx";
+import { Screen } from "#app/ui/screen.tsx";
+import { Segmented } from "#app/ui/segmented.tsx";
+import { useTheme } from "#app/ui/theme-provider.tsx";
+import { LANGUAGES } from "@pace/core";
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ["system", "light", "dark"];
-
-/** The zone this device reports; the account zone defaults to it on first login. */
-export const deviceTimeZone = (): string => new Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const Row = ({
   children,
@@ -24,8 +27,13 @@ const Row = ({
   readonly children: React.ReactNode;
   readonly label: string;
 }) => (
-  <View className="gap-2 border-b border-line px-5 py-4">
-    <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">{label}</Text>
+  <View accessibilityLabel={label} className="gap-2 border-b border-line px-5 py-4" role="group">
+    <Text
+      accessibilityRole="header"
+      className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted"
+    >
+      {label}
+    </Text>
     {children}
   </View>
 );
@@ -52,67 +60,14 @@ const PermissionsRow = () => {
   );
 };
 
-/** History and logout. */
-const SettingsFooter = () => {
+/** Theme (this device) and language (the account). */
+const LookRows = () => {
   const t = useT();
-  const router = useRouter();
-  const { auth } = useAuth();
-  return (
-    <View className="gap-3 px-5 py-6">
-      <Button
-        onPress={() => {
-          router.push("/history");
-        }}
-        variant="secondary"
-      >
-        {t("history.title")}
-      </Button>
-      <Button
-        onPress={() => {
-          router.push("/decisions");
-        }}
-        variant="secondary"
-      >
-        {t("decisions.title")}
-      </Button>
-      <Button onPress={() => void auth.logout()} variant="secondary">
-        {t("settings.logout")}
-      </Button>
-    </View>
-  );
-};
-
-export const SettingsScreen = () => {
-  const t = useT();
-  const router = useRouter();
   const theme = useTheme();
   const settings = useSettings();
-  const { state } = usePace();
-  const deviceZone = deviceTimeZone();
-
-  const update = (payload: { readonly language?: Language; readonly timezone?: string }): void => {
-    void state.dispatch({
-      occurredAt: new Date().toISOString(),
-      payload,
-      type: "settings.updated",
-    });
-  };
-
+  const { actions } = usePace();
   return (
-    <View className="flex-1 bg-bg">
-      <ScreenHeader
-        right={
-          <Button
-            onPress={() => {
-              router.back();
-            }}
-            variant="ghost"
-          >
-            {t("common.done")}
-          </Button>
-        }
-        title={t("settings.title")}
-      />
+    <>
       <Row label={t("settings.theme")}>
         <Segmented
           onChange={theme.setPreference}
@@ -126,30 +81,68 @@ export const SettingsScreen = () => {
       <Row label={t("settings.language")}>
         <Segmented
           onChange={(language) => {
-            update({ language });
+            void actions.setLanguage(language);
           }}
           options={LANGUAGES.map((value) => ({ label: t(`settings.language.${value}`), value }))}
           value={settings.language}
         />
       </Row>
-      <PermissionsRow />
+    </>
+  );
+};
+
+export const SettingsScreen = () => {
+  const t = useT();
+  const router = useRouter();
+  const { auth } = useAuth();
+  const logout = async (): Promise<void> => {
+    await auth.logout();
+    router.replace("/login");
+  };
+  const header = (
+    <ScreenHeader
+      right={
+        <Button
+          onPress={() => {
+            router.back();
+          }}
+          variant="ghost"
+        >
+          {t("common.done")}
+        </Button>
+      }
+      title={t("settings.title")}
+    />
+  );
+  return (
+    <Screen header={header}>
+      <LookRows />
       <Row label={t("settings.timezone")}>
-        <Text className="font-sans text-[15px] text-fg">{settings.timezone ?? deviceZone}</Text>
-        <Text className="font-sans text-[13px] text-muted">
-          {t("settings.timezone.device", { tz: deviceZone })}
-        </Text>
-        {settings.timezone === deviceZone ? null : (
-          <Button
-            onPress={() => {
-              update({ timezone: deviceZone });
-            }}
-            variant="secondary"
-          >
-            {t("settings.timezone.use", { tz: deviceZone })}
-          </Button>
-        )}
+        <TimezoneRow />
       </Row>
-      <SettingsFooter />
-    </View>
+      {IS_PHONE ? <PermissionsRow /> : null}
+      <Row label={t("settings.digestWindows")}>
+        <DigestWindows />
+      </Row>
+      <Row label={t("settings.quietHours")}>
+        <QuietHours />
+      </Row>
+      <Row label={t("settings.more")}>
+        <SettingsLinks />
+      </Row>
+      {IS_PHONE ? null : (
+        <Row label={t("settings.export")}>
+          <ExportRow />
+        </Row>
+      )}
+      <Row label={t("settings.connectedApps")}>
+        <ConnectedApps />
+      </Row>
+      <View className="px-5 py-6">
+        <Button onPress={() => void logout()} variant="secondary">
+          {t("settings.logout")}
+        </Button>
+      </View>
+    </Screen>
   );
 };

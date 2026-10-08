@@ -4,6 +4,7 @@ import { en } from "./en.ts";
 import {
   formatDuration,
   formatEyebrow,
+  formatLate,
   formatRelativeDay,
   formatSpan,
   formatWeekRange,
@@ -150,6 +151,25 @@ describe("formatDuration", () => {
 
   it("rounds fractional minutes", () => {
     expect(formatDuration(89.6, "en")).toBe("1h 30m");
+  });
+});
+
+describe("formatLate", () => {
+  const HOUR = 60;
+  const DAY = 24 * HOUR;
+
+  it("names minutes only while a hard deadline is under an hour late", () => {
+    expect(formatLate(34.9, "en", false)).toBe("34m");
+    expect(formatLate(2 * HOUR + 15, "en", false)).toBe("2h");
+    expect(formatLate(DAY + 3 * HOUR + 40, "en", false)).toBe("1d 3h");
+    expect(formatLate(5 * HOUR + 59, "ru", false)).toBe("5 ч");
+  });
+
+  it("never names minutes for a soft deadline", () => {
+    expect(formatLate(20, "en", true)).toBe("<1h");
+    expect(formatLate(20, "ru", true)).toBe("<1 ч");
+    expect(formatLate(HOUR + 59, "en", true)).toBe("1h");
+    expect(formatLate(3 * DAY + 2 * HOUR, "en", true)).toBe("3d 2h");
   });
 });
 

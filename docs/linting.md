@@ -3,16 +3,15 @@
 One command runs every static check and auto-fixes what can be fixed. It is the
 pre-commit hook (lefthook, staging its own fixes) and the first CI job; CI then fails if
 `bun lint` changed any file (`git status --porcelain` must be empty), so unformatted code,
-a stale `tokens.css` or a forgotten migration cannot reach `main`.
+a forgotten migration cannot reach `main`.
 
 | Step | Tool | Catches |
 |---|---|---|
-| `lint:tokens` | `bun scripts/generate-tokens.ts` | regenerates `apps/web/src/tokens.css` from `packages/core/src/design/tokens.json` (CSS variables per theme for Tailwind v4); drift shows up as a diff |
 | `lint:format` | **Biome** (formatter only), `biome format --write .` | formatting of TS/TSX/JS/JSON/CSS |
 | `lint:eslint` | **ESLint 10** + plugins, `--fix --max-warnings 0`, one process per workspace (`scripts/eslint-all.ts`, memory), cached in `.cache/eslint/<part>/` | bugs, unsafe types, complexity, conventions |
-| `typecheck` | **tsc** (TypeScript 6, strictest) in seven projects: root configs, `packages/core`, `packages/client`, `apps/api`, `apps/web`, `apps/app`, `e2e` | type errors |
+| `typecheck` | **tsc** (TypeScript 6, strictest) in six projects: root configs, `packages/core`, `packages/client`, `apps/api`, `apps/app`, `e2e` | type errors |
 | `lint:knip` | **knip** | unused files, exports, types and dependencies; missing dependencies |
-| `lint:dup` | **jscpd** (threshold 0, 50+ tokens) | copy-paste outside tests, generated code, the i18n catalogs and `shared/ui` |
+| `lint:dup` | **jscpd** (threshold 0, 50+ tokens) | copy-paste outside tests, generated code, the i18n catalogs |
 | `lint:arch` | **dependency-cruiser** over `apps packages e2e` | layer boundaries, cycles, orphans, dev deps in prod code, undeclared packages |
 | `db:check` | `apps/api/scripts/check-migrations.ts` (drizzle-kit) | a D1 or Durable Object schema change without a committed migration |
 
@@ -31,7 +30,7 @@ parameter properties: Bun, Vite and Metro strip types without transforming code)
 `noUncheckedSideEffectImports`, `checkJs` and `types: []` (every project lists what it
 needs). `skipLibCheck` is the only concession. `apps/app/tsconfig.json` extends
 `expo/tsconfig.base` instead and re-enables the same strict flags by hand. Both apps
-declare their alias (`#web/*`, `#app/*`) through package.json `imports`, which
+declare their alias (`#app/*`) through package.json `imports`, which
 TypeScript, Vite, Metro, Jest, eslint, knip and dependency-cruiser all resolve natively.
 
 TypeScript is pinned to **6.0.x** in the catalog: typescript-eslint does not support
@@ -54,18 +53,16 @@ TS 7 yet.
 - **unicorn** (recommended), **sonarjs** (cognitive complexity 10), **import-x**
   (cycles, duplicates, `no-default-export`, extraneous deps, relative package imports),
   **perfectionist** (sorted imports, exports, named imports/exports, union and
-  intersection types, JSX props, heritage clauses; `#web`, `#app` and `@pace` are
+  intersection types, JSX props, heritage clauses; `#app` and `@pace` are
   internal groups), **check-file** (kebab-case files and folders, no `index.ts`),
   **promise** (`await` over `.then`), **regexp**, **security**, **eslint-comments**
   (every `eslint-disable` needs `-- reason`; unused directives are errors).
 - **functional** in the pure layers (`packages/core/src/**`,
   `packages/client/src/view-models/**`, tests excluded): no `let`, no mutation, no
   classes, no `this`, no `throw`, `readonly` everywhere.
-- React (web + app): **@eslint-react** strict type-checked, **react-hooks** (incl. the
-  React Compiler rules), **better-tailwindcss** (Tailwind v4 via `apps/web/src/styles.css`
-  on the web, Tailwind v3 via `apps/app/tailwind.config.js` for NativeWind).
-- Web only: **jsx-a11y** strict; the `Bun` global is banned (browser code).
-- Tests: **@vitest/eslint-plugin**, **testing-library** (web), **playwright** (e2e).
+- React (the app, phone and web): **@eslint-react** strict type-checked, **react-hooks** (incl. the
+  React Compiler rules), **better-tailwindcss** (Tailwind v3 via `apps/app/tailwind.config.js` for NativeWind).
+- Tests: **@vitest/eslint-plugin**, **playwright** (e2e).
 - `eslint-config-prettier` turns off stylistic rules the formatter owns; `curly: all`
   and `no-unexpected-multiline` do not conflict with Biome and are re-enabled after it.
 
@@ -94,7 +91,6 @@ TS 7 yet.
 | config files | `no-unsafe-assignment`, `no-unsafe-member-access`, `max-lines` | declarative lists; some plugins ship without types |
 | loggers, `scripts/**`, `apps/api/scripts/**` | `no-console`, `no-process-exit`, `detect-non-literal-fs-filename` | they own stdout and the exit code and work with paths they compute |
 | tests | size limits, `no-duplicate-string`, `no-await-expression-member`, `require-await`, `no-nested-functions`; `max-nested-callbacks` 5 | tests are long and repetitive by design (DAMP over DRY); fakes implement async ports synchronously |
-| `apps/web/src/shared/ui/**` | `no-unstable-default-props`, `sort-jsx-props`, tailwind class rules | hand-written shadcn-style components kept close to upstream; type-safety rules stay on |
 | `*.d.ts` | `consistent-type-definitions`, `consistent-type-imports` | ambient augmentation needs `interface` and `import()` types |
 
 ## Biome (formatter only)

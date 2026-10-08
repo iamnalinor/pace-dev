@@ -6,9 +6,9 @@ import { ICONS, LOGO_FILES, pngDimensions, renderPng } from "./generate-icons.ts
 describe("generate-icons", () => {
   it("declares every committed icon with its target size", () => {
     const byPath = new Map(ICONS.map((icon) => [icon.path, icon.size]));
-    expect(byPath.get("apps/web/public/icon-192.png")).toBe(192);
-    expect(byPath.get("apps/web/public/icon-512.png")).toBe(512);
-    expect(byPath.get("apps/web/public/apple-touch-icon.png")).toBe(180);
+    expect(byPath.get("apps/app/public/icon-192.png")).toBe(192);
+    expect(byPath.get("apps/app/public/icon-512.png")).toBe(512);
+    expect(byPath.get("apps/app/public/apple-touch-icon.png")).toBe(180);
     expect(byPath.get("apps/app/assets/icon.png")).toBe(1024);
     expect(byPath.get("apps/app/assets/adaptive-icon.png")).toBe(1024);
     expect(byPath.get("apps/app/assets/adaptive-icon-mono.png")).toBe(1024);
@@ -42,7 +42,7 @@ describe("generate-icons", () => {
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain("Geist, system-ui, sans-serif");
     expect(svg["assets/logo/favicon.svg"]).toContain("#d4ff3a");
     expect(svg["assets/logo/favicon.svg"]).not.toContain("<circle");
-    expect(svg["apps/web/public/favicon.svg"]).toBe(svg["assets/logo/favicon.svg"]);
+    expect(svg["apps/app/public/favicon.svg"]).toBe(svg["assets/logo/favicon.svg"]);
   });
 
   it("parses PNG headers", () => {

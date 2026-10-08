@@ -1,6 +1,6 @@
 import { useShareIntentContext } from "expo-share-intent";
 
-import { NowScreen } from "#app/features/now/now-screen.tsx";
+import { NowScreen } from "#app/screens/now-screen.tsx";
 
 /** The Add tab and the share target: Now with the shared text already in the composer. */
 export default function AddRoute() {

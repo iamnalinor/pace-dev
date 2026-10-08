@@ -15,7 +15,6 @@ import betterTailwind from "eslint-plugin-better-tailwindcss";
 import checkFile from "eslint-plugin-check-file";
 import functional from "eslint-plugin-functional";
 import { flatConfigs as importX } from "eslint-plugin-import-x";
-import jsxA11y from "eslint-plugin-jsx-a11y";
 import perfectionist from "eslint-plugin-perfectionist";
 import playwright from "eslint-plugin-playwright";
 import promise from "eslint-plugin-promise";
@@ -23,7 +22,6 @@ import reactHooks from "eslint-plugin-react-hooks";
 import regexp from "eslint-plugin-regexp";
 import security from "eslint-plugin-security";
 import sonarjs from "eslint-plugin-sonarjs";
-import testingLibrary from "eslint-plugin-testing-library";
 import unicorn from "eslint-plugin-unicorn";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
@@ -44,15 +42,13 @@ const TESTS = [
   "e2e/**/*.ts",
   "apps/app/jest.setup.ts",
 ];
-const WEB = ["apps/web/src/**/*.{ts,tsx}"];
 const APP = [
   "apps/app/app/**/*.{ts,tsx}",
   "apps/app/src/**/*.{ts,tsx}",
   "apps/app/modules/**/*.ts",
 ];
-const REACT = [...WEB, ...APP];
+const REACT = APP;
 const EXPO_ROUTES = ["apps/app/app/**"];
-const SHADCN_UI = ["apps/web/src/shared/ui/**"];
 // Tools require a default export from their config files.
 const CONFIG_FILES = [
   "*.config.ts",
@@ -238,7 +234,6 @@ export default defineConfig([
             "packages/core/tsconfig.json",
             "packages/client/tsconfig.json",
             "apps/api/tsconfig.json",
-            "apps/web/tsconfig.json",
             "apps/app/tsconfig.json",
             "e2e/tsconfig.json",
             "tsconfig.json",
@@ -255,7 +250,7 @@ export default defineConfig([
       "perfectionist/sort-heritage-clauses": "error",
       "perfectionist/sort-imports": [
         "error",
-        { internalPattern: ["^#web/.*", "^#app/.*", "^@pace/.*"], newlinesBetween: 1 },
+        { internalPattern: ["^#app/.*", "^@pace/.*"], newlinesBetween: 1 },
       ],
       "perfectionist/sort-intersection-types": "error",
       "perfectionist/sort-jsx-props": "error",
@@ -389,46 +384,6 @@ export default defineConfig([
     },
   },
 
-  // ── Web (DOM) ────────────────────────────────────────────────────────────────
-  {
-    ...jsxA11y.flatConfigs.strict,
-    files: WEB,
-  },
-  {
-    files: WEB,
-    plugins: { "better-tailwindcss": betterTailwind },
-    rules: {
-      ...betterTailwind.configs["recommended-error"].rules,
-      // Line wrapping of class strings is the formatter's concern.
-      "better-tailwindcss/enforce-consistent-line-wrapping": "off",
-    },
-    settings: {
-      "better-tailwindcss": { cwd: "apps/web", entryPoint: "src/styles.css" },
-    },
-  },
-  {
-    files: WEB,
-    rules: {
-      // The web app runs in the browser: Bun APIs would type-check (see tsconfig) but crash.
-      "no-restricted-globals": [
-        "error",
-        { message: "Bun APIs are not available in the browser.", name: "Bun" },
-      ],
-    },
-  },
-  {
-    files: SHADCN_UI,
-    rules: {
-      // Vendored shadcn/ui components, kept close to upstream so updates stay mergeable.
-      // Type-safety rules stay ON; only stylistic/size/naming rules are relaxed.
-      "@eslint-react/no-unstable-default-props": "off",
-      "perfectionist/sort-jsx-props": "off",
-      "better-tailwindcss/enforce-canonical-classes": "off",
-      "better-tailwindcss/enforce-consistent-class-order": "off",
-      "better-tailwindcss/no-unknown-classes": "off",
-    },
-  },
-
   // ── App (React Native): Tailwind v3 classes via NativeWind ───────────────────
   {
     files: APP,
@@ -484,11 +439,7 @@ export default defineConfig([
   },
   {
     ...vitest.configs.recommended,
-    files: ["packages/**/*.test.ts", "apps/api/**/*.test.ts", "apps/web/**/*.test.{ts,tsx}"],
-  },
-  {
-    ...testingLibrary.configs["flat/react"],
-    files: ["apps/web/**/*.test.tsx"],
+    files: ["packages/**/*.test.ts", "apps/api/**/*.test.ts"],
   },
   {
     ...playwright.configs["flat/recommended"],

@@ -7,7 +7,7 @@ every API-login test takes its own id so parallel tests never share account stat
 */
 export const DEV_TELEGRAM_ID = "1919230638";
 
-/** Same key as apps/web/src/platform/local-session.ts. */
+/** Same key as apps/app/src/platform/secure-session.ts (localStorage on the web build). */
 const SESSION_KEY = "pace.session";
 
 /** Mints a session through the dev login route (ENVIRONMENT=test in wrangler dev). */

@@ -13,9 +13,9 @@ describe("Composer", () => {
     const runtime = await createTestRuntime();
     await renderScreen(<Composer />, runtime);
     await fireEvent.changeText(line(), "синк по дашборду завтра 15:00 1ч");
-    expect(screen.getByRole("button", { name: "Work", selected: true })).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { checked: true, name: "Work" })).toBeOnTheScreen();
     expect(
-      screen.getByRole("button", { name: en("importance.normal"), selected: true }),
+      screen.getByRole("radio", { checked: true, name: en("importance.normal") }),
     ).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("composer.add") }));
     await waitFor(() => {
@@ -30,9 +30,9 @@ describe("Composer", () => {
   it("preselects the importance of a category picked with one tap", async () => {
     await renderScreen(<Composer />, await createTestRuntime());
     await fireEvent.changeText(line(), "renew the passport");
-    await fireEvent.press(screen.getByRole("button", { name: "Deferred" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "Deferred" }));
     expect(
-      screen.getByRole("button", { name: en("importance.nice_to_have"), selected: true }),
+      screen.getByRole("radio", { checked: true, name: en("importance.nice_to_have") }),
     ).toBeOnTheScreen();
   });
 
@@ -87,7 +87,7 @@ describe("Composer", () => {
     await fireEvent.changeText(line(), "срочно разобрать почту");
     await fireEvent.press(screen.getByRole("button", { name: en("composer.ai") }));
     expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: "Work", selected: true })).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { checked: true, name: "Work" })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("composer.add") }));
     await waitFor(() => {
       const created = Object.values(runtime.state.store.getState().tasks.byId).find(

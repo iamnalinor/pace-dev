@@ -3,7 +3,7 @@ import { loginViaApi } from "./support/login.ts";
 
 test("a visitor is sent to the login card", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveURL(/\/login\?next=%2F$/);
+  await expect(page).toHaveURL(/\/login$/u);
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
   await expectNoA11yViolations(page);
 });

@@ -46,6 +46,7 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
     <View
       accessibilityLabel={t("phone.sleepTitle")}
       className={cx("mx-5 mb-3 gap-2 rounded-xl border p-3.5", washClass(SLEEP_COLOR))}
+      role="group"
     >
       <Text className={cx("font-sans text-[12px] font-medium", inkClass(SLEEP_COLOR))}>
         {t("phone.sleepTitle")}
@@ -63,7 +64,6 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
                   label: t("phone.sleepLabel"),
                   startAt: sleep.startAt,
                 }),
-                { success: t("phone.sleepLogged"), undo: true },
               );
             }}
           >
@@ -143,10 +143,7 @@ export const EndedAtPrompt = ({
     <View className="pb-2 pl-[98px]">
       <Button
         onPress={() => {
-          void run(actions.stopActivity({ at: pickupAt }), {
-            success: t("time.stopped", { label: row.label }),
-            undo: true,
-          });
+          void run(actions.stopActivity({ at: pickupAt }));
         }}
         variant="ghost"
       >
@@ -213,6 +210,8 @@ const CalendarRow = ({
           <Button
             onPress={() => {
               phone.answered(calendarKey(event));
+              const action = everyTime("attended");
+              // A recurring event offers to remember the answer for the whole series.
               void run(
                 actions.logPast({
                   category: "other",
@@ -220,11 +219,9 @@ const CalendarRow = ({
                   label: event.title,
                   startAt: event.startAt,
                 }),
-                {
-                  action: everyTime("attended"),
-                  success: t("phone.attendedDone", { title: event.title }),
-                  undo: true,
-                },
+                action === undefined
+                  ? undefined
+                  : { action, success: t("phone.attendedDone", { title: event.title }) },
               );
             }}
             variant="ghost"
@@ -303,7 +300,7 @@ export const CalendarSection = ({
     return null;
   }
   return (
-    <View accessibilityLabel={t("day.calendar")} className="mx-5 mt-4 gap-1">
+    <View accessibilityLabel={t("day.calendar")} className="mx-5 mt-4 gap-1" role="group">
       <Text accessibilityRole="header" className="font-sans text-[13px] font-medium text-fg">
         {t("day.calendar")}
       </Text>

@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -7,6 +6,8 @@ import type { DayEntry, DayModel, DayRowProps } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
+import { IS_PHONE } from "#app/platform/device.ts";
+import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
@@ -28,7 +29,7 @@ import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
 const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
   const t = useT();
-  const router = useRouter();
+  const openTask = useOpenTask();
   const { language } = useViewer();
   const range = `${clockTime(row.startAt, zone)}–${row.isRunning ? "" : clockTime(row.endAt, zone)}`;
   return (
@@ -55,7 +56,7 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
             className="font-sans text-[12px] text-fg2 underline"
             numberOfLines={1}
             onPress={() => {
-              router.push(`/task/${row.taskId ?? ""}`);
+              openTask(row.taskId ?? "");
             }}
           >
             {row.taskTitle}
@@ -214,13 +215,14 @@ export const DayScreen = () => {
   return (
     <Screen header={header}>
       <Totals day={day} />
-      {phone.hasUsageAccess ? <SleepCard phone={phone} zone={day.zone} /> : <UsageAccessHint />}
+      {phone.hasUsageAccess ? <SleepCard phone={phone} zone={day.zone} /> : null}
+      {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
       {day.entries.length === 0 ? (
         <Text className="px-5 py-6 font-sans text-[14px] text-muted">{t("day.empty")}</Text>
       ) : (
         <Entries entries={day.entries} onOpen={setSheet} phone={phone} zone={day.zone} />
       )}
-      <CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
+      {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
       <Pressable
         accessibilityRole="button"
         className="mx-5 mt-4 h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line active:opacity-70"

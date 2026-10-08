@@ -484,11 +484,93 @@ describe("presets", () => {
     await expect(world.actions.seedExamplePresets()).resolves.toEqual({ ok: true, value: [] });
   });
 
+  it("moves a preset one place in the picker order, renumbering only what changed", async () => {
+    const world = await setupActions([]);
+    const order = () =>
+      Object.values(world.state.store.getState().presets.byId)
+        .filter((preset) => preset.id !== "inbox")
+        .toSorted((a, b) => a.order - b.order)
+        .map((preset) => preset.id);
+    expect(order()).toEqual(["hw", "work", "personal", "deferred"]);
+    const moved = unwrap(await world.actions.movePreset("personal", -1));
+    expect(moved.map((event) => event.type === "preset.updated" && event.payload)).toEqual([
+      { id: "personal", order: 2 },
+      { id: "work", order: 3 },
+    ]);
+    expect(order()).toEqual(["hw", "personal", "work", "deferred"]);
+    await expect(world.actions.movePreset("hw", -1)).resolves.toEqual({
+      error: "action/nothing-to-do",
+      ok: false,
+    });
+    await expect(world.actions.movePreset("nope", 1)).resolves.toEqual({
+      error: "preset/unknown",
+      ok: false,
+    });
+  });
+
+  it("moves a new preset among the defaults, whose order it shares with other new ones", async () => {
+    const world = await setupActions([]);
+    unwrap(await world.actions.createPreset({ definition: {}, extends: "hw", id: "b", name: "B" }));
+    unwrap(await world.actions.createPreset({ definition: {}, extends: "hw", id: "a", name: "A" }));
+    unwrap(await world.actions.movePreset("b", -1));
+    const ids = Object.values(world.state.store.getState().presets.byId)
+      .filter((preset) => preset.id !== "inbox")
+      .toSorted((x, y) => x.order - y.order)
+      .map((preset) => preset.id);
+    expect(ids).toEqual(["hw", "work", "personal", "deferred", "b", "a"]);
+  });
+
   it("offers the plan's estimate buckets until stage 3 fills them", async () => {
     const world = await setupActions([]);
     expect(world.actions.estimateHints("hw")).toEqual(
       ESTIMATE_BUCKET_MINUTES.map((minutes) => ({ minutes, samples: [] })),
     );
+  });
+});
+
+describe("projects", () => {
+  it("creates a project with a trimmed name and edits, archives and restores it", async () => {
+    const world = await setupActions([]);
+    const [created] = unwrap(await world.actions.createProject({ color: "blue", name: " Infra " }));
+    const projectId = created?.type === "project.created" ? created.payload.projectId : "";
+    expect(created?.type === "project.created" && created.payload).toEqual({
+      color: "blue",
+      name: "Infra",
+      projectId,
+    });
+    unwrap(
+      await world.actions.updateProject(projectId, {
+        color: "coral",
+        description: "  ",
+        name: "Ops",
+      }),
+    );
+    expect(world.state.store.getState().projects.byId[projectId]).toMatchObject({
+      color: "coral",
+      description: null,
+      name: "Ops",
+    });
+    unwrap(await world.actions.updateProject(projectId, { archived: true }));
+    expect(world.state.store.getState().projects.byId[projectId]?.archived).toBe(true);
+  });
+
+  it("refuses an empty name and one another active project carries", async () => {
+    const world = await setupActions([]);
+    const [created] = unwrap(await world.actions.createProject({ color: "blue", name: "Infra" }));
+    const projectId = created?.type === "project.created" ? created.payload.projectId : "";
+    await expect(world.actions.createProject({ color: "coral", name: "  " })).resolves.toEqual({
+      error: "project/name-required",
+      ok: false,
+    });
+    await expect(world.actions.createProject({ color: "coral", name: "infra" })).resolves.toEqual({
+      error: "project/name-taken",
+      ok: false,
+    });
+    unwrap(await world.actions.updateProject(projectId, { name: " INFRA " }));
+    await expect(world.actions.updateProject("p-nope", { name: "X" })).resolves.toEqual({
+      error: "action/unknown-project",
+      ok: false,
+    });
   });
 });
 

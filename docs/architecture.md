@@ -3,9 +3,8 @@
 ## Layers
 
 ```
-apps/app (Expo) ─┐
-apps/web (Vite) ─┼─► packages/client ─► packages/core
-apps/api (Worker)┴──────────────────► packages/core
+apps/app (Expo: Android + web) ─► packages/client ─► packages/core
+apps/api (Worker) ───────────────────────────────► packages/core
 ```
 
 | Layer | Package | Holds | May import |
@@ -13,12 +12,31 @@ apps/api (Worker)┴──────────────────► pa
 | core | `@pace/core` | pure, immutable TypeScript: event schemas, sorting, materializer, reducers, settings, i18n, design tokens, time helpers, `Result`, the zod API contract | its npm deps only (zod, ulidx, date-fns) |
 | client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`), auth flows (`createAuth`), the local-first event store and app state (`createAppState`: the four core slices `tasks`/`projects`/`presets`/`settings` folded by the core reducers, the effective `events`, the raw `log` with corrections, and `version`), the actions (`createActions`: every user intent validated by the core's retro rules, appended with the client's envelope, answered as `Result<Event[], ActionError>`), the pure view-models (`view-models/*`: Now rows with typed meta parts, task, project, inbox, review, history over `AppState` + `QueryContext`), the `Clock` (`systemClock`, `quickTimes`), the outbox/sync loop (`createSyncClient`) and `createPaceClient`, which wires them the one way both shells use; the `EventStore`/`SessionStore` ports with memory adapters; `@pace/client/react` adds `createAppHooks` (store selectors plus `useClock`/`useNow`/`useTaskView`/`useProjectView`/`useInbox`/`useReview`/`useHistory`, memoized on the store version and a 30 s tick) and re-exports zustand's `useStore`; `@pace/client/testing` is the fake `fetch` for every test suite, `@pace/core/testing` the artboard fixtures | core |
 | api | `@pace/api` | the Cloudflare Worker: Hono app, auth, bot, sync routes, the `UserStore` Durable Object, D1 schema | core |
-| web | `@pace/web` | React SPA (Vite, Tailwind v4, PWA), deployed as the `pace-web` assets Worker | client, core |
-| app | `@pace/app` | Expo / React Native (expo-router, NativeWind) | client, core |
+| app | `@pace/app` | the one UI: Expo / React Native (expo-router, NativeWind) on Android, and the same screens on the web through react-native-web (a PWA served by the `pace-web` assets Worker) | client, core |
+
+### One UI on two platforms
+
+`apps/app` builds for Android (`expo run:android`, the release APK) and for the web
+(`bun run build`: `expo export --platform web`, then a Workbox service worker). The web
+build differs in three ways, all in `metro.config.js`:
+
+- **Stand-ins** for phone-only modules (`expo-notifications`, `expo-calendar`,
+  `expo-task-manager`, `expo-background-task`, `expo-secure-store`, `expo-share-intent`) live in
+  `src/platform/web/`; phone features check `IS_PHONE` (`src/platform/device.ts`) before they
+  show.
+- **`.web.tsx` siblings**: when `x.web.ts(x)` exists next to `x.ts(x)`, the web build uses it
+  (the IndexedDB event store, the Telegram Login Widget, the OAuth consent page, the Excel
+  export, the update banner). A `.web` file never imports its own base file.
+- **Layout**: from 1024 px the tabs become a sidebar and Now shows the picked task beside the
+  list (`src/ui/layout.ts`, `src/screens/now-screen.tsx`).
+
+The service worker precaches the build and waits; the update banner offers "Reload", which
+hands control to the new worker.
 
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs
-never import the API (the contract is in core), apps never import each other, API feature
+never import the API (the contract is in core), app feature folders only reach each other
+through `src/shared/` or by composition in `src/screens/`, API feature
 folders (`auth/`, `bot/`, `sync/`, `user-store/`) only reach each other through
 `src/shared/` or by composition in `app.ts`. `packages/core/src/**` and
 `packages/client/src/view-models/**` additionally run eslint-plugin-functional: no `let`,

@@ -30,7 +30,7 @@ export const IconButton = ({
       accessibilityHint={hint}
       accessibilityLabel={label}
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      aria-disabled={disabled}
       className={cx(
         "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
         variant === "surface" && "border border-line bg-surface",

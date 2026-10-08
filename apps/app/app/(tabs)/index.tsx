@@ -1,4 +1,4 @@
-import { NowScreen } from "#app/features/now/now-screen.tsx";
+import { NowScreen } from "#app/screens/now-screen.tsx";
 
 export default function NowRoute() {
   return <NowScreen />;

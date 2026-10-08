@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -6,6 +5,7 @@ import type { NowRow } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { Composer } from "#app/features/now/composer/composer.tsx";
+import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { TaskRow } from "#app/shared/task-row.tsx";
 import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
 import { useCheckTask } from "#app/shared/use-check-task.ts";
@@ -21,16 +21,18 @@ import { useMoveTask } from "./use-move-task.ts";
 
 const Rows = ({
   draggable,
+  label,
   rows,
 }: {
   readonly draggable: boolean;
+  readonly label: string;
   readonly rows: readonly NowRow[];
 }) => {
-  const router = useRouter();
+  const openTask = useOpenTask();
   const check = useCheckTask();
   const move = useMoveTask();
   return (
-    <View className="px-2">
+    <View aria-label={label} className="px-2" role="list">
       {rows.map((row, index) => {
         const item = (
           <TaskRow
@@ -39,26 +41,29 @@ const Rows = ({
               check(row);
             }}
             onOpen={() => {
-              router.push(`/task/${row.id}`);
+              openTask(row.id);
             }}
             row={row}
           />
         );
-        return draggable ? (
-          <DraggableRow
-            key={row.id}
-            onDrag={(rowsMoved) => {
-              move(row.id, categorySteps(rows, row.id, rowsMoved));
-            }}
-            onStep={(step) => {
-              move(row.id, step);
-            }}
-            testID={`now-row-${row.id}`}
-          >
-            {item}
-          </DraggableRow>
-        ) : (
-          <View key={row.id}>{item}</View>
+        return (
+          <View key={row.id} role="listitem">
+            {draggable ? (
+              <DraggableRow
+                onDrag={(rowsMoved) => {
+                  move(row.id, categorySteps(rows, row.id, rowsMoved));
+                }}
+                onStep={(step) => {
+                  move(row.id, step);
+                }}
+                testID={`now-row-${row.id}`}
+              >
+                {item}
+              </DraggableRow>
+            ) : (
+              item
+            )}
+          </View>
         );
       })}
     </View>
@@ -66,10 +71,10 @@ const Rows = ({
 };
 
 /**
-The Main artboard: what to do next, best first; the composer on top (shared text lands there)
-and the time bar fixed at the bottom, where the thumb rests.
+The Main artboard: what to do next, best first; the composer on top (shared text lands there),
+the waiting ones under a divider, the later count, and the time bar where the thumb rests.
 */
-export const NowScreen = ({ composeText }: { readonly composeText?: string | undefined }) => {
+export const NowBoard = ({ composeText }: { readonly composeText?: string | undefined }) => {
   const t = useT();
   const { hooks } = usePace();
   const [projectId, setProjectId] = useState<null | string>(null);
@@ -81,7 +86,7 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
       <ZoneBanner />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={projectId} />
       {isEmpty ? <EmptyState>{t("now.empty")}</EmptyState> : null}
-      <Rows draggable rows={board.rows} />
+      <Rows draggable label={t("now.tasks")} rows={board.rows} />
       {board.waiting.length > 0 && board.rows.length > 0 ? (
         <Text
           accessibilityRole="header"
@@ -90,7 +95,7 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
           {t("now.waiting")}
         </Text>
       ) : null}
-      <Rows draggable={false} rows={board.waiting} />
+      <Rows draggable={false} label={t("now.waiting")} rows={board.waiting} />
       {board.laterCount > 0 ? (
         <Text className="px-5 pt-1 font-sans text-[12px] text-faint">
           {t("now.later", { count: board.laterCount })}

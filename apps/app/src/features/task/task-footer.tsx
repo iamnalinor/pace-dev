@@ -28,16 +28,12 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
     <Pressable
       accessibilityLabel={t(isFocused ? "time.focusing" : "task.focus")}
       accessibilityRole="button"
-      accessibilityState={{ selected: isFocused }}
       className={cx(
         "h-12 w-12 items-center justify-center rounded-md active:opacity-80",
         isFocused ? "bg-accent" : "bg-raised",
       )}
       onPress={() => {
-        void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id), {
-          success: t(isFocused ? "time.stopped" : "time.started", { label: view.title }),
-          undo: true,
-        });
+        void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
       }}
     >
       {isFocused ? (
@@ -55,10 +51,7 @@ const StatusButtons = ({ view }: { readonly view: TaskViewModel }) => {
   const run = useRunAction();
   const status = statusOf(view);
   const set = (next: TaskStatus): void => {
-    void run(actions.setStatus(view.id, next), {
-      success: t("task.statusSet", { status: t(`status.${next}`), title: view.title }),
-      undo: true,
-    });
+    void run(actions.setStatus(view.id, next));
   };
   if (status === "paused" || status === "waiting") {
     return (
@@ -114,10 +107,7 @@ export const TaskFooter = ({
         <Text className="flex-1 font-sans text-[13px] text-muted">
           {t("task.closedAs", { outcome: t(`outcome.${view.outcome ?? view.closed.outcome}`) })}
         </Text>
-        <Button
-          onPress={() => void run(actions.reopen(view.id), { success: t("task.reopened") })}
-          variant="secondary"
-        >
+        <Button onPress={() => void run(actions.reopen(view.id))} variant="secondary">
           {t("task.reopen")}
         </Button>
       </View>

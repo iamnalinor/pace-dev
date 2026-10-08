@@ -38,17 +38,14 @@ export const CardView = ({ card }: { readonly card: InboxCard }) => {
   const run = useRunAction();
   const guess = useGuess(card);
   return (
-    <View className="gap-2.5 rounded-xl border border-line bg-surface p-3.5">
+    <View className="gap-2.5 rounded-xl border border-line bg-surface p-3.5" role="listitem">
       <Text className="font-sans text-[15px] text-fg">{card.text}</Text>
       <Text className="font-sans text-[12px] text-muted">{guess}</Text>
       <View className="flex-row gap-2">
         <View className="flex-1">
           <Button
             onPress={() => {
-              void run(actions.acceptSuggestion(card.id, card.suggestion), {
-                success: t("inbox.accepted"),
-                undo: true,
-              });
+              void run(actions.acceptSuggestion(card.id, card.suggestion));
             }}
           >
             {t("common.accept")}
@@ -57,7 +54,7 @@ export const CardView = ({ card }: { readonly card: InboxCard }) => {
         <View className="flex-1">
           <Button
             onPress={() => {
-              void run(actions.discardInbox(card.id), { success: t("inbox.deleted"), undo: true });
+              void run(actions.discardInbox(card.id));
             }}
             variant="secondary"
           >

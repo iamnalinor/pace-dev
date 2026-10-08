@@ -10,7 +10,9 @@ import { PaceProvider } from "#app/app-state.tsx";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 // Defines the background phone check before Android may run it.
 import "#app/platform/phone-background.ts";
+import { UpdateBanner } from "#app/platform/update-banner.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
+import { ToastProvider } from "#app/ui/toast.tsx";
 
 const Navigator = () => {
   const { palette, scheme } = useTheme();
@@ -20,7 +22,7 @@ const Navigator = () => {
       <Stack screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" options={{ animation: "fade" }} />
-        <Stack.Screen name="auth" options={{ animation: "fade" }} />
+        <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
         <Stack.Screen name="settings" options={{ presentation: "modal" }} />
         <Stack.Screen name="task/[id]" />
         <Stack.Screen name="project/[id]" />
@@ -31,6 +33,7 @@ const Navigator = () => {
         <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
       </Stack>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <UpdateBanner />
     </>
   );
 };
@@ -43,7 +46,9 @@ export default function RootLayout() {
         <ThemeProvider>
           <PaceProvider>
             <ShareIntentProvider>
-              <Navigator />
+              <ToastProvider>
+                <Navigator />
+              </ToastProvider>
             </ShareIntentProvider>
           </PaceProvider>
         </ThemeProvider>

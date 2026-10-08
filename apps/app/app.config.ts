@@ -22,7 +22,9 @@ const config: ExpoConfig = {
   slug: "pace",
   version,
   scheme: "pace",
-  platforms: ["android"],
+  platforms: ["android", "web"],
+  // The web build is a single-page app served by the pace-web Worker (static assets).
+  web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   backgroundColor: "#0b0b0c",
@@ -123,6 +125,10 @@ const config: ExpoConfig = {
     apiUrl: envString("EXPO_PUBLIC_API_URL") ?? "https://pace-api.nalinor.dev",
     // The web app, opened for the browser login fallback (`src/platform/api-base.ts`).
     webOrigin: envString("EXPO_PUBLIC_WEB_ORIGIN") ?? "https://pace.nalinor.dev",
+    // The bot the web login widget signs in with.
+    botUsername: envString("EXPO_PUBLIC_TELEGRAM_BOT") ?? "PaceTaskTrackerBot",
+    // A build made for e2e shows the dev login form (only the test Worker accepts it).
+    isDevLogin: envString("EXPO_PUBLIC_DEV_LOGIN") === "1",
   },
 };
 

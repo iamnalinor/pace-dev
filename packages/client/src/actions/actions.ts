@@ -7,6 +7,7 @@ import { defaultEstimateHints, type EstimateBucket, type EstimateHints } from ".
 import { type InboxActions, inboxActions } from "./inbox-actions.ts";
 import { type InstanceActions, instanceActions } from "./instances.ts";
 import { type PresetActions, presetActions } from "./preset-actions.ts";
+import { type ProjectActions, projectActions } from "./project-actions.ts";
 import { type RankActions, rankActions } from "./rank-actions.ts";
 import { type ReviewActions, reviewActions } from "./review-actions.ts";
 import { type SettingsActions, settingsActions } from "./settings-actions.ts";
@@ -26,6 +27,7 @@ export type Actions = ComposerActions &
   InboxActions &
   InstanceActions &
   PresetActions &
+  ProjectActions &
   RankActions &
   ReviewActions &
   SettingsActions &
@@ -51,6 +53,7 @@ export const createActions = (options: ActionsOptions): Actions => {
     ...inboxActions(deps),
     ...instanceActions(deps),
     ...presetActions(deps),
+    ...projectActions(deps),
     ...rankActions(deps),
     ...reviewActions(deps),
     ...settingsActions(deps),

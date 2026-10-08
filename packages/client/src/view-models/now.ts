@@ -29,7 +29,8 @@ export type MetaPart =
     }
   | { readonly kind: "end-of-day" }
   | { readonly kind: "importance"; readonly importance: Importance }
-  | { readonly kind: "late"; readonly minutes: number }
+  /** `isSoft`: a resubmission deadline, whose lateness is never told in minutes. */
+  | { readonly kind: "late"; readonly minutes: number; readonly isSoft: boolean }
   /** Time until the due, shown next to it: "6d 12h left". */
   | { readonly kind: "left"; readonly minutes: number }
   | { readonly kind: "problems-left"; readonly count: number }
@@ -81,7 +82,8 @@ const importancePart = (item: NowItem): readonly MetaPart[] =>
 const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   const { task } = item;
   if (item.lateMinutes !== null) {
-    return [{ kind: "late", minutes: item.lateMinutes }];
+    const isSoft = item.preset.deadlinePolicy.kind === "resubmission";
+    return [{ isSoft, kind: "late", minutes: item.lateMinutes }];
   }
   if (task.dueAt !== null && task.dueTz !== null) {
     const due = { at: task.dueAt, tz: task.dueTz };

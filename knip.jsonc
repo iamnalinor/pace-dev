@@ -2,9 +2,6 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
   "ignoreIssues": {
-    // Vendored shadcn/ui components export every sub-component (CardAction, ...);
-    // we keep them close to upstream instead of trimming exports we don't use yet.
-    "apps/web/src/shared/ui/**": ["exports", "types"],
     // Drizzle consumes these modules as a namespace (`import * as schema`).
     "apps/api/src/shared/db/d1-schema.ts": ["exports"],
     "apps/api/src/user-store/schema.ts": ["exports"]
@@ -34,23 +31,17 @@
       // `cloudflare:workers` / `cloudflare:test` are runtime modules, not npm packages.
       "ignoreDependencies": ["cloudflare"]
     },
-    "apps/web": {
-      "ignoreDependencies": [
-        "@stryker-mutator/command-runner",
-        // Pre-declared for later shell work; drop from this list when used.
-        // react-query: server-only state (login polling UI) is not needed yet.
-        "@tanstack/react-query",
-        // zustand reaches the web app through @pace/client/react, never directly.
-        "zustand"
-      ],
-      "entry": ["src/test/*.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx,css}"]
-    },
     "apps/app": {
       // Loading metro.config.js would execute NativeWind's Metro plugin (it writes files).
       "metro": false,
       // Local Expo modules are autolinked by folder; their index.ts is the JS entry.
-      "entry": ["plugins/*.js", "modules/*/index.ts"],
+      // The web build swaps in `*.web.ts(x)` siblings and src/platform/web (metro.config.js).
+      "entry": [
+        "plugins/*.js",
+        "modules/*/index.ts",
+        "src/**/*.web.{ts,tsx}",
+        "src/platform/web/*.{ts,tsx}"
+      ],
       "project": [
         "app/**/*.{ts,tsx}",
         "src/**/*.{ts,tsx}",

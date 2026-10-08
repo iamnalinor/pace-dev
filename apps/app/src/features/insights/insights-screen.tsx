@@ -44,6 +44,7 @@ const Bars = ({
             accessibilityLabel={`${name}: ${value}`}
             className="flex-row items-center gap-3"
             key={bar.key ?? "none"}
+            role="group"
           >
             <Text className="w-24 font-sans text-[12px] text-fg2" numberOfLines={1}>
               {name}

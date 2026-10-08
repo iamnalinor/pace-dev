@@ -23,6 +23,8 @@ export const enInput = {
   "actionError.action/not-auto-outcome": "This task was not closed automatically.",
   "actionError.action/nothing-to-do": "Nothing to change.",
   "actionError.action/unknown-project": "That project does not exist anymore.",
+  "actionError.project/name-required": "Give the project a name.",
+  "actionError.project/name-taken": "A project with this name already exists.",
   "actionError.action/unknown-review-action": "That action is not available anymore.",
   "actionError.event/duplicate": "This was already recorded.",
   "actionError.event/not-found": "That record does not exist anymore.",

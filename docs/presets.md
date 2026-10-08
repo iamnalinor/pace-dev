@@ -8,8 +8,9 @@ week, which extra fields the form shows, and when notifications fire.
 
 Presets are data, not code. They live in the event log (`preset.created`,
 `preset.updated`, `preset.archived`), so they sync to every device like tasks do. You edit
-them in the web app under **Settings → Presets**; the Android app and the MCP tools read
-them from the synced state.
+them under **Settings → Presets**, on the phone or the web (one UI); the MCP tools read them
+from the synced state. The list moves a preset up or down in the pickers and opens any of
+them, a default too: a default's editor overrides its shipped values.
 
 ## How a preset is built
 
@@ -116,7 +117,7 @@ What they are for:
 
 ## Example course presets
 
-On first login the web app offers **Start from example course presets**. It creates three
+Settings → Presets offers **Add example course presets**. It creates three
 user presets extending `hw`; their ids are fixed, so applying the seed again creates
 nothing. Edit or archive them freely.
 

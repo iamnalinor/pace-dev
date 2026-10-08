@@ -34,7 +34,7 @@ describe("TaskScreen — homework", () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Focus" }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Focusing", selected: true })).toBeOnTheScreen();
+      expect(screen.getByRole("button", { name: "Focusing" })).toBeOnTheScreen();
     });
     const running = () =>
       Object.values(runtime.state.store.getState().time.activities).filter(

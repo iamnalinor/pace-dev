@@ -1,12 +1,12 @@
 /**
 Architecture as code. `bun lint` fails when a dependency crosses a boundary.
 
-  apps/app ─┐
-  apps/web ─┼─► packages/client ─► packages/core (incl. the zod API contract)
-  apps/api ─┴───────────────────► packages/core
+  apps/app ─► packages/client ─► packages/core (incl. the zod API contract)
+  apps/api ─────────────────────► packages/core
 
 core is pure (no platform, no other workspace); client never imports an app or the API;
-apps never import each other; API features only reach other features through shared/.
+the app (phone and web) never imports the API; API features only reach other features
+through shared/.
 */
 import { builtinModules } from "node:module";
 
@@ -34,26 +34,14 @@ const config = {
       name: "api-does-not-import-ui",
       severity: "error",
       from: { path: "^apps/api/" },
-      to: { path: "^(apps/(web|app)|packages/client)/" },
+      to: { path: "^(apps/app|packages/client)/" },
     },
     {
       name: "ui-does-not-import-api",
       comment: "The browser/phone bundle must never include server code; the contract is in core.",
       severity: "error",
-      from: { path: "^apps/(web|app)/" },
-      to: { path: "^apps/api/" },
-    },
-    {
-      name: "apps-are-isolated",
-      severity: "error",
-      from: { path: "^apps/web/" },
-      to: { path: "^apps/app/" },
-    },
-    {
-      name: "app-does-not-import-web",
-      severity: "error",
       from: { path: "^apps/app/" },
-      to: { path: "^apps/web/" },
+      to: { path: "^apps/api/" },
     },
     {
       name: "api-features-are-isolated",
@@ -69,12 +57,6 @@ const config = {
           String.raw`^apps/api/src/[^/]+\.ts$`,
         ],
       },
-    },
-    {
-      name: "web-features-are-isolated",
-      severity: "error",
-      from: { path: "^apps/web/src/features/([^/]+)/" },
-      to: { path: "^apps/web/src/features/", pathNot: "^apps/web/src/features/$1/" },
     },
     {
       name: "app-features-are-isolated",
@@ -108,7 +90,9 @@ const config = {
           String.raw`^apps/app/jest\.setup\.ts$`,
           "^e2e/",
           "^scripts/",
-          String.raw`^apps/web/src/test/setup\.ts$`, // loaded by vitest.config.ts
+          // The web build swaps these in for their siblings (metro.config.js), by file name.
+          "^apps/app/src/.+[.]web[.]tsx?$",
+          "^apps/app/src/platform/web/",
           String.raw`^apps/api/tests/setup\.ts$`, // loaded by vitest.config.ts
           "^packages/core/src/parse/regression/",
         ],

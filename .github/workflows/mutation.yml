@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   stryker:
-    name: Stryker (core + web)
+    name: Stryker (core)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -23,8 +23,6 @@ jobs:
         if: always()
         with:
           name: mutation-reports
-          path: |
-            packages/core/reports/
-            apps/web/reports/
+          path: packages/core/reports/
           if-no-files-found: warn
           retention-days: 30

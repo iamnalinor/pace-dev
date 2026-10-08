@@ -136,6 +136,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "errors.httpStatus": "{status} {text}",
   "errors.details": "Технические детали",
   "errors.reload": "Перезагрузить",
+  "update.ready": "Мы кое-что поменяли",
+  "update.reload": "Обновить",
   "errors.syncFailed": "Синхронизация не удалась: {reason}",
   "settings.digestWindows.hint": "Когда приходят дневные сводки, по часовому поясу аккаунта.",
   "settings.digestWindows.add": "Добавить время",

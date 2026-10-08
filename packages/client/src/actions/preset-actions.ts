@@ -1,4 +1,5 @@
 import {
+  byPresetOrder,
   err,
   exampleCoursePresetEvents,
   parsePresetDefinition,
@@ -14,6 +15,8 @@ export type PresetActions = {
   readonly createPreset: (input: PresetInput) => ActionResult;
   readonly updatePreset: (input: PresetInput) => ActionResult;
   readonly archivePreset: (presetId: string) => ActionResult;
+  /** One place up (`-1`) or down (`1`) in the pickers. */
+  readonly movePreset: (presetId: string, step: -1 | 1) => ActionResult;
   /** The one-click seed of the example course presets; ids already present are left alone. */
   readonly seedExamplePresets: () => ActionResult;
 };
@@ -76,8 +79,40 @@ const archivePreset =
       : await emit(deps, [stamp(deps, { type: "preset.archived", payload: { id: presetId } })]);
   };
 
+/**
+The pickers' order as positions 1…n: new presets share order 100 until one is moved, so
+the whole list is renumbered and only the presets whose number changes get an event.
+*/
+const movePreset =
+  (deps: ActionDeps): PresetActions["movePreset"] =>
+  async (presetId, step) => {
+    const sorted = Object.values(deps.state.store.getState().presets.byId)
+      .filter((preset) => preset.id !== "inbox")
+      .toSorted(byPresetOrder);
+    const from = sorted.findIndex((preset) => preset.id === presetId);
+    if (from === -1) {
+      return err("preset/unknown");
+    }
+    const to = from + step;
+    const other = sorted[to];
+    const moving = sorted[from];
+    if (other === undefined || moving === undefined) {
+      return err("action/nothing-to-do");
+    }
+    const next = sorted.with(from, other).with(to, moving);
+    return await emit(
+      deps,
+      next.flatMap((preset, index) =>
+        preset.order === index + 1
+          ? []
+          : [stamp(deps, { type: "preset.updated", payload: { id: preset.id, order: index + 1 } })],
+      ),
+    );
+  };
+
 export const presetActions = (deps: ActionDeps): PresetActions => ({
   archivePreset: archivePreset(deps),
+  movePreset: movePreset(deps),
   createPreset: async (input) => await savePreset(deps, input, "create"),
   seedExamplePresets: async () => {
     const { presets } = deps.state.store.getState();

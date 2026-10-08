@@ -89,7 +89,7 @@ export const WhyCard = ({
     <View className="mx-4 rounded-xl border border-line bg-surface">
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ expanded: isOpen }}
+        aria-expanded={isOpen}
         className="min-h-12 flex-row items-center justify-between px-3.5 active:opacity-70"
         onPress={() => {
           setIsOpen((open) => !open);

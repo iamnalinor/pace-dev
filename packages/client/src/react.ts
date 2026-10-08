@@ -37,6 +37,15 @@ import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 
+export {
+  type Consent,
+  type ConsentPhase,
+  type Grants,
+  type GrantsPhase,
+  type Identity,
+  useConsent,
+  useGrants,
+} from "./react/oauth.ts";
 export { useStore } from "zustand";
 
 export type AppHooks = {

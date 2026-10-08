@@ -1,5 +1,5 @@
 import { Minus, Plus } from "lucide-react-native";
-import { type AccessibilityActionEvent, Text, View } from "react-native";
+import { type AccessibilityActionEvent, Platform, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
@@ -34,13 +34,18 @@ export const WorkProgress = ({ view }: { readonly view: TaskViewModel }) => {
         <Text className="font-mono text-[13px] text-fg">{t("task.progressOf", { value })}</Text>
       </View>
       <View
-        accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
-        accessibilityLabel={t("task.progressAria")}
-        accessibilityRole="adjustable"
-        accessibilityValue={{ max: MAX, min: 0, now: value }}
-        accessible
         className="flex-row items-center gap-3"
-        onAccessibilityAction={onAction}
+        // TalkBack reads the row as one slider; a browser keeps the two buttons and the bar.
+        {...(Platform.OS !== "web" && {
+          accessibilityActions: [{ name: "increment" }, { name: "decrement" }],
+          accessibilityLabel: t("task.progressAria"),
+          accessibilityRole: "adjustable",
+          accessible: true,
+          "aria-valuemax": MAX,
+          "aria-valuemin": 0,
+          "aria-valuenow": value,
+          onAccessibilityAction: onAction,
+        })}
       >
         <IconButton
           icon={Minus}

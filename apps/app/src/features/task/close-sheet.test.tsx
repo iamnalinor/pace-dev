@@ -24,22 +24,22 @@ describe("CloseSheet — submitting problems", () => {
       screen.getByText(en("close.subtitleSolved", { title: "Algebra HW 6" })),
     ).toBeOnTheScreen();
     for (const key of ["now", "hour-ago", "yesterday-evening", "at-deadline"] as const) {
-      expect(screen.getByRole("button", { name: en(`quickTime.${key}`) })).toBeOnTheScreen();
+      expect(screen.getByRole("radio", { name: en(`quickTime.${key}`) })).toBeOnTheScreen();
     }
     expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
     expect(preview("open")).toHaveTextContent("5, 6, 7a Bonus", { exact: false });
     expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50", { exact: false });
-    await fireEvent.press(screen.getByRole("button", { name: en("quickTime.hour-ago") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.hour-ago") }));
     expect(preview("recorded")).toHaveTextContent("12:50 · happened 11:50", { exact: false });
   });
 
   it("submits an hour ago as an approximate time", async () => {
     const runtime = await openSubmit();
-    await fireEvent.press(screen.getByRole("button", { name: en("quickTime.hour-ago") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.hour-ago") }));
     await fireEvent(screen.getByRole("switch", { name: en("close.exact") }), "valueChange", false);
     await fireEvent.press(screen.getByRole("button", { name: en("close.submit") }));
     await waitFor(() => {
-      expect(screen.getByText("Algebra HW 6 · 2 sent")).toBeOnTheScreen();
+      expect(runtime.state.store.getState().log.at(-1)?.type).toBe("task.submitted");
     });
     const sent = runtime.state.store.getState().log.at(-1);
     expect(sent).toMatchObject({
@@ -52,7 +52,7 @@ describe("CloseSheet — submitting problems", () => {
 
   it("takes an exact time typed in the device zone and refuses a malformed one", async () => {
     await openSubmit();
-    await fireEvent.press(screen.getByRole("button", { name: en("close.pickExact") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
     expect(screen.getByText(en("edit.inZone", { zone: "Europe/Moscow" }))).toBeOnTheScreen();
     const time = screen.getByLabelText(en("close.time"));
     await fireEvent.changeText(time, "25:00");
@@ -65,7 +65,7 @@ describe("CloseSheet — submitting problems", () => {
   it("closes the task as skipped with a reason instead", async () => {
     const runtime = await openSubmit();
     await fireEvent.press(screen.getByRole("button", { name: en("close.other") }));
-    await fireEvent.press(screen.getByRole("button", { name: en("close.skipped") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.skipped") }));
     await fireEvent.changeText(screen.getByLabelText(en("close.reason")), "course dropped");
     const confirm = en("close.confirm", { outcome: en("close.skipped") });
     await fireEvent.press(screen.getByRole("button", { name: confirm }));
@@ -84,7 +84,7 @@ describe("CloseSheet — closing a whole task", () => {
     await renderScreen(<TaskScreen id={TRK_ID} openClose />, runtime);
     expect(screen.getByRole("header", { name: en("close.closeTitle") })).toBeOnTheScreen();
     expect(preview("outcome")).toHaveTextContent(en("close.late"), { exact: false });
-    await fireEvent.press(screen.getByRole("button", { name: en("quickTime.at-deadline") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.at-deadline") }));
     expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
     await fireEvent.press(screen.getByRole("button", { name: en("common.done") }));
     await waitFor(() => {

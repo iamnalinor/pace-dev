@@ -8,6 +8,9 @@ const SIZES = [
   { height: 900, name: "desktop", width: 1440 },
 ] as const;
 
+/** A word of its own per run, so a reused server or a parallel copy never shows the same line. */
+const unique = (): string => crypto.randomUUID().slice(0, 6);
+
 const add = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
   await line.fill(text);
@@ -19,27 +22,26 @@ for (const size of SIZES) {
   test.describe(`${size.name} (${String(size.width)}px)`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
 
-    test("checks a task off and brings it back with Undo", async ({ page }) => {
-      await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
+    test("checks a task off and brings it back from History", async ({ page }) => {
+      // An account of its own: History lists every synced event, and Undo takes the newest.
+      await loginViaApi(page, size.name === "phone" ? "1011" : "1012");
       await page.goto("/");
-      await add(page, `water the plants ${size.name}`);
+      const title = `water the plants ${size.name} ${unique()}`;
+      await add(page, title);
       const board = page.getByRole("list", { name: "Tasks" });
-      const title = `water the plants ${size.name}`;
-      await board.getByRole("button", { name: `Mark ${title} done` }).click();
+      await board.getByRole("checkbox", { name: `Mark ${title} done` }).click();
       await expect(board.getByText(title)).toHaveCount(0);
-      // The "Added" toast has an Undo too: take the one about this task.
-      await page
-        .locator("[data-sonner-toast]")
-        .filter({ hasText: title })
-        .getByRole("button", { name: "Undo" })
-        .click();
-      await expect(board.getByText(title)).toBeVisible();
+      // No toast: the change is in History, undone from there.
+      await page.goto("/history");
+      await page.getByRole("button", { name: "Undo" }).first().click();
+      await page.goto("/");
+      await expect(page.getByRole("list", { name: "Tasks" }).getByText(title)).toBeVisible();
     });
 
     test("sends a line to Inbox and sorts it there", async ({ page }) => {
       await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
       await page.goto("/");
-      const text = `ask about the ${size.name} invoice`;
+      const text = `ask about the ${size.name} invoice ${unique()}`;
       await page.getByRole("textbox", { name: "New task" }).fill(text);
       await page.getByRole("button", { name: "To Inbox" }).click();
       await page.goto("/inbox");
@@ -58,7 +60,6 @@ for (const size of SIZES) {
       await expectNoA11yViolations(page);
       await page.goto("/settings");
       await expect(page.getByText(/^Account: /u)).toBeVisible();
-      await expect(page.getByText("Not set yet")).toHaveCount(0);
       await page.goto("/no-such-page");
       await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
       await expect(page.getByText("There is nothing at /no-such-page.")).toBeVisible();

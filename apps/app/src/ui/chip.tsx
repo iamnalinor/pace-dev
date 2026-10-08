@@ -44,8 +44,8 @@ export const Chip = ({
 }) => (
   <Pressable
     accessibilityLabel={label ?? children}
-    accessibilityRole="button"
-    accessibilityState={{ selected }}
+    accessibilityRole="radio"
+    aria-checked={selected}
     className={cx(
       "flex-row items-center gap-1.5 rounded-pill px-3 active:opacity-80",
       tall ? "h-9" : "h-8",

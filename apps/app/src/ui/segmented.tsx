@@ -14,13 +14,13 @@ export const Segmented = <T extends string>({
   readonly options: readonly SegmentedOption<T>[];
   readonly value: T;
 }) => (
-  <View className="flex-row gap-1.5">
+  <View className="flex-row gap-1.5" role="radiogroup">
     {options.map((option) => {
       const isSelected = option.value === value;
       return (
         <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ selected: isSelected }}
+          accessibilityRole="radio"
+          aria-checked={isSelected}
           className={cx(
             "h-8 items-center justify-center rounded-pill px-3",
             isSelected ? "bg-inverse" : "border border-line",

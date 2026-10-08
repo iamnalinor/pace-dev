@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, Text, TextInput, View } from "react-native";
+import { ScrollView, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
 
 import type { AiOutcome, AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
@@ -28,6 +28,7 @@ const ChipRow = ({
     contentContainerClassName="gap-1.5 px-1"
     horizontal
     keyboardShouldPersistTaps="handled"
+    role="radiogroup"
     showsHorizontalScrollIndicator={false}
   >
     {children}
@@ -209,6 +210,20 @@ const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
   };
 };
 
+/** A keyboard (the web, a tablet with one): Enter adds, Shift+Enter starts a new line. */
+const enterAdds =
+  (isEmpty: boolean, add: () => Promise<void>) =>
+  (event: TextInputKeyPressEvent): void => {
+    const native = event.nativeEvent as TextInputKeyPressEvent["nativeEvent"] & {
+      shiftKey?: boolean;
+    };
+    if (isEmpty || native.key !== "Enter" || native.shiftKey === true) {
+      return;
+    }
+    event.preventDefault();
+    void add();
+  };
+
 /**
 The app's entry point on Now: one line read into chips as it is typed; Add stores it (or
 adds the problems to this week's homework), To Inbox keeps the raw line for later.
@@ -221,24 +236,20 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
   const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
   const model = hooks.useComposer({ edits, text });
   useAutoAiRead(ai, text, onReading);
-  const toInbox = async (message = t("add.toInboxDone")): Promise<void> => {
-    if (await run(actions.captureInbox(text), { success: message, undo: true })) {
+  const toInbox = async (): Promise<void> => {
+    if (await run(actions.captureInbox(text))) {
       reset();
     }
   };
   const readLater = useReadLater(async () => await ai.readLater(text, onReading), reset);
   const readFirst = useReadFirst(ai, async () => {
-    await toInbox(t("composer.aiSlow"));
+    await toInbox();
   });
   const add = async (): Promise<void> => {
     if (readFirst.isPending(text, onReading)) {
       return;
     }
-    const success =
-      model.target.kind === "instance"
-        ? t("composer.addedTo", { title: model.target.title })
-        : t("add.added");
-    if (await run(actions.createFromComposer(model), { success, undo: true })) {
+    if (await run(actions.createFromComposer(model))) {
       reset();
     }
   };
@@ -251,6 +262,7 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
         className="max-h-48 min-h-11 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
         multiline
         onChangeText={onText}
+        onKeyPress={enterAdds(model.isEmpty, add)}
         placeholder={t("composer.placeholder")}
         placeholderTextColor={palette.muted}
         textAlignVertical="top"

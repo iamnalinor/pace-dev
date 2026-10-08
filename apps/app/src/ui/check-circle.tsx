@@ -23,8 +23,9 @@ export const CheckCircle = ({
   return (
     <Pressable
       accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={{ checked, disabled: onPress === undefined }}
+      accessibilityRole="checkbox"
+      aria-checked={checked}
+      aria-disabled={onPress === undefined}
       className={cx(
         "mt-px h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px]",
         checked ? "border-fg bg-fg" : "border-muted",

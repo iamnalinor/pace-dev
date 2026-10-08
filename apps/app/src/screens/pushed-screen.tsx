@@ -24,7 +24,12 @@ export const PushedScreen = ({
         <BackHeader
           backLabel={t("common.back")}
           onBack={() => {
-            router.back();
+            // A link opened straight on this screen (the web) has nothing to go back to.
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/");
+            }
           }}
           right={right}
         >

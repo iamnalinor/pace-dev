@@ -162,6 +162,18 @@ export const formatSpan = (minutes: number, language: Language): string => {
     : `${total}${units.m}`;
 };
 
+/**
+How late a task is: whole hours from an hour on (`2h`, `1d 3h`); minutes only while a hard
+deadline is under an hour late. A soft deadline (resubmission) never counts minutes: `<1h`.
+*/
+export const formatLate = (minutes: number, language: Language, isSoft: boolean): string => {
+  const total = Math.floor(Math.abs(minutes));
+  if (total >= 60) {
+    return formatSpan(total - (total % 60), language);
+  }
+  return isSoft ? `<1${SPAN_UNITS[language].h}` : formatSpan(total, language);
+};
+
 const dateParts = (
   atIso: string,
   language: Language,

@@ -32,10 +32,7 @@ const RowView = ({ row }: { readonly row: ReviewRow }) => {
           <Button
             key={key}
             onPress={() => {
-              void run(actions.runReviewAction(row.item, key), {
-                success: t("review.applied"),
-                undo: true,
-              });
+              void run(actions.runReviewAction(row.item, key));
             }}
             variant="secondary"
           >

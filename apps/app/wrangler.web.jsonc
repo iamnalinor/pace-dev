@@ -1,0 +1,8 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The web build of the app (`bun run build:web` → dist/), served as static assets.
+  "name": "pace-web",
+  "compatibility_date": "2026-10-01",
+  "routes": [{ "pattern": "pace.nalinor.dev", "custom_domain": true }],
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" }
+}

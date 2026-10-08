@@ -43,11 +43,11 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Build web
-        working-directory: apps/web
+        working-directory: apps/app
         env:
-          VITE_API_URL: https://pace-api.nalinor.dev
-          VITE_TELEGRAM_BOT: ${{ vars.TELEGRAM_BOT_USERNAME || 'PaceTaskTrackerBot' }}
-        run: bun run build
+          EXPO_PUBLIC_API_URL: https://pace-api.nalinor.dev
+          EXPO_PUBLIC_TELEGRAM_BOT: ${{ vars.TELEGRAM_BOT_USERNAME || 'PaceTaskTrackerBot' }}
+        run: bun run build:web
 
       - name: Apply D1 migrations
         working-directory: apps/api
@@ -58,8 +58,8 @@ jobs:
         run: bunx wrangler deploy
 
       - name: Deploy web (static assets worker)
-        working-directory: apps/web
-        run: bunx wrangler deploy
+        working-directory: apps/app
+        run: bun run deploy:web
 
       # The bot token as pasted into GitHub may carry a trailing newline or spaces; every later
       # step (Worker secret, webhook secret, Bot API URLs) uses this trimmed copy.
@@ -135,3 +135,4 @@ jobs:
         run: |
           curl --fail --silent "${API_URL}/api/health" >/dev/null
           curl --fail --silent https://pace.nalinor.dev/ | grep -q '<div id="root">'
+          curl --fail --silent --head https://pace.nalinor.dev/sw.js >/dev/null

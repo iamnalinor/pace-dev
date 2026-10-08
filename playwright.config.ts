@@ -12,14 +12,14 @@ const isCi = process.env["CI"] !== undefined;
 const E2E_STATE_DIR = path.resolve(import.meta.dirname, ".cache/e2e-state");
 // Every e2e test signs in with its own Telegram id (see e2e/support/login.ts) so parallel tests
 // never share account state (language, time zone) through the server.
-const E2E_TELEGRAM_IDS = "1919230638,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010";
+const E2E_TELEGRAM_IDS = "1919230638,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012";
 
 // Optional: a pre-installed Chromium instead of `playwright install` (e.g. sandboxes).
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
 
 /**
-End-to-end: the production web build (vite preview) against the real Worker running
-locally in wrangler dev (workerd with local D1/KV/Durable Objects, ENVIRONMENT=test).
+End-to-end: the production web build of the app (Expo export, served as a single-page app)
+against the real Worker running locally in wrangler dev (workerd with local D1/KV/Durable Objects, ENVIRONMENT=test).
 */
 export default defineConfig({
   forbidOnly: isCi,
@@ -57,10 +57,14 @@ export default defineConfig({
             url: `http://localhost:${String(API_PORT)}/api/health`,
           },
           {
-            command: "bun run --cwd apps/web build && bun run --cwd apps/web preview",
-            // VITE_DEV_LOGIN shows the dev login form in the production build (the tests use it).
-            env: { VITE_API_URL: `http://localhost:${String(API_PORT)}`, VITE_DEV_LOGIN: "1" },
+            command: `bun run --cwd apps/app build:web && bun run --cwd apps/app serve:web dist ${String(WEB_PORT)}`,
+            // EXPO_PUBLIC_DEV_LOGIN shows the dev login form in the production build (the tests use it).
+            env: {
+              EXPO_PUBLIC_API_URL: `http://localhost:${String(API_PORT)}`,
+              EXPO_PUBLIC_DEV_LOGIN: "1",
+            },
             reuseExistingServer: !isCi,
+            timeout: 600_000,
             url: WEB_URL,
           },
         ]

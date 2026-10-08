@@ -17,17 +17,17 @@ describe("TimeBar", () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
     expect(screen.getByText("Nothing running. Tap an activity to start it.")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Work" }));
+    await fireEvent.press(screen.getByRole("switch", { name: "Work" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Work"]);
     });
-    expect(screen.getByRole("button", { name: "Work", selected: true })).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Food" }));
+    expect(screen.getByRole("switch", { checked: true, name: "Work" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("switch", { name: "Food" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Food"]);
     });
     expect(screen.getByText("of ~30m")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Food" }));
+    await fireEvent.press(screen.getByRole("switch", { name: "Food" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual([]);
     });
@@ -36,7 +36,7 @@ describe("TimeBar", () => {
   it("stops the running activity from the Stop button", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: "Study" }));
+    await fireEvent.press(screen.getByRole("switch", { name: "Study" }));
     await fireEvent.press(await screen.findByRole("button", { name: "Stop" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual([]);
@@ -46,12 +46,12 @@ describe("TimeBar", () => {
   it("opens the editor on press and hold and saves the new defaults", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent(screen.getByRole("button", { name: "Commute" }), "longPress");
+    await fireEvent(screen.getByRole("switch", { name: "Commute" }), "longPress");
     const name = await screen.findByLabelText("Name");
     await fireEvent.changeText(name, "Метро");
     await fireEvent.changeText(screen.getByLabelText("Expect, minutes"), "35");
     await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByRole("button", { name: "Метро" })).toBeOnTheScreen();
+    expect(await screen.findByRole("switch", { name: "Метро" })).toBeOnTheScreen();
     expect(runtime.state.store.getState().time.buttons["btn:commute"]).toMatchObject({
       expectMinutes: 35,
       label: "Метро",
@@ -65,7 +65,7 @@ describe("TimeBar", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Add activity" }));
     await fireEvent.changeText(await screen.findByLabelText("Name"), "Reading");
     await fireEvent.press(
-      within(screen.getByLabelText("Category")).getByRole("button", { name: "Study" }),
+      within(screen.getByLabelText("Category")).getByRole("radio", { name: "Study" }),
     );
     await fireEvent.press(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
