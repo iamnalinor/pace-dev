@@ -59,6 +59,7 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "cacheDirectory": "<rootDir>/../../.cache/jest",
     "setupFilesAfterEnv": [
       "<rootDir>/jest.setup.ts"
     ],

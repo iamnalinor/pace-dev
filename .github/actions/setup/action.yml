@@ -1,6 +1,9 @@
 name: Setup
 description: Install Bun (version from .bun-version) and dependencies, with a cache.
 
+# Caches are written by main only: pull requests restore main's (GitHub shares a base branch's
+# caches with PRs) and never upload their own, so storage holds one copy and PR runs skip the
+# upload time.
 runs:
   using: composite
   steps:
@@ -8,7 +11,8 @@ runs:
       with:
         bun-version-file: .bun-version
 
-    - uses: actions/cache@v6
+    - uses: actions/cache/restore@v6
+      id: bun-cache
       with:
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -17,3 +21,9 @@ runs:
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile
+
+    - if: github.ref == 'refs/heads/main' && steps.bun-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}

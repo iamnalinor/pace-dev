@@ -49,7 +49,21 @@ jobs:
       # the Worker or the app bundle. Drop the ignores once upstream publishes fixes.
       - run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm --ignore GHSA-86w9-cpqp-85rv
       - run: bun test:unit
+      # Jest's Babel transforms of React Native and Expo are the slow part of the app tests;
+      # they are content-hashed, so the newest main cache is always safe to start from.
+      - uses: actions/cache/restore@v6
+        with:
+          path: .cache/jest
+          key: jest-${{ runner.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            jest-${{ runner.os }}-${{ hashFiles('bun.lock') }}-
+            jest-${{ runner.os }}-
       - run: bun test:app
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: .cache/jest
+          key: jest-${{ runner.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
       - run: bun test:api
 
   e2e:
@@ -61,7 +75,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - uses: actions/cache@v6
+      # The browser download is cached (written by main only); its system libraries are not.
+      - uses: actions/cache/restore@v6
         id: browsers
         with:
           path: ~/.cache/ms-playwright
@@ -70,6 +85,11 @@ jobs:
         run: bunx playwright install --with-deps chromium
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
+      - if: github.ref == 'refs/heads/main' && steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun test:e2e
       - uses: actions/upload-artifact@v7
         if: failure()
