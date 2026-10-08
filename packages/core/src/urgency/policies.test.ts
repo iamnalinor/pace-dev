@@ -221,7 +221,8 @@ describe("resubmission", () => {
         const span: Record<string, readonly [string, number]> = {
           after: [soft, 30 * DAY],
           before: [addDays(TRK_DUE, -10), 10 * DAY],
-          soft: [TRK_DUE, softDays * DAY],
+          // The due instant itself still belongs to the piece before (the drop at due is by design).
+          soft: [addMinutesIso(TRK_DUE, 1), softDays * DAY - 1],
         };
         const [from, minutes] = span[piece] ?? [TRK_DUE, 0];
         const [a, b] = x <= y ? [x, y] : [y, x];
