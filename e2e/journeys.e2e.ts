@@ -42,8 +42,11 @@ for (const size of SIZES) {
       await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
       await page.goto("/");
       const text = `ask about the ${size.name} invoice ${unique()}`;
-      await page.getByRole("textbox", { name: "New task" }).fill(text);
+      const line = page.getByRole("textbox", { name: "New task" });
+      await line.fill(text);
       await page.getByRole("button", { name: "To Inbox" }).click();
+      // The line clears once the capture is stored: navigating sooner can reload before the write.
+      await expect(line).toHaveValue("");
       await page.goto("/inbox");
       await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
       const card = page.getByRole("listitem").filter({ hasText: text });
