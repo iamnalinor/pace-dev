@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";
 
-import type {
-  AiReading,
-  Assistant,
-  ComposerEdits,
-  ComposerModel,
-} from "@pace/client";
+import type { AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";

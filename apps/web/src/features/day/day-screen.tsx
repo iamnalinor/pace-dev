@@ -147,7 +147,7 @@ export const DayScreen = () => {
   const [sheet, setSheet] = useState<null | SheetTarget>(null);
   const day = hooks.useDay(date);
   return (
-    <main className="flex flex-1 flex-col gap-3 pb-6">
+    <main className="flex flex-1 flex-col gap-3 pb-6 lg:max-w-3xl">
       <PageHeader
         action={<DayNav day={day} onDate={setDate} />}
         eyebrow={formatEyebrow(new Date(day.date), language, day.zone)}

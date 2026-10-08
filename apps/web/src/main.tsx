@@ -25,11 +25,15 @@ createRoot(root).render(
   <StrictMode>
     <PaceProvider services={createWebServices()}>
       <RouterProvider router={router} />
-      {/* Bottom, clear of the phone tab bar, so a toast never covers a page title. */}
+      {/*
+      Bottom, clear of the phone tab bar and of the time bar docked above it, so a toast never
+      covers a page title nor the activity buttons.
+      */}
       <Toaster
         // Always closable: a long task title must never leave a toast stuck over the page.
         closeButton
-        mobileOffset={{ bottom: 92 }}
+        mobileOffset={{ bottom: 236 }}
+        offset={{ bottom: 150 }}
         position="bottom-center"
         // Undo is a real target: at least 24px (WCAG 2.2 target size), here 32px.
         toastOptions={{

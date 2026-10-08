@@ -43,7 +43,7 @@ export const ProjectsList = () => {
   const t = useT();
   const projects = useProjectSummaries();
   return (
-    <div className="grid gap-4 px-4">
+    <div className="grid gap-4 px-4 lg:max-w-3xl">
       {projects.length === 0 ? (
         <p className="px-1 py-4 text-sm text-muted">{t("projects.empty")}</p>
       ) : (

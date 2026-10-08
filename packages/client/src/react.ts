@@ -78,12 +78,19 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     }, []);
     return ctx;
   };
-  /** Recomputes a view-model when the store or the clock moves. */
+  /**
+  Recomputes a view-model when the store or the clock moves. A recompute reads the clock
+  afresh: an activity started a second ago must already count as running, not wait for
+  the next tick.
+  */
   const useView = <T>(compute: (current: AppState, ctx: QueryContext) => T, key = ""): T => {
     const version = useVersion();
-    const ctx = useClock();
-    // `version` and `key` are the inputs that matter; the store is read on demand.
-    return useMemo(() => compute(state.store.getState(), ctx), [version, ctx, key]);
+    const tick = useClock();
+    // `version`, the tick and `key` are the inputs that matter; the store and clock are read on demand.
+    return useMemo(
+      () => compute(state.store.getState(), queryContext(clock)),
+      [version, tick, key],
+    );
   };
   return {
     useAppState: (selector) => useStore(state.store, selector),

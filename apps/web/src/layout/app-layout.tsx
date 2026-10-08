@@ -8,7 +8,9 @@ import { Shortcuts } from "./shortcuts.tsx";
 import { Sidebar } from "./sidebar.tsx";
 import { TopNav } from "./top-nav.tsx";
 
-const COLUMN = "mx-auto w-full max-w-[430px] sm:max-w-2xl lg:max-w-6xl lg:px-6";
+// From 1024px the content uses the screen: up to 1600px wide, so two panes never leave a
+// wide empty margin while the list beside them is squeezed.
+const COLUMN = "mx-auto w-full max-w-[430px] sm:max-w-2xl lg:max-w-[1600px] lg:px-8";
 
 /**
 Three shapes: below 640px the artboards' phone column with the tab bar; 640–1023px one
