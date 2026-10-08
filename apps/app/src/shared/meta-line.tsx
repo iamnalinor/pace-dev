@@ -18,7 +18,9 @@ const TONE: Readonly<Record<MetaTone, string>> = {
 
 /** The project's name, else the category's (a built-in one in the interface language). */
 const rowTagLabel = (tag: NowRow["tag"], t: ReturnType<typeof useT>): string => {
-  return tag.kind === "project" || !isBuiltInPreset(tag.presetId) ? tag.name : t(`preset.base.${tag.presetId}`);
+  return tag.kind === "project" || !isBuiltInPreset(tag.presetId)
+    ? tag.name
+    : t(`preset.base.${tag.presetId}`);
 };
 
 /**
