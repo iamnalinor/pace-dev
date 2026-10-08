@@ -8,6 +8,9 @@ const SIZES = [
   { height: 900, name: "desktop", width: 1440 },
 ] as const;
 
+/** A word of its own per run, so a reused server or a parallel copy never shows the same line. */
+const unique = (): string => crypto.randomUUID().slice(0, 6);
+
 const add = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
   await line.fill(text);
@@ -20,9 +23,10 @@ for (const size of SIZES) {
     test.use({ viewport: { height: size.height, width: size.width } });
 
     test("checks a task off and brings it back from History", async ({ page }) => {
-      await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
+      // An account of its own: History lists every synced event, and Undo takes the newest.
+      await loginViaApi(page, size.name === "phone" ? "1011" : "1012");
       await page.goto("/");
-      const title = `water the plants ${size.name}`;
+      const title = `water the plants ${size.name} ${unique()}`;
       await add(page, title);
       const board = page.getByRole("list", { name: "Tasks" });
       await board.getByRole("checkbox", { name: `Mark ${title} done` }).click();
@@ -37,7 +41,7 @@ for (const size of SIZES) {
     test("sends a line to Inbox and sorts it there", async ({ page }) => {
       await loginViaApi(page, size.name === "phone" ? "1001" : "1002");
       await page.goto("/");
-      const text = `ask about the ${size.name} invoice`;
+      const text = `ask about the ${size.name} invoice ${unique()}`;
       await page.getByRole("textbox", { name: "New task" }).fill(text);
       await page.getByRole("button", { name: "To Inbox" }).click();
       await page.goto("/inbox");
