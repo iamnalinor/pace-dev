@@ -146,6 +146,11 @@ describe("time actions", () => {
       ["food", 30],
     ]);
     expect(week.byProject[0]).toMatchObject({ minutes: 70, name: "Algebra" });
+    // The task time is focus time: it shows by hour and as one unbroken block.
+    expect(week.hours.minutes.reduce((sum, minutes) => sum + minutes, 0)).toBe(70);
+    expect(week.hours.peak).not.toBeNull();
+    expect(week.fragmentation).toMatchObject({ focusBlocks: 1, medianFocusMinutes: 70 });
+    expect(week.focusSleep.at(-1)).toMatchObject({ focusMinutes: 70, sleepMinutes: null });
   });
 
   it("saves the Day sheet: a logged block, then a move and a rename in one go", async () => {

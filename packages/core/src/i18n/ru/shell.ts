@@ -106,6 +106,10 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "onboarding.continue": "Продолжить",
   "onboarding.notNow": "Не сейчас",
   "onboarding.step": "{index} из {total}",
+  "settings.export": "Экспорт",
+  "settings.export.hint":
+    "Всё из аккаунта в файле Excel: задачи, подзадачи, учтённое время, проекты и полный журнал событий.",
+  "settings.export.action": "Скачать .xlsx",
   "settings.digestWindows": "Время сводок",
   "settings.quietHours": "Тихие часы",
   "settings.connectedApps": "Подключённые приложения",
@@ -226,8 +230,11 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "bot.cancelled": "Отменено.",
   "bot.expired": "Это предложение устарело. Отправьте сообщение ещё раз.",
   "bot.unavailable":
-    "У ассистента закончились запросы (вернётся примерно в {time}). Я сохранил это во входящие.",
-  "bot.unavailableSoon": "У ассистента закончились запросы. Я сохранил это во входящие.",
+    "У ассистента закончились запросы примерно до {time}. Тогда я это разберу и напишу вам.",
+  "bot.unavailableSoon":
+    "У ассистента пока закончились запросы. Разберу это, как только он вернётся, и напишу вам.",
+  "parse.deferredDone": "Разобрал вашу заметку «{text}»: она в Pace (отменить можно в истории).",
+  "parse.deferredInbox": "Не смог разобрать заметку «{text}», поэтому она во входящих.",
   "bot.notUnderstood": "Не понял, куда это отнести. Оставить во входящих?",
   "bot.failed": "Не получилось: {reason}",
   "bot.nowEmpty": "Сейчас делать нечего.",

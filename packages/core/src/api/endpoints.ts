@@ -25,7 +25,7 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
-import { ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
+import { LlmStatusSchema, ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
   SyncObservationsBodySchema,
   SyncObservationsOutputSchema,
@@ -119,6 +119,13 @@ export const endpoints = {
       method: "POST",
       output: ParseResponseSchema,
       path: "/api/parse",
+    }),
+    /** Whether a model can answer now (none configured counts as never). */
+    status: endpoint({
+      auth: true,
+      method: "GET",
+      output: LlmStatusSchema,
+      path: "/api/llm/status",
     }),
   },
   notify: {

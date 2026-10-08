@@ -137,6 +137,9 @@ export const enInput = {
     "The assistant is out of requests until about {time}. The chips show the rule-based reading; To Inbox keeps the line for later.",
   "composer.aiUnavailableSoon":
     "The assistant is out of requests for now. The chips show the rule-based reading; To Inbox keeps the line for later.",
+  "composer.aiLater": "Read it when it's back",
+  "composer.aiQueued": "Saved: the assistant reads it when it is back (about {time}) and adds it.",
+  "composer.aiQueuedSoon": "Saved: the assistant reads it as soon as it is back and adds it.",
   "composer.aiFailed": "The assistant could not be reached. The chips show the rule-based reading.",
   "composer.aiQuestion": "Answer to add it to the line",
   "parseField.title": "title",

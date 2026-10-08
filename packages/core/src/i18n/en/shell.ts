@@ -106,6 +106,10 @@ export const enShell = {
   "onboarding.continue": "Continue",
   "onboarding.notNow": "Not now",
   "onboarding.step": "{index} of {total}",
+  "settings.export": "Export",
+  "settings.export.hint":
+    "Everything in the account as an Excel file: tasks, subtasks, tracked time, projects and the full event log.",
+  "settings.export.action": "Download .xlsx",
   "settings.digestWindows": "Digest times",
   "settings.quietHours": "Quiet hours",
   "settings.connectedApps": "Connected apps",
@@ -227,8 +231,11 @@ export const enShell = {
   "bot.cancelled": "Cancelled.",
   "bot.expired": "This preview has expired. Send the message again.",
   "bot.unavailable":
-    "The assistant is out of requests for now (back about {time}). I saved this to your Inbox.",
-  "bot.unavailableSoon": "The assistant is out of requests for now. I saved this to your Inbox.",
+    "The assistant is out of requests until about {time}. I will read this then and write to you.",
+  "bot.unavailableSoon":
+    "The assistant is out of requests for now. I will read this as soon as it is back and write to you.",
+  "parse.deferredDone": "Read your earlier note “{text}”: it is in Pace now (History can undo it).",
+  "parse.deferredInbox": "Could not read your earlier note “{text}”, so it is in your Inbox.",
   "bot.notUnderstood": "I could not place this. Keep it in your Inbox?",
   "bot.failed": "That did not work: {reason}",
   "bot.nowEmpty": "Nothing to do right now.",

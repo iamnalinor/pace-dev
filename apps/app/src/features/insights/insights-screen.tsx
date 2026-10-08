@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { Text, View } from "react-native";
 
 import type { InsightBar, InsightsModel } from "@pace/client";
@@ -13,19 +13,13 @@ import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { formatDuration } from "@pace/core";
 
+import { Card } from "./card.tsx";
+import { Patterns } from "./patterns.tsx";
+
 const MIN_PERCENT = 2;
 
 const barWidth = (share: number): `${number}%` =>
   `${Math.max(MIN_PERCENT, Math.round(share * 100))}%`;
-
-const Card = ({ children, title }: { readonly title: string; readonly children: ReactNode }) => (
-  <View accessibilityLabel={title} className="gap-3 rounded-xl border border-line bg-surface p-4">
-    <Text accessibilityRole="header" className="font-sans text-[14px] font-medium text-fg">
-      {title}
-    </Text>
-    {children}
-  </View>
-);
 
 /**
 One measure per chart, one row per entity: the name and the value are text (color is never
@@ -142,6 +136,7 @@ export const InsightsScreen = () => {
               nameOf={(bar) => bar.name ?? t("insights.noProject")}
               title={t("insights.byProject")}
             />
+            <Patterns week={week} zone={deviceTz} />
           </>
         ) : (
           <Text className="font-sans text-[14px] text-muted">{t("insights.nothing")}</Text>

@@ -4,6 +4,8 @@ import { ParseFieldSchema, ParseResultSchema } from "../../parse/schema.ts";
 
 export const ParseRequestSchema = z.strictObject({
   text: z.string().trim().min(1).max(4000),
+  /** When no model can answer now: keep the text and read it (and write it) once one can. */
+  defer: z.boolean().optional(),
 });
 
 /**
@@ -22,6 +24,17 @@ export const ParseResponseSchema = z.discriminatedUnion("status", [
     status: z.literal("unavailable"),
     retryAt: z.iso.datetime().nullable(),
   }),
+  /** Kept to be read once a model is back (asked with `defer`). */
+  z.strictObject({
+    status: z.literal("queued"),
+    retryAt: z.iso.datetime().nullable(),
+  }),
 ]);
+
+/** Whether the assistant can read now, or when it should again. */
+export const LlmStatusSchema = z.strictObject({
+  available: z.boolean(),
+  retryAt: z.iso.datetime().nullable(),
+});
 
 export type ParseResponse = z.output<typeof ParseResponseSchema>;

@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";
 
-import type { AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
+import type { AiOutcome, AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { zonedText } from "#app/format/time.ts";
+import { clockTime, zonedText } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { useToast } from "#app/ui/toast.tsx";
 import { useAiRead, useAutoAiRead, useReadFirst } from "@pace/client/react";
 import { formatDuration, IMPORTANCE_COLORS, ImportanceSchema, isBuiltInPreset } from "@pace/core";
 
@@ -187,6 +188,26 @@ const useDraft = (initialText: string, assistant: Assistant) => {
   };
 };
 
+/** "Read it when it's back" went through: the server keeps the line, so the composer clears. */
+const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
+  const t = useT();
+  const toast = useToast();
+  const { deviceTz } = useViewer();
+  return async (): Promise<void> => {
+    const outcome = await ask();
+    if (outcome.status !== "queued") {
+      return;
+    }
+    toast.show({
+      message:
+        outcome.retryAt === null
+          ? t("composer.aiQueuedSoon")
+          : t("composer.aiQueued", { time: clockTime(outcome.retryAt, deviceTz) }),
+    });
+    onSaved();
+  };
+};
+
 /**
 The app's entry point on Now: one line read into chips as it is typed; Add stores it (or
 adds the problems to this week's homework), To Inbox keeps the raw line for later.
@@ -204,6 +225,7 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
       reset();
     }
   };
+  const readLater = useReadLater(async () => await ai.readLater(text, onReading), reset);
   const readFirst = useReadFirst(ai, async () => {
     await toInbox(t("composer.aiSlow"));
   });
@@ -246,6 +268,7 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
             onAnswer={(answer) => {
               onText(`${text.trimEnd()} ${answer}`);
             }}
+            onLater={() => void readLater()}
             state={ai.state}
           />
           <ComposerActions

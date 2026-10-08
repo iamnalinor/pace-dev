@@ -97,6 +97,7 @@ export {
   type DayTotal,
 } from "./view-models/day.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
+export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
 export {
   type HistoryEntry,
   type HistoryOptions,
@@ -110,6 +111,14 @@ export {
   type InboxViewModel,
   inboxViewModel,
 } from "./view-models/inbox.ts";
+export {
+  type FocusSleepRow,
+  focusSleepRows,
+  type FragmentationTile,
+  fragmentationTiles,
+  HOUR_TICKS,
+  hourLabel,
+} from "./view-models/insights-text.ts";
 export {
   type InsightBar,
   type InsightsModel,

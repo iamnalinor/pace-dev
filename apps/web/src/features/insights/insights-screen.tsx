@@ -12,6 +12,8 @@ import { Button } from "#web/shared/ui/button.tsx";
 import { fillClass } from "#web/shared/ui/color-tag.tsx";
 import { PageHeader } from "#web/shared/ui/page-header.tsx";
 
+import { FocusSleepCard, FragmentationCard, HoursChart } from "./patterns.tsx";
+
 /**
 One measure per chart, one row per entity: the name and the value are text (color is never
 the only label), the bar is the entity's own color, anchored at zero with rounded ends.
@@ -165,6 +167,9 @@ export const InsightsScreen = () => {
               label={t("insights.byProject")}
               nameOf={(bar) => bar.name ?? t("insights.noProject")}
             />
+            <HoursChart hours={week.hours} />
+            <FragmentationCard fragmentation={week.fragmentation} />
+            <FocusSleepCard days={week.focusSleep} zone={deviceTz} />
           </>
         ) : (
           <p className="text-sm text-muted lg:col-span-2">{t("insights.nothing")}</p>
