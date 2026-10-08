@@ -2,8 +2,10 @@ import {
   type CoreState,
   type Critical,
   type Digest,
+  formatDuration,
   formatRelativeDay,
   type Language,
+  type LimitAlert,
   type NotifyMessage,
   type Stuck,
   t,
@@ -48,6 +50,15 @@ const criticalText = (message: Critical, zoned: Zoned): OutgoingMessage => {
     text,
   };
 };
+
+const limitText = (message: LimitAlert, { language, zone }: Zoned): OutgoingMessage => ({
+  buttons: [],
+  text: t(language, "notify.limit", {
+    duration: formatDuration(message.limitMinutes, language),
+    label: message.label,
+    time: clockIn(message.startAt, language, zone),
+  }),
+});
 
 const stuckText = (message: Stuck, { language }: Zoned): OutgoingMessage => ({
   buttons: [
@@ -107,6 +118,9 @@ export const notificationText = (
     }
     case "stuck": {
       return stuckText(message, zoned);
+    }
+    case "limit": {
+      return limitText(message, zoned);
     }
   }
 };

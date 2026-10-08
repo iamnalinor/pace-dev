@@ -203,6 +203,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "bot.question": "Вопрос: {question}",
   "notify.criticalDeadline": "⚠️ {title}: срок {when}, сделано {progress}%.",
   "notify.criticalScore": "⚠️ {title} теперь среди самых срочных задач.",
+  "notify.limit": "⏱ {label}: превышен лимит {duration} (начато в {time}).",
   "notify.stuckWaiting": "⏳ {title} ждёт уже {days} дн.",
   "notify.stuckIdle": "💤 {title} в работе без изменений уже {days} дн.",
   "notify.digestTitle": "Pace · {time}",

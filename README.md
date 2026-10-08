@@ -13,8 +13,13 @@ phone, in the browser and on the server.
 |---|---|---|
 | 0 — Foundation | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets | **done** |
 | 1 — Tasks | presets (edited in the web UI), tasks and subtasks, urgency and the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
-| 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **ready** — in review |
-| 3 — Time | time ledger and focus sessions, calendars, sleep and phone-usage observations, analytics, MCP analytics | planned |
+| 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
+| 3 — Time | the time ledger: a time bar under Now (one tap switches, hold to edit a button's Expect/Limit), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers for Expect/Limit, a Limit alert through the bot, MCP time tools | **done** — `v0.3.0` |
+
+Not in stage 3: phone-usage and sleep detection, and reading the phone calendar. They need
+a native Android module (UsageStats, Calendar provider) and checks on a real device that
+this project's CI cannot do; the event model already has room for them (a sleep block can
+be logged by hand today with the `sleep` category).
 
 The three product stages are each meant to be usable daily before the next one starts.
 

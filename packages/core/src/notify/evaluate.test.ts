@@ -163,3 +163,43 @@ describe("the next alarm", () => {
     expect(nextAlarmAt(state, ctx, alerted)).toBe("2026-10-06T18:00:00.000Z");
   });
 });
+
+describe("limit alerts", () => {
+  const commute = at(3, MORNING, {
+    type: "activity.started",
+    payload: { activityId: "a-commute", category: "commute", label: "Commute", limitMinutes: 60 },
+  });
+
+  it("alerts once when the running activity passes its Limit, and arms for the crossing", () => {
+    const before = addMinutesIso(MORNING, 30);
+    expect(
+      nextAlarmAt(stateAt(before, [commute]), { deviceTz: MOSCOW, now: before }, checkedAt(before)),
+    ).toBe(addMinutesIso(MORNING, 60));
+    const after = addMinutesIso(MORNING, 61);
+    const first = run(after, [commute], checkedAt(before));
+    expect(first.messages).toEqual([
+      expect.objectContaining({
+        activityId: "a-commute",
+        kind: "limit",
+        label: "Commute",
+        limitMinutes: 60,
+      }),
+    ]);
+    expect(first.decisions.map((entry) => `${entry.rule}:${entry.outcome}`)).toContain(
+      "limit:sent",
+    );
+    const again = run(addMinutesIso(MORNING, 70), [commute], first.memory);
+    expect(again.messages.filter((message) => message.kind === "limit")).toEqual([]);
+  });
+
+  it("says nothing once the activity stopped", () => {
+    const stopped = at(4, addMinutesIso(MORNING, 40), {
+      type: "activity.stopped",
+      payload: { activityId: "a-commute" },
+    });
+    const later = addMinutesIso(MORNING, 90);
+    expect(
+      run(later, [commute, stopped], checkedAt(MORNING)).messages.filter((m) => m.kind === "limit"),
+    ).toEqual([]);
+  });
+});

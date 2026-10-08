@@ -202,6 +202,7 @@ export const enShell = {
   "bot.question": "Question: {question}",
   "notify.criticalDeadline": "⚠️ {title}: due {when}, {progress}% done.",
   "notify.criticalScore": "⚠️ {title} is now one of your most urgent tasks.",
+  "notify.limit": "⏱ {label} is over its {duration} limit (started {time}).",
   "notify.stuckWaiting": "⏳ {title} has been waiting for {days} days.",
   "notify.stuckIdle": "💤 {title} has been in progress without a change for {days} days.",
   "notify.digestTitle": "Pace · {time}",
