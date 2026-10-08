@@ -15,6 +15,18 @@ phone, in the browser and on the server.
 | 1 — Tasks | presets (edited in the web UI), tasks and subtasks, urgency and the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
 | 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
 | 3 — Time | the time ledger: a time bar under Now (one tap switches, hold to edit a button's Expect/Limit), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers for Expect/Limit, a Limit alert through the bot, MCP time tools | **done** — `v0.3.0` |
+| 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules, the messenger penalty; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
+
+Still `v0.x`: the product is in daily use but not final.
+
+| Now (desktop) | Insights (desktop) |
+|---|---|
+| ![Now on a desktop: the composer, the task list and the time bar](docs/screenshots/now-desktop.png) | ![Insights: time by category, focus by hour, fragmentation, sleep and focus](docs/screenshots/insights-desktop.png) |
+| **Day (desktop)** | **Now (phone, dark)** |
+| ![Day: the blocks of a day and the gaps between them](docs/screenshots/day-desktop.png) | ![Now on a phone in the dark theme](docs/screenshots/now-phone-dark.png) |
+
+The screenshots are taken by `README_SHOTS=docs/screenshots bun test:e2e e2e/readme-shots.e2e.ts`
+with a seeded week.
 
 Phone data (`v0.3.1`, Android only): the Day screen reads the phone's own screen and app
 events and its calendar, on the device. It proposes last night's sleep from the longest
@@ -335,6 +347,14 @@ comes back marked "check this". Where it is used:
 - `GET /api/decisions` and the **Decision log** page (Settings), plus the MCP tool
   `search_decisions`: every parse and every notification sent or held back, with the rule,
   its inputs and a one-line explanation.
+
+**When the free tier runs out**: a provider's rate limit is remembered (from its
+`retry-after`) and skipped until then, so the next calls go straight to the one still
+answering; `GET /api/llm/status` says whether the assistant can read now and when it is back.
+With every provider out, the composer offers **Read it when it's back**: the line is kept in
+your Durable Object and read at that time, then written as read (History can undo it) or put in
+the Inbox if it cannot be placed or is still unread a day later. The bot does the same with any
+message and writes back once it has read it.
 
 The Android app mirrors `GET /api/notify/plan` into local reminders (digest windows and
 deadline crossings for the next day) after every sync; it has no rules of its own.

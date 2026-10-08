@@ -45,7 +45,7 @@ tool error (`isError: true`, explaining which scope is missing) instead of runni
 | `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
 | `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons | `list_activity_buttons`, `get_day`, `summary_time` |
 | `time:write` | start, stop and log activities | `start_activity`, `stop_activity`, `log_activity` |
-| `analytics:read` | see analytics | reserved (no tool yet) |
+| `analytics:read` | query the store read-only, replay the reminder rules, export the log | `describe_schema`, `query_sql`, `simulate`, `export_all` |
 | `offline_access` | keep a refresh token, so the connection survives the 24 h access token | — |
 
 The catalogue is advertised as `scopes_supported` in the authorization server metadata.
@@ -102,6 +102,10 @@ shows.
 | `start_activity` | time write | starts an activity; the running one ends at the same instant. A button's defaults, or a label and category; `taskId` counts the time as work on the task | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `limitMinutes?`, `at?` |
 | `stop_activity` | time write | stops what is running (`activity/none-running` otherwise) | `at?` |
 | `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |
+| `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `observations`) with their CREATE statements | — |
+| `query_sql` | analytics | one read-only SQLite `SELECT` (or `WITH … SELECT`), at most 500 rows, run in a transaction that always rolls back; a second statement, `PRAGMA`, `ATTACH` or any write is refused (`sql/forbidden`, `sql/not-select`) | `sql` |
+| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and Limit alert they would send; ranks Now at `to`, optionally with other importance multipliers (`simulate/range` for a bad range) | `from`, `to`, `multipliers?` |
+| `export_all` | analytics | the event log as NDJSON (one event per line, corrections included), a page at a time | `since?`, `limit?` (default 1000, max 5000) |
 
 ### Writes: `at`, `precision`, `dryRun`
 

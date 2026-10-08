@@ -12,7 +12,7 @@ const isCi = process.env["CI"] !== undefined;
 const E2E_STATE_DIR = path.resolve(import.meta.dirname, ".cache/e2e-state");
 // Every e2e test signs in with its own Telegram id (see e2e/support/login.ts) so parallel tests
 // never share account state (language, time zone) through the server.
-const E2E_TELEGRAM_IDS = "1919230638,1001,1002,1003,1004,1005,1006,1007,1008,1009";
+const E2E_TELEGRAM_IDS = "1919230638,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010";
 
 // Optional: a pre-installed Chromium instead of `playwright install` (e.g. sandboxes).
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
