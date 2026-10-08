@@ -10,10 +10,12 @@ import {
 } from "../presets/preset-reducer.ts";
 import { projectReducer } from "./project-reducer.ts";
 import { settingsReducer } from "./settings-reducer.ts";
+import { INITIAL_TIME_STATE, type TimeState } from "../tracking/model.ts";
+import { timeReducer } from "../tracking/time-reducer.ts";
 import { taskReducer } from "./task-reducer.ts";
 
 /**
-Everything the queries read: the four materialized slices. The Durable Object folds the
+Everything the queries read: the materialized slices. The Durable Object folds the
 log with `coreReducer`; the client composes the same slices itself and passes them on.
 */
 export type CoreState = {
@@ -21,6 +23,7 @@ export type CoreState = {
   readonly projects: ProjectsState;
   readonly presets: PresetsState;
   readonly settings: Settings;
+  readonly time: TimeState;
 };
 
 export const INITIAL_CORE_STATE: CoreState = {
@@ -28,6 +31,7 @@ export const INITIAL_CORE_STATE: CoreState = {
   projects: INITIAL_PROJECTS_STATE,
   presets: INITIAL_PRESETS_STATE,
   settings: DEFAULT_SETTINGS,
+  time: INITIAL_TIME_STATE,
 };
 
 /** One event touches at most one slice; the untouched slices (and the whole state) keep their references. */
@@ -37,11 +41,13 @@ export const coreReducer: Reducer<CoreState> = (state, event) => {
     projects: projectReducer(state.projects, event),
     presets: presetReducer(state.presets, event),
     settings: settingsReducer(state.settings, event),
+    time: timeReducer(state.time, event),
   };
   const isSame =
     next.tasks === state.tasks &&
     next.projects === state.projects &&
     next.presets === state.presets &&
-    next.settings === state.settings;
+    next.settings === state.settings &&
+    next.time === state.time;
   return isSame ? state : next;
 };

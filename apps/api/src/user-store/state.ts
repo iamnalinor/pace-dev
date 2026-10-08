@@ -99,7 +99,9 @@ carry one too), preset events `id`. Settings and corrections name none.
 */
 const entityOf = (event: Event): Entity | undefined => {
   if ("taskId" in event.payload) {
-    return ["taskIds", event.payload.taskId];
+    // An activity names a task only when the time was spent on one.
+    const { taskId } = event.payload;
+    return taskId === undefined || taskId === null ? undefined : ["taskIds", taskId];
   }
   if ("projectId" in event.payload) {
     return ["projectIds", event.payload.projectId];

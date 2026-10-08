@@ -25,6 +25,9 @@ import {
   shouldRematerialize,
   sortEvents,
   taskReducer,
+  timeReducer,
+  INITIAL_TIME_STATE,
+  type TimeState,
   type TasksState,
 } from "@pace/core";
 
@@ -44,6 +47,7 @@ export type AppState = {
   readonly projects: ProjectsState;
   readonly presets: PresetsState;
   readonly settings: Settings;
+  readonly time: TimeState;
   readonly deviceId: string;
   readonly lastAppliedOccurredAt: null | string;
   /** Bumps on every change; cheap way for view-models to memoize. */
@@ -51,7 +55,7 @@ export type AppState = {
 };
 
 /** Materialized slices, each folded by its core reducer. */
-type SliceKey = "presets" | "projects" | "settings" | "tasks";
+type SliceKey = "presets" | "projects" | "settings" | "tasks" | "time";
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -98,6 +102,7 @@ export const rootReducer: Reducer<AppState> = composeReducers([
   slice("projects", projectReducer),
   slice("presets", presetReducer),
   slice("settings", settingsReducer),
+  slice("time", timeReducer),
 ]);
 
 const initialState = (deviceId: string): AppState => ({
@@ -110,6 +115,7 @@ const initialState = (deviceId: string): AppState => ({
   settings: DEFAULT_SETTINGS,
   status: "loading",
   tasks: INITIAL_TASKS_STATE,
+  time: INITIAL_TIME_STATE,
   version: 0,
 });
 
