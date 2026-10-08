@@ -32,6 +32,15 @@ export {
   INITIAL_TIME_STATE,
   type TimeState,
 } from "./tracking/model.ts";
+export {
+  type AppMinutes,
+  appUsage,
+  detectSleep,
+  type Interval,
+  type PhoneEvent,
+  screenOnIntervals,
+  type SleepCandidate,
+} from "./tracking/phone.ts";
 export { timeReducer } from "./tracking/time-reducer.ts";
 export {
   type Gap,

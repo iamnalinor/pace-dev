@@ -1,4 +1,5 @@
 import type * as RouterFake from "./src/test/router.ts";
+import type * as CalendarFake from "./src/testing/calendar.fake.ts";
 import type * as NotificationsFake from "./src/testing/notifications.fake.ts";
 import type * as SecureStoreFake from "./src/testing/secure-store.fake.ts";
 
@@ -19,6 +20,9 @@ jest.mock("expo-secure-store", () =>
   jest
     .requireActual<typeof SecureStoreFake>("./src/testing/secure-store.fake.ts")
     .createFakeSecureStore(),
+);
+jest.mock("expo-calendar", () =>
+  jest.requireActual<typeof CalendarFake>("./src/testing/calendar.fake.ts").createFakeCalendar(),
 );
 jest.mock("expo-notifications", () =>
   jest

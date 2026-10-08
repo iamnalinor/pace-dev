@@ -10,6 +10,7 @@ import { Button } from "../ui/button.tsx";
 import { ScreenHeader } from "../ui/screen-header.tsx";
 import { Segmented } from "../ui/segmented.tsx";
 import { useTheme } from "../ui/theme-provider.tsx";
+import { PhoneDataRow } from "./phone-data-row.tsx";
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ["system", "light", "dark"];
 
@@ -109,6 +110,7 @@ export const SettingsScreen = () => {
           value={settings.language}
         />
       </Row>
+      <PhoneDataRow />
       <Row label={t("settings.timezone")}>
         <Text className="font-sans text-[15px] text-fg">{settings.timezone ?? deviceZone}</Text>
         <Text className="font-sans text-[13px] text-muted">

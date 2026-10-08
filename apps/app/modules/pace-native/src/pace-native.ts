@@ -29,12 +29,15 @@ export type PaceNative = {
   readonly setDnd: (isEnabled: boolean) => boolean;
   readonly queryUsageEvents: (beginMs: number, endMs: number) => Promise<readonly UsageEvent[]>;
   readonly queryUsageStats: (beginMs: number, endMs: number) => Promise<readonly UsageStats[]>;
+  /** Package id → the app's name as the launcher shows it (unknown ids map to themselves). */
+  readonly appLabels: (packages: readonly string[]) => Promise<Readonly<Record<string, string>>>;
 };
 
 const noop = (): void => undefined;
 
 /** What the app sees without the native module (Jest, Expo Go): nothing granted, nothing to do. */
 export const fallbackPaceNative: PaceNative = {
+  appLabels: async (packages) => Object.fromEntries(packages.map((name) => [name, name])),
   canScheduleExactAlarms: () => false,
   hasUsageAccess: () => false,
   isDndAccessGranted: () => false,
