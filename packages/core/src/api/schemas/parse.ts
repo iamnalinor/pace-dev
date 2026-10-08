@@ -6,6 +6,8 @@ export const ParseRequestSchema = z.strictObject({
   text: z.string().trim().min(1).max(4000),
   /** When no model can answer now: keep the text and read it (and write it) once one can. */
   defer: z.boolean().optional(),
+  /** A reading while the person is still typing: answered, but kept out of the decision log. */
+  draft: z.boolean().optional(),
 });
 
 /**

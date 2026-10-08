@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ALGEBRA_ID, artboardState, ctx, HW_ID, MOSCOW, WORK_ID } from "@pace/core/testing";
 
-import { type ComposerEdits, composerModel, shouldAiRead } from "./composer.ts";
+import { type ComposerEdits, composerModel, requiresAiFirst, shouldAiRead } from "./composer.ts";
 
 const state = artboardState();
 const model = (text: string, edits: ComposerEdits = {}) =>
@@ -69,13 +69,18 @@ describe("composerModel", () => {
   });
 });
 
-describe("shouldAiRead", () => {
-  it("sends long or multi-line text to the assistant and keeps short lines on the rules", () => {
-    expect(shouldAiRead("call mom tomorrow")).toBe(false);
-    expect(shouldAiRead("first line\nsecond line")).toBe(true);
-    expect(shouldAiRead("  trailing newline only\n")).toBe(false);
+describe("shouldAiRead and requiresAiFirst", () => {
+  it("reads any line with the assistant", () => {
+    expect(shouldAiRead("call mom tomorrow")).toBe(true);
+    expect(shouldAiRead(" hw ")).toBe(false);
+  });
+
+  it("makes Enter wait only for long or multi-line text", () => {
+    expect(requiresAiFirst("call mom tomorrow")).toBe(false);
+    expect(requiresAiFirst("first line\nsecond line")).toBe(true);
+    expect(requiresAiFirst("  trailing newline only\n")).toBe(false);
     expect(
-      shouldAiRead(
+      requiresAiFirst(
         "№№ 290, 292, 293 — решить методом выделения линейных множителей (в 292 можно воспользоваться решением)",
       ),
     ).toBe(true);

@@ -86,6 +86,7 @@ export {
   type ComposerOption,
   type ComposerTarget,
   LONG_TEXT_CHARS,
+  requiresAiFirst,
   shouldAiRead,
   SLOW_READ_MS,
 } from "./view-models/composer.ts";

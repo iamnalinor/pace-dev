@@ -19,7 +19,10 @@ export type Assistant = {
   With `defer`, a line the assistant cannot read now is kept on the server and written once it
   can (`queued`).
   */
-  readonly read: (text: string, options?: { readonly defer?: boolean }) => Promise<AiOutcome>;
+  readonly read: (
+    text: string,
+    options?: { readonly defer?: boolean; readonly draft?: boolean },
+  ) => Promise<AiOutcome>;
 };
 
 export const createAssistant = (deps: {
@@ -30,7 +33,11 @@ export const createAssistant = (deps: {
   read: async (text, options = {}) => {
     try {
       const answer = await deps.api.call(endpoints.parse.run, {
-        body: { text, ...(options.defer === true && { defer: true }) },
+        body: {
+          text,
+          ...(options.defer === true && { defer: true }),
+          ...(options.draft === true && { draft: true }),
+        },
       });
       if (answer.status === "unavailable" || answer.status === "queued") {
         return { retryAt: answer.retryAt, status: answer.status };
