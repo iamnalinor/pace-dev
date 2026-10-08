@@ -70,6 +70,7 @@ describe("whyText", () => {
             { key: "ageDays", unit: "days", value: 12.5 },
             { key: "implicitDue", unit: null, value: "2026-10-06T20:59:00.000Z" },
             { key: "finalAt", unit: null, value: null },
+            { key: "behindPace", unit: null, value: 0.0001 },
           ],
         },
       ],
@@ -81,7 +82,9 @@ describe("whyText", () => {
       "12d",
       "at 20:59",
       "—",
+      "0",
     ]);
+    expect(text.groups[0]?.lines.at(-1)?.tone).toBe("plain");
     expect(text.formula.map(({ isValue, text: run }) => ({ isValue, text: run }))).toEqual([
       { isValue: false, text: "0.25 + " },
       { isValue: true, text: "1h" },

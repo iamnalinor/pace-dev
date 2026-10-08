@@ -197,8 +197,8 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider (stage 2) |
-| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider (stage 2) |
+| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider; several keys may be given (comma or newline separated): a key that hits its rate limit rests while the next one answers |
+| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; several keys rotate the same way |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
 
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so

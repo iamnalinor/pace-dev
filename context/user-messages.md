@@ -127,3 +127,17 @@ Then, about the plan written for that work:
 ## 2026-10-08, after "сложи все требования…"
 
 > не пон зачем тебе план. просто положи все в репо в отдельную папку чтобы оно и было и потом можно было удалить
+
+## 2026-10-08, stage 5 session
+
+> 1) разберись с висящими МРами 2) учти замечания из документа
+
+The document («pace замечания», 27 remarks on 15 web screenshots) is summarised in
+`plan.md` (Stage 5). Answers to the questions asked while planning: the web moves to
+react-native-web (one UI codebase for Android and web); Errands merges into Chores. Then:
+
+> ну на отдельные релизы можно не дробить
+
+> да, кст, не стесняйся делать breaking changes изменения если это поможет упростить код
+
+> и еще я хочу чтобы любой ввод парсился ллмкой. но мб нужно подумать как сделать это быстро - например, отправлять в ллмку запрос (желательно быстрый) после того как в поле ввода некоторое время ничего не вводим. нужно предусмотреть неск токенов чтобы ротация работала

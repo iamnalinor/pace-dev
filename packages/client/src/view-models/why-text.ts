@@ -40,6 +40,10 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 const numberText = (value: number, language: Language): string =>
   new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(value);
 
+/** Behind the pace line by at least what two decimals can show: a lag of 0.0001 reads as none. */
+const isBehind = (row: WhyRow): boolean =>
+  row.key === "behindPace" && typeof row.value === "number" && Math.round(row.value * 100) > 0;
+
 const numberValue = (row: WhyRow, value: number, language: Language): string => {
   switch (row.unit) {
     case "percent": {
@@ -57,9 +61,7 @@ const numberValue = (row: WhyRow, value: number, language: Language): string => 
     case null:
     case undefined: {
       // The lag reads as a signed offset from the pace line.
-      return row.key === "behindPace" && value > 0
-        ? `+${numberText(value, language)}`
-        : numberText(value, language);
+      return isBehind(row) ? `+${numberText(value, language)}` : numberText(value, language);
     }
   }
 };
@@ -88,9 +90,7 @@ const toneOf = (row: WhyRow): WhyLine["tone"] => {
   if (row.key === "score") {
     return "total";
   }
-  return row.key === "behindPace" && typeof row.value === "number" && row.value > 0
-    ? "warn"
-    : "plain";
+  return isBehind(row) ? "warn" : "plain";
 };
 
 const lineOf = (row: WhyRow, index: number, context: WhyTextContext): readonly WhyLine[] => {

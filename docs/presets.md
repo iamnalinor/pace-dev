@@ -13,8 +13,12 @@ them from the synced state.
 
 ## How a preset is built
 
-- Five **base presets** are built in: `hw`, `work`, `personal`, `deferred`, `inbox`. They
-  are complete (every field has a value) and cannot be edited, renamed or archived.
+- Five **default presets** ship with the app: `hw`, `work`, `personal`, `deferred`, `inbox`.
+  Their shipped values are complete (every field has one). They are defaults, not fixtures:
+  rename them, change any field, recolor or archive (delete) them like any other preset. What
+  you change is stored as their own definition and read on top of the shipped values. They
+  keep their id and have no parent, and the inbox (where quick captures land) cannot be
+  archived.
 - A **user preset** extends a base preset or another user preset and stores only the
   fields it changes. "Algebra HW" extends `hw` and adds a schedule and a resubmission
   policy; everything else comes from `hw`.
@@ -43,6 +47,11 @@ Rules the editor enforces:
 - Switching a task to another preset keeps its data; fields are just shown or hidden.
 - Archiving hides a preset from the pickers. Tasks that use it keep resolving. To bring
   it back, revoke the archive event from History.
+- Pickers list presets by `order` (then by name): the defaults come as Homework, Work,
+  Personal, Deferred; new presets go after them (order 100) unless given another place.
+- A task's progress follows its content, not only the preset: with subtasks it is the share
+  solved (and per-subtask submission applies only then); without subtasks it is the 0–10
+  bar and the task is submitted whole. A preset with `progressMode: none` stays without.
 
 ## Fields
 
@@ -68,7 +77,7 @@ others differ.
 | `notify.waitingDays` | days ≥ 0 | A task *waiting* longer than this is reported as stuck. | `7` |
 | `notify.inProgressIdleDays` | days ≥ 0 | A task *in progress* with no activity for this long is reported as stuck. | `5` |
 | `defaultEstimateMinutes` | minutes ≥ 0 | Estimate for a task created without one. | `60` |
-| `color` | `blue`, `violet`, `green`, `amber`, `coral`, `pink`, `teal`, `slate` | Accent used for the preset's tasks when they have no project colour. | `blue` |
+| `color` | `blue`, `violet`, `green`, `amber`, `coral`, `pink`, `teal`, `slate`, `orange`, `yellow` | Accent used for the preset's tasks when they have no project colour. | `yellow` |
 
 Critical and stuck notifications are sent at most once per task; retroactive edits never
 trigger them.
@@ -91,7 +100,7 @@ trigger them.
 | `notify.waitingDays` | 7 | 7 | 7 | 7 | 7 |
 | `notify.inProgressIdleDays` | 5 | 5 | 5 | 5 | 5 |
 | `defaultEstimateMinutes` | 60 | 120 | 30 | 15 | 15 |
-| `color` | blue | violet | green | slate | amber |
+| `color` | yellow | violet | orange | slate | teal |
 
 What they are for:
 
