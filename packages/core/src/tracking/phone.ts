@@ -145,3 +145,60 @@ export const appUsage = (
     .filter((row) => row.minutes >= 1)
     .toSorted((a, b) => b.minutes - a.minutes);
 };
+
+/** Screen-offs this short (a pocket, a timeout) do not end a phone session. */
+const SESSION_GAP_MINUTES = 2;
+
+/**
+When the phone was picked up for the session still going on at `now`: screen-on spells
+joined across short screen-offs. `null` while the screen is off. An activity that ran past
+its Expect probably ended about then.
+*/
+export const phonePickupAt = (events: readonly PhoneEvent[], now: string): null | string => {
+  const spells = screenOnIntervals(events, now);
+  const last = spells.at(-1);
+  if (last?.endAt !== now) {
+    return null;
+  }
+  const earlier = spells.slice(0, -1).toReversed();
+  const joined = earlier.findIndex(
+    (spell, index) =>
+      minutesBetween(spell.endAt, (earlier[index - 1] ?? last).startAt) >= SESSION_GAP_MINUTES,
+  );
+  const session = joined === -1 ? earlier : earlier.slice(0, joined);
+  return session.at(-1)?.startAt ?? last.startAt;
+};
+
+/** Apps whose time is talk, not work, unless the activity was about talking. */
+export const MESSENGER_PACKAGES: ReadonlySet<string> = new Set([
+  "com.discord",
+  "com.facebook.orca",
+  "com.slack",
+  "com.viber.voip",
+  "com.vkontakte.android",
+  "com.whatsapp",
+  "org.telegram.messenger",
+  "org.thoughtcrime.securesms",
+]);
+
+/** The share of messenger time taken off a block. */
+export const MESSENGER_PENALTY = 0.25;
+
+export type Counted = { readonly counted: number; readonly messengerMinutes: number };
+
+/** A block's minutes less a quarter of the messenger time inside it (none when on purpose). */
+export const countedMinutes = (
+  minutes: number,
+  usage: readonly AppMinutes[],
+  { messengers = MESSENGER_PACKAGES, onPurpose = false } = {},
+): Counted => {
+  const messengerMinutes = usage
+    .filter((row) => messengers.has(row.app))
+    .reduce((sum, row) => sum + row.minutes, 0);
+  return {
+    counted: onPurpose
+      ? minutes
+      : Math.max(0, Math.round(minutes - MESSENGER_PENALTY * messengerMinutes)),
+    messengerMinutes,
+  };
+};

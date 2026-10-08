@@ -19,6 +19,7 @@ import {
 } from "@pace/core";
 
 import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
+import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -29,12 +30,19 @@ const RuntimeContext = createContext<null | PaceRuntime>(null);
 A signed-in start: this week's homework instances, a first sync, then the account's time
 zone from the device when it has none yet (never "not set").
 */
+/** The account's language and zone, for the background phone check that runs without a store. */
+const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
+  const { settings } = runtime.state.store.getState();
+  return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
+};
+
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
   await syncLocalNotifications(runtime);
+  await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status === "signed-in") {
     sync.start({ intervalMs: SYNC_INTERVAL_MS });
@@ -102,6 +110,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     void (async () => {
       await sync.syncNow();
       await syncLocalNotifications(runtime);
+      await startPhoneChecks(phoneContextOf(runtime));
     })();
   });
   const stopTimers = followActivityTimers(runtime);

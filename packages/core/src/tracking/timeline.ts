@@ -16,6 +16,9 @@ export type Segment = {
   readonly minutes: number;
   readonly isRunning: boolean;
   readonly isLogged: boolean;
+  /** The activity's Expect, when it has one. */
+  readonly expectMinutes: null | number;
+  readonly messengersOnPurpose: boolean;
 };
 
 export type Gap = { readonly startAt: string; readonly endAt: string; readonly minutes: number };
@@ -81,9 +84,11 @@ const toSegment = (piece: Piece, now: number): Segment => ({
   activityId: piece.activity.id,
   category: piece.activity.category,
   endAt: toIso(piece.end),
+  expectMinutes: piece.activity.expectMinutes,
   isLogged: piece.activity.isLogged,
   isRunning: !piece.activity.isLogged && piece.activity.endAt === null && piece.end === now,
   label: piece.activity.label,
+  messengersOnPurpose: piece.activity.messengersOnPurpose,
   minutes: Math.round((piece.end - piece.start) / MS_PER_MINUTE),
   startAt: toIso(piece.start),
   taskId: piece.activity.taskId,

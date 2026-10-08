@@ -6,6 +6,8 @@ export type PhoneCalendarEvent = {
   readonly title: string;
   readonly startAt: string;
   readonly endAt: string;
+  /** Same calendar and title for every occurrence of a repeating event; `null` for one-offs. */
+  readonly series: null | string;
 };
 
 export type CalendarAccess = "denied" | "granted" | "undetermined";
@@ -42,11 +44,15 @@ export const calendarEvents = async (
   const events = await Calendar.listEvents(ids, new Date(from), new Date(to));
   return events
     .filter((event) => !event.allDay)
-    .map((event) => ({
-      endAt: new Date(event.endDate).toISOString(),
-      id: event.id,
-      startAt: new Date(event.startDate).toISOString(),
-      title: event.title.trim() === "" ? "—" : event.title.trim(),
-    }))
+    .map((event) => {
+      const title = event.title.trim() === "" ? "—" : event.title.trim();
+      return {
+        endAt: new Date(event.endDate).toISOString(),
+        id: event.id,
+        series: event.recurrenceRule === null ? null : `${event.calendarId}:${title}`,
+        startAt: new Date(event.startDate).toISOString(),
+        title,
+      };
+    })
     .toSorted((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
 };

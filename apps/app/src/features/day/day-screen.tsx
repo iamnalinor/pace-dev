@@ -18,7 +18,13 @@ import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatDuration } from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
-import { CalendarSection, SleepCard, UsageAccessHint, UsageLine } from "./phone-section.tsx";
+import {
+  CalendarSection,
+  EndedAtPrompt,
+  SleepCard,
+  UsageAccessHint,
+  UsageLine,
+} from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
 const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
@@ -100,7 +106,8 @@ const EntryRow = ({
   return (
     <>
       <ActivityRow onEdit={open} row={entry.row} zone={zone} />
-      <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
+      <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} row={entry.row} />
+      <EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
     </>
   );
 };

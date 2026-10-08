@@ -5,13 +5,15 @@ import type { Event } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
-import { useToast } from "#app/ui/toast.tsx";
+import { type ToastInput, useToast } from "#app/ui/toast.tsx";
 
 export type RunOptions = {
   /** The toast after it worked; nothing is shown without it. */
   readonly success?: string;
   /** Adds "Undo" to the toast: it revokes what the action recorded. */
   readonly undo?: boolean;
+  /** Another follow-up on the toast instead of "Undo". */
+  readonly action?: ToastInput["action"];
 };
 
 /** Newest first, so a batch is taken back in the reverse order it was written. */
@@ -46,7 +48,8 @@ export const useRunAction = (): ((
             void revokeAll(actions, done.value);
           },
         };
-        toast.show({ message: options.success, ...(options.undo === true && { action: undo }) });
+        const action = options.action ?? (options.undo === true ? undo : undefined);
+        toast.show({ message: options.success, ...(action !== undefined && { action }) });
       }
       return true;
     },

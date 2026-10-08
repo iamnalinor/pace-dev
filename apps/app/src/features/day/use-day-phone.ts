@@ -11,7 +11,16 @@ import {
   requestCalendarAccess,
 } from "#app/platform/phone-calendar.ts";
 import { appLabels, readPhoneEvents } from "#app/platform/phone-data.ts";
-import { dismissedKeys, dismiss as rememberDismissed } from "#app/platform/phone-memory.ts";
+import {
+  calendarKey,
+  dismissedKeys,
+  markNotified,
+  dismiss as rememberDismissed,
+  type SeriesRule,
+  seriesRules,
+  setSeriesRule,
+  sleepKey,
+} from "#app/platform/phone-memory.ts";
 import {
   addDaysIn,
   addMinutesIso,
@@ -19,13 +28,15 @@ import {
   appUsage,
   detectSleep,
   type PhoneEvent,
+  phonePickupAt,
   type SleepCandidate,
 } from "@pace/core";
 
 /** The night before the day belongs to it: phone events are read from noon the day before. */
 const NIGHT_LOOKBACK_MINUTES = 12 * 60;
 
-export type NamedApp = { readonly name: string; readonly minutes: number };
+/** An app's time inside a block: its package id (for the messenger penalty) and its name. */
+export type NamedApp = AppMinutes & { readonly name: string };
 
 export type DayPhone = {
   readonly hasUsageAccess: boolean;
@@ -33,12 +44,21 @@ export type DayPhone = {
   readonly sleep: null | SleepCandidate;
   readonly calendar: {
     readonly access: CalendarAccess;
+    /** The day's events, minus skipped ones and series the person always skips. */
     readonly events: readonly PhoneCalendarEvent[];
+    /** Ended events of a series marked "always attended": logged without asking. */
+    readonly autoLog: readonly PhoneCalendarEvent[];
   };
   /** Phone time inside a block, by app, largest first. */
   readonly usageIn: (startAt: string, endAt: string) => readonly NamedApp[];
+  /** When the phone was picked up for the session going on now (`null` on another day). */
+  readonly pickupAt: null | string;
   readonly askCalendar: () => void;
   readonly dismiss: (key: string) => void;
+  /** Logged from Day: the background check need not ask about it any more. */
+  readonly answered: (key: string) => void;
+  /** "Every time" for a repeating event's series. */
+  readonly remember: (rule: SeriesRule) => void;
 };
 
 type Loaded = {
@@ -48,6 +68,7 @@ type Loaded = {
   readonly dismissed: ReadonlySet<string>;
   readonly access: CalendarAccess;
   readonly calendar: readonly PhoneCalendarEvent[];
+  readonly rules: readonly SeriesRule[];
 };
 
 const EMPTY: Loaded = {
@@ -57,11 +78,8 @@ const EMPTY: Loaded = {
   events: [],
   hasUsageAccess: false,
   labels: {},
+  rules: [],
 };
-
-export const sleepKey = (sleep: SleepCandidate): string => `sleep@${sleep.startAt}`;
-export const calendarKey = (event: PhoneCalendarEvent): string =>
-  `calendar@${event.id}@${event.startAt}`;
 
 const load = async (day: Pick<DayModel, "date" | "zone">, now: string): Promise<Loaded> => {
   const dayEnd = addDaysIn(day.date, 1, day.zone);
@@ -80,8 +98,27 @@ const load = async (day: Pick<DayModel, "date" | "zone">, now: string): Promise<
     events: phone.events,
     hasUsageAccess: phone.hasAccess,
     labels: await appLabels(apps),
+    rules: await seriesRules(),
   };
 };
+
+/** The event is on the day already: a block with its title over its time. */
+export const isCalendarLogged = (
+  entries: DayModel["entries"],
+  event: Pick<PhoneCalendarEvent, "endAt" | "startAt" | "title">,
+): boolean =>
+  entries.some(
+    (entry) =>
+      entry.kind === "activity" &&
+      entry.row.label === event.title &&
+      entry.row.startAt < event.endAt &&
+      entry.row.endAt > event.startAt,
+  );
+
+const ruleOf = (loaded: Loaded, event: PhoneCalendarEvent): null | SeriesRule["rule"] =>
+  event.series === null
+    ? null
+    : (loaded.rules.find((rule) => rule.series === event.series)?.rule ?? null);
 
 /** The sleep candidate this day shows: it ends inside the day, nobody logged or dismissed it. */
 const sleepOf = (day: DayModel, loaded: Loaded, now: string): null | SleepCandidate => {
@@ -103,8 +140,7 @@ const sleepOf = (day: DayModel, loaded: Loaded, now: string): null | SleepCandid
 const named = (
   rows: readonly AppMinutes[],
   labels: Readonly<Record<string, string>>,
-): readonly NamedApp[] =>
-  rows.map((row) => ({ minutes: row.minutes, name: labels[row.app] ?? row.app }));
+): readonly NamedApp[] => rows.map((row) => ({ ...row, name: labels[row.app] ?? row.app }));
 
 /**
 The phone's side of a day, read on the device: last night's sleep, time in apps during each
@@ -130,7 +166,19 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       subscription.remove();
     };
   }, [reload]);
+  const remember = (rule: SeriesRule): void => {
+    void (async () => {
+      await setSeriesRule(rule);
+      reload();
+    })();
+  };
+  const shown = loaded.calendar.filter(
+    (event) => !loaded.dismissed.has(calendarKey(event)) && ruleOf(loaded, event) !== "skip",
+  );
   return {
+    answered: (key) => {
+      void markNotified(key);
+    },
     askCalendar: () => {
       void (async () => {
         await requestCalendarAccess();
@@ -139,7 +187,13 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
     },
     calendar: {
       access: loaded.access,
-      events: loaded.calendar.filter((event) => !loaded.dismissed.has(calendarKey(event))),
+      autoLog: shown.filter(
+        (event) =>
+          ruleOf(loaded, event) === "attended" &&
+          event.endAt <= now &&
+          !isCalendarLogged(day.entries, event),
+      ),
+      events: shown,
     },
     dismiss: (key) => {
       void (async () => {
@@ -148,6 +202,8 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       })();
     },
     hasUsageAccess: loaded.hasUsageAccess,
+    pickupAt: day.isToday ? phonePickupAt(loaded.events, now) : null,
+    remember,
     sleep: sleepOf(day, loaded, now),
     usageIn: (startAt, endAt) =>
       named(appUsage(loaded.events, { from: startAt, now, to: endAt }), loaded.labels),

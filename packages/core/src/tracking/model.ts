@@ -19,6 +19,8 @@ export type Activity = {
   readonly limitMinutes: null | number;
   /** Recorded afterwards: it wins over the live activities it overlaps. */
   readonly isLogged: boolean;
+  /** Messaging was part of it: the phone's messenger time does not count against it. */
+  readonly messengersOnPurpose: boolean;
 };
 
 /** A button of the time bar and the defaults an activity started from it gets. */

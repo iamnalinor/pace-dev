@@ -72,6 +72,7 @@ export type TimeActions = ButtonActions & {
       readonly label?: string;
       readonly category?: ActivityCategory;
       readonly taskId?: null | string;
+      readonly messengersOnPurpose?: boolean;
     },
   ) => ActionResult;
   /** Saves a button (`null` adds one). The first edit writes the default buttons as the account's own. */

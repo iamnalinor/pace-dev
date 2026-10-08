@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { appUsage, detectSleep, type PhoneEvent, screenOnIntervals } from "./phone.ts";
+import {
+  appUsage,
+  countedMinutes,
+  detectSleep,
+  type PhoneEvent,
+  phonePickupAt,
+  screenOnIntervals,
+} from "./phone.ts";
 
 const MOSCOW = "Europe/Moscow";
 /** Moscow wall clock on Oct 7–8 2026 (UTC+3) as an ISO instant. */
@@ -93,5 +100,43 @@ describe("app usage", () => {
       { app: "com.google.android.youtube", minutes: 13 },
       { app: "org.telegram.messenger", minutes: 12 },
     ]);
+  });
+});
+
+describe("phone pickup", () => {
+  it("is the start of the phone session still going on now, short screen-offs included", () => {
+    const events = [
+      on(msk(8, "13:00")),
+      off(msk(8, "13:05")),
+      on(msk(8, "14:32")),
+      off(msk(8, "14:40")),
+      // Off for a minute only: the same session.
+      on(msk(8, "14:41")),
+    ];
+    expect(phonePickupAt(events, msk(8, "14:50"))).toBe(msk(8, "14:32"));
+  });
+
+  it("is unknown while the screen is off", () => {
+    const events = [on(msk(8, "13:00")), off(msk(8, "13:05"))];
+    expect(phonePickupAt(events, msk(8, "14:00"))).toBeNull();
+    expect(phonePickupAt([], msk(8, "14:00"))).toBeNull();
+  });
+});
+
+describe("counted minutes", () => {
+  const usage = [
+    { app: "org.telegram.messenger", minutes: 40 },
+    { app: "com.google.android.youtube", minutes: 10 },
+  ];
+
+  it("takes a quarter of the messenger time off the block", () => {
+    expect(countedMinutes(120, usage)).toEqual({ counted: 110, messengerMinutes: 40 });
+  });
+
+  it("leaves the block whole when the messengers were part of it", () => {
+    expect(countedMinutes(120, usage, { onPurpose: true })).toEqual({
+      counted: 120,
+      messengerMinutes: 40,
+    });
   });
 });

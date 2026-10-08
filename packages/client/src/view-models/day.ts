@@ -27,6 +27,10 @@ export type DayRow = {
   readonly isLogged: boolean;
   readonly taskId: null | string;
   readonly taskTitle: null | string;
+  /** The activity's Expect, when it has one. */
+  readonly expectMinutes: null | number;
+  /** Messaging was part of it: no phone penalty. */
+  readonly messengersOnPurpose: boolean;
 };
 
 /** A line of the day: an activity or a gap, with its list key and what tapping it opens. */

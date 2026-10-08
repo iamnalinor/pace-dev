@@ -4,6 +4,8 @@ type FakeEvent = {
   readonly startDate: string;
   readonly endDate: string;
   readonly allDay: boolean;
+  readonly calendarId?: string;
+  readonly recurrenceRule?: null | { readonly frequency: string };
 };
 
 export type FakeCalendar = {

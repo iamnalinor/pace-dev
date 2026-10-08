@@ -231,6 +231,8 @@ export const ActivityLabelledPayload = z.object({
   label: activityFields.label.optional(),
   category: ActivityCategorySchema.optional(),
   taskId: z.string().min(1).nullable().optional(),
+  /** Messaging was the point of it (a call, a chat about work): no phone penalty. */
+  messengersOnPurpose: z.boolean().optional(),
 });
 /** One button of the time bar, with the defaults an activity started from it gets. */
 export const ActivityButtonSetPayload = z.object({

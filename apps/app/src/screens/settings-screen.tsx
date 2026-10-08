@@ -6,11 +6,11 @@ import { type Language, LANGUAGES } from "@pace/core";
 import type { ThemePreference } from "../platform/theme.ts";
 
 import { useAuth, usePace, useSettings, useT } from "../app-state.tsx";
+import { usePermissions } from "../features/permissions/use-permissions.ts";
 import { Button } from "../ui/button.tsx";
 import { ScreenHeader } from "../ui/screen-header.tsx";
 import { Segmented } from "../ui/segmented.tsx";
 import { useTheme } from "../ui/theme-provider.tsx";
-import { PhoneDataRow } from "./phone-data-row.tsx";
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ["system", "light", "dark"];
 
@@ -29,6 +29,28 @@ const Row = ({
     {children}
   </View>
 );
+
+/** "Permissions · 2 of 4 on", opening the screen with each one. */
+const PermissionsRow = () => {
+  const t = useT();
+  const router = useRouter();
+  const { list } = usePermissions();
+  const on = (list ?? []).filter((permission) => permission.state === "on").length;
+  return (
+    <Row label={t("settings.permissions")}>
+      <Button
+        onPress={() => {
+          router.push("/permissions");
+        }}
+        variant="secondary"
+      >
+        {list === null
+          ? t("settings.permissions")
+          : t("settings.permissions.summary", { on, total: list.length })}
+      </Button>
+    </Row>
+  );
+};
 
 /** History and logout. */
 const SettingsFooter = () => {
@@ -110,7 +132,7 @@ export const SettingsScreen = () => {
           value={settings.language}
         />
       </Row>
-      <PhoneDataRow />
+      <PermissionsRow />
       <Row label={t("settings.timezone")}>
         <Text className="font-sans text-[15px] text-fg">{settings.timezone ?? deviceZone}</Text>
         <Text className="font-sans text-[13px] text-muted">

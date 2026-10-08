@@ -26,6 +26,21 @@ describe("the time reducer", () => {
     expect(time.activities["a2"]).toMatchObject({ category: "food", endAt: T("13:10") });
   });
 
+  it("remembers that the messengers were part of an activity", () => {
+    const time = timeOf([
+      start("09:00", { activityId: "a1", label: "Chat with the team" }),
+      act("09:30", {
+        payload: { activityId: "a1", messengersOnPurpose: true },
+        type: "activity.labelled",
+      }),
+    ]);
+    expect(time.activities["a1"]).toMatchObject({ messengersOnPurpose: true });
+    expect(timeline(time, { ...DAY, now: T("10:00") }).segments.at(0)).toMatchObject({
+      expectMinutes: null,
+      messengersOnPurpose: true,
+    });
+  });
+
   it("adjusts, relabels and keeps buttons once the bar is edited", () => {
     const time = timeOf([
       start("09:00", { activityId: "a1", label: "Work" }),

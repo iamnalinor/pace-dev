@@ -20,7 +20,8 @@ Phone data (`v0.3.1`, Android only): the Day screen reads the phone's own screen
 events and its calendar, on the device. It proposes last night's sleep from the longest
 screen-off stretch, shows phone time and top apps inside each block, and lists the day's
 calendar events with Attended / Skip. Nothing is uploaded; only what you confirm becomes an
-event. See [Phone data on the device](#phone-data-on-the-device) for what to check.
+event. A first-run walk-through explains and asks for each permission (Settings →
+Permissions later). See [Phone data on the device](#phone-data-on-the-device) for what to check.
 
 The three product stages are each meant to be usable daily before the next one starts.
 
@@ -222,21 +223,34 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
 ## Phone data on the device
 
 This part depends on Android itself and is checked on a real phone, not in CI (CI compiles
-the Kotlin and runs the JS logic against mocks).
+the native code and runs the JS logic against mocks).
 
-- **Settings → Phone data** shows two rows: *Usage access* opens Android's
-  "Usage access" list (turn Pace on there), *Calendar* asks for the calendar permission
-  (or opens the app's settings when it was denied). Both rows refresh when you come back.
+- **First run**: after login a short walk-through lists the four permissions Pace may use
+  and why: notifications, calendar, usage access, alarms on time. It then asks for each
+  one that is off, one at a time. A dialog moves on by itself. A settings screen moves on
+  once you come back with it turned on, or you press Skip. "Not now" skips the whole thing.
+  It is shown once per phone.
+- **Settings → Permissions**: the same four, each with its state (on / off / turned off in
+  Android settings) and one button. Calendar series you answered "every time" are listed
+  there too, each with Forget.
 - **Sleep**: after a night with the phone idle for at least 3 h touching 21:00–12:00,
   the Day screen shows a "Last night" card with the times and how often you woke up
   (screen-on glances up to 5 min are merged into the night). *Log sleep* writes a `sleep`
   block; *Not sleep* hides that guess on this phone.
 - **Phone time per block**: under each block on Day, "Phone 25m: YouTube, Telegram…"
-  sums foreground app time inside it.
+  sums foreground app time inside it. On work, study and task blocks, Pace also shows
+  "counted …", which is the block's time minus a quarter of the messenger time.
+  "Messaging was part of it" in the block's editor turns that off.
+- **Ended at …?**: when a running activity is past its Expect and you pick up the
+  phone, the running row on Day offers to end it at the moment of the pickup.
 - **Calendar**: "From your calendar" lists the day's timed events from every visible
   calendar (all-day ones are skipped). *Attended* logs the event as a block, *Skip* hides it
-  on this phone. Exchange or work accounts appear only if Android syncs them into its
-  calendar provider.
+  on this phone. For a repeating event, the toast offers *Every time*: the whole series is
+  then logged when it ends, or always hidden. Exchange or work accounts appear only if
+  Android syncs them into its calendar provider.
+- **In the background**: about every half hour (Android decides exactly when), Pace looks
+  at the phone with the app closed. It sends a notification about last night's sleep and
+  about calendar events that just ended. Each one is asked about once, and a tap opens Day.
 
 ## Telegram bot setup
 
