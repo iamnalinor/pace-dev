@@ -1,5 +1,5 @@
-import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react-native";
-import { Alert, Share } from "react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { Share, Text } from "react-native";
 
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -7,8 +7,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 
 import type * as PaceNativeModule from "../../../modules/pace-native/index.ts";
 
-import { CrashScreen } from "./crash-screen.tsx";
-import { useCrashNotice } from "./use-crash-notice.ts";
+import { CrashGate, CrashScreen } from "./crash-screen.tsx";
 
 const mockLog = { text: "", unseen: "" };
 const mockAppend = jest.fn<undefined, [string, string]>();
@@ -26,18 +25,16 @@ jest.mock("../../../modules/pace-native/index.ts", () => {
       clearCrashLog: () => {
         mockLog.text = "";
       },
-      readCrashLog: () => mockLog.text,
-      takeUnseenCrashes: () => {
-        const { unseen } = mockLog;
+      markCrashesSeen: () => {
         mockLog.unseen = "";
-        return unseen;
       },
+      readCrashLog: () => mockLog.text,
+      readUnseenCrashes: () => mockLog.unseen,
     },
   };
 });
 
 const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
-const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -62,23 +59,33 @@ describe("CrashScreen", () => {
   });
 });
 
-describe("useCrashNotice", () => {
-  it("says once that the app crashed and offers the report", async () => {
-    mockLog.unseen = "=== js-fatal\nTypeError: boom";
-    await renderHook(() => {
-      useCrashNotice();
-    });
-    expect(alert).toHaveBeenCalledTimes(1);
-    const buttons = alert.mock.calls[0]?.[2] ?? [];
-    buttons.find((button) => button.text === en("crash.share"))?.onPress?.();
-    expect(share).toHaveBeenCalledWith({ message: "=== js-fatal\nTypeError: boom" });
+describe("CrashGate", () => {
+  const app = <Text>the app</Text>;
+
+  it("shows the app when nothing crashed", async () => {
+    await render(<CrashGate>{app}</CrashGate>);
+    expect(screen.getByText("the app")).toBeOnTheScreen();
   });
 
-  it("stays quiet when nothing crashed", async () => {
-    await renderHook(() => {
-      useCrashNotice();
+  it("stops at the report after a crash, before the app starts", async () => {
+    mockLog.unseen = "=== js-fatal\nTypeError: boom";
+    await render(<CrashGate>{app}</CrashGate>);
+    expect(screen.queryByText("the app")).toBeNull();
+    expect(screen.getByText(en("crash.lastTitle"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("crash.share") }));
+    expect(share).toHaveBeenCalledWith({ message: "=== js-fatal\nTypeError: boom" });
+    await waitFor(() => {
+      expect(mockLog.unseen).toBe("");
     });
-    expect(alert).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("button", { name: en("crash.continue") }));
+    expect(screen.getByText("the app")).toBeOnTheScreen();
+  });
+
+  it("keeps the reports unseen until the person acts on them", async () => {
+    mockLog.unseen = "=== android\nboom";
+    const { unmount } = await render(<CrashGate>{app}</CrashGate>);
+    await unmount();
+    expect(mockLog.unseen).toBe("=== android\nboom");
   });
 });
 

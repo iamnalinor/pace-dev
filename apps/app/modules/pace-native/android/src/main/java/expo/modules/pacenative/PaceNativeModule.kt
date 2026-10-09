@@ -70,7 +70,9 @@ class PaceNativeModule : Module() {
 
     Function("readCrashLog") { CrashLog.read(context) }
 
-    Function("takeUnseenCrashes") { CrashLog.takeUnseen(context) }
+    Function("readUnseenCrashes") { CrashLog.readUnseen(context) }
+
+    Function("markCrashesSeen") { CrashLog.markSeen(context) }
 
     Function("clearCrashLog") { CrashLog.clear(context) }
 

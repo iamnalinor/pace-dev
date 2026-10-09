@@ -145,7 +145,8 @@ export const enShell = {
   "crash.share": "Share report",
   "crash.lastTitle": "Pace crashed last time",
   "crash.lastBody":
-    "The report is kept in Settings → Crash log. Sharing it helps get the crash fixed.",
+    "Pace stopped here so it cannot crash again before you share the report. Settings → Crash log keeps it too.",
+  "crash.continue": "Open Pace",
   "settings.crashLog": "Crash log",
   "settings.crashLog.clear": "Clear",
   "update.ready": "We changed a few things",

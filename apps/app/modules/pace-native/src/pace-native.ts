@@ -33,8 +33,9 @@ export type PaceNative = {
   readonly appendCrashReport: (kind: string, details: string) => void;
   /** The whole crash log (the newest 64 KB), "" when empty. */
   readonly readCrashLog: () => string;
-  /** The reports logged since the last call, each returned once ("" when none). */
-  readonly takeUnseenCrashes: () => string;
+  /** The reports logged since `markCrashesSeen` ("" when none). */
+  readonly readUnseenCrashes: () => string;
+  readonly markCrashesSeen: () => void;
   readonly clearCrashLog: () => void;
   /** Package id → the app's name as the launcher shows it (unknown ids map to themselves). */
   readonly appLabels: (packages: readonly string[]) => Promise<Readonly<Record<string, string>>>;
@@ -50,14 +51,15 @@ export const fallbackPaceNative: PaceNative = {
   clearCrashLog: noop,
   hasUsageAccess: () => false,
   isDndAccessGranted: () => false,
+  markCrashesSeen: noop,
   openDndAccessSettings: noop,
   openExactAlarmSettings: noop,
   openUsageAccessSettings: noop,
   queryUsageEvents: async () => [],
   queryUsageStats: async () => [],
   readCrashLog: () => "",
+  readUnseenCrashes: () => "",
   setDnd: () => false,
-  takeUnseenCrashes: () => "",
 };
 
 /** The native module when it is linked, otherwise the fallback. */

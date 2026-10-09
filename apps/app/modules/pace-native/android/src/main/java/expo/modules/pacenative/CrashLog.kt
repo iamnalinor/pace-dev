@@ -10,7 +10,7 @@ import java.util.TimeZone
 
 /**
  * The crash log in the app's files: every report goes to `crash-log.txt` (the newest 64 KB)
- * and to `crash-unseen.txt` until the app shows it once. Writes are synchronous on purpose:
+ * and to `crash-unseen.txt` until the person has seen it (markSeen). Writes are synchronous on purpose:
  * the process is about to die when most reports arrive.
  */
 object CrashLog {
@@ -45,16 +45,14 @@ object CrashLog {
   @Synchronized
   fun read(context: Context): String = File(context.filesDir, LOG).let { if (it.exists()) it.readText() else "" }
 
-  /** The reports not shown yet, once: the next call returns "" until something new is logged. */
+  /** The reports logged since the person last looked (markSeen), "" when none. */
   @Synchronized
-  fun takeUnseen(context: Context): String {
-    val file = File(context.filesDir, UNSEEN)
-    if (!file.exists()) {
-      return ""
-    }
-    val text = file.readText()
-    file.delete()
-    return text
+  fun readUnseen(context: Context): String =
+    File(context.filesDir, UNSEEN).let { if (it.exists()) it.readText() else "" }
+
+  @Synchronized
+  fun markSeen(context: Context) {
+    File(context.filesDir, UNSEEN).delete()
   }
 
   @Synchronized

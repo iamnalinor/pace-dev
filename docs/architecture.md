@@ -44,7 +44,9 @@ hands control to the new worker.
   release builds, unhandled promise rejections (`src/platform/crash-log.ts`) are appended to
   a file in the app's storage (`CrashLog.kt`, the newest 64 KB). A screen that throws while
   rendering shows `CrashScreen` (the root layout's `ErrorBoundary`) instead of closing the app.
-  The next launch offers to share what was logged; Settings → Crash log keeps it.
+  After a crash the next launch stops at the report (`CrashGate`, before storage, sync or
+  background work start), so even a crash on every launch can be shared; Settings → Crash log
+  keeps it.
 - **Release build**: R8 minification, resource shrinking and compressed native libraries
   (`expo-build-properties` in `app.config.ts`).
 
