@@ -37,6 +37,8 @@ vite.config.ts.timestamp-*
 
 # Expo (continuous native generation: android/ is produced by `expo prebuild`)
 apps/app/android/
+# Gradle output of the local Expo modules
+apps/app/modules/*/android/build/
 apps/app/ios/
 .expo/
 expo-env.d.ts
