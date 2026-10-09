@@ -45,6 +45,8 @@ hands control to the new worker.
   a file in the app's storage (`CrashLog.kt`, the newest 64 KB). A screen that throws while
   rendering shows `CrashScreen` (the root layout's `ErrorBoundary`) instead of closing the app.
   The next launch offers to share what was logged; Settings → Crash log keeps it.
+- **Release build**: R8 minification, resource shrinking and compressed native libraries
+  (`expo-build-properties` in `app.config.ts`).
 
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs

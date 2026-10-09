@@ -117,6 +117,19 @@ const config: ExpoConfig = {
     "expo-web-browser",
     "expo-secure-store",
     "./plugins/with-release-signing.js",
+    [
+      "expo-build-properties",
+      {
+        android: {
+          // R8 drops unused code (Firebase, Play Services and AndroidX are mostly unused) and
+          // resources; libraries ship their own keep rules.
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          // Native libraries compressed inside the APK: a much smaller download, extracted on install.
+          useLegacyPackaging: true,
+        },
+      },
+    ],
   ],
   // No OTA updates: releases ship as APKs through GitHub Releases.
   updates: { enabled: false },
