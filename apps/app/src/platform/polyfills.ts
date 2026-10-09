@@ -62,7 +62,3 @@ export const installPolyfills = (): void => {
   defineMissing(Object, "groupBy", objectGroupBy);
   defineMissing(Map, "groupBy", mapGroupBy);
 };
-
-// Installed when the entry (`entry.ts`) imports this module, before any route loads.
-// eslint-disable-next-line unicorn/no-top-level-side-effects -- the entry imports this for the side effect, ahead of expo-router
-installPolyfills();

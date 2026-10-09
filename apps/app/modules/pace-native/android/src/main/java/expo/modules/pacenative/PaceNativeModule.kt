@@ -65,6 +65,15 @@ class PaceNativeModule : Module() {
       }
     }
 
+    // The crash log (CrashLog.kt): JS errors are appended here synchronously, before the app dies.
+    Function("appendCrashReport") { kind: String, details: String -> CrashLog.append(context, kind, details) }
+
+    Function("readCrashLog") { CrashLog.read(context) }
+
+    Function("takeUnseenCrashes") { CrashLog.takeUnseen(context) }
+
+    Function("clearCrashLog") { CrashLog.clear(context) }
+
     Function("hasUsageAccess") { hasUsageAccess() }
 
     Function("openUsageAccessSettings") {

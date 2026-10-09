@@ -33,6 +33,19 @@ build differs in three ways, all in `metro.config.js`:
 The service worker precaches the build and waits; the update banner offers "Reload", which
 hands control to the new worker.
 
+### Android runtime
+
+- **Hermes lacks some built-ins** that Node, the browsers and Jest have, so no test notices
+  when shared code uses them: `Array.prototype.toSorted`, `Object.groupBy`, `Map.groupBy` and
+  `Intl.PluralRules`. The entry (`entry.ts` → `src/platform/startup.ts`) installs polyfills for
+  the first three before expo-router loads; `plural()` in core does not use `Intl.PluralRules`.
+  Reach for a newer built-in → check it exists in the APK's `libhermesvm.so` or polyfill it.
+- **Crash log**: uncaught JVM exceptions (`PaceNativePackage.kt`), uncaught JS errors and, in
+  release builds, unhandled promise rejections (`src/platform/crash-log.ts`) are appended to
+  a file in the app's storage (`CrashLog.kt`, the newest 64 KB). A screen that throws while
+  rendering shows `CrashScreen` (the root layout's `ErrorBoundary`) instead of closing the app.
+  The next launch offers to share what was logged; Settings → Crash log keeps it.
+
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs
 never import the API (the contract is in core), app feature folders only reach each other

@@ -6,6 +6,7 @@ import type { ThemePreference } from "#app/platform/theme.ts";
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
+import { CrashLogActions, useCrashLog } from "#app/features/settings/crash-log.tsx";
 import { DeleteAccount } from "#app/features/settings/delete-account.tsx";
 import { ExportRow } from "#app/features/settings/export-row.tsx";
 import { DigestWindows, QuietHours } from "#app/features/settings/notification-settings.tsx";
@@ -92,6 +93,17 @@ const LookRows = () => {
   );
 };
 
+/** Shown only once something crashed (the log lives on the phone). */
+const CrashLogRow = () => {
+  const t = useT();
+  const { clear, text } = useCrashLog();
+  return text === "" ? null : (
+    <Row label={t("settings.crashLog")}>
+      <CrashLogActions onClear={clear} text={text} />
+    </Row>
+  );
+};
+
 export const SettingsScreen = () => {
   const t = useT();
   const router = useRouter();
@@ -139,6 +151,7 @@ export const SettingsScreen = () => {
       <Row label={t("settings.connectedApps")}>
         <ConnectedApps />
       </Row>
+      {IS_PHONE ? <CrashLogRow /> : null}
       <View className="gap-3 px-5 py-6">
         <Button onPress={() => void logout()} variant="secondary">
           {t("settings.logout")}

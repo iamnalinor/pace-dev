@@ -142,6 +142,12 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "errors.httpStatus": "{status} {text}",
   "errors.details": "Технические детали",
   "errors.reload": "Перезагрузить",
+  "crash.share": "Отправить отчёт",
+  "crash.lastTitle": "В прошлый раз Pace упал",
+  "crash.lastBody":
+    "Отчёт сохранён в «Настройки → Журнал сбоев». Если отправить его, сбой будет проще исправить.",
+  "settings.crashLog": "Журнал сбоев",
+  "settings.crashLog.clear": "Очистить",
   "update.ready": "Мы кое-что поменяли",
   "update.reload": "Обновить",
   "errors.syncFailed": "Синхронизация не удалась: {reason}",

@@ -7,6 +7,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider } from "#app/app-state.tsx";
+import { CrashScreen } from "#app/features/crash/crash-screen.tsx";
+import { useCrashNotice } from "#app/features/crash/use-crash-notice.ts";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 // Defines the background phone check before Android may run it.
 import "#app/platform/phone-background.ts";
@@ -38,8 +40,12 @@ const Navigator = () => {
   );
 };
 
+/** A screen that throws while rendering shows the error instead of closing the app. */
+export const ErrorBoundary = CrashScreen;
+
 /** Gesture root → safe areas → theme variables → client runtime → the auth-gated stack. */
 export default function RootLayout() {
+  useCrashNotice();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

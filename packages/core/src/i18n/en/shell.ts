@@ -142,6 +142,12 @@ export const enShell = {
   "errors.httpStatus": "{status} {text}",
   "errors.details": "Technical details",
   "errors.reload": "Reload",
+  "crash.share": "Share report",
+  "crash.lastTitle": "Pace crashed last time",
+  "crash.lastBody":
+    "The report is kept in Settings → Crash log. Sharing it helps get the crash fixed.",
+  "settings.crashLog": "Crash log",
+  "settings.crashLog.clear": "Clear",
   "update.ready": "We changed a few things",
   "update.reload": "Reload",
   "errors.syncFailed": "Sync failed: {reason}",
