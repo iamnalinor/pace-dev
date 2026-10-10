@@ -45,6 +45,12 @@ describe("projectViewModel", () => {
     expect(algebra.done.find((entry) => entry.id === sheetId(3))?.outcome).toBe("done_late");
   });
 
+  it("never counts time left on a closed task", () => {
+    const kinds = view(ALGEBRA_ID).done.flatMap((entry) => entry.meta.map((part) => part.kind));
+    expect(kinds).toContain("due");
+    expect(kinds).not.toContain("left");
+  });
+
   it("lists an empty instance among the open rows, by its due", () => {
     const calculus = view(CALCULUS_ID);
     expect(calculus.open.map((entry) => entry.id)).toEqual([CALC_HW5_ID, CALC_W41_ID]);

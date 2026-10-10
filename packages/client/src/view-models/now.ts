@@ -84,7 +84,7 @@ const startsPart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
     ? [{ kind: "starts", at: item.task.startAt, tz: item.task.startTz ?? ctx.deviceTz }]
     : [];
 
-/** Lateness, else the due date and the time left to it. */
+/** Lateness, else the due date and, while the task is open, the time left to it. */
 const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   const { task } = item;
   if (item.lateMinutes !== null) {
@@ -100,7 +100,9 @@ const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
         relative: relativeDay(task.dueAt, ctx),
         zoneDiffers: zonesDiffer(due, { at: task.dueAt, tz: ctx.deviceTz }),
       },
-      { kind: "left", minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) },
+      ...(task.closed === null
+        ? [{ kind: "left" as const, minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) }]
+        : []),
     ];
   }
   return [];
