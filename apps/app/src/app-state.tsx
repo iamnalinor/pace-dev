@@ -18,8 +18,10 @@ import {
   type User,
 } from "@pace/core";
 
+import { IS_PHONE } from "./platform/device.ts";
 import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
 import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
+import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
@@ -37,6 +39,13 @@ const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
   return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
 };
 
+/** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
+const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
+  if (IS_PHONE) {
+    await uploadPhoneData(runtime.api, runtime.clock.now());
+  }
+};
+
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
@@ -44,6 +53,7 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   await actions.ensureTimezone();
   await syncLocalNotifications(runtime);
   await remindCalendar(runtime);
+  await sendPhoneData(runtime);
   await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status === "signed-in") {
@@ -107,6 +117,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       await sync.syncNow();
       await syncLocalNotifications(runtime);
       await remindCalendar(runtime);
+      await sendPhoneData(runtime);
       await startPhoneChecks(phoneContextOf(runtime));
     })();
   });

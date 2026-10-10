@@ -11,6 +11,18 @@ import {
   TelegramLoginSchema,
   UserSchema,
 } from "./schemas/auth.ts";
+import {
+  CalendarOutputSchema,
+  CalendarSyncSchema,
+  DeviceCreatedSchema,
+  DeviceCreateSchema,
+  DevicesOutputSchema,
+  DoneSchema,
+  RangeQuerySchema,
+  StoredSchema,
+  UsageOutputSchema,
+  UsageUploadSchema,
+} from "./schemas/cloud.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import {
   DecisionsOutputSchema,
@@ -221,6 +233,69 @@ export const endpoints = {
         path: "/api/oauth/grants/:id",
       }),
     },
+  },
+  calendar: {
+    /** A phone's calendar over a range, replacing what that phone sent for it before. */
+    sync: endpoint({
+      auth: true,
+      body: CalendarSyncSchema,
+      method: "POST",
+      output: StoredSchema,
+      path: "/api/calendar/sync",
+    }),
+    /** The calendar's events overlapping a range, from every phone that sends it. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: CalendarOutputSchema,
+      path: "/api/calendar",
+      query: RangeQuerySchema,
+    }),
+    /** Forgets the calendar copy (sending was turned off). */
+    clear: endpoint({ auth: true, method: "DELETE", output: DoneSchema, path: "/api/calendar" }),
+  },
+  usage: {
+    /** A device's app sessions; the same device, app and start is one session (it may grow). */
+    upload: endpoint({
+      auth: true,
+      body: UsageUploadSchema,
+      method: "POST",
+      output: StoredSchema,
+      path: "/api/usage/sessions",
+      scope: "usage:write",
+    }),
+    /** App sessions on every device overlapping a range. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: UsageOutputSchema,
+      path: "/api/usage",
+      query: RangeQuerySchema,
+    }),
+  },
+  devices: {
+    /** The computers connected with a token of their own. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: DevicesOutputSchema,
+      path: "/api/devices",
+    }),
+    /** Connects a computer: a token that can only upload its usage, shown once. */
+    create: endpoint({
+      auth: true,
+      body: DeviceCreateSchema,
+      method: "POST",
+      output: DeviceCreatedSchema,
+      path: "/api/devices",
+    }),
+    revoke: endpoint({
+      auth: true,
+      method: "DELETE",
+      output: DoneSchema,
+      params: z.object({ id: z.string().min(1).max(64) }),
+      path: "/api/devices/:id",
+    }),
   },
 } as const;
 

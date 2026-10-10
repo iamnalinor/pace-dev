@@ -21,6 +21,7 @@ export {
   type User,
   UserSchema,
 } from "./api/schemas/auth.ts";
+export type { CalendarEvent, Device, UsageRow } from "./api/schemas/cloud.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,

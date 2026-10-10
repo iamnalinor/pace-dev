@@ -30,6 +30,39 @@ export const observations = sqliteTable(
   (table) => [index("observations_kind_key_idx").on(table.kind, table.key)],
 );
 
+/** A phone's calendar copy: one row per occurrence, replaced range by range by that phone. */
+export const calendarEvents = sqliteTable(
+  "calendar_events",
+  {
+    deviceId: text().notNull(),
+    eventId: text().notNull(),
+    startAt: text().notNull(),
+    endAt: text().notNull(),
+    title: text().notNull(),
+    series: text(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.deviceId, table.eventId, table.startAt] }),
+    index("calendar_events_start_idx").on(table.startAt),
+  ],
+);
+
+/** Apps in front on each device: names and times only; one row per device, app and start. */
+export const usageSessions = sqliteTable(
+  "usage_sessions",
+  {
+    deviceId: text().notNull(),
+    deviceName: text().notNull(),
+    app: text().notNull(),
+    startAt: text().notNull(),
+    endAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.deviceId, table.app, table.startAt] }),
+    index("usage_sessions_start_idx").on(table.startAt),
+  ],
+);
+
 /** Every automatic decision with its inputs, so "why?" can be answered later. */
 export const decisions = sqliteTable(
   "decisions",

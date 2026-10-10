@@ -43,7 +43,7 @@ tool error (`isError: true`, explaining which scope is missing) instead of runni
 |---|---|---|
 | `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch`, `search_decisions` |
 | `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
-| `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons | `list_activity_buttons`, `get_day`, `summary_time` |
+| `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons, the calendar copy and app usage on every device | `list_activity_buttons`, `get_day`, `summary_time`, `get_calendar`, `get_usage`, `get_week` |
 | `time:write` | start, stop and log activities | `start_activity`, `stop_activity`, `log_activity` |
 | `analytics:read` | query the store read-only, replay the reminder rules, export the log | `describe_schema`, `query_sql`, `simulate`, `export_all` |
 | `offline_access` | keep a refresh token, so the connection survives the 24 h access token | — |
@@ -98,6 +98,9 @@ shows.
 | `list_activity_buttons` | time read | what the time bar's buttons start (Rest, Sport by length, Chores by name): each choice's id, its button, label in the account language, category and Expect minutes | — |
 | `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running, what ran alongside the main line | `date?` (YYYY-MM-DD, default today) |
 | `summary_time` | time read | minutes per category and per project (through the task) over a range, largest first | `from`, `to` |
+| `get_calendar` | time read | the calendar events the phone sends (own and accepted) overlapping a range | `from`, `to` |
+| `get_usage` | time read | app sessions on every device overlapping a range: device, app name, start, end (never titles) | `from`, `to`, `device?` |
+| `get_week` | time read | a range as lived: tracked blocks with `sat` (the apps in front on each device during each), what ran alongside, and the calendar | `from`, `to` |
 | `start_activity` | time write | starts an activity; the main one running ends at the same instant, unless `alongside` (then both run, each stopped on its own). A choice's defaults, or a label and category; `taskId` counts the time as work on the task. At twice its Expect the person is asked whether it still goes on | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `alongside?`, `at?` |
 | `stop_activity` | time write | stops the main activity, or the one `activityId` names (`activity/none-running` otherwise) | `activityId?`, `at?` |
 | `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |

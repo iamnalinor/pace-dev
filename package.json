@@ -37,7 +37,7 @@
     "lint:arch": "depcruise apps packages e2e --config .dependency-cruiser.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/client && tsc -p apps/api && tsc -p apps/app && tsc -p e2e",
     "test": "bun run test:unit && bun run test:api && bun run test:app && bun run test:e2e",
-    "test:unit": "bun test scripts && bun run --cwd packages/core test && bun run --cwd packages/client test",
+    "test:unit": "bun test scripts && bun run --cwd packages/core test && bun run --cwd packages/client test && python3 -m unittest discover -s tools/pace-aw-bridge",
     "test:api": "bun run --cwd apps/api test",
     "test:app": "bun run --cwd apps/app test",
     "test:e2e": "playwright test",

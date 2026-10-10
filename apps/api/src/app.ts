@@ -13,6 +13,7 @@ import { bindBotLogin } from "./auth/bot-login.ts";
 import { findUserIdByTelegramId } from "./auth/users.ts";
 import { isAllowed } from "./auth/whitelist.ts";
 import { mountBotRoutes } from "./bot/bot-routes.ts";
+import { mountCloudRoutes } from "./cloud/cloud-routes.ts";
 import { mountLinkRoutes } from "./links/link-routes.ts";
 import { mountNotifyRoutes } from "./notify/notify-routes.ts";
 import { mountParseRoutes } from "./parse/parse-routes.ts";
@@ -92,5 +93,6 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   mountLinkRoutes(app, deps.fetch);
   mountParseRoutes(app, deps.parseProviders);
   mountNotifyRoutes(app);
+  mountCloudRoutes(app);
   return app;
 };

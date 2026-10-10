@@ -141,6 +141,16 @@ export const SettingsScreen = () => {
           <ExportRow />
         </Row>
       )}
+      <Row label={t("settings.devices")}>
+        <Button
+          onPress={() => {
+            router.push("/devices");
+          }}
+          variant="secondary"
+        >
+          {t("devices.title")}
+        </Button>
+      </Row>
       <Row label={t("settings.connectedApps")}>
         <ConnectedApps />
       </Row>

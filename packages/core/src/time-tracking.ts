@@ -48,6 +48,7 @@ export {
 } from "./tracking/patterns.ts";
 export {
   type AppMinutes,
+  appSessions,
   appUsage,
   detectSleep,
   type Interval,
@@ -68,3 +69,4 @@ export {
   type Timeline,
 } from "./tracking/timeline.ts";
 export { typedActivity, type TypedActivity } from "./tracking/typed.ts";
+export { type SatRow, whereSat } from "./tracking/where-sat.ts";

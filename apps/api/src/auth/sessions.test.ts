@@ -30,7 +30,7 @@ describe("sessions", () => {
     const session = await createSession(db, { label: "web", now: NOW, userId: user.id });
     expect(session.token).toMatch(/^[\w-]{43}$/);
     expect(session.expiresAt).toBe(NOW + 90 * DAY);
-    expect(await findSession(db, session.token, NOW + 89 * DAY)).toEqual(user);
+    expect(await findSession(db, session.token, NOW + 89 * DAY)).toEqual({ scope: null, user });
     expect(await findSession(db, session.token, NOW + 90 * DAY + 1)).toBeNull();
   });
 

@@ -30,6 +30,7 @@ import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
 
+export { type Devices, type DevicesPhase, type NewDevice, useDevices } from "./react/devices.ts";
 export {
   type Consent,
   type ConsentPhase,

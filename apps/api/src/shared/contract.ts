@@ -1,4 +1,5 @@
 import type {
+  CalendarEvent,
   CoreState,
   EventInput,
   NotifyMessage,
@@ -7,6 +8,7 @@ import type {
   RetroError,
   SyncEvent,
   Task,
+  UsageRow,
 } from "@pace/core";
 
 export type { Observation, SyncEvent } from "@pace/core";
@@ -69,6 +71,16 @@ export type DryRunResult = {
 /** The part of the user store that readers outside the Durable Object (MCP, bot) use. */
 export type UserStoreApi = {
   readonly read: (now: string) => Promise<ReadResult>;
+  /** The phone's calendar copy overlapping a range. */
+  readonly calendar: (range: {
+    readonly from: string;
+    readonly to: string;
+  }) => Promise<readonly CalendarEvent[]>;
+  /** App sessions on every device overlapping a range. */
+  readonly usage: (range: {
+    readonly from: string;
+    readonly to: string;
+  }) => Promise<readonly UsageRow[]>;
   readonly apply: (
     inputs: readonly EventInput[],
     meta: ApplyMeta,

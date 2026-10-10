@@ -49,7 +49,7 @@ export const mount = <E extends EndpointShape>(
   handler: Handler<E>,
 ): void => {
   if (endpoint.auth) {
-    app.on(endpoint.method, endpoint.path, requireAuth);
+    app.on(endpoint.method, endpoint.path, requireAuth(endpoint.scope));
   }
   app.on(endpoint.method, endpoint.path, async (c) => {
     const rawBody = endpoint.body === undefined ? undefined : await readJson(c);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appSessions,
   appUsage,
   detectSleep,
   type PhoneEvent,
@@ -98,6 +99,25 @@ describe("app usage", () => {
     ).toEqual([
       { app: "com.google.android.youtube", minutes: 13 },
       { app: "org.telegram.messenger", minutes: 12 },
+    ]);
+  });
+});
+
+describe("app sessions", () => {
+  it("lists each app's spells in front, a minute or longer, the one still open ending now", () => {
+    const events = [
+      on(msk(8, "10:00")),
+      app("app-start", msk(8, "10:00"), "org.telegram.messenger"),
+      app("app-start", msk(8, "10:12"), "com.android.chrome"),
+      app("app-start", msk(8, "10:12"), "org.telegram.messenger"),
+      off(msk(8, "10:30")),
+      on(msk(8, "11:00")),
+      app("app-start", msk(8, "11:00"), "com.google.android.youtube"),
+    ];
+    expect(appSessions(events, msk(8, "11:10"))).toEqual([
+      { app: "org.telegram.messenger", endAt: msk(8, "10:12"), startAt: msk(8, "10:00") },
+      { app: "org.telegram.messenger", endAt: msk(8, "10:30"), startAt: msk(8, "10:12") },
+      { app: "com.google.android.youtube", endAt: msk(8, "11:10"), startAt: msk(8, "11:00") },
     ]);
   });
 });

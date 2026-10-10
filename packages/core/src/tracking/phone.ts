@@ -118,6 +118,15 @@ const foregroundIntervals = (
     });
 };
 
+/** Each app's spells in front (a minute or longer), by start; one still open ends at `now`. */
+export const appSessions = (
+  events: readonly PhoneEvent[],
+  now: string,
+): readonly (Interval & { readonly app: string })[] =>
+  foregroundIntervals(events, now)
+    .filter((interval) => Date.parse(interval.endAt) - Date.parse(interval.startAt) >= 60_000)
+    .toSorted((a, b) => a.startAt.localeCompare(b.startAt));
+
 const clipMinutes = (interval: Interval, from: string, to: string): number => {
   const start = Math.max(Date.parse(interval.startAt), Date.parse(from));
   const end = Math.min(Date.parse(interval.endAt), Date.parse(to));

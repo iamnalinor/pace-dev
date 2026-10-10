@@ -9,6 +9,7 @@ import { requireUser } from "../shared/current-user.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { readBearer } from "./auth-middleware.ts";
+import { mountDeviceRoutes } from "./device-routes.ts";
 import { consumeNonce, createNonce } from "./nonce.ts";
 import { createSession, revokeSession } from "./sessions.ts";
 import { verifyTelegramLogin } from "./telegram-widget.ts";
@@ -128,4 +129,5 @@ export const mountAuthRoutes = (app: Hono<AppEnv>): void => {
   });
   mount(app, endpoints.me, ({ c }) => ok(requireUser(c)));
   mount(app, endpoints.auth.dev, devLogin);
+  mountDeviceRoutes(app);
 };
