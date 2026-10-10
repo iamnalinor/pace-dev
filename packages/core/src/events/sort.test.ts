@@ -40,9 +40,8 @@ describe("sortEvents", () => {
 
   it("is idempotent and a permutation", () => {
     const msArb = fc.integer({ max: 1_800_000_000_000, min: 1_700_000_000_000 });
-    const eventArb = fc
-      .tuple(msArb, fc.nat())
-      .map(([ms, seed]) => reopened(newId(seed), new Date(ms).toISOString()));
+    // The id is made at the event's own time: a random number is no time for a ULID.
+    const eventArb = msArb.map((ms) => reopened(newId(ms), new Date(ms).toISOString()));
     const eventsArb = fc.array(eventArb);
     fc.assert(
       fc.property(eventsArb, (events) => {
