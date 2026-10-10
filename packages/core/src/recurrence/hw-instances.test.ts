@@ -382,7 +382,7 @@ describe("missingInstanceEvents", () => {
       {
         id: "hw:hw.history:2026-W41",
         type: "task.created",
-        occurredAt: TUESDAY_W41,
+        occurredAt: "2026-10-01T06:00:00.000Z",
         precision: "exact",
         source: "system",
         payload: {
@@ -415,13 +415,32 @@ describe("missingInstanceEvents", () => {
       now: "2026-10-05T07:00:00.000Z",
     });
 
-    expect(before.map((input) => [input.id, input.occurredAt])).toEqual([
-      ["hw:hw.algebra:2026-W41", "2026-10-05T06:59:59.000Z"],
-    ]);
+    expect(before.map((input) => input.id)).toEqual(["hw:hw.algebra:2026-W41"]);
     expect(atIssue.map((input) => input.id)).toEqual(["hw:hw.algebra:2026-W41"]);
     expect(
       missingInstanceEvents({ tasks: foldTasks(before), presets, now: "2026-10-05T07:00:00.000Z" }),
     ).toEqual([]);
+  });
+
+  it("makes the same instance ahead whenever, wherever it is derived", () => {
+    const presets = foldPresets(exampleCoursePresetEvents(SEEDED_AT).slice(0, 1));
+    const derive = (now: string) =>
+      missingInstanceEvents({ tasks: INITIAL_TASKS_STATE, presets, now });
+    const early = derive("2026-10-05T03:00:00.000Z");
+    expect(early).toEqual(derive("2026-10-05T06:59:59.000Z"));
+    // Recorded a week before its issue (never after now, never before the course).
+    expect(early.map((input) => input.occurredAt)).toEqual(["2026-09-28T07:00:00.000Z"]);
+  });
+
+  it("puts the next week ahead when this week's instance was taken back", () => {
+    const presets = foldPresets(exampleCoursePresetEvents(SEEDED_AT).slice(0, 1));
+    const events = missingInstanceEvents({
+      existingEventIds: new Set(["hw:hw.algebra:2026-W41"]),
+      now: TUESDAY_W41,
+      presets,
+      tasks: INITIAL_TASKS_STATE,
+    });
+    expect(events.map((input) => input.id)).toEqual(["hw:hw.algebra:2026-W42"]);
   });
 
   it("skips a week whose deadline passed before the course was added; the next waits ahead", () => {

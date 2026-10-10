@@ -41,10 +41,48 @@ type Faults = {
   readonly to: MessageKey | null;
 };
 
+/** An end before the start reads as past midnight only for a block this long at most. */
+const MAX_OVERNIGHT_MS = 12 * 3_600_000;
+
 /**
-The typed clock times on the block's own day; an end at or before the start means the block
-ran past midnight. A logged block needs its end; a running one has none yet.
+The end on the block's day, or after midnight when it is earlier than the start and the night
+is short; `null` for an end equal to the start or a reversed pair (10:00 → 09:30), which
+would otherwise silently make a day-long block.
 */
+const endOf = (sameDay: string, startAt: string, zone: string): null | string => {
+  if (sameDay > startAt) {
+    return sameDay;
+  }
+  const nextDay = addDaysIn(sameDay, 1, zone);
+  const length = Date.parse(nextDay) - Date.parse(startAt);
+  return sameDay < startAt && length <= MAX_OVERNIGHT_MS ? nextDay : null;
+};
+
+/**
+The typed clock times on the block's own day (see `endOf` for one past midnight). A logged
+block needs its end; a running one has none yet.
+*/
+/** What is wrong with the end, if anything: missing on a logged block, not a time, reversed. */
+const toFault = (
+  draft: Draft,
+  target: SheetTarget,
+  times: {
+    readonly startAt: null | string;
+    readonly sameDay: null | string;
+    readonly zone: string;
+  },
+): MessageKey | null => {
+  if (draft.to === "") {
+    return target.kind === "log" ? "day.badTime" : null;
+  }
+  if (times.sameDay === null) {
+    return "day.badTime";
+  }
+  return times.startAt !== null && endOf(times.sameDay, times.startAt, times.zone) === null
+    ? "day.badRange"
+    : null;
+};
+
 const readDraft = (
   draft: Draft,
   target: SheetTarget,
@@ -53,20 +91,18 @@ const readDraft = (
   const { date } = wallClock(target.startAt, zone);
   const startAt = fromWallClock({ date, time: draft.from, tz: zone });
   const sameDay = draft.to === "" ? null : fromWallClock({ date, time: draft.to, tz: zone });
-  const isEndMissing = draft.to === "" ? target.kind === "log" : sameDay === null;
   const faults: Faults = {
     from: startAt === null ? "day.badTime" : null,
     label: draft.label.trim() === "" ? "day.whatMissing" : null,
-    to: isEndMissing ? "day.badTime" : null,
+    to: toFault(draft, target, { sameDay, startAt, zone }),
   };
-  if (startAt === null || isEndMissing) {
+  if (startAt === null || faults.to !== null) {
     return { faults, range: null };
   }
-  if (sameDay === null) {
-    return { faults, range: { endAt: null, startAt } };
-  }
-  const endAt = sameDay > startAt ? sameDay : addDaysIn(sameDay, 1, zone);
-  return { faults, range: { endAt, startAt } };
+  return {
+    faults,
+    range: { endAt: sameDay === null ? null : endOf(sameDay, startAt, zone), startAt },
+  };
 };
 
 const hasFault = (faults: Faults): boolean =>

@@ -36,27 +36,30 @@ const appendSystem = async (deps: ActionDeps, inputs: readonly EventInput[]): Pr
   return added;
 };
 
+/** Every id in the log, revoked ones included: a taken-back instance is not made again. */
+const idsOf = (state: { readonly log: readonly { readonly id: string }[] }): ReadonlySet<string> =>
+  new Set(state.log.map((event) => event.id));
+
 export const instanceActions = (deps: ActionDeps): InstanceActions => ({
   ensureInstances: async () => {
     const now = deps.clock.now();
     const before = deps.state.store.getState();
     const instances = await appendSystem(
       deps,
-      missingInstanceEvents({ tasks: before.tasks, presets: before.presets, now }),
+      missingInstanceEvents({ ...before, existingEventIds: idsOf(before), now }),
     );
     // The outcomes are read after the instances: a fresh instance cannot be due yet, but a
     // revoked and recreated one keeps its id out of the "already emitted" set otherwise.
     const after = deps.state.store.getState();
-    const existingEventIds = new Set(after.log.map((event) => event.id));
     const outcomes = await appendSystem(
       deps,
-      autoOutcomeEvents({ tasks: after.tasks, presets: after.presets, now, existingEventIds }),
+      autoOutcomeEvents({ ...after, existingEventIds: idsOf(after), now }),
     );
     // A course whose last instance an outcome just closed gets its next one ahead.
     const closed = deps.state.store.getState();
     const ahead = await appendSystem(
       deps,
-      missingInstanceEvents({ tasks: closed.tasks, presets: closed.presets, now }),
+      missingInstanceEvents({ ...closed, existingEventIds: idsOf(closed), now }),
     );
     return instances + outcomes + ahead;
   },

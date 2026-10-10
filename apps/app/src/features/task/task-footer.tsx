@@ -68,7 +68,7 @@ export const TaskFooter = ({
       </View>
       {view.primaryAction.kind === "none" ? null : (
         <View className="flex-1">
-          <Button onLongPress={onClose} onPress={finish}>
+          <Button hint={t("task.doneHint")} onLongPress={onClose} onPress={finish}>
             {primary}
           </Button>
         </View>

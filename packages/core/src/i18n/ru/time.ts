@@ -64,6 +64,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "day.editTitle": "Изменить занятие",
   "day.whatMissing": "Напишите, что это было.",
   "day.badTime": "Введите время, например 09:30.",
+  "day.badRange": "Конец должен быть позже начала.",
   "day.delete": "Удалить этот блок",
   "day.deleteConfirm": "Удалить? Нажмите ещё раз",
   "day.total": "{category} · {duration}",

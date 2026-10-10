@@ -1,8 +1,10 @@
 import { act, render, screen, waitFor } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 import { AppState, Text } from "react-native";
 
 import { createMemoryEventStore, createMemorySessionStore } from "@pace/client";
 import { createFakeFetch, emptySyncRoutes, fakeUser } from "@pace/client/testing";
+import { addMinutesIso } from "@pace/core";
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
@@ -48,7 +50,38 @@ afterEach(() => {
   addEventListener.mockClear();
 });
 
+type FakeNotifications = {
+  state: { granted: boolean; scheduled: { identifier: string }[] };
+};
+
+const notifications = Notifications as unknown as FakeNotifications;
+
 describe("PaceProvider", () => {
+  it('schedules the next "still doing this?" once it was answered yes', async () => {
+    notifications.state.granted = true;
+    notifications.state.scheduled = [];
+    const { runtime } = await setup();
+    const now = runtime.clock.now();
+    await runtime.actions.startActivity(
+      { category: "rest", expectMinutes: 30, label: "Rest" },
+      { at: addMinutesIso(now, -70) },
+    );
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    const [running] = Object.values(runtime.state.store.getState().time.activities);
+    await act(async () => {
+      await runtime.actions.stillGoing(running?.id ?? "");
+    });
+    await waitFor(() => {
+      expect(notifications.state.scheduled.map((item) => item.identifier)).toEqual([
+        expect.stringContaining(`:long@`),
+      ]);
+    });
+  });
+
   it("exposes the auth status, the language and starts syncing once signed in", async () => {
     const { api, runtime } = await setup();
     await render(

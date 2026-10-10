@@ -61,7 +61,7 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   }
 };
 
-/** The running activity and its targets: the timers change only when this does. */
+/** The running activity and when it asks next: the timers change only when this does. */
 const timerKey = (runtime: PaceRuntime): string => {
   const { running } = timeBarModel(runtime.state.store.getState(), {
     deviceTz: runtime.clock.deviceTz,
@@ -69,7 +69,7 @@ const timerKey = (runtime: PaceRuntime): string => {
   });
   return running === null
     ? ""
-    : [running.activityId, running.startAt, running.label, running.expectMinutes].join("|");
+    : [running.activityId, running.startAt, running.label, running.remindAt].join("|");
 };
 
 /** Reschedules the phone's "still doing this?" timer on every switch, stop or edit of the running activity. */

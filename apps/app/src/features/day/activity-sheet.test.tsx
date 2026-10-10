@@ -67,6 +67,50 @@ describe("the log-past sheet", () => {
   });
 });
 
+const logSheet = async () => {
+  const runtime = await createTestRuntime();
+  const onClose = jest.fn();
+  await renderScreen(
+    <ActivitySheet
+      onClose={onClose}
+      target={{
+        endAt: "2026-10-06T10:00:00.000Z",
+        kind: "log",
+        startAt: "2026-10-06T09:00:00.000Z",
+      }}
+      zone="Europe/Moscow"
+    />,
+    runtime,
+  );
+  await fireEvent.changeText(screen.getByLabelText("What"), "Nap");
+  return { onClose, runtime };
+};
+
+describe("the log-past sheet's times", () => {
+  it("refuses an end at or well before the start instead of a day-long block", async () => {
+    const { onClose } = await logSheet();
+    await fireEvent.changeText(screen.getByLabelText("From"), "1000");
+    await fireEvent.changeText(screen.getByLabelText("To"), "0930");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("The end must be after the start.")).toBeOnTheScreen();
+    await fireEvent.changeText(screen.getByLabelText("To"), "1000");
+    expect(screen.getByText("The end must be after the start.")).toBeOnTheScreen();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("reads a short evening block that ends after midnight as one night", async () => {
+    const { onClose, runtime } = await logSheet();
+    await fireEvent.changeText(screen.getByLabelText("From"), "2300");
+    await fireEvent.changeText(screen.getByLabelText("To"), "0100");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    const [nap] = Object.values(runtime.state.store.getState().time.activities);
+    expect(Date.parse(nap?.endAt ?? "") - Date.parse(nap?.startAt ?? "")).toBe(2 * 3_600_000);
+  });
+});
+
 describe("deleting a block", () => {
   it("asks for a second tap, then takes it off the day", async () => {
     const runtime = await createTestRuntime();

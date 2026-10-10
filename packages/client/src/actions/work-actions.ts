@@ -14,6 +14,7 @@ import {
   emit,
   fromStore,
   presetOf,
+  serially,
   stamp,
   taskOf,
   type When,
@@ -127,33 +128,35 @@ type ActionErrorOf = Extract<Awaited<ActionResult>, { readonly ok: false }>["err
 
 const submit =
   (deps: ActionDeps): WorkActions["submit"] =>
-  async (input) => {
-    const prepared = submission(deps, input);
-    return prepared.ok ? await emit(deps, [prepared.value]) : prepared;
-  };
+  async (input) =>
+    await serially(deps, async () => {
+      const prepared = submission(deps, input);
+      return prepared.ok ? await emit(deps, [prepared.value]) : prepared;
+    });
 
 const closeTask =
   (deps: ActionDeps): WorkActions["closeTask"] =>
-  async (input) => {
-    const task = taskOf(deps, input.taskId);
-    if (!task.ok) {
-      return task;
-    }
-    if (task.value.closed !== null) {
-      return err("action/nothing-to-do");
-    }
-    const { taskId, outcome, reason } = input;
-    return await emit(deps, [
-      stamp(
-        deps,
-        {
-          type: "task.closed",
-          payload: { taskId, outcome, ...(reason !== undefined && { reason }) },
-        },
-        input,
-      ),
-    ]);
-  };
+  async (input) =>
+    await serially(deps, async () => {
+      const task = taskOf(deps, input.taskId);
+      if (!task.ok) {
+        return task;
+      }
+      if (task.value.closed !== null) {
+        return err("action/nothing-to-do");
+      }
+      const { taskId, outcome, reason } = input;
+      return await emit(deps, [
+        stamp(
+          deps,
+          {
+            type: "task.closed",
+            payload: { taskId, outcome, ...(reason !== undefined && { reason }) },
+          },
+          input,
+        ),
+      ]);
+    });
 
 const reopen =
   (deps: ActionDeps): WorkActions["reopen"] =>

@@ -288,6 +288,20 @@ describe("submit", () => {
 });
 
 describe("closing and reopening", () => {
+  it("closes or submits once when tapped twice at the same moment", async () => {
+    const world = await setupActions();
+    const closes = await Promise.all([
+      world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
+      world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
+    ]);
+    expect(closes.map((result) => result.ok)).toEqual([true, false]);
+    const sends = await Promise.all([
+      world.actions.submit({ taskId: HW_ID }),
+      world.actions.submit({ taskId: HW_ID }),
+    ]);
+    expect(sends.map((result) => result.ok)).toEqual([true, false]);
+  });
+
   it("closes with an outcome and a reason, then reopens", async () => {
     const world = await setupActions();
     const [closed] = unwrap(
@@ -568,8 +582,10 @@ describe("ensureInstances", () => {
     // System-made instances share their id with their creation event.
     unwrap(await world.actions.revoke(CALC_W41_ID));
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
-    await expect(world.actions.ensureInstances()).resolves.toBe(1);
+    // The automatic outcome as before, and the course's next week put ahead instead.
+    await expect(world.actions.ensureInstances()).resolves.toBe(2);
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
+    expect(taskOf(world, "hw:hw.calculus:2026-W42")?.closed).toBeNull();
   });
 });
 

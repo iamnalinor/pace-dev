@@ -52,6 +52,7 @@ export const Button = ({
   busy = false,
   children,
   disabled = false,
+  hint,
   icon: Icon,
   onLongPress,
   onPress,
@@ -60,6 +61,8 @@ export const Button = ({
   readonly busy?: boolean;
   readonly children: string;
   readonly disabled?: boolean;
+  /** What a press does beyond the label (a long press, say), for screen readers. */
+  readonly hint?: string;
   readonly icon?: LucideIcon;
   readonly onPress: () => void;
   /** A second way in (the full close sheet behind a one-tap Done). */
@@ -68,6 +71,7 @@ export const Button = ({
 }) => {
   return (
     <Pressable
+      accessibilityHint={hint}
       accessibilityRole="button"
       aria-busy={busy}
       aria-disabled={disabled || busy}

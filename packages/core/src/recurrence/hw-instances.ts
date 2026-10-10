@@ -31,6 +31,8 @@ export type MissingInstancesInput = {
   readonly tasks: TasksState;
   readonly presets: PresetsState;
   readonly now: string;
+  /** Ids already in the log: an instance taken back (revoked) counts as made. */
+  readonly existingEventIds?: ReadonlySet<string> | undefined;
 };
 
 /** Inverse of `instanceId`; `undefined` for every id that is not a homework instance. */
@@ -144,18 +146,31 @@ const latestOf = (instances: readonly Task[]): Task | undefined =>
   instances.find((task) => instances.every((other) => other.id <= task.id));
 
 /**
+When an instance made ahead of its issue is recorded: a week before the issue (the previous
+week's issue, already past), never before the course. It depends only on the slot and the
+preset, so every device and the server write the same event; it starts at the issue instant
+and waits under "In future".
+*/
+const aheadAt = ({ slot, source }: Expected, now: string): string => {
+  const weekBefore = toIso(addDays(slot.issuedAt, -7, { in: tz(source.recurrence.tz) }));
+  const at = Math.max(Date.parse(weekBefore), Date.parse(source.preset.createdAt));
+  // A course is never created after `now`; the guard only keeps an event out of the future.
+  return new Date(Math.min(at, Date.parse(now))).toISOString();
+};
+
+/**
 The creation of one instance. It is numbered after every instance of the preset so far,
 closed ones included, and inherits the estimate of the most recent one: the student
-knows better than the preset how long a sheet takes. One made ahead of its issue is recorded
-now and starts at the issue instant (it waits under "In future").
+knows better than the preset how long a sheet takes.
 */
-const instanceEvent = ({ slot, source }: Expected, tasks: TasksState, now: string): EventInput => {
+const instanceEvent = (item: Expected, tasks: TasksState, now: string): EventInput => {
+  const { slot, source } = item;
   const id = instanceId(slot.presetId, slot.isoWeek);
   const existing = instancesOf(tasks, slot.presetId);
   return {
     id,
     type: "task.created",
-    occurredAt: isIssuedBy(slot, now) ? slot.issuedAt : now,
+    occurredAt: isIssuedBy(slot, now) ? slot.issuedAt : aheadAt(item, now),
     precision: "exact",
     source: "system",
     payload: {
@@ -174,8 +189,11 @@ const instanceEvent = ({ slot, source }: Expected, tasks: TasksState, now: strin
   };
 };
 
-const isMissing = (tasks: TasksState, slot: InstanceSlot): boolean =>
-  taskById(tasks, instanceId(slot.presetId, slot.isoWeek)) === undefined;
+/** Not made yet: no task, and not made and taken back either. */
+const isMissing = (input: MissingInstancesInput, slot: InstanceSlot): boolean => {
+  const id = instanceId(slot.presetId, slot.isoWeek);
+  return taskById(input.tasks, id) === undefined && input.existingEventIds?.has(id) !== true;
+};
 
 /**
 What one preset needs now: its issued slot if it has no task yet (unless its deadline passed
@@ -184,14 +202,14 @@ its issue, so the week's homework is on the plan before it is given.
 */
 const missingFor = (
   slots: readonly Expected[],
-  tasks: TasksState,
-  now: string,
+  input: MissingInstancesInput,
 ): readonly Expected[] => {
+  const { now, tasks } = input;
   const issued = slots.filter(
     (item) =>
       isIssuedBy(item.slot, now) &&
       !isBeforeCourse(item.slot, item.source) &&
-      isMissing(tasks, item.slot),
+      isMissing(input, item.slot),
   );
   if (issued.length > 0) {
     return issued;
@@ -201,7 +219,7 @@ const missingFor = (
     first !== undefined &&
     instancesOf(tasks, first.slot.presetId).some((task) => task.closed === null);
   const ahead = slots.find((item) => !isIssuedBy(item.slot, now));
-  return hasOpen || ahead === undefined || !isMissing(tasks, ahead.slot) ? [] : [ahead];
+  return hasOpen || ahead === undefined || !isMissing(input, ahead.slot) ? [] : [ahead];
 };
 
 /**
@@ -217,8 +235,7 @@ export const missingInstanceEvents = (input: MissingInstancesInput): readonly Ev
     .flatMap((presetId) =>
       missingFor(
         all.filter((item) => item.slot.presetId === presetId),
-        input.tasks,
-        input.now,
+        input,
       ),
     )
     .toSorted(compareExpected)

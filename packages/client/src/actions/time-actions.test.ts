@@ -60,6 +60,21 @@ describe("time actions", () => {
     });
   });
 
+  it("deletes a started block without bringing back the one it had ended", async () => {
+    const world = await setupActions();
+    const [work] = unwrap(await world.actions.startChoice("rest"));
+    world.setNow(later(60));
+    const [lunch] = unwrap(await world.actions.startChoice("chores:eating"));
+    world.setNow(later(90));
+    unwrap(await world.actions.stopActivity());
+    const workId = work?.type === "activity.started" ? work.payload.activityId : "";
+    const lunchId = lunch?.type === "activity.started" ? lunch.payload.activityId : "";
+    unwrap(await world.actions.deleteActivity(lunchId));
+    const { activities } = world.state.store.getState().time;
+    expect(activities[lunchId]).toBeUndefined();
+    expect(activities[workId]).toMatchObject({ endAt: later(60) });
+  });
+
   it("deletes a block from the day: the event that made it is revoked", async () => {
     const world = await setupActions();
     const [event] = unwrap(

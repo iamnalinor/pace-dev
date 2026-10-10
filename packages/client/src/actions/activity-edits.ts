@@ -1,4 +1,4 @@
-import { type ActivityCategory, err, newId, ok } from "@pace/core";
+import { type ActivityCategory, err, type Event, newId, ok } from "@pace/core";
 
 import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
 
@@ -154,21 +154,69 @@ const saveActivity = async (
 };
 
 /** The start or the log entry that made the activity, if it still stands. */
-const originOf = (deps: ActionDeps, activityId: string): null | string =>
+const originOf = (deps: ActionDeps, activityId: string): Event | undefined =>
   deps.state.store
     .getState()
     .events.find(
       (event) =>
         (event.type === "activity.started" || event.type === "activity.logged") &&
         event.payload.activityId === activityId,
-    )?.id ?? null;
+    );
+
+/**
+The main activity a main start closed: nothing else ended it (a start emits no stop for the
+one before), so revoking the start alone would bring it back running.
+*/
+const closedBy = (deps: ActionDeps, origin: Event): null | string => {
+  if (origin.type !== "activity.started" || origin.payload.alongside === true) {
+    return null;
+  }
+  const { events, time } = deps.state.store.getState();
+  const stopped = new Set<string>();
+  for (const event of events) {
+    if (event.type === "activity.stopped") {
+      stopped.add(event.payload.activityId);
+    }
+  }
+  return (
+    Object.values(time.activities).find(
+      (activity) =>
+        activity.id !== origin.payload.activityId &&
+        !activity.isLogged &&
+        !activity.isAlongside &&
+        activity.endAt === origin.occurredAt &&
+        !stopped.has(activity.id),
+    )?.id ?? null
+  );
+};
+
+/** Takes a block off the ledger; the one its start had ended stays ended where it was. */
+const deleteActivity = async (deps: ActionDeps, activityId: string): ActionResult => {
+  const origin = originOf(deps, activityId);
+  if (origin === undefined) {
+    return err("event/not-found");
+  }
+  const before = closedBy(deps, origin);
+  const kept =
+    before === null
+      ? ok([])
+      : await emit(deps, [
+          stamp(
+            deps,
+            { payload: { activityId: before }, type: "activity.stopped" },
+            { at: origin.occurredAt, precision: origin.precision },
+          ),
+        ]);
+  if (!kept.ok) {
+    return kept;
+  }
+  const revoked = fromStore(await deps.state.revoke(origin.id));
+  return revoked.ok ? ok([...kept.value, ...revoked.value]) : revoked;
+};
 
 export const editActions = (deps: ActionDeps): EditActions => ({
   ...corrections(deps),
-  deleteActivity: async (activityId) => {
-    const origin = originOf(deps, activityId);
-    return origin === null ? err("event/not-found") : fromStore(await deps.state.revoke(origin));
-  },
+  deleteActivity: async (activityId) => await deleteActivity(deps, activityId),
   logPast: async (activity) => await logPast(deps, activity),
   saveActivity: async (target, entry) => await saveActivity(deps, target, entry),
   stillGoing: async (activityId) =>
