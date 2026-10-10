@@ -7,7 +7,8 @@ import { useAppState, usePace } from "#app/app-state.tsx";
 import { calendarKey, dismiss, dismissedKeys, seriesRules } from "#app/platform/phone-memory.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 
-import { calendarToday, promptedEvent } from "./calendar-today.ts";
+import { calendarToday } from "./calendar-source.ts";
+import { promptedEvent } from "./calendar-today.ts";
 
 /** The calendar is read again this often while Now is open (and whenever the app comes back). */
 const RELOAD_MS = 5 * 60_000;
@@ -28,13 +29,13 @@ export const useCalendarPrompt = (): {
   readonly event: null | PhoneCalendarEvent;
   readonly skip: (event: PhoneCalendarEvent) => void;
 } => {
-  const { clock } = usePace();
+  const { api, clock } = usePace();
   const { deviceTz, now } = useViewer();
   const activities = useAppState((state) => state.time.activities);
   const [loaded, setLoaded] = useState<Loaded>(EMPTY);
   const reload = useCallback(() => {
     void (async () => {
-      const today = await calendarToday(clock.now(), deviceTz);
+      const today = await calendarToday({ api, now: clock.now(), zone: deviceTz });
       const rules = await seriesRules();
       setLoaded({
         dismissed: await dismissedKeys(),
@@ -42,7 +43,7 @@ export const useCalendarPrompt = (): {
         ruled: new Set(rules.map((rule) => rule.series)),
       });
     })();
-  }, [clock, deviceTz]);
+  }, [api, clock, deviceTz]);
   useEffect(() => {
     reload();
     const timer = setInterval(reload, RELOAD_MS);

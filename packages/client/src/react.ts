@@ -29,6 +29,7 @@ import { type ProjectViewModel, projectViewModel } from "./view-models/project.t
 import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
+import { type WeekModel, weekModel } from "./view-models/week.ts";
 
 export { type Devices, type DevicesPhase, type NewDevice, useDevices } from "./react/devices.ts";
 export {
@@ -40,6 +41,7 @@ export {
   useConsent,
   useGrants,
 } from "./react/oauth.ts";
+export { useCalendarRange, useUsage } from "./react/usage.ts";
 export { useStore } from "zustand";
 
 export type AppHooks = {
@@ -62,6 +64,7 @@ export type AppHooks = {
   readonly useDay: (date: null | string) => DayModel;
   /** One week of insights; `null` is this week. */
   readonly useInsights: (weekOf: null | string) => InsightsModel;
+  readonly useWeek: (weekOf: null | string) => WeekModel;
 };
 
 /** Relative times ("5 h ago", "due today") drift slowly: half a minute is fine. */
@@ -100,6 +103,7 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     useAppState: (selector) => useStore(state.store, selector),
     useClock,
     useDay: (date) => useView((current, ctx) => dayModel(current, date, ctx), date ?? ""),
+    useWeek: (weekOf) => useView((current, ctx) => weekModel(current, weekOf, ctx), weekOf ?? ""),
     useInsights: (weekOf) =>
       useView((current, ctx) => insightsModel(current, weekOf, ctx), weekOf ?? ""),
     useTimeBar: () => useView(timeBarModel),

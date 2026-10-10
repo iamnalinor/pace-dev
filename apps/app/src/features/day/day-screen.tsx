@@ -1,27 +1,28 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { Pencil, Plus } from "lucide-react-native";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
-import { useAppState, usePace, useT } from "#app/app-state.tsx";
-import { clockTime, fromWallClock } from "#app/format/time.ts";
+import type { DayEntry, DayModel, DayRowProps } from "@pace/client";
+
+import { usePace, useT } from "#app/app-state.tsx";
+import { clockTime } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { useWhereSat } from "#app/shared/use-where-sat.ts";
+import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
 import { Button } from "#app/ui/button.tsx";
-import { Calendar } from "#app/ui/calendar.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { IconButton } from "#app/ui/icon-button.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { Sheet } from "#app/ui/sheet.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { type DayEntry, type DayModel, type DayRowProps, trackedDates } from "@pace/client";
-import { formatDuration, formatEyebrow, formatInZone, type Language } from "@pace/core";
+import { addDaysIn, formatDuration, formatEyebrow, type Language, type SatRow } from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
+import { DayNav } from "./day-nav.tsx";
 import {
   CalendarSection,
   EndedAtPrompt,
@@ -116,16 +117,21 @@ const GapRow = ({ minutes, onLog }: { readonly minutes: number; readonly onLog: 
   );
 };
 
+/** Where a block's time went on the other devices. */
+type SatOf = (startAt: string, endAt: string) => readonly SatRow[];
+
 /** One line of the day; a tap opens its sheet (edit the block, or log the gap). */
 const EntryRow = ({
   entry,
   onOpen,
   phone,
+  sat,
   zone,
 }: {
   readonly entry: DayEntry;
   readonly zone: string;
   readonly phone: DayPhone;
+  readonly sat: SatOf;
   readonly onOpen: (target: SheetTarget) => void;
 }) => {
   const open = (): void => {
@@ -138,6 +144,7 @@ const EntryRow = ({
     <>
       <ActivityRow onEdit={open} row={entry.row} zone={zone} />
       <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
+      <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />
       <EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
     </>
   );
@@ -148,102 +155,23 @@ const Entries = ({
   entries,
   onOpen,
   phone,
+  sat,
   zone,
 }: {
   readonly entries: readonly DayEntry[];
   readonly zone: string;
   readonly phone: DayPhone;
+  readonly sat: SatOf;
   readonly onOpen: (target: SheetTarget) => void;
 }) => (
   <View className="px-5">
     {entries.map((entry) => (
       <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
-        <EntryRow entry={entry} onOpen={onOpen} phone={phone} zone={zone} />
+        <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
       </Animated.View>
     ))}
   </View>
 );
-
-/**
-[Today] [‹] [calendar] [›]: Today keeps its place (disabled on today) so the arrows never
-move under the thumb; the calendar jumps to any past day, days with time on them dotted.
-*/
-const DayNav = ({
-  day,
-  onDate,
-}: {
-  readonly day: DayModel;
-  readonly onDate: (date: null | string) => void;
-}) => {
-  const t = useT();
-  const { hooks } = usePace();
-  const { language, now } = useViewer();
-  const ctx = hooks.useClock();
-  const state = useAppState((current) => current);
-  const marked = useMemo(() => trackedDates(state, ctx), [ctx, state]);
-  const [isPicking, setIsPicking] = useState(false);
-  const shown = formatInZone(day.date, day.zone, "yyyy-MM-dd");
-  const today = formatInZone(now, day.zone, "yyyy-MM-dd");
-  return (
-    <View className="flex-row items-center gap-1">
-      <Button
-        disabled={day.isToday}
-        onPress={() => {
-          onDate(null);
-        }}
-        variant="secondary"
-      >
-        {t("day.today")}
-      </Button>
-      <IconButton
-        icon={ChevronLeft}
-        label={t("day.previous")}
-        onPress={() => {
-          onDate(day.previous);
-        }}
-        variant="plain"
-      />
-      <IconButton
-        icon={CalendarDays}
-        label={t("day.pick")}
-        onPress={() => {
-          setIsPicking(true);
-        }}
-        variant="plain"
-      />
-      <IconButton
-        disabled={day.next === null}
-        icon={ChevronRight}
-        label={t("day.next")}
-        onPress={() => {
-          onDate(day.next);
-        }}
-        variant="plain"
-      />
-      <Sheet
-        closeLabel={t("common.close")}
-        onClose={() => {
-          setIsPicking(false);
-        }}
-        title={t("day.pick")}
-        visible={isPicking}
-      >
-        <Calendar
-          labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
-          language={language}
-          marked={marked}
-          max={today}
-          onPick={(date) => {
-            setIsPicking(false);
-            onDate(date === today ? null : fromWallClock({ date, time: "00:00", tz: day.zone }));
-          }}
-          selected={shown}
-          today={today}
-        />
-      </Sheet>
-    </View>
-  );
-};
 
 /** The day's tracked time and its split by category. */
 const Totals = ({ day }: { readonly day: DayModel }) => {
@@ -277,6 +205,7 @@ export const DayScreen = () => {
   const day = hooks.useDay(date);
   const { now } = hooks.useClock();
   const phone = useDayPhone(day, now);
+  const sat = useWhereSat(day.date, addDaysIn(day.date, 1, day.zone));
   const header = (
     <ScreenHeader
       eyebrow={formatEyebrow(day.date, day.zone, language)}
@@ -292,7 +221,7 @@ export const DayScreen = () => {
       {day.entries.length === 0 ? (
         <Text className="px-5 py-6 font-sans text-[14px] text-muted">{t("day.empty")}</Text>
       ) : (
-        <Entries entries={day.entries} onOpen={setSheet} phone={phone} zone={day.zone} />
+        <Entries entries={day.entries} onOpen={setSheet} phone={phone} sat={sat} zone={day.zone} />
       )}
       {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
       <Pressable

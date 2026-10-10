@@ -3,7 +3,7 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import { syncCalendarReminders } from "#app/platform/notifications.ts";
 import { calendarKey, dismissedKeys, seriesRules } from "#app/platform/phone-memory.ts";
 
-import { calendarToday } from "./calendar-today.ts";
+import { calendarToday } from "./calendar-source.ts";
 
 /**
 Today's calendar events still ahead, minus the ones waved away and the series answered for
@@ -12,7 +12,7 @@ good, each reminded about as it starts. Runs at start-up and whenever the app co
 export const remindCalendar = async (runtime: PaceRuntime): Promise<void> => {
   const now = runtime.clock.now();
   const zone = runtime.clock.deviceTz;
-  const today = await calendarToday(now, zone);
+  const today = await calendarToday({ api: runtime.api, now, zone });
   const dismissed = await dismissedKeys();
   const rules = await seriesRules();
   const ruled = new Set(rules.map((rule) => rule.series));

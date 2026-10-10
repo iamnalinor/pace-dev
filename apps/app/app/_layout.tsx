@@ -52,6 +52,7 @@ const Navigator = () => {
           <Stack.Screen name="history" />
           <Stack.Screen name="permissions" />
           <Stack.Screen name="devices" />
+          <Stack.Screen name="week" />
           <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
         </Stack>
       </View>

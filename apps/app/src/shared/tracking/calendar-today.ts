@@ -1,27 +1,20 @@
-import {
-  calendarAccess,
-  type CalendarAccess,
-  calendarEvents,
-  type PhoneCalendarEvent,
-} from "#app/platform/phone-calendar.ts";
+import type { CalendarAccess, PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
+import type { ApiClient } from "@pace/client";
+
 import { calendarKey } from "#app/platform/phone-memory.ts";
-import { type Activity, addDaysIn, addMinutesIso, startOfDayIn } from "@pace/core";
+import { type Activity, addMinutesIso } from "@pace/core";
+
+/** Where today's calendar is read from: the phone's own, or the copy it sends (on the web). */
+export type CalendarSource = {
+  readonly api: ApiClient;
+  readonly now: string;
+  readonly zone: string;
+};
 
 export type CalendarToday = {
   readonly access: CalendarAccess;
   /** Today's events going on or still to come, the person's own or accepted. */
   readonly events: readonly PhoneCalendarEvent[];
-};
-
-/** What "From calendar" can start: today's events from now on, read on the phone. */
-export const calendarToday = async (now: string, zone: string): Promise<CalendarToday> => {
-  const access = await calendarAccess();
-  if (access !== "granted") {
-    return { access, events: [] };
-  }
-  const from = startOfDayIn(now, zone);
-  const events = await calendarEvents(from, addDaysIn(from, 1, zone));
-  return { access, events: events.filter((event) => event.endAt > now) };
 };
 
 /** The event going on at `now`, if any. */

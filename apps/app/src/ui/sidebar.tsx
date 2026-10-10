@@ -1,5 +1,6 @@
 import { type Href, usePathname, useRouter } from "expo-router";
 import {
+  CalendarRange,
   ChartColumn,
   Clock,
   Folder,
@@ -37,6 +38,7 @@ const DESTINATIONS: readonly Destination[] = [
     owns: (path) => path === "/" || path.startsWith("/task/"),
   },
   { href: "/day", icon: Clock, label: "nav.day", owns: (path) => path === "/day" },
+  { href: "/week", icon: CalendarRange, label: "nav.week", owns: (path) => path === "/week" },
   {
     href: "/projects",
     icon: Folder,

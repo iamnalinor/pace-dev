@@ -210,3 +210,11 @@ export {
   type TypedTime,
   typeTime,
 } from "./view-models/time-forms.ts";
+export {
+  placeIn,
+  type Placement,
+  type WeekBlock,
+  type WeekDay,
+  type WeekModel,
+  weekModel,
+} from "./view-models/week.ts";

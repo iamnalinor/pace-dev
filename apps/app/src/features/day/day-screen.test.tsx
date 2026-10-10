@@ -28,6 +28,32 @@ describe("DayScreen", () => {
     expect(screen.getByText("Tracked 1h")).toBeOnTheScreen();
   });
 
+  it("shows under a block where its time went on the computer", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/usage": () => ({
+          sessions: [
+            {
+              app: "code",
+              deviceId: "01LAPTOP",
+              deviceName: "Laptop",
+              endAt: addMinutesIso(NOW, -200),
+              startAt: addMinutesIso(NOW, -250),
+            },
+          ],
+        }),
+      },
+    });
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -180),
+      label: "Lecture notes",
+      startAt: addMinutesIso(NOW, -240),
+    });
+    await renderScreen(<DayScreen />, runtime);
+    expect(await screen.findByText("Laptop: code 40m")).toBeOnTheScreen();
+  });
+
   it("refuses an end before the start", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<DayScreen />, runtime);

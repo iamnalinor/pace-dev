@@ -22,7 +22,8 @@ import { useTheme } from "#app/ui/theme-provider.tsx";
 import { PACE_STATUS_TEXT, type RunningView, type TimeButtonView } from "@pace/client";
 import { type Event, formatDuration } from "@pace/core";
 
-import { calendarToday, type CalendarToday, eventOnNow } from "./calendar-today.ts";
+import { calendarToday } from "./calendar-source.ts";
+import { type CalendarToday, eventOnNow } from "./calendar-today.ts";
 import { ChoicesSheet } from "./choices-sheet.tsx";
 
 const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
@@ -244,11 +245,11 @@ type Opened = { readonly button: TimeButtonView; readonly calendar: CalendarToda
 
 /** What a tap does: stop the running button, start the calendar's event or a single choice, or ask. */
 const useTap = (open: (opened: Opened) => void) => {
-  const { actions } = usePace();
+  const { actions, api } = usePace();
   const { deviceTz, now } = useViewer();
   const run = useRunAction();
   const calendarOf = async (button: TimeButtonView): Promise<CalendarToday | null> =>
-    button.kind === "calendar" ? await calendarToday(now, deviceTz) : null;
+    button.kind === "calendar" ? await calendarToday({ api, now, zone: deviceTz }) : null;
   const tap = async (button: TimeButtonView): Promise<void> => {
     if (button.isRunning) {
       await run(actions.stopActivity());
