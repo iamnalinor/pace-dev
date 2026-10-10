@@ -5,9 +5,6 @@ import type { ImportanceSchema } from "../events/payloads.ts";
 
 export type Importance = z.output<typeof ImportanceSchema>;
 
-/** How urgency grows: see `docs/presets.md` and the urgency module. */
-export type UrgencyPolicy = "age" | "lag" | "pace" | "resubmission";
-
 /** What happens when the deadline passes. */
 export type DeadlinePolicy =
   | { readonly kind: "hard" }
@@ -57,17 +54,12 @@ export type NotifyParams = {
   readonly criticalHours: number;
   /** … with progress below this share (0–1). */
   readonly criticalProgress: number;
-  /** Or the score first crosses this value. */
-  readonly criticalScore: number;
-  /** A task waiting longer than this is "stuck". */
-  readonly waitingDays: number;
   /** An in-progress task untouched longer than this is "stuck". */
   readonly inProgressIdleDays: number;
 };
 
 /** What a preset stores: only the keys it changes relative to its parent. */
 export type PresetDefinition = {
-  readonly urgencyPolicy?: UrgencyPolicy;
   readonly defaultImportance?: Importance;
   readonly deadlinePolicy?: DeadlinePolicy;
   readonly submission?: Submission;
@@ -82,7 +74,6 @@ export type PresetDefinition = {
 
 /** A definition with every value filled in: the base preset, its chain and the task's overrides. */
 export type ResolvedPreset = {
-  readonly urgencyPolicy: UrgencyPolicy;
   readonly defaultImportance: Importance;
   readonly deadlinePolicy: DeadlinePolicy;
   readonly submission: Submission;

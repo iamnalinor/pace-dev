@@ -2,8 +2,8 @@ import { formatLate, formatSpan, type Language, plural, t } from "@pace/core";
 
 import type { MetaPart } from "./now.ts";
 
-/** Meta parts whose text needs no zone or color: everything but the due and the importance. */
-export type PlainMetaPart = Exclude<MetaPart, { readonly kind: "due" | "importance" }>;
+/** Meta parts whose text needs no zone or color: everything but the dates and the importance. */
+export type PlainMetaPart = Exclude<MetaPart, { readonly kind: "due" | "importance" | "starts" }>;
 
 /** "6d 12h left", "15h late", "2 problems left", "4/7 solved" … */
 export const plainMetaText = (part: PlainMetaPart, language: Language): string => {
@@ -16,12 +16,6 @@ export const plainMetaText = (part: PlainMetaPart, language: Language): string =
       return t(language, "meta.late", {
         span: formatLate(part.minutes, language, part.isSoft),
       });
-    }
-    case "behind-pace": {
-      return t(language, "meta.behindPace", { percent: part.percent });
-    }
-    case "end-of-day": {
-      return t(language, "meta.endOfDay");
     }
     case "problems-left": {
       return plural(language, part.count, {

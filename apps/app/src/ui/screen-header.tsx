@@ -15,7 +15,7 @@ export const ScreenHeader = ({
   <View className="flex-row items-end justify-between px-5 pb-3 pt-6">
     <View>
       {eyebrow === undefined ? null : (
-        <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+        <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
           {eyebrow}
         </Text>
       )}

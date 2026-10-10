@@ -30,7 +30,9 @@ const LinkRow = ({ count = 0, hintKey, titleKey, to }: Entry) => {
         <Text className="font-sans text-[15px] text-fg">{t(titleKey)}</Text>
         <Text className="font-sans text-[12px] text-muted">{t(hintKey)}</Text>
       </View>
-      {count > 0 ? <Text className="font-mono text-[13px] text-fg2">{count}</Text> : null}
+      {count > 0 ? (
+        <Text className="font-sans text-[13px] tabular-nums text-fg2">{count}</Text>
+      ) : null}
       <ChevronRight color={palette.faint} size={16} strokeWidth={1.75} />
     </Pressable>
   );

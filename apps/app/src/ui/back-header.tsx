@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ChevronLeft } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
+import { cx } from "./cx.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 /** The pushed-screen header (Inbox, Project, Task): a 44px back chevron, a title, actions. */
@@ -14,20 +15,28 @@ export const BackHeader = ({
 }: {
   readonly backLabel: string;
   readonly children?: ReactNode;
-  readonly onBack: () => void;
+  /** Without it there is no back chevron (a top-level screen beside the sidebar). */
+  readonly onBack?: () => void;
   readonly right?: ReactNode;
 }) => {
   const { palette } = useTheme();
   return (
-    <View className="flex-row items-center gap-1 pb-2.5 pl-2 pr-4 pt-3.5">
-      <Pressable
-        accessibilityLabel={backLabel}
-        accessibilityRole="button"
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        onPress={onBack}
-      >
-        <ChevronLeft color={palette.fg2} size={20} strokeWidth={1.75} />
-      </Pressable>
+    <View
+      className={cx(
+        "flex-row items-center gap-1 pb-2.5 pr-4 pt-3.5",
+        onBack === undefined ? "pl-5" : "pl-2",
+      )}
+    >
+      {onBack === undefined ? null : (
+        <Pressable
+          accessibilityLabel={backLabel}
+          accessibilityRole="button"
+          className="h-11 w-11 items-center justify-center active:opacity-70"
+          onPress={onBack}
+        >
+          <ChevronLeft color={palette.fg2} size={20} strokeWidth={1.75} />
+        </Pressable>
+      )}
       <View className="flex-1 flex-row items-center gap-1.5">{children}</View>
       {right}
     </View>

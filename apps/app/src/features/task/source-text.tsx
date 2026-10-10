@@ -1,11 +1,14 @@
+import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
+import { useTheme } from "#app/ui/theme-provider.tsx";
 
 /** The text the task came from, shown verbatim on request. */
 export const SourceText = ({ text }: { readonly text: null | string }) => {
   const t = useT();
+  const { palette } = useTheme();
   const [isShown, setIsShown] = useState(false);
   if (text === null) {
     return null;
@@ -15,14 +18,17 @@ export const SourceText = ({ text }: { readonly text: null | string }) => {
       <Pressable
         accessibilityRole="button"
         aria-expanded={isShown}
-        className="min-h-11 justify-center"
+        className="min-h-11 flex-row items-center gap-1.5"
         onPress={() => {
           setIsShown((shown) => !shown);
         }}
       >
-        <Text className="font-sans text-[13px] text-fg2">
-          {t(isShown ? "task.hideSource" : "task.showSource")}
-        </Text>
+        <Text className="font-sans text-[13px] text-fg2">{t("task.source")}</Text>
+        {isShown ? (
+          <ChevronUp color={palette.muted} size={16} strokeWidth={2} />
+        ) : (
+          <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+        )}
       </Pressable>
       {isShown ? (
         <Text

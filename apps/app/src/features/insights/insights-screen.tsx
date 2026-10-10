@@ -55,7 +55,7 @@ const Bars = ({
                 style={{ width: barWidth(bar.share) }}
               />
             </View>
-            <Text className="font-mono text-[12px] text-fg">{value}</Text>
+            <Text className="font-sans text-[12px] tabular-nums text-fg">{value}</Text>
           </View>
         );
       })}
@@ -68,7 +68,7 @@ const Row = ({ name, value }: { readonly name: string; readonly value: string })
     <Text className="flex-1 font-sans text-[12px] text-fg2" numberOfLines={1}>
       {name}
     </Text>
-    <Text className="font-mono text-[12px] text-fg">{value}</Text>
+    <Text className="font-sans text-[12px] tabular-nums text-fg">{value}</Text>
   </View>
 );
 

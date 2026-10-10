@@ -92,7 +92,9 @@ export const DuePanel = ({
           value={time}
         />
         {tz === viewer.deviceTz ? null : (
-          <Text className="font-mono text-[12px] text-muted">{t("add.dueZone", { tz })}</Text>
+          <Text className="font-sans text-[12px] tabular-nums text-muted">
+            {t("add.dueZone", { tz })}
+          </Text>
         )}
       </View>
       <View className="flex-row justify-end gap-2">

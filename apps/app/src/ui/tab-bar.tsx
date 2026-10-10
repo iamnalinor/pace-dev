@@ -1,24 +1,13 @@
+import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
-import { type Tabs, useRouter } from "expo-router";
-import {
-  ChartColumn,
-  Clock,
-  Folder,
-  History,
-  Inbox,
-  type LucideIcon,
-  Plus,
-  Settings,
-  Zap,
-} from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { ChartColumn, Clock, Folder, type LucideIcon, Plus, Zap } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useT } from "../app-state.tsx";
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
-import { PaceMark } from "./logo.tsx";
 import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
@@ -82,104 +71,5 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   );
 };
 
-/** A tab of the sidebar (`isActive` set), or a link to a pushed screen (without it). */
-const SidebarLink = ({
-  icon: Icon,
-  isActive,
-  label,
-  onPress,
-}: {
-  readonly icon: LucideIcon;
-  readonly isActive?: boolean;
-  readonly label: string;
-  readonly onPress: () => void;
-}) => {
-  const { palette } = useTheme();
-  const isCurrent = isActive === true;
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole={isActive === undefined ? "link" : "tab"}
-      aria-selected={isActive}
-      className={cx(
-        "h-10 flex-row items-center gap-3 rounded-lg px-3 active:opacity-70",
-        isCurrent && "bg-raised",
-      )}
-      onPress={onPress}
-    >
-      <Icon color={isCurrent ? palette.fg : palette.muted} size={18} strokeWidth={STROKE} />
-      <Text className={cx("font-sans text-[14px]", isCurrent ? "text-fg" : "text-fg2")}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-};
-
-/** On a wide window the tabs become a sidebar, with the pushed screens (Inbox, History, Settings) below. */
-const Sidebar = ({ descriptors, navigation, state }: TabBarProps) => {
-  const t = useT();
-  const router = useRouter();
-  const { palette } = useTheme();
-  const tabs = state.routes.filter((route) => route.name !== "add");
-  return (
-    <View
-      aria-label={t("nav.main")}
-      className="w-56 gap-1 border-r border-line bg-bg px-3 pb-4 pt-5"
-      role="navigation"
-    >
-      <View className="mb-3 flex-row items-center gap-2 px-2">
-        <PaceMark size={22} />
-        <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
-      </View>
-      <Pressable
-        accessibilityLabel={t("nav.newTask")}
-        accessibilityRole="button"
-        className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3 active:opacity-80"
-        onPress={() => {
-          navigation.navigate("add");
-        }}
-      >
-        <Plus color={palette.accentFg} size={18} strokeWidth={STROKE} />
-        <Text className="font-sans text-[14px] font-medium text-accentFg">{t("nav.newTask")}</Text>
-      </Pressable>
-      <View className="gap-1" role="tablist">
-        {tabs.map((route) => (
-          <SidebarLink
-            icon={ICONS[route.name] ?? Zap}
-            isActive={state.routes[state.index]?.key === route.key}
-            key={route.key}
-            label={descriptors[route.key]?.options.title ?? route.name}
-            onPress={() => {
-              navigation.navigate(route.name, route.params);
-            }}
-          />
-        ))}
-      </View>
-      <SidebarLink
-        icon={Inbox}
-        label={t("nav.inbox")}
-        onPress={() => {
-          router.push("/inbox");
-        }}
-      />
-      <SidebarLink
-        icon={History}
-        label={t("nav.history")}
-        onPress={() => {
-          router.push("/history");
-        }}
-      />
-      <SidebarLink
-        icon={Settings}
-        label={t("nav.settings")}
-        onPress={() => {
-          router.push("/settings");
-        }}
-      />
-    </View>
-  );
-};
-
-/** Bottom tabs on a phone, a sidebar on a wide window. */
-export const TabBar = (props: TabBarProps) =>
-  useIsWide() ? <Sidebar {...props} /> : <BottomTabs {...props} />;
+/** Bottom tabs on a phone; a wide window has the root layout's sidebar instead. */
+export const TabBar = (props: TabBarProps) => (useIsWide() ? null : <BottomTabs {...props} />);

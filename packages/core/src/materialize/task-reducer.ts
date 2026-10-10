@@ -10,7 +10,6 @@ import {
   type TaskFields,
   type TasksState,
 } from "../model/task.ts";
-import { minutesBetween } from "../time.ts";
 
 /** Events applied to an existing task; `task.created` is the one that needs the state instead. */
 type AppliedEventType = Exclude<
@@ -107,9 +106,7 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
     overrides: emptyToNull(payload.overrides),
     status: "not_started",
     statusSince: occurredAt,
-    waitingMinutes: 0,
     touched: false,
-    rank: null,
     createdAt: occurredAt,
     submittedAt: null,
     closed: null,
@@ -118,18 +115,9 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
   };
 };
 
-/** Minutes of the waiting spell that started at `statusSince`, never negative. */
-const spell = (task: Task, at: string): number => Math.max(0, minutesBetween(task.statusSince, at));
-
-/** Folds the running waiting spell into the total when the task leaves (or is closed while) waiting. */
-const endWaiting = (task: Task, at: string): Task =>
-  task.status === "waiting"
-    ? { ...task, waitingMinutes: task.waitingMinutes + spell(task, at), statusSince: at }
-    : task;
-
 /**
-Work implies "in progress", but only from "not started": an explicit paused or waiting
-status set by the user is never overridden by an implicit one.
+Work implies "in progress", but only from "not started": an explicit pause set by the user
+is never overridden by an implicit one.
 */
 const touched = (task: Task, at: string): Task => {
   if (task.status === "not_started") {
@@ -138,7 +126,7 @@ const touched = (task: Task, at: string): Task => {
   return task.touched ? task : { ...task, touched: true };
 };
 
-/** The first closure stays until a reopen; an open waiting spell ends here. */
+/** The first closure stays until a reopen. */
 const close = (
   task: Task,
   event: TaskEvent<"task.closed" | "task.submitted">,
@@ -150,18 +138,19 @@ const close = (
 ): Task =>
   task.closed === null
     ? {
-        ...endWaiting(task, event.occurredAt),
+        ...task,
         closed: { ...closure, at: event.occurredAt, source: event.source, eventId: event.id },
       }
     : task;
 
+/** "waiting" (removed in stage 6) is read as in progress. */
 const statusSet: Handler<"task.status.set"> = (task, event) => {
-  const { status } = event.payload;
+  const status = event.payload.status === "waiting" ? "in_progress" : event.payload.status;
   if (status === task.status) {
     return task;
   }
   return {
-    ...endWaiting(task, event.occurredAt),
+    ...task,
     status,
     statusSince: event.occurredAt,
     touched: task.touched || status === "in_progress",
@@ -273,8 +262,8 @@ const HANDLERS: Handlers = {
     event.payload.estimateMinutes === task.estimateMinutes
       ? task
       : { ...task, estimateMinutes: event.payload.estimateMinutes },
-  "task.rank.set": (task, event) =>
-    event.payload.rank === task.rank ? task : { ...task, rank: event.payload.rank },
+  // Manual ranks were removed in stage 6: old events stay in the log and change nothing.
+  "task.rank.set": (task) => task,
   "task.source.attached": (task, event) => ({
     ...task,
     sourceText: task.sourceText ?? event.payload.sourceText,

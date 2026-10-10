@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -18,12 +18,13 @@ const hwScreen = async () => {
 };
 
 describe("TaskScreen — homework", () => {
-  it("shows the stats, the window and the problems with their states", async () => {
+  it("shows the start, the due, the work left and the problems with their states", async () => {
     await hwScreen();
     expect(screen.getByRole("header", { name: "Algebra HW 6" })).toBeOnTheScreen();
     expect(screen.getByText("today 23:59")).toBeOnTheScreen();
     expect(screen.getByText("1h 43m")).toBeOnTheScreen();
-    expect(screen.getByText(en("task.windowGone", { percent: 82 }))).toBeOnTheScreen();
+    expect(screen.getByText(en("task.start"))).toBeOnTheScreen();
+    expect(screen.queryByText(/of window gone/u)).toBeNull();
     expect(screen.getByText(en("task.problemsSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeDisabled();
@@ -83,21 +84,14 @@ const trkScreen = async () => {
 };
 
 describe("TaskScreen — work", () => {
-  it("explains its place on Now", async () => {
+  it("shows its link and description, and no ranking card", async () => {
     await trkScreen();
     expect(screen.getByText("tracker.example.com ↗")).toBeOnTheScreen();
     expect(
       screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
     ).toBeOnTheScreen();
-    const toggle = screen.getByRole("button", { name: /^Why it's/ });
-    await fireEvent.press(toggle);
-    const card = screen.getByTestId("why-card");
-    expect(within(card).getByText("Window elapsed")).toBeOnTheScreen();
-    // 65 % shows in its row and again in the filled-in formula.
-    expect(within(card).getAllByText("65%")).toHaveLength(2);
-    expect(within(card).getByText("Your rank in Prioritized")).toBeOnTheScreen();
-    expect(within(card).getByText("2 of 3")).toBeOnTheScreen();
-    expect(within(card).getByText("× 5")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Why it's/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Waiting" })).toBeNull();
   });
 
   it("moves the progress slider and pauses the task", async () => {

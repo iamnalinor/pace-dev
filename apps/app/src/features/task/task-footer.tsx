@@ -1,87 +1,35 @@
-import { Hourglass, Square, Timer } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { Square, Timer } from "lucide-react-native";
+import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { TaskViewModel } from "@pace/client";
-import type { TaskStatus } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
-import { cx } from "#app/ui/cx.ts";
-import { IconButton } from "#app/ui/icon-button.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import { useSubmitTitle } from "./use-submit-title.ts";
-
-const statusOf = (view: TaskViewModel): TaskStatus | undefined =>
-  view.tags.find((tag) => tag.kind === "status")?.status;
 
 /** Starts (or stops) an activity on this task: the time lands in the Day ledger. */
 const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   const { actions, hooks } = usePace();
-  const { palette } = useTheme();
   const run = useRunAction();
   const isFocused = hooks.useTimeBar().running?.taskId === view.id;
   return (
-    <Pressable
-      accessibilityLabel={t(isFocused ? "time.focusing" : "task.focus")}
-      accessibilityRole="button"
-      className={cx(
-        "h-12 w-12 items-center justify-center rounded-md active:opacity-80",
-        isFocused ? "bg-accent" : "bg-raised",
-      )}
+    <Button
+      icon={isFocused ? Square : Timer}
       onPress={() => {
         void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
       }}
+      variant="secondary"
     >
-      {isFocused ? (
-        <Square color={palette.accentFg} size={18} strokeWidth={1.75} />
-      ) : (
-        <Timer color={palette.fg} size={18} strokeWidth={1.75} />
-      )}
-    </Pressable>
+      {t(isFocused ? "time.focusing" : "task.focus")}
+    </Button>
   );
 };
 
-const StatusButtons = ({ view }: { readonly view: TaskViewModel }) => {
-  const t = useT();
-  const { actions } = usePace();
-  const run = useRunAction();
-  const status = statusOf(view);
-  // A paused task resumes from the header's play button.
-  if (status === "paused") {
-    return null;
-  }
-  const set = (next: TaskStatus): void => {
-    void run(actions.setStatus(view.id, next));
-  };
-  if (status === "waiting") {
-    return (
-      <Button
-        onPress={() => {
-          set("in_progress");
-        }}
-        variant="secondary"
-      >
-        {t("task.resume")}
-      </Button>
-    );
-  }
-  return (
-    <IconButton
-      icon={Hourglass}
-      label={t("task.waiting")}
-      onPress={() => {
-        set("waiting");
-      }}
-      variant="raised"
-    />
-  );
-};
-
-/** Focus, Waiting / Resume, and the primary Done or "Submit 3 and 4" (pausing is in the header). */
+/** Focus and the primary Done or "Submit 3 and 4", side by side and the same width. */
 export const TaskFooter = ({
   onClose,
   view,
@@ -110,8 +58,9 @@ export const TaskFooter = ({
   const primary = view.primaryAction.kind === "submit" ? submitTitle : t("task.done");
   return (
     <View className="flex-row items-center gap-2 border-t border-line px-4 pt-3" style={padding}>
-      <FocusButton view={view} />
-      <StatusButtons view={view} />
+      <View className="flex-1">
+        <FocusButton view={view} />
+      </View>
       {view.primaryAction.kind === "none" ? null : (
         <View className="flex-1">
           <Button onPress={onClose}>{primary}</Button>

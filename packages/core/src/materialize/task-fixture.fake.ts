@@ -104,6 +104,9 @@ export const algebraHw6Events = (): readonly Event[] => [
 /** TRK-231 from the artboard: a Prioritized work task started Monday, due Friday, slider at 4. */
 export const TRK_ID = "01ARZ3NDEKTSV4RRFFQ69G5TRK";
 export const TRK_CREATED = "2026-10-05T09:00:00.000Z";
+/** The TRK-231 window starts Monday 09:00; "now" on the artboard is Thursday 05:15. */
+export const TRK_START = "2026-10-05T09:00:00.000Z";
+export const TRK_NOW = "2026-10-08T05:15:00.000Z";
 export const TRK_DUE = "2026-10-09T18:00:00.000Z";
 
 export const trk231Events = (): readonly Event[] => [
@@ -152,9 +155,7 @@ export const taskFixture = (overrides: Partial<Task> = {}): Task => ({
   overrides: null,
   status: "not_started",
   statusSince: HW_CREATED,
-  waitingMinutes: 0,
   touched: false,
-  rank: null,
   createdAt: HW_CREATED,
   submittedAt: null,
   closed: null,

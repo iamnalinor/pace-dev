@@ -16,7 +16,7 @@ top", log-past dialog, time bar, toasts, Day page, composer chips, presets, task
 updates, animations, and "everything said about the web applies to the app — keep them in
 sync"). Answers taken: **web moves to react-native-web** (one UI codebase for Android and web),
 **Errands merges into Chores**. Working agreements from `context/`: one thread, no subagents;
-plans are not sent for approval; PRs from fresh `main` on `claude/stoic-goodall-26jj51`, driven
+plans are not sent for approval; PRs from fresh `main`, driven
 to green, merged with a merge commit, deploy verified, APK released via `release.yml` dispatch
 (`v0.x`, never `v1.0.0`); no model ids in commits/PRs. Record this round in
 `context/user-messages.md` and `context/plan.md`.
@@ -193,7 +193,7 @@ on rate limits.
 ### Context
 
 M0 and most of M1 are built, deployed (`pace.nalinor.dev`, `pace-api.nalinor.dev`) and on
-`claude/sweet-ramanujan-xtto1q` (HEAD `3079123`). Done and green: core (presets, tasks,
+the stage branch (HEAD `3079123`). Done and green: core (presets, tasks,
 outcomes, urgency, recurrence, queries, review rules; 392 tests), client (actions,
 view-models, hooks; 100), API (OAuth 2.1 + full MCP tool set, DO state/projections, webhook
 IP allowlist; 186), web screens as a first draft (197 unit tests). The user tried the web
@@ -274,7 +274,7 @@ against the artboards, code review, release.
    axe (login, compose → task on Now, check + undo, task pane, submit sheet/dialog, inbox
    triage, preset editor, history revoke, error pages); screenshots compared with the
    artboards (phone) and checked for desktop sanity; `/code-review` and its fixes.
-6. **Release**: deploy API + web, PR `claude/sweet-ramanujan-xtto1q` → `main`, subscribe,
+6. **Release**: deploy API + web, PR → `main`, subscribe,
    CI green, merge commit, tag `v0.1.0` (APK on the GitHub Release), send the user the PR and
    release links, stop.
 
@@ -297,7 +297,7 @@ against the artboards, code review, release.
 - Stage 1: PR #9 merged (merge commit 75d4fd2), deployed (`deploy.yml` re-run from the branch
   after the bot-token trim fix; health OK, webhook set). Tag `v0.1.0` must be pushed by the
   user (the session's git proxy refuses tag pushes).
-- Stage 2: PR #18 open on `claude/sweet-ramanujan-xtto1q` (head f8361a9): every CI check
+- Stage 2: PR #18 open (head f8361a9): every CI check
   green (lint, unit, API, app, e2e, audit), mergeable `clean`, no reviews. Done — left
   unmerged as agreed; merging it deploys stage 2 (deploy.yml sets the LLM keys and webhook).
   Remaining duty: watch PR #18 events (safety-net check-in armed for 23:33 UTC), never merge.
@@ -307,7 +307,7 @@ against the artboards, code review, release.
 
 ## Stage 2 plan (current; after stage 1 is merged and deployed)
 
-Delivery: a new PR from fresh `main` on `claude/sweet-ramanujan-xtto1q`, driven to fully
+Delivery: a new PR from fresh `main`, driven to fully
 green CI and **left unmerged** (user decision). Stage 1 stays deployed; stage 2 ready to deploy.
 Plans are written here but not sent for approval (user decision).
 
@@ -344,8 +344,8 @@ Stages 1–2 are merged, deployed and released (colors now drawn as tags). Stage
 time tracking. The user's brief: switching activity takes 1–2 taps; the main screen is tasks on
 top and **time tracking at the bottom** (thumb reach); a grid of activity buttons — one tap
 starts that activity and ends the previous one; every button carries defaults, a **long press**
-edits them; same polish as the rest. Delivery: one PR from fresh `main` on
-`claude/sweet-ramanujan-xtto1q`, driven to green and **merged**, then deploy + release `v0.3.0`.
+edits them; same polish as the rest. Delivery: one PR from fresh `main`,
+driven to green and **merged**, then deploy + release `v0.3.0`.
 
 ### Scope decisions
 - In: the time ledger (events, timeline, expect/limit), activity buttons with defaults, focus
@@ -499,7 +499,7 @@ the Claude Doc was written from it and is its complete form, so it is the source
 - `bun lint` (format check covers markdown? biome ignores .md — fine) passes; links resolve
   (`grep` the relative paths); the exported spec's section list matches the Claude Doc's 17
   sections («Зачем и принципы» … «Открытые вопросы»).
-- Commit, push to `claude/sweet-ramanujan-xtto1q`; CI green; merges with PR #23.
+- Commit, push; CI green; merges with PR #23.
 
 ## Stage 4 plan (done — what the original plan still owed + permissions; 2026-10-08)
 
@@ -513,7 +513,7 @@ fragmentation, focus vs sleep), Excel export, MCP `query_sql` / `simulate` / `ex
 README with screenshots. **No `v1.0.0`** — the product is not final; releases stay `v0.x`.
 Work in one thread (no agents), plans are not sent for approval.
 
-Delivery: two PRs from fresh `main` on `claude/sweet-ramanujan-xtto1q`, each driven to green,
+Delivery: two PRs from fresh `main`, each driven to green,
 merged (merge commit), deployed; app releases via `release.yml` dispatch.
 - **PR A — app: permissions, onboarding, phone extras** → release `v0.4.0`.
 - **PR B — server + analytics: LLM queue, MCP analytics, insights, export, README** → `v0.5.0`.

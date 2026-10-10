@@ -45,7 +45,6 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   "preset/unknown": "No preset with this id (see list_presets).",
   "preset/unknown-parent": "The parent preset does not exist.",
   "project/unknown": "No project with this id or name.",
-  "rank/not-competing": "Closed tasks, inbox items and empty instances have no rank.",
   "retro/before-created": "`at` is before the task was created.",
   "retro/future": "`at` is in the future; events are recorded for now or the past.",
   "retro/nothing-to-submit": "Nothing is solved and unsubmitted, so there is nothing to send.",

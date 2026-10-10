@@ -19,7 +19,6 @@ export {
   type ProjectPatch,
 } from "./actions/project-actions.ts";
 export type { ProjectTarget } from "./actions/projects.ts";
-export type { RankActions } from "./actions/rank-actions.ts";
 export type { ReviewActions } from "./actions/review-actions.ts";
 export type { QuietHours, SettingsActions } from "./actions/settings-actions.ts";
 export type {
@@ -174,7 +173,6 @@ export {
   type PreviewContext,
 } from "./view-models/preset-preview.ts";
 export {
-  type AwaitingRow,
   type DoneRow,
   type ProjectViewModel,
   projectViewModel,
@@ -216,20 +214,3 @@ export {
   typeTime,
   withCategory,
 } from "./view-models/time-forms.ts";
-export {
-  type FormulaRun,
-  type WhyLine,
-  whyText,
-  type WhyText,
-  type WhyTextContext,
-  type WhyTextGroup,
-  whyValueText,
-} from "./view-models/why-text.ts";
-export {
-  type FormulaPart,
-  type WhyGroup,
-  type WhyGroupName,
-  type WhyModel,
-  whyModel,
-  type WhyRow,
-} from "./view-models/why.ts";

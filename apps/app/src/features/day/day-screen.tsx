@@ -64,7 +64,7 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
       className="min-h-14 flex-row items-center gap-3 border-t border-line py-2 active:opacity-70"
       onPress={onEdit}
     >
-      <Text className="w-[104px] font-mono text-[12px] text-muted">{range}</Text>
+      <Text className="w-[104px] font-sans text-[12px] tabular-nums text-muted">{range}</Text>
       <View className="flex-1 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
@@ -89,7 +89,10 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
       </View>
       <View className="items-end">
         <Text
-          className={cx("font-mono text-[13px]", row.isRunning ? "text-accentText" : "text-fg")}
+          className={cx(
+            "font-sans text-[13px] tabular-nums",
+            row.isRunning ? "text-accentText" : "text-fg",
+          )}
         >
           {formatDuration(row.minutes, language)}
         </Text>

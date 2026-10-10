@@ -1,9 +1,9 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { HW_ID, TRK_ID } from "@pace/core/testing";
+import { HW_ID } from "@pace/core/testing";
 
 import { NowBoard } from "./now-screen.tsx";
 
@@ -17,29 +17,31 @@ const checks = (): readonly string[] =>
     .map((button) => String(button.props["accessibilityLabel"]));
 
 describe("NowBoard", () => {
-  it("lists the artboard rows in score order with their meta lines", async () => {
+  it("lists the artboard rows by deadline with their meta lines", async () => {
     await renderScreen(<NowBoard />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
     expect(checks()).toEqual([
       "Mark Calculus HW 5 done",
-      "Mark Reply to course curator done",
-      "Mark Flaky latency test in nightly done",
       "Mark Algebra HW 6 done",
-      "Mark Return library books done",
+      "Mark History HW 1 done",
       "Mark Prepare demo for Friday done",
+      "Mark Flaky latency test in nightly done",
+      "Mark Calculus HW 6 done",
+      "Mark Return library books done",
       "Mark RFC: dedicated runner pool done",
+      "Mark Reply to course curator done",
     ]);
     expect(
       screen.getByText("Due tomorrow 23:59 · 1d 8h left · 4/7 solved · 2 sent"),
     ).toBeOnTheScreen();
     // The project (else the category) and the importance are coloured tags before the meta text.
-    expect(screen.getByText("by end of day")).toBeOnTheScreen();
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Normal").length).toBeGreaterThan(0);
     expect(screen.getByText("15h late · 2 problems left")).toBeOnTheScreen();
     expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
-    expect(screen.getByText("Due Fri Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
+    expect(screen.getByText("Due Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
     expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
     expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
   });
@@ -76,33 +78,22 @@ describe("NowBoard", () => {
     expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toBeNull();
   });
 
-  it("filters by project and lists the waiting tasks under a divider", async () => {
+  it("filters by project and folds the tasks that start later under In future", async () => {
     await renderScreen(<NowBoard />, await createTestRuntime());
     const chips = screen.getByLabelText("Filter by project");
     await fireEvent.press(within(chips).getByRole("radio", { name: "Work" }));
     expect(checks()).toEqual([
-      "Mark Flaky latency test in nightly done",
       "Mark Prepare demo for Friday done",
+      "Mark Flaky latency test in nightly done",
       "Mark RFC: dedicated runner pool done",
     ]);
     await fireEvent.press(screen.getByRole("radio", { name: "All" }));
-    expect(checks()).toHaveLength(7);
-    expect(screen.getByRole("header", { name: "Waiting" })).toBeOnTheScreen();
-    expect(screen.getByText("+ 6 later")).toBeOnTheScreen();
-    expect(screen.getByText("Prepare demo for Friday")).toBeOnTheScreen();
-    expect(screen.getByText("RFC: dedicated runner pool")).toBeOnTheScreen();
-  });
-
-  it("moves a task inside its importance category", async () => {
-    const runtime = await createTestRuntime();
-    await renderScreen(<NowBoard />, runtime);
-    const row = screen.getByTestId(`now-row-${TRK_ID}`);
-    await act(async () => {
-      await fireEvent(row, "accessibilityAction", { nativeEvent: { actionName: "moveUp" } });
-    });
-    await waitFor(() => {
-      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.rank).toBe(1);
-    });
+    expect(checks()).toHaveLength(9);
+    const fold = screen.getByRole("button", { name: "In future · 4" });
+    expect(screen.queryByText("Check test 1 grade")).toBeNull();
+    await fireEvent.press(fold);
+    expect(screen.getByText("Check test 1 grade")).toBeOnTheScreen();
+    expect(screen.getByText(/^Starts Oct 20/u)).toBeOnTheScreen();
   });
 
   it("offers the device zone when the account sits in another one", async () => {

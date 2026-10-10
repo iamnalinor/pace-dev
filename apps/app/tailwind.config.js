@@ -21,7 +21,8 @@ module.exports = {
     extend: {
       colors: { ...semantic, ...project },
       borderRadius: radius,
-      fontFamily: { sans: [tokens.fonts.sans], mono: [tokens.fonts.mono] },
+      // The phone uses the first family (embedded by expo-font); the web falls back glyph by glyph.
+      fontFamily: { sans: [tokens.fonts.sans, "system-ui", "sans-serif"] },
     },
   },
   plugins: [],

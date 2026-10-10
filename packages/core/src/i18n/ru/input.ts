@@ -2,7 +2,6 @@ import type { enInput } from "../en/input.ts";
 
 /** Adding and changing tasks: the composer, the edit and close sheets, action errors. */
 export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
-  "add.empty": "Добавление задач появится на этапе 1.",
   "review.title": "Разобрать",
   "review.empty": "Разбирать нечего.",
   "review.kind.submitted": "Всё решено уже сутки — сдали?",
@@ -18,7 +17,6 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "review.action.sort": "Принять подсказку",
   "review.action.submit-now": "Сдано",
   "review.action.undo": "Открыть снова",
-  "review.applied": "Применено",
   "actionError.generic": "Не удалось применить изменение ({code}).",
   "actionError.action/empty-text": "Сначала напишите что-нибудь.",
   "actionError.action/invalid-input": "Проверьте значения и попробуйте снова.",
@@ -57,8 +55,6 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.submitted": "Сдано",
   "close.closed": "Задача закрыта",
   "add.dueZone": "в зоне {tz}",
-  "add.added": "Добавлено",
-  "add.toInboxDone": "Сохранено во Входящие",
   "edit.title": "Изменить задачу",
   "edit.preset": "Пресет",
   "edit.taskTitle": "Название",

@@ -6,7 +6,6 @@ import {
   CALC_HW5_ID,
   CALC_W41_ID,
   ctx,
-  DEMO_ID,
   HW_ID,
   INBOX_GRADE_ID,
   INBOX_SYNC_ID,
@@ -321,10 +320,10 @@ describe("task fields", () => {
     unwrap(await world.actions.setProgress(TRK_ID, 7));
     unwrap(await world.actions.setEstimate(TRK_ID, null));
     unwrap(await world.actions.setPreset(TRK_ID, "personal"));
-    unwrap(await world.actions.setOverrides(TRK_ID, { urgencyPolicy: "age" }));
+    unwrap(await world.actions.setOverrides(TRK_ID, { defaultEstimateMinutes: 45 }));
     expect(taskOf(world, TRK_ID)).toMatchObject({
       estimateMinutes: null,
-      overrides: { urgencyPolicy: "age" },
+      overrides: { defaultEstimateMinutes: 45 },
       presetId: "personal",
       slider: 7,
       status: "paused",
@@ -334,7 +333,7 @@ describe("task fields", () => {
       error: "action/invalid-input",
       ok: false,
     });
-    await expect(world.actions.setOverrides(TRK_ID, { urgencyPolicy: "nope" })).resolves.toEqual({
+    await expect(world.actions.setOverrides(TRK_ID, { progressMode: "nope" })).resolves.toEqual({
       error: "preset/invalid-overrides",
       ok: false,
     });
@@ -383,41 +382,8 @@ describe("task fields", () => {
   });
 });
 
-describe("setRank", () => {
-  it("renumbers the open tasks of the category densely from 1", async () => {
-    const world = await setupActions();
-    const events = unwrap(await world.actions.setRank(RFC_ID, 1));
-    const ranks = events.map((event) =>
-      event.type === "task.rank.set" ? [event.payload.taskId, event.payload.rank] : [],
-    );
-    expect(ranks).toEqual([
-      [RFC_ID, 1],
-      [DEMO_ID, 2],
-      [TRK_ID, 3],
-    ]);
-    await expect(world.actions.setRank(RFC_ID, 1)).resolves.toEqual({ ok: true, value: [] });
-  });
-
-  it("ranks the unranked Normal tasks by creation first and clamps the position", async () => {
-    const world = await setupActions();
-    const events = unwrap(await world.actions.setRank(HW_ID, 99));
-    expect(
-      events.map((event) =>
-        event.type === "task.rank.set" ? [event.payload.taskId, event.payload.rank] : [],
-      ),
-    ).toEqual([
-      [CALC_HW5_ID, 1],
-      [HW_ID, 2],
-    ]);
-    await expect(world.actions.setRank(INBOX_SYNC_ID, 1)).resolves.toEqual({
-      error: "action/nothing-to-do",
-      ok: false,
-    });
-  });
-});
-
 describe("presets", () => {
-  const definition = { urgencyPolicy: "age" } as const;
+  const definition = { defaultImportance: "prioritized" } as const;
 
   it("creates, updates and archives a user preset after validating it", async () => {
     const world = await setupActions();

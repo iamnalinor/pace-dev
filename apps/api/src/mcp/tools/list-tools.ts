@@ -32,18 +32,18 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
 export const listNow = defineTool({
   annotations: READ_ONLY,
   description:
-    "The Now list: every open task that competes for attention, best urgency score first, with its deadline, lateness and progress; plus the tasks waiting on someone else, how many are folded away as 'later' (future start, empty homework instances) and how many inbox items are unsorted. Use it to answer 'what should I do now', 'what is overdue' or before changing a task you only know by title. Pass projectId to narrow it to one project.",
+    "The Now list: every open task, the nearest deadline first (tasks without one after, oldest first), with its deadline, lateness and progress; plus the tasks that start later ('In future') and how many inbox items are unsorted. Use it to answer 'what should I do now', 'what is overdue' or before changing a task you only know by title. Pass projectId to narrow it to one project.",
   handler: async (args, ctx) =>
     await runRead(ctx, (scope) => {
       const options = args.projectId === undefined ? undefined : { projectId: args.projectId };
       const list = nowList(scope.state, scope.qctx, options);
       const items = list.items.map((item) => rowFromItem(scope, item));
-      const waiting = list.waiting.map((item) => rowFromItem(scope, item));
+      const future = list.future.map((item) => rowFromItem(scope, item));
       const top = items.slice(0, 5).map((row) => `- ${describeRow(row)}`);
       return ok({
-        structured: { inboxCount: list.inboxCount, items, laterCount: list.laterCount, waiting },
+        structured: { future, inboxCount: list.inboxCount, items },
         summary: [
-          `${plural(items.length, "task")} on Now, ${waiting.length} waiting, ${list.laterCount} later, ${list.inboxCount} in the inbox.`,
+          `${plural(items.length, "task")} on Now, ${future.length} in future, ${list.inboxCount} in the inbox.`,
           ...top,
         ].join("\n"),
       });
@@ -51,10 +51,9 @@ export const listNow = defineTool({
   input: { projectId: z.string().min(1).optional().describe("Only tasks of this project.") },
   name: "list_now",
   output: {
+    future: z.array(TaskRowSchema),
     inboxCount: z.int(),
     items: z.array(TaskRowSchema),
-    laterCount: z.int(),
-    waiting: z.array(TaskRowSchema),
   },
   scope: "tasks:read",
   title: "Now list",
@@ -88,14 +87,6 @@ export const listProjects = defineTool({
   title: "List projects",
 });
 
-const AwaitingSchema = z.object({
-  dueAt: z.string().nullable(),
-  dueTz: z.string().nullable(),
-  id: z.string(),
-  title: z.string(),
-  url: z.string(),
-});
-
 const DoneSchema = z.object({
   closedAt: z.string(),
   id: z.string(),
@@ -115,7 +106,7 @@ const StatsSchema = z.object({
 export const listProjectTasks = defineTool({
   annotations: READ_ONLY,
   description:
-    "The project page: its open tasks (best score first, waiting and hidden ones included), the empty homework instances still awaiting an assignment, the closed tasks with their outcomes (done, done_late, cancelled, cancelled_missed, skipped) and the header figures (open, on time x/y, late). Name the project by id or by name.",
+    "The project page: its open tasks (the nearest deadline first), the ones that start later, the closed tasks with their outcomes (done, done_late, cancelled, cancelled_missed, skipped; the latest deadline first) and the header figures (open, on time x/y, late). Name the project by id or by name.",
   handler: async (args, ctx) =>
     await runRead(ctx, (scope) => {
       const projectId = findProject(scope.state, args);
@@ -130,26 +121,20 @@ export const listProjectTasks = defineTool({
       const open = view.value.open.map((item) => rowFromItem(scope, item));
       return ok({
         structured: {
-          awaiting: view.value.awaiting.map((task) => ({
-            dueAt: task.dueAt,
-            dueTz: task.dueTz,
-            id: task.id,
-            title: task.title,
-            url: taskUrl(scope.webOrigin, task.id),
+          done: view.value.done.map(({ item, outcome }) => ({
+            closedAt: item.task.closed?.at ?? "",
+            id: item.task.id,
+            outcome,
+            title: item.task.title,
+            url: taskUrl(scope.webOrigin, item.task.id),
           })),
-          done: view.value.done.map((entry) => ({
-            closedAt: entry.task.closed?.at ?? "",
-            id: entry.task.id,
-            outcome: entry.outcome,
-            title: entry.task.title,
-            url: taskUrl(scope.webOrigin, entry.task.id),
-          })),
+          future: view.value.future.map((item) => rowFromItem(scope, item)),
           open,
           project: projectRow(scope, project),
           stats,
         },
         summary: [
-          `${project.name}: ${plural(stats.open, "open task")}, on time ${stats.onTime.done}/${stats.onTime.total}, ${stats.late} late, ${view.value.awaiting.length} awaiting assignment.`,
+          `${project.name}: ${plural(stats.open, "open task")}, on time ${stats.onTime.done}/${stats.onTime.total}, ${stats.late} late, ${view.value.future.length} in future.`,
           ...open.slice(0, 5).map((row) => `- ${describeRow(row)}`),
         ].join("\n"),
       });
@@ -157,8 +142,8 @@ export const listProjectTasks = defineTool({
   input: PROJECT_REF,
   name: "list_project_tasks",
   output: {
-    awaiting: z.array(AwaitingSchema),
     done: z.array(DoneSchema),
+    future: z.array(TaskRowSchema),
     open: z.array(TaskRowSchema),
     project: ProjectRowSchema,
     stats: StatsSchema,

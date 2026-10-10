@@ -70,7 +70,9 @@ const DayCell = ({
       onPick(cell.date);
     }}
   >
-    <Text className={cx("font-mono text-[13px]", ink(cell, isSelected))}>{String(cell.day)}</Text>
+    <Text className={cx("font-sans text-[13px] tabular-nums", ink(cell, isSelected))}>
+      {String(cell.day)}
+    </Text>
     {isMarked ? (
       <View
         className={cx(
@@ -137,9 +139,12 @@ export const Calendar = ({
       </View>
       <View className="flex-row">
         {weekdays.map((weekday, index) => (
-          // Narrow names repeat (T, S): the column is the key.
-          // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-          <Text className="flex-1 text-center font-mono text-[11px] text-muted" key={index}>
+          <Text
+            className="flex-1 text-center font-sans text-[11px] tabular-nums text-muted"
+            // Narrow names repeat (T, S): the column is the key.
+            // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
+            key={index}
+          >
             {weekday}
           </Text>
         ))}

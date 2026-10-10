@@ -19,10 +19,10 @@ const hw = BASE_PRESETS.hw.definition;
 
 describe("toggleOverride", () => {
   it("starts an override from the inherited value and drops it again", () => {
-    const overridden = toggleOverride({}, "urgencyPolicy", hw);
-    expect(overridden).toEqual({ urgencyPolicy: "pace" });
-    expect(isOverridden(overridden, "urgencyPolicy")).toBe(true);
-    expect(toggleOverride(overridden, "urgencyPolicy", hw)).toEqual({});
+    const overridden = toggleOverride({}, "defaultImportance", hw);
+    expect(overridden).toEqual({ defaultImportance: "normal" });
+    expect(isOverridden(overridden, "defaultImportance")).toBe(true);
+    expect(toggleOverride(overridden, "defaultImportance", hw)).toEqual({});
   });
 
   it("keeps a removed recurrence (null) as an override", () => {

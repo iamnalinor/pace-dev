@@ -75,21 +75,12 @@ describe("MCP analytics tools", () => {
     expect(replaced["rows"]).toEqual([["Kept me"]]);
   });
 
-  it("replays the reminders over a range and ranks Now with other weights", async () => {
+  it("replays the reminders over a range and refuses a range that is too long", async () => {
     const token = (await obtainToken(ANALYTICS)).tokens.access_token;
-    await ok(token, "create_task", { importance: "nice_to_have", title: "Someday" });
     await ok(token, "create_task", { importance: "normal", title: "Regular" });
-    const result = await ok(token, "simulate", {
-      from: hoursFromNow(-1),
-      multipliers: { nice_to_have: 50 },
-      to: hoursFromNow(0),
-    });
-    const ranking = result["ranking"] as { title: string; score: number; simulatedScore: number }[];
-    const titles = ranking.map((row) => row.title);
-    // A nice-to-have weighted 50 now outranks a normal task.
-    expect(titles.indexOf("Someday")).toBeLessThan(titles.indexOf("Regular"));
-    const someday = ranking.find((row) => row.title === "Someday");
-    expect(someday?.simulatedScore).toBeGreaterThan(someday?.score ?? 0);
+    const result = await ok(token, "simulate", { from: hoursFromNow(-1), to: hoursFromNow(0) });
+    expect(Array.isArray(result["messages"])).toBe(true);
+    expect(result["ranking"]).toBeUndefined();
     const tooLong = await call(token, "simulate", {
       from: hoursFromNow(-24 * 40),
       to: hoursFromNow(0),

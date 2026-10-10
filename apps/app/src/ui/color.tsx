@@ -23,16 +23,16 @@ export const PROJECT_FILL: Readonly<Record<ProjectColorName, string>> = {
 };
 
 const WASH: Readonly<Record<ProjectColorName, string>> = {
-  amber: "bg-project-amber/16",
-  blue: "bg-project-blue/16",
-  coral: "bg-project-coral/16",
-  green: "bg-project-green/16",
-  orange: "bg-project-orange/16",
-  pink: "bg-project-pink/16",
-  slate: "bg-project-slate/16",
-  teal: "bg-project-teal/16",
-  violet: "bg-project-violet/16",
-  yellow: "bg-project-yellow/16",
+  amber: "bg-project-amber/22",
+  blue: "bg-project-blue/22",
+  coral: "bg-project-coral/22",
+  green: "bg-project-green/22",
+  orange: "bg-project-orange/22",
+  pink: "bg-project-pink/22",
+  slate: "bg-project-slate/22",
+  teal: "bg-project-teal/22",
+  violet: "bg-project-violet/22",
+  yellow: "bg-project-yellow/22",
 };
 
 const EDGE: Readonly<Record<ProjectColorName, string>> = {
@@ -48,18 +48,21 @@ const EDGE: Readonly<Record<ProjectColorName, string>> = {
   yellow: "border-project-yellow/45",
 };
 
-/** A full-strength outline in the color: an unselected chip of that color. */
+/**
+An unselected chip of the color: an outline in its ink shade (the color itself on dark, a
+deeper one on light), which the token contrast test keeps at 3:1 on every surface.
+*/
 export const OUTLINE: Readonly<Record<ProjectColorName, string>> = {
-  amber: "border-project-amber",
-  blue: "border-project-blue",
-  coral: "border-project-coral",
-  green: "border-project-green",
-  orange: "border-project-orange",
-  pink: "border-project-pink",
-  slate: "border-project-slate",
-  teal: "border-project-teal",
-  violet: "border-project-violet",
-  yellow: "border-project-yellow",
+  amber: "border-ink-amber",
+  blue: "border-ink-blue",
+  coral: "border-ink-coral",
+  green: "border-ink-green",
+  orange: "border-ink-orange",
+  pink: "border-ink-pink",
+  slate: "border-ink-slate",
+  teal: "border-ink-teal",
+  violet: "border-ink-violet",
+  yellow: "border-ink-yellow",
 };
 
 export const INK: Readonly<Record<ProjectColorName, string>> = {

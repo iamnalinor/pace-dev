@@ -3,7 +3,7 @@ import type { Importance } from "../model/preset.ts";
 
 import { isOpen, taskById } from "../model/task.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
-import { type NowItem, nowItem } from "../queries/now-item.ts";
+import { hasLaterStart, type NowItem, nowItem } from "../queries/now-item.ts";
 import { nowList } from "../queries/now-list.ts";
 import { reviewItems } from "../review/to-sort.ts";
 import { minutesBetween } from "../time.ts";
@@ -114,7 +114,7 @@ const decision = (
   return {
     kind: "notification",
     taskId: "taskId" in message ? message.taskId : null,
-    rule: "rule" in message ? `${kind}.${message.rule}` : kind,
+    rule: kind,
     outcome,
     inputs,
     explanation,
@@ -144,7 +144,7 @@ const wasCriticalAt = ({ ctx, state }: Pass, taskId: string, at: string): boolea
     return false;
   }
   const item = nowItem(state, task, { ...ctx, now: at });
-  return item.ok && !item.value.score.hidden && criticalOf(item.value, at) !== null;
+  return item.ok && !hasLaterStart(task, at) && criticalOf(item.value, at) !== null;
 };
 
 const isSnoozed = (memory: NotifyMemory, taskId: string, now: string): boolean =>
@@ -296,7 +296,7 @@ export const evaluateNotifications = (
     window !== null && (memory.digestWindow === null || window > memory.digestWindow);
   const digest = isDigestDue ? digestStep(state, ctx, window) : { messages: [], decisions: [] };
   const stuck = isDigestDue
-    ? stuckStep(ctx, memory, [...list.items, ...list.waiting])
+    ? stuckStep(ctx, memory, list.items)
     : { messages: [], decisions: [], handled: [] };
   const next: NotifyMemory = {
     evaluatedAt: ctx.now,

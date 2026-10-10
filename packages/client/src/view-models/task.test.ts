@@ -69,29 +69,8 @@ describe("taskViewModel", () => {
       trackedMinutes: 0,
       workLeftMinutes: 288,
     });
-    expect(trk.stats.windowElapsed).toBeCloseTo(0.65, 10);
     expect(trk.progress).toMatchObject({ mode: "slider", slider: 4 });
     expect(trk.progress.value).toBeCloseTo(0.4, 10);
-    expect(trk.rank).toEqual({ position: 2, size: 3 });
-    expect(trk.why.policy).toBe("lag");
-    expect(trk.why.groups.map((group) => group.name)).toEqual([
-      "work",
-      "time",
-      "importance",
-      "result",
-    ]);
-    const rows = Object.fromEntries(
-      trk.why.groups.flatMap((group) => group.rows).map((entry) => [entry.key, entry]),
-    );
-    expect(
-      trk.why.formula.map((part) => (part.kind === "text" ? part.text : part.row.key)),
-    ).toEqual(["0.25 + 1.5 · max(0, ", "windowElapsed", " − ", "progress", ")", " = ", "urgency"]);
-    expect(rows["windowElapsed"]).toMatchObject({ unit: "percent" });
-    expect(rows["windowElapsed"]?.value).toBeCloseTo(65, 10);
-    expect(rows["progress"]?.value).toBeCloseTo(40, 10);
-    expect(rows["multiplier"]).toEqual({ key: "multiplier", unit: "x", value: 5 });
-    expect(rows["behindPace"]?.value).toBeCloseTo(0.25, 10);
-    expect(rows["rank"]).toEqual({ key: "rank", unit: null, value: 2 });
     expect(trk.primaryAction).toEqual({ kind: "done" });
     expect(trk.problems).toEqual([]);
     expect(trk.outcome).toBeNull();
@@ -124,6 +103,7 @@ describe("taskViewModel", () => {
     expect(hw.stats.workLeftMinutes).toBe(103);
     expect(hw.progress).toMatchObject({ mode: "subtasks", slider: null });
     expect(hw.tags).toEqual([
+      { importance: "normal", kind: "importance" },
       { kind: "status", status: "in_progress" },
       { kind: "submission", submission: "per_subtask" },
     ]);
@@ -140,7 +120,6 @@ describe("taskViewModel", () => {
       overrides: null,
       presetId: "hw.algebra",
       presetName: "Algebra HW",
-      urgencyPolicy: "resubmission",
     });
     expect(hw.overrideSheet.presets.map((preset) => preset.id)).toEqual([
       "hw",
@@ -166,7 +145,6 @@ describe("taskViewModel", () => {
     const sheet = view(sheetId(3), HW_VIEW_NOW);
     expect(sheet.primaryAction).toEqual({ kind: "none" });
     expect(sheet.outcome).toBe("done_late");
-    expect(sheet.rank).toBeNull();
     expect(taskViewModel(artboardState(), "t-nope", ctx())).toEqual({
       error: "task/unknown",
       ok: false,

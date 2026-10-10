@@ -18,11 +18,7 @@ import { NOTIFY_ACTIONS } from "../shared/contract.ts";
 
 type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
 
-const button = (
-  language: Language,
-  key: "cancelTask" | "markDone" | "snooze" | "stillWaiting",
-  data: string,
-) => ({
+const button = (language: Language, key: "cancelTask" | "markDone" | "snooze", data: string) => ({
   data,
   label: t(language, `notify.${key}`),
 });
@@ -32,14 +28,11 @@ const dueText = (dueAt: string, { language, now, zone }: Zoned): string =>
 
 const criticalText = (message: Critical, zoned: Zoned): OutgoingMessage => {
   const { language } = zoned;
-  const text =
-    message.rule === "deadline" && message.dueAt !== null
-      ? t(language, "notify.criticalDeadline", {
-          progress: Math.round(message.progress * 100),
-          title: message.title,
-          when: dueText(message.dueAt, zoned),
-        })
-      : t(language, "notify.criticalScore", { title: message.title });
+  const text = t(language, "notify.criticalDeadline", {
+    progress: Math.round(message.progress * 100),
+    title: message.title,
+    when: dueText(message.dueAt, zoned),
+  });
   return {
     buttons: [
       [
@@ -63,15 +56,11 @@ const limitText = (message: LimitAlert, { language, zone }: Zoned): OutgoingMess
 const stuckText = (message: Stuck, { language }: Zoned): OutgoingMessage => ({
   buttons: [
     [
-      button(
-        language,
-        message.rule === "waiting" ? "stillWaiting" : "snooze",
-        `${NOTIFY_ACTIONS.snooze}:${message.taskId}`,
-      ),
+      button(language, "snooze", `${NOTIFY_ACTIONS.snooze}:${message.taskId}`),
       button(language, "cancelTask", `${NOTIFY_ACTIONS.cancel}:${message.taskId}`),
     ],
   ],
-  text: t(language, message.rule === "waiting" ? "notify.stuckWaiting" : "notify.stuckIdle", {
+  text: t(language, "notify.stuckIdle", {
     days: message.days,
     title: message.title,
   }),

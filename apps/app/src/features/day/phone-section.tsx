@@ -197,7 +197,7 @@ const CalendarRow = ({
         };
   return (
     <View className="flex-row items-center gap-2 border-t border-line py-2">
-      <Text className="w-[86px] font-mono text-[12px] text-muted">
+      <Text className="w-[86px] font-sans text-[12px] tabular-nums text-muted">
         {`${clockTime(event.startAt, zone)}–${clockTime(event.endAt, zone)}`}
       </Text>
       <Text className="flex-1 font-sans text-[14px] text-fg" numberOfLines={2}>

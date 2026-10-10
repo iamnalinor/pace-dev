@@ -42,7 +42,7 @@ const RunningRow = ({
         <View className="flex-row flex-wrap items-center gap-2">
           <PulseDot className={PROJECT_FILL[running.color]} />
           <ColorTag color={running.color}>{running.label}</ColorTag>
-          <Text className="font-mono text-[13px] text-fg">
+          <Text className="font-sans text-[13px] tabular-nums text-fg">
             {formatDuration(running.minutes, language)}
           </Text>
           {target === null ? null : (

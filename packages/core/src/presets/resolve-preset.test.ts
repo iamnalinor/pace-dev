@@ -47,7 +47,7 @@ const isComplete = (value: ResolvedPreset): boolean =>
   PresetDefinitionSchema.safeParse(value).success &&
   Object.keys(value).toSorted(byText).join(",") === RESOLVED_KEYS.join(",") &&
   Object.keys(value.fields).length === 4 &&
-  Object.keys(value.notify).length === 5;
+  Object.keys(value.notify).length === 3;
 
 const input = (patch: Partial<PresetInput>): PresetInput => ({
   definition: {},
@@ -103,20 +103,18 @@ describe("resolvePreset", () => {
 
   it("merges fields and notify key by key across the chain", () => {
     const state = stateWith(
-      user("w.a", "work", { fields: { link: false }, notify: { waitingDays: 3 } }),
+      user("w.a", "work", { fields: { link: false }, notify: { inProgressIdleDays: 3 } }),
       user("w.b", "w.a", { fields: { submitVia: true }, notify: { criticalHours: 48 } }),
     );
-    const result = resolvePreset(state, "w.b", { notify: { criticalScore: 20 } });
+    const result = resolvePreset(state, "w.b", { notify: { criticalProgress: 0.2 } });
     expect(result).toMatchObject({
       ok: true,
       value: {
         fields: { description: true, startAt: true, submitVia: true, link: false },
         notify: {
           criticalHours: 48,
-          criticalProgress: 0.5,
-          criticalScore: 20,
-          inProgressIdleDays: 5,
-          waitingDays: 3,
+          criticalProgress: 0.2,
+          inProgressIdleDays: 3,
         },
       },
     });

@@ -10,7 +10,7 @@ import { TaskRow } from "#app/shared/task-row.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { addMinutesIso, type MessageKey } from "@pace/core";
+import { addMinutesIso, EVENT_LABEL_KEYS } from "@pace/core";
 
 import { PushedScreen } from "./pushed-screen.tsx";
 
@@ -25,7 +25,7 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
     <View className="flex-row items-center gap-3 border-t border-line py-2.5">
       <View className="flex-1 gap-0.5">
         <Text className="font-sans text-[14px] text-fg">
-          {t(`event.${entry.type}` as MessageKey)}
+          {t(EVENT_LABEL_KEYS[entry.type])}
           {entry.taskTitle === null ? "" : ` · ${entry.taskTitle}`}
         </Text>
         <Text className="font-sans text-[12px] text-muted">

@@ -20,7 +20,7 @@ export {
 } from "./notify/evaluate.ts";
 export type { LimitAlert } from "./notify/limit.ts";
 export { notifyPlan, type PlannedNotification } from "./notify/plan.ts";
-export type { Critical, CriticalRule, Stuck, StuckRule } from "./notify/rules.ts";
+export type { Critical, Stuck } from "./notify/rules.ts";
 export { nextDigestAt } from "./notify/schedule.ts";
 export {
   type EventBody,

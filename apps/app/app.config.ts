@@ -72,36 +72,23 @@ const config: ExpoConfig = {
             {
               fontDefinitions: [
                 {
-                  path: "./node_modules/@expo-google-fonts/geist/400Regular/Geist_400Regular.ttf",
+                  path: "./node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
                   weight: 400,
                 },
                 {
-                  path: "./node_modules/@expo-google-fonts/geist/500Medium/Geist_500Medium.ttf",
+                  path: "./node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf",
                   weight: 500,
                 },
                 {
-                  path: "./node_modules/@expo-google-fonts/geist/600SemiBold/Geist_600SemiBold.ttf",
+                  path: "./node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf",
                   weight: 600,
                 },
                 {
-                  path: "./node_modules/@expo-google-fonts/geist/700Bold/Geist_700Bold.ttf",
+                  path: "./node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf",
                   weight: 700,
                 },
               ],
-              fontFamily: "Geist",
-            },
-            {
-              fontDefinitions: [
-                {
-                  path: "./node_modules/@expo-google-fonts/geist-mono/400Regular/GeistMono_400Regular.ttf",
-                  weight: 400,
-                },
-                {
-                  path: "./node_modules/@expo-google-fonts/geist-mono/500Medium/GeistMono_500Medium.ttf",
-                  weight: 500,
-                },
-              ],
-              fontFamily: "Geist Mono",
+              fontFamily: "Inter",
             },
           ],
         },

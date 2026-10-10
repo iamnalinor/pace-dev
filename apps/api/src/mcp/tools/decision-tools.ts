@@ -10,7 +10,7 @@ const DecisionSchema = z.object({
   inputs: z.unknown().describe("What the rule saw: thresholds, scores, the digest content…"),
   kind: z.string().describe("notification | parse"),
   outcome: z.string().describe("sent | suppressed | parsed | unavailable"),
-  rule: z.string().describe("For example critical.deadline, digest, stuck.waiting, parse."),
+  rule: z.string().describe("For example critical, digest, stuck, limit, parse."),
   taskId: z.string().nullable(),
 });
 

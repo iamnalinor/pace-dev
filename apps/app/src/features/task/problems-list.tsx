@@ -62,7 +62,9 @@ const Problem = ({
       }}
     >
       <Mark state={problem.state} />
-      <Text className="w-6 font-mono text-[13px] text-muted">{problem.number ?? ""}</Text>
+      <Text className="w-6 font-sans text-[13px] tabular-nums text-muted">
+        {problem.number ?? ""}
+      </Text>
       <Text className={cx("flex-1 font-sans text-[15px]", isSent ? "text-muted" : "text-fg")}>
         {problem.label}
       </Text>

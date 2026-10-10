@@ -49,7 +49,7 @@ export const THEMES: readonly ThemeName[] = ["dark", "light"];
 export type Palette = Readonly<Record<PaletteName, string>>;
 
 export type Tokens = {
-  readonly fonts: { readonly sans: string; readonly mono: string };
+  readonly fonts: { readonly sans: string };
   readonly radius: Readonly<Record<RadiusName, number>>;
   readonly project: Readonly<Record<ProjectColorName, string>>;
   readonly dark: Palette;
@@ -77,4 +77,4 @@ export const IMPORTANCE_COLORS: Readonly<
 export const inkOf = (color: ProjectColorName): PaletteName => `ink-${color}`;
 
 /** How strong the wash behind a colored tag is (the `ink-*` contrast is checked against it). */
-export const TAG_TINT = 0.16;
+export const TAG_TINT = 0.22;

@@ -6,9 +6,7 @@ import type { ProjectViewModel } from "@pace/client";
 
 import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { ProjectForm } from "#app/features/projects/project-form.tsx";
-import { useOpenTask } from "#app/shared/task-opener.tsx";
-import { TaskRow } from "#app/shared/task-row.tsx";
-import { useCheckTask } from "#app/shared/use-check-task.ts";
+import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { Button } from "#app/ui/button.tsx";
 import { washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -26,7 +24,7 @@ const Figure = ({ label, value }: { readonly label: string; readonly value: stri
     role="group"
   >
     <Text className="font-sans text-[11px] text-muted">{label}</Text>
-    <Text className="font-mono text-[18px] text-fg">{value}</Text>
+    <Text className="font-sans text-[18px] tabular-nums text-fg">{value}</Text>
   </View>
 );
 
@@ -97,26 +95,9 @@ const Stats = ({ project }: { readonly project: ProjectViewModel }) => {
   );
 };
 
-/** What was closed, newest first, with how it ended. */
-const DoneList = ({ project }: { readonly project: ProjectViewModel }) => {
-  const t = useT();
-  return project.done.length === 0 ? null : (
-    <View className="px-5 pt-4">
-      <Text className="pb-1 font-sans text-[12px] font-medium text-muted">{t("project.done")}</Text>
-      {project.done.map((row) => (
-        <Text className="border-t border-line py-2.5 font-sans text-[14px] text-fg2" key={row.id}>
-          {[row.title, t(`outcome.${row.outcome}`)].join(" · ")}
-        </Text>
-      ))}
-    </View>
-  );
-};
-
-/** A project: its figures, the open tasks like Now, and what was done. */
+/** A project: its figures, then its tasks as on Now: open, in future, done (each one opens). */
 export const ProjectScreen = ({ id }: { readonly id: string }) => {
   const t = useT();
-  const openTask = useOpenTask();
-  const check = useCheckTask();
   const view = usePace().hooks.useProjectView(id);
   const [isEditing, setIsEditing] = useState(false);
   if (!view.ok) {
@@ -153,23 +134,16 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
         <Text className="mx-5 mb-3 font-sans text-[14px] text-fg2">{project.description}</Text>
       )}
       <Stats project={project} />
-      {project.open.length === 0 ? <EmptyState>{t("project.empty")}</EmptyState> : null}
-      <View className="px-2">
-        {project.open.map((row) => (
-          <TaskRow
-            key={row.id}
-            onCheck={() => {
-              check(row);
-            }}
-            onOpen={() => {
-              openTask(row.id);
-            }}
-            row={row}
-            withTag={false}
-          />
-        ))}
-      </View>
-      <DoneList project={project} />
+      {project.open.length + project.future.length + project.done.length === 0 ? (
+        <EmptyState>{t("project.empty")}</EmptyState>
+      ) : null}
+      <TaskRows label={t("now.tasks")} rows={project.open} withTag={false} />
+      <FoldedSection count={project.future.length} title={t("now.future")}>
+        <TaskRows label={t("now.future")} rows={project.future} withTag={false} />
+      </FoldedSection>
+      <FoldedSection count={project.done.length} initiallyOpen title={t("project.done")}>
+        <TaskRows checked label={t("project.done")} rows={project.done} withTag={false} />
+      </FoldedSection>
     </PushedScreen>
   );
 };

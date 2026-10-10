@@ -24,7 +24,7 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
       className="mx-4 mt-3 gap-2 rounded-xl border border-dashed border-line p-3"
       role="group"
     >
-      <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
         {t("presets.preview")}
       </Text>
       <View className="flex-row gap-3">
@@ -46,7 +46,7 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
           {preview.progressMode === "none" ? null : (
             <ProgressBar
               label={t("presets.preview")}
-              marker={PREVIEW_SAMPLE.expected}
+              marker={null}
               value={PREVIEW_SAMPLE.progress}
             />
           )}

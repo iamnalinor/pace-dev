@@ -18,16 +18,12 @@ describe("metaTexts", () => {
         { kind: "sent", submitted: 2 },
       ]),
     ).toEqual(["plain:Due tomorrow 23:59", "plain:4/7 solved", "plain:2 sent"]);
-    expect(texts([{ importance: "asap", kind: "importance" }, { kind: "end-of-day" }])).toEqual([
-      "strong:ASAP",
-      "plain:by end of day",
-    ]);
     expect(
       texts([
         { importance: "prioritized", kind: "importance" },
-        { kind: "behind-pace", percent: 25 },
+        { at: HW_DUE, kind: "starts", tz: MOSCOW },
       ]),
-    ).toEqual(["strong:Prioritized", "plain:25% behind pace"]);
+    ).toEqual(["strong:Prioritized", "plain:Starts tomorrow 23:59"]);
     expect(
       texts([
         { isSoft: false, kind: "late", minutes: 901 },

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { EVENT_TYPES } from "../events/event-schema.ts";
 import { en } from "./en.ts";
+import { EVENT_LABEL_KEYS } from "./event-labels.ts";
 import {
   formatDuration,
   formatEyebrow,
@@ -31,7 +33,10 @@ describe("catalogs", () => {
   it("keep every placeholder of en in ru", () => {
     const missing = Object.entries(en).flatMap(([key, text]) =>
       placeholders(text)
-        .filter((name) => !placeholders(ru[key as MessageKey]).includes(name))
+        .filter(
+          (name) =>
+            !placeholders((ru as Readonly<Record<string, string>>)[key] ?? "").includes(name),
+        )
         .map((name) => `${key}:{${name}}`),
     );
     expect(missing).toEqual([]);
@@ -87,6 +92,16 @@ describe("catalogs", () => {
   });
 });
 
+describe("event labels", () => {
+  it("name every event type in both languages", () => {
+    const catalogs: readonly Readonly<Record<string, string>>[] = [en, ru];
+    const missing = EVENT_TYPES.filter((type) =>
+      catalogs.some((catalog) => catalog[EVENT_LABEL_KEYS[type]] === undefined),
+    );
+    expect(missing).toEqual([]);
+  });
+});
+
 describe("t", () => {
   it("returns the message for the language", () => {
     expect(t("en", "nav.now")).toBe("Now");
@@ -100,6 +115,10 @@ describe("t", () => {
     expect(t("ru", "login.openBot", { bot: "@PaceTaskTrackerBot" })).toContain(
       "@PaceTaskTrackerBot",
     );
+  });
+
+  it("answers a key missing from the catalog with the key itself, never a throw", () => {
+    expect(t("en", "no.such.key" as never)).toBe("no.such.key");
   });
 
   it("leaves unknown placeholders visible", () => {
@@ -226,14 +245,14 @@ describe("formatRelativeDay", () => {
     );
   });
 
-  it("names the exact date with its weekday otherwise, never a bare weekday", () => {
+  it("names the exact date otherwise, without a weekday", () => {
     const en = (at: string) => formatRelativeDay(at, now, { language: "en", tz: MOSCOW });
-    expect(en("2026-10-08T10:00:00.000Z")).toBe("Thu Oct 8");
-    expect(en("2026-10-13T10:00:00.000Z")).toBe("Tue Oct 13");
-    expect(en("2026-10-01T10:00:00.000Z")).toBe("Thu Oct 1");
-    expect(en("2027-01-05T10:00:00.000Z")).toBe("Tue Jan 5 2027");
+    expect(en("2026-10-08T10:00:00.000Z")).toBe("Oct 8");
+    expect(en("2026-10-13T10:00:00.000Z")).toBe("Oct 13");
+    expect(en("2026-10-01T10:00:00.000Z")).toBe("Oct 1");
+    expect(en("2027-01-05T10:00:00.000Z")).toBe("Jan 5 2027");
     expect(formatRelativeDay("2026-10-13T10:00:00.000Z", now, { language: "ru", tz: MOSCOW })).toBe(
-      "вт 13 окт.",
+      "13 окт.",
     );
   });
 });

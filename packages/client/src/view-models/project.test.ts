@@ -25,7 +25,7 @@ const view = (projectId: string): ProjectViewModel => {
 };
 
 describe("projectViewModel", () => {
-  it("shows the Algebra page: header stats, open rows, done list newest first", () => {
+  it("shows the Algebra page: header stats, open and future rows, done rows latest deadline first", () => {
     const algebra = view(ALGEBRA_ID);
     expect(algebra).toMatchObject({
       color: "blue",
@@ -33,9 +33,9 @@ describe("projectViewModel", () => {
       name: "Algebra",
       stats: { late: 2, onTime: { done: 9, total: 11 }, open: 2 },
     });
-    expect(algebra.open.map((entry) => entry.id)).toEqual([HW_ID, GRADE_ID]);
-    expect(algebra.open[0]?.meta[0]).toMatchObject({ kind: "due", relative: "tomorrow" });
-    expect(algebra.awaiting).toEqual([]);
+    expect(algebra.open.map((entry) => entry.id)).toEqual([HW_ID]);
+    expect(algebra.open[0]?.meta[1]).toMatchObject({ kind: "due", relative: "tomorrow" });
+    expect(algebra.future.map((entry) => entry.id)).toEqual([GRADE_ID]);
     expect(algebra.done).toHaveLength(DONE_SHEETS);
     expect(algebra.done[0]).toMatchObject({
       id: sheetId(DONE_SHEETS),
@@ -45,18 +45,12 @@ describe("projectViewModel", () => {
     expect(algebra.done.find((entry) => entry.id === sheetId(3))?.outcome).toBe("done_late");
   });
 
-  it("lists an empty instance as awaiting assignment with its due", () => {
+  it("lists an empty instance among the open rows, by its due", () => {
     const calculus = view(CALCULUS_ID);
-    expect(calculus.open.map((entry) => entry.id)).toEqual([CALC_HW5_ID]);
-    expect(calculus.awaiting).toEqual([
-      {
-        dueAt: "2026-10-12T20:59:00.000Z",
-        dueTz: MOSCOW,
-        id: CALC_W41_ID,
-        relative: "later",
-        title: "Calculus HW 6",
-      },
-    ]);
+    expect(calculus.open.map((entry) => entry.id)).toEqual([CALC_HW5_ID, CALC_W41_ID]);
+    expect(calculus.open[1]?.meta).toContainEqual(
+      expect.objectContaining({ at: "2026-10-12T20:59:00.000Z", kind: "due", tz: MOSCOW }),
+    );
   });
 
   it("reports an unknown project", () => {

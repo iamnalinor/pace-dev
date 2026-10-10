@@ -25,7 +25,9 @@ const Line = ({
     <Text className="font-sans text-[13px] text-muted">{label}</Text>
     <Text
       className={
-        mono ? "font-mono text-[12px] text-fg" : "flex-shrink font-sans text-[13px] text-fg"
+        mono
+          ? "font-sans text-[12px] tabular-nums text-fg"
+          : "flex-shrink font-sans text-[13px] text-fg"
       }
     >
       {value}

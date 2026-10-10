@@ -28,13 +28,12 @@ const view = (projectId: string, extra: Parameters<typeof artboardState>[1] = []
 };
 
 describe("projectView", () => {
-  it("lists the Algebra project: HW 6 and the deferred grade check open, eleven sheets done", () => {
+  it("lists the Algebra project: HW 6 open, the grade check in future, eleven sheets done", () => {
     const algebra = view(ALGEBRA_ID);
     expect(algebra.project.name).toBe("Algebra");
-    expect(algebra.open.map((item) => item.task.id)).toEqual([HW_ID, GRADE_ID]);
-    expect(algebra.open[1]?.score.hidden).toBe(true);
-    expect(algebra.awaiting).toEqual([]);
-    expect(algebra.done.map((entry) => entry.task.id)).toEqual(
+    expect(algebra.open.map((item) => item.task.id)).toEqual([HW_ID]);
+    expect(algebra.future.map((item) => item.task.id)).toEqual([GRADE_ID]);
+    expect(algebra.done.map((entry) => entry.item.task.id)).toEqual(
       Array.from({ length: DONE_SHEETS }, (_, index) => sheetId(DONE_SHEETS - index)),
     );
     expect(algebra.done.map((entry) => entry.outcome)).toEqual(
@@ -54,16 +53,15 @@ describe("projectView", () => {
     });
   });
 
-  it("shows an empty instance as awaiting assignment instead of open", () => {
+  it("lists an empty instance among the open tasks, by its deadline", () => {
     const calculus = view(CALCULUS_ID);
-    expect(calculus.open.map((item) => item.task.id)).toEqual([CALC_HW5_ID]);
-    expect(calculus.awaiting.map((task) => task.id)).toEqual([CALC_W41_ID]);
+    expect(calculus.open.map((item) => item.task.id)).toEqual([CALC_HW5_ID, CALC_W41_ID]);
     expect(calculus.done).toEqual([]);
-    expect(calculus.stats).toMatchObject({ open: 1, onTime: { done: 0, total: 0 }, late: 0 });
+    expect(calculus.stats).toMatchObject({ open: 2, onTime: { done: 0, total: 0 }, late: 0 });
   });
 
-  it("keeps waiting tasks in the open list, in score order", () => {
-    expect(view(WORK_ID).open.map((item) => item.task.id)).toEqual([TRK_ID, DEMO_ID, RFC_ID]);
+  it("orders the open list like Now: the nearest deadline first", () => {
+    expect(view(WORK_ID).open.map((item) => item.task.id)).toEqual([DEMO_ID, TRK_ID, RFC_ID]);
   });
 
   it("counts a missed deadline as late but a cancellation in neither column", () => {
@@ -103,11 +101,10 @@ describe("projectView", () => {
       }),
     ]);
     expect(algebra.stats).toMatchObject({ onTime: { done: 9, total: 12 }, late: 3 });
-    expect(algebra.done.slice(0, 3).map((entry) => [entry.task.id, entry.outcome])).toEqual([
-      ["t-missed", "cancelled_missed"],
-      ["t-dropped", "cancelled"],
-      [sheetId(DONE_SHEETS), "done"],
-    ]);
+    // The latest deadline first; the undated cancellation after every dated task.
+    const done = algebra.done.map((entry) => [entry.item.task.id, entry.outcome]);
+    expect(done.at(-1)).toEqual(["t-dropped", "cancelled"]);
+    expect(done).toContainEqual(["t-missed", "cancelled_missed"]);
   });
 
   it("rejects an unknown project", () => {

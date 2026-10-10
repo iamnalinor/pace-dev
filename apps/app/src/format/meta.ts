@@ -13,9 +13,12 @@ const partText = (part: MetaPart, viewer: Viewer): string => {
   if (part.kind === "importance") {
     return t(language, `importance.${part.importance}`);
   }
-  return part.kind === "due"
-    ? t(language, "meta.due", { when: zonedText({ ...part, mode: "due" }, viewer) })
-    : plainMetaText(part, language);
+  if (part.kind === "due" || part.kind === "starts") {
+    return t(language, part.kind === "due" ? "meta.due" : "meta.starts", {
+      when: zonedText({ ...part, mode: "due" }, viewer),
+    });
+  }
+  return plainMetaText(part, language);
 };
 
 const toneOf = (part: MetaPart): MetaTone => {

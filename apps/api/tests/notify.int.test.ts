@@ -97,7 +97,7 @@ describe("the notifier in the user store", () => {
         logged
           .map((entry) => `${entry.rule} ${entry.outcome}`)
           .toSorted((a, b) => a.localeCompare(b)),
-      ).toEqual(["critical.deadline suppressed", "digest sent"]);
+      ).toEqual(["critical suppressed", "digest sent"]);
       expect(await instance.decisions({ limit: 10, taskId: "t-report" })).toHaveLength(1);
       expect(await instance.decisions({ limit: 10, q: "retro" })).toHaveLength(1);
     });

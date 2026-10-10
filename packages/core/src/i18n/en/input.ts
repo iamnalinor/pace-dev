@@ -1,6 +1,5 @@
 /** Adding and changing tasks: the composer, the edit and close sheets, action errors. */
 export const enInput = {
-  "add.empty": "Adding tasks arrives with stage 1.",
   "review.title": "To sort",
   "review.empty": "Nothing to sort.",
   "review.kind.submitted": "Everything solved for a day — submitted?",
@@ -16,7 +15,6 @@ export const enInput = {
   "review.action.sort": "Accept suggestion",
   "review.action.submit-now": "Submitted",
   "review.action.undo": "Reopen",
-  "review.applied": "Applied",
   "actionError.generic": "Could not apply this change ({code}).",
   "actionError.action/empty-text": "Type something first.",
   "actionError.action/invalid-input": "Check the values and try again.",
@@ -55,8 +53,6 @@ export const enInput = {
   "close.submitted": "Submitted",
   "close.closed": "Task closed",
   "add.dueZone": "in {tz}",
-  "add.added": "Added",
-  "add.toInboxDone": "Saved to Inbox",
   "edit.title": "Edit task",
   "edit.preset": "Preset",
   "edit.taskTitle": "Title",

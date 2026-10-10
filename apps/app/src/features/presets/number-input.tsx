@@ -28,7 +28,7 @@ export const NumberInput = ({
     <TextInput
       accessibilityLabel={label}
       className={cx(
-        "h-11 rounded-lg border bg-bg px-3 font-mono text-[15px] text-fg",
+        "h-11 rounded-lg border bg-bg px-3 font-sans text-[15px] tabular-nums text-fg",
         invalid ? "border-warn" : "border-line",
       )}
       inputMode="decimal"

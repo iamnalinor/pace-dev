@@ -75,6 +75,28 @@ describe("tokens", () => {
     expect(failures).toEqual([]);
   });
 
+  it.each(THEMES)(
+    "%s outlines and the mark (ink-*, accentText) reach 3:1 on bg, surface and raised",
+    (theme) => {
+      const palette = tokens[theme];
+      const marks: readonly PaletteName[] = [
+        "accentText",
+        "faint",
+        ...COLORS.map((color) => inkOf(color)),
+      ];
+      const failures = marks.flatMap((mark) =>
+        (["bg", "surface", "raised"] as const)
+          .map((background) => ({
+            background,
+            mark,
+            ratio: contrastRatio(palette[mark], palette[background]) ?? 0,
+          }))
+          .filter(({ ratio }) => ratio < 3),
+      );
+      expect(failures).toEqual([]);
+    },
+  );
+
   it.each(THEMES)("%s accentFg reaches 4.5:1 on accent", (theme) => {
     expect(contrastRatio(tokens[theme].accentFg, tokens[theme].accent)).toBeGreaterThanOrEqual(4.5);
   });
@@ -96,7 +118,7 @@ describe("tokens", () => {
   );
 
   it("exposes fonts, radii and the project palette", () => {
-    expect(tokens.fonts).toEqual({ mono: "Geist Mono", sans: "Geist" });
+    expect(tokens.fonts).toEqual({ sans: "Inter" });
     expect(tokens.radius.pill).toBe(999);
     expect(Object.keys(tokens.project)).toHaveLength(10);
   });

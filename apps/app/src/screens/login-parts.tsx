@@ -43,13 +43,13 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
   };
   return (
     <View className="gap-2 rounded-xl border border-line bg-surface p-4">
-      <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
         {t("login.dev")}
       </Text>
       <TextInput
         accessibilityLabel={t("login.devId")}
         autoCapitalize="none"
-        className="h-12 rounded-md bg-raised px-3 font-mono text-[15px] text-fg"
+        className="h-12 rounded-md bg-raised px-3 font-sans text-[15px] tabular-nums text-fg"
         keyboardType="number-pad"
         onChangeText={setTelegramId}
         placeholder={t("login.devId")}

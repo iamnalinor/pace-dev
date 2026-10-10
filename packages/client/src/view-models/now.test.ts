@@ -32,21 +32,18 @@ const row = (rows: readonly NowRow[], id: string): NowRow => {
 describe("nowViewModel", () => {
   const board = nowViewModel(artboardState(), ctx());
 
-  it("lists the rows in score order with the counters of the header and the footer", () => {
-    expect(board.rows.map((entry) => entry.id)).toEqual([
-      CALC_HW5_ID,
-      REPLY_ID,
-      TRK_ID,
-      HW_ID,
-      BOOKS_ID,
-    ]);
-    expect(board).toMatchObject({ inboxCount: 3, laterCount: 6 });
-    expect(board.waiting.map((entry) => entry.id)).toHaveLength(2);
+  it("lists the rows by deadline, with the inbox counter and the In future fold", () => {
+    expect(board.rows.map((entry) => entry.id).slice(0, 2)).toEqual([CALC_HW5_ID, HW_ID]);
+    expect(board.rows.map((entry) => entry.id).at(-1)).toBe(REPLY_ID);
+    expect(board.inboxCount).toBe(3);
+    expect(board.future).toHaveLength(4);
+    expect(board.future[0]?.meta).toContainEqual(expect.objectContaining({ kind: "starts" }));
   });
 
   it("describes Algebra HW 6 as due tomorrow 23:59 · 4/7 solved · 2 sent", () => {
     const hw = row(board.rows, HW_ID);
     expect(hw.meta).toEqual([
+      { importance: "normal", kind: "importance" },
       { at: HW_DUE, kind: "due", relative: "tomorrow", tz: MOSCOW, zoneDiffers: false },
       { kind: "left", minutes: minutesBetween(ctx().now, HW_DUE) },
       { kind: "solved", solved: 4, total: 7 },
@@ -59,17 +56,16 @@ describe("nowViewModel", () => {
       title: "Algebra HW 6",
     });
     expect(hw.progress).toBeCloseTo(4 / 7, 10);
-    expect(hw.paceExpected).not.toBeNull();
   });
 
-  it("describes the ASAP reply as ASAP · by end of day", () => {
+  it("describes the ASAP reply without a due as ASAP and its age", () => {
     expect(row(board.rows, REPLY_ID).meta).toEqual([
       { importance: "asap", kind: "importance" },
-      { kind: "end-of-day" },
+      { kind: "age", minutes: expect.any(Number) as number },
     ]);
   });
 
-  it("describes TRK-231 as Prioritized with its due, and 25 % behind pace on Thursday", () => {
+  it("describes TRK-231 as Prioritized with its due and the time left, no pace", () => {
     expect(row(board.rows, TRK_ID).meta).toEqual([
       { importance: "prioritized", kind: "importance" },
       { at: TRK_DUE, kind: "due", relative: "later", tz: "UTC", zoneDiffers: true },
@@ -80,17 +76,16 @@ describe("nowViewModel", () => {
       { importance: "prioritized", kind: "importance" },
       { at: TRK_DUE, kind: "due", relative: "tomorrow", tz: "UTC", zoneDiffers: false },
       { kind: "left", minutes: minutesBetween(TRK_NOW, TRK_DUE) },
-      { kind: "behind-pace", percent: 25 },
     ]);
   });
 
   it("describes Calculus HW 5 as 1 day late · 2 problems left", () => {
     const calc = row(board.rows, CALC_HW5_ID);
     expect(calc.meta).toEqual([
+      { importance: "normal", kind: "importance" },
       { isSoft: false, kind: "late", minutes: 15 * 60 + 1 },
       { count: 2, kind: "problems-left" },
     ]);
-    expect(calc.paceExpected).toBe(1);
     expect(CALC_HW5_DUE < ctx().now).toBe(true);
   });
 
@@ -102,7 +97,7 @@ describe("nowViewModel", () => {
     ]);
     const age = books.meta[1];
     expect(age?.kind === "age" && Math.floor(age.minutes / (24 * 60))).toBe(12);
-    expect(books).toMatchObject({ color: "orange", dimmed: true, paceExpected: null });
+    expect(books).toMatchObject({ color: "orange", dimmed: true });
   });
 
   it("offers a chip per project with open tasks", () => {
@@ -112,8 +107,7 @@ describe("nowViewModel", () => {
       { color: "violet", id: WORK_ID, name: "Work", open: 3 },
     ]);
     const work = nowViewModel(artboardState(), ctx(), { projectId: WORK_ID });
-    expect(work.rows.map((entry) => entry.id)).toEqual([TRK_ID]);
-    expect(work.waiting).toHaveLength(2);
+    expect(work.rows.map((entry) => entry.id)).toHaveLength(3);
     expect(work.inboxCount).toBe(3);
   });
 });
