@@ -38,6 +38,8 @@ export type QuickInput = {
   readonly link: null | string;
   readonly subtasks: readonly QuickSubtask[];
   readonly spans: readonly QuickSpan[];
+  /** The message's details beyond the title and the problems (the assistant's reading only). */
+  readonly description: null | string;
 };
 
 const linkSpansOf = (text: string, link: null | string): readonly QuickSpan[] => {
@@ -94,6 +96,7 @@ export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContex
   const dueAt = dueOf(dated, { now: ctx.now, zone });
   const { project } = dated;
   return {
+    description: null,
     dueAt,
     dueTz: dueAt === null ? null : zone,
     estimateMinutes: estimate.minutes,

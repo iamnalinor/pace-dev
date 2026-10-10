@@ -104,7 +104,7 @@ for (const width of [1440, 1920]) {
     await loginViaApi(page);
     await page.goto("/");
     const line = page.getByRole("textbox", { name: "New task" });
-    await line.fill(`renew the passport ${String(width)}`);
+    await line.pressSequentially(`renew the passport ${String(width)}`);
     await line.press("Enter");
     await expect(line).toHaveValue("");
     const list = page.getByRole("list", { name: "Tasks" });

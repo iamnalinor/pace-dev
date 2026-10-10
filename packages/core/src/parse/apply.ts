@@ -114,6 +114,7 @@ export const parseToQuickInput = (
     ...projectOf(state, result.project, rules),
     ...dueOf(result, rules, accountTz(state, ctx)),
     ...importanceOf(result, rules, resolvePreset(state.presets, presetId)),
+    description: result.description,
     estimateMinutes: result.estimateMinutes ?? rules.estimateMinutes,
     link: extractLink(text),
     presetId,

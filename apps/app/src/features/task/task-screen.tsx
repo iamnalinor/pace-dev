@@ -15,7 +15,7 @@ import { ProjectSheet } from "./project-sheet.tsx";
 import { SourceText } from "./source-text.tsx";
 import { TaskFooter } from "./task-footer.tsx";
 import { TaskHeader } from "./task-header.tsx";
-import { EditTextSheet } from "./task-sheets.tsx";
+import { EditTaskSheet } from "./task-sheets.tsx";
 import { TaskSummary } from "./task-summary.tsx";
 import { WorkProgress } from "./work-progress.tsx";
 
@@ -54,7 +54,7 @@ const OpenSheet = ({
         view={task}
       />
     ) : null}
-    {open === "edit" ? <EditTextSheet onClose={dismiss} view={task} /> : null}
+    {open === "edit" ? <EditTaskSheet onClose={dismiss} view={task} /> : null}
     {open === "project" ? <ProjectSheet onClose={dismiss} view={task} /> : null}
   </>
 );

@@ -13,7 +13,7 @@ const unique = (): string => crypto.randomUUID().slice(0, 6);
 
 const add = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill(text);
+  await line.pressSequentially(text);
   await line.press("Enter");
   await expect(line).toHaveValue("");
 };
@@ -46,7 +46,7 @@ for (const size of SIZES) {
       await page.goto("/");
       const text = `ask about the ${size.name} invoice ${unique()}`;
       const line = page.getByRole("textbox", { name: "New task" });
-      await line.fill(text);
+      await line.pressSequentially(text);
       await page.getByRole("button", { name: "To Inbox" }).click();
       // The line clears once the capture is stored: navigating sooner can reload before the write.
       await expect(line).toHaveValue("");

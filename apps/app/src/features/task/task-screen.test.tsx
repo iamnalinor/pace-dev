@@ -125,6 +125,24 @@ describe("TaskScreen — work", () => {
     });
   });
 
+  it("edits everything from the pencil: clears the due and sets an estimate", async () => {
+    const runtime = await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
+    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    await fireEvent.press(screen.getByRole("radio", { name: "1h 30m" }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("importance.asap") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toMatchObject({
+        dueAt: null,
+        estimateMinutes: 90,
+        importance: "asap",
+      });
+    });
+  });
+
   it("deletes from the header's trash: the close sheet opens on Cancelled · Skipped", async () => {
     await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));

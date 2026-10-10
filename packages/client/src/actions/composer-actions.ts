@@ -1,14 +1,9 @@
-import { err } from "@pace/core";
+import { err, instanceBodies, newId, type QuickInput, taskById } from "@pace/core";
 
 import type { ComposerModel } from "../view-models/composer.ts";
 
 import { type ActionDeps, type ActionResult, emit, stamp } from "./deps.ts";
-import {
-  type CreateTaskForm,
-  type SubtaskForm,
-  subtaskInputs,
-  taskActions,
-} from "./task-actions.ts";
+import { type CreateTaskForm, type SubtaskForm, taskActions } from "./task-actions.ts";
 
 /** What the expanded composer adds to the line: a description and problems typed one by one. */
 export type ComposerExtras = {
@@ -36,30 +31,47 @@ const subtaskForms = (model: ComposerModel, extras: ComposerExtras): readonly Su
     .map((label) => ({ label })),
 ];
 
+/** The composer's reading in the shape the core writes from (the bot and the server use it too). */
+const quickInputOf = (
+  model: ComposerModel,
+  input: { readonly description: null | string; readonly subtasks: readonly SubtaskForm[] },
+): QuickInput => ({
+  description: input.description,
+  dueAt: model.due?.at ?? null,
+  dueTz: model.due?.tz ?? null,
+  estimateMinutes: model.estimateMinutes,
+  importance: model.importance,
+  isImportanceExplicit: true,
+  link: model.link?.url ?? null,
+  presetId: model.preset.id,
+  projectId: model.project?.id ?? null,
+  projectName: model.newProjectName,
+  spans: model.spans,
+  subtasks: input.subtasks.map((subtask) => ({
+    label: subtask.label,
+    number: subtask.number ?? null,
+  })),
+  text: model.text,
+  title: model.title,
+});
+
+/** The problems, the details and the text itself added to this week's homework. */
 const addToInstance = async (
   deps: ActionDeps,
-  taskId: string,
-  input: { readonly model: ComposerModel; readonly subtasks: readonly SubtaskForm[] },
+  model: ComposerModel & {
+    readonly target: { readonly kind: "instance"; readonly taskId: string };
+  },
+  input: { readonly description: null | string; readonly subtasks: readonly SubtaskForm[] },
 ): ActionResult => {
-  const { model, subtasks } = input;
-  return await emit(deps, [
-    ...(subtasks.length === 0
-      ? []
-      : [
-          stamp(deps, {
-            type: "task.subtasks.added",
-            payload: { taskId, subtasks: subtaskInputs(subtasks) },
-          }),
-        ]),
-    stamp(deps, {
-      type: "task.source.attached",
-      payload: {
-        taskId,
-        sourceText: model.text.trim(),
-        ...(model.link !== null && { sourceUrl: model.link.url }),
-      },
-    }),
-  ]);
+  const task = taskById(deps.state.store.getState().tasks, model.target.taskId);
+  if (task === undefined) {
+    return err("action/invalid-input");
+  }
+  const bodies = instanceBodies(quickInputOf(model, input), task, newId);
+  return await emit(
+    deps,
+    bodies.map((body) => stamp(deps, body)),
+  );
 };
 
 const blankToUndefined = (text: string | undefined): string | undefined => {
@@ -67,21 +79,27 @@ const blankToUndefined = (text: string | undefined): string | undefined => {
   return trimmed === "" ? undefined : trimmed;
 };
 
+/** The model's dates as a form's: absent when not set. */
+const scheduleOf = (
+  model: ComposerModel,
+): Pick<CreateTaskForm, "dueAt" | "dueTz" | "startAt" | "startTz"> => ({
+  ...(model.due !== null && { dueAt: model.due.at, dueTz: model.due.tz }),
+  ...(model.start !== null && { startAt: model.start.at, startTz: model.start.tz }),
+});
+
 const newTaskForm = (
   model: ComposerModel,
-  extras: ComposerExtras,
-  subtasks: readonly SubtaskForm[],
+  details: { readonly description: null | string; readonly subtasks: readonly SubtaskForm[] },
 ): CreateTaskForm => ({
   title: model.title === "" ? model.text.trim() : model.title,
   presetId: model.preset.id,
   projectId: model.project?.id,
   projectName: model.project === null ? (model.newProjectName ?? undefined) : undefined,
   importance: model.importance,
-  dueAt: model.due?.at,
-  dueTz: model.due?.tz,
+  ...scheduleOf(model),
   estimateMinutes: model.estimateMinutes ?? undefined,
-  subtasks,
-  description: blankToUndefined(extras.description),
+  subtasks: details.subtasks,
+  description: details.description ?? undefined,
   sourceText: model.text,
   fields: model.link === null ? {} : { link: model.link.url },
 });
@@ -92,8 +110,13 @@ export const composerActions = (deps: ActionDeps): ComposerActions => ({
       return err("action/empty-text");
     }
     const subtasks = subtaskForms(model, extras);
+    const description =
+      blankToUndefined(extras.description) ??
+      blankToUndefined(model.description ?? undefined) ??
+      null;
+    const details = { description, subtasks };
     return model.target.kind === "instance"
-      ? await addToInstance(deps, model.target.taskId, { model, subtasks })
-      : await taskActions(deps).createTask(newTaskForm(model, extras, subtasks));
+      ? await addToInstance(deps, { ...model, target: model.target }, details)
+      : await taskActions(deps).createTask(newTaskForm(model, details));
   },
 });

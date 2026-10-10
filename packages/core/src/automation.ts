@@ -4,7 +4,14 @@ export {
   type ParseResponse,
   ParseResponseSchema,
 } from "./api/schemas/parse.ts";
-export { openInstanceOf, quickInputBodies } from "./input/compose.ts";
+export {
+  dueOfInput,
+  instanceBodies,
+  type NamedDue,
+  openInstanceOf,
+  openInstancesOf,
+  quickInputBodies,
+} from "./input/compose.ts";
 /** The assistant layer of @pace/core: the LLM parse (schema, checks, application) and the notifier. */
 export {
   type Digest,

@@ -100,7 +100,7 @@ const signIn = async (page: Page, token: string, theme: "dark" | "light"): Promi
 
 const add = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill(text);
+  await line.pressSequentially(text);
   await line.press("Enter");
   await expect(line).toHaveValue("");
 };

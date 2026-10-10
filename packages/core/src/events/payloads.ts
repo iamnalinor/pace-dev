@@ -47,17 +47,18 @@ const OpaqueRecordSchema = z.record(z.string(), z.unknown());
 const taskRef = { taskId: z.string().min(1) };
 
 type ZonedFields = {
-  readonly dueAt?: string | undefined;
+  readonly dueAt?: null | string | undefined;
   readonly dueTz?: string | undefined;
-  readonly startAt?: string | undefined;
+  readonly startAt?: null | string | undefined;
   readonly startTz?: string | undefined;
 };
 
+/** A time that is set carries its zone; a cleared one (`null`) needs none. */
 const zonePaired = (value: ZonedFields, ctx: z.RefinementCtx): void => {
-  if (value.dueAt !== undefined && value.dueTz === undefined) {
+  if (typeof value.dueAt === "string" && value.dueTz === undefined) {
     ctx.addIssue({ code: "custom", message: "dueTz is required with dueAt", path: ["dueTz"] });
   }
-  if (value.startAt !== undefined && value.startTz === undefined) {
+  if (typeof value.startAt === "string" && value.startTz === undefined) {
     ctx.addIssue({
       code: "custom",
       message: "startTz is required with startAt",
@@ -90,12 +91,16 @@ export const TaskCreatedPayload = z
   })
   .superRefine(zonePaired);
 
+/** `null` clears the due date or the start (and their zones with them). */
 export const TaskUpdatedPayload = z
   .object({
     ...taskRef,
     title: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
-    ...zonedShape,
+    dueAt: InstantSchema.nullable().optional(),
+    dueTz: TimeZoneSchema.optional(),
+    startAt: InstantSchema.nullable().optional(),
+    startTz: TimeZoneSchema.optional(),
     fields: TaskFieldsSchema.optional(),
   })
   .superRefine(zonePaired);

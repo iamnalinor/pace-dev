@@ -1,159 +1,26 @@
-import { useState } from "react";
-import { ScrollView, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
+import { useRef, useState } from "react";
+import { Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
 
-import type { AiOutcome, AiReading, Assistant, ComposerEdits, ComposerModel } from "@pace/client";
-
-import { useLanguage, usePace, useT } from "#app/app-state.tsx";
+import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { Chip } from "#app/ui/chip.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useToast } from "#app/ui/toast.tsx";
-import { useAiRead, useAutoAiRead, useReadFirst } from "@pace/client/react";
-import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
+import {
+  type AiOutcome,
+  type AiReading,
+  type Assistant,
+  canAiRead,
+  type ComposerEdits,
+  isPasted,
+  requiresAiFirst,
+} from "@pace/client";
+import { useAiRead } from "@pace/client/react";
 
 import { AiStatus } from "./ai-status.tsx";
-import { ComposerFields } from "./composer-fields.tsx";
-
-const ChipRow = ({
-  children,
-  label,
-}: {
-  readonly children: React.ReactNode;
-  readonly label: string;
-}) => (
-  <ScrollView
-    accessibilityLabel={label}
-    contentContainerClassName="gap-1.5 px-1"
-    horizontal
-    keyboardShouldPersistTaps="handled"
-    role="radiogroup"
-    showsHorizontalScrollIndicator={false}
-  >
-    {children}
-  </ScrollView>
-);
-
-/** The link, the problems and a new project, read from the line, in words. */
-const useFacts = (model: ComposerModel): readonly string[] => {
-  const t = useT();
-  return [
-    ...(model.link === null ? [] : [`${model.link.host} ↗`]),
-    ...(model.subtasks.length === 0
-      ? []
-      : [t("composer.problems", { list: model.subtasks.map((item) => item.label).join(", ") })]),
-    ...(model.newProjectName === null
-      ? []
-      : [t("composer.newProject", { name: model.newProjectName })]),
-  ];
-};
-
-/** What the line was read as: one-tap category, importance and project; the rest as facts. */
-const ComposerChips = ({
-  model,
-  onEdit,
-}: {
-  readonly model: ComposerModel;
-  readonly onEdit: (edits: ComposerEdits) => void;
-}) => {
-  const t = useT();
-  const language = useLanguage();
-  const facts = useFacts(model);
-  return (
-    <View className="gap-2 pt-2">
-      <ComposerFields model={model} onEdit={onEdit} />
-      <ChipRow label={t("composer.category")}>
-        {model.presets.map((preset) => (
-          <Chip
-            color={preset.color}
-            key={preset.id}
-            onPress={() => {
-              onEdit({ importance: undefined, presetId: preset.id });
-            }}
-            selected={preset.id === model.preset.id}
-          >
-            {presetLabel(preset, language)}
-          </Chip>
-        ))}
-      </ChipRow>
-      <ChipRow label={t("edit.importance")}>
-        {ImportanceSchema.options.map((importance) => (
-          <Chip
-            color={IMPORTANCE_COLORS[importance]}
-            key={importance}
-            onPress={() => {
-              onEdit({ importance });
-            }}
-            selected={importance === model.importance}
-          >
-            {t(`importance.${importance}`)}
-          </Chip>
-        ))}
-      </ChipRow>
-      <ChipRow label={t("composer.project")}>
-        <Chip
-          onPress={() => {
-            onEdit({ projectId: null });
-          }}
-          selected={model.project === null && model.newProjectName === null}
-        >
-          {t("composer.noProject")}
-        </Chip>
-        {model.projects.map((project) => (
-          <Chip
-            color={project.color}
-            key={project.id}
-            label={t("composer.projectNamed", { name: project.name })}
-            onPress={() => {
-              onEdit({ projectId: project.id });
-            }}
-            selected={project.id === model.project?.id}
-          >
-            {project.name}
-          </Chip>
-        ))}
-      </ChipRow>
-      {facts.length === 0 ? null : (
-        <Text className="px-1 font-sans text-[12px] text-muted">{facts.join(" · ")}</Text>
-      )}
-    </View>
-  );
-};
-
-const ComposerActions = ({
-  isReading,
-  submitLabel,
-  onAdd,
-  onAi,
-  onInbox,
-}: {
-  readonly isReading: boolean;
-  readonly submitLabel: string;
-  readonly onAdd: () => void;
-  readonly onAi: () => void;
-  readonly onInbox: () => void;
-}) => {
-  const t = useT();
-  return (
-    <View className="flex-row gap-2 pt-2">
-      <View className="flex-1">
-        <Button onPress={onInbox} variant="secondary">
-          {t("composer.toInbox")}
-        </Button>
-      </View>
-      <View className="flex-1">
-        <Button busy={isReading} onPress={onAi} variant="secondary">
-          {t(isReading ? "composer.aiReading" : "composer.ai")}
-        </Button>
-      </View>
-      <View className="flex-1">
-        <Button onPress={onAdd}>{submitLabel}</Button>
-      </View>
-    </View>
-  );
-};
+import { ComposerForm } from "./composer-form.tsx";
 
 /** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
 const useDraft = (initialText: string, assistant: Assistant) => {
@@ -205,9 +72,9 @@ const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
   };
 };
 
-/** A keyboard (the web, a tablet with one): Enter adds, Shift+Enter starts a new line. */
-const enterAdds =
-  (isEmpty: boolean, add: () => Promise<void>) =>
+/** A keyboard (the web, a tablet with one): Enter acts, Shift+Enter starts a new line. */
+const onEnter =
+  (isEmpty: boolean, act: () => void) =>
   (event: TextInputKeyPressEvent): void => {
     const native = event.nativeEvent as TextInputKeyPressEvent["nativeEvent"] & {
       shiftKey?: boolean;
@@ -216,48 +83,150 @@ const enterAdds =
       return;
     }
     event.preventDefault();
-    void add();
+    act();
   };
 
-/**
-The app's entry point on Now: one line read into chips as it is typed; Add stores it (or
-adds the problems to this week's homework), To Inbox keeps the raw line for later.
-*/
-export const Composer = ({ initialText = "" }: { readonly initialText?: string | undefined }) => {
+/** Parse (the assistant), Fill in by hand (the form, empty but for the rules' reading), To Inbox. */
+const QuickActions = ({
+  canParse,
+  isReading,
+  onByHand,
+  onInbox,
+  onParse,
+}: {
+  readonly canParse: boolean;
+  readonly isReading: boolean;
+  readonly onParse: () => void;
+  readonly onByHand: () => void;
+  readonly onInbox: () => void;
+}) => {
   const t = useT();
+  return (
+    <View className="flex-row flex-wrap gap-2 pt-2">
+      <View className="min-w-36 flex-[2]">
+        <Button busy={isReading} disabled={!canParse} onPress={onParse}>
+          {t("composer.parse")}
+        </Button>
+      </View>
+      <View className="min-w-28 flex-1">
+        <Button onPress={onByHand} variant="secondary">
+          {t("composer.byHand")}
+        </Button>
+      </View>
+      <View className="min-w-28 flex-1">
+        <Button onPress={onInbox} variant="ghost">
+          {t("composer.toInbox")}
+        </Button>
+      </View>
+    </View>
+  );
+};
+
+/** The composer's state and moves: the text, the reading, the form, and what each key or button does. */
+const useComposerFlow = (initialText: string) => {
   const { actions, assistant, hooks } = usePace();
-  const { palette } = useTheme();
   const run = useRunAction();
   const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
   const model = hooks.useComposer({ edits, text });
-  useAutoAiRead(ai, text, onReading);
-  const toInbox = async (): Promise<void> => {
-    if (await run(actions.captureInbox(text))) {
-      reset();
-    }
+  const [isForm, setIsForm] = useState(false);
+  const previousRef = useRef(text);
+  const done = (): void => {
+    reset();
+    setIsForm(false);
   };
-  const readLater = useReadLater(async () => await ai.readLater(text, onReading), reset);
-  const readFirst = useReadFirst(ai, async () => {
-    await toInbox();
-  });
+  const toForm = (reading: AiReading): void => {
+    onReading(reading);
+    setIsForm(true);
+  };
+  const parse = (line: string): void => {
+    void ai.read(line, toForm);
+  };
   const add = async (): Promise<void> => {
-    if (readFirst.isPending(text, onReading)) {
-      return;
-    }
     if (await run(actions.createFromComposer(model))) {
-      reset();
+      done();
     }
   };
+  return {
+    add,
+    ai,
+    isForm,
+    model,
+    onText,
+    parse,
+    readLater: useReadLater(async () => await ai.readLater(text, toForm), done),
+    setEdits,
+    setIsForm,
+    text,
+    /** A paste is read at once; typing never is. */
+    type: (next: string): void => {
+      const isPaste = isPasted(previousRef.current, next) && canAiRead(next);
+      previousRef.current = next;
+      onText(next);
+      if (isPaste) {
+        parse(next);
+      }
+    },
+    /** Enter adds a short line as it is and reads a long one into the form. */
+    enter: (): void => {
+      if (requiresAiFirst(text)) {
+        parse(text);
+      } else {
+        void add();
+      }
+    },
+    toInbox: async (): Promise<void> => {
+      if (await run(actions.captureInbox(text))) {
+        done();
+      }
+    },
+  };
+};
+
+/**
+The app's entry point on Now, in two steps that look different on purpose. The quick input
+takes a short line (Enter adds it as it is) or a message: a paste, a long text or Parse sends
+it to the assistant, whose reading opens the task form, where every field is labelled and
+checked before anything is written. Nothing is sent to the assistant while typing.
+*/
+export const Composer = ({ initialText = "" }: { readonly initialText?: string | undefined }) => {
+  const t = useT();
+  const { palette } = useTheme();
+  const flow = useComposerFlow(initialText);
+  const { ai, model, text } = flow;
+  const status = (
+    <AiStatus
+      onAnswer={(answer) => {
+        flow.onText(`${text.trimEnd()} ${answer}`);
+      }}
+      onLater={() => void flow.readLater()}
+      state={ai.state}
+    />
+  );
+  if (flow.isForm) {
+    return (
+      <ComposerForm
+        model={model}
+        onAdd={() => void flow.add()}
+        onBack={() => {
+          flow.setIsForm(false);
+        }}
+        onEdit={(next) => {
+          flow.setEdits((current) => ({ ...current, ...next }));
+        }}
+        status={status}
+      />
+    );
+  }
   return (
     <View className="mx-4 mb-3 rounded-xl border border-line bg-surface p-2">
       <TextInput
-        accessibilityHint={t("composer.hint")}
+        accessibilityHint={t("composer.quickHint")}
         accessibilityLabel={t("composer.label")}
-        // Grows with a pasted message up to about eight lines; Add (below) stores it.
+        // Grows with a pasted message up to about eight lines.
         className="max-h-48 min-h-11 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
         multiline
-        onChangeText={onText}
-        onKeyPress={enterAdds(model.isEmpty, add)}
+        onChangeText={flow.type}
+        onKeyPress={onEnter(model.isEmpty, flow.enter)}
         placeholder={t("composer.placeholder")}
         placeholderTextColor={palette.muted}
         textAlignVertical="top"
@@ -265,36 +234,18 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
       />
       {model.isEmpty ? null : (
         <>
-          <ComposerChips
-            model={model}
-            onEdit={(next) => {
-              setEdits((current) => ({ ...current, ...next }));
-            }}
-          />
-          <AiStatus
-            isWaiting={readFirst.isWaiting}
-            onAnswer={(answer) => {
-              onText(`${text.trimEnd()} ${answer}`);
-            }}
-            onLater={() => void readLater()}
-            state={ai.state}
-          />
-          <ComposerActions
+          <Text className="px-2 font-sans text-[12px] text-muted">{t("composer.quickHint")}</Text>
+          {status}
+          <QuickActions
+            canParse={canAiRead(text)}
             isReading={ai.state.status === "reading"}
-            onAdd={() => {
-              void add();
+            onByHand={() => {
+              flow.setIsForm(true);
             }}
-            onAi={() => {
-              void ai.read(text, onReading);
+            onInbox={() => void flow.toInbox()}
+            onParse={() => {
+              flow.parse(text);
             }}
-            onInbox={() => {
-              void toInbox();
-            }}
-            submitLabel={
-              model.target.kind === "instance"
-                ? t("composer.addTo", { title: model.target.title })
-                : t("composer.add")
-            }
           />
         </>
       )}

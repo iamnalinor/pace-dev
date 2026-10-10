@@ -7,14 +7,17 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   await loginViaApi(page);
   await page.goto("/");
   const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill("разобрать почту после обеда");
-  await page.getByRole("button", { name: "Read with AI" }).click();
+  await line.pressSequentially("разобрать почту");
+  await page.getByRole("button", { name: "Parse" }).click();
   await expect(page.getByText(/Read by the assistant\./u)).toBeVisible();
   await expectNoA11yViolations(page);
-  await line.press("Enter");
+  await page
+    .getByRole("form", { name: "New task" })
+    .getByRole("button", { name: "Create" })
+    .click();
   await expect(line).toHaveValue("");
   await expect(
-    page.getByRole("list", { name: "Tasks" }).getByText("разобрать почту после обеда"),
+    page.getByRole("list", { name: "Tasks" }).getByText("разобрать почту"),
   ).toBeVisible();
 
   await page.goto("/decisions");

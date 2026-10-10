@@ -198,6 +198,28 @@ const isSamePatch = (a: Task, b: Task): boolean =>
   a.fields.link === b.fields.link &&
   a.fields.submitVia === b.fields.submitVia;
 
+type UpdatedPayload = EventOf<"task.updated">["payload"];
+
+/** A patched time: a new one with its zone, `null` clears both, absent keeps the old. */
+const patchedTime = (
+  at: null | string | undefined,
+  tz: string | undefined,
+  current: { readonly at: null | string; readonly tz: null | string },
+): { readonly at: null | string; readonly tz: null | string } =>
+  at === null ? { at: null, tz: null } : { at: at ?? current.at, tz: tz ?? current.tz };
+
+const patchedSchedule = (
+  task: Task,
+  payload: UpdatedPayload,
+): Pick<Task, "dueAt" | "dueTz" | "startAt" | "startTz"> => {
+  const due = patchedTime(payload.dueAt, payload.dueTz, { at: task.dueAt, tz: task.dueTz });
+  const start = patchedTime(payload.startAt, payload.startTz, {
+    at: task.startAt,
+    tz: task.startTz,
+  });
+  return { dueAt: due.at, dueTz: due.tz, startAt: start.at, startTz: start.tz };
+};
+
 /** `description: null` clears; `fields` replaces both fields when present. */
 const updated: Handler<"task.updated"> = (task, event) => {
   const { payload } = event;
@@ -205,10 +227,7 @@ const updated: Handler<"task.updated"> = (task, event) => {
     ...task,
     title: payload.title ?? task.title,
     description: payload.description === undefined ? task.description : payload.description,
-    dueAt: payload.dueAt ?? task.dueAt,
-    dueTz: payload.dueTz ?? task.dueTz,
-    startAt: payload.startAt ?? task.startAt,
-    startTz: payload.startTz ?? task.startTz,
+    ...patchedSchedule(task, payload),
     fields: payload.fields === undefined ? task.fields : toFields(payload.fields),
   };
   return isSamePatch(next, task) ? task : next;

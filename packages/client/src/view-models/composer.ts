@@ -5,6 +5,7 @@ import {
   isHttpUrl,
   linkHost,
   openInstanceOf,
+  openInstancesOf,
   parseQuickInput,
   presetById,
   projectById,
@@ -33,6 +34,12 @@ export type ComposerEdits = {
   /** The assistant's reading of the title and the problems, over the rules' one. */
   readonly title?: string | undefined;
   readonly subtasks?: readonly QuickSubtask[] | undefined;
+  /** The details beyond the title (the assistant's reading, or typed in the form). */
+  readonly description?: null | string | undefined;
+  /** When the task starts; `null` (the default) is "now, as it is created". */
+  readonly start?: null | undefined | { readonly at: string; readonly tz: string };
+  /** Which week's homework to add to: a task id, or `null` for a task of its own. */
+  readonly targetTaskId?: null | string | undefined;
 };
 
 export type ComposerOption = {
@@ -61,12 +68,16 @@ export type ComposerModel = {
   /** The category's own importance, preselected when the text names none. */
   readonly defaultImportance: Importance;
   readonly due: null | { readonly at: string; readonly tz: string };
+  readonly start: null | { readonly at: string; readonly tz: string };
+  readonly description: null | string;
   readonly estimateMinutes: null | number;
   readonly link: null | TaskLink;
   readonly subtasks: readonly QuickSubtask[];
   /** Which part of the text produced each chip, for highlighting. */
   readonly spans: readonly QuickSpan[];
   readonly target: ComposerTarget;
+  /** The chosen course's open weeks, the earliest due first: what "Add to" can pick. */
+  readonly instances: readonly { readonly id: string; readonly title: string }[];
 };
 
 const presetOptions = (state: CoreState): readonly ComposerOption[] =>
@@ -83,6 +94,17 @@ const projectOptions = (state: CoreState): readonly ComposerOption[] =>
     .filter((project) => !project.archived)
     .map((project) => ({ color: project.color, id: project.id, name: project.name }))
     .toSorted((a, b) => a.name.localeCompare(b.name));
+
+/** The categories and projects a task form offers (the composer's and the editor's). */
+export const taskFormOptions = (
+  state: CoreState,
+): {
+  readonly presets: readonly ComposerOption[];
+  readonly projects: readonly ComposerOption[];
+} => ({
+  presets: presetOptions(state),
+  projects: projectOptions(state),
+});
 
 const optionOf = (options: readonly ComposerOption[], id: null | string): ComposerOption | null =>
   options.find((option) => option.id === id) ?? null;
@@ -134,8 +156,24 @@ const newProjectNameOf = (parsed: Parsed, edits: ComposerEdits): null | string =
   return edits.projectName === undefined ? parsed.projectName : edits.projectName;
 };
 
-const targetOf = (state: CoreState, presetId: string, now: string): ComposerTarget => {
-  const instance = openInstanceOf(state, presetId, now);
+/**
+Where the text goes: a tapped week (or a tapped "a task of its own"), else the week the due
+points at (none for a due on another day), else the nearest open week of the course.
+*/
+const targetOf = (
+  state: CoreState,
+  presetId: string,
+  input: {
+    readonly due: ComposerModel["due"];
+    readonly now: string;
+    readonly picked: null | string | undefined;
+  },
+): ComposerTarget => {
+  const { due, now, picked } = input;
+  const instance =
+    picked === undefined
+      ? openInstanceOf(state, presetId, { due, now })
+      : openInstancesOf(state, presetId).find((task) => task.id === picked);
   return instance === undefined
     ? { kind: "new" }
     : { kind: "instance", taskId: instance.id, title: instance.title };
@@ -152,11 +190,15 @@ export const LONG_TEXT_CHARS = 80;
 /** Shorter than this there is nothing for the assistant to read yet. */
 const MIN_AI_CHARS = 3;
 
-/** How long Enter waits for the assistant before the text goes to Inbox to be sorted later. */
-export const SLOW_READ_MS = 5000;
+/** From this many characters arriving at once the change is a paste, not typing. */
+const PASTE_CHARS = 20;
 
-/** Every line is read by the assistant once typing pauses; the rules fill the chips meanwhile. */
-export const shouldAiRead = (text: string): boolean => text.trim().length >= MIN_AI_CHARS;
+/** A paste (a message, a homework) is read by the assistant at once; typing is not. */
+export const isPasted = (previous: string, next: string): boolean =>
+  next.length - previous.length >= PASTE_CHARS;
+
+/** Shorter text has nothing for the assistant to read. */
+export const canAiRead = (text: string): boolean => text.trim().length >= MIN_AI_CHARS;
 
 /** Long or multi-line text (a pasted homework, a forwarded message) is never added on the rules alone. */
 export const requiresAiFirst = (text: string): boolean => {
@@ -177,9 +219,12 @@ export const composerModel = (
   const presetId = chosenPreset(state, parsed, edits);
   const defaultImportance = defaultImportanceOf(state, presetId);
   const textImportance = parsed.isImportanceExplicit ? parsed.importance : undefined;
+  const due = dueOf(parsed, edits);
   return {
     defaultImportance,
-    due: dueOf(parsed, edits),
+    description: edits.description ?? null,
+    due,
+    start: edits.start ?? null,
     estimateMinutes: pick(edits.estimateMinutes, parsed.estimateMinutes),
     importance: edits.importance ?? textImportance ?? defaultImportance,
     isEmpty: text.trim() === "",
@@ -191,7 +236,8 @@ export const composerModel = (
     projects,
     spans: parsed.spans,
     subtasks: edits.subtasks ?? parsed.subtasks,
-    target: targetOf(state, presetId, ctx.now),
+    target: targetOf(state, presetId, { due, now: ctx.now, picked: edits.targetTaskId }),
+    instances: openInstancesOf(state, presetId).map((task) => ({ id: task.id, title: task.title })),
     text,
     title: edits.title ?? parsed.title,
   };

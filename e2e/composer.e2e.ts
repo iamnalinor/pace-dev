@@ -10,9 +10,10 @@ const LINES = [
   "renew the passport someday",
 ];
 
+/** Typed key by key (a fill reads as a paste, which the assistant reads into the form). */
 const addLine = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill(text);
+  await line.pressSequentially(text);
   await line.press("Enter");
   await expect(line).toHaveValue("");
 };
@@ -30,7 +31,7 @@ for (const [width, height, size] of [
   [1440, 900, "desktop"],
 ] as const) {
   for (const theme of ["dark", "light"] as const) {
-    test(`composer adds tasks with chips (${size}, ${theme})`, async ({ page }) => {
+    test(`composer adds lines and fills the form (${size}, ${theme})`, async ({ page }) => {
       await loginViaApi(page);
       await page.addInitScript((value) => {
         localStorage.setItem("pace.theme", value);
@@ -38,12 +39,16 @@ for (const [width, height, size] of [
       await page.setViewportSize({ height, width });
       await page.goto("/");
       const line = page.getByRole("textbox", { name: "New task" });
-      await line.fill(LINES[0] ?? "");
-      await expect(page.getByRole("radio", { exact: true, name: "Work" })).toBeChecked();
-      await expect(page.getByText(/example\.com ↗/u)).toBeVisible();
+      await line.pressSequentially(LINES[0] ?? "");
+      await page.getByRole("button", { name: "Fill in by hand" }).click();
+      const form = page.getByRole("form", { name: "New task" });
+      await expect(form.getByRole("radio", { exact: true, name: "Work" })).toBeChecked();
+      await expect(form.getByRole("textbox", { name: "Link" })).toHaveValue(
+        "https://example.com/dashboards",
+      );
       await shoot(page, `composer-${size}-${theme}`);
       await expectNoA11yViolations(page);
-      await line.press("Enter");
+      await form.getByRole("button", { name: "Create" }).click();
       // Saving clears the line: type the next one only after that, or the clearing eats it.
       await expect(line).toHaveValue("");
       for (const text of LINES.slice(1)) {
@@ -62,3 +67,17 @@ for (const [width, height, size] of [
     });
   }
 }
+
+test("a pasted message opens the form and is written only on Create", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const message = "№№ 290, 292, 293 — решить методом выделения линейных множителей";
+  // A fill is a paste: the (fake) assistant reads it at once and the form opens.
+  await page.getByRole("textbox", { name: "New task" }).fill(message);
+  const form = page.getByRole("form", { name: "New task" });
+  await expect(form.getByRole("textbox", { name: "Title" })).toHaveValue(message);
+  await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toHaveCount(0);
+  await expectNoA11yViolations(page);
+  await form.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toBeVisible();
+});

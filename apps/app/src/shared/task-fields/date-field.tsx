@@ -1,7 +1,5 @@
-import { CalendarDays } from "lucide-react-native";
+import { CalendarDays, Play } from "lucide-react-native";
 import { Text, View } from "react-native";
-
-import type { ComposerModel } from "@pace/client";
 
 import { useSettings, useT } from "#app/app-state.tsx";
 import { fromWallClock, wallClock, zonedText } from "#app/format/time.ts";
@@ -12,48 +10,58 @@ import { Chip } from "#app/ui/chip.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 
-type Due = ComposerModel["due"];
+/** A time a person sets, with the zone it was set in; `null` when not set. */
+export type Zoned = null | { readonly at: string; readonly tz: string };
 
-/** A due typed without a time ends the day: 23:59 on the zone's clock. */
-const END_OF_DAY = "23:59";
+/** Which date a field holds: the deadline, or the start. */
+export type DateKind = "due" | "start";
 
-/** The due's chip: its exact date and time ("Thu Oct 13 23:59"), or "No deadline". */
-export const DueChip = ({
-  due,
+/** A due typed without a time ends the day; a start without one begins it. */
+const DEFAULT_TIME: Readonly<Record<DateKind, string>> = { due: "23:59", start: "09:00" };
+
+/** The date's chip: its exact date and time ("Oct 13 23:59"), or what an unset one means. */
+export const DateChip = ({
   isOpen,
+  kind,
   onToggle,
+  value,
 }: {
-  readonly due: Due;
+  readonly kind: DateKind;
+  readonly value: Zoned;
   readonly isOpen: boolean;
   readonly onToggle: () => void;
 }) => {
   const t = useT();
   const viewer = useViewer();
   const { palette } = useTheme();
-  const text = due === null ? t("composer.noDue") : zonedText({ ...due, mode: "due" }, viewer);
+  const unset = t(kind === "due" ? "composer.noDue" : "form.startNow");
+  const text = value === null ? unset : zonedText({ ...value, mode: "due" }, viewer);
+  const Icon = kind === "due" ? CalendarDays : Play;
   return (
     <Chip
-      label={`${t("composer.due")}: ${text}`}
-      leading={<CalendarDays color={palette.fg2} size={14} strokeWidth={1.75} />}
+      label={`${t(kind === "due" ? "composer.due" : "edit.start")}: ${text}`}
+      leading={<Icon color={palette.fg2} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >
-      {text}
+      {kind === "start" && value !== null ? `${t("edit.start")} ${text}` : text}
     </Chip>
   );
 };
 
 /**
-The deadline panel: a month calendar and the time, both read on the due's own zone (the
+A date panel: a month calendar and the time, both read on the value's own zone (the
 account's for a new one). The zone is named only when it is not the device's.
 */
-export const DuePanel = ({
-  due,
+export const DatePanel = ({
+  kind,
+  onChange,
   onClose,
-  onDue,
+  value: due,
 }: {
-  readonly due: Due;
-  readonly onDue: (due: Due) => void;
+  readonly kind: DateKind;
+  readonly value: Zoned;
+  readonly onChange: (value: Zoned) => void;
   readonly onClose: () => void;
 }) => {
   const t = useT();
@@ -61,12 +69,12 @@ export const DuePanel = ({
   const { timezone } = useSettings();
   const tz = due?.tz ?? timezone ?? viewer.deviceTz;
   const today = wallClock(viewer.now, tz).date;
-  const shown = due === null ? { date: null, time: END_OF_DAY } : wallClock(due.at, tz);
+  const shown = due === null ? { date: null, time: DEFAULT_TIME[kind] } : wallClock(due.at, tz);
   const { time } = shown;
   const set = (date: string, at: string): void => {
     const instant = fromWallClock({ date, time: at, tz });
     if (instant !== null) {
-      onDue({ at: instant, tz });
+      onChange({ at: instant, tz });
     }
   };
   return (
@@ -101,7 +109,7 @@ export const DuePanel = ({
         {due === null ? null : (
           <Button
             onPress={() => {
-              onDue(null);
+              onChange(null);
             }}
             variant="ghost"
           >

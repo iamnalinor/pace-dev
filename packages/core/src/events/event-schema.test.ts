@@ -140,6 +140,7 @@ describe("parseEvent", () => {
     const taskId = created.payload.taskId;
     const cases: readonly (readonly [Event["type"], unknown])[] = [
       ["task.updated", { taskId, title: "New title" }],
+      ["task.updated", { dueAt: null, startAt: null, taskId }],
       ["task.preset.set", { presetId: "preset-hw", taskId }],
       ["task.overrides.set", { overrides: { softDays: 2 }, taskId }],
       ["task.status.set", { status: "in_progress", taskId }],

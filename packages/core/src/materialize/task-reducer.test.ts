@@ -406,6 +406,21 @@ describe("taskReducer: attributes", () => {
     });
   });
 
+  it("clears the due date and the start with null", () => {
+    const task = hw([
+      hwCreated(1),
+      at(2, T(9), {
+        type: "task.updated",
+        payload: { taskId: HW_ID, startAt: T(8), startTz: "UTC" },
+      }),
+      at(3, T(10), {
+        type: "task.updated",
+        payload: { taskId: HW_ID, dueAt: null, startAt: null },
+      }),
+    ]);
+    expect(task).toMatchObject({ dueAt: null, dueTz: null, startAt: null, startTz: null });
+  });
+
   it("sets importance with its time, project and estimate; an old rank changes nothing", () => {
     const task = hw([
       hwCreated(1),

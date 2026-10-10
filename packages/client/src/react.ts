@@ -19,14 +19,7 @@ import type { AppState, AppStateHandle } from "./state.ts";
 import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
-import {
-  type ComposerDraft,
-  composerModel,
-  type ComposerModel,
-  requiresAiFirst,
-  shouldAiRead,
-  SLOW_READ_MS,
-} from "./view-models/composer.ts";
+import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
@@ -151,8 +144,6 @@ export type AiRead = {
   read it. Resolves to `queued` (the composer can clear), or to a reading if it is back already.
   */
   readonly readLater: (text: string, onReading: (reading: AiReading) => void) => Promise<AiOutcome>;
-  /** Waits for the reading in flight, up to `ms`: `slow` when it is still not back. */
-  readonly settle: (ms: number) => Promise<"done" | "slow">;
   readonly reset: () => void;
 };
 
@@ -161,7 +152,6 @@ export const useAiRead = (assistant: Assistant): AiRead => {
   const [state, setState] = useState<AiState>({ status: "idle" });
   // Each read and reset starts a new generation: a late answer to an older one is dropped.
   const generation = useRef(0);
-  const pending = useRef<Promise<unknown>>(Promise.resolve());
   const ask = async (
     text: string,
     onReading: (reading: AiReading) => void,
@@ -181,7 +171,6 @@ export const useAiRead = (assistant: Assistant): AiRead => {
       setState(outcome);
       return outcome;
     })();
-    pending.current = reading;
     return await reading;
   };
   return {
@@ -193,47 +182,8 @@ export const useAiRead = (assistant: Assistant): AiRead => {
       generation.current += 1;
       setState({ status: "idle" });
     },
-    settle: async (ms) => {
-      const done = async (): Promise<"done"> => {
-        await pending.current;
-        return "done";
-      };
-      const slow = new Promise<"slow">((resolve) => {
-        setTimeout(() => {
-          resolve("slow");
-        }, ms);
-      });
-      return await Promise.race([done(), slow]);
-    },
     state,
   };
-};
-
-/** A pause in typing before the line is sent to the assistant on its own. */
-const AUTO_READ_DELAY_MS = 700;
-
-/**
-Reads whatever is typed with the assistant as soon as typing pauses, so its reading is on the
-chips before the user presses Enter (the rules fill them until then).
-*/
-export const useAutoAiRead = (
-  ai: AiRead,
-  text: string,
-  onReading: (reading: AiReading) => void,
-): void => {
-  const isWanted = shouldAiRead(text) && ai.state.status === "idle";
-  useEffect(() => {
-    if (!isWanted) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      void ai.read(text, onReading, { draft: true });
-    }, AUTO_READ_DELAY_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-    // Only a new text (or a reset) restarts the pause; the callbacks change every render.
-  }, [isWanted, text]);
 };
 
 const DECISIONS_LIMIT = 100;
@@ -279,43 +229,4 @@ export const useDraft = <T extends object>(
     setDraft((current) => ({ ...current, ...next }));
   };
   return [draft, patch];
-};
-
-/**
-A long text is never added on the rules alone: Enter (Add) first waits for the assistant's reading
-(shown on the chips, for a second press), and when the assistant is slow the text goes to
-Inbox so nothing is lost and nothing waits.
-*/
-export type ReadFirst = {
-  readonly isWaiting: boolean;
-  /** Starts or awaits the reading when the text needs one; `false` when it may be added now. */
-  readonly isPending: (text: string, onReading: (reading: AiReading) => void) => boolean;
-};
-
-export const useReadFirst = (ai: AiRead, toInbox: (text: string) => Promise<void>): ReadFirst => {
-  const [isWaiting, setIsWaiting] = useState(false);
-  const wait = async (text: string): Promise<void> => {
-    setIsWaiting(true);
-    const settled = await ai.settle(SLOW_READ_MS);
-    setIsWaiting(false);
-    if (settled !== "slow") {
-      return;
-    }
-
-    ai.reset();
-    await toInbox(text);
-  };
-  return {
-    isWaiting,
-    isPending: (text: string, onReading: (reading: AiReading) => void): boolean => {
-      if (!requiresAiFirst(text) || ai.state.status === "read" || ai.state.status === "failed") {
-        return false;
-      }
-      if (ai.state.status === "idle") {
-        void ai.read(text, onReading);
-      }
-      void wait(text);
-      return true;
-    },
-  };
 };

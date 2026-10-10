@@ -91,16 +91,17 @@ export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
+  canAiRead,
   type ComposerDraft,
   type ComposerEdits,
   composerModel,
   type ComposerModel,
   type ComposerOption,
   type ComposerTarget,
+  isPasted,
   LONG_TEXT_CHARS,
   requiresAiFirst,
-  shouldAiRead,
-  SLOW_READ_MS,
+  taskFormOptions,
 } from "./view-models/composer.ts";
 export {
   type DayEntry,
