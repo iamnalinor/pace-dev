@@ -1,5 +1,8 @@
 export type { Decision } from "./api/schemas/notify.ts";
 export {
+  type ActivityParseResponse,
+  type ActivityReading,
+  ActivityReadingSchema,
   ParseRequestSchema,
   type ParseResponse,
   ParseResponseSchema,
@@ -25,7 +28,7 @@ export {
   type NotifyMessage,
   snooze,
 } from "./notify/evaluate.ts";
-export type { LimitAlert } from "./notify/limit.ts";
+export type { LongRun } from "./notify/long-run.ts";
 export { notifyPlan, type PlannedNotification } from "./notify/plan.ts";
 export type { Critical, Stuck } from "./notify/rules.ts";
 export { nextDigestAt } from "./notify/schedule.ts";

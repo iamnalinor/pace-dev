@@ -216,13 +216,18 @@ const activityFields = {
   taskId: z.string().min(1).optional(),
 };
 
-/** A new primary activity from `occurredAt`; whatever ran until then stops there. */
+/**
+A new activity from `occurredAt`. A main one stops the main one running until then; one run
+`alongside` (music over work) stops nothing and is stopped only by its own stop.
+*/
 export const ActivityStartedPayload = z.object({
   activityId: z.string().min(1),
   ...activityFields,
   buttonId: z.string().min(1).optional(),
   expectMinutes: minutes.optional(),
+  /** Retired (activities have no limits any more): still parsed in old events, never read. */
   limitMinutes: minutes.optional(),
+  alongside: z.literal(true).optional(),
 });
 export const ActivityStoppedPayload = z.object({ activityId: z.string().min(1) });
 /** A block recorded afterwards; it takes precedence over the live activities it overlaps. */
@@ -244,10 +249,12 @@ export const ActivityLabelledPayload = z.object({
   label: activityFields.label.optional(),
   category: ActivityCategorySchema.optional(),
   taskId: z.string().min(1).nullable().optional(),
-  /** Messaging was the point of it (a call, a chat about work): no phone penalty. */
+  /** How long it is expected to take (the assistant's reading of "20 min"); null clears it. */
+  expectMinutes: minutes.nullable().optional(),
+  /** Retired with the messenger penalty: still parsed in old events, never read. */
   messengersOnPurpose: z.boolean().optional(),
 });
-/** One button of the time bar, with the defaults an activity started from it gets. */
+/** Retired (the time bar's buttons are fixed now): still parsed in old events, never read. */
 export const ActivityButtonSetPayload = z.object({
   buttonId: z.string().min(1),
   ...activityFields,
@@ -257,6 +264,7 @@ export const ActivityButtonSetPayload = z.object({
   order: z.number().int().nonnegative(),
   shouldAskDetails: z.boolean().optional(),
 });
+/** Retired with the editable buttons: still parsed in old events, never read. */
 export const ActivityButtonRemovedPayload = z.object({ buttonId: z.string().min(1) });
 
 export const FocusStartedPayload = z.object(taskRef);

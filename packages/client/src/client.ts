@@ -32,8 +32,10 @@ export type {
   ActivityEntry,
   ActivityInput,
   ActivityTarget,
-  ButtonDraft,
+  CalendarStart,
   PastActivity,
+  StartOptions,
+  StopWhen,
   TimeActions,
 } from "./actions/time-actions.ts";
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
@@ -81,12 +83,6 @@ export {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-client.ts";
-export {
-  type DetailsModel,
-  detailsModel,
-  type DetailsTask,
-  recentLabels,
-} from "./view-models/activity-details.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
@@ -191,6 +187,7 @@ export {
   taskViewModel,
 } from "./view-models/task.ts";
 export {
+  type ChoiceView,
   type MessageText,
   PACE_STATUS_TEXT,
   type RunningView,
@@ -203,15 +200,9 @@ export {
   activityFormOf,
   type ActivityRange,
   type ActivitySheetProps,
-  type ButtonForm,
-  buttonFormOf,
-  buttonSaveOf,
   type DayRowProps,
-  type EditorProps,
-  type EditorTarget,
   type FormPartProps,
   hasEnd,
   type TypedTime,
   typeTime,
-  withCategory,
 } from "./view-models/time-forms.ts";

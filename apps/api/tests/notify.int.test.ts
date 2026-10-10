@@ -168,15 +168,15 @@ describe("GET /api/notify/plan and /api/decisions", () => {
   });
 });
 
-describe("the Limit alert", () => {
-  it("arms for the running activity's Limit and sends the alert once", async () => {
+describe("still doing this?", () => {
+  it("arms for twice the running activity's Expect and asks once", async () => {
     /** 10:00 Moscow: no digest window, nothing else to say. */
     const started = "2026-10-07T07:00:00.000Z";
     const commute = envelope("activity.started", started, {
       activityId: "a-commute",
       category: "commute",
+      expectMinutes: 30,
       label: "Commute",
-      limitMinutes: 60,
     });
     await runInDurableObject(freshStore(), async (instance: UserStore) => {
       await instance.append([setup(), commute], { now: started });
@@ -189,7 +189,7 @@ describe("the Limit alert", () => {
       const crossed = "2026-10-07T08:01:00.000Z";
       await instance.runNotifications(crossed, telegram.target);
       const texts = telegram.sent.map((message) => String(message["text"]));
-      expect(texts).toEqual([expect.stringContaining("Commute is over its 1h limit")]);
+      expect(texts).toEqual([expect.stringContaining("Still doing Commute?")]);
       await instance.runNotifications("2026-10-07T08:30:00.000Z", telegram.target);
       expect(telegram.sent).toHaveLength(1);
     });

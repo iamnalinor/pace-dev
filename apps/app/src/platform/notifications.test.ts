@@ -76,7 +76,7 @@ describe("syncActivityTimers", () => {
     jest.clearAllMocks();
   });
 
-  it("schedules the running activity's timers and leaves the plan's reminders alone", async () => {
+  it("asks at twice the running activity's Expect and leaves the plan's reminders alone", async () => {
     const { state } = await client({});
     const clock = { deviceTz: "Europe/Moscow", now: () => "2026-10-06T12:00:00.000Z" };
     const started = await state.dispatch({
@@ -90,9 +90,9 @@ describe("syncActivityTimers", () => {
     await syncActivityTimers({ clock, state });
     expect(Notifications.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
-      content: { body: "Commute is past its usual 45m.", title: "Pace" },
-      identifier: "pace:activity:a1:expect",
-      trigger: { channelId: "timers", date: new Date("2026-10-06T12:45:00.000Z"), type: "date" },
+      content: { body: "Still doing Commute?", title: "Pace" },
+      identifier: "pace:activity:a1:long",
+      trigger: { channelId: "timers", date: new Date("2026-10-06T13:30:00.000Z"), type: "date" },
     });
   });
 });

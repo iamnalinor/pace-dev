@@ -1,45 +1,106 @@
-import type { ActivityButton, TimeState } from "./model.ts";
+import type { MessageKey } from "../i18n/i18n.ts";
+import type { ActivityCategory } from "./model.ts";
 
-import { ACTIVITY_CATEGORIES, CATEGORY_COLORS, CATEGORY_DEFAULTS } from "./categories.ts";
+/** One thing a button can start: its name (none: the button's own), category and Expect. */
+export type ButtonChoice = {
+  readonly id: string;
+  readonly labelKey: MessageKey | null;
+  readonly category: ActivityCategory;
+  readonly expectMinutes: number;
+};
 
-/** Work and study are too broad to start blind: their buttons ask what exactly first. */
-const ASKING: ReadonlySet<ActivityButton["category"]> = new Set(["work", "study"]);
+/**
+A button of the time bar. "calendar" starts whatever the calendar says is on now; a button with
+one choice starts it on a tap; with more, a tap opens a picker.
+*/
+export type TimeButton = {
+  readonly id: "calendar" | "chores" | "rest" | "sport";
+  readonly kind: "calendar" | "choices";
+  readonly labelKey: MessageKey;
+  readonly category: ActivityCategory;
+  readonly choices: readonly ButtonChoice[];
+};
 
-const button = (
-  category: ActivityButton["category"],
-  label: string,
-  order: number,
-): ActivityButton => ({
-  shouldAskDetails: ASKING.has(category),
+const sport = (expectMinutes: number): ButtonChoice => ({
+  category: "sport",
+  expectMinutes,
+  id: `sport:${String(expectMinutes)}`,
+  labelKey: null,
+});
+
+/** A chore of the picker: the key of its name is spelled out so the catalog check sees it. */
+const chore = (
+  labelKey: Extract<MessageKey, `time.choice.${string}`>,
+  { category, expectMinutes }: Pick<ButtonChoice, "category" | "expectMinutes">,
+): ButtonChoice => ({
   category,
-  color: CATEGORY_COLORS[category],
-  id: `btn:${category}`,
-  label,
-  order,
-  taskId: null,
-  ...CATEGORY_DEFAULTS[category],
+  expectMinutes,
+  id: `chores:${labelKey.slice("time.choice.".length)}`,
+  labelKey,
 });
 
 /**
-The buttons a new account starts with (labels are the account's to rename). They live only in
-code until the user edits the bar; the first edit writes them all as events. Work and Study ask
-what exactly before they start.
+The four buttons, always in these places (work and study are tracked through tasks' Focus).
+The chores are everyday upkeep, each with its usual length.
 */
-export const DEFAULT_BUTTONS: readonly ActivityButton[] = [
-  button("work", "Work", 0),
-  button("study", "Study", 1),
-  button("food", "Food", 2),
-  button("commute", "Commute", 3),
-  button("rest", "Rest", 4),
-  button("sport", "Sport", 5),
-  button("chores", "Chores", 6),
+const BUTTONS: { readonly [Id in TimeButton["id"]]: TimeButton & { readonly id: Id } } = {
+  calendar: {
+    category: "other",
+    choices: [],
+    id: "calendar",
+    kind: "calendar",
+    labelKey: "time.button.calendar",
+  },
+  rest: {
+    category: "rest",
+    choices: [{ category: "rest", expectMinutes: 30, id: "rest", labelKey: null }],
+    id: "rest",
+    kind: "choices",
+    labelKey: "time.button.rest",
+  },
+  sport: {
+    category: "sport",
+    choices: [sport(30), sport(60), sport(120), sport(180)],
+    id: "sport",
+    kind: "choices",
+    labelKey: "time.button.sport",
+  },
+  chores: {
+    category: "chores",
+    choices: [
+      chore("time.choice.ready", { category: "hygiene", expectMinutes: 30 }),
+      chore("time.choice.eating", { category: "food", expectMinutes: 30 }),
+      chore("time.choice.cooking", { category: "chores", expectMinutes: 45 }),
+      chore("time.choice.commute", { category: "commute", expectMinutes: 45 }),
+      chore("time.choice.shower", { category: "hygiene", expectMinutes: 15 }),
+      chore("time.choice.cleaning", { category: "chores", expectMinutes: 30 }),
+      chore("time.choice.laundry", { category: "chores", expectMinutes: 20 }),
+      chore("time.choice.dishes", { category: "chores", expectMinutes: 15 }),
+      chore("time.choice.groceries", { category: "chores", expectMinutes: 45 }),
+      chore("time.choice.errands", { category: "chores", expectMinutes: 60 }),
+      chore("time.choice.nap", { category: "rest", expectMinutes: 30 }),
+    ],
+    id: "chores",
+    kind: "choices",
+    labelKey: "time.button.chores",
+  },
+};
+
+/** The buttons in their places. */
+export const TIME_BUTTONS: readonly TimeButton[] = [
+  BUTTONS.calendar,
+  BUTTONS.rest,
+  BUTTONS.sport,
+  BUTTONS.chores,
 ];
 
-/** Sleep is read from the phone's night, not tapped: a button for it is never shown. */
-export const BUTTON_CATEGORIES = ACTIVITY_CATEGORIES.filter((category) => category !== "sleep");
+/** A button by its id. */
+export const timeButton = (id: TimeButton["id"]): TimeButton => BUTTONS[id];
 
-/** The time bar's buttons in their order. */
-export const effectiveButtons = (time: TimeState): readonly ActivityButton[] =>
-  (time.hasCustomButtons ? Object.values(time.buttons) : DEFAULT_BUTTONS)
-    .filter((candidate) => candidate.category !== "sleep")
-    .toSorted((a, b) => (a.order === b.order ? a.label.localeCompare(b.label) : a.order - b.order));
+/** The button a choice belongs to and the choice, by the choice's id ("sport:60"). */
+export const choiceById = (
+  choiceId: string,
+): null | { readonly button: TimeButton; readonly choice: ButtonChoice } =>
+  TIME_BUTTONS.flatMap((button) =>
+    button.choices.filter((choice) => choice.id === choiceId).map((choice) => ({ button, choice })),
+  ).at(0) ?? null;

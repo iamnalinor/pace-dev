@@ -32,12 +32,10 @@ export type DayRow = {
   readonly taskTitle: null | string;
   /** The activity's Expect, when it has one. */
   readonly expectMinutes: null | number;
-  /** The activity's Limit, when it has one. */
-  readonly limitMinutes: null | number;
   /** `false` when the label only repeats the category ("Food" in Food): the tag says it. */
   readonly showsLabel: boolean;
-  /** Messaging was part of it: no phone penalty. */
-  readonly messengersOnPurpose: boolean;
+  /** Ran next to the main line: shown, not counted in the day's totals. */
+  readonly isAlongside: boolean;
 };
 
 /** A line of the day: an activity or a gap, with its list key and what tapping it opens. */
@@ -107,14 +105,13 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
   const from = date === null ? today : startOfDayIn(date, zone);
   const to = addDaysIn(from, 1, zone);
   const day = timeline(state.time, { from, now: ctx.now, to });
-  const rows: readonly DayEntry[] = day.segments.map((segment) => ({
+  const rows: readonly DayEntry[] = [...day.segments, ...day.alongside].map((segment) => ({
     key: `${segment.activityId}-${segment.startAt}`,
     kind: "activity",
     target: editTargetOf(segment),
     row: {
       ...segment,
       color: CATEGORY_COLORS[segment.category],
-      limitMinutes: state.time.activities[segment.activityId]?.limitMinutes ?? null,
       showsLabel: !isCategoryName(segment.label, segment.category),
       taskTitle:
         segment.taskId === null ? null : (taskById(state.tasks, segment.taskId)?.title ?? null),

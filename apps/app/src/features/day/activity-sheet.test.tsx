@@ -6,7 +6,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { ActivitySheet } from "./activity-sheet.tsx";
 
 describe("the activity sheet", () => {
-  it("marks a focus block as one where messaging was the point", async () => {
+  it("renames a block and closes on save", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({
       category: "work",
@@ -31,13 +31,13 @@ describe("the activity sheet", () => {
       />,
       runtime,
     );
-    await fireEvent(screen.getByLabelText("Messaging was part of it"), "valueChange", true);
+    await fireEvent.changeText(screen.getByLabelText("What"), "Standup");
     await fireEvent.press(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
     expect(runtime.state.store.getState().time.activities[activity?.id ?? ""]).toMatchObject({
-      messengersOnPurpose: true,
+      label: "Standup",
     });
   });
 });

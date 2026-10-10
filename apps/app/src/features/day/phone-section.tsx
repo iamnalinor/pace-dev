@@ -14,7 +14,7 @@ import { Button } from "#app/ui/button.tsx";
 import { inkClass, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useToast } from "#app/ui/toast.tsx";
-import { CATEGORY_COLORS, countedMinutes, FOCUS_CATEGORIES, formatDuration } from "@pace/core";
+import { CATEGORY_COLORS, formatDuration } from "@pace/core";
 
 import { type DayPhone, isCalendarLogged, type NamedApp } from "./use-day-phone.ts";
 
@@ -85,17 +85,8 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
   );
 };
 
-/**
-"Phone 23m: Telegram 15m, YouTube 8m" under a block, when the phone was used in it. A focus
-block also says what it counts once a quarter of the messenger time is taken off.
-*/
-export const UsageLine = ({
-  apps,
-  row,
-}: {
-  readonly apps: readonly NamedApp[];
-  readonly row: Pick<DayRow, "category" | "messengersOnPurpose" | "minutes">;
-}) => {
+/** "Phone 23m: Telegram 15m, YouTube 8m" under a block, when the phone was used in it. */
+export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
   const t = useT();
   const { language } = useViewer();
   if (apps.length === 0) {
@@ -106,16 +97,9 @@ export const UsageLine = ({
     .slice(0, TOP_APPS)
     .map((app) => `${app.name} ${formatDuration(app.minutes, language)}`)
     .join(", ");
-  const { counted } = countedMinutes(row.minutes, apps, { onPurpose: row.messengersOnPurpose });
-  const parts = [
-    t("phone.usage", { apps: named, duration: formatDuration(total, language) }),
-    ...(FOCUS_CATEGORIES.has(row.category) && counted !== row.minutes
-      ? [t("phone.counted", { duration: formatDuration(counted, language) })]
-      : []),
-  ];
   return (
     <Text className="pb-2 pl-[98px] font-sans text-[12px] text-muted" numberOfLines={2}>
-      {parts.join(" · ")}
+      {t("phone.usage", { apps: named, duration: formatDuration(total, language) })}
     </Text>
   );
 };

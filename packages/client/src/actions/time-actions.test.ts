@@ -12,22 +12,22 @@ const later = (minutes: number): string =>
 const ctx = (now: string) => ({ deviceTz: "Europe/Moscow", now });
 
 describe("time actions", () => {
-  it("switches with one tap and stops with a second tap on the running button", async () => {
+  it("switches with one tap and stops with a second tap on the running choice", async () => {
     const world = await setupActions();
-    unwrap(await world.actions.tapButton("btn:work"));
+    unwrap(await world.actions.startChoice("sport:60"));
     world.setNow(later(50));
-    unwrap(await world.actions.tapButton("btn:food"));
+    unwrap(await world.actions.startChoice("chores:eating"));
     const bar = timeBarModel(world.state.store.getState(), ctx(later(80)));
     expect(bar.running).toMatchObject({
       expectMinutes: 30,
-      label: "Food",
+      label: "Eating",
       minutes: 30,
       status: "ok",
     });
-    expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("btn:food");
+    expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("chores");
 
     world.setNow(later(90));
-    unwrap(await world.actions.tapButton("btn:food"));
+    unwrap(await world.actions.startChoice("chores:eating"));
     const after = world.state.store.getState();
     const at = ctx(later(95));
     expect(timeBarModel(after, at).running).toBeNull();
@@ -35,12 +35,39 @@ describe("time actions", () => {
     const rowOf = (entry: (typeof day.entries)[number]) =>
       entry.kind === "activity" ? [[entry.row.label, entry.row.minutes]] : [];
     expect(day.entries.flatMap((entry) => rowOf(entry))).toEqual([
-      ["Work", 50],
-      ["Food", 40],
+      ["Sport", 50],
+      ["Eating", 40],
     ]);
   });
 
-  it("starts what was typed: a label used before keeps its category, a button's name taps it", async () => {
+  it("asks whether it is still going at twice the Expect", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startChoice("rest"));
+    const at = (minutes: number) =>
+      timeBarModel(world.state.store.getState(), ctx(later(minutes))).running?.status;
+    expect(at(45)).toBe("ok");
+    expect(at(60)).toBe("long");
+  });
+
+  it("runs an activity alongside: the main one keeps going, each stops on its own", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startChoice("chores:commute"));
+    world.setNow(later(5));
+    unwrap(await world.actions.startTyped("Podcast", { alongside: true }));
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(10)));
+    expect(bar.running).toMatchObject({ label: "Commute" });
+    expect(bar.alongside).toEqual([
+      expect.objectContaining({ isAlongside: true, label: "Podcast" }),
+    ]);
+    const podcast = bar.alongside[0]?.activityId ?? "";
+    world.setNow(later(20));
+    unwrap(await world.actions.stopActivity({ activityId: podcast }));
+    const after = timeBarModel(world.state.store.getState(), ctx(later(21)));
+    expect(after.running).toMatchObject({ label: "Commute" });
+    expect(after.alongside).toEqual([]);
+  });
+
+  it("starts what was typed at once, a length in it as the Expect", async () => {
     const world = await setupActions();
     unwrap(
       await world.actions.logPast({
@@ -54,98 +81,76 @@ describe("time actions", () => {
     const running = (minute: number) =>
       timeBarModel(world.state.store.getState(), ctx(later(minute))).running;
     expect(running(1)).toMatchObject({ category: "study", label: "lecture" });
-    world.setNow(later(5));
-    unwrap(await world.actions.startTyped("work"));
-    const { buttons } = timeBarModel(world.state.store.getState(), ctx(later(6)));
-    expect(buttons.find((button) => button.isRunning)?.id).toBe("btn:work");
     world.setNow(later(10));
-    unwrap(await world.actions.startTyped("Walk the dog"));
-    expect(running(11)).toMatchObject({ category: "other", label: "Walk the dog" });
+    unwrap(await world.actions.startTyped("Пошел в ЦСС, 20мин"));
+    expect(running(11)).toMatchObject({
+      category: "other",
+      expectMinutes: 20,
+      label: "Пошел в ЦСС",
+    });
     await expect(world.actions.startTyped("  ")).resolves.toEqual({
       error: "action/empty-text",
       ok: false,
     });
   });
 
-  it("starts a button with the details sheet's changes, even on the running one", async () => {
+  it("starts the calendar's event from its start, expected until its end", async () => {
     const world = await setupActions();
-    unwrap(await world.actions.tapButton("btn:work"));
-    world.setNow(later(5));
     unwrap(
-      await world.actions.tapButton("btn:work", { expectMinutes: 90, label: "Write the report" }),
+      await world.actions.startCalendar({
+        endAt: later(60),
+        startAt: later(-30),
+        title: "Алгебра, лекция",
+      }),
     );
-    const bar = timeBarModel(world.state.store.getState(), ctx(later(10)));
-    expect(bar.running).toMatchObject({ expectMinutes: 90, label: "Write the report" });
-    expect(bar.buttons.find((button) => button.id === "btn:work")).toMatchObject({
-      isRunning: true,
-      shouldAskDetails: true,
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(1)));
+    expect(bar.running).toMatchObject({
+      expectMinutes: 90,
+      label: "Алгебра, лекция",
+      minutes: 31,
+      startAt: later(-30),
     });
+    expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("calendar");
   });
 
-  it("marks a block as one where the messengers were the point, and stops at a past instant", async () => {
+  it("stops at a past instant, and the assistant's reading relabels the running one", async () => {
     const world = await setupActions();
-    unwrap(await world.actions.tapButton("btn:work"));
-    const day = dayModel(world.state.store.getState(), null, ctx(later(10)));
-    const running = day.entries.find((entry) => entry.kind === "activity");
-    const activityId = running?.kind === "activity" ? running.row.activityId : "";
-    unwrap(await world.actions.relabelActivity(activityId, { messengersOnPurpose: true }));
+    unwrap(await world.actions.startTyped("цсс"));
+    const id = timeBarModel(world.state.store.getState(), ctx(later(1))).running?.activityId ?? "";
+    unwrap(
+      await world.actions.relabelActivity(id, {
+        category: "sport",
+        expectMinutes: 90,
+        label: "ЦСС",
+      }),
+    );
     world.setNow(later(90));
     unwrap(await world.actions.stopActivity({ at: later(60) }));
     const after = dayModel(world.state.store.getState(), null, ctx(later(95)));
     expect(after.entries.find((entry) => entry.kind === "activity")).toMatchObject({
-      row: { isRunning: false, messengersOnPurpose: true, minutes: 60 },
+      row: { category: "sport", expectMinutes: 90, isRunning: false, label: "ЦСС", minutes: 60 },
     });
+  });
+
+  it("takes the assistant's reading of a typed activity unless it was renamed meanwhile", async () => {
+    const world = await setupActions();
+    const typed = "Пошел в ЦСС, 20мин";
+    unwrap(await world.actions.startTyped(typed));
+    const running = () => timeBarModel(world.state.store.getState(), ctx(later(1))).running;
+    const id = running()?.activityId ?? "";
+    const reading = { category: "sport" as const, expectMinutes: 90, label: "ЦСС", typed };
+    unwrap(await world.actions.refineActivity(id, reading));
+    expect(running()).toMatchObject({ category: "sport", expectMinutes: 90, label: "ЦСС" });
+    // Renamed by the person (here: by the first reading): a late reading changes nothing.
+    expect(
+      unwrap(await world.actions.refineActivity(id, { ...reading, label: "Бассейн" })),
+    ).toEqual([]);
+    expect(running()).toMatchObject({ label: "ЦСС" });
   });
 
   it("leaves a day with nothing on it empty instead of one long gap", async () => {
     const world = await setupActions();
     expect(dayModel(world.state.store.getState(), null, ctx(NOW)).entries).toEqual([]);
-  });
-
-  it("turns the default buttons into the account's own on the first edit", async () => {
-    const world = await setupActions();
-    unwrap(
-      await world.actions.saveButton("btn:food", {
-        category: "food",
-        expectMinutes: 20,
-        label: "Обед",
-        limitMinutes: null,
-      }),
-    );
-    unwrap(
-      await world.actions.saveButton(null, {
-        category: "study",
-        expectMinutes: 45,
-        label: "Reading",
-        limitMinutes: 90,
-      }),
-    );
-    unwrap(await world.actions.removeButton("btn:chores"));
-    const bar = timeBarModel(world.state.store.getState(), ctx(NOW));
-    expect(bar.buttons.map((button) => button.label)).toEqual([
-      "Work",
-      "Study",
-      "Обед",
-      "Commute",
-      "Rest",
-      "Sport",
-      "Reading",
-    ]);
-    expect(bar.buttons.find((button) => button.label === "Reading")).toMatchObject({
-      color: "violet",
-      limitMinutes: 90,
-    });
-    expect(
-      await world.actions.saveButton(null, {
-        category: "rest",
-        expectMinutes: null,
-        label: " ",
-        limitMinutes: null,
-      }),
-    ).toEqual({
-      error: "action/empty-text",
-      ok: false,
-    });
   });
 
   it("focuses a task, logs the past and adjusts a block", async () => {

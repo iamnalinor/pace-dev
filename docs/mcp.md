@@ -95,15 +95,15 @@ shows.
 | `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
 | `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
 | `archive_preset` | write | archives a user preset; its tasks keep working (`preset/built-in` for built-ins) | `id` |
-| `list_activity_buttons` | time read | the time bar's buttons in order: id, label, category, Expect/Limit minutes, linked task | — |
-| `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running | `date?` (YYYY-MM-DD, default today) |
+| `list_activity_buttons` | time read | what the time bar's buttons start (Rest, Sport by length, Chores by name): each choice's id, its button, label in the account language, category and Expect minutes | — |
+| `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running, what ran alongside the main line | `date?` (YYYY-MM-DD, default today) |
 | `summary_time` | time read | minutes per category and per project (through the task) over a range, largest first | `from`, `to` |
-| `start_activity` | time write | starts an activity; the running one ends at the same instant. A button's defaults, or a label and category; `taskId` counts the time as work on the task | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `limitMinutes?`, `at?` |
-| `stop_activity` | time write | stops what is running (`activity/none-running` otherwise) | `at?` |
+| `start_activity` | time write | starts an activity; the main one running ends at the same instant, unless `alongside` (then both run, each stopped on its own). A choice's defaults, or a label and category; `taskId` counts the time as work on the task. At twice its Expect the person is asked whether it still goes on | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `alongside?`, `at?` |
+| `stop_activity` | time write | stops the main activity, or the one `activityId` names (`activity/none-running` otherwise) | `activityId?`, `at?` |
 | `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |
 | `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `observations`) with their CREATE statements | — |
 | `query_sql` | analytics | one read-only SQLite `SELECT` (or `WITH … SELECT`), at most 500 rows, run in a transaction that always rolls back; a second statement, `PRAGMA`, `ATTACH` or any write is refused (`sql/forbidden`, `sql/not-select`) | `sql` |
-| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and Limit alert they would send (`simulate/range` for a bad range) | `from`, `to` |
+| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and "still doing this?" they would send (`simulate/range` for a bad range) | `from`, `to` |
 | `export_all` | analytics | the event log as NDJSON (one event per line, corrections included), a page at a time | `since?`, `limit?` (default 1000, max 5000) |
 
 ### Writes: `at`, `precision`, `dryRun`

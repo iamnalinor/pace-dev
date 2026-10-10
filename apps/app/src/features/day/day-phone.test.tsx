@@ -2,11 +2,11 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react-nativ
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
-import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
 
 import { DayScreen } from "./day-screen.tsx";
 
@@ -69,6 +69,18 @@ beforeEach(() => {
       startDate: "2026-10-06T10:00:00.000Z",
       title: "Seminar",
     },
+    {
+      allDay: false,
+      attendees: [
+        { email: "dean@example.com", status: "accepted" },
+        { email: FAKE_OWNER, status: "declined" },
+      ],
+      endDate: "2026-10-06T13:00:00.000Z",
+      id: "ev-declined",
+      organizerEmail: "dean@example.com",
+      startDate: "2026-10-06T12:00:00.000Z",
+      title: "Faculty meeting",
+    },
   ];
 });
 
@@ -87,10 +99,12 @@ describe("Day with the phone's data", () => {
     await renderScreen(<DayScreen />, runtime);
 
     expect(await screen.findByText("Slept 23:50–07:40 · 7h 50m · woke up 1×")).toBeOnTheScreen();
-    // A study block: a quarter of the Telegram time is taken off what it counts.
-    expect(await screen.findByText("Phone 20m: Telegram 20m · counted 35m")).toBeOnTheScreen();
+    // Where the time went on the phone, with no penalty for it.
+    expect(await screen.findByText("Phone 20m: Telegram 20m")).toBeOnTheScreen();
     const seminar = await screen.findByText("Seminar");
     expect(seminar).toBeOnTheScreen();
+    // A declined invitation is not the person's to attend.
+    expect(screen.queryByText("Faculty meeting")).toBeNull();
 
     await fireEvent.press(screen.getByRole("button", { name: "Log sleep" }));
     await waitFor(() => {

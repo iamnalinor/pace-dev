@@ -7,7 +7,6 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import {
   type ActivityForm,
@@ -25,7 +24,6 @@ import {
   type ActivityCategory,
   addDaysIn,
   CATEGORY_COLORS,
-  FOCUS_CATEGORIES,
   formatEyebrow,
 } from "@pace/core";
 
@@ -157,19 +155,11 @@ const ActivityFields = ({
 /** Log a past block, or move and rename one already on the day. */
 export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => {
   const t = useT();
-  const { actions, state } = usePace();
+  const { actions } = usePace();
   const language = useLanguage();
   const run = useRunAction();
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
-  const editedId = target.kind === "edit" ? target.activityId : null;
-  // Read once: the switch below is the sheet's own copy until it is saved.
-  const [wasOnPurpose] = useState(
-    () =>
-      editedId !== null &&
-      state.store.getState().time.activities[editedId]?.messengersOnPurpose === true,
-  );
-  const [isOnPurpose, setIsOnPurpose] = useState(wasOnPurpose);
   const range = rangeOf(draft, target, zone);
   // Said once a save was tried, and gone as soon as the times read right.
   const error = hasTriedToSave && range === null ? t("day.badRange") : null;
@@ -181,13 +171,9 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
     const isSaved = await run(
       actions.saveActivity(target, { category: draft.category, label: draft.label, ...range }),
     );
-    if (!isSaved) {
-      return;
+    if (isSaved) {
+      onClose();
     }
-    if (editedId !== null && isOnPurpose !== wasOnPurpose) {
-      await run(actions.relabelActivity(editedId, { messengersOnPurpose: isOnPurpose }));
-    }
-    onClose();
   };
   return (
     <Sheet
@@ -199,13 +185,6 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
       visible
     >
       <ActivityFields draft={draft} error={error} isEndEditable={hasEnd(target)} patch={patch} />
-      {editedId !== null && FOCUS_CATEGORIES.has(draft.category) ? (
-        <SwitchRow
-          isOn={isOnPurpose}
-          label={t("editor.messengersOnPurpose")}
-          onChange={setIsOnPurpose}
-        />
-      ) : null}
       <SheetActions
         cancelLabel={t("common.cancel")}
         onCancel={onClose}

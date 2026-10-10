@@ -24,47 +24,46 @@ const shoot = async (
 
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
-/** A press held until `opened` shows, as a finger does it (the long press fires while held). */
-const hold = async (page: Page, target: Locator, opened: Locator): Promise<void> => {
-  await target.hover();
-  await page.mouse.down();
-  await expect(opened).toBeVisible();
-  await page.mouse.up();
-};
-
 for (const size of SIZES) {
   test.describe(`time tracking, ${size.name} (${String(size.width)}px)`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
 
-    test("switches activities from Now and edits a button by press and hold", async ({
+    test("switches with four fixed buttons, picks a chore, runs one alongside, types one", async ({
       page,
     }, info) => {
       await loginViaApi(page);
       await page.goto("/");
       const bar = timeBar(page);
-      // Work asks for details first: what exactly, which task; Start begins it.
-      await bar.getByRole("switch", { name: "Work" }).click();
-      // A sheet renders outside the app's root: it must still carry the theme (contrast).
-      await expect(page.getByRole("button", { name: "Start" })).toBeVisible();
-      await expectNoA11yViolations(page);
-      await page.getByRole("button", { name: "Start" }).click();
-      await expect(bar.getByRole("button", { name: "Stop" })).toBeVisible();
-      await expect(bar.getByRole("switch", { name: "Work" })).toBeChecked();
-      await bar.getByRole("switch", { name: "Food" }).click();
+      await bar.getByRole("switch", { name: "Rest" }).click();
+      await expect(bar.getByRole("switch", { name: "Rest" })).toBeChecked();
       await expect(bar.getByText(/of ~30m/u)).toBeVisible();
-      await expect(bar.getByRole("switch", { name: "Work" })).not.toBeChecked();
+
+      // Chores asks which one; the sheet renders outside the app's root and keeps the theme.
+      await bar.getByRole("switch", { name: "Chores" }).click();
+      await expect(page.getByRole("button", { name: "Getting ready" })).toBeVisible();
+      await expectNoA11yViolations(page);
+      await page.getByRole("button", { name: "Getting ready" }).click();
+      await expect(bar.getByRole("switch", { name: "Chores" })).toBeChecked();
+      await expect(bar.getByRole("switch", { name: "Rest" })).not.toBeChecked();
+
+      // Sport alongside, from a right click (a press and hold on a phone opens the same sheet).
+      await bar.getByRole("switch", { name: "Sport" }).click({ button: "right" });
+      await page.getByLabel("Alongside what is running").click();
+      await page.getByRole("button", { name: "1h" }).click();
+      await expect(bar.getByRole("button", { name: "Stop: Getting ready" })).toBeVisible();
+      await expect(bar.getByRole("button", { name: "Stop: Sport" })).toBeVisible();
       await shoot(page, `now-running-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
 
-      const change = page.getByRole("button", { name: "Change the button" });
-      await hold(page, bar.getByRole("switch", { name: "Commute" }), change);
-      await change.click();
-      const name = page.getByRole("textbox", { name: "Name" });
-      await name.fill("Metro");
-      await page.getByRole("button", { name: "Save" }).click();
-      await expect(bar.getByRole("switch", { name: "Metro" })).toBeVisible();
-      await bar.getByRole("button", { name: "Stop" }).click();
-      await expect(bar.getByRole("textbox", { name: "What are you doing?" })).toBeVisible();
+      // Typed: it starts at once, its length becomes the Expect.
+      const typed = bar.getByRole("textbox", { name: "What are you doing?" });
+      await typed.fill("Пошел в ЦСС, 20мин");
+      await typed.press("Enter");
+      await expect(bar.getByRole("button", { name: "Stop: Пошел в ЦСС" })).toBeVisible();
+      await expect(bar.getByText(/of ~20m/u)).toBeVisible();
+      await bar.getByRole("button", { name: "Stop: Пошел в ЦСС" }).click();
+      await bar.getByRole("button", { name: "Stop: Sport" }).click();
+      await expect(bar.getByRole("button", { name: /^Stop/u })).toHaveCount(0);
     });
 
     test("logs a past block on Day and sees it in Insights", async ({ page }, info) => {

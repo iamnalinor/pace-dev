@@ -32,15 +32,29 @@ const minutesAgo = (minutes: number): string =>
   new Date(Date.now() - minutes * 60_000).toISOString();
 
 describe("MCP time tools", () => {
-  it("starts from a button, switches, stops, and shows the day", async () => {
+  it("starts from a button, switches, runs one alongside, stops, and shows the day", async () => {
     const token = (await obtainToken(ALL)).tokens.access_token;
     const { buttons } = await ok(token, "list_activity_buttons");
     expect(buttons).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "btn:food", label: "Food" })]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          button: "chores",
+          expectMinutes: 30,
+          id: "chores:eating",
+          label: "Eating",
+        }),
+      ]),
     );
 
-    await ok(token, "start_activity", { at: minutesAgo(90), buttonId: "btn:work" });
+    await ok(token, "start_activity", { at: minutesAgo(90), buttonId: "sport:60" });
+    const { activityId: music } = await ok(token, "start_activity", {
+      alongside: true,
+      at: minutesAgo(40),
+      category: "rest",
+      label: "Music",
+    });
     await ok(token, "start_activity", { at: minutesAgo(30), category: "food", label: "Lunch" });
+    await ok(token, "stop_activity", { activityId: music, at: minutesAgo(20) });
     await ok(token, "stop_activity");
     expect((await call(token, "stop_activity")).content[0]?.text).toMatch(
       /^activity\/none-running/u,
@@ -52,9 +66,10 @@ describe("MCP time tools", () => {
       segment.minutes,
     ]);
     expect(labels).toEqual([
-      ["Work", 60],
+      ["Sport", 60],
       ["Lunch", 30],
     ]);
+    expect(day["alongside"]).toEqual([expect.objectContaining({ label: "Music", minutes: 20 })]);
     expect(day["running"]).toBeNull();
   });
 

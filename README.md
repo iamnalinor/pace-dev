@@ -14,8 +14,9 @@ phone, in the browser and on the server.
 | 0 — Foundation | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets | **done** |
 | 1 — Tasks | presets (edited in the web UI), tasks and subtasks, the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
 | 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
-| 3 — Time | the time ledger: a time bar under Now (one tap switches, hold to edit a button's Expect/Limit), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers for Expect/Limit, a Limit alert through the bot, MCP time tools | **done** — `v0.3.0` |
-| 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules, the messenger penalty; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
+| 3 — Time | the time ledger: a time bar under Now (one tap switches), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers, alerts through the bot, MCP time tools | **done** — `v0.3.0` |
+| 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
+| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | in progress |
 
 Still `v0.x`: the product is in daily use but not final.
 
@@ -259,13 +260,14 @@ the native code and runs the JS logic against mocks).
   (screen-on glances up to 5 min are merged into the night). *Log sleep* writes a `sleep`
   block; *Not sleep* hides that guess on this phone.
 - **Phone time per block**: under each block on Day, "Phone 25m: YouTube, Telegram…"
-  sums foreground app time inside it. On work, study and task blocks, Pace also shows
-  "counted …", which is the block's time minus a quarter of the messenger time.
-  "Messaging was part of it" in the block's editor turns that off.
+  sums foreground app time inside it. It only shows where the time went: nothing is taken
+  off the block.
 - **Ended at …?**: when a running activity is past its Expect and you pick up the
   phone, the running row on Day offers to end it at the moment of the pickup.
 - **Calendar**: "From your calendar" lists the day's timed events from every visible
-  calendar (all-day ones are skipped). *Attended* logs the event as a block, *Skip* hides it
+  calendar that are yours to attend: your own events and subscriptions, and invitations you
+  accepted (declined, tentative and unanswered ones, and all-day events, are skipped). The
+  time bar's *From calendar* starts the event going on now under its title, from its start. *Attended* logs the event as a block, *Skip* hides it
   on this phone. For a repeating event, the toast offers *Every time*: the whole series is
   then logged when it ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.

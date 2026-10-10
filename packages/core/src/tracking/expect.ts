@@ -1,31 +1,31 @@
-import type { ActivityCategory, TimeState } from "./model.ts";
+import type { Activity, ActivityCategory, TimeState } from "./model.ts";
 
-import { CATEGORY_DEFAULTS, type ExpectLimit } from "./categories.ts";
+import { addMinutesIso } from "../time.ts";
+import { CATEGORY_EXPECT } from "./categories.ts";
 
-/** "Near the limit" starts this many minutes before it. */
-export const NEAR_LIMIT_MINUTES = 10;
 /** A label needs this many finished runs before its median becomes the default. */
 export const MEDIAN_SAMPLES = 3;
 
-export type PaceStatus = "near-limit" | "none" | "ok" | "over-expect" | "over-limit";
+/** Past this many times its Expect a running activity asks whether it is still going. */
+export const REMIND_FACTOR = 2;
 
-/** Where a running activity stands against what it expects and what it may take. */
-export const paceStatus = (
-  minutes: number,
-  { expectMinutes, limitMinutes }: ExpectLimit,
-): PaceStatus => {
-  if (limitMinutes !== null) {
-    if (minutes >= limitMinutes) {
-      return "over-limit";
-    }
-    if (minutes >= limitMinutes - NEAR_LIMIT_MINUTES) {
-      return "near-limit";
-    }
+/** "long": twice the Expect is gone, time to ask; "none": nothing is expected. */
+export type PaceStatus = "long" | "none" | "ok";
+
+/** Where a running activity stands against what it expects. */
+export const paceStatus = (minutes: number, expectMinutes: null | number): PaceStatus => {
+  if (expectMinutes === null) {
+    return "none";
   }
-  if (expectMinutes !== null) {
-    return minutes > expectMinutes ? "over-expect" : "ok";
-  }
-  return limitMinutes === null ? "none" : "ok";
+  return minutes >= REMIND_FACTOR * expectMinutes ? "long" : "ok";
+};
+
+/** When to ask "still doing this?": twice its Expect after the start; never without one. */
+export const remindAt = (activity: Activity | undefined): null | string => {
+  const expectMinutes = activity?.expectMinutes ?? null;
+  return activity === undefined || expectMinutes === null
+    ? null
+    : addMinutesIso(activity.startAt, REMIND_FACTOR * expectMinutes);
 };
 
 const median = (values: readonly number[]): number => {
@@ -35,7 +35,8 @@ const median = (values: readonly number[]): number => {
   return sorted.length % 2 === 0 ? ((sorted[middle - 1] ?? upper) + upper) / 2 : upper;
 };
 
-export type Defaults = ExpectLimit & {
+export type Defaults = {
+  readonly expectMinutes: null | number;
   /** Where the Expect came from, for the "why" line. */
   readonly source: "category" | "history";
   readonly samples: number;
@@ -43,7 +44,7 @@ export type Defaults = ExpectLimit & {
 
 /**
 What a new activity should expect: the median of the label's past finished runs once there are
-`MEDIAN_SAMPLES` of them, else the category's default. The Limit always comes from the category.
+`MEDIAN_SAMPLES` of them, else the category's default.
 */
 export const defaultsFor = (
   time: TimeState,
@@ -57,13 +58,11 @@ export const defaultsFor = (
         (Date.parse(activity.endAt ?? activity.startAt) - Date.parse(activity.startAt)) / 60_000,
     )
     .filter((minutes) => minutes > 0);
-  const fallback = CATEGORY_DEFAULTS[category];
   return durations.length >= MEDIAN_SAMPLES
     ? {
         expectMinutes: Math.round(median(durations)),
-        limitMinutes: fallback.limitMinutes,
         samples: durations.length,
         source: "history",
       }
-    : { ...fallback, samples: durations.length, source: "category" };
+    : { expectMinutes: CATEGORY_EXPECT[category], samples: durations.length, source: "category" };
 };

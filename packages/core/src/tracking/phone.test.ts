@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   appUsage,
-  countedMinutes,
   detectSleep,
   type PhoneEvent,
   phonePickupAt,
@@ -120,23 +119,5 @@ describe("phone pickup", () => {
     const events = [on(msk(8, "13:00")), off(msk(8, "13:05"))];
     expect(phonePickupAt(events, msk(8, "14:00"))).toBeNull();
     expect(phonePickupAt([], msk(8, "14:00"))).toBeNull();
-  });
-});
-
-describe("counted minutes", () => {
-  const usage = [
-    { app: "org.telegram.messenger", minutes: 40 },
-    { app: "com.google.android.youtube", minutes: 10 },
-  ];
-
-  it("takes a quarter of the messenger time off the block", () => {
-    expect(countedMinutes(120, usage)).toEqual({ counted: 110, messengerMinutes: 40 });
-  });
-
-  it("leaves the block whole when the messengers were part of it", () => {
-    expect(countedMinutes(120, usage, { onPurpose: true })).toEqual({
-      counted: 120,
-      messengerMinutes: 40,
-    });
   });
 });

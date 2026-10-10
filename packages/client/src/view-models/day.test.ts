@@ -13,7 +13,7 @@ type Spec = {
   readonly startAt: string;
   readonly endAt: null | string;
   readonly expect?: null | number;
-  readonly limit?: null | number;
+  readonly isAlongside?: boolean;
 };
 
 const activity = ({
@@ -21,8 +21,8 @@ const activity = ({
   endAt,
   expect = null,
   id,
+  isAlongside = false,
   label,
-  limit = null,
   startAt,
 }: Spec): Activity => ({
   buttonId: null,
@@ -30,10 +30,9 @@ const activity = ({
   endAt,
   expectMinutes: expect,
   id,
+  isAlongside,
   isLogged: endAt !== null,
   label,
-  limitMinutes: limit,
-  messengersOnPurpose: false,
   startAt,
   taskId: null,
 });
@@ -50,7 +49,7 @@ const minutesBefore = (minutes: number): string =>
   new Date(Date.parse(NOW) - minutes * 60_000).toISOString();
 
 describe("dayModel rows", () => {
-  it("carries the Expect and the Limit, and hides a label that only repeats the category", () => {
+  it("carries the Expect, shows what ran alongside, and hides a label that only repeats the category", () => {
     const state = withActivities([
       activity({
         category: "food",
@@ -70,21 +69,30 @@ describe("dayModel rows", () => {
       activity({
         category: "sport",
         endAt: null,
+        expect: 90,
         id: "a3",
         label: "Gym",
-        limit: 90,
         startAt: minutesBefore(60),
+      }),
+      activity({
+        category: "rest",
+        endAt: null,
+        id: "a4",
+        isAlongside: true,
+        label: "Music",
+        startAt: minutesBefore(50),
       }),
     ]);
     const rows = dayModel(state, null, ctx()).entries.flatMap((entry) =>
       entry.kind === "activity" ? [entry.row] : [],
     );
     expect(
-      rows.map((row) => [row.label, row.showsLabel, row.expectMinutes, row.limitMinutes]),
+      rows.map((row) => [row.label, row.showsLabel, row.expectMinutes, row.isAlongside]),
     ).toEqual([
-      ["Food", false, 30, null],
-      ["Еда", false, null, null],
-      ["Gym", true, null, 90],
+      ["Food", false, 30, false],
+      ["Еда", false, null, false],
+      ["Gym", true, 90, false],
+      ["Music", true, null, true],
     ]);
   });
 });

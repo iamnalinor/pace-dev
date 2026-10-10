@@ -270,8 +270,29 @@ const events = (now: number, ids: LivedIn & { readonly workId: string }): readon
       type: "activity.logged",
     },
     {
+      // An older event's shape: a limit, as the bar once set it (read, never used).
+      at: now - 3 * HOUR,
+      payload: {
+        activityId: ulid(now - 3 * HOUR),
+        category: "hygiene",
+        label: "Собираюсь",
+        limitMinutes: 60,
+      },
+      type: "activity.started",
+    },
+    {
       at: now - 2 * HOUR,
       payload: { activityId: typed, category: "other", expectMinutes: 20, label: "Пошёл в ЦСС" },
+      type: "activity.started",
+    },
+    {
+      at: now - 90 * MINUTE,
+      payload: {
+        activityId: ulid(now - 90 * MINUTE),
+        alongside: true,
+        category: "rest",
+        label: "Музыка",
+      },
       type: "activity.started",
     },
     {

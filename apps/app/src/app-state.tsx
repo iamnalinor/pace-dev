@@ -57,16 +57,10 @@ const timerKey = (runtime: PaceRuntime): string => {
   });
   return running === null
     ? ""
-    : [
-        running.activityId,
-        running.startAt,
-        running.label,
-        running.expectMinutes,
-        running.limitMinutes,
-      ].join("|");
+    : [running.activityId, running.startAt, running.label, running.expectMinutes].join("|");
 };
 
-/** Reschedules the phone's Expect/Limit timers on every switch, stop or edit of the running activity. */
+/** Reschedules the phone's "still doing this?" timer on every switch, stop or edit of the running activity. */
 const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
   let last = timerKey(runtime);
   void syncActivityTimers(runtime);

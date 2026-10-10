@@ -1,9 +1,9 @@
 import {
   addMinutesIso,
   endpoints,
-  formatDuration,
   type Language,
   type PlannedNotification,
+  REMIND_FACTOR,
   t,
 } from "@pace/core";
 
@@ -21,7 +21,7 @@ export type LocalNotification = {
 /** Every id this module schedules starts with this, so it never touches anyone else's. */
 export const LOCAL_ID_PREFIX = "pace:";
 
-/** The running activity's timers: Expect, then the Limit's warning and crossing. */
+/** The running activity's timer: "still doing this?". */
 export const ACTIVITY_ID_PREFIX = `${LOCAL_ID_PREFIX}activity:`;
 
 export const isActivityId = (id: string): boolean => id.startsWith(ACTIVITY_ID_PREFIX);
@@ -30,78 +30,37 @@ export const isActivityId = (id: string): boolean => id.startsWith(ACTIVITY_ID_P
 export const isPlanId = (id: string): boolean =>
   id.startsWith(LOCAL_ID_PREFIX) && !isActivityId(id);
 
-/** Minutes before the Limit at which the warning goes out. */
-const NEAR_LIMIT_MINUTES = 10;
-
 export type RunningTimer = {
   readonly activityId: string;
   readonly label: string;
   readonly startAt: string;
   readonly expectMinutes: null | number;
-  readonly limitMinutes: null | number;
 };
 
 /**
-The phone's own timers for the running activity, so they ring offline: Expect passed, ten
-minutes to the Limit, the Limit passed. Moments already behind `now` are left out.
+The phone's own timer for the running activity, so it rings offline: "still doing this?" at
+twice its Expect. A moment already behind `now` is left out.
 */
 export const activityNotifications = (
   running: null | RunningTimer,
   now: string,
   language: Language,
 ): readonly LocalNotification[] => {
-  if (running === null) {
+  const expectMinutes = running?.expectMinutes ?? null;
+  if (running === null || expectMinutes === null) {
     return [];
   }
-  const timer = (kind: string, minutes: number, body: string): readonly LocalNotification[] => {
-    const at = addMinutesIso(running.startAt, minutes);
-    return Date.parse(at) > Date.parse(now)
-      ? [
-          {
-            at,
-            body,
-            id: `${ACTIVITY_ID_PREFIX}${running.activityId}:${kind}`,
-            title: t(language, "notify.localTitle"),
-          },
-        ]
-      : [];
-  };
-  const { expectMinutes, label, limitMinutes } = running;
-  const expect =
-    expectMinutes === null
-      ? []
-      : timer(
-          "expect",
-          expectMinutes,
-          t(language, "notify.activityExpect", {
-            duration: formatDuration(expectMinutes, language),
-            label,
-          }),
-        );
-  const limit =
-    limitMinutes === null
-      ? []
-      : [
-          ...(limitMinutes > NEAR_LIMIT_MINUTES
-            ? timer(
-                "near-limit",
-                limitMinutes - NEAR_LIMIT_MINUTES,
-                t(language, "notify.activityNearLimit", {
-                  duration: formatDuration(limitMinutes, language),
-                  label,
-                }),
-              )
-            : []),
-          ...timer(
-            "over-limit",
-            limitMinutes,
-            t(language, "notify.activityOverLimit", {
-              duration: formatDuration(limitMinutes, language),
-              label,
-            }),
-          ),
-        ];
-  return [...expect, ...limit];
+  const at = addMinutesIso(running.startAt, REMIND_FACTOR * expectMinutes);
+  return Date.parse(at) <= Date.parse(now)
+    ? []
+    : [
+        {
+          at,
+          body: t(language, "notify.activityLong", { label: running.label }),
+          id: `${ACTIVITY_ID_PREFIX}${running.activityId}:long`,
+          title: t(language, "notify.localTitle"),
+        },
+      ];
 };
 
 /** The plan as notifications in the account language. */

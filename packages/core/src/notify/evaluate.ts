@@ -7,7 +7,7 @@ import { hasLaterStart, type NowItem, nowItem } from "../queries/now-item.ts";
 import { nowList } from "../queries/now-list.ts";
 import { reviewItems } from "../review/to-sort.ts";
 import { minutesBetween } from "../time.ts";
-import { type LimitAlert, limitAlertOf, limitCrossing } from "./limit.ts";
+import { type LongRun, longRunCrossing, longRunOf } from "./long-run.ts";
 import { type Critical, criticalOf, deadlineCrossingAt, type Stuck, stuckOf } from "./rules.ts";
 import { isQuietAt, lastDigestWindow, nextDigestAt } from "./schedule.ts";
 
@@ -31,8 +31,8 @@ export type NotifyMemory = {
   readonly stuck: readonly string[];
   /** Task id → until when its alerts are snoozed. */
   readonly snoozed: Readonly<Record<string, string>>;
-  /** Activities already alerted for going past their Limit (absent in older memories). */
-  readonly limits?: readonly string[];
+  /** Activities already asked "still doing this?" (absent in older memories). */
+  readonly longRuns?: readonly string[];
 };
 
 export const INITIAL_NOTIFY_MEMORY: NotifyMemory = {
@@ -64,7 +64,7 @@ export type Digest = {
 export type NotifyMessage =
   | (Critical & { readonly kind: "critical" })
   | (Digest & { readonly kind: "digest" })
-  | (LimitAlert & { readonly kind: "limit" })
+  | (LongRun & { readonly kind: "long" })
   | (Stuck & { readonly kind: "stuck" });
 
 export type NotifyOutcome = "sent" | "suppressed";
@@ -87,19 +87,19 @@ export type NotifyEvaluation = {
   readonly nextAt: null | string;
 };
 
-/** The running activity past its Limit: one alert per activity, logged like any other. */
-const limitStep = (
+/** The running activity at twice its Expect: asked once per activity, logged like any other. */
+const longRunStep = (
   state: CoreState,
   ctx: QueryContext,
   memory: NotifyMemory,
 ): Step & { readonly handled: readonly string[] } => {
-  const alert = limitAlertOf(state.time, ctx.now, memory.limits ?? []);
+  const alert = longRunOf(state.time, ctx.now, memory.longRuns ?? []);
   if (alert === null) {
     return { decisions: [], handled: [], messages: [] };
   }
-  const message: NotifyMessage = { kind: "limit", ...alert };
+  const message: NotifyMessage = { kind: "long", ...alert };
   return {
-    decisions: [decision(message, "sent", "The running activity passed its Limit.")],
+    decisions: [decision(message, "sent", "The running activity took twice its Expect.")],
     handled: [alert.activityId],
     messages: [message],
   };
@@ -258,14 +258,14 @@ export const nextAlarmAt = (
   const crossings = items
     .filter((item) => !memory.critical.includes(item.task.id))
     .map((item) => deadlineCrossingAt(item.task, item.preset));
-  const limit = limitCrossing(state.time, ctx.now);
-  const limitAt =
-    limit === null || (memory.limits ?? []).includes(limit.activityId) ? null : limit.crossedAt;
+  const long = longRunCrossing(state.time, ctx.now);
+  const longAt =
+    long === null || (memory.longRuns ?? []).includes(long.activityId) ? null : long.crossedAt;
   return laterOf(
     [
       nextDigestAt(ctx.now, zone, state.settings),
       ...crossings,
-      limitAt,
+      longAt,
       ...Object.values(memory.snoozed),
     ],
     ctx.now,
@@ -276,8 +276,9 @@ export const nextAlarmAt = (
 One pass of the notifier at `ctx.now`. Quiet hours send nothing and keep the memory, so
 whatever crossed at night is still news in the morning. Otherwise: critical alerts (one
 per task; a crossing that a retro edit placed before the last evaluation, or that predates
-the very first one, is logged as suppressed: the digest shows it), the running activity's
-Limit (once per activity), and in a digest window the digest plus the stuck reports.
+the very first one, is logged as suppressed: the digest shows it), "still doing this?" for
+the running activity at twice its Expect (once per activity), and in a digest window the
+digest plus the stuck reports.
 */
 export const evaluateNotifications = (
   state: CoreState,
@@ -290,7 +291,7 @@ export const evaluateNotifications = (
   }
   const list = nowList(state, ctx);
   const critical = criticalStep({ ctx, memory, state }, list.items);
-  const limit = limitStep(state, ctx, memory);
+  const long = longRunStep(state, ctx, memory);
   const window = lastDigestWindow(ctx.now, zone, state.settings);
   const isDigestDue =
     window !== null && (memory.digestWindow === null || window > memory.digestWindow);
@@ -307,13 +308,13 @@ export const evaluateNotifications = (
       Object.entries(memory.snoozed).filter(([, until]) => until > ctx.now),
     ),
     // Only the running activity can still cross: older ids are dropped.
-    limits: [...(memory.limits ?? []), ...limit.handled].filter(
-      (id) => limitCrossing(state.time, ctx.now)?.activityId === id,
+    longRuns: [...(memory.longRuns ?? []), ...long.handled].filter(
+      (id) => longRunCrossing(state.time, ctx.now)?.activityId === id,
     ),
   };
   return {
-    messages: [...critical.messages, ...limit.messages, ...digest.messages, ...stuck.messages],
-    decisions: [...critical.decisions, ...limit.decisions, ...digest.decisions, ...stuck.decisions],
+    messages: [...critical.messages, ...long.messages, ...digest.messages, ...stuck.messages],
+    decisions: [...critical.decisions, ...long.decisions, ...digest.decisions, ...stuck.decisions],
     memory: next,
     nextAt: nextAlarmAt(state, ctx, next),
   };

@@ -18,18 +18,22 @@ export type Segment = {
   readonly isLogged: boolean;
   /** The activity's Expect, when it has one. */
   readonly expectMinutes: null | number;
-  readonly messengersOnPurpose: boolean;
+  /** Ran next to the main line (music over work): listed apart, not in the totals. */
+  readonly isAlongside: boolean;
 };
 
 export type Gap = { readonly startAt: string; readonly endAt: string; readonly minutes: number };
 
 export type Timeline = {
+  /** The main line: one activity at a time. */
   readonly segments: readonly Segment[];
+  /** What ran alongside the main line, by start. */
+  readonly alongside: readonly Segment[];
   readonly gaps: readonly Gap[];
   /** Minutes per category, only those with any time. */
   readonly totals: Readonly<Partial<Record<ActivityCategory, number>>>;
   readonly trackedMinutes: number;
-  /** The live activity running at `now`, when it falls inside the range. */
+  /** The live main activity running at `now`, when it falls inside the range. */
   readonly running: null | Segment;
 };
 
@@ -87,8 +91,8 @@ const toSegment = (piece: Piece, now: number): Segment => ({
   expectMinutes: piece.activity.expectMinutes,
   isLogged: piece.activity.isLogged,
   isRunning: !piece.activity.isLogged && piece.activity.endAt === null && piece.end === now,
+  isAlongside: piece.activity.isAlongside,
   label: piece.activity.label,
-  messengersOnPurpose: piece.activity.messengersOnPurpose,
   minutes: Math.round((piece.end - piece.start) / MS_PER_MINUTE),
   startAt: toIso(piece.start),
   taskId: piece.activity.taskId,
@@ -113,6 +117,7 @@ const gapsBetween = (pieces: readonly Piece[], from: number, until: number): rea
 The time between `from` and `to` as non-overlapping segments. Live activities follow each
 other (a start closes the previous one; a later start wins an overlap left by an adjustment);
 logged blocks win over the live time they cover and may split it. Nothing exists after `now`.
+Activities run alongside are listed apart, as they ran.
 */
 export const timeline = (time: TimeState, { from, now, to }: Range): Timeline => {
   const fromMs = Date.parse(from);
@@ -122,8 +127,9 @@ export const timeline = (time: TimeState, { from, now, to }: Range): Timeline =>
     const piece = clip(activity, { from: fromMs, now: nowMs, until: untilMs });
     return piece === null ? [] : [piece];
   });
-  const logged = trimOverlaps(clipped.filter((piece) => piece.activity.isLogged));
-  const live = trimOverlaps(clipped.filter((piece) => !piece.activity.isLogged)).flatMap((piece) =>
+  const main = clipped.filter((piece) => !piece.activity.isAlongside);
+  const logged = trimOverlaps(main.filter((piece) => piece.activity.isLogged));
+  const live = trimOverlaps(main.filter((piece) => !piece.activity.isLogged)).flatMap((piece) =>
     subtract(piece, logged),
   );
   const pieces = [...live, ...logged].toSorted((a, b) => a.start - b.start);
@@ -134,6 +140,10 @@ export const timeline = (time: TimeState, { from, now, to }: Range): Timeline =>
     ),
   );
   return {
+    alongside: clipped
+      .filter((piece) => piece.activity.isAlongside)
+      .toSorted((a, b) => a.start - b.start)
+      .map((piece) => toSegment(piece, nowMs)),
     gaps: gapsBetween(pieces, fromMs, untilMs),
     running: segments.find((segment) => segment.isRunning) ?? null,
     segments,
@@ -142,9 +152,16 @@ export const timeline = (time: TimeState, { from, now, to }: Range): Timeline =>
   };
 };
 
-/** The live activity running now (whatever the day), or null. */
-export const runningActivity = (time: TimeState, now: string): Activity | null =>
+/** Every live activity running now (whatever the day): the main one first, then by start. */
+export const runningActivities = (time: TimeState, now: string): readonly Activity[] =>
   Object.values(time.activities)
     .filter((activity) => !activity.isLogged && activity.endAt === null && activity.startAt <= now)
-    .toSorted((a, b) => b.startAt.localeCompare(a.startAt))
-    .at(0) ?? null;
+    .toSorted((a, b) =>
+      a.isAlongside === b.isAlongside
+        ? b.startAt.localeCompare(a.startAt)
+        : Number(a.isAlongside) - Number(b.isAlongside),
+    );
+
+/** The live main activity running now (whatever the day), or null. */
+export const runningActivity = (time: TimeState, now: string): Activity | null =>
+  runningActivities(time, now).find((activity) => !activity.isAlongside) ?? null;

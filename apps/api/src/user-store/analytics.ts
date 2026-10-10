@@ -122,11 +122,11 @@ const describeMessage = (message: NotifyMessage): Omit<SimulatedMessage, "at"> =
             : `Digest: ${message.top.map((row) => row.title).join(", ")}`,
       };
     }
-    case "limit": {
+    case "long": {
       return {
-        kind: "limit",
+        kind: "long",
         taskId: null,
-        text: `${message.label} past its ${String(message.limitMinutes)} min limit`,
+        text: `${message.label}: still going at twice its ${String(message.expectMinutes)} min`,
       };
     }
     case "stuck": {

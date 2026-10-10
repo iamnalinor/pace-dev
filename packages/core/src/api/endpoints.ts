@@ -26,7 +26,13 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
-import { LlmStatusSchema, ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
+import {
+  ActivityParseRequestSchema,
+  ActivityParseResponseSchema,
+  LlmStatusSchema,
+  ParseRequestSchema,
+  ParseResponseSchema,
+} from "./schemas/parse.ts";
 import {
   SyncObservationsBodySchema,
   SyncObservationsOutputSchema,
@@ -127,6 +133,14 @@ export const endpoints = {
       method: "POST",
       output: ParseResponseSchema,
       path: "/api/parse",
+    }),
+    /** A note of what the person is doing, read into a label, a category and a length. */
+    activity: endpoint({
+      auth: true,
+      body: ActivityParseRequestSchema,
+      method: "POST",
+      output: ActivityParseResponseSchema,
+      path: "/api/parse/activity",
     }),
     /** Whether a model can answer now (none configured counts as never). */
     status: endpoint({

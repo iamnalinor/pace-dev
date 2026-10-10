@@ -31,19 +31,15 @@ import {
 } from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
-/** "of ~30m" or "limit 1h", when the block has either. */
+/** "of ~30m", when the block has an Expect. */
 const targetText = (
   row: DayRowProps["row"],
   t: ReturnType<typeof useT>,
   language: Language,
-): null | string => {
-  if (row.expectMinutes !== null) {
-    return t("time.expectOf", { duration: formatDuration(row.expectMinutes, language) });
-  }
-  return row.limitMinutes === null
+): null | string =>
+  row.expectMinutes === null
     ? null
-    : t("time.limitOf", { duration: formatDuration(row.limitMinutes, language) });
-};
+    : t("time.expectOf", { duration: formatDuration(row.expectMinutes, language) });
 
 /**
 A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category tag and the
@@ -141,7 +137,7 @@ const EntryRow = ({
   return (
     <>
       <ActivityRow onEdit={open} row={entry.row} zone={zone} />
-      <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} row={entry.row} />
+      <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
       <EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
     </>
   );

@@ -133,7 +133,7 @@ if (SHOT_DIR !== undefined) {
       ]) {
         await add(desktop, line);
       }
-      await desktop.getByRole("button", { name: "Work", exact: true }).click();
+      await desktop.getByRole("switch", { name: "Rest", exact: true }).click();
       await shoot(desktop, "now-desktop");
       await desktop.goto("/day");
       await shoot(desktop, "day-desktop");

@@ -7,12 +7,15 @@ const withActivity = (state: TimeState, activity: Activity): TimeState => ({
   activities: { ...state.activities, [activity.id]: activity },
 });
 
-/** A start closes every live activity still running before it (one primary at a time). */
+/** A main start closes the main activity still running before it (one main at a time). */
 const closeRunning = (activities: TimeState["activities"], at: string): TimeState["activities"] =>
   Object.fromEntries(
     Object.entries(activities).map(([id, activity]) => [
       id,
-      !activity.isLogged && activity.endAt === null && activity.startAt <= at
+      !activity.isLogged &&
+      !activity.isAlongside &&
+      activity.endAt === null &&
+      activity.startAt <= at
         ? { ...activity, endAt: at }
         : activity,
     ]),
@@ -23,18 +26,21 @@ const started = (state: TimeState, event: EventOf<"activity.started">): TimeStat
   if (Object.hasOwn(state.activities, payload.activityId)) {
     return state;
   }
+  const isAlongside = payload.alongside === true;
   return withActivity(
-    { ...state, activities: closeRunning(state.activities, event.occurredAt) },
+    {
+      ...state,
+      activities: isAlongside ? state.activities : closeRunning(state.activities, event.occurredAt),
+    },
     {
       buttonId: payload.buttonId ?? null,
       category: payload.category,
       endAt: null,
       expectMinutes: payload.expectMinutes ?? null,
       id: payload.activityId,
+      isAlongside,
       isLogged: false,
       label: payload.label,
-      limitMinutes: payload.limitMinutes ?? null,
-      messengersOnPurpose: false,
       startAt: event.occurredAt,
       taskId: payload.taskId ?? null,
     },
@@ -51,10 +57,9 @@ const logged = (state: TimeState, event: EventOf<"activity.logged">): TimeState 
         endAt: payload.endAt,
         expectMinutes: null,
         id: payload.activityId,
+        isAlongside: false,
         isLogged: true,
         label: payload.label,
-        limitMinutes: null,
-        messengersOnPurpose: false,
         startAt: payload.startAt,
         taskId: payload.taskId ?? null,
       });
@@ -68,34 +73,6 @@ const patch = (
   const activity = state.activities[activityId];
   return activity === undefined ? state : withActivity(state, change(activity));
 };
-
-const buttonSet = (state: TimeState, event: EventOf<"activity.button.set">): TimeState => {
-  const { payload } = event;
-  return {
-    ...state,
-    buttons: {
-      ...state.buttons,
-      [payload.buttonId]: {
-        category: payload.category,
-        color: payload.color,
-        expectMinutes: payload.expectMinutes ?? null,
-        id: payload.buttonId,
-        label: payload.label,
-        limitMinutes: payload.limitMinutes ?? null,
-        order: payload.order,
-        taskId: payload.taskId ?? null,
-        shouldAskDetails: payload.shouldAskDetails ?? false,
-      },
-    },
-    hasCustomButtons: true,
-  };
-};
-
-const buttonRemoved = (state: TimeState, buttonId: string): TimeState => ({
-  ...state,
-  buttons: Object.fromEntries(Object.entries(state.buttons).filter(([id]) => id !== buttonId)),
-  hasCustomButtons: true,
-});
 
 type ActivityEventType = Extract<EventType, `activity.${string}`>;
 
@@ -124,17 +101,18 @@ const HANDLERS: Handlers = {
     }));
   },
   "activity.labelled": (state, event) => {
-    const { category, label, messengersOnPurpose, taskId } = event.payload;
+    const { category, expectMinutes, label, taskId } = event.payload;
     return patch(state, event.payload.activityId, (activity) => ({
       ...activity,
       category: category ?? activity.category,
+      expectMinutes: expectMinutes === undefined ? activity.expectMinutes : expectMinutes,
       label: label ?? activity.label,
-      messengersOnPurpose: messengersOnPurpose ?? activity.messengersOnPurpose,
       taskId: taskId === undefined ? activity.taskId : taskId,
     }));
   },
-  "activity.button.set": buttonSet,
-  "activity.button.removed": (state, event) => buttonRemoved(state, event.payload.buttonId),
+  // The bar's buttons are fixed now: the old edits stay in the log and change nothing.
+  "activity.button.set": (state) => state,
+  "activity.button.removed": (state) => state,
 };
 
 const isActivityEvent = (event: Event): event is ActivityEvent =>

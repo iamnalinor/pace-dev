@@ -108,8 +108,8 @@ export const showNow = async (
 };
 
 /**
-Keeps the running activity's Expect and Limit timers on the phone, so they ring without the
-network; called whenever the running activity or its targets change.
+Keeps the running activity's "still doing this?" timer on the phone, so it rings without the
+network; called whenever the running activity or its Expect change.
 */
 export const syncActivityTimers = async (
   client: Pick<PaceClient, "clock" | "state">,

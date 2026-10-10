@@ -5,7 +5,7 @@ import {
   formatDuration,
   formatRelativeDay,
   type Language,
-  type LimitAlert,
+  type LongRun,
   type NotifyMessage,
   type Stuck,
   t,
@@ -44,10 +44,10 @@ const criticalText = (message: Critical, zoned: Zoned): OutgoingMessage => {
   };
 };
 
-const limitText = (message: LimitAlert, { language, zone }: Zoned): OutgoingMessage => ({
+const longText = (message: LongRun, { language, zone }: Zoned): OutgoingMessage => ({
   buttons: [],
-  text: t(language, "notify.limit", {
-    duration: formatDuration(message.limitMinutes, language),
+  text: t(language, "notify.long", {
+    duration: formatDuration(message.expectMinutes, language),
     label: message.label,
     time: clockIn(message.startAt, language, zone),
   }),
@@ -108,8 +108,8 @@ export const notificationText = (
     case "stuck": {
       return stuckText(message, zoned);
     }
-    case "limit": {
-      return limitText(message, zoned);
+    case "long": {
+      return longText(message, zoned);
     }
   }
 };
