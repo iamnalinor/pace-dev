@@ -50,7 +50,10 @@ export const replaceCalendar = async (
   return events.length;
 };
 
-/** The calendar's events overlapping a range, each occurrence once (phones may both send it). */
+/**
+The calendar's events overlapping a range, each occurrence once: two phones send the same event
+under their own local ids, so the same title and times count as one.
+*/
 export const listCalendar = async (
   db: Db,
   { from, to }: Range,
@@ -65,7 +68,8 @@ export const listCalendar = async (
     .filter(
       (row, index) =>
         rows.findIndex(
-          (other) => other.eventId === row.eventId && other.startAt === row.startAt,
+          (other) =>
+            other.title === row.title && other.startAt === row.startAt && other.endAt === row.endAt,
         ) === index,
     )
     .map((row) => ({
@@ -77,8 +81,8 @@ export const listCalendar = async (
     }));
 };
 
-export const clearCalendar = async (db: Db): Promise<void> => {
-  await db.delete(schema.calendarEvents);
+export const clearCalendar = async (db: Db, deviceId: string): Promise<void> => {
+  await db.delete(schema.calendarEvents).where(eq(schema.calendarEvents.deviceId, deviceId));
 };
 
 /** A device's sessions: a session seen again (same app and start) keeps the later end. */

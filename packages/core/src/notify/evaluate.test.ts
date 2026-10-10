@@ -190,6 +190,23 @@ describe("still doing this?", () => {
     expect(again.messages.filter((message) => message.kind === "long")).toEqual([]);
   });
 
+  it("asks again after a yes, at twice the new Expect", () => {
+    const first = run(addMinutesIso(MORNING, 61), [commute], checkedAt(addMinutesIso(MORNING, 30)));
+    const yes = at(4, addMinutesIso(MORNING, 62), {
+      type: "activity.labelled",
+      payload: { activityId: "a-commute", expectMinutes: 62 },
+    });
+    expect(
+      run(addMinutesIso(MORNING, 100), [commute, yes], first.memory).messages.filter(
+        (m) => m.kind === "long",
+      ),
+    ).toEqual([]);
+    const later = run(addMinutesIso(MORNING, 125), [commute, yes], first.memory);
+    expect(later.messages.filter((m) => m.kind === "long")).toEqual([
+      expect.objectContaining({ expectMinutes: 62 }),
+    ]);
+  });
+
   it("says nothing once the activity stopped", () => {
     const stopped = at(4, addMinutesIso(MORNING, 40), {
       type: "activity.stopped",

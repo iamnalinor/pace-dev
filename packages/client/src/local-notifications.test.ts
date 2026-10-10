@@ -85,7 +85,7 @@ describe("local notifications", () => {
       {
         at: "2026-10-06T13:00:00.000Z",
         body: "Still doing Commute?",
-        id: "pace:activity:a1:long",
+        id: "pace:activity:a1:long@2026-10-06T13:00:00.000Z",
         title: "Pace",
       },
     ]);

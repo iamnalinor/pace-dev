@@ -25,8 +25,18 @@ export type NewSession = {
 /** What a device token may do: upload its usage. */
 export type SessionScope = "usage:write";
 
-/** A bearer session resolved: whose it is and, for a device token, its one permission. */
-export type SessionAccess = { readonly user: User; readonly scope: null | SessionScope };
+/** A computer connected with its own token: its id (the session's) and its name. */
+export type DeviceIdentity = { readonly id: string; readonly name: string };
+
+/**
+A bearer session resolved: whose it is and, for a device token, its one permission and the
+device it belongs to (whatever it sends is filed under that device).
+*/
+export type SessionAccess = {
+  readonly user: User;
+  readonly scope: null | SessionScope;
+  readonly device: DeviceIdentity | null;
+};
 
 const isScope = (value: null | string): value is SessionScope => value === "usage:write";
 
@@ -67,6 +77,7 @@ export const findSession = async (
       sessionId: sessions.id,
       lastSeenAt: sessions.lastSeenAt,
       scope: sessions.scope,
+      label: sessions.label,
       user: {
         id: users.id,
         telegramId: users.telegramId,
@@ -88,7 +99,12 @@ export const findSession = async (
       .set({ lastSeenAt: new Date(now) })
       .where(eq(sessions.id, row.sessionId));
   }
-  return { scope: isScope(row.scope) ? row.scope : null, user: row.user };
+  const scope = isScope(row.scope) ? row.scope : null;
+  return {
+    device: scope === null ? null : { id: row.sessionId, name: row.label },
+    scope,
+    user: row.user,
+  };
 };
 
 /** A device connected with its own token: its name and when it was last heard from. */

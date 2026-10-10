@@ -31,5 +31,6 @@ export const requireAuth =
       throw new HTTPException(403, { res });
     }
     c.set("user", access.user);
+    c.set("device", access.device ?? undefined);
     await next();
   };

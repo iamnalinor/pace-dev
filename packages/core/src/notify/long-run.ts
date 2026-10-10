@@ -28,14 +28,18 @@ export const longRunCrossing = (time: TimeState, now: string): LongRun | null =>
       };
 };
 
-/** The question due at `now`: crossed, still running, not asked before (one per activity). */
+/** How an asked question is remembered: the activity and the moment, so a new Expect asks again. */
+export const longRunKey = (run: Pick<LongRun, "activityId" | "crossedAt">): string =>
+  `${run.activityId}@${run.crossedAt}`;
+
+/** The question due at `now`: crossed, still running, not asked at this moment before. */
 export const longRunOf = (
   time: TimeState,
   now: string,
   asked: readonly string[],
 ): LongRun | null => {
   const crossing = longRunCrossing(time, now);
-  return crossing !== null && crossing.crossedAt <= now && !asked.includes(crossing.activityId)
+  return crossing !== null && crossing.crossedAt <= now && !asked.includes(longRunKey(crossing))
     ? crossing
     : null;
 };

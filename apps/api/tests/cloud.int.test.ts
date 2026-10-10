@@ -24,13 +24,18 @@ const titles = async (token: string): Promise<readonly string[]> =>
   );
 
 describe("the calendar copy", () => {
-  it("replaces a phone's range, keeps another phone's events, and is forgotten on clear", async () => {
+  it("replaces a phone's range, keeps another phone's events, and forgets one phone's copy", async () => {
     const token = await loginAsDev("1001");
     await sync(token, "phone-a", [event("e1", 6, "Алгебра"), event("e2", 7, "Матанализ")]);
     await sync(token, "phone-b", [event("e9", 8, "Английский")]);
     await sync(token, "phone-a", [event("e1", 6, "Алгебра")]);
+    // The second phone knows the same lecture under its own id: listed once.
+    await sync(token, "phone-b", [event("e9", 8, "Английский"), event("b-77", 6, "Алгебра")]);
     expect(await titles(token)).toEqual(["Алгебра", "Английский"]);
-    expect((await call("/api/calendar", { method: "DELETE", token })).status).toBe(200);
+    const clear = await call("/api/calendar?deviceId=phone-a", { method: "DELETE", token });
+    expect(clear.status).toBe(200);
+    expect(await titles(token)).toEqual(["Алгебра", "Английский"]);
+    await call("/api/calendar?deviceId=phone-b", { method: "DELETE", token });
     expect(await titles(token)).toEqual([]);
     expect((await call(`/api/calendar?${RANGE}`)).status).toBe(401);
   });
@@ -67,8 +72,9 @@ describe("usage and device tokens", () => {
       body: { name: "Linux Mint" },
       token,
     });
+    // Whatever the request claims, a computer's sessions are filed under that computer.
     const body = {
-      deviceId: device.id,
+      deviceId: "someone-elses-phone",
       deviceName: "Linux Mint",
       sessions: [
         { app: "firefox", endAt: "2026-10-06T09:30:00.000Z", startAt: "2026-10-06T09:00:00.000Z" },

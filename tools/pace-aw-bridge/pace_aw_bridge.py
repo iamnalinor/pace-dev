@@ -44,6 +44,8 @@ MIN_SESSION = timedelta(seconds=60)
 FIRST_LOOKBACK = timedelta(hours=24)
 # At most this many sessions go in one request.
 BATCH = 500
+# Without a session to resend, the next run still reads this far back.
+REREAD = timedelta(minutes=10)
 
 
 @dataclass(frozen=True)
@@ -196,7 +198,8 @@ def run(dry_run: bool) -> int:
         )
     # The last session may still grow: the next run starts from its start and sends it again
     # (the server keeps one row per device, app and start).
-    config["cursor"] = iso(sessions[-1].start if sessions else now)
+    # With none, start a little back, so an app opened just now is not cut at its start.
+    config["cursor"] = iso(sessions[-1].start if sessions else max(since, now - REREAD))
     save_config(config)
     print(f"Sent {len(sessions)} sessions.")
     return 0
@@ -225,9 +228,8 @@ def units(script: Path) -> dict[str, str]:
     """The systemd user service (one run) and the timer that starts it every 5 minutes."""
     return {
         f"{UNIT}.service": (
-            "[Unit]\nDescription=Pace: send app usage from ActivityWatch\n"
-            "After=network-online.target\n\n"
-            f"[Service]\nType=oneshot\nExecStart={sys.executable} {script} run\n"
+            "[Unit]\nDescription=Pace: send app usage from ActivityWatch\n\n"
+            f'[Service]\nType=oneshot\nExecStart="{sys.executable}" "{script}" run\n'
         ),
         f"{UNIT}.timer": (
             "[Unit]\nDescription=Pace: send app usage every 5 minutes\n\n"

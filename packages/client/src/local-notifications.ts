@@ -62,7 +62,8 @@ export const activityNotifications = (
         {
           at,
           body: t(language, "notify.activityLong", { label: running.label }),
-          id: `${ACTIVITY_ID_PREFIX}${running.activityId}:long`,
+          // The moment is in the id: a new Expect replaces the timer instead of keeping the old one.
+          id: `${ACTIVITY_ID_PREFIX}${running.activityId}:long@${at}`,
           title: t(language, "notify.localTitle"),
         },
       ];

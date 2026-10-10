@@ -7,7 +7,7 @@ import { hasLaterStart, type NowItem, nowItem } from "../queries/now-item.ts";
 import { nowList } from "../queries/now-list.ts";
 import { reviewItems } from "../review/to-sort.ts";
 import { minutesBetween } from "../time.ts";
-import { type LongRun, longRunCrossing, longRunOf } from "./long-run.ts";
+import { type LongRun, longRunCrossing, longRunKey, longRunOf } from "./long-run.ts";
 import { type Critical, criticalOf, deadlineCrossingAt, type Stuck, stuckOf } from "./rules.ts";
 import { isQuietAt, lastDigestWindow, nextDigestAt } from "./schedule.ts";
 
@@ -31,7 +31,7 @@ export type NotifyMemory = {
   readonly stuck: readonly string[];
   /** Task id → until when its alerts are snoozed. */
   readonly snoozed: Readonly<Record<string, string>>;
-  /** Activities already asked "still doing this?" (absent in older memories). */
+  /** "Still doing this?" already asked, as `activityId@moment` (absent in older memories). */
   readonly longRuns?: readonly string[];
 };
 
@@ -100,7 +100,7 @@ const longRunStep = (
   const message: NotifyMessage = { kind: "long", ...alert };
   return {
     decisions: [decision(message, "sent", "The running activity took twice its Expect.")],
-    handled: [alert.activityId],
+    handled: [longRunKey(alert)],
     messages: [message],
   };
 };
@@ -260,7 +260,7 @@ export const nextAlarmAt = (
     .map((item) => deadlineCrossingAt(item.task, item.preset));
   const long = longRunCrossing(state.time, ctx.now);
   const longAt =
-    long === null || (memory.longRuns ?? []).includes(long.activityId) ? null : long.crossedAt;
+    long === null || (memory.longRuns ?? []).includes(longRunKey(long)) ? null : long.crossedAt;
   return laterOf(
     [
       nextDigestAt(ctx.now, zone, state.settings),
@@ -308,8 +308,8 @@ export const evaluateNotifications = (
       Object.entries(memory.snoozed).filter(([, until]) => until > ctx.now),
     ),
     // Only the running activity can still cross: older ids are dropped.
-    longRuns: [...(memory.longRuns ?? []), ...long.handled].filter(
-      (id) => longRunCrossing(state.time, ctx.now)?.activityId === id,
+    longRuns: [...(memory.longRuns ?? []), ...long.handled].filter((key) =>
+      key.startsWith(`${longRunCrossing(state.time, ctx.now)?.activityId ?? "-"}@`),
     ),
   };
   return {

@@ -50,3 +50,6 @@ expo-env.d.ts
 *.keystore
 *.jks
 !apps/app/keystores/debug.keystore
+
+# Python bytecode (the desktop bridge)
+__pycache__/

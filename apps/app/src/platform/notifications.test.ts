@@ -91,7 +91,7 @@ describe("syncActivityTimers", () => {
     expect(Notifications.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
       content: { body: "Still doing Commute?", title: "Pace" },
-      identifier: "pace:activity:a1:long",
+      identifier: "pace:activity:a1:long@2026-10-06T13:30:00.000Z",
       trigger: { channelId: "timers", date: new Date("2026-10-06T13:30:00.000Z"), type: "date" },
     });
   });

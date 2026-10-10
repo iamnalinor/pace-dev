@@ -78,7 +78,7 @@ class UnitsTest(unittest.TestCase):
         from pathlib import Path
 
         service, timer = bridge.units(Path("/home/me/.local/share/pace/pace_aw_bridge.py")).values()
-        self.assertIn("pace_aw_bridge.py run", service)
+        self.assertIn('"/home/me/.local/share/pace/pace_aw_bridge.py" run', service)
         self.assertIn("Type=oneshot", service)
         self.assertIn("OnUnitActiveSec=5min", timer)
 

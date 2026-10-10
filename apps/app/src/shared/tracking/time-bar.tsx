@@ -35,6 +35,9 @@ const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
 
 const percent = (share: number): `${number}%` => `${Math.round(share * 100)}%`;
 
+/** An Expect is a day at most. */
+const MAX_EXPECT_MINUTES = 24 * 60;
+
 /** The running activity's line under its label: the time, the Expect and, at twice it, the question. */
 const RunningMeta = ({ running }: { readonly running: RunningView }) => {
   const t = useT();
@@ -92,7 +95,9 @@ const RunningRow = ({ running }: { readonly running: RunningView }) => {
           onPress={() => {
             // Still going: what it took so far becomes its Expect, so the next ask is twice that.
             void run(
-              actions.relabelActivity(running.activityId, { expectMinutes: running.minutes }),
+              actions.relabelActivity(running.activityId, {
+                expectMinutes: Math.min(running.minutes, MAX_EXPECT_MINUTES),
+              }),
             );
           }}
         >
@@ -151,6 +156,7 @@ const TypedStart = () => {
       <TextInput
         accessibilityLabel={t("time.whatDoing")}
         className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
+        maxLength={200}
         onChangeText={setText}
         onSubmitEditing={() => void start()}
         placeholder={t("time.whatDoing")}

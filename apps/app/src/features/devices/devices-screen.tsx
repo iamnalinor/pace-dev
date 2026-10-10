@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { loadDeviceId } from "#app/platform/device-id.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { isCalendarSyncOn, setCalendarSync } from "#app/platform/phone-memory.ts";
 import { uploadPhoneData } from "#app/platform/phone-upload.ts";
@@ -32,7 +33,7 @@ const CalendarSyncRow = () => {
       return;
     }
     try {
-      await api.call(endpoints.calendar.clear, {});
+      await api.call(endpoints.calendar.clear, { query: { deviceId: await loadDeviceId() } });
     } catch {
       // Offline: the copy stays until the next time it is turned off; nothing new is sent.
     }

@@ -113,6 +113,34 @@ describe("time actions", () => {
     expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("calendar");
   });
 
+  it("attends a calendar event late without hiding it behind what was started meanwhile", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startChoice("rest"));
+    world.setNow(later(10));
+    unwrap(
+      await world.actions.startCalendar({
+        endAt: later(60),
+        startAt: later(-10),
+        title: "Seminar",
+      }),
+    );
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(11)));
+    expect(bar.running).toMatchObject({ label: "Seminar", startAt: NOW });
+    expect(bar.alongside).toEqual([]);
+    const open = Object.values(world.state.store.getState().time.activities).filter(
+      (activity) => activity.endAt === null,
+    );
+    expect(open.map((activity) => activity.label)).toEqual(["Seminar"]);
+  });
+
+  it("keeps a typed activity within the limits: 80 characters, a day at most", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startTyped(`${"чтение ".repeat(20)}30 ч`));
+    const running = timeBarModel(world.state.store.getState(), ctx(later(1))).running;
+    expect(running?.label.length).toBeLessThanOrEqual(80);
+    expect(running?.expectMinutes).toBe(24 * 60);
+  });
+
   it("stops at a past instant, and the assistant's reading relabels the running one", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startTyped("цсс"));

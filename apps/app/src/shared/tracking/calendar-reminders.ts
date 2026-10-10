@@ -5,11 +5,7 @@ import { calendarKey, dismissedKeys, seriesRules } from "#app/platform/phone-mem
 
 import { calendarToday } from "./calendar-source.ts";
 
-/**
-Today's calendar events still ahead, minus the ones waved away and the series answered for
-good, each reminded about as it starts. Runs at start-up and whenever the app comes back.
-*/
-export const remindCalendar = async (runtime: PaceRuntime): Promise<void> => {
+const schedule = async (runtime: PaceRuntime): Promise<void> => {
   const now = runtime.clock.now();
   const zone = runtime.clock.deviceTz;
   const today = await calendarToday({ api: runtime.api, now, zone });
@@ -22,4 +18,16 @@ export const remindCalendar = async (runtime: PaceRuntime): Promise<void> => {
   );
   const { language } = runtime.state.store.getState().settings;
   await syncCalendarReminders(events, { language, now, zone });
+};
+
+/**
+Today's calendar events still ahead, minus the ones waved away and the series answered for
+good, each reminded about as it starts. Runs at start-up and whenever the app comes back.
+*/
+export const remindCalendar = async (runtime: PaceRuntime): Promise<void> => {
+  try {
+    await schedule(runtime);
+  } catch {
+    // The calendar or the notifications refused: start-up goes on, the next return tries again.
+  }
 };

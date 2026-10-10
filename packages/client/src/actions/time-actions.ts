@@ -71,9 +71,16 @@ export type TimeActions = EditActions & {
 /** When to stop, and which activity: the main one unless named. */
 export type StopWhen = When & { readonly activityId?: string | undefined };
 
-/** Whole positive minutes, or nothing. */
+/** An activity's Expect is a day at most (what the events accept). */
+const MAX_MINUTES = 24 * 60;
+/** A label is at most this long (what the events accept). */
+const MAX_LABEL = 80;
+
+/** Whole positive minutes up to a day, or nothing. */
 const positive = (minutes: null | number | undefined): number | undefined =>
-  minutes === null || minutes === undefined || minutes <= 0 ? undefined : Math.round(minutes);
+  minutes === null || minutes === undefined || minutes <= 0
+    ? undefined
+    : Math.min(MAX_MINUTES, Math.round(minutes));
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 
@@ -82,7 +89,7 @@ const startActivity = async (
   input: Parameters<TimeActions["startActivity"]>[0],
   when: When = {},
 ): ActionResult => {
-  const label = input.label.trim();
+  const label = input.label.trim().slice(0, MAX_LABEL).trim();
   if (label === "") {
     return err("action/empty-text");
   }
@@ -154,7 +161,13 @@ const startCalendar = async (
   options: StartOptions = {},
 ): ActionResult => {
   const now = deps.clock.now();
-  const startAt = Date.parse(event.startAt) < Date.parse(now) ? event.startAt : now;
+  // A main activity begun since the event started keeps its time: the event takes over from it.
+  const since =
+    options.alongside === true ? null : (runningActivity(timeOf(deps), now)?.startAt ?? null);
+  const begun = Math.min(Date.parse(event.startAt), Date.parse(now));
+  const startAt = new Date(
+    since === null ? begun : Math.max(begun, Date.parse(since)),
+  ).toISOString();
   const minutes = Math.round((Date.parse(event.endAt) - Date.parse(startAt)) / 60_000);
   return await startActivity(
     deps,
@@ -163,7 +176,7 @@ const startCalendar = async (
       buttonId: "calendar",
       category: "other",
       expectMinutes: minutes > 0 ? minutes : null,
-      label: event.title.slice(0, 80),
+      label: event.title,
     },
     { at: startAt },
   );

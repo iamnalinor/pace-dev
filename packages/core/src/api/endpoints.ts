@@ -251,8 +251,14 @@ export const endpoints = {
       path: "/api/calendar",
       query: RangeQuerySchema,
     }),
-    /** Forgets the calendar copy (sending was turned off). */
-    clear: endpoint({ auth: true, method: "DELETE", output: DoneSchema, path: "/api/calendar" }),
+    /** Forgets one phone's calendar copy (it turned sending off). */
+    clear: endpoint({
+      auth: true,
+      method: "DELETE",
+      output: DoneSchema,
+      path: "/api/calendar",
+      query: z.object({ deviceId: z.string().min(1).max(64) }),
+    }),
   },
   usage: {
     /** A device's app sessions; the same device, app and start is one session (it may grow). */

@@ -272,8 +272,9 @@ export class UserStore extends DurableObject {
     return await cloud.listCalendar(this.db, range);
   }
 
-  async clearCalendar(): Promise<void> {
-    await cloud.clearCalendar(this.db);
+  /** Forgets one phone's calendar copy (it stopped sending it). */
+  async clearCalendar(deviceId: string): Promise<void> {
+    await cloud.clearCalendar(this.db, deviceId);
   }
 
   /** A device's app sessions (names and times only). */

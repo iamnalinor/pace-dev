@@ -24,7 +24,7 @@ Pace only shows where the time went.
 4. The computer appears in **Settings → Devices** with its last data within 5 minutes.
 
 The token is shown once and may only upload usage (`usage:write`): it cannot read or change
-anything else. Lost it? Disconnect the computer and add it again.
+anything else, and whatever it sends is filed under its own computer. Lost it? Disconnect the computer and add it again.
 
 ### macOS and Windows
 

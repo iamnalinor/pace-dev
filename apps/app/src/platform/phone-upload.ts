@@ -14,6 +14,10 @@ const CALENDAR_BACK_MINUTES = 7 * 24 * 60;
 const CALENDAR_AHEAD_MINUTES = 14 * 24 * 60;
 /** A first upload looks back a day. */
 const FIRST_LOOKBACK_MINUTES = 24 * 60;
+/** Without a session to resend, the next upload still reads this far back. */
+const REREAD_MINUTES = 10;
+/** At most this many events go in one calendar copy (what the server accepts). */
+const MAX_EVENTS = 2000;
 /** At most this many sessions go in one request. */
 const BATCH = 1000;
 
@@ -33,7 +37,11 @@ const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Pr
   await api.call(endpoints.calendar.sync, {
     body: {
       deviceId,
-      events: events.map((event) => ({ ...event, title: event.title.slice(0, 200) })),
+      events: events.slice(0, MAX_EVENTS).map((event) => ({
+        ...event,
+        series: event.series?.slice(0, 300) ?? null,
+        title: event.title.slice(0, 200),
+      })),
       from,
       to,
     },
@@ -59,7 +67,10 @@ const uploadUsage = async (api: ApiClient, deviceId: string, now: string): Promi
     });
   }
   // The last session may still grow: the next upload starts from its start and sends it again.
-  await setUsageCursor(named.at(-1)?.startAt ?? now);
+  // With none, it starts a little back, so an app opened just now is not cut at its start.
+  const reread = addMinutesIso(now, -REREAD_MINUTES);
+  const quiet = new Date(Math.max(Date.parse(since), Date.parse(reread))).toISOString();
+  await setUsageCursor(named.at(-1)?.startAt ?? quiet);
 };
 
 /**
@@ -68,11 +79,13 @@ Sends what the phone knows beside the event log: its calendar (own and accepted 
 refused, it tries again on the next start or return to the app.
 */
 export const uploadPhoneData = async (api: ApiClient, now: string): Promise<void> => {
-  try {
-    const deviceId = await loadDeviceId();
-    await uploadCalendar(api, deviceId, now);
-    await uploadUsage(api, deviceId, now);
-  } catch {
-    // Kept for the next try: nothing here is lost, the phone still has it.
+  const deviceId = await loadDeviceId();
+  // Each on its own: a calendar the server refuses never holds the usage back, or the reverse.
+  for (const upload of [uploadCalendar, uploadUsage]) {
+    try {
+      await upload(api, deviceId, now);
+    } catch {
+      // Kept for the next try: nothing here is lost, the phone still has it.
+    }
   }
 };
