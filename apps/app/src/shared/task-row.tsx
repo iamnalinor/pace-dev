@@ -47,6 +47,7 @@ export const TaskRow = ({
             checked || row.dimmed ? "text-fg2" : "font-medium text-fg",
             checked && "line-through",
           )}
+          numberOfLines={2}
         >
           {row.title}
         </Text>

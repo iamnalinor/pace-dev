@@ -30,16 +30,21 @@ export type TaskFormValues = {
 export type TaskFormOptions = {
   readonly presets: readonly ComposerOption[];
   readonly projects: readonly ComposerOption[];
+  /** Each category's own estimate, shown when the task has none of its own. */
+  readonly estimates: Readonly<Record<string, number>>;
 };
 
 type Panel = "due" | "estimate" | "start" | null;
 
 /** Start, due and estimate as chips; a chip opens its panel (a calendar with a time, or a list). */
 const WhenFields = ({
+  fallback,
   onChange,
   values,
 }: {
   readonly values: TaskFormValues;
+  /** The category's estimate, used while the task has none of its own. */
+  readonly fallback: null | number;
   readonly onChange: (patch: Partial<TaskFormValues>) => void;
 }) => {
   const [panel, setPanel] = useState<Panel>(null);
@@ -69,6 +74,7 @@ const WhenFields = ({
           value={values.due}
         />
         <EstimateChip
+          fallback={fallback}
           isOpen={panel === "estimate"}
           minutes={values.estimateMinutes}
           onToggle={() => {
@@ -89,6 +95,7 @@ const WhenFields = ({
       ) : null}
       {panel === "estimate" ? (
         <EstimateOptions
+          fallback={fallback}
           minutes={values.estimateMinutes}
           onEstimate={(estimateMinutes) => {
             onChange({ estimateMinutes });
@@ -199,7 +206,11 @@ export const TaskFields = ({
         value={values.title}
       />
       <ChoiceFields onChange={onChange} options={options} values={values} />
-      <WhenFields onChange={onChange} values={values} />
+      <WhenFields
+        fallback={options.estimates[values.presetId] ?? null}
+        onChange={onChange}
+        values={values}
+      />
       <TextField
         label={t("edit.description")}
         multiline

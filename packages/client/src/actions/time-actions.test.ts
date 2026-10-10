@@ -4,6 +4,7 @@ import { NOW } from "@pace/core/testing";
 
 import { dayModel } from "../view-models/day.ts";
 import { insightsModel } from "../view-models/insights.ts";
+import { nowViewModel } from "../view-models/now.ts";
 import { timeBarModel } from "../view-models/time-bar.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
@@ -174,6 +175,24 @@ describe("time actions", () => {
       unwrap(await world.actions.refineActivity(id, { ...reading, label: "Бассейн" })),
     ).toEqual([]);
     expect(running()).toMatchObject({ label: "ЦСС" });
+  });
+
+  it("picks a paused task up again when focusing on it", async () => {
+    const world = await setupActions();
+    const task = Object.values(world.state.store.getState().tasks.byId).find(
+      (candidate) => candidate.title === "Algebra HW 6",
+    );
+    const taskId = task?.id ?? "";
+    unwrap(await world.actions.setStatus(taskId, "paused"));
+    const isPaused = () =>
+      nowViewModel(world.state.store.getState(), ctx(later(1)))
+        .rows.find((candidate) => candidate.id === taskId)
+        ?.meta.some((part) => part.kind === "paused");
+    // A paused task is marked on Now; Focus picks it up again.
+    expect(isPaused()).toBe(true);
+    unwrap(await world.actions.focusTask(taskId));
+    expect(world.state.store.getState().tasks.byId[taskId]?.status).toBe("in_progress");
+    expect(isPaused()).toBe(false);
   });
 
   it("leaves a day with nothing on it empty instead of one long gap", async () => {

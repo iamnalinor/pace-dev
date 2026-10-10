@@ -112,6 +112,50 @@ describe("parseQuickInput", () => {
     expect(parse("buy 2, 3 apples")).toMatchObject({ subtasks: [], title: "buy 2, 3 apples" });
   });
 
+  it("reads a date by the month's name, this year or the next once it has passed", () => {
+    expect(parse("дз по алгебре 12, 14 сдать до 12 октября")).toMatchObject({
+      dueAt: "2026-10-12T20:59:00.000Z",
+      subtasks: [
+        { label: "12", number: 12 },
+        { label: "14", number: 14 },
+      ],
+      title: "по алгебре сдать",
+    });
+    expect(parse("report due October 12 18:00").dueAt).toBe("2026-10-12T15:00:00.000Z");
+    expect(parse("продлить визу 3 марта").dueAt).toBe("2027-03-03T20:59:00.000Z");
+    expect(parse("встреча 1 октября").dueAt).toBe("2027-10-01T20:59:00.000Z");
+  });
+
+  it("takes «№2» after «задание» as the assignment's number, not a problem", () => {
+    expect(parse("Домашнее задание №2 по алгебре: задачи 12, 14, 17").subtasks).toEqual([
+      { label: "12", number: 12 },
+      { label: "14", number: 14 },
+      { label: "17", number: 17 },
+    ]);
+    expect(parse("Домашнее задание №2 по алгебре").subtasks).toEqual([]);
+  });
+
+  it("makes a pasted message's first line the title and the rest its description", () => {
+    const pasted = [
+      "Домашнее задание №2 по «Безопасность жизнедеятельности»",
+      "Дедлайн: вторник 13 октября 23:59",
+      "Методичка: https://example.com/bzd/method.pdf",
+    ].join("\n");
+    expect(parse(pasted)).toMatchObject({
+      description:
+        "Дедлайн: вторник 13 октября 23:59\nМетодичка: https://example.com/bzd/method.pdf",
+      dueAt: "2026-10-13T20:59:00.000Z",
+      link: "https://example.com/bzd/method.pdf",
+      title: "Домашнее задание №2 по «Безопасность жизнедеятельности»",
+    });
+  });
+
+  it("cuts a long one-line title at a word, at most 100 characters", () => {
+    const title = parse(`${"очень ".repeat(30)}длинная задача`).title;
+    expect(title.length).toBeLessThanOrEqual(100);
+    expect(title.endsWith("…")).toBe(true);
+  });
+
   it("keeps the source text verbatim", () => {
     const text = "  Синк  по дашборду завтра ";
     expect(parse(text).text).toBe(text);

@@ -93,6 +93,8 @@ export const enInput = {
   "form.addSubtask": "Add a problem",
   "form.removeSubtask": "Remove {label}",
   "form.create": "Create",
+  "form.estimateDefault": "{duration} by category",
+  "form.estimateTyped": "Other: 50, 2.5h",
   "composer.parse": "Parse",
   "composer.byHand": "Fill in by hand",
   "composer.quickHint": "Enter adds a short line as it is. A pasted message is parsed into a form.",

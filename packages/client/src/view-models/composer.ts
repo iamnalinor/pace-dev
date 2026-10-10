@@ -101,10 +101,21 @@ export const taskFormOptions = (
 ): {
   readonly presets: readonly ComposerOption[];
   readonly projects: readonly ComposerOption[];
-} => ({
-  presets: presetOptions(state),
-  projects: projectOptions(state),
-});
+  /** Each category's own estimate: what a task without one of its own counts with. */
+  readonly estimates: Readonly<Record<string, number>>;
+} => {
+  const presets = presetOptions(state);
+  return {
+    estimates: Object.fromEntries(
+      presets.flatMap((option) => {
+        const resolved = resolvePreset(state.presets, option.id);
+        return resolved.ok ? [[option.id, resolved.value.defaultEstimateMinutes]] : [];
+      }),
+    ),
+    presets,
+    projects: projectOptions(state),
+  };
+};
 
 const optionOf = (options: readonly ComposerOption[], id: null | string): ComposerOption | null =>
   options.find((option) => option.id === id) ?? null;

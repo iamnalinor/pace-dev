@@ -13,7 +13,8 @@ export const WorkProgress = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
-  if (view.progress.mode !== "slider") {
+  // A closed task's progress is its outcome, shown in the tags.
+  if (view.progress.mode !== "slider" || view.closed !== null) {
     return null;
   }
   const value = view.progress.slider ?? 0;

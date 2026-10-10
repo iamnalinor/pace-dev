@@ -222,14 +222,21 @@ export const timeActions = (deps: ActionDeps): TimeActions => ({
   refineActivity: async (activityId, reading) => await refineActivity(deps, activityId, reading),
   focusTask: async (taskId) => {
     const task = taskById(deps.state.store.getState().tasks, taskId);
-    return task === undefined
-      ? err("task/unknown")
-      : await startActivity(deps, {
-          category: "task",
-          expectMinutes: task.estimateMinutes,
-          label: task.title.slice(0, 80),
-          taskId,
-        });
+    if (task === undefined) {
+      return err("task/unknown");
+    }
+    const started = await startActivity(deps, {
+      category: "task",
+      expectMinutes: task.estimateMinutes,
+      label: task.title,
+      taskId,
+    });
+    // Focusing on a paused task picks it up again.
+    return started.ok && task.status === "paused"
+      ? await emit(deps, [
+          stamp(deps, { payload: { status: "in_progress", taskId }, type: "task.status.set" }),
+        ])
+      : started;
   },
   startActivity: async (input, when) => await startActivity(deps, input, when),
   startCalendar: async (event, options) => await startCalendar(deps, event, options),

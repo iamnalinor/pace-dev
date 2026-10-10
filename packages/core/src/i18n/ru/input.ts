@@ -95,6 +95,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "form.addSubtask": "Добавить задачу",
   "form.removeSubtask": "Убрать {label}",
   "form.create": "Создать",
+  "form.estimateDefault": "{duration} по категории",
+  "form.estimateTyped": "Другое: 50, 2,5 ч",
   "composer.parse": "Разобрать",
   "composer.byHand": "Заполнить вручную",
   "composer.quickHint":

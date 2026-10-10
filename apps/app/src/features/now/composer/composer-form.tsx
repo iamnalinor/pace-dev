@@ -1,15 +1,14 @@
-import { X } from "lucide-react-native";
-import { type ReactNode, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { type ReactNode, useMemo } from "react";
+import { Text, View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
+import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
 /** The form's values from the composer's reading: the edits over the rules' reading of the text. */
@@ -48,60 +47,6 @@ const editsOf = (patch: Partial<TaskFormValues>): ComposerEdits => {
 const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
   const number = /^\d+$/u.test(label) ? Number(label) : null;
   return { label, number };
-};
-
-/** The problems read from the message, each removable, and a line to add one more. */
-const SubtaskList = ({
-  model,
-  onEdit,
-}: {
-  readonly model: ComposerModel;
-  readonly onEdit: (edits: ComposerEdits) => void;
-}) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const [draft, setDraft] = useState("");
-  const add = (): void => {
-    const label = draft.trim();
-    if (label === "") {
-      return;
-    }
-
-    onEdit({ subtasks: [...model.subtasks, subtaskOf(label)] });
-    setDraft("");
-  };
-  return (
-    <View className="gap-1.5">
-      <Text className="font-sans text-[12px] text-muted">{t("form.subtasks")}</Text>
-      <View className="flex-row flex-wrap gap-1.5">
-        {model.subtasks.map((subtask, index) => (
-          <Pressable
-            accessibilityLabel={t("form.removeSubtask", { label: subtask.label })}
-            accessibilityRole="button"
-            className="h-8 flex-row items-center gap-1 rounded-pill border-2 border-line bg-surface pl-3 pr-2 active:opacity-70"
-            key={`${String(index)}-${subtask.label}`}
-            onPress={() => {
-              onEdit({ subtasks: model.subtasks.filter((_, other) => other !== index) });
-            }}
-          >
-            <Text className="font-sans text-[13px] text-fg">{subtask.label}</Text>
-            <X color={palette.muted} size={14} strokeWidth={2} />
-          </Pressable>
-        ))}
-        <TextInput
-          accessibilityLabel={t("form.addSubtask")}
-          className="h-8 min-w-32 rounded-pill border border-dashed border-line px-3 font-sans text-[13px] text-fg"
-          onChangeText={setDraft}
-          onSubmitEditing={add}
-          placeholder={t("form.addSubtask")}
-          placeholderTextColor={palette.muted}
-          returnKeyType="done"
-          submitBehavior="submit"
-          value={draft}
-        />
-      </View>
-    </View>
-  );
 };
 
 /** For a weekly course: this week's homework, another open week, or a task of its own. */
@@ -198,7 +143,12 @@ export const ComposerForm = ({
       ) : (
         <TaskFields onChange={change} options={options} values={values} />
       )}
-      <SubtaskList model={model} onEdit={onEdit} />
+      <SubtaskList
+        items={model.subtasks.map((subtask) => subtask.label)}
+        onChange={(labels) => {
+          onEdit({ subtasks: labels.map((label) => subtaskOf(label)) });
+        }}
+      />
       <SheetActions
         cancelLabel={t("common.cancel")}
         isDisabled={!isInstance && values.title.trim() === ""}

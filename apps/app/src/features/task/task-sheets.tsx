@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 
+import type { PaceRuntime } from "#app/runtime.ts";
+
 import { useAppState, usePace, useT } from "#app/app-state.tsx";
+import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -58,9 +61,48 @@ const patchOf = (before: TaskFormValues, after: TaskFormValues): TaskPatch => ({
   ...timePatch("start", before.start, after.start),
 });
 
+type SaveInput = {
+  readonly actions: PaceRuntime["actions"];
+  readonly view: TaskViewModel;
+  readonly before: TaskFormValues;
+  readonly values: TaskFormValues;
+  /** Problems added in the sheet. */
+  readonly added: readonly string[];
+};
+
+/** The writes a save makes, in order: only what changed. */
+const saveSteps = ({ actions, added, before, values, view }: SaveInput) => {
+  const patch = patchOf(before, values);
+  return [
+    ...(Object.keys(patch).length === 0
+      ? []
+      : [async () => await actions.updateTask(view.id, patch)]),
+    ...(values.presetId === before.presetId
+      ? []
+      : [async () => await actions.setPreset(view.id, values.presetId)]),
+    ...(values.projectId === before.projectId
+      ? []
+      : [
+          async () =>
+            await actions.setProject(
+              view.id,
+              values.projectId === null ? null : { projectId: values.projectId },
+            ),
+        ]),
+    ...(values.importance === before.importance
+      ? []
+      : [async () => await actions.setImportance(view.id, values.importance)]),
+    ...(values.estimateMinutes === before.estimateMinutes
+      ? []
+      : [async () => await actions.setEstimate(view.id, values.estimateMinutes)]),
+    ...(added.length === 0 ? [] : [async () => await actions.addSubtasks(view.id, added)]),
+  ];
+};
+
 /**
 Everything about a task, editable in one place: title, category, importance, project, start,
-due (clearable), estimate (clearable), description and link. Only what changed is written.
+due (clearable), estimate (clearable), description, link and new problems. Only what changed
+is written.
 */
 export const EditTaskSheet = ({
   onClose,
@@ -77,34 +119,11 @@ export const EditTaskSheet = ({
   const options = useMemo(() => taskFormOptions(state), [state]);
   const before = useMemo(() => valuesOf(view, deviceTz), [view, deviceTz]);
   const [values, setValues] = useState(before);
+  const [added, setAdded] = useState<readonly string[]>([]);
   const save = async (): Promise<void> => {
-    const patch = patchOf(before, values);
-    const steps = [
-      ...(Object.keys(patch).length === 0
-        ? []
-        : [async () => await actions.updateTask(view.id, patch)]),
-      ...(values.presetId === before.presetId
-        ? []
-        : [async () => await actions.setPreset(view.id, values.presetId)]),
-      ...(values.projectId === before.projectId
-        ? []
-        : [
-            async () =>
-              await actions.setProject(
-                view.id,
-                values.projectId === null ? null : { projectId: values.projectId },
-              ),
-          ]),
-      ...(values.importance === before.importance
-        ? []
-        : [async () => await actions.setImportance(view.id, values.importance)]),
-      ...(values.estimateMinutes === before.estimateMinutes
-        ? []
-        : [async () => await actions.setEstimate(view.id, values.estimateMinutes)]),
-    ];
+    const steps = saveSteps({ actions, added, before, values, view });
     for (const step of steps) {
       // One after another: each write is validated against the state the previous one left.
-
       if (!(await run(step()))) {
         return;
       }
@@ -119,6 +138,11 @@ export const EditTaskSheet = ({
         }}
         options={options}
         values={values}
+      />
+      <SubtaskList
+        items={added}
+        kept={view.problems.map((problem) => problem.label)}
+        onChange={setAdded}
       />
       <SheetActions
         cancelLabel={t("common.cancel")}

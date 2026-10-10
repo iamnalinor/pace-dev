@@ -145,6 +145,10 @@ describe("taskViewModel", () => {
     const sheet = view(sheetId(3), HW_VIEW_NOW);
     expect(sheet.primaryAction).toEqual({ kind: "none" });
     expect(sheet.outcome).toBe("done_late");
+    // Closed: its outcome instead of a status, and no work left.
+    expect(sheet.tags).toContainEqual({ kind: "outcome", outcome: "done_late" });
+    expect(sheet.tags.some((tag) => tag.kind === "status")).toBe(false);
+    expect(sheet.stats.workLeftMinutes).toBe(0);
     expect(taskViewModel(artboardState(), "t-nope", ctx())).toEqual({
       error: "task/unknown",
       ok: false,

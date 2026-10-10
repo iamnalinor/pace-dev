@@ -25,6 +25,7 @@ import { type QuickTime, quickTimes } from "../clock.ts";
 
 export type TaskTag =
   | { readonly kind: "importance"; readonly importance: Importance }
+  | { readonly kind: "outcome"; readonly outcome: Outcome }
   | { readonly kind: "status"; readonly status: TaskStatus }
   | { readonly kind: "submission"; readonly submission: Submission };
 
@@ -121,9 +122,10 @@ const problemState = (solvedAt: null | string, submittedAt: null | string): Prob
   return solvedAt === null ? "pending" : "solved";
 };
 
-const tags = (view: TaskView): readonly TaskTag[] => [
+const tags = (view: TaskView, outcome: null | Outcome): readonly TaskTag[] => [
   { kind: "importance", importance: view.importance },
-  { kind: "status", status: view.status },
+  // A closed task shows how it ended, not the status it had while open.
+  outcome === null ? { kind: "status", status: view.status } : { kind: "outcome", outcome },
   // Only a task with subtasks can be submitted piece by piece; "whole" goes without saying.
   ...(view.preset.submission === "per_subtask"
     ? [{ kind: "submission" as const, submission: view.preset.submission }]
@@ -163,7 +165,7 @@ const stats = (view: TaskView): TaskViewModel["stats"] => ({
   dueZoneDiffers: view.dueZoneDiffers,
   startAt: view.task.startAt ?? view.task.createdAt,
   startTz: view.task.startTz,
-  workLeftMinutes: view.workLeftMinutes,
+  workLeftMinutes: view.task.closed === null ? view.workLeftMinutes : 0,
   trackedMinutes: view.trackedMinutes,
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
 });
@@ -200,7 +202,7 @@ export const taskViewModel = (
       sourceText: task.sourceText,
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
-      tags: tags(view),
+      tags: tags(view, taskOutcome(task, preset)),
       stats: stats(view),
       progress: {
         mode: preset.progressMode,

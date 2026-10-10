@@ -5,7 +5,7 @@ import type { ParseResult } from "./schema.ts";
 import type { VerifiedParse } from "./verify.ts";
 
 import { type EventBody, subtasksAddedBodies } from "../input/bodies.ts";
-import { parseQuickInput, type QuickInput } from "../input/parse-quick-input.ts";
+import { parseQuickInput, type QuickInput, shortTitle } from "../input/parse-quick-input.ts";
 import { extractLink } from "../links.ts";
 import { findProjectByName } from "../model/project.ts";
 import { isOpen, type Task } from "../model/task.ts";
@@ -114,13 +114,14 @@ export const parseToQuickInput = (
     ...projectOf(state, result.project, rules),
     ...dueOf(result, rules, accountTz(state, ctx)),
     ...importanceOf(result, rules, resolvePreset(state.presets, presetId)),
-    description: result.description,
+    description: result.description ?? rules.description,
     estimateMinutes: result.estimateMinutes ?? rules.estimateMinutes,
     link: extractLink(text),
     presetId,
     spans: [],
     subtasks: result.subtasks.length === 0 ? rules.subtasks : result.subtasks,
-    title: result.title ?? rules.title,
+    // A title the model kept long (the whole message) is cut like a typed one.
+    title: result.title === null ? rules.title : shortTitle(result.title),
   };
 };
 

@@ -12,6 +12,9 @@ export const plainMetaText = (part: PlainMetaPart, language: Language): string =
     case "left": {
       return t(language, `meta.${part.kind}`, { span: formatSpan(part.minutes, language) });
     }
+    case "paused": {
+      return t(language, "status.paused");
+    }
     case "late": {
       return t(language, "meta.late", {
         span: formatLate(part.minutes, language, part.isSoft),

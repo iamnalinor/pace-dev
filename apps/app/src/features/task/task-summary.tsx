@@ -14,6 +14,9 @@ const tagKey = (tag: TaskTag) => {
     case "importance": {
       return `importance.${tag.importance}` as const;
     }
+    case "outcome": {
+      return `outcome.${tag.outcome}` as const;
+    }
     case "status": {
       return `status.${tag.status}` as const;
     }
