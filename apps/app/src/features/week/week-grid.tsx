@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { type ReactNode, useRef } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import type { CalendarEvent, Language, UsageRow } from "@pace/core";
 
@@ -28,6 +29,10 @@ export type GridProps = {
   readonly hourPx: number;
   readonly language: Language;
   readonly onPick: (picked: Picked) => void;
+  /** Where the "now" line goes in today's column. */
+  readonly now: string;
+  /** A phone keeps each day readable at this width and scrolls the week sideways. */
+  readonly minColumnPx: number;
 };
 
 /** "Mon 5", "пн 5" in the person's language. */
@@ -184,14 +189,17 @@ const DayColumn = ({
   day,
   hourPx,
   language,
+  minColumnPx,
+  now,
   onPick,
   usage,
   week,
 }: GridProps & { readonly day: WeekDay }) => {
   const where = { fromHour: week.fromHour, zone: week.zone };
   const grid: Grid = { hourPx, place: (stretch) => placeIn(day.date, stretch, where) };
+  const nowMinutes = (Date.parse(now) - Date.parse(day.date)) / 60_000 - week.fromHour * 60;
   return (
-    <View className="min-w-0 flex-1">
+    <View className="min-w-0 flex-1" style={{ minWidth: minColumnPx }}>
       <Text
         className={cx(
           "h-7 text-center font-sans text-[11px] tabular-nums",
@@ -212,6 +220,13 @@ const DayColumn = ({
           />
         ))}
         <UsageStrip {...grid} usage={usage} />
+        {nowMinutes >= 0 && day.isToday ? (
+          // The line only shows where now is; the blocks and events carry the words.
+          <View
+            className="absolute left-0 right-0 h-0.5 bg-warn"
+            style={{ top: px(nowMinutes, hourPx) }}
+          />
+        ) : null}
         <View className="absolute bottom-0 left-1.5 right-0.5 top-0">
           <DayItems
             blocks={day.blocks}
@@ -233,26 +248,67 @@ const hourIn = (at: string, zone: string): number =>
     ),
   );
 
+/** The grid's first hour: the model's, or earlier for the week's first calendar event. */
+export const gridFromHour = (week: WeekModel, calendar: readonly CalendarEvent[]): number =>
+  Math.min(
+    week.fromHour,
+    ...calendar
+      .filter((event) => event.startAt >= week.weekStart && event.startAt < week.weekEnd)
+      .map((event) => hourIn(event.startAt, week.zone)),
+  );
+
+/** The hour in the week's zone, for opening the grid there. */
+export const hourNow = (now: string, zone: string): number => hourIn(now, zone);
+
 /**
 Monday to Sunday side by side on one hour grid; it starts early enough for the first tracked
-block or calendar event of the week.
+block or calendar event of the week. On a phone the days keep a readable width and the week
+scrolls sideways.
 */
 export const WeekGrid = (props: GridProps) => {
-  const fromHour = Math.min(
-    props.week.fromHour,
-    ...props.calendar
-      .filter(
-        (event) => event.startAt >= props.week.weekStart && event.startAt < props.week.weekEnd,
-      )
-      .map((event) => hourIn(event.startAt, props.week.zone)),
-  );
+  const fromHour = gridFromHour(props.week, props.calendar);
   const week = { ...props.week, fromHour };
+  const days = week.days.map((day) => (
+    <DayColumn key={day.date} {...props} day={day} week={week} />
+  ));
   return (
-    <View className="flex-row px-3 pb-6">
+    <View className="flex-1 flex-row px-3 pb-6">
       <HourGutter fromHour={fromHour} hourPx={props.hourPx} />
-      {week.days.map((day) => (
-        <DayColumn key={day.date} {...props} day={day} week={week} />
-      ))}
+      {props.minColumnPx === 0 ? (
+        days
+      ) : (
+        <SidewaysDays minColumnPx={props.minColumnPx} week={week}>
+          {days}
+        </SidewaysDays>
+      )}
     </View>
+  );
+};
+
+/** The phone's days: scrolled sideways so that today (with the day before) is in sight. */
+const SidewaysDays = ({
+  children,
+  minColumnPx,
+  week,
+}: {
+  readonly children: ReactNode;
+  readonly minColumnPx: number;
+  readonly week: WeekModel;
+}) => {
+  const scrollerRef = useRef<ScrollView>(null);
+  const today = week.days.findIndex((day) => day.isToday);
+  return (
+    <ScrollView
+      contentContainerClassName="min-w-full flex-row"
+      horizontal
+      onContentSizeChange={() => {
+        if (today > 0) {
+          scrollerRef.current?.scrollTo({ animated: false, x: (today - 1) * minColumnPx });
+        }
+      }}
+      ref={scrollerRef}
+    >
+      {children}
+    </ScrollView>
   );
 };

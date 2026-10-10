@@ -127,6 +127,7 @@ export const HistoryScreen = () => {
       <View className="px-2">
         {history.board.rows.map((row) => (
           <TaskRow
+            asOf={instant}
             key={row.id}
             onOpen={() => {
               openTask(row.id);
@@ -139,6 +140,9 @@ export const HistoryScreen = () => {
         <Text className="pb-1 font-sans text-[12px] font-medium text-muted">
           {at === null ? t("history.events") : t("history.eventsUntil", { when })}
         </Text>
+        {history.board.rows.length === 0 && events.length === 0 ? (
+          <Text className="py-2 font-sans text-[14px] text-muted">{t("history.emptyAt")}</Text>
+        ) : null}
         {events.map((entry) => (
           <EntryRow entry={entry} key={entry.id} />
         ))}

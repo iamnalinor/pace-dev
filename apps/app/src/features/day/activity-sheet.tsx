@@ -4,6 +4,7 @@ import { Text, type TextInput, View } from "react-native";
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
@@ -103,6 +104,28 @@ const readDraft = (
     faults,
     range: { endAt: sameDay === null ? null : endOf(sameDay, startAt, zone), startAt },
   };
+};
+
+type Read = { readonly range: ActivityRange | null; readonly faults: Faults };
+
+/** A block is what already happened: a start or an end after now is said under its field. */
+const notAhead = (read: Read, now: string): Read => {
+  const { range } = read;
+  if (range === null) {
+    return read;
+  }
+  const isStartAhead = Date.parse(range.startAt) > Date.parse(now);
+  const isEndAhead = range.endAt !== null && Date.parse(range.endAt) > Date.parse(now);
+  return isStartAhead || isEndAhead
+    ? {
+        faults: {
+          ...read.faults,
+          ...(isStartAhead && { from: "day.ahead" }),
+          ...(isEndAhead && { to: "day.ahead" }),
+        },
+        range: null,
+      }
+    : read;
 };
 
 const hasFault = (faults: Faults): boolean =>
@@ -248,7 +271,8 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
   const run = useRunAction();
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
-  const { faults, range } = readDraft(draft, target, zone);
+  const { now } = useViewer();
+  const { faults, range } = notAhead(readDraft(draft, target, zone), now);
   const save = async (): Promise<void> => {
     setHasTriedToSave(true);
     if (range === null || hasFault(faults)) {

@@ -63,6 +63,7 @@ export const enTime = {
   "day.whatMissing": "Say what it was.",
   "day.badTime": "Type a time like 09:30.",
   "day.badRange": "The end must be after the start.",
+  "day.ahead": "That is still ahead: log what already happened.",
   "day.delete": "Delete this block",
   "day.deleteConfirm": "Delete it? Tap again",
   "day.total": "{category} · {duration}",

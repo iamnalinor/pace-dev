@@ -196,7 +196,13 @@ takes a short line (Enter adds it as it is) or a message: a paste, a long text o
 it to the assistant, whose reading opens the task form, where every field is labelled and
 checked before anything is written. Nothing is sent to the assistant while typing.
 */
-export const Composer = ({ initialText = "" }: { readonly initialText?: string | undefined }) => {
+export const Composer = ({
+  initialText = "",
+  isFocused = false,
+}: {
+  readonly initialText?: string | undefined;
+  readonly isFocused?: boolean;
+}) => {
   const t = useT();
   const { palette } = useTheme();
   const flow = useComposerFlow(initialText);
@@ -232,6 +238,7 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
       <TextInput
         accessibilityHint={t("composer.quickHint")}
         accessibilityLabel={t("composer.label")}
+        autoFocus={isFocused}
         // Grows with a pasted message up to about eight lines.
         className="mb-1 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
         multiline

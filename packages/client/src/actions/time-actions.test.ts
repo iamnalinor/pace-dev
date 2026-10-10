@@ -60,6 +60,31 @@ describe("time actions", () => {
     });
   });
 
+  it("refuses a block that ends or starts after now: the past is logged, not the future", async () => {
+    const world = await setupActions();
+    await expect(
+      world.actions.logPast({
+        category: "rest",
+        endAt: later(60),
+        label: "Later",
+        startAt: later(-60),
+      }),
+    ).resolves.toEqual({ error: "retro/future", ok: false });
+    const [event] = unwrap(
+      await world.actions.logPast({
+        category: "rest",
+        endAt: later(-30),
+        label: "Nap",
+        startAt: later(-90),
+      }),
+    );
+    const activityId = event?.type === "activity.logged" ? event.payload.activityId : "";
+    await expect(world.actions.adjustActivity(activityId, { endAt: later(30) })).resolves.toEqual({
+      error: "retro/future",
+      ok: false,
+    });
+  });
+
   it("deletes a started block without bringing back the one it had ended", async () => {
     const world = await setupActions();
     const [work] = unwrap(await world.actions.startChoice("rest"));

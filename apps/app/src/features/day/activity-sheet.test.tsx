@@ -67,16 +67,17 @@ describe("the log-past sheet", () => {
   });
 });
 
-const logSheet = async () => {
+/** The log-past sheet on a day (the test clock is 6 Oct, 15:00 in Moscow). */
+const logSheet = async (day = "2026-10-06") => {
   const runtime = await createTestRuntime();
   const onClose = jest.fn();
   await renderScreen(
     <ActivitySheet
       onClose={onClose}
       target={{
-        endAt: "2026-10-06T10:00:00.000Z",
+        endAt: `${day}T10:00:00.000Z`,
         kind: "log",
-        startAt: "2026-10-06T09:00:00.000Z",
+        startAt: `${day}T09:00:00.000Z`,
       }}
       zone="Europe/Moscow"
     />,
@@ -98,8 +99,19 @@ describe("the log-past sheet's times", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("refuses what is still ahead today", async () => {
+    const { onClose } = await logSheet();
+    await fireEvent.changeText(screen.getByLabelText("From"), "1600");
+    await fireEvent.changeText(screen.getByLabelText("To"), "1700");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    expect(
+      await screen.findAllByText("That is still ahead: log what already happened."),
+    ).toHaveLength(2);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("reads a short evening block that ends after midnight as one night", async () => {
-    const { onClose, runtime } = await logSheet();
+    const { onClose, runtime } = await logSheet("2026-10-05");
     await fireEvent.changeText(screen.getByLabelText("From"), "2300");
     await fireEvent.changeText(screen.getByLabelText("To"), "0100");
     await fireEvent.press(screen.getByRole("button", { name: "Save" }));

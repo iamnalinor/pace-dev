@@ -57,10 +57,17 @@ export type EditActions = {
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 
+/** After now: a block is the past, logged or moved; the future is not tracked yet. */
+const isAhead = (deps: ActionDeps, at: string | undefined): boolean =>
+  at !== undefined && Date.parse(at) > Date.parse(deps.clock.now());
+
 const logPast = async (deps: ActionDeps, activity: PastActivity): ActionResult => {
   const label = activity.label.trim();
   if (label === "" || Date.parse(activity.endAt) <= Date.parse(activity.startAt)) {
     return err("action/invalid-input");
+  }
+  if (isAhead(deps, activity.endAt)) {
+    return err("retro/future");
   }
   return await emit(deps, [
     stamp(
@@ -89,6 +96,9 @@ const corrections = (
     const activity = timeOf(deps).activities[activityId];
     if (activity === undefined) {
       return err("event/not-found");
+    }
+    if (isAhead(deps, change.startAt) || isAhead(deps, change.endAt)) {
+      return err("retro/future");
     }
     const startAt = change.startAt ?? activity.startAt;
     const endAt = change.endAt ?? activity.endAt;

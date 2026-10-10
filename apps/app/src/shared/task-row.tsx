@@ -14,12 +14,15 @@ A task as every list shows it (Now, a project's open and done lists, History): t
 title, then the project (or category) and the importance as tags with the meta line.
 */
 export const TaskRow = ({
+  asOf,
   checked = false,
   onCheck,
   onOpen,
   row,
   withTag = true,
 }: {
+  /** History's moment: relative words count from it. */
+  readonly asOf?: string;
   /** A closed task: the check is filled and the title muted. */
   readonly checked?: boolean;
   /** Without it the check is read-only. */
@@ -54,7 +57,7 @@ export const TaskRow = ({
         >
           {row.title}
         </Text>
-        <MetaLine parts={row.meta} tag={withTag ? row : null} />
+        <MetaLine asOf={asOf} parts={row.meta} tag={withTag ? row : null} />
       </Pressable>
     </View>
   );

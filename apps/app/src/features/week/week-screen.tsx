@@ -18,7 +18,10 @@ import { Sheet } from "#app/ui/sheet.tsx";
 import { useCalendarRange, useUsage } from "@pace/client/react";
 import { addDaysIn, formatDuration, type Language } from "@pace/core";
 
-import { dayLabel, type Picked, WeekGrid } from "./week-grid.tsx";
+import { dayLabel, gridFromHour, hourNow, type Picked, WeekGrid } from "./week-grid.tsx";
+
+/** The day labels' row above the grid. */
+const LABELS_PX = 28;
 
 /** "5 Oct", "5 окт." */
 const monthDay = (date: string, zone: string, language: Language): string =>
@@ -122,7 +125,7 @@ calendar's events outlined, a thin strip where some device was in use. A tap tel
 export const WeekScreen = () => {
   const t = useT();
   const { api, hooks } = usePace();
-  const { language } = useViewer();
+  const { language, now } = useViewer();
   const isWide = useIsWide();
   const [weekOf, setWeekOf] = useState<null | string>(null);
   const [picked, setPicked] = useState<null | Picked>(null);
@@ -137,12 +140,21 @@ export const WeekScreen = () => {
       title={t("week.title")}
     />
   );
+  const hourPx = isWide ? 40 : 30;
+  // This week opens at the hour before now; a past one at its first hour.
+  const scrollTo =
+    week.next === null
+      ? Math.max(0, (hourNow(now, week.zone) - gridFromHour(week, calendar) - 1) * hourPx) +
+        LABELS_PX
+      : undefined;
   return (
-    <Screen header={header}>
+    <Screen header={header} {...(scrollTo !== undefined && { scrollTo })}>
       <WeekGrid
         calendar={calendar}
-        hourPx={isWide ? 40 : 30}
+        hourPx={hourPx}
         language={language}
+        minColumnPx={isWide ? 0 : 72}
+        now={now}
         onPick={setPicked}
         usage={usage}
         week={week}

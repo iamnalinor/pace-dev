@@ -25,7 +25,12 @@ export const NowBoard = ({ composeText }: { readonly composeText?: string | unde
   const isEmpty = board.rows.length === 0 && board.future.length === 0;
   return (
     <Screen footer={<TimeBar />} header={<NowHeader inboxCount={board.inboxCount} />}>
-      <Composer initialText={composeText} key={composeText ?? ""} />
+      {/* On /add (New task, the "+" tab, a share) the cursor is in the composer. */}
+      <Composer
+        initialText={composeText}
+        isFocused={composeText !== undefined}
+        key={composeText ?? ""}
+      />
       <ZoneBanner />
       <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={projectId} />

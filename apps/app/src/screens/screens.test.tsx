@@ -65,6 +65,8 @@ describe("HistoryScreen", () => {
     // The day viewed is in the label, and the events stop there.
     expect(screen.getByText(/^Tasks as they were at .*Oct 5/u)).toBeOnTheScreen();
     expect(screen.getByText(/^Events up to/u)).toBeOnTheScreen();
+    // Relative words count from the moment shown: a task due on 5 Oct is "today" there.
+    expect(screen.getByText("Due today 23:59")).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: en("history.now") })).toBeEnabled();
   });
 });

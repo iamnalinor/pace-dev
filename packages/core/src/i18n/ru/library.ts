@@ -22,6 +22,7 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "history.events": "События",
   "history.eventsUntil": "События до {when}",
   "history.revoked": "Отменено",
+  "history.emptyAt": "На тот момент в Pace ещё ничего не было.",
   "event.task.created": "Задача создана",
   "event.task.updated": "Задача изменена",
   "event.task.preset.set": "Пресет изменён",

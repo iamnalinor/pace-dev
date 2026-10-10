@@ -20,6 +20,7 @@ export const enLibrary = {
   "history.events": "Events",
   "history.eventsUntil": "Events up to {when}",
   "history.revoked": "Undone",
+  "history.emptyAt": "Nothing in Pace yet at that moment.",
   "event.task.created": "Task created",
   "event.task.updated": "Task edited",
   "event.task.preset.set": "Preset changed",
