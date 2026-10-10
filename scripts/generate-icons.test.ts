@@ -16,6 +16,15 @@ describe("generate-icons", () => {
     expect(byPath.get("apps/app/assets/notification-icon.png")).toBe(96);
   });
 
+  it("installs the web app with the phone's icon, the bot avatar's look", () => {
+    const svgOf = new Map(ICONS.map((icon) => [icon.path, icon.svg]));
+    const app = svgOf.get("apps/app/assets/icon.png");
+    for (const web of ["icon-192.png", "icon-512.png", "apple-touch-icon.png"]) {
+      expect(svgOf.get(`apps/app/public/${web}`), web).toBe(app);
+    }
+    expect(svgOf.get("assets/logo/bot-avatar.png")).toBe(app);
+  });
+
   it("renders every icon as a square PNG of the declared size", () => {
     for (const icon of ICONS) {
       const png = renderPng(icon.svg, icon.size);

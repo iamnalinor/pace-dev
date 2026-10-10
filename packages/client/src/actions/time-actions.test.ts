@@ -48,6 +48,35 @@ describe("time actions", () => {
       timeBarModel(world.state.store.getState(), ctx(later(minutes))).running?.status;
     expect(at(45)).toBe("ok");
     expect(at(60)).toBe("long");
+    world.setNow(later(70));
+    const running = timeBarModel(world.state.store.getState(), ctx(later(70))).running;
+    unwrap(await world.actions.stillGoing(running?.activityId ?? ""));
+    expect(at(100)).toBe("ok");
+    expect(at(140)).toBe("long");
+    const after = timeBarModel(world.state.store.getState(), ctx(later(100)));
+    expect(after.running).toMatchObject({
+      expectMinutes: 30,
+      remindAt: later(140),
+    });
+  });
+
+  it("deletes a block from the day: the event that made it is revoked", async () => {
+    const world = await setupActions();
+    const [event] = unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: later(-60),
+        label: "Lecture",
+        startAt: later(-120),
+      }),
+    );
+    const activityId = event?.type === "activity.logged" ? event.payload.activityId : "";
+    unwrap(await world.actions.deleteActivity(activityId));
+    expect(world.state.store.getState().time.activities[activityId]).toBeUndefined();
+    expect(await world.actions.deleteActivity(activityId)).toEqual({
+      error: "event/not-found",
+      ok: false,
+    });
   });
 
   it("runs an activity alongside: the main one keeps going, each stops on its own", async () => {

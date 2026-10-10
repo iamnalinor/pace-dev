@@ -8,7 +8,11 @@ export type PlainMetaPart = Exclude<MetaPart, { readonly kind: "due" | "importan
 /** "6d 12h left", "15h late", "2 problems left", "4/7 solved" … */
 export const plainMetaText = (part: PlainMetaPart, language: Language): string => {
   switch (part.kind) {
-    case "age":
+    case "age": {
+      return part.minutes < 1
+        ? t(language, "meta.ageNew")
+        : t(language, "meta.age", { span: formatSpan(part.minutes, language) });
+    }
     case "left": {
       return t(language, `meta.${part.kind}`, { span: formatSpan(part.minutes, language) });
     }

@@ -42,6 +42,7 @@ const started = (state: TimeState, event: EventOf<"activity.started">): TimeStat
       isLogged: false,
       label: payload.label,
       startAt: event.occurredAt,
+      stillAt: null,
       taskId: payload.taskId ?? null,
     },
   );
@@ -61,6 +62,7 @@ const logged = (state: TimeState, event: EventOf<"activity.logged">): TimeState 
         isLogged: true,
         label: payload.label,
         startAt: payload.startAt,
+        stillAt: null,
         taskId: payload.taskId ?? null,
       });
 };
@@ -101,12 +103,13 @@ const HANDLERS: Handlers = {
     }));
   },
   "activity.labelled": (state, event) => {
-    const { category, expectMinutes, label, taskId } = event.payload;
+    const { category, expectMinutes, label, stillAt, taskId } = event.payload;
     return patch(state, event.payload.activityId, (activity) => ({
       ...activity,
       category: category ?? activity.category,
       expectMinutes: expectMinutes === undefined ? activity.expectMinutes : expectMinutes,
       label: label ?? activity.label,
+      stillAt: stillAt ?? activity.stillAt,
       taskId: taskId === undefined ? activity.taskId : taskId,
     }));
   },

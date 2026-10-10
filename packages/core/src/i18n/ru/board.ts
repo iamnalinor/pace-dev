@@ -22,6 +22,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "meta.late": "опоздание {span}",
   "meta.left": "осталось {span}",
   "meta.age": "{span} назад",
+  "meta.ageNew": "только что",
   "meta.problemsLeft.one": "осталась {count} задача",
   "meta.problemsLeft.few": "осталось {count} задачи",
   "meta.problemsLeft.many": "осталось {count} задач",

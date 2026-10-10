@@ -71,7 +71,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.whenClosed": "Когда вы закрыли задачу?",
   "close.pickExact": "Выбрать точное время",
   "close.exact": "Точное время",
-  "close.exactHint": "Выкл. = «примерно тогда», не учитывается в калибровке",
+  "close.exactHint": "Выкл. = «примерно тогда»",
   "close.outcome": "Итог",
   "close.stillOpen": "Ещё открыты",
   "close.recorded": "Записано",

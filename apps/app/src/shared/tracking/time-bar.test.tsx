@@ -122,7 +122,7 @@ describe("TimeBar", () => {
     });
   });
 
-  it("asks at twice the Expect whether it still goes on; yes moves the next ask on", async () => {
+  it("asks at twice the Expect whether it still goes on; yes moves the next ask on and keeps the Expect", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.startActivity(
       { category: "rest", expectMinutes: 30, label: "Rest" },
@@ -132,7 +132,9 @@ describe("TimeBar", () => {
     expect(await screen.findByText("Still doing this?")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Yes, still" }));
     await waitFor(() => {
-      expect(activities(runtime)).toEqual([expect.objectContaining({ expectMinutes: 70 })]);
+      expect(activities(runtime)).toEqual([
+        expect.objectContaining({ expectMinutes: 30, stillAt: NOW }),
+      ]);
     });
     expect(screen.queryByText("Still doing this?")).toBeNull();
   });

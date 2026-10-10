@@ -251,6 +251,8 @@ export const ActivityLabelledPayload = z.object({
   taskId: z.string().min(1).nullable().optional(),
   /** How long it is expected to take (the assistant's reading of "20 min"); null clears it. */
   expectMinutes: minutes.nullable().optional(),
+  /** Answered "still doing this?" with yes at this instant (the Expect stays as it was). */
+  stillAt: InstantSchema.optional(),
   /** Retired with the messenger penalty: still parsed in old events, never read. */
   messengersOnPurpose: z.boolean().optional(),
 });

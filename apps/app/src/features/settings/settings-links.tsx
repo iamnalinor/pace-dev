@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 type Entry = {
@@ -38,9 +39,13 @@ const LinkRow = ({ count = 0, hintKey, titleKey, to }: Entry) => {
   );
 };
 
-/** The settings that live on their own pages: presets, the review block, history, decisions. */
+/**
+The settings that live on their own pages: presets, the review block, history (beside the
+sidebar it is there already), the notification log.
+*/
 export const SettingsLinks = () => {
   const { count } = usePace().hooks.useReview();
+  const isWide = useIsWide();
   return (
     <View>
       <LinkRow hintKey="settings.presets.hint" titleKey="settings.presets" to="/presets" />
@@ -50,7 +55,9 @@ export const SettingsLinks = () => {
         titleKey="settings.review"
         to="/review"
       />
-      <LinkRow hintKey="settings.history.hint" titleKey="settings.history" to="/history" />
+      {isWide ? null : (
+        <LinkRow hintKey="settings.history.hint" titleKey="settings.history" to="/history" />
+      )}
       <LinkRow hintKey="settings.decisions.hint" titleKey="settings.decisions" to="/decisions" />
     </View>
   );

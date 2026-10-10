@@ -74,11 +74,11 @@ describe("local notifications", () => {
     expect(changes.cancel).toEqual(["pace:digest:2026-10-06T11:00:00.000Z"]);
   });
 
-  it("asks whether the running activity is still going at twice its Expect, once that is ahead", () => {
+  it("asks whether the running activity is still going at its reminder, once that is ahead", () => {
     const running = {
       activityId: "a1",
-      expectMinutes: 30,
       label: "Commute",
+      remindAt: "2026-10-06T13:00:00.000Z",
       startAt: "2026-10-06T12:00:00.000Z",
     };
     expect(activityNotifications(running, "2026-10-06T12:10:00.000Z", "en")).toEqual([
@@ -91,7 +91,7 @@ describe("local notifications", () => {
     ]);
     expect(activityNotifications(running, "2026-10-06T13:10:00.000Z", "en")).toEqual([]);
     expect(
-      activityNotifications({ ...running, expectMinutes: null }, "2026-10-06T12:10:00.000Z", "en"),
+      activityNotifications({ ...running, remindAt: null }, "2026-10-06T12:10:00.000Z", "en"),
     ).toEqual([]);
     expect(activityNotifications(null, "2026-10-06T12:10:00.000Z", "en")).toEqual([]);
     expect(isActivityId("pace:activity:a1:long")).toBe(true);

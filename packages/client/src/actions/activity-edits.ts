@@ -1,6 +1,6 @@
 import { type ActivityCategory, err, newId, ok } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, stamp } from "./deps.ts";
+import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
 
 /** What the Day sheet edits: an existing block (move and rename) or a new past one. */
 export type ActivityTarget =
@@ -49,6 +49,10 @@ export type EditActions = {
       readonly expectMinutes?: null | number;
     },
   ) => ActionResult;
+  /** "Still doing this?" answered yes: the next ask moves on, the Expect stays. */
+  readonly stillGoing: (activityId: string) => ActionResult;
+  /** Takes a block off the ledger by revoking the event that made it (History restores it). */
+  readonly deleteActivity: (activityId: string) => ActionResult;
 };
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
@@ -149,8 +153,31 @@ const saveActivity = async (
       });
 };
 
+/** The start or the log entry that made the activity, if it still stands. */
+const originOf = (deps: ActionDeps, activityId: string): null | string =>
+  deps.state.store
+    .getState()
+    .events.find(
+      (event) =>
+        (event.type === "activity.started" || event.type === "activity.logged") &&
+        event.payload.activityId === activityId,
+    )?.id ?? null;
+
 export const editActions = (deps: ActionDeps): EditActions => ({
   ...corrections(deps),
+  deleteActivity: async (activityId) => {
+    const origin = originOf(deps, activityId);
+    return origin === null ? err("event/not-found") : fromStore(await deps.state.revoke(origin));
+  },
   logPast: async (activity) => await logPast(deps, activity),
   saveActivity: async (target, entry) => await saveActivity(deps, target, entry),
+  stillGoing: async (activityId) =>
+    timeOf(deps).activities[activityId] === undefined
+      ? err("event/not-found")
+      : await emit(deps, [
+          stamp(deps, {
+            payload: { activityId, stillAt: deps.clock.now() },
+            type: "activity.labelled",
+          }),
+        ]),
 });

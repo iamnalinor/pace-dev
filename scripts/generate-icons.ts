@@ -79,6 +79,13 @@ const canvas = (shapes: string, fraction: number, background?: string): string =
 
 const FAVICON = faviconSvg();
 
+/**
+The app's icon wherever it is installed (Android, the PWA, the iPhone home screen) and the
+bot's avatar: the dark tile with the mark at 56%, centred. A launcher's or Telegram's circle
+(the maskable safe zone, 80%) leaves it whole.
+*/
+const APP_ICON = canvas(markShapes(DARK), 0.56, DARK_BG);
+
 /** The bot avatar's 56%, of the 2/3 of an adaptive icon a launcher shows. */
 const ADAPTIVE_FRACTION = 0.37;
 
@@ -91,15 +98,15 @@ export const LOGO_FILES: readonly LogoFile[] = [
 ];
 
 export const ICONS: readonly IconSpec[] = [
-  // Web: the lime tile; the chevrons stay inside the central 80% (maskable-safe).
-  { path: "apps/app/public/icon-192.png", size: 192, svg: FAVICON },
-  { path: "apps/app/public/icon-512.png", size: 512, svg: FAVICON },
-  { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: FAVICON },
+  // The installed web app looks like the phone's: the same icon, not the browser tab's tile.
+  { path: "apps/app/public/icon-192.png", size: 192, svg: APP_ICON },
+  { path: "apps/app/public/icon-512.png", size: 512, svg: APP_ICON },
+  { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: APP_ICON },
   // Expo's web.favicon: the same tile as the SVG, for browsers that ask for a PNG.
-  { path: "apps/app/assets/favicon.png", size: 48, svg: FAVICON },
-  // Expo: the dark icon as the bot avatar draws it (the mark at 56% of what is seen). Android
-  // shows only the central 72 of an adaptive icon's 108 dp, so its foreground is 56% × 2/3.
-  { path: "apps/app/assets/icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.56, DARK_BG) },
+  { path: "apps/app/assets/favicon.png", size: 64, svg: FAVICON },
+  // Android shows only the central 72 of an adaptive icon's 108 dp, so its foreground is the
+  // icon's 56% × 2/3.
+  { path: "apps/app/assets/icon.png", size: 1024, svg: APP_ICON },
   {
     path: "apps/app/assets/adaptive-icon.png",
     size: 1024,
@@ -118,11 +125,7 @@ export const ICONS: readonly IconSpec[] = [
   },
   // Telegram crops profile photos to a circle: the dark app icon (the default look), the
   // mark well inside the inscribed circle. Set through the Bot API (setMyProfilePhoto).
-  {
-    path: "assets/logo/bot-avatar.png",
-    size: 640,
-    svg: canvas(markShapes(DARK), 0.56, DARK_BG),
-  },
+  { path: "assets/logo/bot-avatar.png", size: 640, svg: APP_ICON },
 ];
 
 export const renderPng = (source: string, width: number): Buffer =>

@@ -20,6 +20,7 @@ export const enBoard = {
   "meta.late": "{span} late",
   "meta.left": "{span} left",
   "meta.age": "{span} old",
+  "meta.ageNew": "just added",
   "meta.problemsLeft.one": "{count} problem left",
   "meta.problemsLeft.few": "{count} problems left",
   "meta.problemsLeft.many": "{count} problems left",

@@ -79,11 +79,14 @@ export const enShell = {
   "settings.permissions": "Permissions",
   "settings.permissions.summary": "{on} of {total} on",
   "permissions.title": "Permissions",
+  "permissions.web":
+    "The browser needs no permissions. Notifications, the calendar and screen time are set up in Pace on your Android phone.",
+  "onboarding.web.continue": "Continue",
   "permissions.hint":
     "Each one is optional. What Pace reads with them stays on this phone; only what you log is synced.",
   "permissions.notifications": "Notifications",
   "permissions.notifications.why":
-    "Reminders, Expect and Limit timers, and the morning question about your sleep.",
+    "Reminders about deadlines, “still doing this?” for activities, and the morning question about your sleep.",
   "permissions.calendar": "Calendar",
   "permissions.calendar.why":
     "Your calendar's events on Day, so a meeting you attended is logged in one tap.",
@@ -117,10 +120,10 @@ export const enShell = {
   "settings.digestWindows": "Digest times",
   "settings.quietHours": "Quiet hours",
   "settings.connectedApps": "Connected apps",
-  "settings.devices": "Devices",
+  "settings.devices": "Phones and computers",
   "devices.title": "Devices",
   "devices.hint":
-    "What sends Pace the apps you have in front (names and times only, never what is in them), so Day and Week show where you sat.",
+    "Phones and computers that tell Pace which app is on screen (names and times only, never what is in them), so Day and Week show where you sat.",
   "devices.loading": "Loading the devices…",
   "devices.failed": "Could not load the devices. Check the connection.",
   "devices.empty": "Nothing sends app usage yet.",
@@ -143,7 +146,7 @@ export const enShell = {
   "devices.openActivityWatch": "Open activitywatch.net",
   "devices.step2":
     "2. Paste this into a terminal there. It downloads the bridge, saves this computer's token and sends every 5 minutes:",
-  "devices.step3": "3. The computer shows up in the list after its first upload, within 5 minutes.",
+  "devices.step3": "3. Within 5 minutes its line in the list shows when it last sent data.",
   "devices.tokenOnce":
     "The token is in the command and is shown only now. Lost it? Disconnect the computer and add it again.",
   "devices.copy": "Copy the command",
@@ -280,8 +283,8 @@ export const enShell = {
   "notify.timersChannel": "Activity timers",
   "notify.long": "⏱ Still doing {label}? Started {time}, usually ~{duration}.",
   "notify.activityLong": "Still doing {label}?",
-  "settings.decisions": "Decision log",
-  "settings.decisions.hint": "Why a reminder was sent or held back, and what the assistant read.",
+  "settings.decisions": "Notification log",
+  "settings.decisions.hint": "Which reminders were sent or held back, and what the assistant read.",
   "decisions.title": "Decision log",
   "decisions.search": "Search decisions",
   "decisions.empty": "No decisions yet.",

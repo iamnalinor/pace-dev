@@ -1,11 +1,4 @@
-import {
-  addMinutesIso,
-  endpoints,
-  type Language,
-  type PlannedNotification,
-  REMIND_FACTOR,
-  t,
-} from "@pace/core";
+import { endpoints, type Language, type PlannedNotification, t } from "@pace/core";
 
 import type { ApiClient } from "./api-client.ts";
 
@@ -39,23 +32,24 @@ export type RunningTimer = {
   readonly activityId: string;
   readonly label: string;
   readonly startAt: string;
-  readonly expectMinutes: null | number;
+  /** When to ask "still doing this?" (core's `remindAt`); `null` never. */
+  readonly remindAt: null | string;
 };
 
 /**
 The phone's own timer for the running activity, so it rings offline: "still doing this?" at
-twice its Expect. A moment already behind `now` is left out.
+its reminder (twice its Expect, moved on by each "yes"). A moment already behind `now` is left
+out.
 */
 export const activityNotifications = (
   running: null | RunningTimer,
   now: string,
   language: Language,
 ): readonly LocalNotification[] => {
-  const expectMinutes = running?.expectMinutes ?? null;
-  if (running === null || expectMinutes === null) {
+  const at = running?.remindAt ?? null;
+  if (running === null || at === null) {
     return [];
   }
-  const at = addMinutesIso(running.startAt, REMIND_FACTOR * expectMinutes);
   return Date.parse(at) <= Date.parse(now)
     ? []
     : [

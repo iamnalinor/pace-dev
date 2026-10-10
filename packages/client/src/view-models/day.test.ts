@@ -34,6 +34,7 @@ const activity = ({
   isLogged: endAt !== null,
   label,
   startAt,
+  stillAt: null,
   taskId: null,
 });
 

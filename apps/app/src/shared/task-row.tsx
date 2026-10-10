@@ -7,6 +7,7 @@ import { CheckCircle } from "#app/ui/check-circle.tsx";
 import { cx } from "#app/ui/cx.ts";
 
 import { MetaLine } from "./meta-line.tsx";
+import { useSelectedTask } from "./task-opener.tsx";
 
 /**
 A task as every list shows it (Now, a project's open and done lists, History): the check, the
@@ -29,8 +30,9 @@ export const TaskRow = ({
   readonly withTag?: boolean;
 }) => {
   const t = useT();
+  const isSelected = useSelectedTask() === row.id;
   return (
-    <View className="flex-row gap-3 rounded-lg py-3 pl-3 pr-3">
+    <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-raised")}>
       <CheckCircle
         checked={checked}
         label={t("now.markDone", { title: row.title })}
@@ -38,6 +40,7 @@ export const TaskRow = ({
       />
       <Pressable
         accessibilityRole="link"
+        aria-current={isSelected ? "page" : undefined}
         className="flex-1 gap-[5px] active:opacity-70"
         onPress={onOpen}
       >

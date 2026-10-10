@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
-import { ScrollView, Text, type TextInput, View } from "react-native";
+import { Text, type TextInput, View } from "react-native";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
@@ -25,6 +26,7 @@ import {
   addDaysIn,
   CATEGORY_COLORS,
   formatEyebrow,
+  type MessageKey,
 } from "@pace/core";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
@@ -32,25 +34,43 @@ export type SheetTarget = ActivityTarget;
 
 type Draft = ActivityForm;
 
+/** Which field reads wrong, if any: its sentence goes under it. */
+type Faults = {
+  readonly label: MessageKey | null;
+  readonly from: MessageKey | null;
+  readonly to: MessageKey | null;
+};
+
 /**
 The typed clock times on the block's own day; an end at or before the start means the block
-ran past midnight.
+ran past midnight. A logged block needs its end; a running one has none yet.
 */
-const rangeOf = (draft: Draft, target: SheetTarget, zone: string): ActivityRange | null => {
+const readDraft = (
+  draft: Draft,
+  target: SheetTarget,
+  zone: string,
+): { readonly range: ActivityRange | null; readonly faults: Faults } => {
   const { date } = wallClock(target.startAt, zone);
   const startAt = fromWallClock({ date, time: draft.from, tz: zone });
-  if (startAt === null) {
-    return null;
+  const sameDay = draft.to === "" ? null : fromWallClock({ date, time: draft.to, tz: zone });
+  const isEndMissing = draft.to === "" ? target.kind === "log" : sameDay === null;
+  const faults: Faults = {
+    from: startAt === null ? "day.badTime" : null,
+    label: draft.label.trim() === "" ? "day.whatMissing" : null,
+    to: isEndMissing ? "day.badTime" : null,
+  };
+  if (startAt === null || isEndMissing) {
+    return { faults, range: null };
   }
-  if (draft.to === "") {
-    return target.kind === "log" ? null : { endAt: null, startAt };
-  }
-  const sameDay = fromWallClock({ date, time: draft.to, tz: zone });
   if (sameDay === null) {
-    return null;
+    return { faults, range: { endAt: null, startAt } };
   }
-  return { endAt: sameDay > startAt ? sameDay : addDaysIn(sameDay, 1, zone), startAt };
+  const endAt = sameDay > startAt ? sameDay : addDaysIn(sameDay, 1, zone);
+  return { faults, range: { endAt, startAt } };
 };
+
+const hasFault = (faults: Faults): boolean =>
+  faults.label !== null || faults.from !== null || faults.to !== null;
 
 const CategoryPicker = ({
   onChange,
@@ -63,11 +83,7 @@ const CategoryPicker = ({
   return (
     <View className="gap-1.5">
       <Text className="font-sans text-[12px] text-muted">{t("editor.category")}</Text>
-      <ScrollView
-        accessibilityLabel={t("editor.category")}
-        contentContainerClassName="gap-1.5"
-        horizontal
-      >
+      <View accessibilityLabel={t("editor.category")} className="flex-row flex-wrap gap-1.5">
         {ACTIVITY_CATEGORIES.map((category) => (
           <Chip
             color={CATEGORY_COLORS[category]}
@@ -80,7 +96,7 @@ const CategoryPicker = ({
             {t(`category.${category}`)}
           </Chip>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -88,18 +104,21 @@ const CategoryPicker = ({
 /** What it was, its category and its boundaries (the end only once it has one). */
 const ActivityFields = ({
   draft,
-  error,
+  faults,
   isEndEditable,
   patch,
 }: FormPartProps<Draft> & {
-  readonly error: null | string;
+  readonly faults: Faults | null;
   readonly isEndEditable: boolean;
 }) => {
   const t = useT();
+  const said = (key: MessageKey | null | undefined): null | string =>
+    key === null || key === undefined ? null : t(key);
   const toFieldRef = useRef<TextInput>(null);
   return (
     <>
       <TextField
+        error={said(faults?.label)}
         label={t("day.what")}
         maxLength={80}
         onChangeText={(label) => {
@@ -116,7 +135,7 @@ const ActivityFields = ({
       <View className="flex-row gap-3">
         <View className="flex-1">
           <TextField
-            error={error}
+            error={said(faults?.from)}
             keyboardType="number-pad"
             label={t("day.from")}
             maxLength={5}
@@ -135,6 +154,7 @@ const ActivityFields = ({
         {isEndEditable ? (
           <View className="flex-1">
             <TextField
+              error={said(faults?.to)}
               keyboardType="number-pad"
               label={t("day.to")}
               maxLength={5}
@@ -152,6 +172,38 @@ const ActivityFields = ({
   );
 };
 
+/** Takes the block off the day after a second tap (History brings it back). */
+const DeleteBlock = ({
+  activityId,
+  onDeleted,
+}: {
+  readonly activityId: string;
+  readonly onDeleted: () => void;
+}) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  const [isArmed, setIsArmed] = useState(false);
+  return (
+    <Button
+      onPress={() => {
+        if (!isArmed) {
+          setIsArmed(true);
+          return;
+        }
+        void (async () => {
+          if (await run(actions.deleteActivity(activityId))) {
+            onDeleted();
+          }
+        })();
+      }}
+      variant="ghost"
+    >
+      {t(isArmed ? "day.deleteConfirm" : "day.delete")}
+    </Button>
+  );
+};
+
 /** Log a past block, or move and rename one already on the day. */
 export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => {
   const t = useT();
@@ -160,12 +212,10 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
   const run = useRunAction();
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
-  const range = rangeOf(draft, target, zone);
-  // Said once a save was tried, and gone as soon as the times read right.
-  const error = hasTriedToSave && range === null ? t("day.badRange") : null;
+  const { faults, range } = readDraft(draft, target, zone);
   const save = async (): Promise<void> => {
     setHasTriedToSave(true);
-    if (range === null) {
+    if (range === null || hasFault(faults)) {
       return;
     }
     const isSaved = await run(
@@ -184,7 +234,13 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
       visible
     >
-      <ActivityFields draft={draft} error={error} isEndEditable={hasEnd(target)} patch={patch} />
+      {/* Said under each field once a save was tried, and gone as soon as it reads right. */}
+      <ActivityFields
+        draft={draft}
+        faults={hasTriedToSave ? faults : null}
+        isEndEditable={hasEnd(target)}
+        patch={patch}
+      />
       <SheetActions
         cancelLabel={t("common.cancel")}
         onCancel={onClose}
@@ -193,6 +249,9 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         }}
         primaryLabel={t("common.save")}
       />
+      {target.kind === "edit" ? (
+        <DeleteBlock activityId={target.activityId} onDeleted={onClose} />
+      ) : null}
     </Sheet>
   );
 };

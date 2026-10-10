@@ -21,6 +21,9 @@ module.exports = {
     extend: {
       colors: { ...semantic, ...project },
       borderRadius: radius,
+      // Tailwind only generates the opacity modifiers on its scale; 22 is TAG_TINT, the wash
+      // behind a colored tag (without it `bg-project-*/22` compiled to nothing).
+      opacity: { 22: "0.22" },
       // The phone uses the first family (embedded by expo-font); the web falls back glyph by glyph.
       fontFamily: { sans: [tokens.fonts.sans, "system-ui", "sans-serif"] },
     },

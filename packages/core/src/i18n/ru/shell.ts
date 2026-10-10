@@ -81,10 +81,14 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.permissions": "Разрешения",
   "settings.permissions.summary": "Включено {on} из {total}",
   "permissions.title": "Разрешения",
+  "permissions.web":
+    "Браузеру разрешения не нужны. Уведомления, календарь и экранное время настраиваются в Pace на телефоне с Android.",
+  "onboarding.web.continue": "Продолжить",
   "permissions.hint":
     "Все необязательны. То, что Pace читает с их помощью, остаётся на телефоне; синхронизируется только то, что вы запишете.",
   "permissions.notifications": "Уведомления",
-  "permissions.notifications.why": "Напоминания, таймеры Expect и Limit и утренний вопрос про сон.",
+  "permissions.notifications.why":
+    "Напоминания о дедлайнах, «всё ещё этим занимаетесь?» для активностей и утренний вопрос про сон.",
   "permissions.calendar": "Календарь",
   "permissions.calendar.why":
     "События календаря в «Дне»: встречу, на которой вы были, можно записать одним нажатием.",
@@ -117,10 +121,10 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.digestWindows": "Время сводок",
   "settings.quietHours": "Тихие часы",
   "settings.connectedApps": "Подключённые приложения",
-  "settings.devices": "Устройства",
+  "settings.devices": "Телефоны и компьютеры",
   "devices.title": "Устройства",
   "devices.hint":
-    "Что присылает Pace, какие приложения у вас на экране (только названия и время, без содержимого), чтобы День и Неделя показывали, где вы сидели.",
+    "Телефоны и компьютеры, которые сообщают Pace, какое приложение на экране (только названия и время, без содержимого), чтобы День и Неделя показывали, где вы сидели.",
   "devices.loading": "Загружаем устройства…",
   "devices.failed": "Не удалось загрузить устройства. Проверьте соединение.",
   "devices.empty": "Пока ничего не присылает данные.",
@@ -143,7 +147,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "devices.openActivityWatch": "Открыть activitywatch.net",
   "devices.step2":
     "2. Вставьте это в терминал на нём. Команда скачает мост, сохранит токен компьютера и будет отправлять данные каждые 5 минут:",
-  "devices.step3": "3. Компьютер появится в списке после первой отправки, в течение 5 минут.",
+  "devices.step3": "3. В течение 5 минут в его строке появится время последней отправки.",
   "devices.tokenOnce":
     "Токен — внутри команды и показывается только сейчас. Потеряли? Отключите компьютер и добавьте заново.",
   "devices.copy": "Скопировать команду",
@@ -279,9 +283,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "notify.timersChannel": "Таймеры активностей",
   "notify.long": "⏱ Вы всё ещё: {label}? Начато в {time}, обычно ~{duration}.",
   "notify.activityLong": "Вы всё ещё: {label}?",
-  "settings.decisions": "Журнал решений",
+  "settings.decisions": "Журнал уведомлений",
   "settings.decisions.hint":
-    "Почему напоминание отправлено или придержано и что прочитал ассистент.",
+    "Какие напоминания отправлены или придержаны и что прочитал ассистент.",
   "decisions.title": "Журнал решений",
   "decisions.search": "Поиск по решениям",
   "decisions.empty": "Решений пока нет.",

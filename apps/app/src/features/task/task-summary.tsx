@@ -51,7 +51,7 @@ const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
         <View
           className={cx(
             "flex-row items-center gap-1.5 rounded-sm px-2 py-1",
-            tag.kind === "importance" ? washClass(IMPORTANCE_COLORS[tag.importance]) : "bg-raised",
+            tag.kind === "importance" ? washClass(IMPORTANCE_COLORS[tag.importance]) : "bg-track",
           )}
           key={tag.kind}
         >

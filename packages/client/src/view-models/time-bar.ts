@@ -9,6 +9,7 @@ import {
   type PaceStatus,
   type ProjectColorName,
   type QueryContext,
+  remindAt,
   runningActivities,
   TIME_BUTTONS,
   type TimeButton,
@@ -43,6 +44,8 @@ export type RunningView = {
   readonly startAt: string;
   readonly minutes: number;
   readonly expectMinutes: null | number;
+  /** When it asks "still doing this?" (moved on by each "yes"); `null` without an Expect. */
+  readonly remindAt: null | string;
   readonly status: PaceStatus;
   /** 0..1 of the Expect used up; `null` without one. */
   readonly share: null | number;
@@ -75,7 +78,8 @@ const runningView = (active: Activity, now: string): RunningView => {
     minutes,
     share: target === null ? null : Math.min(1, minutes / target),
     startAt: active.startAt,
-    status: paceStatus(minutes, active.expectMinutes),
+    remindAt: remindAt(active),
+    status: paceStatus(active, now),
     taskId: active.taskId,
   };
 };

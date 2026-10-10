@@ -12,10 +12,12 @@ import { IconButton } from "./icon-button.tsx";
 /** January 1, 2024 was a Monday: day `n` of that week names weekday `n`. */
 const WEEKDAY_SAMPLES = [1, 2, 3, 4, 5, 6, 7].map((day) => new Date(Date.UTC(2024, 0, day)));
 
-const monthTitle = (month: string, language: Language): string =>
-  new Intl.DateTimeFormat(language, { month: "long", timeZone: "UTC", year: "numeric" }).format(
-    new Date(`${month}-01T00:00:00Z`),
-  );
+/** "October 2026", "Октябрь 2026": the month on its own (no "г."), capitalized once. */
+const monthTitle = (month: string, language: Language): string => {
+  const date = new Date(`${month}-01T00:00:00Z`);
+  const name = new Intl.DateTimeFormat(language, { month: "long", timeZone: "UTC" }).format(date);
+  return `${name.charAt(0).toLocaleUpperCase(language)}${name.slice(1)} ${month.slice(0, 4)}`;
+};
 
 const dayLabel = (date: string, language: Language): string =>
   new Intl.DateTimeFormat(language, {
@@ -123,7 +125,7 @@ export const Calendar = ({
         />
         <Text
           accessibilityLiveRegion="polite"
-          className="flex-1 text-center font-sans text-[15px] font-medium capitalize text-fg"
+          className="flex-1 text-center font-sans text-[15px] font-medium text-fg"
         >
           {monthTitle(month, language)}
         </Text>

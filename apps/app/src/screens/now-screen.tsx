@@ -18,6 +18,7 @@ const NowSplit = ({ composeText }: { readonly composeText?: string | undefined }
       open={(id, options) => {
         setPicked({ close: options?.close === true, id });
       }}
+      selectedId={picked?.id ?? null}
     >
       <View className="flex-1 flex-row bg-bg">
         <View className="w-[560px] max-w-[50%] border-r border-line">

@@ -12,20 +12,31 @@ export const REMIND_FACTOR = 2;
 /** "long": twice the Expect is gone, time to ask; "none": nothing is expected. */
 export type PaceStatus = "long" | "none" | "ok";
 
-/** Where a running activity stands against what it expects. */
-export const paceStatus = (minutes: number, expectMinutes: null | number): PaceStatus => {
-  if (expectMinutes === null) {
-    return "none";
-  }
-  return minutes >= REMIND_FACTOR * expectMinutes ? "long" : "ok";
-};
-
-/** When to ask "still doing this?": twice its Expect after the start; never without one. */
+/**
+When to ask "still doing this?": twice its Expect after the start; once answered yes, as far
+again from the start as that answer was. Never without an Expect.
+*/
 export const remindAt = (activity: Activity | undefined): null | string => {
   const expectMinutes = activity?.expectMinutes ?? null;
-  return activity === undefined || expectMinutes === null
-    ? null
-    : addMinutesIso(activity.startAt, REMIND_FACTOR * expectMinutes);
+  if (activity === undefined || expectMinutes === null) {
+    return null;
+  }
+  const first = addMinutesIso(activity.startAt, REMIND_FACTOR * expectMinutes);
+  if (activity.stillAt === null) {
+    return first;
+  }
+  const start = Date.parse(activity.startAt);
+  const again = start + REMIND_FACTOR * (Date.parse(activity.stillAt) - start);
+  return new Date(Math.max(Date.parse(first), again)).toISOString();
+};
+
+/** Where a running activity stands against what it expects, at `now`. */
+export const paceStatus = (activity: Activity | undefined, now: string): PaceStatus => {
+  const at = remindAt(activity);
+  if (at === null) {
+    return "none";
+  }
+  return Date.parse(now) >= Date.parse(at) ? "long" : "ok";
 };
 
 const median = (values: readonly number[]): number => {

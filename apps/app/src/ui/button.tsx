@@ -53,6 +53,7 @@ export const Button = ({
   children,
   disabled = false,
   icon: Icon,
+  onLongPress,
   onPress,
   variant = "primary",
 }: {
@@ -61,6 +62,8 @@ export const Button = ({
   readonly disabled?: boolean;
   readonly icon?: LucideIcon;
   readonly onPress: () => void;
+  /** A second way in (the full close sheet behind a one-tap Done). */
+  readonly onLongPress?: () => void;
   readonly variant?: ButtonVariant;
 }) => {
   return (
@@ -74,6 +77,7 @@ export const Button = ({
         (disabled || busy) && "opacity-50",
       )}
       disabled={disabled || busy}
+      onLongPress={onLongPress}
       onPress={onPress}
     >
       {busy ? (

@@ -6,12 +6,13 @@ import type { ActionResult, ChoiceView, StartOptions, TimeButtonView } from "@pa
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
+import { IS_PHONE } from "#app/platform/device.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { formatDuration } from "@pace/core";
+import { formatDuration, type MessageKey } from "@pace/core";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
@@ -81,6 +82,14 @@ const ButtonChoices = ({ button, options, start }: ListProps) => {
   ));
 };
 
+/** Why there is nothing to pick: on the web the calendar is the copy the phone sends. */
+const noEventsKey = (calendar: CalendarToday | null): MessageKey => {
+  if (!IS_PHONE) {
+    return "time.calendarNoneWeb";
+  }
+  return calendar?.access === "granted" ? "time.calendarNone" : "phone.calendarAsk";
+};
+
 /** Today's events from the calendar (own or accepted), or why there are none. */
 const CalendarChoices = ({ calendar, options, start }: ListProps) => {
   const t = useT();
@@ -88,11 +97,7 @@ const CalendarChoices = ({ calendar, options, start }: ListProps) => {
   const { actions } = usePace();
   const events = calendar?.events ?? [];
   if (events.length === 0) {
-    return (
-      <Text className="font-sans text-[14px] text-muted">
-        {t(calendar?.access === "granted" ? "time.calendarNone" : "phone.calendarAsk")}
-      </Text>
-    );
+    return <Text className="font-sans text-[14px] text-muted">{t(noEventsKey(calendar))}</Text>;
   }
   return (
     <View aria-label={t("time.calendarToday")} className="gap-2" role="list">

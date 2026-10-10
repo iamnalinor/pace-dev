@@ -35,14 +35,10 @@ const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
 
 const percent = (share: number): `${number}%` => `${Math.round(share * 100)}%`;
 
-/** An Expect is a day at most. */
-const MAX_EXPECT_MINUTES = 24 * 60;
-
-/** The running activity's line under its label: the time, the Expect and, at twice it, the question. */
+/** The running activity's line: the label, the time and the Expect. */
 const RunningMeta = ({ running }: { readonly running: RunningView }) => {
   const t = useT();
   const { language } = useViewer();
-  const statusKey = PACE_STATUS_TEXT[running.status];
   return (
     <View className="flex-row flex-wrap items-center gap-2">
       <PulseDot className={PROJECT_FILL[running.color]} />
@@ -58,9 +54,6 @@ const RunningMeta = ({ running }: { readonly running: RunningView }) => {
       {running.isAlongside ? (
         <Text className="font-sans text-[12px] text-muted">{t("time.alongsideTag")}</Text>
       ) : null}
-      {statusKey === null ? null : (
-        <Text className="font-sans text-[12px] font-medium text-warn">{t(statusKey)}</Text>
-      )}
     </View>
   );
 };
@@ -72,10 +65,15 @@ const RunningRow = ({ running }: { readonly running: RunningView }) => {
   const { palette } = useTheme();
   const run = useRunAction();
   const isLong = running.status === "long";
+  const statusKey = PACE_STATUS_TEXT[running.status];
   return (
     <View className="flex-row items-center gap-2">
       <View accessibilityLiveRegion="polite" className="flex-1 gap-1">
         <RunningMeta running={running} />
+        {/* Its own line, so the bar does not move as the minutes grow. */}
+        {statusKey === null ? null : (
+          <Text className="font-sans text-[12px] font-medium text-warn">{t(statusKey)}</Text>
+        )}
         {running.share === null ? null : (
           <View className="h-1 overflow-hidden rounded-full bg-track">
             <View
@@ -93,12 +91,8 @@ const RunningRow = ({ running }: { readonly running: RunningView }) => {
           accessibilityRole="button"
           className="h-9 justify-center rounded-lg border border-line px-3 active:opacity-70"
           onPress={() => {
-            // Still going: what it took so far becomes its Expect, so the next ask is twice that.
-            void run(
-              actions.relabelActivity(running.activityId, {
-                expectMinutes: Math.min(running.minutes, MAX_EXPECT_MINUTES),
-              }),
-            );
+            // Still going: the next ask moves on as far again; the Expect stays what it was.
+            void run(actions.stillGoing(running.activityId));
           }}
         >
           <Text className="font-sans text-[13px] text-fg">{t("time.stillYes")}</Text>
@@ -237,11 +231,11 @@ const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
       <Pressable
         accessibilityLabel={t("time.more", { label })}
         accessibilityRole="button"
-        className="absolute right-0.5 top-0.5 h-6 w-6 items-center justify-center rounded-md active:opacity-60"
-        hitSlop={4}
+        className="absolute right-0 top-0 h-8 w-8 items-center justify-center rounded-md active:opacity-60"
+        hitSlop={6}
         onPress={more}
       >
-        <Ellipsis color={palette.muted} size={14} />
+        <Ellipsis color={palette.muted} size={16} />
       </Pressable>
     </View>
   );

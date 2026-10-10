@@ -19,6 +19,8 @@ export type Activity = {
   readonly isLogged: boolean;
   /** Runs next to the main activity (music over work): neither stops the other. */
   readonly isAlongside: boolean;
+  /** When "still doing this?" was answered yes: the next ask is as far again from there. */
+  readonly stillAt: null | string;
 };
 
 export type TimeState = {

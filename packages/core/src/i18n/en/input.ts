@@ -69,7 +69,7 @@ export const enInput = {
   "close.whenClosed": "When did you close it?",
   "close.pickExact": "Pick exact time",
   "close.exact": "Exact time",
-  "close.exactHint": "Off = “about then”, kept out of calibration",
+  "close.exactHint": "Off = “about then”",
   "close.outcome": "Outcome",
   "close.stillOpen": "Still open",
   "close.recorded": "Recorded",

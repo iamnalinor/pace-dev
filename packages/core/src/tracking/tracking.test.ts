@@ -208,14 +208,29 @@ describe("timeline", () => {
 
 describe("expect", () => {
   it("asks whether it is still going once an activity runs twice as long as expected", () => {
-    expect(paceStatus(20, 30)).toBe("ok");
-    expect(paceStatus(45, 30)).toBe("ok");
-    expect(paceStatus(60, 30)).toBe("long");
-    expect(paceStatus(600, null)).toBe("none");
     const time = timeOf([start("09:00", { activityId: "a1", expectMinutes: 30, label: "Rest" })]);
-    expect(remindAt(time.activities["a1"])).toBe(T("10:00"));
+    const rest = time.activities["a1"];
+    expect(paceStatus(rest, T("09:45"))).toBe("ok");
+    expect(paceStatus(rest, T("10:00"))).toBe("long");
+    expect(remindAt(rest)).toBe(T("10:00"));
     const unexpected = timeOf([start("09:00", { activityId: "a2", label: "x" })]);
     expect(remindAt(unexpected.activities["a2"])).toBeNull();
+    expect(paceStatus(unexpected.activities["a2"], T("19:00"))).toBe("none");
+  });
+
+  it("'still going' moves the next ask as far again and keeps the Expect", () => {
+    const time = timeOf([
+      start("09:00", { activityId: "a1", expectMinutes: 30, label: "Rest" }),
+      act("10:10", {
+        payload: { activityId: "a1", stillAt: T("10:10") },
+        type: "activity.labelled",
+      }),
+    ]);
+    const rest = time.activities["a1"];
+    expect(rest?.expectMinutes).toBe(30);
+    expect(remindAt(rest)).toBe(T("11:20"));
+    expect(paceStatus(rest, T("11:00"))).toBe("ok");
+    expect(paceStatus(rest, T("11:20"))).toBe("long");
   });
 
   it("learns a label's typical length from three finished runs, else uses the category", () => {

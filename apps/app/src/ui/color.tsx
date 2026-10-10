@@ -95,7 +95,7 @@ export const ColorTag = ({
   readonly children: string;
 }) => (
   <View
-    className={cx("self-start rounded-sm px-1.5 py-px", color === null ? "bg-raised" : WASH[color])}
+    className={cx("self-start rounded-sm px-1.5 py-px", color === null ? "bg-track" : WASH[color])}
   >
     <Text
       className={cx("font-sans text-[11px] font-medium leading-4", inkClass(color))}
