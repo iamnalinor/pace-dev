@@ -98,6 +98,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "week.title": "Неделя",
   "week.thisWeek": "Эта неделя",
   "week.calendarEvent": "Из календаря",
+  "week.openTask": "Открыть задачу",
   "week.open": "Неделя",
   "insights.title": "Аналитика",
   "insights.previous": "Предыдущая неделя",

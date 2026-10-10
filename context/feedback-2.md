@@ -141,7 +141,7 @@ Written while planning stage 6 (full / partial / none), see `plan.md` (Stage 6) 
 
 | # | Now | Where |
 |---|---|---|
-| T1 | Done: empty weekly instances are ordinary rows by their due | Now list, `compareNowItems` |
+| T1 | Done: empty weekly instances are ordinary rows by their due; a course with no open instance gets its next week's one ahead (under «In future»), and a week whose deadline passed before the course was added is skipped | Now list, `compareNowItems`, `recurrence/hw-instances.ts` |
 | T2 | Done: nearest open instance, or the one the due names (else a task of its own); subtasks, description, link, estimate | `input/compose.ts`, task form «Add to …» |
 | T3 | Done: the form shows the guessed project and fields, all editable | composer form |
 | T4 | Done: Parse button or paste only; Enter adds a short line; the form is a separate step | `composer.tsx`, `composer-form.tsx` |

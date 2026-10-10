@@ -552,7 +552,8 @@ describe("ensureInstances", () => {
     await expect(world.actions.ensureInstances()).resolves.toBe(0);
 
     world.setNow("2026-10-13T12:00:00.000Z");
-    await expect(world.actions.ensureInstances()).resolves.toBe(5);
+    // Week 42's two issued instances, the outcomes, and History's next one ahead.
+    await expect(world.actions.ensureInstances()).resolves.toBe(6);
     const log = world.state.store.getState().log;
     for (const id of ["hw:hw.algebra:2026-W42", "hw:hw.calculus:2026-W42"]) {
       expect(log.find((event) => event.id === id)).toMatchObject({ source: "system" });

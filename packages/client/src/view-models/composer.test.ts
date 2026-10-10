@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { ALGEBRA_ID, artboardState, ctx, HW_ID, MOSCOW, WORK_ID } from "@pace/core/testing";
+import {
+  ALGEBRA_ID,
+  artboardState,
+  CALC_W41_ID,
+  ctx,
+  HW_ID,
+  MOSCOW,
+  WORK_ID,
+} from "@pace/core/testing";
 
 import { type ComposerEdits, composerModel, isPasted, requiresAiFirst } from "./composer.ts";
 
@@ -25,6 +33,18 @@ describe("composerModel", () => {
       subtasks: [{ label: "1" }, { label: "3" }, { label: "5а" }],
       target: { kind: "instance", taskId: HW_ID },
     });
+  });
+
+  it("routes a pasted course homework with its deadline to that week, project untouched", () => {
+    const calc = model(
+      "Calculus HW: №№ 12, 14, 16 — найти пределы, сдать до 12 октября https://example.com/calc/3",
+    );
+    expect(calc).toMatchObject({
+      preset: { id: "hw.calculus" },
+      subtasks: [{ label: "12" }, { label: "14" }, { label: "16" }],
+      target: { kind: "instance", taskId: CALC_W41_ID },
+    });
+    expect(calc.project?.id).not.toBe(ALGEBRA_ID);
   });
 
   it("gives homework with a deadline on another day a task of its own", () => {

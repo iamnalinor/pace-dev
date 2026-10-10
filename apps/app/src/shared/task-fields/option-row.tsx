@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
-import { ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
-/** A labelled, horizontally scrolling row of one-tap options (a radio group). */
+/** A labelled group of one-tap options (a radio group) that wraps instead of hiding its end. */
 export const OptionRow = ({
   children,
   label,
@@ -12,15 +12,8 @@ export const OptionRow = ({
 }) => (
   <View className="gap-1.5">
     <Text className="font-sans text-[12px] text-muted">{label}</Text>
-    <ScrollView
-      accessibilityLabel={label}
-      contentContainerClassName="gap-1.5"
-      horizontal
-      keyboardShouldPersistTaps="handled"
-      role="radiogroup"
-      showsHorizontalScrollIndicator={false}
-    >
+    <View accessibilityLabel={label} className="flex-row flex-wrap gap-1.5" role="radiogroup">
       {children}
-    </ScrollView>
+    </View>
   </View>
 );

@@ -27,6 +27,8 @@ export type WeekBlock = Placement & {
   readonly endAt: string;
   readonly minutes: number;
   readonly isAlongside: boolean;
+  /** The task the time was spent on, if any: the block's sheet opens it. */
+  readonly taskId: null | string;
 };
 
 export type WeekDay = {
@@ -108,6 +110,7 @@ export const weekModel = (
           label: segment.label,
           minutes: segment.minutes,
           startAt: segment.startAt,
+          taskId: segment.taskId,
         })),
       date,
       isToday: formatInZone(date, zone, "yyyy-MM-dd") === today,

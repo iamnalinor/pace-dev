@@ -3,7 +3,7 @@ export const enLibrary = {
   "projects.empty": "No projects yet.",
   "inbox.title": "Inbox",
   "inbox.hint":
-    "Everything here counts as Nice-to-have until you sort it. Suggestions are a guess — tap a field to change it.",
+    "Notes kept for later and what Pace wants a decision on. Accept takes a note as a task with the guess under it (you can edit it on the task); Delete drops it.",
   "inbox.noDeadline": "No deadline",
   "inbox.empty": "Nothing to sort.",
   "project.notFound": "Project not found.",

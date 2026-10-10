@@ -1,13 +1,13 @@
 import { type ReactNode, useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
-import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
+import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
@@ -115,51 +115,50 @@ export const ComposerForm = ({
     onEdit(editsOf(patch));
   };
   const isInstance = model.target.kind === "instance";
+  const footer = (
+    <SheetActions
+      cancelLabel={t("common.back")}
+      isDisabled={!isInstance && values.title.trim() === ""}
+      onCancel={onBack}
+      onPrimary={onAdd}
+      primaryLabel={
+        model.target.kind === "instance"
+          ? t("composer.addTo", { title: model.target.title })
+          : t("form.create")
+      }
+    />
+  );
   return (
-    <View
-      accessibilityLabel={t("form.newTask")}
-      className="mx-4 mb-3 gap-3.5 rounded-xl border border-line bg-surface p-3.5"
-      role="form"
+    <Sheet
+      closeLabel={t("common.close")}
+      footer={footer}
+      formLabel={t("form.newTask")}
+      onClose={onBack}
+      title={t("composer.formTitle")}
+      visible
     >
-      <View className="flex-row items-center justify-between">
-        <Text accessibilityRole="header" className="font-sans text-[16px] font-semibold text-fg">
-          {t("composer.formTitle")}
-        </Text>
-        <Button onPress={onBack} variant="ghost">
-          {t("composer.backToText")}
-        </Button>
-      </View>
-      {status}
-      <TargetRow model={model} onEdit={onEdit} />
-      {isInstance ? (
-        <TextField
-          label={t("edit.description")}
-          multiline
-          onChangeText={(description) => {
-            change({ description });
+      <View className="gap-3.5">
+        {status}
+        <TargetRow model={model} onEdit={onEdit} />
+        {isInstance ? (
+          <TextField
+            label={t("edit.description")}
+            multiline
+            onChangeText={(description) => {
+              change({ description });
+            }}
+            value={values.description}
+          />
+        ) : (
+          <TaskFields onChange={change} options={options} values={values} />
+        )}
+        <SubtaskList
+          items={model.subtasks.map((subtask) => subtask.label)}
+          onChange={(labels) => {
+            onEdit({ subtasks: labels.map((label) => subtaskOf(label)) });
           }}
-          value={values.description}
         />
-      ) : (
-        <TaskFields onChange={change} options={options} values={values} />
-      )}
-      <SubtaskList
-        items={model.subtasks.map((subtask) => subtask.label)}
-        onChange={(labels) => {
-          onEdit({ subtasks: labels.map((label) => subtaskOf(label)) });
-        }}
-      />
-      <SheetActions
-        cancelLabel={t("common.cancel")}
-        isDisabled={!isInstance && values.title.trim() === ""}
-        onCancel={onBack}
-        onPrimary={onAdd}
-        primaryLabel={
-          model.target.kind === "instance"
-            ? t("composer.addTo", { title: model.target.title })
-            : t("form.create")
-        }
-      />
-    </View>
+      </View>
+    </Sheet>
   );
 };

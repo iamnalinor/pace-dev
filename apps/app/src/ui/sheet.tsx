@@ -23,6 +23,8 @@ up with it.
 export const Sheet = ({
   children,
   closeLabel,
+  footer,
+  formLabel,
   onClose,
   subtitle,
   title,
@@ -30,6 +32,10 @@ export const Sheet = ({
 }: {
   readonly children: ReactNode;
   readonly closeLabel: string;
+  /** Stays under the scrolling body (a long form keeps its buttons in sight). */
+  readonly footer?: ReactNode;
+  /** The sheet is a form (its fields and the footer's buttons), named this. */
+  readonly formLabel?: string;
   readonly onClose: () => void;
   readonly subtitle?: string;
   readonly title: string;
@@ -55,6 +61,7 @@ export const Sheet = ({
         <Animated.View entering={SHEET_ENTER} style={FRAME}>
           <View
             accessibilityViewIsModal
+            {...(formLabel !== undefined && { accessibilityLabel: formLabel, role: "form" })}
             className="shrink rounded-t-[22px] border-t border-line bg-surface px-5 pt-2.5"
             style={{ paddingBottom: Math.max(insets.bottom, 12) + 12 }}
           >
@@ -77,6 +84,9 @@ export const Sheet = ({
             >
               {children}
             </ScrollView>
+            {footer === undefined ? null : (
+              <View className="border-t border-line pt-3">{footer}</View>
+            )}
           </View>
         </Animated.View>
       </View>

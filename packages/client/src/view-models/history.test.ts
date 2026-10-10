@@ -6,6 +6,20 @@ import { setupActions, unwrap } from "../actions/fixture.fake.ts";
 import { historyViewModel } from "./history.ts";
 
 describe("historyViewModel", () => {
+  it("names the activity an activity event is about", async () => {
+    const world = await setupActions();
+    const [started] = unwrap(await world.actions.startChoice("rest"));
+    const history = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    });
+    expect(history.events.find((entry) => entry.id === started?.id)).toMatchObject({
+      taskId: null,
+      taskTitle: "Rest",
+      type: "activity.started",
+    });
+  });
+
   it("shows the board at an instant and the log newest first with what can be undone", async () => {
     const world = await setupActions();
     const [solved] = unwrap(await world.actions.markSolved(HW_ID, "s5"));
@@ -49,6 +63,7 @@ describe("historyViewModel", () => {
       taskTitle: "Algebra sheet 1",
       type: "task.created",
     });
+    expect(history.events.at(-1)?.taskTitle).toBe("Algebra sheet 1");
     const instants = history.events.map((entry) => `${entry.occurredAt}${entry.recordedAt}`);
     expect(instants).toEqual([...instants].toSorted((a, b) => a.localeCompare(b)).toReversed());
   });

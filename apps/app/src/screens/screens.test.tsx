@@ -31,6 +31,15 @@ describe("InboxScreen", () => {
   });
 });
 
+describe("InboxScreen — decisions", () => {
+  it("puts what the rules want a decision on above the captures", async () => {
+    await renderScreen(<InboxScreen />, await createTestRuntime());
+    expect(screen.getByRole("header", { name: en("review.title") })).toBeOnTheScreen();
+    expect(screen.getByText("Calculus HW 5")).toBeOnTheScreen();
+    expect(screen.getByText(INBOX_TEXTS[INBOX_CABLE_ID])).toBeOnTheScreen();
+  });
+});
+
 describe("ReviewScreen", () => {
   it("lists what waits for a decision", async () => {
     await renderScreen(<ReviewScreen />, await createTestRuntime());

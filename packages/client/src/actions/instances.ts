@@ -52,6 +52,12 @@ export const instanceActions = (deps: ActionDeps): InstanceActions => ({
       deps,
       autoOutcomeEvents({ tasks: after.tasks, presets: after.presets, now, existingEventIds }),
     );
-    return instances + outcomes;
+    // A course whose last instance an outcome just closed gets its next one ahead.
+    const closed = deps.state.store.getState();
+    const ahead = await appendSystem(
+      deps,
+      missingInstanceEvents({ tasks: closed.tasks, presets: closed.presets, now }),
+    );
+    return instances + outcomes + ahead;
   },
 });

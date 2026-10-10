@@ -9,6 +9,15 @@ Important limits of this round:
 - Web cannot read a phone calendar or Android permissions, so A4/A5 (Attend/Skip, From calendar naming) were only observed as far as the web build goes.
 - No console errors or warnings, no failed requests (other than 401 on a bad token and the deliberate offline test) on any of 21 screens x 2 sizes x 2 themes x 2 languages (sweep in `sweep.json`). No horizontal page overflow anywhere. No missing translation keys. Inter is the only font in use (1220 text nodes checked).
 
+## 0. What was done with it
+
+Fixed (in three batches after the round):
+- **High:** QA-1 (title capped at the first line / 100 chars, the rest goes to the description, titles clamped to 2 lines), QA-2 (with the date read right the paste goes to that week's Calculus instance; covered by a composer test), QA-3 ("до 12 октября" and month-name dates).
+- **Medium:** QA-4 ("задание №2" is not a problem), QA-5 (a closed task shows its outcome, no work left, no live slider), QA-6 (Focus resumes a paused task, paused rows are marked), QA-7 (the task form is a sheet with Create always in sight), QA-8 (no Expect/Limit/calibration jargon, readable notification labels, "Notification log"), QA-9 (a week whose deadline passed before the course was added is skipped; each course keeps its next instance ahead under "In future"), QA-10 (one Inbox: decisions on top, captures below, one counter; Settings no longer duplicates it; the hint tells what the buttons do), QA-11 (the tag wash never compiled; all tags are pills now), QA-12, QA-13 (PWA and iPhone icons are the app icon, like the bot), QA-14, QA-15 (errors under their field, a real message for 99:99, Delete for a block, wrapping chips), QA-16 (From calendar on the web says where events come from), QA-17 ("Yes, still" keeps the Expect, only the next ask moves), QA-18 (Permissions and the walk-through on the web say the browser needs none), QA-19 (Done is one tap; a long press opens the sheet), QA-20 (subtasks and a typed estimate in the editor, "Октябрь 2026").
+- **Low:** QA-21 (option rows wrap), QA-23 ("⋯" is 32 px), QA-24 ("still doing this?" on its own line), QA-25 (a block on time spent on a task opens the task), QA-26 (activity lines name the activity, "Задачи на момент"), QA-27 ("только что"), QA-29, QA-30 (texts), QA-31 (switch colours), QA-32 (the open task's row is highlighted), QA-34 (no duplicate History/To sort links beside the sidebar).
+
+Left for later: a course preset linked to a project (QA-9, needs a preset field); the example presets keep their names on purpose (the owner: his presets are not to be hardcoded, the shipped ones are defaults he edits); the phone layout notes of QA-22, text sizes of QA-23, "From calendar" wrapping on phone (QA-24), History's long day-nav labels and undo confirmation (QA-26), an offline indicator (QA-27), the session-expired message and the Telegram widget's own error font (QA-28), the orphan device when the token sheet is dismissed (QA-30), title heights across screens (QA-33).
+
 ## 1. Summary
 
 | Severity | Count |

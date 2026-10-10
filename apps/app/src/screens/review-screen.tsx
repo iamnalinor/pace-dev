@@ -11,7 +11,15 @@ import { EmptyState } from "#app/ui/empty-state.tsx";
 
 import { PushedScreen } from "./pushed-screen.tsx";
 
-const RowView = ({ row }: { readonly row: ReviewRow }) => {
+/**
+The decisions to show beside the Inbox's captures: a capture unsorted for too long is the
+capture's own card there, not a second line.
+*/
+export const decisionsOf = (rows: readonly ReviewRow[]): readonly ReviewRow[] =>
+  rows.filter((row) => row.kind !== "unsorted-too-long");
+
+/** One decision the rules want, with its one-tap answers (also on the Inbox). */
+export const ReviewCard = ({ row }: { readonly row: ReviewRow }) => {
   const t = useT();
   const viewer = useViewer();
   const { actions } = usePace();
@@ -53,7 +61,7 @@ export const ReviewScreen = () => {
       {review.count === 0 ? <EmptyState>{t("review.empty")}</EmptyState> : null}
       <View className="gap-2.5 px-4">
         {review.items.map((row) => (
-          <RowView key={row.taskId} row={row} />
+          <ReviewCard key={row.taskId} row={row} />
         ))}
       </View>
     </PushedScreen>

@@ -3,12 +3,10 @@ import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlit
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
 import {
-  autoOutcomeEvents,
   type CalendarEvent,
   type CoreState,
   type Event,
   type EventInput,
-  missingInstanceEvents,
   notifyPlan,
   ok,
   parseEvent,
@@ -44,6 +42,7 @@ import migrations from "../../drizzle/do/migrations.js";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import * as cloud from "./cloud-data.ts";
 import { insertDecisions, listDecisions } from "./decision-log.ts";
+import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
 import * as log from "./log-queries.ts";
 import * as notifier from "./notifier.ts";
@@ -404,18 +403,17 @@ export class UserStore extends DurableObject {
   }
 
   /**
-  Appends the system events the state calls for at `now`: the homework instances of
-  the current week and the automatic outcomes whose deadline passed. Deterministic ids
+  Appends the system events the state calls for at `now` (see `DERIVE_STEPS`). Deterministic ids
   make this idempotent against clients that derived the same events. Returns their ids.
   */
   async derive(now: string): Promise<readonly string[]> {
-    const before = await this.#current();
-    const instances = await this.#system(missingInstanceEvents({ ...before.state, now }), now);
-    const after = await this.#current();
-    const outcomes = await this.#system(
-      autoOutcomeEvents({ ...after.state, existingEventIds: after.ids, now }),
-      now,
-    );
-    return [...instances, ...outcomes].map((event) => event.id);
+    const made: string[] = [];
+    for (const step of DERIVE_STEPS) {
+      const current = await this.#current();
+      const events = step({ ...current.state, existingEventIds: current.ids, now });
+      const appended = await this.#system(events, now);
+      made.push(...appended.map((event) => event.id));
+    }
+    return made;
   }
 }

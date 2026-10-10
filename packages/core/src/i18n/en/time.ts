@@ -95,6 +95,7 @@ export const enTime = {
   "week.title": "Week",
   "week.thisWeek": "This week",
   "week.calendarEvent": "From the calendar",
+  "week.openTask": "Open the task",
   "week.open": "Week",
   "insights.title": "Insights",
   "insights.previous": "Previous week",

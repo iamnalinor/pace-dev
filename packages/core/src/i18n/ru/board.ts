@@ -9,7 +9,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "task.presetTitle": "Пресет",
   "task.presetBuiltIn": "встроенный",
   "task.presetSet": "Пресет изменён",
-  "now.inbox": "Входящие, не разобрано: {count}",
+  "now.inbox": "Входящие, ждут: {count}",
   "now.filterByProject": "Фильтр по проекту",
   "now.allProjects": "Все",
   "now.tasks": "Задачи",

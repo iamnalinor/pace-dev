@@ -5,6 +5,7 @@ import type { WeekModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
+import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
@@ -50,6 +51,29 @@ const WeekNav = ({
   );
 };
 
+/** The block was time on a task: its page is one tap away. */
+const OpenTaskButton = ({
+  onOpened,
+  taskId,
+}: {
+  readonly taskId: string;
+  readonly onOpened: () => void;
+}) => {
+  const t = useT();
+  const openTask = useOpenTask();
+  return (
+    <Button
+      onPress={() => {
+        onOpened();
+        openTask(taskId);
+      }}
+      variant="secondary"
+    >
+      {t("week.openTask")}
+    </Button>
+  );
+};
+
 /** A tapped block (with where its time went) or calendar event. */
 const PickedSheet = ({
   onClose,
@@ -80,6 +104,9 @@ const PickedSheet = ({
           <View className="-ml-[98px]">
             <WhereSatLine rows={sat(stretch.startAt, stretch.endAt)} />
           </View>
+          {picked.block.taskId === null ? null : (
+            <OpenTaskButton onOpened={onClose} taskId={picked.block.taskId} />
+          )}
         </View>
       ) : (
         <Text className="font-sans text-[14px] text-muted">{t("week.calendarEvent")}</Text>
