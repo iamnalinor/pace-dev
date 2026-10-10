@@ -30,11 +30,12 @@ export type NowItem = {
   readonly isLate: boolean;
 };
 
+/** Late against the due date: as of now while open, as of the closing once closed. */
 const lateMinutesOf = (task: Task, now: string): null | number => {
   if (task.dueAt === null) {
     return null;
   }
-  const minutes = minutesBetween(task.dueAt, now);
+  const minutes = minutesBetween(task.dueAt, task.closed?.at ?? now);
   return minutes > 0 ? minutes : null;
 };
 

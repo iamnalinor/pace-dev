@@ -168,3 +168,21 @@ real signing key now that the debug keystore is public:
 After the v0.6.0 release:
 
 > тебе осталось что делать? ты с депендаботом еще не разобрался
+
+## 2026-10-10, stage 6 session
+
+The second feedback document («pace замечания 2», text in `feedback-2.md`), with:
+
+> вот новый фидбек от меня. почему такое говно? я не могу просто уже. пожалуйста после того как закончишь отправь агента (соннета) прям тыкать приложение в браузере и находить все что работает странно или неудонбо - и это тоже чини
+
+Answers while planning: four time buttons only (From calendar, Rest, Sport, Chores; work
+and study are tracked through tasks): «пока предполагается что 4 а work/study трекаем через
+заведенные таски»; desktop time through an ActivityWatch bridge; calendar: accepted events
+and own events without an invitation; project page: the nearest deadline first.
+
+> может интер везде тогда
+
+On the plan: the branch name does not belong in `context/` («убери это из папки и делай
+просто свои ветки как обычно»); the release is just the current main with the next tag; and
+
+> а почему не ловили? почему мы пишем такие тесты которые ловят не все?

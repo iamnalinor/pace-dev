@@ -95,6 +95,8 @@ export const ICONS: readonly IconSpec[] = [
   { path: "apps/app/public/icon-192.png", size: 192, svg: FAVICON },
   { path: "apps/app/public/icon-512.png", size: 512, svg: FAVICON },
   { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: FAVICON },
+  // Expo's web.favicon: the same tile as the SVG, for browsers that ask for a PNG.
+  { path: "apps/app/assets/favicon.png", size: 48, svg: FAVICON },
   // Expo: the dark icon as the bot avatar draws it (the mark at 56% of what is seen). Android
   // shows only the central 72 of an adaptive icon's 108 dp, so its foreground is 56% × 2/3.
   { path: "apps/app/assets/icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.56, DARK_BG) },

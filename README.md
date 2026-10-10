@@ -12,7 +12,7 @@ phone, in the browser and on the server.
 | Stage | Scope | State |
 |---|---|---|
 | 0 — Foundation | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets | **done** |
-| 1 — Tasks | presets (edited in the web UI), tasks and subtasks, urgency and the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
+| 1 — Tasks | presets (edited in the web UI), tasks and subtasks, the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
 | 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
 | 3 — Time | the time ledger: a time bar under Now (one tap switches, hold to edit a button's Expect/Limit), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers for Expect/Limit, a Limit alert through the bot, MCP time tools | **done** — `v0.3.0` |
 | 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules, the messenger penalty; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
@@ -308,10 +308,9 @@ What the bot does, in the account language:
 - Notifications: digests at the account's digest times (09:00, 14:00, 21:00 by default)
   with the top of Now, what is left to sort and the Inbox count; a **critical** alert once
   per task when its deadline is within the preset's `criticalHours` and progress is below
-  `criticalProgress`, or its score passes `criticalScore` (buttons: Snooze until the next
-  digest, Done); a **stuck** report with the digest when a task waits longer than
-  `waitingDays` or sits in progress untouched for `inProgressIdleDays` (Still waiting /
-  Snooze, Cancel task). Nothing is sent in the quiet hours (23:00–08:00 by default): a
+  `criticalProgress` (buttons: Snooze until the next digest, Done); a **stuck** report with
+  the digest when a task sits in progress untouched for `inProgressIdleDays` (Snooze, Cancel
+  task). Nothing is sent in the quiet hours (23:00–08:00 by default): a
   crossing at night is reported in the morning. A deadline that was already critical before
   the previous check — a back-dated edit, or anything before notifications started — is
   logged as held back instead of sent; the digest shows it. The Durable Object's alarm
@@ -326,7 +325,7 @@ Cursor and MCP Inspector connect with just that URL. The stage-1 tools cover the
 loop: `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`,
 `list_presets`, `list_inbox`, `list_review`, `search_decisions`, `search` and `fetch` (the pair ChatGPT needs)
 to read (`tasks:read`); `create_task`, `capture_inbox`, `mark_subtasks`, `submit`,
-`close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`,
+`close_task`, `reopen`, `update_task`, `set_importance`, `set_status`,
 `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`,
 `update_preset` and `archive_preset` to write (`tasks:write`). Every write takes `at`
 (retroactive records), `precision` and `dryRun` (preview without writing), answers the

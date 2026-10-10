@@ -62,9 +62,12 @@ const Problem = ({
       }}
     >
       <Mark state={problem.state} />
-      <Text className="w-6 font-sans text-[13px] tabular-nums text-muted">
-        {problem.number ?? ""}
-      </Text>
+      {/* A bare number label ("290") is the number itself: shown once, in the label. */}
+      {problem.number === null || String(problem.number) === problem.label ? null : (
+        <Text className="min-w-8 font-sans text-[13px] tabular-nums text-muted">
+          {`№${String(problem.number)}`}
+        </Text>
+      )}
       <Text className={cx("flex-1 font-sans text-[15px]", isSent ? "text-muted" : "text-fg")}>
         {problem.label}
       </Text>

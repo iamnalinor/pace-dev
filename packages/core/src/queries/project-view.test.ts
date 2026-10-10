@@ -27,6 +27,8 @@ const view = (projectId: string, extra: Parameters<typeof artboardState>[1] = []
   return result.value;
 };
 
+const byId = (a: string, b: string): number => a.localeCompare(b);
+
 describe("projectView", () => {
   it("lists the Algebra project: HW 6 open, the grade check in future, eleven sheets done", () => {
     const algebra = view(ALGEBRA_ID);
@@ -41,6 +43,12 @@ describe("projectView", () => {
         LATE_SHEETS.includes(DONE_SHEETS - index) ? "done_late" : "done",
       ),
     );
+  });
+
+  it("tells a closed task's lateness as of its closing, not as of now", () => {
+    const done = view(ALGEBRA_ID).done;
+    const late = done.filter((entry) => entry.item.isLate).map((entry) => entry.item.task.id);
+    expect(late.toSorted(byId)).toEqual(LATE_SHEETS.map((k) => sheetId(k)).toSorted(byId));
   });
 
   it("counts open, on time 9/11 and late 2; hours stay at zero until stage 3", () => {
