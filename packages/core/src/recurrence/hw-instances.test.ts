@@ -332,14 +332,14 @@ describe("expectedInstances", () => {
 });
 
 describe("missingInstanceEvents", () => {
-  it("creates one task per issued slot that has no task yet", () => {
+  it("creates the issued instances, and one ahead of its issue for a course with none open", () => {
     const events = missingInstanceEvents({
       tasks: INITIAL_TASKS_STATE,
       presets: EXAMPLES,
       now: TUESDAY_W41,
     });
 
-    // History is issued on Thursday; the next-week slots are not issued either.
+    // History is issued on Thursday: it is put on the plan now, starting at its issue.
     expect(events).toEqual([
       {
         id: "hw:hw.algebra:2026-W41",
@@ -379,10 +379,29 @@ describe("missingInstanceEvents", () => {
           fields: {},
         },
       },
+      {
+        id: "hw:hw.history:2026-W41",
+        type: "task.created",
+        occurredAt: "2026-10-01T06:00:00.000Z",
+        precision: "exact",
+        source: "system",
+        payload: {
+          taskId: "hw:hw.history:2026-W41",
+          title: "History HW 1",
+          presetId: "hw.history",
+          dueAt: "2026-10-15T06:00:00.000Z",
+          dueTz: MOSCOW,
+          startAt: "2026-10-08T06:00:00.000Z",
+          startTz: MOSCOW,
+          estimateMinutes: 60,
+          subtasks: [],
+          fields: {},
+        },
+      },
     ]);
   });
 
-  it("creates nothing before the issue instant and the instance at that very instant", () => {
+  it("makes the first instance ahead of its issue, under the same id as at the issue", () => {
     // Algebra alone: issued Monday 10:00 Moscow.
     const presets = foldPresets(exampleCoursePresetEvents(SEEDED_AT).slice(0, 1));
     const before = missingInstanceEvents({
@@ -396,8 +415,44 @@ describe("missingInstanceEvents", () => {
       now: "2026-10-05T07:00:00.000Z",
     });
 
-    expect(before).toEqual([]);
+    expect(before.map((input) => input.id)).toEqual(["hw:hw.algebra:2026-W41"]);
     expect(atIssue.map((input) => input.id)).toEqual(["hw:hw.algebra:2026-W41"]);
+    expect(
+      missingInstanceEvents({ tasks: foldTasks(before), presets, now: "2026-10-05T07:00:00.000Z" }),
+    ).toEqual([]);
+  });
+
+  it("makes the same instance ahead whenever, wherever it is derived", () => {
+    const presets = foldPresets(exampleCoursePresetEvents(SEEDED_AT).slice(0, 1));
+    const derive = (now: string) =>
+      missingInstanceEvents({ tasks: INITIAL_TASKS_STATE, presets, now });
+    const early = derive("2026-10-05T03:00:00.000Z");
+    expect(early).toEqual(derive("2026-10-05T06:59:59.000Z"));
+    // Recorded a week before its issue (never after now, never before the course).
+    expect(early.map((input) => input.occurredAt)).toEqual(["2026-09-28T07:00:00.000Z"]);
+  });
+
+  it("puts the next week ahead when this week's instance was taken back", () => {
+    const presets = foldPresets(exampleCoursePresetEvents(SEEDED_AT).slice(0, 1));
+    const events = missingInstanceEvents({
+      existingEventIds: new Set(["hw:hw.algebra:2026-W41"]),
+      now: TUESDAY_W41,
+      presets,
+      tasks: INITIAL_TASKS_STATE,
+    });
+    expect(events.map((input) => input.id)).toEqual(["hw:hw.algebra:2026-W42"]);
+  });
+
+  it("skips a week whose deadline passed before the course was added; the next waits ahead", () => {
+    // Algebra (Mon 10:00 → Wed 23:59) added on Saturday of week 41.
+    const saturday = "2026-10-10T09:00:00.000Z";
+    const presets = foldPresets(exampleCoursePresetEvents(saturday).slice(0, 1));
+
+    const events = missingInstanceEvents({ tasks: INITIAL_TASKS_STATE, presets, now: saturday });
+
+    expect(events.map((input) => [input.id, input.payload])).toMatchObject([
+      ["hw:hw.algebra:2026-W42", { startAt: "2026-10-12T07:00:00.000Z", title: "Algebra HW 1" }],
+    ]);
   });
 
   it("numbers the title after every existing instance of the preset, closed ones included", () => {
@@ -419,6 +474,7 @@ describe("missingInstanceEvents", () => {
     expect(events.map((input) => input.payload)).toMatchObject([
       { taskId: "hw:hw.algebra:2026-W41", title: "Algebra HW 3" },
       { taskId: "hw:hw.calculus:2026-W41", title: "Calculus HW 2" },
+      { taskId: "hw:hw.history:2026-W41", title: "History HW 1" },
     ]);
   });
 
@@ -433,6 +489,7 @@ describe("missingInstanceEvents", () => {
     expect(events.map((input) => input.payload)).toMatchObject([
       { taskId: "hw:hw.algebra:2026-W41", estimateMinutes: 90 },
       { taskId: "hw:hw.calculus:2026-W41", estimateMinutes: 60 },
+      { taskId: "hw:hw.history:2026-W41" },
     ]);
   });
 
@@ -451,7 +508,7 @@ describe("missingInstanceEvents", () => {
       missingInstanceEvents({ tasks: algebra, presets: EXAMPLES, now: TUESDAY_W41 }).map(
         (input) => input.payload,
       ),
-    ).toMatchObject([{ taskId: "hw:hw.algebra:2026-W41", estimateMinutes: 60 }, {}]);
+    ).toMatchObject([{ taskId: "hw:hw.algebra:2026-W41", estimateMinutes: 60 }, {}, {}]);
     expect(ny.map((input) => input.payload)).toMatchObject([
       { taskId: "hw:hw.ny:2026-W44", title: "NY HW 1", estimateMinutes: 45 },
     ]);
@@ -465,7 +522,7 @@ describe("missingInstanceEvents", () => {
     });
     const tasks = foldTasks(first);
 
-    expect(first).toHaveLength(2);
+    expect(first).toHaveLength(3);
     expect(missingInstanceEvents({ tasks, presets: EXAMPLES, now: TUESDAY_W41 })).toEqual([]);
     // The slots themselves are still expected: only the creation is skipped.
     expect(expectedInstances(EXAMPLES, TUESDAY_W41)).toHaveLength(6);
@@ -479,7 +536,10 @@ describe("missingInstanceEvents", () => {
 
     const events = missingInstanceEvents({ tasks: INITIAL_TASKS_STATE, presets, now: TUESDAY_W41 });
 
-    expect(events.map((input) => input.id)).toEqual(["hw:hw.calculus:2026-W41"]);
+    expect(events.map((input) => input.id)).toEqual([
+      "hw:hw.calculus:2026-W41",
+      "hw:hw.history:2026-W41",
+    ]);
   });
 
   it("generates valid events for any schedule, zone and instant (property)", () => {

@@ -65,7 +65,8 @@ export const CloseSheet = ({
       />
       <ClosePreview form={form} view={view} />
       <SheetActions
-        cancelLabel={t("common.cancel")}
+        // "Back", not "Cancel": next to Cancelled and "Close as Cancelled" it read as a third.
+        cancelLabel={t("common.back")}
         isDisabled={form.at === null}
         onCancel={onClose}
         onPrimary={submit}

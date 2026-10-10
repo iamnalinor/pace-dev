@@ -19,7 +19,6 @@ export {
   type ProjectPatch,
 } from "./actions/project-actions.ts";
 export type { ProjectTarget } from "./actions/projects.ts";
-export type { RankActions } from "./actions/rank-actions.ts";
 export type { ReviewActions } from "./actions/review-actions.ts";
 export type { QuietHours, SettingsActions } from "./actions/settings-actions.ts";
 export type {
@@ -33,8 +32,10 @@ export type {
   ActivityEntry,
   ActivityInput,
   ActivityTarget,
-  ButtonDraft,
+  CalendarStart,
   PastActivity,
+  StartOptions,
+  StopWhen,
   TimeActions,
 } from "./actions/time-actions.ts";
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
@@ -60,8 +61,11 @@ export { createPaceClient, type PaceClient, type PaceClientOptions } from "./cre
 export type { EventStore } from "./event-store.ts";
 export {
   activityNotifications,
+  calendarNotifications,
+  type CalendarReminder,
   fetchNotificationPlan,
   isActivityId,
+  isCalendarId,
   type LocalNotification,
   localNotifications,
   type RunningTimer,
@@ -82,26 +86,21 @@ export {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-client.ts";
-export {
-  type DetailsModel,
-  detailsModel,
-  type DetailsTask,
-  recentLabels,
-} from "./view-models/activity-details.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
+  canAiRead,
   type ComposerDraft,
   type ComposerEdits,
   composerModel,
   type ComposerModel,
   type ComposerOption,
   type ComposerTarget,
+  isPasted,
   LONG_TEXT_CHARS,
   requiresAiFirst,
-  shouldAiRead,
-  SLOW_READ_MS,
+  taskFormOptions,
 } from "./view-models/composer.ts";
 export {
   type DayEntry,
@@ -112,6 +111,7 @@ export {
   trackedDates,
 } from "./view-models/day.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
+export { bridgeCommand } from "./view-models/devices.ts";
 export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
 export {
   type HistoryEntry,
@@ -174,7 +174,6 @@ export {
   type PreviewContext,
 } from "./view-models/preset-preview.ts";
 export {
-  type AwaitingRow,
   type DoneRow,
   type ProjectViewModel,
   projectViewModel,
@@ -192,6 +191,7 @@ export {
   taskViewModel,
 } from "./view-models/task.ts";
 export {
+  type ChoiceView,
   type MessageText,
   PACE_STATUS_TEXT,
   type RunningView,
@@ -204,32 +204,19 @@ export {
   activityFormOf,
   type ActivityRange,
   type ActivitySheetProps,
-  type ButtonForm,
-  buttonFormOf,
-  buttonSaveOf,
   type DayRowProps,
-  type EditorProps,
-  type EditorTarget,
   type FormPartProps,
   hasEnd,
   type TypedTime,
   typeTime,
-  withCategory,
 } from "./view-models/time-forms.ts";
 export {
-  type FormulaRun,
-  type WhyLine,
-  whyText,
-  type WhyText,
-  type WhyTextContext,
-  type WhyTextGroup,
-  whyValueText,
-} from "./view-models/why-text.ts";
-export {
-  type FormulaPart,
-  type WhyGroup,
-  type WhyGroupName,
-  type WhyModel,
-  whyModel,
-  type WhyRow,
-} from "./view-models/why.ts";
+  type Lane,
+  lanesOf,
+  placeIn,
+  type Placement,
+  type WeekBlock,
+  type WeekDay,
+  type WeekModel,
+  weekModel,
+} from "./view-models/week.ts";

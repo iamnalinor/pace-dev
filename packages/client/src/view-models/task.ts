@@ -19,14 +19,13 @@ import {
   type TaskStatus,
   type TaskView,
   taskView,
-  type UrgencyPolicy,
 } from "@pace/core";
 
 import { type QuickTime, quickTimes } from "../clock.ts";
-import { type WhyModel, whyModel } from "./why.ts";
 
 export type TaskTag =
   | { readonly kind: "importance"; readonly importance: Importance }
+  | { readonly kind: "outcome"; readonly outcome: Outcome }
   | { readonly kind: "status"; readonly status: TaskStatus }
   | { readonly kind: "submission"; readonly submission: Submission };
 
@@ -61,7 +60,6 @@ export type OverrideSheet = {
   readonly dueTz: null | string;
   readonly estimateMinutes: number;
   readonly isEstimateOwn: boolean;
-  readonly urgencyPolicy: UrgencyPolicy;
   readonly overrides: null | Readonly<Record<string, unknown>>;
 };
 
@@ -97,9 +95,9 @@ export type TaskViewModel = {
     readonly dueAt: null | string;
     readonly dueTz: null | string;
     readonly dueZoneDiffers: boolean;
-    readonly startAt: null | string;
+    /** When the task starts: its own start, else its creation. */
+    readonly startAt: string;
     readonly startTz: null | string;
-    readonly windowElapsed: null | number;
     readonly workLeftMinutes: number;
     readonly trackedMinutes: number;
     readonly estimateMinutes: number;
@@ -110,8 +108,6 @@ export type TaskViewModel = {
     readonly slider: null | number;
   };
   readonly problems: readonly ProblemRow[];
-  readonly why: WhyModel;
-  readonly rank: null | { readonly position: number; readonly size: number };
   readonly primaryAction: PrimaryAction;
   readonly quickTimes: readonly QuickTime[];
   readonly overrideSheet: OverrideSheet;
@@ -126,11 +122,10 @@ const problemState = (solvedAt: null | string, submittedAt: null | string): Prob
   return solvedAt === null ? "pending" : "solved";
 };
 
-const tags = (view: TaskView): readonly TaskTag[] => [
-  ...(view.importance === "normal"
-    ? []
-    : [{ kind: "importance" as const, importance: view.importance }]),
-  { kind: "status", status: view.status },
+const tags = (view: TaskView, outcome: null | Outcome): readonly TaskTag[] => [
+  { kind: "importance", importance: view.importance },
+  // A closed task shows how it ended, not the status it had while open.
+  outcome === null ? { kind: "status", status: view.status } : { kind: "outcome", outcome },
   // Only a task with subtasks can be submitted piece by piece; "whole" goes without saying.
   ...(view.preset.submission === "per_subtask"
     ? [{ kind: "submission" as const, submission: view.preset.submission }]
@@ -160,7 +155,6 @@ const overrideSheet = (state: CoreState, view: TaskView): OverrideSheet => {
     dueTz: task.dueTz,
     estimateMinutes: task.estimateMinutes ?? preset.defaultEstimateMinutes,
     isEstimateOwn: task.estimateMinutes !== null,
-    urgencyPolicy: preset.urgencyPolicy,
     overrides: task.overrides,
   };
 };
@@ -169,10 +163,9 @@ const stats = (view: TaskView): TaskViewModel["stats"] => ({
   dueAt: view.task.dueAt,
   dueTz: view.task.dueTz,
   dueZoneDiffers: view.dueZoneDiffers,
-  startAt: view.task.startAt,
+  startAt: view.task.startAt ?? view.task.createdAt,
   startTz: view.task.startTz,
-  windowElapsed: view.windowElapsed,
-  workLeftMinutes: view.workLeftMinutes,
+  workLeftMinutes: view.task.closed === null ? view.workLeftMinutes : 0,
   trackedMinutes: view.trackedMinutes,
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
 });
@@ -209,7 +202,7 @@ export const taskViewModel = (
       sourceText: task.sourceText,
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
-      tags: tags(view),
+      tags: tags(view, taskOutcome(task, preset)),
       stats: stats(view),
       progress: {
         mode: preset.progressMode,
@@ -217,8 +210,6 @@ export const taskViewModel = (
         slider: task.slider,
       },
       problems: problems(task),
-      why: whyModel(view.explanation),
-      rank: view.rank,
       primaryAction: primaryAction(view.submitPreview),
       quickTimes: quickTimes({ deviceTz: ctx.deviceTz, now: () => ctx.now }, task),
       overrideSheet: overrideSheet(state, view),

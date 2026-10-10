@@ -21,7 +21,7 @@ export const TimezoneRow = () => {
   const isOffsetDifferent = zonesDiffer({ at: now, tz: account }, { at: now, tz: device });
   return (
     <View className="gap-2">
-      <Text className="font-mono text-[14px] text-fg">
+      <Text className="font-sans text-[14px] tabular-nums text-fg">
         {t("settings.timezone.account", { tz: account })}
       </Text>
       {account === device ? null : (

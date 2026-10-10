@@ -6,16 +6,28 @@ export type OpenTask = (taskId: string, options?: { readonly close?: boolean }) 
 /** A list that has a detail pane next to it opens tasks there instead of a new screen. */
 const OpenerContext = createContext<null | OpenTask>(null);
 
+/** The task open in the pane, so its row shows which one it is. */
+const SelectedContext = createContext<null | string>(null);
+
 /** Inside a detail pane: how the task's back button closes it. */
 const PaneContext = createContext<(() => void) | null>(null);
 
 export const TaskOpenerProvider = ({
   children,
   open,
+  selectedId,
 }: {
   readonly children: ReactNode;
   readonly open: OpenTask;
-}) => <OpenerContext value={open}>{children}</OpenerContext>;
+  readonly selectedId: null | string;
+}) => (
+  <OpenerContext value={open}>
+    <SelectedContext value={selectedId}>{children}</SelectedContext>
+  </OpenerContext>
+);
+
+/** The id of the task open beside the list, if any. */
+export const useSelectedTask = (): null | string => use(SelectedContext);
 
 export const TaskPaneProvider = ({
   children,

@@ -40,6 +40,7 @@ export const aiReading = (
   return {
     doubtful: response.doubtful,
     edits: {
+      description: input.description ?? undefined,
       due,
       estimateMinutes: input.estimateMinutes ?? undefined,
       importance: input.isImportanceExplicit ? input.importance : undefined,

@@ -20,8 +20,7 @@ import { relativeDay } from "./relative-day.ts";
 const PREVIEW_ID = "preview";
 const MINUTES_PER_DAY = 24 * 60;
 /** The sample task is 40 % done where the pace expects 60 %. */
-export const PREVIEW_SAMPLE = { expected: 0.6, progress: 0.4, solved: 2, total: 5 } as const;
-const PERCENT = 100;
+export const PREVIEW_SAMPLE = { progress: 0.4, solved: 2, total: 5 } as const;
 
 /** A sample task of the draft, drawn like a Now row. */
 export type PresetPreviewModel = {
@@ -64,12 +63,9 @@ const withDraft = (
 
 const progressParts = (resolved: ResolvedPreset): readonly MetaPart[] => {
   switch (resolved.progressMode) {
-    case "none": {
-      return [];
-    }
+    case "none":
     case "slider": {
-      const percent = Math.round((PREVIEW_SAMPLE.expected - PREVIEW_SAMPLE.progress) * PERCENT);
-      return [{ kind: "behind-pace", percent }];
+      return [];
     }
     case "subtasks": {
       return [{ kind: "solved", solved: PREVIEW_SAMPLE.solved, total: PREVIEW_SAMPLE.total }];
@@ -111,7 +107,7 @@ export const presetPreview = (
     color,
     importance,
     meta: [
-      ...(importance === "normal" ? [] : [{ importance, kind: "importance" } as const]),
+      { importance, kind: "importance" } as const,
       {
         ...due,
         kind: "due",

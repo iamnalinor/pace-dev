@@ -1,4 +1,3 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -6,8 +5,8 @@ import type { InsightBar, InsightsModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
-import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { formatDuration, formatWeekRange } from "@pace/core";
@@ -55,7 +54,7 @@ const Bars = ({
                 style={{ width: barWidth(bar.share) }}
               />
             </View>
-            <Text className="font-mono text-[12px] text-fg">{value}</Text>
+            <Text className="font-sans text-[12px] tabular-nums text-fg">{value}</Text>
           </View>
         );
       })}
@@ -68,7 +67,7 @@ const Row = ({ name, value }: { readonly name: string; readonly value: string })
     <Text className="flex-1 font-sans text-[12px] text-fg2" numberOfLines={1}>
       {name}
     </Text>
-    <Text className="font-mono text-[12px] text-fg">{value}</Text>
+    <Text className="font-sans text-[12px] tabular-nums text-fg">{value}</Text>
   </View>
 );
 
@@ -80,26 +79,9 @@ const WeekNav = ({
   readonly week: InsightsModel;
   readonly onWeek: (weekOf: null | string) => void;
 }) => {
-  const t = useT();
   return (
     <View className="flex-row items-center gap-1">
-      <IconButton
-        icon={ChevronLeft}
-        label={t("insights.previous")}
-        onPress={() => {
-          onWeek(week.previous);
-        }}
-        variant="plain"
-      />
-      <IconButton
-        disabled={week.next === null}
-        icon={ChevronRight}
-        label={t("insights.next")}
-        onPress={() => {
-          onWeek(week.next);
-        }}
-        variant="plain"
-      />
+      <WeekArrows next={week.next} onWeek={onWeek} previous={week.previous} />
     </View>
   );
 };

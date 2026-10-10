@@ -1,9 +1,11 @@
 import { APICallError, type LanguageModel } from "ai";
 
-import type { ParseResult } from "@pace/core";
+import { type ActivityReading, type ParseResult, typedActivity } from "@pace/core";
 
-/** What a scripted model does with a message: answer with a parse, or be rate limited. */
-export type FakeReply = ParseResult | { readonly rateLimitedFor: number };
+import { ACTIVITY_PROMPT_MARK } from "./activity-prompt.ts";
+
+/** What a scripted model does with a message: answer it, or be rate limited. */
+export type FakeReply = ActivityReading | ParseResult | { readonly rateLimitedFor: number };
 
 const USAGE = {
   inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
@@ -19,6 +21,12 @@ const messageOf = (prompt: readonly PromptMessage[]): string => {
   return parts.map((part) => part.text ?? "").join("");
 };
 
+/** The system instructions, which say which question this is. */
+const systemOf = (prompt: readonly PromptMessage[]): string => {
+  const system = prompt.find((message) => message.role === "system");
+  return typeof system?.content === "string" ? system.content : "";
+};
+
 /**
 A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the process.
 `reply` decides per message; a rate limit throws the 429 a real provider would.
@@ -26,11 +34,13 @@ A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the 
 /** A model object of the current provider specification (`LanguageModel` also admits ids). */
 type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" }>;
 
-export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageModel => {
+export const fakeParseModel = (
+  reply: (text: string, system: string) => FakeReply,
+): LanguageModel => {
   const model: ModelObject = {
     doGenerate: async ({ prompt }) => {
       await Promise.resolve();
-      const answer = reply(messageOf(prompt));
+      const answer = reply(messageOf(prompt), systemOf(prompt));
       if ("rateLimitedFor" in answer) {
         throw new APICallError({
           message: "Rate limit reached",
@@ -58,6 +68,16 @@ export const fakeParseModel = (reply: (text: string) => FakeReply): LanguageMode
   };
   return model;
 };
+
+/** An activity note read by the rules alone: its words, Other, the length it states. */
+const echoActivity = (text: string): ActivityReading => ({
+  category: "other",
+  ...typedActivity(text),
+});
+
+/** The plainest reading of either question: a task titled with the message, or the note's words. */
+export const echoReply = (text: string, system: string): ActivityReading | ParseResult =>
+  system.startsWith(ACTIVITY_PROMPT_MARK) ? echoActivity(text) : echoParse(text);
 
 /** The plainest reading: one new task titled with the message itself. */
 export const echoParse = (text: string): ParseResult => ({

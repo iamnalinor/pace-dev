@@ -22,7 +22,7 @@ export const ScopeList = ({
   const { palette } = useTheme();
   return (
     <View accessibilityLabel={t("oauth.scopesTitle")} className="gap-2" role="group">
-      <Text className="mb-1 font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+      <Text className="mb-1 font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
         {t("oauth.scopesTitle")}
       </Text>
       {offered.map((scope) => {

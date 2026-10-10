@@ -28,7 +28,33 @@ describe("DayScreen", () => {
     expect(screen.getByText("Tracked 1h")).toBeOnTheScreen();
   });
 
-  it("refuses an end before the start", async () => {
+  it("shows under a block where its time went on the computer", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/usage": () => ({
+          sessions: [
+            {
+              app: "code",
+              deviceId: "01LAPTOP",
+              deviceName: "Laptop",
+              endAt: addMinutesIso(NOW, -200),
+              startAt: addMinutesIso(NOW, -250),
+            },
+          ],
+        }),
+      },
+    });
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -180),
+      label: "Lecture notes",
+      startAt: addMinutesIso(NOW, -240),
+    });
+    await renderScreen(<DayScreen />, runtime);
+    expect(await screen.findByText("Laptop: code 40m")).toBeOnTheScreen();
+  });
+
+  it("refuses a start that is not a time, saying so under the field", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<DayScreen />, runtime);
     expect(screen.getByText("Nothing recorded on this day.")).toBeOnTheScreen();
@@ -36,7 +62,7 @@ describe("DayScreen", () => {
     await fireEvent.changeText(await screen.findByLabelText("What"), "Nap");
     await fireEvent.changeText(screen.getByLabelText("From"), "25:00");
     await fireEvent.press(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByText("The end must be after the start.")).toBeOnTheScreen();
+    expect(await screen.findByText("Type a time like 09:30.")).toBeOnTheScreen();
   });
 
   it("moves to the previous day and back", async () => {

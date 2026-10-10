@@ -16,8 +16,6 @@ const BUILT_IN_CREATED_AT = "1970-01-01T00:00:00.000Z";
 const DEFAULT_NOTIFY: NotifyParams = {
   criticalHours: 24,
   criticalProgress: 0.5,
-  criticalScore: 10,
-  waitingDays: 7,
   inProgressIdleDays: 5,
 };
 
@@ -41,7 +39,6 @@ const basePreset = (id: BasePresetId, name: string, definition: ResolvedPreset):
 
 export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
   hw: basePreset("hw", "Homework", {
-    urgencyPolicy: "pace",
     defaultImportance: "normal",
     deadlinePolicy: { kind: "hard" },
     submission: "per_subtask",
@@ -54,7 +51,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     color: "yellow",
   }),
   work: basePreset("work", "Work", {
-    urgencyPolicy: "lag",
     defaultImportance: "normal",
     deadlinePolicy: { kind: "hard" },
     submission: "whole",
@@ -66,7 +62,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     color: "violet",
   }),
   personal: basePreset("personal", "Personal", {
-    urgencyPolicy: "age",
     defaultImportance: "normal",
     deadlinePolicy: { kind: "hard" },
     submission: "whole",
@@ -78,7 +73,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     color: "orange",
   }),
   deferred: basePreset("deferred", "Deferred", {
-    urgencyPolicy: "age",
     defaultImportance: "nice_to_have",
     deadlinePolicy: { kind: "hard" },
     submission: "whole",
@@ -90,7 +84,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     color: "slate",
   }),
   inbox: basePreset("inbox", "Inbox", {
-    urgencyPolicy: "age",
     defaultImportance: "nice_to_have",
     deadlinePolicy: { kind: "hard" },
     submission: "whole",

@@ -21,6 +21,7 @@ export {
   type User,
   UserSchema,
 } from "./api/schemas/auth.ts";
+export type { CalendarEvent, Device, UsageRow } from "./api/schemas/cloud.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,
@@ -93,6 +94,7 @@ export {
 } from "./events/payloads.ts";
 export { sortEvents } from "./events/sort.ts";
 export { en } from "./i18n/en.ts";
+export { EVENT_LABEL_KEYS } from "./i18n/event-labels.ts";
 export * from "./i18n/i18n.ts";
 export { ru } from "./i18n/ru.ts";
 export {
@@ -134,7 +136,6 @@ export {
   type Recurrence,
   type ResolvedPreset,
   type Submission,
-  type UrgencyPolicy,
   type Weekday,
   type WeekSlot,
 } from "./model/preset.ts";
@@ -213,7 +214,7 @@ export {
 export { importanceOf, presetOf } from "./queries/classify.ts";
 export { accountTz, type QueryContext } from "./queries/context.ts";
 export { type InboxItem, inboxList, UNSORTED_TOO_LONG_MINUTES } from "./queries/inbox.ts";
-export { nowItem } from "./queries/now-item.ts";
+export { compareNowItems, hasLaterStart, nowItem } from "./queries/now-item.ts";
 export { type NowItem, type NowList, nowList, type NowListOptions } from "./queries/now-list.ts";
 export {
   type DoneItem,
@@ -222,8 +223,12 @@ export {
   projectView,
 } from "./queries/project-view.ts";
 export { suggestFor, type Suggestion } from "./queries/suggest.ts";
-export { type SubmitPreview, type TaskView, taskView } from "./queries/task-view.ts";
-export { rankWithinCategory, urgencyInputFor } from "./queries/urgency-input.ts";
+export {
+  estimateMinutesOf,
+  type SubmitPreview,
+  type TaskView,
+  taskView,
+} from "./queries/task-view.ts";
 export {
   expectedInstances,
   type InstanceRef,
@@ -254,36 +259,6 @@ export {
   type ZonedInstant,
   zonesDiffer,
 } from "./time.ts";
-export {
-  AGE_SAT,
-  AGE_TAU_DAYS,
-  LAG_GAIN,
-  MULTIPLIERS,
-  PACE_MIN_HOURS,
-  PRIORITIZED_HORIZON_DAYS,
-  RANK_BONUS,
-  RESUBMISSION_GROWTH_PER_DAY,
-  U_FLOOR,
-  U_MAX,
-} from "./urgency/constants.ts";
-export { explain, type Explanation } from "./urgency/explain.ts";
-export { type UrgencyInput, type WorkLeft } from "./urgency/input.ts";
-export { age, lag, pace, resubmission } from "./urgency/policies.ts";
-export {
-  compareScores,
-  effectiveDue,
-  type Ranked,
-  type Score,
-  scoreTask,
-  type TieBreak,
-} from "./urgency/score.ts";
-export {
-  type ExplainInput,
-  type ExplainKey,
-  type ExplainStep,
-  type ExplainUnit,
-  type FormulaSymbol,
-} from "./urgency/trace.ts";
 export {
   FUTURE_TOLERANCE_MINUTES,
   type RetroError,

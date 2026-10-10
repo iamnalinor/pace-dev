@@ -4,8 +4,11 @@ import { createApiClient } from "./api-client.ts";
 import { createFakeFetch, problem } from "./fake-fetch.fake.ts";
 import {
   activityNotifications,
+  calendarNotifications,
   fetchNotificationPlan,
   isActivityId,
+  isCalendarId,
+  isPlanId,
   localNotifications,
   scheduleChanges,
 } from "./local-notifications.ts";
@@ -65,48 +68,66 @@ describe("local notifications", () => {
 
   it("never lets the plan sync cancel the activity timers", () => {
     const changes = scheduleChanges(
-      ["pace:activity:a1:limit", "pace:digest:2026-10-06T11:00:00.000Z"],
+      ["pace:activity:a1:long", "pace:digest:2026-10-06T11:00:00.000Z"],
       [],
     );
     expect(changes.cancel).toEqual(["pace:digest:2026-10-06T11:00:00.000Z"]);
   });
 
-  it("times the running activity's Expect and Limit, skipping moments already past", () => {
+  it("asks whether the running activity is still going at its reminder, once that is ahead", () => {
     const running = {
       activityId: "a1",
-      expectMinutes: 30,
       label: "Commute",
-      limitMinutes: 60,
+      remindAt: "2026-10-06T13:00:00.000Z",
       startAt: "2026-10-06T12:00:00.000Z",
     };
-    const at = (id: string) =>
-      activityNotifications(running, "2026-10-06T12:40:00.000Z", "en").find(
-        (item) => item.id === id,
-      );
     expect(activityNotifications(running, "2026-10-06T12:10:00.000Z", "en")).toEqual([
       {
-        at: "2026-10-06T12:30:00.000Z",
-        body: "Commute is past its usual 30m.",
-        id: "pace:activity:a1:expect",
-        title: "Pace",
-      },
-      {
-        at: "2026-10-06T12:50:00.000Z",
-        body: "Commute: 10 minutes left before the 1h limit.",
-        id: "pace:activity:a1:near-limit",
-        title: "Pace",
-      },
-      {
         at: "2026-10-06T13:00:00.000Z",
-        body: "Commute is over its 1h limit.",
-        id: "pace:activity:a1:over-limit",
+        body: "Still doing Commute?",
+        id: "pace:activity:a1:long@2026-10-06T13:00:00.000Z",
         title: "Pace",
       },
     ]);
-    expect(at("pace:activity:a1:expect")).toBeUndefined();
-    expect(at("pace:activity:a1:over-limit")).toBeDefined();
+    expect(activityNotifications(running, "2026-10-06T13:10:00.000Z", "en")).toEqual([]);
+    expect(
+      activityNotifications({ ...running, remindAt: null }, "2026-10-06T12:10:00.000Z", "en"),
+    ).toEqual([]);
     expect(activityNotifications(null, "2026-10-06T12:10:00.000Z", "en")).toEqual([]);
-    expect(isActivityId("pace:activity:a1:expect")).toBe(true);
+    expect(isActivityId("pace:activity:a1:long")).toBe(true);
     expect(isActivityId("pace:digest:x")).toBe(false);
+  });
+
+  it("asks about each calendar event as it starts, and keeps those reminders from the plan sync", () => {
+    const events = [
+      {
+        endAt: "2026-10-06T08:00:00.000Z",
+        id: "past",
+        startAt: "2026-10-06T07:00:00.000Z",
+        title: "Gone",
+      },
+      {
+        endAt: "2026-10-06T11:30:00.000Z",
+        id: "e1",
+        startAt: "2026-10-06T10:00:00.000Z",
+        title: "Seminar",
+      },
+    ];
+    expect(
+      calendarNotifications(events, {
+        clock: (at) => at.slice(11, 16),
+        language: "en",
+        now: "2026-10-06T09:00:00.000Z",
+      }),
+    ).toEqual([
+      {
+        at: "2026-10-06T10:00:00.000Z",
+        body: "Seminar, 10:00–11:30. Attend?",
+        id: "pace:calendar:e1@2026-10-06T10:00:00.000Z",
+        title: "Starting now",
+      },
+    ]);
+    expect(isPlanId("pace:calendar:e1@x")).toBe(false);
+    expect(isCalendarId("pace:calendar:e1@x")).toBe(true);
   });
 });

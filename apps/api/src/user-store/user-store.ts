@@ -3,17 +3,17 @@ import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlit
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
 import {
-  autoOutcomeEvents,
+  type CalendarEvent,
   type CoreState,
   type Event,
   type EventInput,
-  missingInstanceEvents,
   notifyPlan,
   ok,
   parseEvent,
   type PlannedNotification,
   type Result,
   snooze,
+  type UsageRow,
 } from "@pace/core";
 
 import type {
@@ -40,42 +40,13 @@ import type { TelegramTarget } from "../shared/telegram-api.ts";
 
 import migrations from "../../drizzle/do/migrations.js";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
+import * as cloud from "./cloud-data.ts";
 import { insertDecisions, listDecisions } from "./decision-log.ts";
-import {
-  coreValidator,
-  type EventValidator,
-  screenBatch,
-  type ScreenedBatch,
-} from "./event-log.ts";
-import {
-  countEvents,
-  findEvent,
-  insertNew,
-  insertObservations,
-  latestSeq,
-  listPage,
-  loadLog,
-  takeMemo,
-} from "./log-queries.ts";
-import {
-  chatOf,
-  memoryOf,
-  type NotifyRun,
-  rearm,
-  runNotifier,
-  saveMemory,
-  SERVER_TZ,
-  setChat,
-  telegramOf,
-} from "./notifier.ts";
-import {
-  armForQueue,
-  cooldownsOf,
-  drainQueue,
-  enqueue,
-  noteLimits,
-  type QueuedParse,
-} from "./parse-queue.ts";
+import { DERIVE_STEPS } from "./derive-steps.ts";
+import * as eventLog from "./event-log.ts";
+import * as log from "./log-queries.ts";
+import * as notifier from "./notifier.ts";
+import * as parseQueue from "./parse-queue.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
 import {
@@ -93,12 +64,12 @@ type Db = DrizzleSqliteDODatabase<typeof schema>;
 export type AppendOptions = {
   readonly now: string;
   /** Only for in-process callers (tests); RPC callers get the core event schema. */
-  readonly validateEvent?: EventValidator;
+  readonly validateEvent?: eventLog.EventValidator;
 };
 
 export type AppendResult = {
   readonly accepted: readonly string[];
-  readonly rejected: ScreenedBatch["rejected"];
+  readonly rejected: eventLog.ScreenedBatch["rejected"];
   readonly seq: number;
 };
 
@@ -138,11 +109,11 @@ export class UserStore extends DurableObject {
 
   /** The cached state, rebuilt from the log when the cache is missing or behind it. */
   async #current(): Promise<Materialized> {
-    const seq = await latestSeq(this.db);
+    const seq = await log.latestSeq(this.db);
     if (this.#cache?.seq === seq) {
       return this.#cache;
     }
-    const rebuilt = rebuild({ events: await loadLog(this.db), seq });
+    const rebuilt = rebuild({ events: await log.loadLog(this.db), seq });
     await rewriteProjections(this.db, rebuilt.state);
     this.#cache = rebuilt;
     return rebuilt;
@@ -155,11 +126,11 @@ export class UserStore extends DurableObject {
   */
   async #insert(events: readonly Event[]): Promise<readonly Event[]> {
     const before = await this.#current();
-    const inserted = await insertNew(this.db, events, before.ids);
+    const inserted = await log.insertNew(this.db, events, before.ids);
     if (inserted.length === 0) {
       return inserted;
     }
-    const seq = await latestSeq(this.db);
+    const seq = await log.latestSeq(this.db);
     if (canApplyInOrder(before, inserted)) {
       const next = applyInOrder(before, inserted, seq);
       await updateProjections(this.db, next.state, touchedBy(inserted));
@@ -177,7 +148,7 @@ export class UserStore extends DurableObject {
   }
 
   async #rearm(now: string): Promise<void> {
-    await rearm(this.ctx.storage, await this.#state(), now);
+    await notifier.rearm(this.ctx.storage, await this.#state(), now);
   }
 
   /**
@@ -193,7 +164,7 @@ export class UserStore extends DurableObject {
 
   /** Smoke check used by tests: the schema is in place. */
   async countEvents(): Promise<number> {
-    return await countEvents(this.db);
+    return await log.countEvents(this.db);
   }
 
   /**
@@ -203,29 +174,29 @@ export class UserStore extends DurableObject {
   calls for (instances, automatic outcomes) are derived right after.
   */
   async append(raw: readonly unknown[], options: AppendOptions): Promise<AppendResult> {
-    const { accepted, events, rejected } = screenBatch(raw, {
+    const { accepted, events, rejected } = eventLog.screenBatch(raw, {
       now: options.now,
-      validateEvent: options.validateEvent ?? coreValidator,
+      validateEvent: options.validateEvent ?? eventLog.coreValidator,
     });
     await this.#insert(events);
     await this.derive(options.now);
     await this.#rearm(options.now);
-    return { accepted, rejected, seq: await latestSeq(this.db) };
+    return { accepted, rejected, seq: await log.latestSeq(this.db) };
   }
 
   /** Events after `since` in sequence order; `seq` is the cursor for the next call. */
   async list(since: number, limit: number): Promise<EventPage> {
-    return await listPage(this.db, since, limit);
+    return await log.listPage(this.db, since, limit);
   }
 
   /** One event by id, corrections included; `undefined` when the log has no such id. */
   async find(id: string): Promise<StoredEvent | undefined> {
-    return await findEvent(this.db, id);
+    return await log.findEvent(this.db, id);
   }
 
   /** Append-only facts from the phone; a `kind+key` pair is stored once. Returns how many were new. */
   async appendObservations(observations: readonly Observation[]): Promise<number> {
-    return await insertObservations(this.db, observations);
+    return await log.insertObservations(this.db, observations);
   }
 
   /** The materialized state as of `now`, with the system events due by then derived first. */
@@ -285,7 +256,39 @@ export class UserStore extends DurableObject {
 
   /** The remembered value, taken out: a second recall finds nothing. */
   async recall(key: string): Promise<JsonValue | undefined> {
-    return await takeMemo(this.ctx.storage, `memo:${key}`);
+    return await log.takeMemo(this.ctx.storage, `memo:${key}`);
+  }
+
+  /** A phone's calendar over a range, replacing what that phone sent for it before. */
+  async syncCalendar(
+    upload: cloud.Range & { readonly deviceId: string; readonly events: readonly CalendarEvent[] },
+  ): Promise<number> {
+    return await cloud.replaceCalendar(this.db, upload);
+  }
+
+  /** The calendar's events overlapping a range. */
+  async calendar(range: cloud.Range): Promise<readonly CalendarEvent[]> {
+    return await cloud.listCalendar(this.db, range);
+  }
+
+  /** Forgets one phone's calendar copy (it stopped sending it). */
+  async clearCalendar(deviceId: string): Promise<void> {
+    await cloud.clearCalendar(this.db, deviceId);
+  }
+
+  /** A device's app sessions (names and times only). */
+  async addUsage(upload: Parameters<typeof cloud.addUsage>[1]): Promise<number> {
+    return await cloud.addUsage(this.db, upload);
+  }
+
+  /** Each device that sent usage, with the end of its newest session. */
+  async usageDevices(): Promise<ReturnType<typeof cloud.usageDevices>> {
+    return await cloud.usageDevices(this.db);
+  }
+
+  /** App sessions on every device overlapping a range. */
+  async usage(range: cloud.Range): Promise<readonly UsageRow[]> {
+    return await cloud.listUsage(this.db, range);
   }
 
   /** Appends to the decision log (notifications here, parses from the routes and the bot). */
@@ -315,18 +318,21 @@ export class UserStore extends DurableObject {
 
   /** Replays the notification rules over the log (see `simulate`); writes nothing. */
   async simulate(args: SimulationArgs): Promise<Simulation> {
-    return simulate(await loadLog(this.db), args);
+    return simulate(await log.loadLog(this.db), args);
   }
 
   /** Notifications go to this chat from now on (the bot and every bot login call it). */
   async notifyTo(chatId: string, now: string): Promise<void> {
-    await setChat(this.ctx.storage, chatId);
+    await notifier.setChat(this.ctx.storage, chatId);
     await this.#rearm(now);
   }
 
   /** Silences a task's alerts until `until`. */
   async snoozeTask(taskId: string, until: string, now: string): Promise<void> {
-    await saveMemory(this.ctx.storage, snooze(await memoryOf(this.ctx.storage), taskId, until));
+    await notifier.saveMemory(
+      this.ctx.storage,
+      snooze(await notifier.memoryOf(this.ctx.storage), taskId, until),
+    );
     await this.#rearm(now);
   }
 
@@ -334,17 +340,24 @@ export class UserStore extends DurableObject {
   async notifyPlan(now: string): Promise<readonly PlannedNotification[]> {
     await this.derive(now);
     const state = await this.#state();
-    return notifyPlan(state, { deviceTz: SERVER_TZ, now }, await memoryOf(this.ctx.storage));
+    return notifyPlan(
+      state,
+      { deviceTz: notifier.SERVER_TZ, now },
+      await notifier.memoryOf(this.ctx.storage),
+    );
   }
 
   /** One pass of the notifier (see `runNotifier`); nothing happens until the chat is known. */
-  async runNotifications(now: string, telegram: null | TelegramTarget): Promise<NotifyRun> {
-    const chatId = await chatOf(this.ctx.storage);
+  async runNotifications(
+    now: string,
+    telegram: null | TelegramTarget,
+  ): Promise<notifier.NotifyRun> {
+    const chatId = await notifier.chatOf(this.ctx.storage);
     if (chatId === undefined) {
       return { decisions: 0, nextAt: null, sent: 0 };
     }
     await this.derive(now);
-    return await runNotifier({
+    return await notifier.runNotifier({
       chatId,
       log: async (decisions) => {
         await this.logDecisions(decisions, now);
@@ -358,27 +371,27 @@ export class UserStore extends DurableObject {
 
   override async alarm(): Promise<void> {
     const now = new Date().toISOString();
-    await this.runNotifications(now, telegramOf(this.env));
+    await this.runNotifications(now, notifier.telegramOf(this.env));
     await this.drainParses(now);
   }
 
   /** The providers known to be rate limited at `now`, to skip until their time. */
   async llmCooldowns(now: string): Promise<Cooldowns> {
-    return await cooldownsOf(this.ctx.storage, now);
+    return await parseQueue.cooldownsOf(this.ctx.storage, now);
   }
 
   /** Remembers the rate limits a parse ran into. */
   async noteLlmLimits(limited: Cooldowns, now: string): Promise<void> {
-    await noteLimits(this.ctx.storage, limited, now);
+    await parseQueue.noteLimits(this.ctx.storage, limited, now);
   }
 
   /** Keeps a text to read once the assistant is back (`retryAt`, or the next chance). */
   async enqueueParse(
-    item: Pick<QueuedParse, "channel" | "retryAt" | "text">,
+    item: Pick<parseQueue.QueuedParse, "channel" | "retryAt" | "text">,
     now: string,
   ): Promise<void> {
-    await enqueue(this.ctx.storage, { ...item, enqueuedAt: now });
-    await armForQueue(this.ctx.storage, now);
+    await parseQueue.enqueue(this.ctx.storage, { ...item, enqueuedAt: now });
+    await parseQueue.armForQueue(this.ctx.storage, now);
   }
 
   /**
@@ -386,22 +399,21 @@ export class UserStore extends DurableObject {
   can undo it) or the text goes to the Inbox; one still out of reach waits for the next try.
   */
   async drainParses(now: string): Promise<void> {
-    await drainQueue({ env: this.env, now, storage: this.ctx.storage, store: this });
+    await parseQueue.drainQueue({ env: this.env, now, storage: this.ctx.storage, store: this });
   }
 
   /**
-  Appends the system events the state calls for at `now`: the homework instances of
-  the current week and the automatic outcomes whose deadline passed. Deterministic ids
+  Appends the system events the state calls for at `now` (see `DERIVE_STEPS`). Deterministic ids
   make this idempotent against clients that derived the same events. Returns their ids.
   */
   async derive(now: string): Promise<readonly string[]> {
-    const before = await this.#current();
-    const instances = await this.#system(missingInstanceEvents({ ...before.state, now }), now);
-    const after = await this.#current();
-    const outcomes = await this.#system(
-      autoOutcomeEvents({ ...after.state, existingEventIds: after.ids, now }),
-      now,
-    );
-    return [...instances, ...outcomes].map((event) => event.id);
+    const made: string[] = [];
+    for (const step of DERIVE_STEPS) {
+      const current = await this.#current();
+      const events = step({ ...current.state, existingEventIds: current.ids, now });
+      const appended = await this.#system(events, now);
+      made.push(...appended.map((event) => event.id));
+    }
+    return made;
   }
 }

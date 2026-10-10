@@ -18,9 +18,12 @@ import {
   type User,
 } from "@pace/core";
 
+import { IS_PHONE } from "./platform/device.ts";
 import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
 import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
+import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
+import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
 const SYNC_INTERVAL_MS = 30_000;
 
@@ -36,12 +39,21 @@ const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
   return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
 };
 
+/** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
+const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
+  if (IS_PHONE) {
+    await uploadPhoneData(runtime.api, runtime.clock.now());
+  }
+};
+
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
   await syncLocalNotifications(runtime);
+  await remindCalendar(runtime);
+  await sendPhoneData(runtime);
   await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status === "signed-in") {
@@ -49,7 +61,7 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   }
 };
 
-/** The running activity and its targets: the timers change only when this does. */
+/** The running activity and when it asks next: the timers change only when this does. */
 const timerKey = (runtime: PaceRuntime): string => {
   const { running } = timeBarModel(runtime.state.store.getState(), {
     deviceTz: runtime.clock.deviceTz,
@@ -57,16 +69,10 @@ const timerKey = (runtime: PaceRuntime): string => {
   });
   return running === null
     ? ""
-    : [
-        running.activityId,
-        running.startAt,
-        running.label,
-        running.expectMinutes,
-        running.limitMinutes,
-      ].join("|");
+    : [running.activityId, running.startAt, running.label, running.remindAt].join("|");
 };
 
-/** Reschedules the phone's Expect/Limit timers on every switch, stop or edit of the running activity. */
+/** Reschedules the phone's "still doing this?" timer on every switch, stop or edit of the running activity. */
 const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
   let last = timerKey(runtime);
   void syncActivityTimers(runtime);
@@ -110,6 +116,8 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     void (async () => {
       await sync.syncNow();
       await syncLocalNotifications(runtime);
+      await remindCalendar(runtime);
+      await sendPhoneData(runtime);
       await startPhoneChecks(phoneContextOf(runtime));
     })();
   });

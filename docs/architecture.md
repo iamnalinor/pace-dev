@@ -201,8 +201,9 @@ order (nothing before the last applied `occurredAt`, no correction: core's
 (a preset change rewrites every task row, since it moves their derived columns); anything
 else rebuilds the state and every projection row (`user-store/projections.ts`). After every
 append (a client's sync push, an `apply`) and before every read and every `apply`,
-`derive(now)` appends the system events the state calls for: this week's homework instances and the automatic
-`cancelled_missed` / `skipped` outcomes, with deterministic ids, so they are idempotent
+`derive(now)` appends the system events the state calls for: this week's homework instances, the automatic
+`cancelled_missed` / `skipped` outcomes, then the next instance of a course left with none open
+(`user-store/derive-steps.ts`), with deterministic ids, so they are idempotent
 against clients that derived the same events.
 
 Methods: `append` and `list` (sync), `appendObservations`, `find(id)`, `read(now)`,

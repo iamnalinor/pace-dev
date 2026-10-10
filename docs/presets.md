@@ -2,7 +2,7 @@
 
 A task in Pace is always the same thing: a title, optional subtasks, a deadline, an
 estimate, a status. A **preset** is the profile that says how a kind of task behaves:
-how its urgency grows, what happens when the deadline passes, whether it is submitted as a
+what happens when the deadline passes, whether it is submitted as a
 whole or subtask by subtask, how progress is tracked, whether a new instance appears every
 week, which extra fields the form shows, and when notifications fire.
 
@@ -62,33 +62,31 @@ others differ.
 
 | Field | Values | Meaning | Default (`hw`) |
 |---|---|---|---|
-| `urgencyPolicy` | `pace`, `lag`, `age`, `resubmission` | How urgency grows. `pace`: work left over time left, for things with a real deadline. `lag`: how far you are behind an even pace between start and due; without a due date it behaves like `age`. `age`: slowly saturating with the days since creation, for things that have no deadline. `resubmission`: `pace` until the deadline, then the resubmission curve of the deadline policy. | `pace` |
-| `defaultImportance` | `asap`, `prioritized`, `normal`, `nice_to_have` | Importance a new task starts with (multipliers 7 / 5 / 3 / 1 on the score). | `normal` |
-| `deadlinePolicy` | `{ kind: "hard" }` or `{ kind: "resubmission", softDays, finalAt, finalTz }` | **Hard**: when the deadline passes the task is closed as *cancelled (missed)* and you are asked to confirm. **Resubmission**: late work is still welcome; the soft target is `softDays` after the deadline, urgency keeps growing after it, and `finalAt` (an instant in the zone `finalTz`, or `null` for none) is the hard end. | `hard` |
+| `defaultImportance` | `asap`, `prioritized`, `normal`, `nice_to_have` | Importance a new task starts with: a label shown after the project on every row. Lists are ordered by deadline only, whatever the importance. | `normal` |
+| `deadlinePolicy` | `{ kind: "hard" }` or `{ kind: "resubmission", softDays, finalAt, finalTz }` | **Hard**: when the deadline passes the task is closed as *cancelled (missed)* and you are asked to confirm. **Resubmission**: late work is still welcome; the soft target is `softDays` after the deadline, and `finalAt` (an instant in the zone `finalTz`, or `null` for none) is the hard end. | `hard` |
 | `submission` | `whole`, `per_subtask` | **Whole**: one Done/Submit for the task. **Per subtask**: each subtask is *solved* and then *submitted*; "Submit" sends every solved, unsent subtask at once, and the submission time decides whether it was on time. | `per_subtask` |
 | `progressMode` | `subtasks`, `slider`, `none` | What progress means: the share of subtasks solved, a 0–10 slider, or nothing. | `subtasks` |
-| `recurrence` | `{ issued: { weekday, time }, due: { weekday, time }, tz }` or `null` | Weekly homework rhythm. `weekday` is ISO (1 = Monday … 7 = Sunday), `time` is `HH:MM` on the wall clock of `tz` (an IANA zone such as `Europe/Moscow`). An instance is created for every ISO week; its deadline is the due slot in the same week when that slot is later than the issued slot, otherwise in the following week (Thursday 09:00 → Thursday 09:00 means a week later). An instance that never receives an assignment is closed as *skipped* 24 h after its deadline. | `null` |
+| `recurrence` | `{ issued: { weekday, time }, due: { weekday, time }, tz }` or `null` | Weekly homework rhythm. `weekday` is ISO (1 = Monday … 7 = Sunday), `time` is `HH:MM` on the wall clock of `tz` (an IANA zone such as `Europe/Moscow`). One instance belongs to every ISO week; its deadline is the due slot in the same week when that slot is later than the issued slot, otherwise in the following week (Thursday 09:00 → Thursday 09:00 means a week later). An instance is created at its issue; a course with no open instance gets the next one ahead of its issue (it waits under "In future"), and a week whose deadline passed before the course was added is skipped. An instance that never receives an assignment is closed as *skipped* 24 h after its deadline. | `null` |
 | `fields.ticket` | `true` / `false` | Show a ticket / reference field. | `false` |
 | `fields.description` | `true` / `false` | Show a free-text description. | `true` |
-| `fields.startAt` | `true` / `false` | Show a start date; a task whose start is in the future is hidden from Now until then. | `false` |
+| `fields.startAt` | `true` / `false` | Show a start date; a task whose start is in the future waits under "In future" until then. | `false` |
 | `fields.submitVia` | `true` / `false` | Show "where to submit". | `false` |
 | `notify.criticalHours` | hours ≥ 0 | A task is *critical* when less than this many hours remain to its deadline … | `12` |
 | `notify.criticalProgress` | 0–1 | … and its progress is below this share. | `0.5` |
-| `notify.criticalScore` | ≥ 0 | Also critical when its score first crosses this value. | `10` |
-| `notify.waitingDays` | days ≥ 0 | A task *waiting* longer than this is reported as stuck. | `7` |
 | `notify.inProgressIdleDays` | days ≥ 0 | A task *in progress* with no activity for this long is reported as stuck. | `5` |
 | `defaultEstimateMinutes` | minutes ≥ 0 | Estimate for a task created without one. | `60` |
 | `color` | `blue`, `violet`, `green`, `amber`, `coral`, `pink`, `teal`, `slate`, `orange`, `yellow` | Accent used for the preset's tasks when they have no project colour. | `yellow` |
 
 Critical and stuck notifications are sent at most once per task; retroactive edits never
-trigger them.
+trigger them. Stage 6 removed urgency scoring, the waiting status and their settings
+(`urgencyPolicy`, `notify.criticalScore`, `notify.waitingDays`): old presets that still carry
+them parse, and the values are ignored.
 
 ## Base presets
 
 | | `hw` | `work` | `personal` | `deferred` | `inbox` |
 |---|---|---|---|---|---|
 | Name | Homework | Work | Personal | Deferred | Inbox |
-| `urgencyPolicy` | `pace` | `lag` | `age` | `age` | `age` |
 | `defaultImportance` | `normal` | `normal` | `normal` | `nice_to_have` | `nice_to_have` |
 | `deadlinePolicy` | hard | hard | hard | hard | hard |
 | `submission` | `per_subtask` | `whole` | `whole` | `whole` | `whole` |
@@ -97,8 +95,6 @@ trigger them.
 | `fields` | description | ticket, description, startAt | — | startAt | — |
 | `notify.criticalHours` | 12 | 24 | 24 | 24 | 24 |
 | `notify.criticalProgress` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| `notify.criticalScore` | 10 | 10 | 10 | 10 | 10 |
-| `notify.waitingDays` | 7 | 7 | 7 | 7 | 7 |
 | `notify.inProgressIdleDays` | 5 | 5 | 5 | 5 | 5 |
 | `defaultEstimateMinutes` | 60 | 120 | 30 | 15 | 15 |
 | `color` | yellow | violet | orange | slate | teal |
@@ -107,8 +103,7 @@ What they are for:
 
 - **`hw`** — a course's weekly homework: subtasks are the problem numbers, each is solved
   and then submitted. Course presets extend it with a schedule (see below).
-- **`work`** — a ticket with a start, an optional due date and a 0–10 slider; urgency is how
-  far behind an even pace you are.
+- **`work`** — a ticket with a start, an optional due date and a 0–10 slider.
 - **`personal`** — errands and small projects with an optional checklist.
 - **`deferred`** — "check the exam grade on the 20th": a start date in the future keeps it
   out of the way until then.
@@ -127,7 +122,6 @@ nothing. Edit or archive them freely.
 | Issued | Monday 10:00 | Tuesday 12:00 | Thursday 09:00 |
 | Due | Wednesday 23:59, same week | Monday 23:59, next week | Thursday 09:00, next week |
 | Zone | Europe/Moscow | Europe/Moscow | Europe/Moscow |
-| `urgencyPolicy` | `resubmission` | `pace` (inherited) | `pace` (inherited) |
 | `deadlinePolicy` | resubmission, soft target 7 days after the deadline, no final date yet | hard (inherited) | hard (inherited) |
 | `defaultImportance` | `normal` (inherited) | `normal` (inherited) | `nice_to_have` |
 
@@ -137,7 +131,7 @@ field, 60-minute estimate, 12-hour critical window, blue) comes from `hw`.
 ## Overrides on a task
 
 Any preset field can be overridden on a single task from the task page (deadline policy,
-importance, estimate, urgency policy, …). Overrides use the same shape as a preset
+importance, estimate, …). Overrides use the same shape as a preset
 definition and are validated by the same schema; they are applied after the whole preset
 chain, so they win over the preset and survive later preset edits. Clearing an override
 returns the task to whatever the preset chain says.

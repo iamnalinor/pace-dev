@@ -6,7 +6,6 @@ import {
   CALC_HW5_ID,
   CALC_W41_ID,
   ctx,
-  DEMO_ID,
   HW_ID,
   INBOX_GRADE_ID,
   INBOX_SYNC_ID,
@@ -244,6 +243,23 @@ describe("subtasks", () => {
   });
 });
 
+describe("removing a problem", () => {
+  it("takes an unsent problem off the task; a sent or unknown one stays", async () => {
+    const world = await setupActions();
+    const [removed] = unwrap(await world.actions.removeSubtask(HW_ID, "s7"));
+    expect(removed?.type).toBe("task.subtask.removed");
+    expect(taskOf(world, HW_ID)?.subtasks.map((item) => item.id)).not.toContain("s7");
+    await expect(world.actions.removeSubtask(HW_ID, "s7")).resolves.toEqual({
+      error: "subtask/unknown",
+      ok: false,
+    });
+    await expect(world.actions.removeSubtask(HW_ID, "s1")).resolves.toEqual({
+      error: "subtask/submitted",
+      ok: false,
+    });
+  });
+});
+
 describe("submit", () => {
   it("sends the solved problems by default and closes with the last ones", async () => {
     const world = await setupActions();
@@ -289,6 +305,20 @@ describe("submit", () => {
 });
 
 describe("closing and reopening", () => {
+  it("closes or submits once when tapped twice at the same moment", async () => {
+    const world = await setupActions();
+    const closes = await Promise.all([
+      world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
+      world.actions.closeTask({ outcome: "done", taskId: TRK_ID }),
+    ]);
+    expect(closes.map((result) => result.ok)).toEqual([true, false]);
+    const sends = await Promise.all([
+      world.actions.submit({ taskId: HW_ID }),
+      world.actions.submit({ taskId: HW_ID }),
+    ]);
+    expect(sends.map((result) => result.ok)).toEqual([true, false]);
+  });
+
   it("closes with an outcome and a reason, then reopens", async () => {
     const world = await setupActions();
     const [closed] = unwrap(
@@ -321,10 +351,10 @@ describe("task fields", () => {
     unwrap(await world.actions.setProgress(TRK_ID, 7));
     unwrap(await world.actions.setEstimate(TRK_ID, null));
     unwrap(await world.actions.setPreset(TRK_ID, "personal"));
-    unwrap(await world.actions.setOverrides(TRK_ID, { urgencyPolicy: "age" }));
+    unwrap(await world.actions.setOverrides(TRK_ID, { defaultEstimateMinutes: 45 }));
     expect(taskOf(world, TRK_ID)).toMatchObject({
       estimateMinutes: null,
-      overrides: { urgencyPolicy: "age" },
+      overrides: { defaultEstimateMinutes: 45 },
       presetId: "personal",
       slider: 7,
       status: "paused",
@@ -334,7 +364,7 @@ describe("task fields", () => {
       error: "action/invalid-input",
       ok: false,
     });
-    await expect(world.actions.setOverrides(TRK_ID, { urgencyPolicy: "nope" })).resolves.toEqual({
+    await expect(world.actions.setOverrides(TRK_ID, { progressMode: "nope" })).resolves.toEqual({
       error: "preset/invalid-overrides",
       ok: false,
     });
@@ -383,41 +413,8 @@ describe("task fields", () => {
   });
 });
 
-describe("setRank", () => {
-  it("renumbers the open tasks of the category densely from 1", async () => {
-    const world = await setupActions();
-    const events = unwrap(await world.actions.setRank(RFC_ID, 1));
-    const ranks = events.map((event) =>
-      event.type === "task.rank.set" ? [event.payload.taskId, event.payload.rank] : [],
-    );
-    expect(ranks).toEqual([
-      [RFC_ID, 1],
-      [DEMO_ID, 2],
-      [TRK_ID, 3],
-    ]);
-    await expect(world.actions.setRank(RFC_ID, 1)).resolves.toEqual({ ok: true, value: [] });
-  });
-
-  it("ranks the unranked Normal tasks by creation first and clamps the position", async () => {
-    const world = await setupActions();
-    const events = unwrap(await world.actions.setRank(HW_ID, 99));
-    expect(
-      events.map((event) =>
-        event.type === "task.rank.set" ? [event.payload.taskId, event.payload.rank] : [],
-      ),
-    ).toEqual([
-      [CALC_HW5_ID, 1],
-      [HW_ID, 2],
-    ]);
-    await expect(world.actions.setRank(INBOX_SYNC_ID, 1)).resolves.toEqual({
-      error: "action/nothing-to-do",
-      ok: false,
-    });
-  });
-});
-
 describe("presets", () => {
-  const definition = { urgencyPolicy: "age" } as const;
+  const definition = { defaultImportance: "prioritized" } as const;
 
   it("creates, updates and archives a user preset after validating it", async () => {
     const world = await setupActions();
@@ -586,7 +583,8 @@ describe("ensureInstances", () => {
     await expect(world.actions.ensureInstances()).resolves.toBe(0);
 
     world.setNow("2026-10-13T12:00:00.000Z");
-    await expect(world.actions.ensureInstances()).resolves.toBe(5);
+    // Week 42's two issued instances, the outcomes, and History's next one ahead.
+    await expect(world.actions.ensureInstances()).resolves.toBe(6);
     const log = world.state.store.getState().log;
     for (const id of ["hw:hw.algebra:2026-W42", "hw:hw.calculus:2026-W42"]) {
       expect(log.find((event) => event.id === id)).toMatchObject({ source: "system" });
@@ -601,8 +599,10 @@ describe("ensureInstances", () => {
     // System-made instances share their id with their creation event.
     unwrap(await world.actions.revoke(CALC_W41_ID));
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
-    await expect(world.actions.ensureInstances()).resolves.toBe(1);
+    // The automatic outcome as before, and the course's next week put ahead instead.
+    await expect(world.actions.ensureInstances()).resolves.toBe(2);
     expect(taskOf(world, CALC_W41_ID)).toBeUndefined();
+    expect(taskOf(world, "hw:hw.calculus:2026-W42")?.closed).toBeNull();
   });
 });
 

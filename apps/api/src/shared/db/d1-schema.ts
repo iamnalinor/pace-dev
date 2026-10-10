@@ -20,6 +20,8 @@ export const sessions = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text().notNull().unique(),
     label: text().notNull(),
+    /** A device token's one permission (`usage:write`); `null` for a full sign-in. */
+    scope: text(),
     createdAt: integer({ mode: "timestamp_ms" }).notNull(),
     expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
     lastSeenAt: integer({ mode: "timestamp_ms" }).notNull(),

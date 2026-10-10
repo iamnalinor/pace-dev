@@ -9,20 +9,9 @@ import {
 } from "@pace/core";
 
 import { type NowRow, nowRow } from "./now.ts";
-import { type DueRelative, relativeDay } from "./relative-day.ts";
 
-/** An empty recurring instance: nothing assigned yet, so it waits here instead of on Now. */
-export type AwaitingRow = {
-  readonly id: string;
-  readonly title: string;
-  readonly dueAt: null | string;
-  readonly dueTz: null | string;
-  readonly relative: DueRelative | null;
-};
-
-export type DoneRow = {
-  readonly id: string;
-  readonly title: string;
+/** A closed task: the same row as an open one, checked, with how it ended. */
+export type DoneRow = NowRow & {
   readonly outcome: Outcome;
   readonly closedAt: null | string;
 };
@@ -33,10 +22,11 @@ export type ProjectViewModel = {
   readonly color: null | ProjectColorName;
   readonly description: null | string;
   readonly stats: ProjectStats;
-  /** Every open task but the empty instances, best score first. */
+  /** Open tasks that have started, the nearest deadline first (as on Now). */
   readonly open: readonly NowRow[];
-  readonly awaiting: readonly AwaitingRow[];
-  /** Newest closure first. */
+  /** Open tasks that start later, under "In future". */
+  readonly future: readonly NowRow[];
+  /** Closed tasks, the latest deadline first. */
   readonly done: readonly DoneRow[];
 };
 
@@ -49,7 +39,7 @@ export const projectViewModel = (
   if (!result.ok) {
     return result;
   }
-  const { project, open, awaiting, done, stats } = result.value;
+  const { project, open, future, done, stats } = result.value;
   return {
     ok: true,
     value: {
@@ -59,18 +49,11 @@ export const projectViewModel = (
       description: project.description,
       stats,
       open: open.map((item) => nowRow(item, ctx)),
-      awaiting: awaiting.map((task) => ({
-        id: task.id,
-        title: task.title,
-        dueAt: task.dueAt,
-        dueTz: task.dueTz,
-        relative: task.dueAt === null ? null : relativeDay(task.dueAt, ctx),
-      })),
+      future: future.map((item) => nowRow(item, ctx)),
       done: done.map((entry) => ({
-        id: entry.task.id,
-        title: entry.task.title,
+        ...nowRow(entry.item, ctx),
         outcome: entry.outcome,
-        closedAt: entry.task.closed?.at ?? null,
+        closedAt: entry.item.task.closed?.at ?? null,
       })),
     },
   };

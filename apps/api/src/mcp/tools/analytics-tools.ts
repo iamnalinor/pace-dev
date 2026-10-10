@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { ImportanceSchema } from "@pace/core";
-
 import { defineTool } from "../registry.ts";
 import { failure, success } from "../tool-kit.ts";
 
@@ -65,54 +63,39 @@ export const querySql = defineTool({
   title: "Query (SQL, read only)",
 });
 
-/** What the notifier would have sent over a past range, and how Now ranks with other weights. */
+/** What the notifier would have sent over a past range. */
 export const simulateTool = defineTool({
   annotations: READ,
   description:
-    "Replays the reminder rules over the log from `from` to `to` (at most 31 days): every digest, critical alert, stuck report and Limit alert the notifier would send, starting from a fresh memory. Also ranks Now at `to`, optionally with other importance multipliers (asap, prioritized, normal, nice_to_have; built-in 7/5/3/1) to see how the order would change. Writes nothing.",
+    "Replays the reminder rules over the log from `from` to `to` (at most 31 days): every digest, critical alert, stuck report and Limit alert the notifier would send, starting from a fresh memory. Writes nothing.",
   handler: async (args, ctx) => {
     const span = Date.parse(args.to) - Date.parse(args.from);
     if (span <= 0 || span > MAX_SIMULATION_MS) {
       return failure("simulate/range", "`to` must be after `from` and at most 31 days later.");
     }
-    const simulation = await ctx.store.simulate({
-      from: args.from,
-      to: args.to,
-      ...(args.multipliers !== undefined && { multipliers: args.multipliers }),
-    });
+    const simulation = await ctx.store.simulate({ from: args.from, to: args.to });
     return success(
       {
         isCut: simulation.isCut,
         messages: simulation.messages.map((message) => ({ ...message })),
-        ranking: simulation.ranking.map((row) => ({ ...row })),
       },
       [
         `${String(simulation.messages.length)} notifications:`,
         ...simulation.messages.map((message) => `- ${message.at} ${message.text}`),
-        "Now at the end:",
-        ...simulation.ranking.map(
-          (row, index) =>
-            `${String(index + 1)}. ${row.title} (${row.simulatedScore.toFixed(2)}, was ${row.score.toFixed(2)})`,
-        ),
       ].join("\n"),
     );
   },
   input: {
     from: z.iso.datetime(),
     to: z.iso.datetime(),
-    multipliers: z
-      .partialRecord(ImportanceSchema, z.number().min(0).max(100))
-      .optional()
-      .describe("Importance multipliers to rank with instead of 7/5/3/1."),
   },
   name: "simulate",
   output: {
     isCut: z.boolean(),
     messages: z.array(RECORD),
-    ranking: z.array(RECORD),
   },
   scope: "analytics:read",
-  title: "Simulate reminders and ranking",
+  title: "Simulate reminders",
 });
 
 /** The whole log as NDJSON, a page at a time. */

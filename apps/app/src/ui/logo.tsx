@@ -3,7 +3,10 @@ import Svg, { Circle, Path } from "react-native-svg";
 
 import { useTheme } from "./theme-provider.tsx";
 
-/** The chevron mark from `assets/logo/pace-mark.svg`, drawn with the current palette. */
+/**
+The chevron mark from `assets/logo/pace-mark.svg`, drawn with the current palette: the lead
+chevron in the accent's text shade, so it reads on a light background as well as a dark one.
+*/
 export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
   const { palette } = useTheme();
   return (
@@ -19,7 +22,7 @@ export const PaceMark = ({ size = 56 }: { readonly size?: number }) => {
       <Path
         d="M58 30 L88 60 L58 90"
         fill="none"
-        stroke={palette.accent}
+        stroke={palette.accentText}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={16}

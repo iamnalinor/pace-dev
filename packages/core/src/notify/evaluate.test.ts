@@ -62,9 +62,9 @@ describe("critical alerts", () => {
     const tuesdayNight = "2026-10-06T17:30:00.000Z";
     const first = run(tuesdayNight, [report()], checkedAt("2026-10-06T16:00:00.000Z", null));
     expect(first.messages).toEqual([
-      expect.objectContaining({ kind: "critical", rule: "deadline", taskId: "t-report" }),
+      expect.objectContaining({ kind: "critical", taskId: "t-report" }),
     ]);
-    expect(first.decisions[0]).toMatchObject({ outcome: "sent", rule: "critical.deadline" });
+    expect(first.decisions[0]).toMatchObject({ outcome: "sent", rule: "critical" });
     const again = run(addMinutesIso(tuesdayNight, 30), [report()], first.memory);
     expect(again.messages.filter((message) => message.kind === "critical")).toEqual([]);
   });
@@ -76,7 +76,7 @@ describe("critical alerts", () => {
     expect(result.decisions).toEqual([
       expect.objectContaining({
         outcome: "suppressed",
-        rule: "critical.deadline",
+        rule: "critical",
         taskId: "t-report",
       }),
     ]);
@@ -131,10 +131,10 @@ describe("digests", () => {
     expect(stale.memory.digestWindow).toBe(TWO_PM);
   });
 
-  it("reports a task waiting longer than its preset allows with the digest, once", () => {
+  it("reports a task in progress untouched longer than its preset allows with the digest, once", () => {
     const waiting = at(3, "2026-09-28T07:00:00.000Z", {
       type: "task.status.set",
-      payload: { taskId: "t-report", status: "waiting" },
+      payload: { taskId: "t-report", status: "in_progress" },
     });
     const result = run(
       addMinutesIso(TWO_PM, 1),
@@ -142,7 +142,7 @@ describe("digests", () => {
       checkedAt(MORNING),
     );
     expect(result.messages).toContainEqual(
-      expect.objectContaining({ days: 9, kind: "stuck", rule: "waiting", taskId: "t-report" }),
+      expect.objectContaining({ days: 9, kind: "stuck", taskId: "t-report" }),
     );
     const next = run(
       addMinutesIso(TWO_PM, 7 * 60),
@@ -164,13 +164,13 @@ describe("the next alarm", () => {
   });
 });
 
-describe("limit alerts", () => {
+describe("still doing this?", () => {
   const commute = at(3, MORNING, {
     type: "activity.started",
-    payload: { activityId: "a-commute", category: "commute", label: "Commute", limitMinutes: 60 },
+    payload: { activityId: "a-commute", category: "commute", expectMinutes: 30, label: "Commute" },
   });
 
-  it("alerts once when the running activity passes its Limit, and arms for the crossing", () => {
+  it("asks once when the running activity takes twice its Expect, and arms for it", () => {
     const before = addMinutesIso(MORNING, 30);
     expect(
       nextAlarmAt(stateAt(before, [commute]), { deviceTz: MOSCOW, now: before }, checkedAt(before)),
@@ -180,16 +180,31 @@ describe("limit alerts", () => {
     expect(first.messages).toEqual([
       expect.objectContaining({
         activityId: "a-commute",
-        kind: "limit",
+        expectMinutes: 30,
+        kind: "long",
         label: "Commute",
-        limitMinutes: 60,
       }),
     ]);
-    expect(first.decisions.map((entry) => `${entry.rule}:${entry.outcome}`)).toContain(
-      "limit:sent",
-    );
+    expect(first.decisions.map((entry) => `${entry.rule}:${entry.outcome}`)).toContain("long:sent");
     const again = run(addMinutesIso(MORNING, 70), [commute], first.memory);
-    expect(again.messages.filter((message) => message.kind === "limit")).toEqual([]);
+    expect(again.messages.filter((message) => message.kind === "long")).toEqual([]);
+  });
+
+  it("asks again after a yes, at twice the new Expect", () => {
+    const first = run(addMinutesIso(MORNING, 61), [commute], checkedAt(addMinutesIso(MORNING, 30)));
+    const yes = at(4, addMinutesIso(MORNING, 62), {
+      type: "activity.labelled",
+      payload: { activityId: "a-commute", expectMinutes: 62 },
+    });
+    expect(
+      run(addMinutesIso(MORNING, 100), [commute, yes], first.memory).messages.filter(
+        (m) => m.kind === "long",
+      ),
+    ).toEqual([]);
+    const later = run(addMinutesIso(MORNING, 125), [commute, yes], first.memory);
+    expect(later.messages.filter((m) => m.kind === "long")).toEqual([
+      expect.objectContaining({ expectMinutes: 62 }),
+    ]);
   });
 
   it("says nothing once the activity stopped", () => {
@@ -199,7 +214,7 @@ describe("limit alerts", () => {
     });
     const later = addMinutesIso(MORNING, 90);
     expect(
-      run(later, [commute, stopped], checkedAt(MORNING)).messages.filter((m) => m.kind === "limit"),
+      run(later, [commute, stopped], checkedAt(MORNING)).messages.filter((m) => m.kind === "long"),
     ).toEqual([]);
   });
 });

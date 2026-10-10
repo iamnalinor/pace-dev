@@ -35,7 +35,7 @@ const hw = (events: readonly Event[]): Task => {
   return task;
 };
 
-const status = (index: number, occurredAt: string, value: Task["status"]): Event =>
+const status = (index: number, occurredAt: string, value: "waiting" | Task["status"]): Event =>
   at(index, occurredAt, { type: "task.status.set", payload: { taskId: HW_ID, status: value } });
 
 const closed = (
@@ -66,7 +66,6 @@ describe("taskReducer: artboard scenarios", () => {
       status: "in_progress",
       statusSince: "2026-10-05T12:00:00.000Z",
       touched: true,
-      waitingMinutes: 0,
       closed: null,
       lastEventAt: "2026-10-06T08:00:00.000Z",
     });
@@ -120,7 +119,6 @@ describe("taskReducer: artboard scenarios", () => {
       status: "not_started",
       statusSince: HW_CREATED,
       touched: false,
-      rank: null,
       submittedAt: null,
       reopenedAt: null,
       lastEventAt: HW_CREATED,
@@ -179,30 +177,27 @@ describe("taskReducer: preset switch", () => {
   });
 });
 
-describe("taskReducer: status and waiting", () => {
-  it("accumulates waiting minutes across two spells", () => {
+describe("taskReducer: status", () => {
+  it("reads a waiting status (removed in stage 6) as in progress", () => {
+    const task = hw([hwCreated(1), status(2, T(10), "waiting")]);
+    expect(task).toMatchObject({ status: "in_progress", statusSince: T(10), touched: true });
+  });
+
+  it("keeps paused across later work and moves through the explicit statuses", () => {
     const task = hw([
       hwCreated(1),
       status(2, T(10), "waiting"),
       status(3, T(11, 30), "in_progress"),
-      status(4, T(12), "waiting"),
-      status(5, T(12, 45), "paused"),
+      status(4, T(12, 45), "paused"),
     ]);
-    expect(task.waitingMinutes).toBe(135);
     expect(task.status).toBe("paused");
     expect(task.statusSince).toBe(T(12, 45));
     expect(task.touched).toBe(true);
   });
 
-  it("excludes the running spell while still waiting", () => {
-    const task = hw([hwCreated(1), status(2, T(10), "waiting")]);
-    expect(task).toMatchObject({ status: "waiting", statusSince: T(10), waitingMinutes: 0 });
-    expect(task.touched).toBe(false);
-  });
-
   it("treats setting the current status again as a no-op", () => {
-    const state = fold([hwCreated(1), status(2, T(10), "waiting")]);
-    const again = status(3, T(11), "waiting");
+    const state = fold([hwCreated(1), status(2, T(10), "paused")]);
+    const again = status(3, T(11), "paused");
     expect(taskReducer(state, again)).toBe(state);
   });
 
@@ -210,12 +205,6 @@ describe("taskReducer: status and waiting", () => {
     const paused = hw([hwCreated(1), status(2, T(9), "paused"), solved(3, T(10), "s1")]);
     expect(paused.status).toBe("paused");
     expect(paused.touched).toBe(true);
-    const waiting = hw([
-      hwCreated(1),
-      status(2, T(9), "waiting"),
-      at(3, T(10), { type: "task.progress.set", payload: { taskId: HW_ID, progress: 2 } }),
-    ]);
-    expect(waiting.status).toBe("waiting");
     const back = hw([hwCreated(1), solved(2, T(9), "s1"), status(3, T(10), "not_started")]);
     expect(back.status).toBe("not_started");
     expect(back.touched).toBe(true);
@@ -229,16 +218,15 @@ describe("taskReducer: status and waiting", () => {
     expect(task.lastEventAt).toBe(T(10));
   });
 
-  it("ends a waiting spell when the task is closed and restarts the clock on reopen", () => {
+  it("keeps the status through a close and a reopen", () => {
     const task = hw([
       hwCreated(1),
-      status(2, T(10), "waiting"),
+      status(2, T(10), "paused"),
       closed(3, T(11), { outcome: "cancelled", reason: "not needed" }),
       reopened(4, T(13)),
     ]);
     expect(task).toMatchObject({
-      waitingMinutes: 60,
-      status: "waiting",
+      status: "paused",
       statusSince: T(13),
       closed: null,
       reopenedAt: T(13),
@@ -418,7 +406,22 @@ describe("taskReducer: attributes", () => {
     });
   });
 
-  it("sets importance with its time, project, rank and estimate", () => {
+  it("clears the due date and the start with null", () => {
+    const task = hw([
+      hwCreated(1),
+      at(2, T(9), {
+        type: "task.updated",
+        payload: { taskId: HW_ID, startAt: T(8), startTz: "UTC" },
+      }),
+      at(3, T(10), {
+        type: "task.updated",
+        payload: { taskId: HW_ID, dueAt: null, startAt: null },
+      }),
+    ]);
+    expect(task).toMatchObject({ dueAt: null, dueTz: null, startAt: null, startTz: null });
+  });
+
+  it("sets importance with its time, project and estimate; an old rank changes nothing", () => {
     const task = hw([
       hwCreated(1),
       at(2, T(9), {
@@ -436,7 +439,6 @@ describe("taskReducer: attributes", () => {
       importance: "asap",
       importanceSetAt: T(9),
       projectId: "p1",
-      rank: 2,
       estimateMinutes: 90,
     });
     const cleared = hw([

@@ -2,14 +2,15 @@ import { z } from "zod";
 
 import {
   ACTIVITY_CATEGORIES,
-  type ActivityButton,
   type ActivityCategory,
+  choiceById,
   defaultsFor,
-  effectiveButtons,
   err,
   newId,
   ok,
+  runningActivities,
   runningActivity,
+  t,
 } from "@pace/core";
 
 import { WRITE_INPUT } from "../inputs.ts";
@@ -28,24 +29,39 @@ type StartArgs = {
   readonly category?: ActivityCategory | undefined;
   readonly taskId?: string | undefined;
   readonly expectMinutes?: number | undefined;
-  readonly limitMinutes?: number | undefined;
+  readonly alongside?: boolean | undefined;
 };
 
-const buttonOf = (scope: Scope, buttonId: string | undefined): ActivityButton | undefined =>
-  buttonId === undefined
+/** A button's choice as the call can use it: its label in the account language. */
+type ButtonPick = {
+  readonly id: string;
+  readonly label: string;
+  readonly category: ActivityCategory;
+  readonly expectMinutes: number;
+};
+
+const buttonOf = (scope: Scope, buttonId: string | undefined): ButtonPick | undefined => {
+  const found = buttonId === undefined ? null : choiceById(buttonId);
+  return found === null
     ? undefined
-    : effectiveButtons(scope.state.time).find((button) => button.id === buttonId);
+    : {
+        category: found.choice.category,
+        expectMinutes: found.choice.expectMinutes,
+        id: found.choice.id,
+        label: t(scope.state.settings.language, found.choice.labelKey ?? found.button.labelKey),
+      };
+};
 
 /** The label and category the call names, else the button's; `null` without a label. */
-const nameOf = (args: StartArgs, button: ActivityButton | undefined) => {
+const nameOf = (args: StartArgs, button: ButtonPick | undefined) => {
   const label = (args.label ?? button?.label ?? "").trim();
   return label === "" ? null : { category: args.category ?? button?.category ?? "other", label };
 };
 
-/** Expect, Limit and task: the call's, else the button's, else what past runs of the label suggest. */
+/** Expect and task: the call's, else the button's, else what past runs of the label suggest. */
 type Named = {
   readonly args: StartArgs;
-  readonly button: ActivityButton | undefined;
+  readonly button: ButtonPick | undefined;
   readonly name: { readonly label: string; readonly category: ActivityCategory };
 };
 
@@ -53,8 +69,7 @@ const targetsOf = (scope: Scope, { args, button, name }: Named) => {
   const learned = defaultsFor(scope.state.time, name);
   return {
     expectMinutes: args.expectMinutes ?? button?.expectMinutes ?? learned.expectMinutes,
-    limitMinutes: args.limitMinutes ?? button?.limitMinutes ?? learned.limitMinutes,
-    taskId: args.taskId ?? button?.taskId ?? null,
+    taskId: args.taskId ?? null,
   };
 };
 
@@ -74,14 +89,14 @@ const startPayload = (scope: Scope, args: StartArgs, activityId: string) => {
       message: "Name the activity (label) or pick a button.",
     });
   }
-  const { expectMinutes, limitMinutes, taskId } = targetsOf(scope, { args, button, name });
+  const { expectMinutes, taskId } = targetsOf(scope, { args, button, name });
   return ok({
     activityId,
     ...name,
     ...(button !== undefined && { buttonId: button.id }),
     ...(taskId !== null && { taskId }),
     ...(expectMinutes !== null && { expectMinutes }),
-    ...(limitMinutes !== null && { limitMinutes }),
+    ...(args.alongside === true && { alongside: true as const }),
   });
 };
 
@@ -89,7 +104,7 @@ const startPayload = (scope: Scope, args: StartArgs, activityId: string) => {
 export const startActivity = defineTool({
   annotations: WRITE,
   description:
-    "Starts tracking an activity (what the person is doing now); the activity running until then ends at the same instant. Give a buttonId from list_activity_buttons to use that button's label, category and Expect/Limit, or a label and a category. taskId links the time to a task (it counts as work on it). `at` records a start in the past.",
+    "Starts tracking an activity (what the person is doing now); the main activity running until then ends at the same instant, unless `alongside` is set (music over work: both run, each is stopped on its own). Give a buttonId from list_activity_buttons to use that choice's label, category and Expect, or a label and a category. taskId links the time to a task (it counts as work on it). `at` records a start in the past.",
   handler: async (args, ctx) => {
     const activityId = newId();
     return await runWrite(ctx, args, {
@@ -106,13 +121,14 @@ export const startActivity = defineTool({
     ...WRITE_INPUT,
     buttonId: z.string().optional().describe("A button id from list_activity_buttons."),
     category: CATEGORY.optional(),
+    alongside: z
+      .boolean()
+      .optional()
+      .describe("Run it next to the main activity instead of replacing it."),
     expectMinutes: MINUTES.optional().describe(
-      "How long it usually takes; past it, it counts as long.",
+      "How long it usually takes; at twice that the person is asked whether it still goes on.",
     ),
     label: z.string().trim().min(1).max(80).optional(),
-    limitMinutes: MINUTES.optional().describe(
-      "The most it may take; a reminder is sent at the limit.",
-    ),
     taskId: z.string().optional(),
   },
   name: "start_activity",
@@ -125,18 +141,29 @@ export const startActivity = defineTool({
 export const stopActivity = defineTool({
   annotations: WRITE,
   description:
-    "Stops the activity that is running (at `at`, default now). Fails with activity/none-running when nothing runs.",
+    "Stops the main activity that is running (at `at`, default now), or the one `activityId` names (one run alongside). Fails with activity/none-running when nothing such runs.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: (scope, when) => {
-        const running = runningActivity(scope.state.time, when.at);
+        const running =
+          args.activityId === undefined
+            ? runningActivity(scope.state.time, when.at)
+            : (runningActivities(scope.state.time, when.at).find(
+                (activity) => activity.id === args.activityId,
+              ) ?? null);
         return running === null
           ? err({ code: "activity/none-running", message: "Nothing is running." })
           : ok([stamp(when, { payload: { activityId: running.id }, type: "activity.stopped" })]);
       },
       render: () => ({ structured: {}, summary: "Stopped." }),
     }),
-  input: { ...WRITE_INPUT },
+  input: {
+    ...WRITE_INPUT,
+    activityId: z
+      .string()
+      .optional()
+      .describe("The running activity to stop; default the main one."),
+  },
   name: "stop_activity",
   output: { ...WRITE_OUTPUT },
   scope: "time:write",

@@ -16,6 +16,18 @@ const openSubmit = async () => {
 
 const preview = (label: string) => screen.getByTestId(`preview-${label}`);
 
+describe("CloseSheet — a task without a deadline", () => {
+  it("previews plain Done, no deadline words or pill", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    const result = await runtime.actions.createTask({ presetId: "personal", title: "Call mom" });
+    const [created] = result.ok ? result.value : [];
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} openClose />, runtime);
+    expect(preview("outcome")).toHaveTextContent(`${en("close.outcome")}${en("outcome.done")}`);
+    expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
+  });
+});
+
 describe("CloseSheet — submitting problems", () => {
   it("offers the quick times and previews the outcome", async () => {
     await openSubmit();

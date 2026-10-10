@@ -15,18 +15,24 @@ type IconSpec = { readonly path: string; readonly size: number; readonly svg: st
 const XMLNS = 'xmlns="http://www.w3.org/2000/svg"';
 const STROKE = 'fill="none" stroke-linecap="round" stroke-linejoin="round"';
 
-const DARK: Palette = { accent: "#d4ff3a", fg: "#ececee", track: "#3a3a40" };
+// The first chevron is the quiet one, yet it must read on the dark tile (3:1, not 1.7:1).
+const DARK: Palette = { accent: "#d4ff3a", fg: "#ececee", track: "#6a6a74" };
 const LIGHT: Palette = { accent: "#17181c", fg: "#17181c", track: "#b9bcc6" };
 const WHITE: Palette = { accent: "#ffffff", fg: "#ffffff", track: "#ffffff" };
 const DARK_BG = "#0b0b0c";
 const LIME = "#d4ff3a";
 
-/** The mark's drawing in its 120x120 coordinate space (no <svg> wrapper). */
+/**
+The mark's drawing in its 120x120 coordinate space (no <svg> wrapper). Its ink spans x 10–114,
+so it is drawn 2 units to the left: centred in the box, it is centred on every icon.
+*/
 const markShapes = ({ accent, fg, track }: Palette): string =>
   [
+    `<g transform="translate(-2 0)">`,
     `<path d="M18 30 L48 60 L18 90" ${STROKE} stroke="${track}" stroke-width="16"/>`,
     `<path d="M58 30 L88 60 L58 90" ${STROKE} stroke="${accent}" stroke-width="16"/>`,
     `<circle cx="106" cy="60" r="8" fill="${fg}"/>`,
+    `</g>`,
   ].join("\n  ");
 
 /**
@@ -49,7 +55,7 @@ const markSvg = (palette: Palette): string => svg(120, markShapes(palette));
 const wordmarkSvg = (): string =>
   `<svg ${XMLNS} viewBox="0 0 360 120" width="360" height="120">
   ${markShapes(DARK)}
-  <text x="138" y="60" dominant-baseline="central" font-family="Geist, system-ui, sans-serif" font-weight="600" font-size="88" letter-spacing="-0.04em" fill="${DARK.fg}">pace</text>
+  <text x="138" y="60" dominant-baseline="central" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="88" letter-spacing="-0.04em" fill="${DARK.fg}">pace</text>
 </svg>
 `;
 
@@ -73,6 +79,16 @@ const canvas = (shapes: string, fraction: number, background?: string): string =
 
 const FAVICON = faviconSvg();
 
+/**
+The app's icon wherever it is installed (Android, the PWA, the iPhone home screen) and the
+bot's avatar: the dark tile with the mark at 56%, centred. A launcher's or Telegram's circle
+(the maskable safe zone, 80%) leaves it whole.
+*/
+const APP_ICON = canvas(markShapes(DARK), 0.56, DARK_BG);
+
+/** The bot avatar's 56%, of the 2/3 of an adaptive icon a launcher shows. */
+const ADAPTIVE_FRACTION = 0.37;
+
 export const LOGO_FILES: readonly LogoFile[] = [
   { path: "assets/logo/pace-mark.svg", svg: markSvg(DARK) },
   { path: "assets/logo/pace-mark-light.svg", svg: markSvg(LIGHT) },
@@ -82,17 +98,24 @@ export const LOGO_FILES: readonly LogoFile[] = [
 ];
 
 export const ICONS: readonly IconSpec[] = [
-  // Web: the lime tile; the chevrons stay inside the central 80% (maskable-safe).
-  { path: "apps/app/public/icon-192.png", size: 192, svg: FAVICON },
-  { path: "apps/app/public/icon-512.png", size: 512, svg: FAVICON },
-  { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: FAVICON },
-  // Expo: dark iOS icon, Android adaptive foreground (central 66% safe zone), themed mono.
-  { path: "apps/app/assets/icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.6, DARK_BG) },
-  { path: "apps/app/assets/adaptive-icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.56) },
+  // The installed web app looks like the phone's: the same icon, not the browser tab's tile.
+  { path: "apps/app/public/icon-192.png", size: 192, svg: APP_ICON },
+  { path: "apps/app/public/icon-512.png", size: 512, svg: APP_ICON },
+  { path: "apps/app/public/apple-touch-icon.png", size: 180, svg: APP_ICON },
+  // Expo's web.favicon: the same tile as the SVG, for browsers that ask for a PNG.
+  { path: "apps/app/assets/favicon.png", size: 64, svg: FAVICON },
+  // Android shows only the central 72 of an adaptive icon's 108 dp, so its foreground is the
+  // icon's 56% × 2/3.
+  { path: "apps/app/assets/icon.png", size: 1024, svg: APP_ICON },
+  {
+    path: "apps/app/assets/adaptive-icon.png",
+    size: 1024,
+    svg: canvas(markShapes(DARK), ADAPTIVE_FRACTION),
+  },
   {
     path: "apps/app/assets/adaptive-icon-mono.png",
     size: 1024,
-    svg: canvas(markShapes(WHITE), 0.56),
+    svg: canvas(markShapes(WHITE), ADAPTIVE_FRACTION),
   },
   { path: "apps/app/assets/splash-icon.png", size: 1024, svg: canvas(markShapes(DARK), 0.5) },
   {
@@ -102,11 +125,7 @@ export const ICONS: readonly IconSpec[] = [
   },
   // Telegram crops profile photos to a circle: the dark app icon (the default look), the
   // mark well inside the inscribed circle. Set through the Bot API (setMyProfilePhoto).
-  {
-    path: "assets/logo/bot-avatar.png",
-    size: 640,
-    svg: canvas(markShapes(DARK), 0.56, DARK_BG),
-  },
+  { path: "assets/logo/bot-avatar.png", size: 640, svg: APP_ICON },
 ];
 
 export const renderPng = (source: string, width: number): Buffer =>

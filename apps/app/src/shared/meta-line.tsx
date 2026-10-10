@@ -25,14 +25,18 @@ A row's meta line: the project (else the category) and the importance as coloure
 `by end of day · 2 problems left` with lateness in orange.
 */
 export const MetaLine = ({
+  asOf,
   parts,
   tag,
 }: {
+  /** The moment "tomorrow" and "in 2 days" count from (History's); now by default. */
+  readonly asOf?: string | undefined;
   readonly parts: readonly MetaPart[];
   readonly tag: null | Pick<NowRow, "color" | "tag">;
 }) => {
   const t = useT();
-  const viewer = useViewer();
+  const current = useViewer();
+  const viewer = asOf === undefined ? current : { ...current, now: asOf };
   const importances = parts.flatMap((part) => (part.kind === "importance" ? [part] : []));
   const rest = parts.filter((part) => part.kind !== "importance");
   const texts = metaTexts(rest, viewer);

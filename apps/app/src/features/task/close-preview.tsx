@@ -25,7 +25,9 @@ const Line = ({
     <Text className="font-sans text-[13px] text-muted">{label}</Text>
     <Text
       className={
-        mono ? "font-mono text-[12px] text-fg" : "flex-shrink font-sans text-[13px] text-fg"
+        mono
+          ? "font-sans text-[12px] tabular-nums text-fg"
+          : "flex-shrink font-sans text-[13px] text-fg"
       }
     >
       {value}
@@ -45,7 +47,9 @@ export const ClosePreview = ({
   const { deviceTz, now } = useViewer();
   const open = form.mode === "submit" ? stillOpen(view) : [];
   const isLate = isLatePreview(view, form.mode, form.at ?? now);
-  const timing = t(isLate ? "close.late" : "close.beforeDeadline");
+  const deadlineTiming = isLate ? "close.late" : "close.beforeDeadline";
+  // Without a deadline there is nothing to be early or late for.
+  const timing = t(view.stats.dueAt === null ? "outcome.done" : deadlineTiming);
   const outcome = form.mode === "other" ? t(`close.${form.outcome}`) : timing;
   const happened = form.at === null ? "—" : clockTime(form.at, deviceTz);
   return (

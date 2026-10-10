@@ -100,7 +100,7 @@ const signIn = async (page: Page, token: string, theme: "dark" | "light"): Promi
 
 const add = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill(text);
+  await line.pressSequentially(text);
   await line.press("Enter");
   await expect(line).toHaveValue("");
 };
@@ -133,7 +133,7 @@ if (SHOT_DIR !== undefined) {
       ]) {
         await add(desktop, line);
       }
-      await desktop.getByRole("button", { name: "Work", exact: true }).click();
+      await desktop.getByRole("switch", { name: "Rest", exact: true }).click();
       await shoot(desktop, "now-desktop");
       await desktop.goto("/day");
       await shoot(desktop, "day-desktop");

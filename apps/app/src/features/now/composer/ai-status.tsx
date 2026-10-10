@@ -9,8 +9,6 @@ import { Chip } from "#app/ui/chip.tsx";
 
 type Props = {
   readonly state: AiState;
-  /** Add was pressed on a long text: it waits for the reading. */
-  readonly isWaiting: boolean;
   /** An answer to one of the assistant's questions goes into the line. */
   readonly onAnswer: (answer: string) => void;
   /** "Read it when it's back": the server keeps the line and adds it once it can read it. */
@@ -18,7 +16,7 @@ type Props = {
 };
 
 /** What the assistant made of the line: done (and what to check), its questions, or why not. */
-export const AiStatus = ({ isWaiting, onAnswer, onLater, state }: Props) => {
+export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
   const t = useT();
   const viewer = useViewer();
   switch (state.status) {
@@ -30,7 +28,7 @@ export const AiStatus = ({ isWaiting, onAnswer, onLater, state }: Props) => {
     case "reading": {
       return (
         <Text accessibilityLiveRegion="polite" className="px-1 pt-2 font-sans text-[12px] text-fg">
-          {t(isWaiting ? "composer.aiWaiting" : "composer.aiReadingStatus")}
+          {t("composer.aiReadingStatus")}
         </Text>
       );
     }

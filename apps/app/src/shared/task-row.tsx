@@ -5,25 +5,27 @@ import type { NowRow } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { CheckCircle } from "#app/ui/check-circle.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { ImportanceEdge } from "#app/ui/importance-edge.tsx";
-import { ProgressBar } from "#app/ui/progress-bar.tsx";
 
 import { MetaLine } from "./meta-line.tsx";
+import { useSelectedTask } from "./task-opener.tsx";
 
 /**
-A task as the Now and Project lists show it (Main artboard): the importance edge, the check,
-the title, the project (or category) and importance as coloured tags with the meta line, and
-the progress bar with the pace marker when pace applies.
+A task as every list shows it (Now, a project's open and done lists, History): the check, the
+title, then the project (or category) and the importance as tags with the meta line.
 */
 export const TaskRow = ({
-  highlighted = false,
+  asOf,
+  checked = false,
   onCheck,
   onOpen,
   row,
   withTag = true,
 }: {
-  readonly highlighted?: boolean;
-  /** Without it the row is read-only (a past board). */
+  /** History's moment: relative words count from it. */
+  readonly asOf?: string;
+  /** A closed task: the check is filled and the title muted. */
+  readonly checked?: boolean;
+  /** Without it the check is read-only. */
   readonly onCheck?: () => void;
   readonly onOpen: () => void;
   readonly row: NowRow;
@@ -31,26 +33,31 @@ export const TaskRow = ({
   readonly withTag?: boolean;
 }) => {
   const t = useT();
+  const isSelected = useSelectedTask() === row.id;
   return (
-    <View className={cx("flex-row gap-3 rounded-lg py-3 pl-1.5 pr-3", highlighted && "bg-surface")}>
-      <ImportanceEdge importance={row.importance} />
-      {onCheck === undefined ? null : (
-        <CheckCircle label={t("now.markDone", { title: row.title })} onPress={onCheck} />
-      )}
+    <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-raised")}>
+      <CheckCircle
+        checked={checked}
+        label={t("now.markDone", { title: row.title })}
+        {...(onCheck !== undefined && { onPress: onCheck })}
+      />
       <Pressable
         accessibilityRole="link"
+        aria-current={isSelected ? "page" : undefined}
         className="flex-1 gap-[5px] active:opacity-70"
         onPress={onOpen}
       >
         <Text
-          className={cx("font-sans text-[15px]", row.dimmed ? "text-fg2" : "font-medium text-fg")}
+          className={cx(
+            "font-sans text-[15px]",
+            checked || row.dimmed ? "text-fg2" : "font-medium text-fg",
+            checked && "line-through",
+          )}
+          numberOfLines={2}
         >
           {row.title}
         </Text>
-        <MetaLine parts={row.meta} tag={withTag ? row : null} />
-        {row.paceExpected === null ? null : (
-          <ProgressBar label={t("task.progress")} marker={row.paceExpected} value={row.progress} />
-        )}
+        <MetaLine asOf={asOf} parts={row.meta} tag={withTag ? row : null} />
       </Pressable>
     </View>
   );

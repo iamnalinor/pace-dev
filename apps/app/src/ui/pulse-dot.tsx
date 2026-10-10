@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { View } from "react-native";
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -22,5 +23,10 @@ export const PulseDot = ({ className }: { readonly className: string }) => {
     );
   }, [opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return <Animated.View className={cx("h-2 w-2 rounded-full", className)} style={style} />;
+  // The class names sit on a plain view: reanimated views drop them on the web.
+  return (
+    <Animated.View style={style}>
+      <View className={cx("h-2 w-2 rounded-full", className)} />
+    </Animated.View>
+  );
 };

@@ -1,18 +1,18 @@
 import { useRef, useState } from "react";
-import { ScrollView, Text, type TextInput, View } from "react-native";
+import { Text, type TextInput, View } from "react-native";
 
-import { useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
+import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
+import { clockTime } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import {
   type ActivityForm,
   activityFormOf,
-  type ActivityRange,
   type ActivitySheetProps,
   type ActivityTarget,
   type FormPartProps,
@@ -23,36 +23,24 @@ import { useDraft } from "@pace/client/react";
 import {
   ACTIVITY_CATEGORIES,
   type ActivityCategory,
-  addDaysIn,
   CATEGORY_COLORS,
-  FOCUS_CATEGORIES,
   formatEyebrow,
+  type MessageKey,
 } from "@pace/core";
+
+import {
+  type Faults,
+  hasFault,
+  nextStartOf,
+  notAhead,
+  notIntoNext,
+  readDraft,
+} from "./activity-draft.ts";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
 export type SheetTarget = ActivityTarget;
 
 type Draft = ActivityForm;
-
-/**
-The typed clock times on the block's own day; an end at or before the start means the block
-ran past midnight.
-*/
-const rangeOf = (draft: Draft, target: SheetTarget, zone: string): ActivityRange | null => {
-  const { date } = wallClock(target.startAt, zone);
-  const startAt = fromWallClock({ date, time: draft.from, tz: zone });
-  if (startAt === null) {
-    return null;
-  }
-  if (draft.to === "") {
-    return target.kind === "log" ? null : { endAt: null, startAt };
-  }
-  const sameDay = fromWallClock({ date, time: draft.to, tz: zone });
-  if (sameDay === null) {
-    return null;
-  }
-  return { endAt: sameDay > startAt ? sameDay : addDaysIn(sameDay, 1, zone), startAt };
-};
 
 const CategoryPicker = ({
   onChange,
@@ -65,11 +53,7 @@ const CategoryPicker = ({
   return (
     <View className="gap-1.5">
       <Text className="font-sans text-[12px] text-muted">{t("editor.category")}</Text>
-      <ScrollView
-        accessibilityLabel={t("editor.category")}
-        contentContainerClassName="gap-1.5"
-        horizontal
-      >
+      <View accessibilityLabel={t("editor.category")} className="flex-row flex-wrap gap-1.5">
         {ACTIVITY_CATEGORIES.map((category) => (
           <Chip
             color={CATEGORY_COLORS[category]}
@@ -82,7 +66,7 @@ const CategoryPicker = ({
             {t(`category.${category}`)}
           </Chip>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -90,18 +74,21 @@ const CategoryPicker = ({
 /** What it was, its category and its boundaries (the end only once it has one). */
 const ActivityFields = ({
   draft,
-  error,
+  faults,
   isEndEditable,
   patch,
 }: FormPartProps<Draft> & {
-  readonly error: null | string;
+  readonly faults: Faults | null;
   readonly isEndEditable: boolean;
 }) => {
   const t = useT();
+  const said = (key: MessageKey | null | undefined): null | string =>
+    key === null || key === undefined ? null : t(key);
   const toFieldRef = useRef<TextInput>(null);
   return (
     <>
       <TextField
+        error={said(faults?.label)}
         label={t("day.what")}
         maxLength={80}
         onChangeText={(label) => {
@@ -118,7 +105,7 @@ const ActivityFields = ({
       <View className="flex-row gap-3">
         <View className="flex-1">
           <TextField
-            error={error}
+            error={said(faults?.from)}
             keyboardType="number-pad"
             label={t("day.from")}
             maxLength={5}
@@ -137,6 +124,7 @@ const ActivityFields = ({
         {isEndEditable ? (
           <View className="flex-1">
             <TextField
+              error={said(faults?.to)}
               keyboardType="number-pad"
               label={t("day.to")}
               maxLength={5}
@@ -154,40 +142,60 @@ const ActivityFields = ({
   );
 };
 
+/** Takes the block off the day after a second tap (History brings it back). */
+const DeleteBlock = ({
+  activityId,
+  onDeleted,
+}: {
+  readonly activityId: string;
+  readonly onDeleted: () => void;
+}) => {
+  const t = useT();
+  const { actions } = usePace();
+  const run = useRunAction();
+  const [isArmed, setIsArmed] = useState(false);
+  return (
+    <Button
+      onPress={() => {
+        if (!isArmed) {
+          setIsArmed(true);
+          return;
+        }
+        void (async () => {
+          if (await run(actions.deleteActivity(activityId))) {
+            onDeleted();
+          }
+        })();
+      }}
+      variant="ghost"
+    >
+      {t(isArmed ? "day.deleteConfirm" : "day.delete")}
+    </Button>
+  );
+};
+
 /** Log a past block, or move and rename one already on the day. */
 export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => {
   const t = useT();
-  const { actions, state } = usePace();
+  const { actions } = usePace();
   const language = useLanguage();
   const run = useRunAction();
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
-  const editedId = target.kind === "edit" ? target.activityId : null;
-  // Read once: the switch below is the sheet's own copy until it is saved.
-  const [wasOnPurpose] = useState(
-    () =>
-      editedId !== null &&
-      state.store.getState().time.activities[editedId]?.messengersOnPurpose === true,
-  );
-  const [isOnPurpose, setIsOnPurpose] = useState(wasOnPurpose);
-  const range = rangeOf(draft, target, zone);
-  // Said once a save was tried, and gone as soon as the times read right.
-  const error = hasTriedToSave && range === null ? t("day.badRange") : null;
+  const { now } = useViewer();
+  const nextStart = useAppState((state) => nextStartOf(state.time, target));
+  const { faults, range } = notIntoNext(notAhead(readDraft(draft, target, zone), now), nextStart);
   const save = async (): Promise<void> => {
     setHasTriedToSave(true);
-    if (range === null) {
+    if (range === null || hasFault(faults)) {
       return;
     }
     const isSaved = await run(
       actions.saveActivity(target, { category: draft.category, label: draft.label, ...range }),
     );
-    if (!isSaved) {
-      return;
+    if (isSaved) {
+      onClose();
     }
-    if (editedId !== null && isOnPurpose !== wasOnPurpose) {
-      await run(actions.relabelActivity(editedId, { messengersOnPurpose: isOnPurpose }));
-    }
-    onClose();
   };
   return (
     <Sheet
@@ -198,14 +206,13 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
       visible
     >
-      <ActivityFields draft={draft} error={error} isEndEditable={hasEnd(target)} patch={patch} />
-      {editedId !== null && FOCUS_CATEGORIES.has(draft.category) ? (
-        <SwitchRow
-          isOn={isOnPurpose}
-          label={t("editor.messengersOnPurpose")}
-          onChange={setIsOnPurpose}
-        />
-      ) : null}
+      {/* Said under each field once a save was tried, and gone as soon as it reads right. */}
+      <ActivityFields
+        draft={draft}
+        faults={hasTriedToSave ? faults : null}
+        isEndEditable={hasEnd(target)}
+        patch={patch}
+      />
       <SheetActions
         cancelLabel={t("common.cancel")}
         onCancel={onClose}
@@ -214,6 +221,9 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         }}
         primaryLabel={t("common.save")}
       />
+      {target.kind === "edit" ? (
+        <DeleteBlock activityId={target.activityId} onDeleted={onClose} />
+      ) : null}
     </Sheet>
   );
 };

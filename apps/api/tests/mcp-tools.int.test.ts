@@ -23,7 +23,6 @@ const WRITE_TOOLS = [
   "revoke_event",
   "seed_example_presets",
   "set_importance",
-  "set_rank",
   "set_status",
   "submit",
   "update_preset",
@@ -93,7 +92,6 @@ const pull = async (): Promise<PullResult> =>
   await json<PullResult>("/api/sync/pull", { token: await loginAsDev("1001") });
 
 const rows = (value: unknown): Row[] => (Array.isArray(value) ? (value as Row[]) : []);
-const strings = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : []);
 
 const createTask = async (token: string, args: Record<string, unknown>): Promise<string> => {
   const result = await okTool(token, "create_task", { title: "A task", ...args });
@@ -128,7 +126,6 @@ describe("MCP tools catalogue", () => {
         "update_task",
         "set_importance",
         "set_status",
-        "set_rank",
         "add_subtasks",
         "revoke_event",
         "review_action",
@@ -196,8 +193,7 @@ describe("create_task", () => {
       total: 3,
     });
     expect(typeof now["inboxCount"]).toBe("number");
-    expect(typeof now["laterCount"]).toBe("number");
-    expect(Array.isArray(now["waiting"])).toBe(true);
+    expect(Array.isArray(now["future"])).toBe(true);
   });
 
   it("creates a project by name once and reuses it (case-insensitively) afterwards", async () => {
@@ -395,7 +391,7 @@ describe("editing", () => {
       "task.updated",
     ]);
     await okTool(token, "set_importance", { importance: "asap", taskId });
-    await okTool(token, "set_status", { status: "waiting", taskId });
+    await okTool(token, "set_status", { status: "paused", taskId });
     const view = await okTool(token, "get_task", { id: taskId });
     expect(view).toMatchObject({
       description: "details",
@@ -405,20 +401,16 @@ describe("editing", () => {
       importance: "asap",
       presetId: "work",
       projectName: "Side",
-      status: "waiting",
+      status: "paused",
       title: "Final",
     });
     const now = await okTool(token, "list_now");
-    expect(rows(now["waiting"]).map((row) => row["id"])).toContain(taskId);
+    expect(rows(now["items"]).map((row) => row["id"])).toContain(taskId);
   });
 
-  it("adds subtasks and renumbers the category on set_rank", async () => {
+  it("adds subtasks with labels and numbers", async () => {
     const token = await readWriteToken();
-    const [a, b, c] = [
-      await createTask(token, { title: "A" }),
-      await createTask(token, { title: "B" }),
-      await createTask(token, { title: "C" }),
-    ];
+    const a = await createTask(token, { title: "A" });
     const added = await okTool(token, "add_subtasks", {
       labels: ["x", { label: "y", number: 9 }],
       taskId: a,
@@ -427,20 +419,6 @@ describe("editing", () => {
       ["x", null],
       ["y", 9],
     ]);
-    const ranked = await okTool(token, "set_rank", { position: 1, taskId: c });
-    const order = strings(ranked["order"]);
-    expect(order[0]).toBe(c);
-    expect(order.indexOf(a)).toBeLessThan(order.indexOf(b));
-    expect(ranked["position"]).toBe(1);
-    const types = rows(ranked["events"]).map((event) => event["type"]);
-    expect(types.length).toBeGreaterThanOrEqual(1);
-    expect(new Set(types)).toEqual(new Set(["task.rank.set"]));
-    const last = await okTool(token, "set_rank", { position: order.length, taskId: c });
-    expect(strings(last["order"]).at(-1)).toBe(c);
-    const now = await okTool(token, "list_now");
-    const ids = strings(rows(now["items"]).map((row) => row["id"]));
-    expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b));
-    expect(ids.indexOf(b)).toBeLessThan(ids.indexOf(c));
   });
 
   it("revokes an event by id and refuses an unknown one", async () => {
@@ -503,7 +481,7 @@ describe("presets", () => {
     expect(algebra).toMatchObject({
       builtIn: false,
       extends: "hw",
-      resolved: { submission: "per_subtask", urgencyPolicy: "resubmission" },
+      resolved: { submission: "per_subtask" },
     });
     expect(listed.find((preset) => preset["id"] === "hw")).toMatchObject({ builtIn: true });
 
@@ -558,7 +536,7 @@ describe("search and fetch", () => {
       url: `${env.WEB_ORIGIN}/task/${taskId}`,
     });
     const project = found.find((row) => row["title"] === "Алгебра");
-    expect(String(project?.["url"])).toBe(`${env.WEB_ORIGIN}/projects/${String(project?.["id"])}`);
+    expect(String(project?.["url"])).toBe(`${env.WEB_ORIGIN}/project/${String(project?.["id"])}`);
     expect(
       rows((await okTool(token, "search", { query: "ЗАДАЧА" }))["results"]).map((row) => row["id"]),
     ).toEqual([taskId]);
@@ -631,7 +609,6 @@ const writeArgs = (fixture: Fixture): Record<string, Record<string, unknown>> =>
   revoke_event: { eventId: fixture.solveId },
   seed_example_presets: {},
   set_importance: { importance: "asap", taskId: fixture.taskId },
-  set_rank: { position: 1, taskId: fixture.taskId },
   set_status: { status: "paused", taskId: fixture.taskId },
   submit: { taskId: fixture.taskId },
   update_preset: { id: fixture.presetId, name: "Renamed" },
@@ -658,7 +635,6 @@ const refusals = (
   review_action: [{ key: "undo", taskId: fixture.taskId }, "review/no-item"],
   revoke_event: [{ eventId: "ghost" }, "event/not-found"],
   set_importance: [{ importance: "asap", taskId: "ghost" }, "task/unknown"],
-  set_rank: [{ position: 1, taskId: fixture.missedId }, "rank/not-competing"],
   set_status: [{ status: "paused", taskId: fixture.missedId }, "retro/task-closed"],
   submit: [{ taskId: fixture.missedId }, "retro/task-closed"],
   update_preset: [{ id: "nope", name: "x" }, "preset/unknown"],

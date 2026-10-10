@@ -13,7 +13,7 @@ const unique = (): string => crypto.randomUUID().slice(0, 6);
 
 const add = async (page: Page, text: string): Promise<void> => {
   const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill(text);
+  await line.pressSequentially(text);
   await line.press("Enter");
   await expect(line).toHaveValue("");
 };
@@ -46,7 +46,7 @@ for (const size of SIZES) {
       await page.goto("/");
       const text = `ask about the ${size.name} invoice ${unique()}`;
       const line = page.getByRole("textbox", { name: "New task" });
-      await line.fill(text);
+      await line.pressSequentially(text);
       await page.getByRole("button", { name: "To Inbox" }).click();
       // The line clears once the capture is stored: navigating sooner can reload before the write.
       await expect(line).toHaveValue("");
@@ -57,6 +57,28 @@ for (const size of SIZES) {
       await expectNoA11yViolations(page);
       await card.getByRole("button", { name: "Accept" }).click();
       await expect(page.getByRole("listitem").filter({ hasText: text })).toHaveCount(0);
+    });
+
+    test("edits a task in a sheet that covers the page", async ({ page }) => {
+      await loginViaApi(page);
+      await page.goto("/");
+      const title = `call the dentist ${size.name} ${unique()}`;
+      await add(page, title);
+      await page.getByRole("list", { name: "Tasks" }).getByText(title).click();
+      await page.getByRole("button", { exact: true, name: "Edit details" }).click();
+      const heading = page.getByRole("heading", { name: "Edit task" });
+      await expect(heading).toBeVisible();
+      // The sheet's surface is opaque: it once lost its background and showed the page through.
+      const isOpaque = await heading.evaluate((element) => {
+        const panel = element.parentElement;
+        return panel !== null && getComputedStyle(panel).backgroundColor.startsWith("rgb(");
+      });
+      expect(isOpaque).toBe(true);
+      await expectNoA11yViolations(page);
+      const renamed = `${title} at 9`;
+      await page.getByRole("textbox", { name: "Title" }).fill(renamed);
+      await page.getByRole("button", { exact: true, name: "Save" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: renamed })).toBeVisible();
     });
 
     test("history, settings and an unknown page explain themselves", async ({ page }) => {

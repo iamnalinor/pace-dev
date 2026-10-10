@@ -10,7 +10,7 @@ import { useRunAction } from "./use-run-action.ts";
 
 /**
 The row's check: a task submitted problem by problem opens its submit sheet (which problems,
-when); anything else is closed as done at once, with Undo in the toast.
+when); anything else is closed as done at once (History undoes it).
 */
 export const useCheckTask = (): ((row: NowRow) => void) => {
   const { actions, state } = usePace();

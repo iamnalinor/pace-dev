@@ -1,5 +1,6 @@
 import {
   type CoreState,
+  hasLaterStart,
   type Importance,
   isOpen,
   minutesBetween,
@@ -18,7 +19,7 @@ import { type DueRelative, relativeDay } from "./relative-day.ts";
 export type MetaPart =
   /** How long an undated task has been open. */
   | { readonly kind: "age"; readonly minutes: number }
-  | { readonly kind: "behind-pace"; readonly percent: number }
+  /** Paused by the person: shown so a paused task does not look like the others. */
   | {
       readonly kind: "due";
       readonly at: string;
@@ -27,15 +28,17 @@ export type MetaPart =
       /** The due was set in a zone whose offset differs from the device's: show both times. */
       readonly zoneDiffers: boolean;
     }
-  | { readonly kind: "end-of-day" }
   | { readonly kind: "importance"; readonly importance: Importance }
-  /** `isSoft`: a resubmission deadline, whose lateness is never told in minutes. */
   | { readonly kind: "late"; readonly minutes: number; readonly isSoft: boolean }
-  /** Time until the due, shown next to it: "6d 12h left". */
+  /** `isSoft`: a resubmission deadline, whose lateness is never told in minutes. */
   | { readonly kind: "left"; readonly minutes: number }
+  /** Time until the due, shown next to it: "6d 12h left". */
+  | { readonly kind: "paused" }
   | { readonly kind: "problems-left"; readonly count: number }
   | { readonly kind: "sent"; readonly submitted: number }
-  | { readonly kind: "solved"; readonly solved: number; readonly total: number };
+  | { readonly kind: "solved"; readonly solved: number; readonly total: number }
+  /** A start still ahead: the row waits under "In future". */
+  | { readonly kind: "starts"; readonly at: string; readonly tz: string };
 
 export type RowTag =
   | { readonly kind: "preset"; readonly presetId: string; readonly name: string }
@@ -52,8 +55,6 @@ export type NowRow = {
   readonly importance: Importance;
   /** 0..1 in the preset's progress mode. */
   readonly progress: number;
-  /** Where the pace marker sits on the bar; `null` without a due. */
-  readonly paceExpected: null | number;
   /** A Nice-to-have without a deadline is shown quietly. */
   readonly dimmed: boolean;
   readonly meta: readonly MetaPart[];
@@ -67,18 +68,26 @@ export type ProjectChip = {
 };
 
 export type NowViewModel = {
+  /** Open tasks by deadline, the nearest first. */
   readonly rows: readonly NowRow[];
-  readonly waiting: readonly NowRow[];
-  readonly laterCount: number;
+  /** Tasks that start later, folded under "In future". */
+  readonly future: readonly NowRow[];
   readonly inboxCount: number;
   /** Projects with open tasks, by name. */
   readonly projects: readonly ProjectChip[];
 };
 
-const importancePart = (item: NowItem): readonly MetaPart[] =>
-  item.importance === "normal" ? [] : [{ kind: "importance", importance: item.importance }];
+/** Every row names its importance, Normal included: it reads right after the project. */
+const importancePart = (item: NowItem): readonly MetaPart[] => [
+  { kind: "importance", importance: item.importance },
+];
 
-/** Lateness, else the explicit due, else the end of the day an ASAP task implies. */
+const startsPart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
+  item.task.startAt !== null && hasLaterStart(item.task, ctx.now)
+    ? [{ kind: "starts", at: item.task.startAt, tz: item.task.startTz ?? ctx.deviceTz }]
+    : [];
+
+/** Lateness, else the due date and, while the task is open, the time left to it. */
 const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   const { task } = item;
   if (item.lateMinutes !== null) {
@@ -94,17 +103,15 @@ const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
         relative: relativeDay(task.dueAt, ctx),
         zoneDiffers: zonesDiffer(due, { at: task.dueAt, tz: ctx.deviceTz }),
       },
-      ...(item.task.status === "waiting"
-        ? []
-        : [{ kind: "left" as const, minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) }]),
+      ...(task.closed === null
+        ? [{ kind: "left" as const, minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) }]
+        : []),
     ];
   }
-  return item.importance === "asap" ? [{ kind: "end-of-day" }] : [];
+  return [];
 };
 
-const PERCENT = 100;
-
-/** Problems solved and sent; a late sheet shows what is still owed; a slider task, its lag. */
+/** Problems solved and sent; a late sheet shows what is still owed. */
 const progressParts = (item: NowItem): readonly MetaPart[] => {
   if (item.total > 0) {
     if (item.isLate) {
@@ -115,20 +122,19 @@ const progressParts = (item: NowItem): readonly MetaPart[] => {
       ...(item.submitted > 0 ? [{ kind: "sent" as const, submitted: item.submitted }] : []),
     ];
   }
-  // Only against a deadline the person set: an ASAP's end of day is no schedule to lag behind.
-  const behind =
-    item.preset.progressMode === "slider" && item.task.dueAt !== null && item.paceExpected !== null
-      ? Math.round((item.paceExpected - item.progress) * PERCENT)
-      : 0;
-  return behind > 0 ? [{ kind: "behind-pace", percent: behind }] : [];
+  return [];
 };
 
+/** How old an undated open task is; not next to a later start (that says when it begins). */
 const agePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
-  item.dueAt === null
+  item.dueAt === null && item.task.closed === null && !hasLaterStart(item.task, ctx.now)
     ? [{ kind: "age", minutes: Math.max(0, minutesBetween(item.task.createdAt, ctx.now)) }]
     : [];
 
-/** A row of the Now list or of a project's open list. */
+const pausedPart = (item: NowItem): readonly MetaPart[] =>
+  item.task.status === "paused" && item.task.closed === null ? [{ kind: "paused" }] : [];
+
+/** A row of the Now list or of a project's lists (closed tasks too). */
 export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
   id: item.task.id,
   title: item.task.title,
@@ -140,10 +146,11 @@ export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
       : { kind: "project", name: item.project.name },
   importance: item.importance,
   progress: item.progress,
-  paceExpected: item.paceExpected,
   dimmed: item.importance === "nice_to_have" && item.task.dueAt === null,
   meta: [
     ...importancePart(item),
+    ...pausedPart(item),
+    ...startsPart(item, ctx),
     ...duePart(item, ctx),
     ...progressParts(item),
     ...agePart(item, ctx),
@@ -182,8 +189,7 @@ export const nowViewModel = (
   const list = nowList(state, ctx, options);
   return {
     rows: list.items.map((item) => nowRow(item, ctx)),
-    waiting: list.waiting.map((item) => nowRow(item, ctx)),
-    laterCount: list.laterCount,
+    future: list.future.map((item) => nowRow(item, ctx)),
     inboxCount: list.inboxCount,
     projects: projectChips(state),
   };

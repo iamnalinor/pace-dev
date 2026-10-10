@@ -3,12 +3,11 @@ import { Inbox, Settings } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
+import { decisionsOf } from "#app/screens/review-card.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatEyebrow } from "@pace/core";
-
-import { NowHelp } from "./now-help.tsx";
 
 const CounterButton = ({
   count,
@@ -34,42 +33,32 @@ const CounterButton = ({
       ) : (
         <Text className="font-sans text-[13px] text-fg">{title}</Text>
       )}
-      <Text className="font-mono text-[13px] text-fg">{count}</Text>
+      <Text className="font-sans text-[13px] tabular-nums text-fg">{count}</Text>
     </Pressable>
   );
 };
 
-/** Date eyebrow and "Now"; on the right "To sort" (when anything waits), Inbox, help, Settings. */
+/** Date eyebrow and "Now"; on the right the Inbox (captures and decisions) and Settings. */
 export const NowHeader = ({ inboxCount }: { readonly inboxCount: number }) => {
   const t = useT();
   const router = useRouter();
   const language = useLanguage();
   const { hooks } = usePace();
   const { deviceTz, now } = hooks.useClock();
-  const review = hooks.useReview();
+  // One Inbox: the captures and the decisions the rules want.
+  const waiting = inboxCount + decisionsOf(hooks.useReview().items).length;
   return (
     <ScreenHeader
       eyebrow={formatEyebrow(now, deviceTz, language)}
       right={
         <View className="flex-row gap-2">
-          {review.count === 0 ? null : (
-            <CounterButton
-              count={review.count}
-              label={`${t("review.title")}, ${review.count}`}
-              onPress={() => {
-                router.push("/review");
-              }}
-              title={t("review.title")}
-            />
-          )}
           <CounterButton
-            count={inboxCount}
-            label={t("now.inbox", { count: inboxCount })}
+            count={waiting}
+            label={t("now.inbox", { count: waiting })}
             onPress={() => {
               router.push("/inbox");
             }}
           />
-          <NowHelp />
           <IconButton
             icon={Settings}
             label={t("nav.settings")}

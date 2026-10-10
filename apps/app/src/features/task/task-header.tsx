@@ -1,5 +1,5 @@
-import { ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react-native";
-import { Pressable, View } from "react-native";
+import { ChevronDown, CircleX, Pause, Pencil, Play } from "lucide-react-native";
+import { Pressable, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
@@ -7,11 +7,15 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useTaskBack } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { BackHeader } from "#app/ui/back-header.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
+import { inkClass } from "#app/ui/color.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
-/** Edit, pause or resume, delete: the task's actions as icons, no menu in between. */
+/**
+Edit, pause or resume, close without doing: the task's actions as icons, no menu in between.
+Nothing is deleted (History keeps every task); the last one closes as Cancelled or Skipped.
+*/
 const TaskActions = ({
   onDelete,
   onEdit,
@@ -41,7 +45,7 @@ const TaskActions = ({
         />
       ) : null}
       {isOpen ? (
-        <IconButton icon={Trash2} label={t("task.delete")} onPress={onDelete} variant="plain" />
+        <IconButton icon={CircleX} label={t("task.delete")} onPress={onDelete} variant="plain" />
       ) : null}
     </View>
   );
@@ -82,8 +86,18 @@ export const TaskHeader = ({
         disabled={onProject === undefined}
         onPress={onProject}
       >
-        <ColorTag color={project?.color ?? null}>{project?.name ?? t("task.noProject")}</ColorTag>
-        {onProject === undefined ? null : <ChevronDown color={palette.muted} size={14} />}
+        <Text
+          className={cx(
+            "font-sans text-[15px] font-medium",
+            project === null ? "text-fg2" : inkClass(project.color),
+          )}
+          numberOfLines={1}
+        >
+          {project?.name ?? t("task.noProject")}
+        </Text>
+        {onProject === undefined ? null : (
+          <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+        )}
       </Pressable>
     </BackHeader>
   );

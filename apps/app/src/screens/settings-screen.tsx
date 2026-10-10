@@ -13,6 +13,7 @@ import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { Button } from "#app/ui/button.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
@@ -31,7 +32,7 @@ const Row = ({
   <View accessibilityLabel={label} className="gap-2 border-b border-line px-5 py-4" role="group">
     <Text
       accessibilityRole="header"
-      className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted"
+      className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted"
     >
       {label}
     </Text>
@@ -96,6 +97,8 @@ export const SettingsScreen = () => {
   const t = useT();
   const router = useRouter();
   const { auth } = useAuth();
+  // Beside the sidebar Settings is a destination, not a sheet to dismiss.
+  const isWide = useIsWide();
   const logout = async (): Promise<void> => {
     await auth.logout();
     router.replace("/login");
@@ -103,14 +106,16 @@ export const SettingsScreen = () => {
   const header = (
     <ScreenHeader
       right={
-        <Button
-          onPress={() => {
-            router.back();
-          }}
-          variant="ghost"
-        >
-          {t("common.done")}
-        </Button>
+        isWide ? null : (
+          <Button
+            onPress={() => {
+              router.back();
+            }}
+            variant="ghost"
+          >
+            {t("common.done")}
+          </Button>
+        )
       }
       title={t("settings.title")}
     />
@@ -136,6 +141,16 @@ export const SettingsScreen = () => {
           <ExportRow />
         </Row>
       )}
+      <Row label={t("settings.devices")}>
+        <Button
+          onPress={() => {
+            router.push("/devices");
+          }}
+          variant="secondary"
+        >
+          {t("devices.title")}
+        </Button>
+      </Row>
       <Row label={t("settings.connectedApps")}>
         <ConnectedApps />
       </Row>

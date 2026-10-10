@@ -87,7 +87,9 @@ export const ProjectsScreen = () => {
             >
               {project.name}
             </Text>
-            <Text className="font-mono text-[13px] text-fg2">{openCount(project.id)}</Text>
+            <Text className="font-sans text-[13px] tabular-nums text-fg2">
+              {openCount(project.id)}
+            </Text>
           </Pressable>
         ))}
       </View>

@@ -100,7 +100,9 @@ const ResubmissionFields = ({
         value={policy.softDays}
       />
       <FinalAt onPolicy={onPolicy} policy={policy} zone={zone} />
-      <Text className="font-mono text-[12px] text-muted">{t("add.dueZone", { tz: zone })}</Text>
+      <Text className="font-sans text-[12px] tabular-nums text-muted">
+        {t("add.dueZone", { tz: zone })}
+      </Text>
     </View>
   );
 };

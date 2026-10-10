@@ -21,6 +21,8 @@ export {
   TRK_CREATED,
   TRK_DUE,
   TRK_ID,
+  TRK_NOW,
+  TRK_START,
 } from "./materialize/task-fixture.fake.ts";
 export {
   ALGEBRA_ID,
@@ -53,4 +55,3 @@ export {
   WAITING_IDS,
   WORK_ID,
 } from "./queries/fixture.fake.ts";
-export { TRK_NOW, TRK_START } from "./urgency/fixture.fake.ts";

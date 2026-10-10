@@ -2,15 +2,20 @@ import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { ActivityCategorySchema } from "../events/payloads.ts";
-import { BUTTON_CATEGORIES, DEFAULT_BUTTONS, effectiveButtons } from "./buttons.ts";
-import { defaultsFor, paceStatus } from "./expect-limit.ts";
-import { runningActivity, timeline } from "./timeline.ts";
+import { TIME_BUTTONS, timeButton } from "./buttons.ts";
+import { defaultsFor, paceStatus, remindAt } from "./expect.ts";
+import { runningActivities, runningActivity, timeline } from "./timeline.ts";
 import { act, start, T, timeOf } from "./tracking.fake.ts";
 
 const DAY = { from: T("00:00"), to: "2026-10-08T00:00:00.000Z" };
 
 const minuteArb = fc.integer({ max: 24 * 60 - 1, min: 0 });
-const blockArb = fc.record({ end: minuteArb, isLogged: fc.boolean(), start: minuteArb });
+const blockArb = fc.record({
+  end: minuteArb,
+  isAlongside: fc.boolean(),
+  isLogged: fc.boolean(),
+  start: minuteArb,
+});
 
 /** `hh:mm` of a minute of the day. */
 const clock = (value: number): string =>
@@ -27,22 +32,22 @@ describe("the time reducer", () => {
     expect(time.activities["a2"]).toMatchObject({ category: "food", endAt: T("13:10") });
   });
 
-  it("remembers that the messengers were part of an activity", () => {
+  it("runs an activity alongside the main one: neither closes the other", () => {
     const time = timeOf([
-      start("09:00", { activityId: "a1", label: "Chat with the team" }),
-      act("09:30", {
-        payload: { activityId: "a1", messengersOnPurpose: true },
-        type: "activity.labelled",
-      }),
+      start("09:00", { activityId: "a1", label: "Work" }),
+      start("09:10", { activityId: "m1", alongside: true, category: "rest", label: "Music" }),
+      start("09:30", { activityId: "a2", label: "Call" }),
     ]);
-    expect(time.activities["a1"]).toMatchObject({ messengersOnPurpose: true });
-    expect(timeline(time, { ...DAY, now: T("10:00") }).segments.at(0)).toMatchObject({
-      expectMinutes: null,
-      messengersOnPurpose: true,
-    });
+    expect(time.activities["a1"]).toMatchObject({ endAt: T("09:30"), isAlongside: false });
+    expect(time.activities["m1"]).toMatchObject({ endAt: null, isAlongside: true });
+    expect(runningActivity(time, T("10:00"))?.id).toBe("a2");
+    expect(runningActivities(time, T("10:00")).map((activity) => activity.id)).toEqual([
+      "a2",
+      "m1",
+    ]);
   });
 
-  it("adjusts, relabels and keeps buttons once the bar is edited", () => {
+  it("adjusts and relabels, and ignores the retired button events", () => {
     const time = timeOf([
       start("09:00", { activityId: "a1", label: "Work" }),
       act("10:00", {
@@ -69,8 +74,7 @@ describe("the time reducer", () => {
       label: "Algebra",
       startAt: T("08:45"),
     });
-    expect(effectiveButtons(time).map((button) => button.label)).toEqual(["Read"]);
-    expect(effectiveButtons(timeOf([]))).toEqual(DEFAULT_BUTTONS);
+    expect(Object.keys(time)).toEqual(["activities"]);
   });
 });
 
@@ -80,24 +84,27 @@ describe("categories and buttons", () => {
     expect(ActivityCategorySchema.parse("food")).toBe("food");
   });
 
-  it("starts with Work and Study asking for details, and never shows a sleep button", () => {
-    expect(
-      DEFAULT_BUTTONS.filter((button) => button.shouldAskDetails).map((button) => button.id),
-    ).toEqual(["btn:work", "btn:study"]);
-    expect(BUTTON_CATEGORIES).not.toContain("sleep");
-    const time = timeOf([
-      act("10:00", {
-        payload: {
-          buttonId: "btn:sleep",
-          category: "sleep",
-          color: "violet",
-          label: "Sleep",
-          order: 0,
-        },
-        type: "activity.button.set",
-      }),
+  it("has four fixed buttons: calendar, rest (30 min), sport and chores with choices", () => {
+    expect(TIME_BUTTONS.map((button) => button.id)).toEqual([
+      "calendar",
+      "rest",
+      "sport",
+      "chores",
     ]);
-    expect(effectiveButtons(time)).toEqual([]);
+    const rest = timeButton("rest");
+    expect(rest.choices).toEqual([
+      expect.objectContaining({ category: "rest", expectMinutes: 30 }),
+    ]);
+    expect(timeButton("sport").choices.map((choice) => choice.expectMinutes)).toEqual([
+      30, 60, 120, 180,
+    ]);
+    const chores = timeButton("chores").choices;
+    expect(chores.map((choice) => choice.id)).toContain("chores:ready");
+    expect(chores.find((choice) => choice.id === "chores:commute")).toMatchObject({
+      category: "commute",
+      expectMinutes: 45,
+    });
+    expect(timeButton("calendar").choices).toEqual([]);
   });
 });
 
@@ -144,6 +151,22 @@ describe("timeline", () => {
     expect(day.gaps.at(-1)).toEqual({ endAt: T("13:00"), minutes: 60, startAt: T("12:00") });
   });
 
+  it("lists an activity run alongside apart: it neither cuts the main line nor counts in totals", () => {
+    const time = timeOf([
+      start("08:00", { activityId: "a1", label: "Work" }),
+      start("08:30", { activityId: "m1", alongside: true, category: "rest", label: "Music" }),
+      act("09:00", { payload: { activityId: "m1" }, type: "activity.stopped" }),
+    ]);
+    const day = timeline(time, { ...DAY, now: T("10:00") });
+    expect(day.segments.map((segment) => [segment.label, segment.minutes])).toEqual([
+      ["Work", 120],
+    ]);
+    expect(day.alongside).toEqual([
+      expect.objectContaining({ isAlongside: true, label: "Music", minutes: 30 }),
+    ]);
+    expect(day.totals).toEqual({ work: 120 });
+  });
+
   it("never overlaps and never counts more than the range (property)", () => {
     fc.assert(
       fc.property(fc.array(blockArb, { maxLength: 12 }), (blocks) => {
@@ -159,7 +182,11 @@ describe("timeline", () => {
                 },
                 type: "activity.logged",
               })
-            : start(clock(block.start), { activityId: `a${String(index)}`, label: "y" }),
+            : start(clock(block.start), {
+                activityId: `a${String(index)}`,
+                label: "y",
+                ...(block.isAlongside && { alongside: true }),
+              }),
         );
         const day = timeline(timeOf(events), { ...DAY, now: "2026-10-08T00:00:00.000Z" });
         const isOrdered = day.segments.every(
@@ -179,13 +206,31 @@ describe("timeline", () => {
   });
 });
 
-describe("expect and limit", () => {
-  it("rates a running activity against its expect and limit", () => {
-    expect(paceStatus(20, { expectMinutes: 30, limitMinutes: null })).toBe("ok");
-    expect(paceStatus(35, { expectMinutes: 30, limitMinutes: null })).toBe("over-expect");
-    expect(paceStatus(52, { expectMinutes: null, limitMinutes: 60 })).toBe("near-limit");
-    expect(paceStatus(60, { expectMinutes: null, limitMinutes: 60 })).toBe("over-limit");
-    expect(paceStatus(10, { expectMinutes: null, limitMinutes: null })).toBe("none");
+describe("expect", () => {
+  it("asks whether it is still going once an activity runs twice as long as expected", () => {
+    const time = timeOf([start("09:00", { activityId: "a1", expectMinutes: 30, label: "Rest" })]);
+    const rest = time.activities["a1"];
+    expect(paceStatus(rest, T("09:45"))).toBe("ok");
+    expect(paceStatus(rest, T("10:00"))).toBe("long");
+    expect(remindAt(rest)).toBe(T("10:00"));
+    const unexpected = timeOf([start("09:00", { activityId: "a2", label: "x" })]);
+    expect(remindAt(unexpected.activities["a2"])).toBeNull();
+    expect(paceStatus(unexpected.activities["a2"], T("19:00"))).toBe("none");
+  });
+
+  it("'still going' moves the next ask as far again and keeps the Expect", () => {
+    const time = timeOf([
+      start("09:00", { activityId: "a1", expectMinutes: 30, label: "Rest" }),
+      act("10:10", {
+        payload: { activityId: "a1", stillAt: T("10:10") },
+        type: "activity.labelled",
+      }),
+    ]);
+    const rest = time.activities["a1"];
+    expect(rest?.expectMinutes).toBe(30);
+    expect(remindAt(rest)).toBe(T("11:20"));
+    expect(paceStatus(rest, T("11:00"))).toBe("ok");
+    expect(paceStatus(rest, T("11:20"))).toBe("long");
   });
 
   it("learns a label's typical length from three finished runs, else uses the category", () => {
@@ -198,13 +243,11 @@ describe("expect and limit", () => {
     ]);
     expect(defaultsFor(timeOf(runs), { category: "commute", label: "commute" })).toEqual({
       expectMinutes: 40,
-      limitMinutes: null,
       samples: 3,
       source: "history",
     });
-    expect(defaultsFor(timeOf([]), { category: "hygiene", label: "Shower" })).toEqual({
+    expect(defaultsFor(timeOf([]), { category: "chores", label: "Tidy up" })).toEqual({
       expectMinutes: null,
-      limitMinutes: 60,
       samples: 0,
       source: "category",
     });
