@@ -190,3 +190,18 @@ On the plan: the branch name does not belong in `context/` («убери это 
 Later in the session:
 
 > я тебе поставил плагины про ux дизайн, ты их юзаешь? еще - можешь не дробить на ПРы, делай все в одном (но ревьюить не забывай). строчку про это убери из папки контекст
+
+Devices in Settings:
+
+> в настройках мы хотим контролировать добавленные устройтсва с активностью + инструкцию по добавлению новых + заведение новых усртйоств (ну типа создаем устройство там генерится токен и нам дают скрипт или что-то еще и рассказывают как его поставить)
+
+After the first exploratory QA report:
+
+> о, приколньо qa репорт работает. напиши в claude.md такое прогонять (плюс какие плагины юзать)
+
+On the example course presets:
+
+> мои пресеты не должны быть захардкожены в коде. те пресеты что есть лучше оставить просто как дефолтные, дальше юзер может сам поправить
+
+Taken as: the owner's own courses are never written into the code; the shipped presets
+(and the example courses behind the button) stay defaults the person edits.
