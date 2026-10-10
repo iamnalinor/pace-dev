@@ -15,12 +15,12 @@ export const Screen = ({
   readonly children: ReactNode;
   readonly footer?: ReactNode;
   readonly header?: ReactNode;
-  /** Opens scrolled this far down (Week opens at the current hour), once. */
+  /** Opens scrolled this far down (Week opens at the current hour); again when it changes. */
   readonly scrollTo?: number;
 }) => {
   const insets = useSafeAreaInsets();
   const scrollerRef = useRef<ScrollView>(null);
-  const scrolledRef = useRef(false);
+  const scrolledToRef = useRef<number | undefined>(undefined);
   return (
     <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       <View className="w-full max-w-[880px] flex-1 self-center">
@@ -30,10 +30,11 @@ export const Screen = ({
           contentContainerClassName="pb-24"
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => {
-            if (scrollTo === undefined || scrolledRef.current) {
+            // The calendar arriving can move the grid's first hour: the target moves with it.
+            if (scrollTo === undefined || scrolledToRef.current === scrollTo) {
               return;
             }
-            scrolledRef.current = true;
+            scrolledToRef.current = scrollTo;
             scrollerRef.current?.scrollTo({ animated: false, y: scrollTo });
           }}
           ref={scrollerRef}

@@ -66,6 +66,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "day.badTime": "Введите время, например 09:30.",
   "day.badRange": "Конец должен быть позже начала.",
   "day.ahead": "Это ещё впереди: записывайте то, что уже было.",
+  "day.overlapsNext": "Это заходит на следующую активность: сначала сдвиньте её начало.",
   "day.delete": "Удалить этот блок",
   "day.deleteConfirm": "Удалить? Нажмите ещё раз",
   "day.total": "{category} · {duration}",

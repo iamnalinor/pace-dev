@@ -64,6 +64,7 @@ export const enTime = {
   "day.badTime": "Type a time like 09:30.",
   "day.badRange": "The end must be after the start.",
   "day.ahead": "That is still ahead: log what already happened.",
+  "day.overlapsNext": "That runs into the next activity: move its start first.",
   "day.delete": "Delete this block",
   "day.deleteConfirm": "Delete it? Tap again",
   "day.total": "{category} · {duration}",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text, useWindowDimensions, View } from "react-native";
 
 import type { WeekModel } from "@pace/client";
 
@@ -22,6 +22,9 @@ import { dayLabel, gridFromHour, hourNow, type Picked, WeekGrid } from "./week-g
 
 /** The day labels' row above the grid. */
 const LABELS_PX = 28;
+
+/** What the screen's header and a phone's tab bar take of the window's height, roughly. */
+const CHROME_PX = 200;
 
 /** "5 Oct", "5 окт." */
 const monthDay = (date: string, zone: string, language: Language): string =>
@@ -119,6 +122,25 @@ const PickedSheet = ({
 };
 
 /**
+How far down the week opens: this week only as far as needed to bring now into sight (the day
+names stay whenever now already is); a past week at its top.
+*/
+const useOpenAt = (
+  week: WeekModel,
+  calendar: Parameters<typeof gridFromHour>[1],
+  hourPx: number,
+): number => {
+  const { now } = useViewer();
+  const { height } = useWindowDimensions();
+  const nowTop =
+    LABELS_PX + (hourNow(now, week.zone) - gridFromHour(week, calendar) + 0.5) * hourPx;
+  // Scrolled only when now (and two hours after it) would be below what is in sight under the
+  // header and the tab bar; otherwise the top stays, day names included.
+  const overflow = nowTop + 2 * hourPx - (height - CHROME_PX);
+  return week.next === null ? Math.max(0, Math.round(overflow)) : 0;
+};
+
+/**
 The week as lived: Monday to Sunday on one hour grid, tracked time filled in its color, the
 calendar's events outlined, a thin strip where some device was in use. A tap tells more.
 */
@@ -142,13 +164,9 @@ export const WeekScreen = () => {
   );
   const hourPx = isWide ? 40 : 30;
   // This week opens at the hour before now; a past one at its first hour.
-  const scrollTo =
-    week.next === null
-      ? Math.max(0, (hourNow(now, week.zone) - gridFromHour(week, calendar) - 1) * hourPx) +
-        LABELS_PX
-      : undefined;
+  const scrollTo = useOpenAt(week, calendar, hourPx);
   return (
-    <Screen header={header} {...(scrollTo !== undefined && { scrollTo })}>
+    <Screen header={header} scrollTo={scrollTo}>
       <WeekGrid
         calendar={calendar}
         hourPx={hourPx}

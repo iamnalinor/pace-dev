@@ -123,6 +123,45 @@ describe("the log-past sheet's times", () => {
   });
 });
 
+describe("moving a block's end", () => {
+  it("refuses an end that runs into the next activity instead of clipping it", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.startActivity(
+      { category: "rest", label: "Rest" },
+      { at: "2026-10-06T09:00:00.000Z" },
+    );
+    await runtime.actions.startActivity(
+      { category: "chores", label: "Lunch" },
+      { at: "2026-10-06T10:00:00.000Z" },
+    );
+    const rest = Object.values(runtime.state.store.getState().time.activities).find(
+      (activity) => activity.label === "Rest",
+    );
+    const onClose = jest.fn();
+    await renderScreen(
+      <ActivitySheet
+        onClose={onClose}
+        target={{
+          activityId: rest?.id ?? "",
+          category: "rest",
+          endAt: "2026-10-06T10:00:00.000Z",
+          kind: "edit",
+          label: "Rest",
+          startAt: "2026-10-06T09:00:00.000Z",
+        }}
+        zone="Europe/Moscow"
+      />,
+      runtime,
+    );
+    await fireEvent.changeText(screen.getByLabelText("To"), "1330");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    expect(
+      await screen.findByText("That runs into the next activity: move its start first."),
+    ).toBeOnTheScreen();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
 describe("deleting a block", () => {
   it("asks for a second tap, then takes it off the day", async () => {
     const runtime = await createTestRuntime();

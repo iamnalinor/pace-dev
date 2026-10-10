@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { Text, type TextInput, View } from "react-native";
 
-import { useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
+import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
+import { clockTime } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -13,7 +13,6 @@ import { TextField } from "#app/ui/text-field.tsx";
 import {
   type ActivityForm,
   activityFormOf,
-  type ActivityRange,
   type ActivitySheetProps,
   type ActivityTarget,
   type FormPartProps,
@@ -24,112 +23,24 @@ import { useDraft } from "@pace/client/react";
 import {
   ACTIVITY_CATEGORIES,
   type ActivityCategory,
-  addDaysIn,
   CATEGORY_COLORS,
   formatEyebrow,
   type MessageKey,
 } from "@pace/core";
 
+import {
+  type Faults,
+  hasFault,
+  nextStartOf,
+  notAhead,
+  notIntoNext,
+  readDraft,
+} from "./activity-draft.ts";
+
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
 export type SheetTarget = ActivityTarget;
 
 type Draft = ActivityForm;
-
-/** Which field reads wrong, if any: its sentence goes under it. */
-type Faults = {
-  readonly label: MessageKey | null;
-  readonly from: MessageKey | null;
-  readonly to: MessageKey | null;
-};
-
-/** An end before the start reads as past midnight only for a block this long at most. */
-const MAX_OVERNIGHT_MS = 12 * 3_600_000;
-
-/**
-The end on the block's day, or after midnight when it is earlier than the start and the night
-is short; `null` for an end equal to the start or a reversed pair (10:00 → 09:30), which
-would otherwise silently make a day-long block.
-*/
-const endOf = (sameDay: string, startAt: string, zone: string): null | string => {
-  if (sameDay > startAt) {
-    return sameDay;
-  }
-  const nextDay = addDaysIn(sameDay, 1, zone);
-  const length = Date.parse(nextDay) - Date.parse(startAt);
-  return sameDay < startAt && length <= MAX_OVERNIGHT_MS ? nextDay : null;
-};
-
-/**
-The typed clock times on the block's own day (see `endOf` for one past midnight). A logged
-block needs its end; a running one has none yet.
-*/
-/** What is wrong with the end, if anything: missing on a logged block, not a time, reversed. */
-const toFault = (
-  draft: Draft,
-  target: SheetTarget,
-  times: {
-    readonly startAt: null | string;
-    readonly sameDay: null | string;
-    readonly zone: string;
-  },
-): MessageKey | null => {
-  if (draft.to === "") {
-    return target.kind === "log" ? "day.badTime" : null;
-  }
-  if (times.sameDay === null) {
-    return "day.badTime";
-  }
-  return times.startAt !== null && endOf(times.sameDay, times.startAt, times.zone) === null
-    ? "day.badRange"
-    : null;
-};
-
-const readDraft = (
-  draft: Draft,
-  target: SheetTarget,
-  zone: string,
-): { readonly range: ActivityRange | null; readonly faults: Faults } => {
-  const { date } = wallClock(target.startAt, zone);
-  const startAt = fromWallClock({ date, time: draft.from, tz: zone });
-  const sameDay = draft.to === "" ? null : fromWallClock({ date, time: draft.to, tz: zone });
-  const faults: Faults = {
-    from: startAt === null ? "day.badTime" : null,
-    label: draft.label.trim() === "" ? "day.whatMissing" : null,
-    to: toFault(draft, target, { sameDay, startAt, zone }),
-  };
-  if (startAt === null || faults.to !== null) {
-    return { faults, range: null };
-  }
-  return {
-    faults,
-    range: { endAt: sameDay === null ? null : endOf(sameDay, startAt, zone), startAt },
-  };
-};
-
-type Read = { readonly range: ActivityRange | null; readonly faults: Faults };
-
-/** A block is what already happened: a start or an end after now is said under its field. */
-const notAhead = (read: Read, now: string): Read => {
-  const { range } = read;
-  if (range === null) {
-    return read;
-  }
-  const isStartAhead = Date.parse(range.startAt) > Date.parse(now);
-  const isEndAhead = range.endAt !== null && Date.parse(range.endAt) > Date.parse(now);
-  return isStartAhead || isEndAhead
-    ? {
-        faults: {
-          ...read.faults,
-          ...(isStartAhead && { from: "day.ahead" }),
-          ...(isEndAhead && { to: "day.ahead" }),
-        },
-        range: null,
-      }
-    : read;
-};
-
-const hasFault = (faults: Faults): boolean =>
-  faults.label !== null || faults.from !== null || faults.to !== null;
 
 const CategoryPicker = ({
   onChange,
@@ -272,7 +183,8 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
   const [draft, patch] = useDraft(() => activityFormOf(target, (atIso) => clockTime(atIso, zone)));
   const [hasTriedToSave, setHasTriedToSave] = useState(false);
   const { now } = useViewer();
-  const { faults, range } = notAhead(readDraft(draft, target, zone), now);
+  const nextStart = useAppState((state) => nextStartOf(state.time, target));
+  const { faults, range } = notIntoNext(notAhead(readDraft(draft, target, zone), now), nextStart);
   const save = async (): Promise<void> => {
     setHasTriedToSave(true);
     if (range === null || hasFault(faults)) {
