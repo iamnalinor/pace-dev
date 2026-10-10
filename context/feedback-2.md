@@ -137,6 +137,27 @@ Written while planning stage 6 (full / partial / none), see `plan.md` (Stage 6) 
 | W1 | Calendar synced to the cloud, week view in the browser | None |
 | W2 | App time from every device in the cloud, «where I sat» per activity, in MCP | None: phone-local only, messenger penalty |
 
+## Scenario coverage after stage 6 (PR #38)
+
+| # | Now | Where |
+|---|---|---|
+| T1 | Done: empty weekly instances are ordinary rows by their due | Now list, `compareNowItems` |
+| T2 | Done: nearest open instance, or the one the due names (else a task of its own); subtasks, description, link, estimate | `input/compose.ts`, task form «Add to …» |
+| T3 | Done: the form shows the guessed project and fields, all editable | composer form |
+| T4 | Done: Parse button or paste only; Enter adds a short line; the form is a separate step | `composer.tsx`, `composer-form.tsx` |
+| T5 | Done: start in the form and the edit sheet; later starts fold under «In future» | Now, project page |
+| T6 | Done: every field in the edit sheet, start and due can be cleared | `EditTaskSheet` |
+| T7 | Done: Open / In future / Done rows, done tasks open | project page |
+| T8 | Done: `[Focus] [Done]` footer, no Waiting | task footer |
+| A1 | Done: four fixed buttons, Chores → picker | time bar |
+| A2 | Done: switching closes the main one; long press, right click or ⋯ → «Alongside what is running» | time bar, `activity.started.alongside` |
+| A3 | Done: Rest 30m, Sport 30m–3h; «Still doing this?» at 2× in the bar, a phone timer and the bot; limits removed | `paceStatus`, `long-run.ts` |
+| A4 | Done: own and accepted events only; Attend / Skip on Now from ten minutes before; a phone reminder at the start | `calendar-filter.ts`, `CalendarPrompt` |
+| A5 | Done: From calendar starts the event going on now under its title, from its start | `startCalendar` |
+| A6 | Done: starts at once with the length as Expect; `POST /api/parse/activity` relabels it in the background | `startTyped`, `refineActivity` |
+| W1 | Done: the phone sends its calendar (toggle in Settings → Devices); `/week` in the browser | `calendar_events`, Week |
+| W2 | Done: phone and computers (ActivityWatch bridge) send app sessions; «where I sat» on Day and Week; MCP `get_usage`, `get_week`; no penalties | `usage_sessions`, Devices |
+
 ## Product references found while planning
 
 - Simple Time Tracker (open source, F-Droid): start/stop on long press as an option, a sticky running notification.
