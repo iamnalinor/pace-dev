@@ -59,6 +59,28 @@ for (const size of SIZES) {
       await expect(page.getByRole("listitem").filter({ hasText: text })).toHaveCount(0);
     });
 
+    test("edits a task in a sheet that covers the page", async ({ page }) => {
+      await loginViaApi(page);
+      await page.goto("/");
+      const title = `call the dentist ${size.name} ${unique()}`;
+      await add(page, title);
+      await page.getByRole("list", { name: "Tasks" }).getByText(title).click();
+      await page.getByRole("button", { exact: true, name: "Edit details" }).click();
+      const heading = page.getByRole("heading", { name: "Edit task" });
+      await expect(heading).toBeVisible();
+      // The sheet's surface is opaque: it once lost its background and showed the page through.
+      const isOpaque = await heading.evaluate((element) => {
+        const panel = element.parentElement;
+        return panel !== null && getComputedStyle(panel).backgroundColor.startsWith("rgb(");
+      });
+      expect(isOpaque).toBe(true);
+      await expectNoA11yViolations(page);
+      const renamed = `${title} at 9`;
+      await page.getByRole("textbox", { name: "Title" }).fill(renamed);
+      await page.getByRole("button", { exact: true, name: "Save" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: renamed })).toBeVisible();
+    });
+
     test("history, settings and an unknown page explain themselves", async ({ page }) => {
       await loginViaApi(page);
       await page.goto("/history");
