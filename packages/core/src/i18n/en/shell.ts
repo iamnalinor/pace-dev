@@ -81,6 +81,7 @@ export const enShell = {
   "permissions.title": "Permissions",
   "permissions.web":
     "The browser needs no permissions. Notifications, the calendar and screen time are set up in Pace on your Android phone.",
+  "onboarding.web.title": "Pace in the browser",
   "onboarding.web.continue": "Continue",
   "permissions.hint":
     "Each one is optional. What Pace reads with them stays on this phone; only what you log is synced.",
@@ -285,7 +286,7 @@ export const enShell = {
   "notify.activityLong": "Still doing {label}?",
   "settings.decisions": "Notification log",
   "settings.decisions.hint": "Which reminders were sent or held back, and what the assistant read.",
-  "decisions.title": "Decision log",
+  "decisions.title": "Notification log",
   "decisions.search": "Search decisions",
   "decisions.empty": "No decisions yet.",
   "decisions.failed": "The decision log could not be loaded.",

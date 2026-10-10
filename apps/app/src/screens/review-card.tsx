@@ -7,9 +7,6 @@ import { zonedText } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { EmptyState } from "#app/ui/empty-state.tsx";
-
-import { PushedScreen } from "./pushed-screen.tsx";
 
 /**
 The decisions to show beside the Inbox's captures: a capture unsorted for too long is the
@@ -49,21 +46,5 @@ export const ReviewCard = ({ row }: { readonly row: ReviewRow }) => {
         ))}
       </View>
     </View>
-  );
-};
-
-/** "To sort": what the rules want a decision on, each with its one-tap answers. */
-export const ReviewScreen = () => {
-  const t = useT();
-  const review = usePace().hooks.useReview();
-  return (
-    <PushedScreen title={t("review.title")}>
-      {review.count === 0 ? <EmptyState>{t("review.empty")}</EmptyState> : null}
-      <View className="gap-2.5 px-4">
-        {review.items.map((row) => (
-          <ReviewCard key={row.taskId} row={row} />
-        ))}
-      </View>
-    </PushedScreen>
   );
 };

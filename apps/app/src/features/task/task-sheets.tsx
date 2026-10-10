@@ -68,10 +68,12 @@ type SaveInput = {
   readonly values: TaskFormValues;
   /** Problems added in the sheet. */
   readonly added: readonly string[];
+  /** Problems taken off in the sheet. */
+  readonly removed: readonly string[];
 };
 
 /** The writes a save makes, in order: only what changed. */
-const saveSteps = ({ actions, added, before, values, view }: SaveInput) => {
+const saveSteps = ({ actions, added, before, removed, values, view }: SaveInput) => {
   const patch = patchOf(before, values);
   return [
     ...(Object.keys(patch).length === 0
@@ -95,14 +97,15 @@ const saveSteps = ({ actions, added, before, values, view }: SaveInput) => {
     ...(values.estimateMinutes === before.estimateMinutes
       ? []
       : [async () => await actions.setEstimate(view.id, values.estimateMinutes)]),
+    ...removed.map((id) => async () => await actions.removeSubtask(view.id, id)),
     ...(added.length === 0 ? [] : [async () => await actions.addSubtasks(view.id, added)]),
   ];
 };
 
 /**
 Everything about a task, editable in one place: title, category, importance, project, start,
-due (clearable), estimate (clearable), description, link and new problems. Only what changed
-is written.
+due (clearable), estimate (clearable), description, link, new problems and unsent ones taken
+off. Only what changed is written.
 */
 export const EditTaskSheet = ({
   onClose,
@@ -120,8 +123,9 @@ export const EditTaskSheet = ({
   const before = useMemo(() => valuesOf(view, deviceTz), [view, deviceTz]);
   const [values, setValues] = useState(before);
   const [added, setAdded] = useState<readonly string[]>([]);
+  const [removed, setRemoved] = useState<readonly string[]>([]);
   const save = async (): Promise<void> => {
-    const steps = saveSteps({ actions, added, before, values, view });
+    const steps = saveSteps({ actions, added, before, removed, values, view });
     for (const step of steps) {
       // One after another: each write is validated against the state the previous one left.
       if (!(await run(step()))) {
@@ -141,8 +145,17 @@ export const EditTaskSheet = ({
       />
       <SubtaskList
         items={added}
-        kept={view.problems.map((problem) => problem.label)}
+        kept={view.problems
+          .filter((problem) => !removed.includes(problem.id))
+          .map((problem) => ({
+            id: problem.id,
+            isSent: problem.submittedAt !== null,
+            label: problem.label,
+          }))}
         onChange={setAdded}
+        onRemoveKept={(id) => {
+          setRemoved((current) => [...current, id]);
+        }}
       />
       <SheetActions
         cancelLabel={t("common.cancel")}

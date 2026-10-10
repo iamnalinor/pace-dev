@@ -3,7 +3,7 @@ import { Inbox, Settings } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
-import { decisionsOf } from "#app/screens/review-screen.tsx";
+import { decisionsOf } from "#app/screens/review-card.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";

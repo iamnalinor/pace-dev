@@ -12,6 +12,7 @@ export const EVENT_LABEL_KEYS: Readonly<Record<EventType, MessageKey>> = {
   "task.overrides.set": "event.task.overrides.set",
   "task.status.set": "event.task.status.set",
   "task.subtask.solved": "event.task.subtask.solved",
+  "task.subtask.removed": "event.task.subtask.removed",
   "task.subtasks.added": "event.task.subtasks.added",
   "task.submitted": "event.task.submitted",
   "task.closed": "event.task.closed",

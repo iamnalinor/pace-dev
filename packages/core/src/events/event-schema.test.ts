@@ -227,8 +227,9 @@ describe("EVENT_TYPES", () => {
     expect(new Set(EVENT_TYPES).size).toBe(EVENT_TYPES.length);
   });
 
-  it("covers every stage-1 type from the plan and the stage-3 activity types", () => {
-    expect(EVENT_TYPES).toHaveLength(33);
+  it("covers every stage-1 type from the plan, the stage-3 activity types and problem removal", () => {
+    expect(EVENT_TYPES).toHaveLength(34);
+    expect(EVENT_TYPES).toContain("task.subtask.removed");
     expect(EVENT_TYPES.filter((type) => type.startsWith("activity."))).toEqual([
       "activity.started",
       "activity.stopped",

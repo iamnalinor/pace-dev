@@ -67,7 +67,10 @@ const addToInstance = async (
   if (task === undefined) {
     return err("action/invalid-input");
   }
-  const bodies = instanceBodies(quickInputOf(model, input), task, newId);
+  const bodies = instanceBodies(quickInputOf(model, input), task, {
+    newId,
+    now: deps.clock.now(),
+  });
   return await emit(
     deps,
     bodies.map((body) => stamp(deps, body)),

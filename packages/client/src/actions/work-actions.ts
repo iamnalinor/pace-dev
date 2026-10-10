@@ -38,6 +38,8 @@ export type WorkActions = {
   /** Revokes the latest solve of the problem. */
   readonly unmarkSolved: (taskId: string, subtaskId: string) => ActionResult;
   readonly addSubtasks: (taskId: string, items: readonly (string | SubtaskForm)[]) => ActionResult;
+  /** Takes an unsent problem off the task (History brings it back). */
+  readonly removeSubtask: (taskId: string, subtaskId: string) => ActionResult;
   /** Per problem: sends the given (or every solved) problem, closing with the last one; whole: closes as done. */
   readonly submit: (input: SubmitInput) => ActionResult;
   readonly closeTask: (input: CloseInput) => ActionResult;
@@ -203,6 +205,10 @@ export const workActions = (deps: ActionDeps): WorkActions => ({
   markSolved: async (taskId, subtaskId, when) =>
     await emit(deps, [
       stamp(deps, { type: "task.subtask.solved", payload: { taskId, subtaskId } }, when),
+    ]),
+  removeSubtask: async (taskId, subtaskId) =>
+    await emit(deps, [
+      stamp(deps, { type: "task.subtask.removed", payload: { taskId, subtaskId } }),
     ]),
   reopen: reopen(deps),
   setEstimate: async (taskId, estimateMinutes) =>

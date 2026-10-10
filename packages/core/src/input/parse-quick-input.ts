@@ -84,7 +84,8 @@ export const shortTitle = (text: string): string =>
 
 /**
 A pasted message: its first line (what is left of it once the chips are taken out) is the
-title, the lines after it the description; one line is all title.
+title, the lines after it the description. A first line too long for a title is cut, and
+then the description starts with that whole line, so nothing of it is lost.
 */
 const titleAndDescription = (
   text: string,
@@ -93,13 +94,16 @@ const titleAndDescription = (
   const lines = text.split(/\r?\n/u);
   const masked = mask(text, spans).split(/\r?\n/u);
   const first = masked.findIndex((line) => line.trim() !== "");
+  const whole = titleOf(masked[first] ?? "", []);
+  const title = capTitle(whole);
+  const isCut = title !== whole;
   const rest = lines
-    .slice(first + 1)
+    .slice(isCut ? first : first + 1)
     .join("\n")
     .trim();
   return {
     description: first === -1 || rest === "" ? null : rest,
-    title: capTitle(titleOf(masked[first] ?? "", [])),
+    title,
   };
 };
 

@@ -238,6 +238,11 @@ const overridesSet: Handler<"task.overrides.set"> = (task, event) => {
   return overrides === null && task.overrides === null ? task : { ...task, overrides };
 };
 
+const subtaskRemoved: Handler<"task.subtask.removed"> = (task, event) => {
+  const subtasks = task.subtasks.filter((item) => item.id !== event.payload.subtaskId);
+  return subtasks.length === task.subtasks.length ? task : { ...task, subtasks };
+};
+
 const subtasksAdded: Handler<"task.subtasks.added"> = (task, event) => {
   const subtasks = appendSubtasks(task.subtasks, event.payload.subtasks);
   return subtasks === task.subtasks ? task : { ...task, subtasks };
@@ -250,6 +255,7 @@ const HANDLERS: Handlers = {
   "task.overrides.set": overridesSet,
   "task.status.set": statusSet,
   "task.subtask.solved": subtaskSolved,
+  "task.subtask.removed": subtaskRemoved,
   "task.subtasks.added": subtasksAdded,
   "task.submitted": submitted,
   "task.closed": (task, event) =>

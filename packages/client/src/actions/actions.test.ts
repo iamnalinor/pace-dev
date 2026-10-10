@@ -243,6 +243,23 @@ describe("subtasks", () => {
   });
 });
 
+describe("removing a problem", () => {
+  it("takes an unsent problem off the task; a sent or unknown one stays", async () => {
+    const world = await setupActions();
+    const [removed] = unwrap(await world.actions.removeSubtask(HW_ID, "s7"));
+    expect(removed?.type).toBe("task.subtask.removed");
+    expect(taskOf(world, HW_ID)?.subtasks.map((item) => item.id)).not.toContain("s7");
+    await expect(world.actions.removeSubtask(HW_ID, "s7")).resolves.toEqual({
+      error: "subtask/unknown",
+      ok: false,
+    });
+    await expect(world.actions.removeSubtask(HW_ID, "s1")).resolves.toEqual({
+      error: "subtask/submitted",
+      ok: false,
+    });
+  });
+});
+
 describe("submit", () => {
   it("sends the solved problems by default and closes with the last ones", async () => {
     const world = await setupActions();

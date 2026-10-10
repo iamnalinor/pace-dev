@@ -83,6 +83,27 @@ const trkScreen = async () => {
   return runtime;
 };
 
+describe("TaskScreen — editing problems", () => {
+  it("takes an unsent problem off in the editor; a sent one has no remove", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    expect(
+      screen.queryByRole("button", { name: en("form.removeSubtask", { label: "Matrix rank" }) }),
+    ).toBeNull();
+    await fireEvent.press(
+      screen.getByRole("button", {
+        name: en("form.removeSubtask", { label: "Kronecker–Capelli" }),
+      }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(
+        runtime.state.store.getState().tasks.byId[HW_ID]?.subtasks.map((item) => item.label),
+      ).not.toContain("Kronecker–Capelli");
+    });
+  });
+});
+
 describe("TaskScreen — work", () => {
   it("shows its link and description, and no ranking card", async () => {
     await trkScreen();
@@ -153,7 +174,7 @@ describe("TaskScreen — work", () => {
     const runtime = await trkScreen();
     await fireEvent(screen.getByRole("button", { name: en("task.done") }), "longPress");
     expect(screen.getByText(en("close.whenDone"))).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.back") }));
     await fireEvent.press(screen.getByRole("button", { name: en("task.done") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed).toMatchObject({

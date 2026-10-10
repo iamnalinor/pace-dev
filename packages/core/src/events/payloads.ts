@@ -109,6 +109,8 @@ export const TaskPresetSetPayload = z.object({ ...taskRef, presetId: z.string().
 export const TaskOverridesSetPayload = z.object({ ...taskRef, overrides: OpaqueRecordSchema });
 export const TaskStatusSetPayload = z.object({ ...taskRef, status: TaskStatusSchema });
 export const TaskSubtaskSolvedPayload = z.object({ ...taskRef, subtaskId: z.string().min(1) });
+/** A problem taken off the task (an unsent one: a sent problem stays on the record). */
+export const TaskSubtaskRemovedPayload = z.object({ ...taskRef, subtaskId: z.string().min(1) });
 export const TaskSubtasksAddedPayload = z.object({
   ...taskRef,
   subtasks: z.array(SubtaskSchema).min(1),

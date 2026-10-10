@@ -64,6 +64,71 @@ export const placeIn = (
   return end > start ? { height: (end - start) / 60_000, top: (start - dayStart) / 60_000 } : null;
 };
 
+/** A column within a day: which one, out of how many side by side. */
+export type Lane = { readonly lane: number; readonly lanes: number };
+
+type Stretch = { readonly startAt: string; readonly endAt: string };
+
+/** Overlapping stretches being laid out: who took which lane, and where each lane ends. */
+type Run = {
+  readonly members: readonly { readonly index: number; readonly lane: number }[];
+  readonly laneEnds: readonly number[];
+  readonly end: number;
+};
+
+type Placed = readonly (readonly [number, Lane])[];
+
+const EMPTY_RUN: Run = { end: -Infinity, laneEnds: [], members: [] };
+
+/** A finished run: each member shares the column in as many lanes as the run needed. */
+const closeRun = (run: Run): Placed =>
+  run.members.map((member) => [member.index, { lane: member.lane, lanes: run.laneEnds.length }]);
+
+/** The next stretch (by start) takes the first lane free at its start, or a new one. */
+const placeNext = (
+  acc: { readonly placed: Placed; readonly run: Run },
+  item: { readonly index: number; readonly start: number; readonly end: number },
+): { readonly placed: Placed; readonly run: Run } => {
+  const isNewRun = item.start >= acc.run.end;
+  const run = isNewRun ? EMPTY_RUN : acc.run;
+  const free = run.laneEnds.findIndex((end) => end <= item.start);
+  const lane = free === -1 ? run.laneEnds.length : free;
+  const laneEnds =
+    free === -1
+      ? [...run.laneEnds, item.end]
+      : run.laneEnds.map((end, index) => (index === lane ? item.end : end));
+  return {
+    placed: isNewRun ? [...acc.placed, ...closeRun(acc.run)] : acc.placed,
+    run: {
+      end: Math.max(run.end, item.end),
+      laneEnds,
+      members: [...run.members, { index: item.index, lane }],
+    },
+  };
+};
+
+/**
+Lanes for stretches that may overlap (calendar events, tracked blocks): each takes the first
+lane free at its start, and a run of overlapping stretches shares the column in as many lanes
+as it needed. Returned in the input order.
+*/
+export const lanesOf = (stretches: readonly Stretch[]): readonly Lane[] => {
+  const order = stretches
+    .map((stretch, index) => ({
+      end: Date.parse(stretch.endAt),
+      index,
+      start: Date.parse(stretch.startAt),
+    }))
+    .toSorted((a, b) => (a.start === b.start ? a.end - b.end : a.start - b.start));
+  // eslint-disable-next-line unicorn/no-array-reduce -- each stretch takes a lane from what the previous ones left
+  const last = order.reduce((acc, item) => placeNext(acc, item), {
+    placed: [] as Placed,
+    run: EMPTY_RUN,
+  });
+  const byIndex = new Map([...last.placed, ...closeRun(last.run)]);
+  return stretches.map((_, index) => byIndex.get(index) ?? { lane: 0, lanes: 1 });
+};
+
 const hourOf = (at: string, zone: string): number => Number(formatInZone(at, zone, "H"));
 
 /**

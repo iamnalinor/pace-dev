@@ -80,8 +80,27 @@ const detailBodies = (input: QuickInput, task: Task): readonly EventBody[] => {
   ];
 };
 
+/**
+An instance made ahead waits under "In future" until its issue: once its homework arrives it
+has been given, so it starts now and shows on Now.
+*/
+const startedBodies = (task: Task, now: string): readonly EventBody[] =>
+  task.startAt !== null && Date.parse(task.startAt) > Date.parse(now)
+    ? [
+        {
+          type: "task.updated",
+          payload: { taskId: task.id, startAt: now, startTz: task.startTz ?? "UTC" },
+        } as const,
+      ]
+    : [];
+
 /** The problems, the details and the message itself added to this week's homework. */
-export const instanceBodies = (input: QuickInput, task: Task, newId: Ids): readonly EventBody[] => [
+export const instanceBodies = (
+  input: QuickInput,
+  task: Task,
+  { newId, now }: { readonly newId: Ids; readonly now: string },
+): readonly EventBody[] => [
+  ...startedBodies(task, now),
   ...subtasksAddedBodies(task.id, input.subtasks, () => newId()),
   ...detailBodies(input, task),
   {
@@ -128,7 +147,7 @@ export const quickInputBodies = (
     now: world.now,
   });
   if (instance !== undefined) {
-    return instanceBodies(input, instance, newId);
+    return instanceBodies(input, instance, { newId, now: world.now });
   }
   const project = projectBodies(input, world.state, newId);
   const title = input.title === "" ? input.text.trim() : input.title;

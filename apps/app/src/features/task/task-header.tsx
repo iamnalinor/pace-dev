@@ -1,4 +1,4 @@
-import { ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react-native";
+import { ChevronDown, CircleX, Pause, Pencil, Play } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
@@ -12,7 +12,10 @@ import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
-/** Edit, pause or resume, delete: the task's actions as icons, no menu in between. */
+/**
+Edit, pause or resume, close without doing: the task's actions as icons, no menu in between.
+Nothing is deleted (History keeps every task); the last one closes as Cancelled or Skipped.
+*/
 const TaskActions = ({
   onDelete,
   onEdit,
@@ -42,7 +45,7 @@ const TaskActions = ({
         />
       ) : null}
       {isOpen ? (
-        <IconButton icon={Trash2} label={t("task.delete")} onPress={onDelete} variant="plain" />
+        <IconButton icon={CircleX} label={t("task.delete")} onPress={onDelete} variant="plain" />
       ) : null}
     </View>
   );

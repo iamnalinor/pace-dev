@@ -82,7 +82,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "task.edit": "Изменить детали",
   "task.changeProject": "Проект: {project}. Изменить",
   "task.move": "Перенести в проект",
-  "task.delete": "Удалить задачу",
+  "task.delete": "Отменить или пропустить задачу…",
   "task.deleteTitle": "Удалить «{title}»?",
   "task.deleteBody":
     "Задача, у которой уже есть история, вместо удаления закрывается как отменённая.",

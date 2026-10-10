@@ -150,10 +150,14 @@ describe("parseQuickInput", () => {
     });
   });
 
-  it("cuts a long one-line title at a word, at most 100 characters", () => {
-    const title = parse(`${"очень ".repeat(30)}длинная задача`).title;
+  it("cuts a long one-line title at a word, at most 100 characters, the whole line kept below", () => {
+    const line = `${"очень ".repeat(30)}длинная задача`;
+    const { description, title } = parse(line);
     expect(title.length).toBeLessThanOrEqual(100);
     expect(title.endsWith("…")).toBe(true);
+    expect(description).toBe(line);
+    expect(parse(`${line}\nвторая строка`).description).toBe(`${line}\nвторая строка`);
+    expect(parse("короткая\nвторая строка").description).toBe("вторая строка");
   });
 
   it("keeps the source text verbatim", () => {

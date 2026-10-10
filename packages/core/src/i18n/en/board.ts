@@ -80,7 +80,7 @@ export const enBoard = {
   "task.edit": "Edit details",
   "task.changeProject": "Project: {project}. Change",
   "task.move": "Move to project",
-  "task.delete": "Delete task",
+  "task.delete": "Cancel or skip the task…",
   "task.deleteTitle": "Delete {title}?",
   "task.deleteBody": "A task that already has history is closed as cancelled instead.",
   "task.deleted": "{title} · deleted",

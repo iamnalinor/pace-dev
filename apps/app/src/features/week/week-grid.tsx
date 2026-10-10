@@ -7,6 +7,8 @@ import { clockTime } from "#app/format/time.ts";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import {
+  type Lane,
+  lanesOf,
   placeIn,
   type Placement,
   type WeekBlock,
@@ -82,66 +84,99 @@ const UsageStrip = ({ hourPx, place, usage }: Grid & Pick<GridProps, "usage">) =
     );
   });
 
-/** The calendar's events as dashed outlines. */
-const CalendarBoxes = ({
+/** A lane's share of the column, as percentages (a hair of room between neighbours). */
+const laneStyle = ({
+  lane,
+  lanes,
+}: Lane): { readonly left: `${number}%`; readonly width: `${number}%` } => ({
+  left: `${(lane / lanes) * 100}%`,
+  width: `${100 / lanes - 1}%`,
+});
+
+/** One thing on a day's column: a calendar event (outlined) or tracked time (filled). */
+type Item =
+  | { readonly kind: "block"; readonly at: Placement; readonly block: WeekBlock }
+  | { readonly kind: "event"; readonly at: Placement; readonly event: CalendarEvent };
+
+const isPlaced = <T extends { readonly at: null | Placement }>(
+  item: T,
+): item is T & { readonly at: Placement } => item.at !== null;
+
+const keyOf = (item: Item): string =>
+  item.kind === "event" ? `e-${item.event.id}-${item.event.startAt}` : `b-${item.block.id}`;
+
+/** The day's calendar events and blocks, overlapping ones side by side in lanes. */
+const DayItems = ({
+  blocks,
   calendar,
-  hourPx,
+  grid,
   onPick,
-  place,
-}: Grid & Pick<GridProps, "calendar" | "onPick">) => {
+  zone,
+}: {
+  readonly blocks: readonly WeekBlock[];
+  readonly calendar: readonly CalendarEvent[];
+  readonly grid: Grid;
+  readonly onPick: GridProps["onPick"];
+  readonly zone: string;
+}) => {
   const t = useT();
-  return calendar.map((event) => {
-    const at = place(event);
-    return at === null ? null : (
+  const items: Item[] = [
+    ...calendar
+      .map((event) => ({ at: grid.place(event), event, kind: "event" as const }))
+      .filter((item) => isPlaced(item)),
+    // Placed again here: the grid may start earlier than the model did (an early event).
+    ...blocks
+      .map((block) => ({ at: grid.place(block), block, kind: "block" as const }))
+      .filter((item) => isPlaced(item)),
+  ];
+  const lanes = lanesOf(items.map((item) => (item.kind === "event" ? item.event : item.block)));
+  return items.map((item, index) => {
+    const height = px(item.at.height, grid.hourPx);
+    const isEvent = item.kind === "event";
+    const label = isEvent ? item.event.title : item.block.label;
+    const stretch = isEvent ? item.event : item.block;
+    return (
       <Pressable
-        accessibilityLabel={`${t("week.calendarEvent")}: ${event.title}`}
+        accessibilityLabel={
+          isEvent
+            ? `${t("week.calendarEvent")}: ${label}`
+            : `${label}, ${clockTime(stretch.startAt, zone)}–${clockTime(stretch.endAt, zone)}`
+        }
         accessibilityRole="button"
-        className="absolute left-1 right-0.5 overflow-hidden rounded-md border border-dashed border-ink-slate px-1"
-        key={`${event.id}-${event.startAt}`}
+        className={cx(
+          "absolute overflow-hidden rounded-md px-1",
+          isEvent ? "border border-dashed border-ink-slate" : "opacity-90",
+          item.kind === "block" && PROJECT_FILL[item.block.color],
+        )}
+        key={keyOf(item)}
         onPress={() => {
-          onPick({ event, kind: "event" });
+          onPick(
+            item.kind === "event"
+              ? { event: item.event, kind: "event" }
+              : { block: item.block, kind: "block" },
+          );
         }}
-        style={{ height: px(at.height, hourPx), top: px(at.top, hourPx) }}
+        style={{
+          ...laneStyle(lanes[index] ?? { lane: 0, lanes: 1 }),
+          height: Math.max(2, height),
+          top: px(item.at.top, grid.hourPx),
+        }}
       >
-        {px(at.height, hourPx) >= MIN_LABEL_PX ? (
-          <Text className="font-sans text-[10px] text-fg2" numberOfLines={1}>
-            {event.title}
+        {height >= MIN_LABEL_PX ? (
+          <Text
+            className={cx(
+              "font-sans text-[10px]",
+              isEvent ? "text-fg2" : "font-medium text-accentFg",
+            )}
+            numberOfLines={1}
+          >
+            {label}
           </Text>
         ) : null}
       </Pressable>
     );
   });
 };
-
-type BlocksProps = Pick<GridProps, "hourPx" | "onPick"> & {
-  readonly blocks: readonly WeekBlock[];
-  readonly zone: string;
-};
-
-/** Tracked time filled in its color; what ran alongside on the right half. */
-const BlockBoxes = ({ blocks, hourPx, onPick, zone }: BlocksProps) =>
-  blocks.map((block) => (
-    <Pressable
-      accessibilityLabel={`${block.label}, ${clockTime(block.startAt, zone)}–${clockTime(block.endAt, zone)}`}
-      accessibilityRole="button"
-      className={cx(
-        "absolute overflow-hidden rounded-md px-1 opacity-90",
-        PROJECT_FILL[block.color],
-        block.isAlongside ? "left-[55%] right-0.5" : "left-2 right-1",
-      )}
-      key={block.id}
-      onPress={() => {
-        onPick({ block, kind: "block" });
-      }}
-      style={{ height: Math.max(2, px(block.height, hourPx)), top: px(block.top, hourPx) }}
-    >
-      {px(block.height, hourPx) >= MIN_LABEL_PX ? (
-        <Text className="font-sans text-[10px] font-medium text-accentFg" numberOfLines={1}>
-          {block.label}
-        </Text>
-      ) : null}
-    </Pressable>
-  ));
 
 /** One day: its date, the hour lines, and what the day held laid over them. */
 const DayColumn = ({
@@ -177,19 +212,47 @@ const DayColumn = ({
           />
         ))}
         <UsageStrip {...grid} usage={usage} />
-        <CalendarBoxes {...grid} calendar={calendar} onPick={onPick} />
-        <BlockBoxes blocks={day.blocks} hourPx={hourPx} onPick={onPick} zone={week.zone} />
+        <View className="absolute bottom-0 left-1.5 right-0.5 top-0">
+          <DayItems
+            blocks={day.blocks}
+            calendar={calendar}
+            grid={grid}
+            onPick={onPick}
+            zone={week.zone}
+          />
+        </View>
       </View>
     </View>
   );
 };
 
-/** Monday to Sunday side by side on one hour grid. */
-export const WeekGrid = (props: GridProps) => (
-  <View className="flex-row px-3 pb-6">
-    <HourGutter fromHour={props.week.fromHour} hourPx={props.hourPx} />
-    {props.week.days.map((day) => (
-      <DayColumn key={day.date} {...props} day={day} />
-    ))}
-  </View>
-);
+const hourIn = (at: string, zone: string): number =>
+  Number(
+    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: zone }).format(
+      new Date(at),
+    ),
+  );
+
+/**
+Monday to Sunday side by side on one hour grid; it starts early enough for the first tracked
+block or calendar event of the week.
+*/
+export const WeekGrid = (props: GridProps) => {
+  const fromHour = Math.min(
+    props.week.fromHour,
+    ...props.calendar
+      .filter(
+        (event) => event.startAt >= props.week.weekStart && event.startAt < props.week.weekEnd,
+      )
+      .map((event) => hourIn(event.startAt, props.week.zone)),
+  );
+  const week = { ...props.week, fromHour };
+  return (
+    <View className="flex-row px-3 pb-6">
+      <HourGutter fromHour={fromHour} hourPx={props.hourPx} />
+      {week.days.map((day) => (
+        <DayColumn key={day.date} {...props} day={day} week={week} />
+      ))}
+    </View>
+  );
+};

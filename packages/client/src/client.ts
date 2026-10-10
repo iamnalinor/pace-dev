@@ -211,6 +211,8 @@ export {
   typeTime,
 } from "./view-models/time-forms.ts";
 export {
+  type Lane,
+  lanesOf,
   placeIn,
   type Placement,
   type WeekBlock,

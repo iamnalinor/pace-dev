@@ -29,6 +29,7 @@ export const enInput = {
   "actionError.undo/nothing": "Nothing to undo.",
   "actionError.task/unknown": "That task does not exist anymore.",
   "actionError.subtask/unknown": "That problem does not exist anymore.",
+  "actionError.subtask/submitted": "A sent problem stays on the task.",
   "actionError.retro/before-created": "That is before the task was created.",
   "actionError.retro/future": "That time is in the future.",
   "actionError.retro/nothing-to-submit": "Nothing solved to submit yet.",

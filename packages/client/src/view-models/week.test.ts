@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { artboardState, ctx, MOSCOW } from "@pace/core/testing";
 
-import { placeIn, weekModel } from "./week.ts";
+import { lanesOf, placeIn, weekModel } from "./week.ts";
 
 describe("weekModel", () => {
   it("is Monday to Sunday in the account zone, today marked, the next week only for a past one", () => {
@@ -32,5 +32,36 @@ describe("weekModel", () => {
         { fromHour: 7, zone },
       ),
     ).toBeNull();
+  });
+});
+
+const at = (hhmm: string): string => `2026-10-06T${hhmm}:00.000Z`;
+const stretch = (from: string, to: string) => ({ endAt: at(to), startAt: at(from) });
+
+describe("lanesOf", () => {
+  it("puts overlapping stretches side by side and leaves a lone one the whole width", () => {
+    expect(
+      lanesOf([
+        stretch("09:00", "10:30"),
+        stretch("10:00", "11:00"),
+        stretch("10:15", "10:45"),
+        stretch("12:00", "13:00"),
+      ]),
+    ).toEqual([
+      { lane: 0, lanes: 3 },
+      { lane: 1, lanes: 3 },
+      { lane: 2, lanes: 3 },
+      { lane: 0, lanes: 1 },
+    ]);
+  });
+
+  it("reuses a lane once it is free, and keeps the input order", () => {
+    expect(
+      lanesOf([stretch("10:00", "12:00"), stretch("09:00", "10:00"), stretch("09:30", "11:00")]),
+    ).toEqual([
+      { lane: 0, lanes: 2 },
+      { lane: 0, lanes: 2 },
+      { lane: 1, lanes: 2 },
+    ]);
   });
 });

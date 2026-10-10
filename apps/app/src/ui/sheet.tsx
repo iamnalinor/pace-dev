@@ -62,7 +62,7 @@ export const Sheet = ({
           <View
             accessibilityViewIsModal
             {...(formLabel !== undefined && { accessibilityLabel: formLabel, role: "form" })}
-            className="shrink rounded-t-[22px] border-t border-line bg-surface px-5 pt-2.5"
+            className="shrink overflow-hidden rounded-t-[22px] border-t border-line bg-surface px-5 pt-2.5"
             style={{ paddingBottom: Math.max(insets.bottom, 12) + 12 }}
           >
             <View
@@ -78,8 +78,11 @@ export const Sheet = ({
             {subtitle === undefined ? null : (
               <Text className="mt-1 font-sans text-[13px] text-muted">{subtitle}</Text>
             )}
+            {/* The body shrinks and clips inside the frame, under a hairline: scrolled content
+            meets an edge instead of seeming to run into the title. */}
             <ScrollView
-              contentContainerClassName="gap-[18px] pt-[18px]"
+              className="mt-3 min-h-0 shrink border-t border-line"
+              contentContainerClassName="gap-[18px] pt-[15px]"
               keyboardShouldPersistTaps="handled"
             >
               {children}

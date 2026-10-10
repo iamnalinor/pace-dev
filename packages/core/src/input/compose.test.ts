@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { HW_ID } from "../materialize/task-fixture.fake.ts";
 import { artboardState, ctx, MOSCOW, NOW, WORK_ID } from "../queries/fixture.fake.ts";
-import { quickInputBodies } from "./compose.ts";
+import { instanceBodies, quickInputBodies } from "./compose.ts";
 import { parseQuickInput, type QuickInput } from "./parse-quick-input.ts";
 
 const state = artboardState();
@@ -19,6 +19,26 @@ const bodiesFor = (text: string, patch: Partial<QuickInput> = {}) =>
     { now: NOW, state },
     counter(),
   );
+
+describe("instanceBodies", () => {
+  it("brings an instance made ahead onto Now once its homework is added", () => {
+    const hw = state.tasks.byId[HW_ID];
+    if (hw === undefined) {
+      throw new Error("no HW");
+    }
+    const ahead = { ...hw, startAt: "2026-10-12T07:00:00.000Z", startTz: MOSCOW };
+    const input = parseQuickInput("дз по алгебре 9", state, ctx());
+    expect(instanceBodies(input, ahead, { newId: counter(), now: NOW })).toContainEqual({
+      payload: { startAt: NOW, startTz: MOSCOW, taskId: HW_ID },
+      type: "task.updated",
+    });
+    expect(
+      instanceBodies(input, hw, { newId: counter(), now: NOW }).some(
+        (body) => body.type === "task.updated" && "startAt" in body.payload,
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("quickInputBodies", () => {
   it("creates a task with its fields and the text as its source", () => {

@@ -31,6 +31,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.undo/nothing": "Отменять нечего.",
   "actionError.task/unknown": "Этой задачи больше нет.",
   "actionError.subtask/unknown": "Этой задачи-пункта больше нет.",
+  "actionError.subtask/submitted": "Отправленная задача остаётся в задании.",
   "actionError.retro/before-created": "Это раньше, чем задача была создана.",
   "actionError.retro/future": "Это время в будущем.",
   "actionError.retro/nothing-to-submit": "Пока нечего сдавать: ничего не решено.",

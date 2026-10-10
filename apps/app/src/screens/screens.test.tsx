@@ -9,7 +9,6 @@ import { HistoryScreen } from "./history-screen.tsx";
 import { InboxScreen } from "./inbox-screen.tsx";
 import { ProjectScreen } from "./project-screen.tsx";
 import { ProjectsScreen } from "./projects-screen.tsx";
-import { ReviewScreen } from "./review-screen.tsx";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -40,14 +39,6 @@ describe("InboxScreen — decisions", () => {
   });
 });
 
-describe("ReviewScreen", () => {
-  it("lists what waits for a decision", async () => {
-    await renderScreen(<ReviewScreen />, await createTestRuntime());
-    expect(screen.getByRole("header", { name: en("review.title") })).toBeOnTheScreen();
-    expect(screen.getByText("Calculus HW 5")).toBeOnTheScreen();
-  });
-});
-
 describe("ProjectsScreen and ProjectScreen", () => {
   it("lists the projects and opens one", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
@@ -69,7 +60,11 @@ describe("HistoryScreen", () => {
     await renderScreen(<HistoryScreen />, await createTestRuntime());
     expect(screen.getByRole("header", { name: en("history.title") })).toBeOnTheScreen();
     expect(screen.getAllByRole("button", { name: en("common.undo") }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: en("history.now") })).toBeDisabled();
     await fireEvent.press(screen.getByRole("button", { name: en("history.dayBack") }));
-    expect(screen.getByText(en("history.boardAt"))).toBeOnTheScreen();
+    // The day viewed is in the label, and the events stop there.
+    expect(screen.getByText(/^Tasks as they were at .*Oct 5/u)).toBeOnTheScreen();
+    expect(screen.getByText(/^Events up to/u)).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("history.now") })).toBeEnabled();
   });
 });

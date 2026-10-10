@@ -83,6 +83,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.title": "Разрешения",
   "permissions.web":
     "Браузеру разрешения не нужны. Уведомления, календарь и экранное время настраиваются в Pace на телефоне с Android.",
+  "onboarding.web.title": "Pace в браузере",
   "onboarding.web.continue": "Продолжить",
   "permissions.hint":
     "Все необязательны. То, что Pace читает с их помощью, остаётся на телефоне; синхронизируется только то, что вы запишете.",
@@ -286,7 +287,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.decisions": "Журнал уведомлений",
   "settings.decisions.hint":
     "Какие напоминания отправлены или придержаны и что прочитал ассистент.",
-  "decisions.title": "Журнал решений",
+  "decisions.title": "Журнал уведомлений",
   "decisions.search": "Поиск по решениям",
   "decisions.empty": "Решений пока нет.",
   "decisions.failed": "Не удалось загрузить журнал решений.",

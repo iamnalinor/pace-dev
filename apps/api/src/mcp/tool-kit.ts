@@ -51,6 +51,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   "retro/task-closed": "The task is closed; reopen it first.",
   "review/no-action": "The review item for this task does not offer this action.",
   "review/no-item": "Nothing to review for this task.",
+  "subtask/submitted": "That subtask was already submitted; it stays on the task.",
   "subtask/unknown": "No such subtask on this task.",
   "task/unknown": "No task with this id.",
 };

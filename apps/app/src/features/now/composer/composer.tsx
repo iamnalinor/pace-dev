@@ -72,6 +72,13 @@ const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
   };
 };
 
+const MIN_INPUT_HEIGHT = 44;
+/** Eight lines of 24 px and the padding: a longer message scrolls inside. */
+const MAX_INPUT_HEIGHT = 212;
+
+const heightOf = (content: number): number =>
+  Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
+
 /** A keyboard (the web, a tablet with one): Enter acts, Shift+Enter starts a new line. */
 const onEnter =
   (isEmpty: boolean, act: () => void) =>
@@ -108,12 +115,13 @@ const QuickActions = ({
           {t("composer.parse")}
         </Button>
       </View>
-      <View className="min-w-28 flex-1">
+      {/* Wide enough for the label on one line: a narrow column wraps the button, not its text. */}
+      <View className="min-w-48 flex-1">
         <Button onPress={onByHand} variant="secondary">
           {t("composer.byHand")}
         </Button>
       </View>
-      <View className="min-w-28 flex-1">
+      <View className="min-w-36 flex-1">
         <Button onPress={onInbox} variant="ghost">
           {t("composer.toInbox")}
         </Button>
@@ -192,6 +200,8 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
   const t = useT();
   const { palette } = useTheme();
   const flow = useComposerFlow(initialText);
+  // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
+  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
   const { ai, model, text } = flow;
   const status = (
     <AiStatus
@@ -223,19 +233,24 @@ export const Composer = ({ initialText = "" }: { readonly initialText?: string |
         accessibilityHint={t("composer.quickHint")}
         accessibilityLabel={t("composer.label")}
         // Grows with a pasted message up to about eight lines.
-        className="max-h-48 min-h-11 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
+        className="mb-1 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
         multiline
         onChangeText={flow.type}
+        onContentSizeChange={(event) => {
+          setInputHeight(heightOf(event.nativeEvent.contentSize.height));
+        }}
         onKeyPress={onEnter(model.isEmpty, flow.enter)}
         placeholder={t("composer.placeholder")}
         placeholderTextColor={palette.muted}
+        style={{ height: inputHeight }}
         textAlignVertical="top"
         value={text}
       />
       {model.isEmpty ? null : (
         <>
           <Text className="px-2 font-sans text-[12px] text-muted">{t("composer.quickHint")}</Text>
-          {status}
+          {/* The reading belongs to the form; back at the text only what is still going on shows. */}
+          {ai.state.status === "read" ? null : status}
           <QuickActions
             canParse={canAiRead(text)}
             isReading={ai.state.status === "reading"}

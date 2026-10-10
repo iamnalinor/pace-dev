@@ -5,7 +5,7 @@ import { EmptyState } from "#app/ui/empty-state.tsx";
 
 import { CardView } from "./inbox-card.tsx";
 import { PushedScreen } from "./pushed-screen.tsx";
-import { decisionsOf, ReviewCard } from "./review-screen.tsx";
+import { decisionsOf, ReviewCard } from "./review-card.tsx";
 
 /**
 The one place for what waits on the person: the decisions the rules want ("To sort") first,
