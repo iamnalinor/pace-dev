@@ -77,7 +77,7 @@ export const Button = ({
       onPress={onPress}
     >
       {busy ? (
-        <ActivityIndicator />
+        <ActivityIndicator accessibilityLabel={children} />
       ) : (
         <Label icon={Icon} variant={variant}>
           {children}

@@ -29,7 +29,6 @@ Approved by the user in Russian; kept as written. The document itself is `feedba
 
 Порядок работы:
 - работаю в ветке этой сессии, как обычно;
-- PR'ы по очереди от свежего `main`, каждый доводится до зелёного CI, влит merge-коммитом, деплой проверен;
 - в конце релиз APK актуального `main` со следующим тегом (`v0.7.0`; последний был `v0.6.0`). Ничего недоделанного за ним нет — это просто новая версия с этими изменениями;
 - никаких id моделей в коммитах и PR;
 - `bun lint` после каждого изменения, TDD.
@@ -100,7 +99,7 @@ Approved by the user in Russian; kept as written. The document itself is `feedba
 | W1 | Календарь синкается в облако (отключаемо с телефона), в браузере неделя: события + затреканное | **Никак** | (D) |
 | W2 | Время во всех приложениях со всех устройств (Android + Linux) в облаке, только названия приложений и таймслоты; у активности видно «где сидел»; без штрафов; в MCP | **Никак**: Android считает локально, ничего не отправляет; ПК нет; есть штраф за мессенджеры | (D) |
 
-### PR A — мелкие фиксы и удаление «умной» логики
+### Часть A — мелкие фиксы и удаление «умной» логики
 
 **Оболочка веба**
 - **Постоянный сайдбар.** Корневой `app/_layout.tsx` на широком экране рендерит `Shell = Row(Sidebar, Stack)`; у `(tabs)` на широком экране свой tabBar скрыт.
@@ -168,7 +167,7 @@ Approved by the user in Russian; kept as written. The document itself is `feedba
   - событие `task.progress.set` отправляется при отпускании.
   - Кнопки −/+ убрать.
 
-### PR B — тасктрекер: быстрый ввод, форма, редактирование, проект
+### Часть B — тасктрекер: быстрый ввод, форма, редактирование, проект
 
 - **Быстрый ввод и форма задачи — разные вещи.**
   - Быстрый ввод (ПБВ): многострочное поле «Вставь или напиши…» и видная кнопка `✨ Разобрать`.
@@ -200,7 +199,7 @@ Approved by the user in Russian; kept as written. The document itself is `feedba
   - «No tasks here yet» только когда пусто всё.
   - Карточку Open/On time/Late оставить, но с нормальным контрастом.
 
-### PR C — таймтрекер
+### Часть C — таймтрекер
 
 - **Модель** (`packages/core/src/tracking/`):
   - **Кнопки.** Фиксированные 4 в `buttons.ts`:
@@ -248,7 +247,7 @@ Approved by the user in Russian; kept as written. The document itself is `feedba
     - Skip скрывает. Правила на серию («всегда»/«никогда») остаются.
   - Android: локальное уведомление в начале события с тем же выбором.
 
-### PR D — облако: календарь, неделя, время на устройствах, MCP
+### Часть D — облако: календарь, неделя, время на устройствах, MCP
 
 - **Календарь в облако.**
   - Новый эндпоинт `POST /api/calendar/sync {from, to, events[]}`: заменяет события диапазона. Таблица `calendar_events` в Durable Object, `bun db:generate`.
@@ -276,7 +275,7 @@ Approved by the user in Russian; kept as written. The document itself is `feedba
   - Навигация `[Today] [‹] [📅] [›]` как на Day.
 - **MCP.** `get_calendar(from,to)`, `get_usage(from,to,device?)`, `get_week(from,to)` (активности с «где сидел»), `docs/mcp.md`.
 
-### После PR A–D: исследовательский QA (Sonnet) и PR E
+### После частей A–D: исследовательский QA (Sonnet) и исправления
 
 - Агент `general-purpose` с `model: "sonnet"`, в фоне.
   - Поднимает стек как e2e: wrangler dev + `build:web`, `serve:web`, `EXPO_PUBLIC_DEV_LOGIN=1`.

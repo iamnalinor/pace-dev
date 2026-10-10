@@ -71,7 +71,7 @@ export const Waiting = ({ onCancel }: { readonly onCancel: () => void }) => {
   const t = useT();
   return (
     <View className="items-center gap-3">
-      <ActivityIndicator />
+      <ActivityIndicator accessibilityLabel={t("login.waiting")} />
       <Text className="font-sans text-[15px] font-medium text-fg">{t("login.waiting")}</Text>
       <Text className="text-center font-sans text-[13px] text-muted">{t("login.botHint")}</Text>
       <Button onPress={onCancel} variant="ghost">

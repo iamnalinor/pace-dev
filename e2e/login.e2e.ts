@@ -13,15 +13,17 @@ test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await expectNoA11yViolations(page);
 
   const nav = page.getByRole("navigation", { name: "Main" });
-  await nav.getByRole("tab", { name: "Day" }).click();
+  await nav.getByRole("link", { name: "Day" }).click();
   await expect(page.getByRole("heading", { name: "Day" })).toBeVisible();
-  await expect(nav.getByRole("tab", { name: "Day" })).toHaveAttribute("aria-selected", "true");
-  await nav.getByRole("tab", { name: "Projects" }).click();
+  await expect(nav.getByRole("link", { name: "Day" })).toHaveAttribute("aria-current", "page");
+  await nav.getByRole("link", { name: "Projects" }).click();
   await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
-  await nav.getByRole("tab", { name: "Now" }).click();
+  await nav.getByRole("link", { name: "Now" }).click();
 
   await nav.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  // Settings sits beside the sidebar like any other destination.
+  await expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   await expectNoA11yViolations(page);
 
   await page.getByRole("radio", { name: "Русский" }).click();
