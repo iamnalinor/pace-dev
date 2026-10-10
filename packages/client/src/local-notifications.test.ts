@@ -4,8 +4,11 @@ import { createApiClient } from "./api-client.ts";
 import { createFakeFetch, problem } from "./fake-fetch.fake.ts";
 import {
   activityNotifications,
+  calendarNotifications,
   fetchNotificationPlan,
   isActivityId,
+  isCalendarId,
+  isPlanId,
   localNotifications,
   scheduleChanges,
 } from "./local-notifications.ts";
@@ -93,5 +96,38 @@ describe("local notifications", () => {
     expect(activityNotifications(null, "2026-10-06T12:10:00.000Z", "en")).toEqual([]);
     expect(isActivityId("pace:activity:a1:long")).toBe(true);
     expect(isActivityId("pace:digest:x")).toBe(false);
+  });
+
+  it("asks about each calendar event as it starts, and keeps those reminders from the plan sync", () => {
+    const events = [
+      {
+        endAt: "2026-10-06T08:00:00.000Z",
+        id: "past",
+        startAt: "2026-10-06T07:00:00.000Z",
+        title: "Gone",
+      },
+      {
+        endAt: "2026-10-06T11:30:00.000Z",
+        id: "e1",
+        startAt: "2026-10-06T10:00:00.000Z",
+        title: "Seminar",
+      },
+    ];
+    expect(
+      calendarNotifications(events, {
+        clock: (at) => at.slice(11, 16),
+        language: "en",
+        now: "2026-10-06T09:00:00.000Z",
+      }),
+    ).toEqual([
+      {
+        at: "2026-10-06T10:00:00.000Z",
+        body: "Seminar, 10:00–11:30. Attend?",
+        id: "pace:calendar:e1@2026-10-06T10:00:00.000Z",
+        title: "Starting now",
+      },
+    ]);
+    expect(isPlanId("pace:calendar:e1@x")).toBe(false);
+    expect(isCalendarId("pace:calendar:e1@x")).toBe(true);
   });
 });

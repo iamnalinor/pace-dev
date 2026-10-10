@@ -21,6 +21,7 @@ import {
 import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
 import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
+import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
 const SYNC_INTERVAL_MS = 30_000;
 
@@ -42,6 +43,7 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   await sync.syncNow();
   await actions.ensureTimezone();
   await syncLocalNotifications(runtime);
+  await remindCalendar(runtime);
   await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status === "signed-in") {
@@ -104,6 +106,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     void (async () => {
       await sync.syncNow();
       await syncLocalNotifications(runtime);
+      await remindCalendar(runtime);
       await startPhoneChecks(phoneContextOf(runtime));
     })();
   });

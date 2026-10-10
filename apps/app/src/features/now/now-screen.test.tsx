@@ -1,15 +1,40 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import * as Calendar from "expo-calendar";
+import * as SecureStore from "expo-secure-store";
+
+import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
+import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { HW_ID } from "@pace/core/testing";
+import { addMinutesIso } from "@pace/core";
+import { HW_ID, NOW } from "@pace/core/testing";
 
 import { NowBoard } from "./now-screen.tsx";
 
+const calendar = Calendar as unknown as FakeCalendar;
+
 beforeEach(() => {
   jest.clearAllMocks();
+  (SecureStore as unknown as FakeSecureStore).values.clear();
+  calendar.state.status = "undetermined";
+  calendar.state.events = [];
 });
+
+/** A seminar in the phone's calendar, starting five minutes after the frozen clock. */
+const seminarSoon = (): void => {
+  calendar.state.status = "granted";
+  calendar.state.events = [
+    {
+      allDay: false,
+      endDate: addMinutesIso(NOW, 95),
+      id: "ev-1",
+      startDate: addMinutesIso(NOW, 5),
+      title: "Seminar",
+    },
+  ];
+};
 
 const checks = (): readonly string[] =>
   screen
@@ -107,6 +132,35 @@ describe("NowBoard", () => {
       expect(runtime.state.store.getState().settings.timezone).toBe("UTC");
     });
     expect(screen.queryByRole("button", { name: "Use UTC" })).toBeNull();
+  });
+
+  it("offers a calendar event about to start: Attend tracks it under its title", async () => {
+    seminarSoon();
+    const runtime = await createTestRuntime();
+    await renderScreen(<NowBoard />, runtime);
+    const card = await screen.findByLabelText("From your calendar");
+    expect(within(card).getByText("Seminar")).toBeOnTheScreen();
+    await fireEvent.press(within(card).getByRole("button", { name: "Attend" }));
+    await waitFor(() => {
+      expect(
+        Object.values(runtime.state.store.getState().time.activities).map((a) => a.label),
+      ).toContain("Seminar");
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    });
+  });
+
+  it("hides a calendar event on Skip", async () => {
+    seminarSoon();
+    const runtime = await createTestRuntime();
+    await renderScreen(<NowBoard />, runtime);
+    const card = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
+    await waitFor(() => {
+      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    });
+    expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
   });
 
   it("shows the empty state on a fresh account", async () => {

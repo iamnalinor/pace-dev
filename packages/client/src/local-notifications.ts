@@ -26,9 +26,14 @@ export const ACTIVITY_ID_PREFIX = `${LOCAL_ID_PREFIX}activity:`;
 
 export const isActivityId = (id: string): boolean => id.startsWith(ACTIVITY_ID_PREFIX);
 
-/** The server plan's reminders: every id of ours that is not an activity timer. */
+/** The calendar's events, each asked about as it starts. */
+export const CALENDAR_ID_PREFIX = `${LOCAL_ID_PREFIX}calendar:`;
+
+export const isCalendarId = (id: string): boolean => id.startsWith(CALENDAR_ID_PREFIX);
+
+/** The server plan's reminders: every id of ours that is not an activity or calendar one. */
 export const isPlanId = (id: string): boolean =>
-  id.startsWith(LOCAL_ID_PREFIX) && !isActivityId(id);
+  id.startsWith(LOCAL_ID_PREFIX) && !isActivityId(id) && !isCalendarId(id);
 
 export type RunningTimer = {
   readonly activityId: string;
@@ -62,6 +67,43 @@ export const activityNotifications = (
         },
       ];
 };
+
+/** A calendar event the phone may remind about. */
+export type CalendarReminder = {
+  readonly id: string;
+  readonly title: string;
+  readonly startAt: string;
+  readonly endAt: string;
+};
+
+/**
+"Seminar, 10:00–11:30. Attend?" as each event starts, for the events still ahead; `clock`
+writes an instant as the wall clock the person reads.
+*/
+export const calendarNotifications = (
+  events: readonly CalendarReminder[],
+  {
+    clock,
+    language,
+    now,
+  }: {
+    readonly now: string;
+    readonly language: Language;
+    readonly clock: (atIso: string) => string;
+  },
+): readonly LocalNotification[] =>
+  events
+    .filter((event) => Date.parse(event.startAt) > Date.parse(now))
+    .map((event) => ({
+      at: event.startAt,
+      body: t(language, "phone.notify.eventStart", {
+        from: clock(event.startAt),
+        title: event.title,
+        to: clock(event.endAt),
+      }),
+      id: `${CALENDAR_ID_PREFIX}${event.id}@${event.startAt}`,
+      title: t(language, "phone.notify.eventStartTitle"),
+    }));
 
 /** The plan as notifications in the account language. */
 export const localNotifications = (

@@ -2,15 +2,18 @@ import * as Notifications from "expo-notifications";
 
 import {
   activityNotifications,
+  calendarNotifications,
+  type CalendarReminder,
   fetchNotificationPlan,
   isActivityId,
+  isCalendarId,
   type LocalNotification,
   localNotifications,
   type PaceClient,
   scheduleChanges,
   timeBarModel,
 } from "@pace/client";
-import { type Language, t } from "@pace/core";
+import { formatInZone, type Language, t } from "@pace/core";
 
 /** The Android channel the reminders go to (users can silence it in system settings). */
 const CHANNEL_ID = "reminders";
@@ -75,6 +78,33 @@ export const syncLocalNotifications = async (
     name: t(language, "notify.channel"),
   });
   await apply(localNotifications(plan, language), { channelId: CHANNEL_ID });
+};
+
+/**
+Reminds as each of today's calendar events starts ("Seminar, 10:00–11:30. Attend?"); a tap
+opens Now, where the event waits with Attend and Skip. Events no longer wanted are cancelled.
+*/
+export const syncCalendarReminders = async (
+  events: readonly CalendarReminder[],
+  {
+    language,
+    now,
+    zone,
+  }: { readonly language: Language; readonly now: string; readonly zone: string },
+): Promise<void> => {
+  const wanted = calendarNotifications(events, {
+    clock: (at) => formatInZone(at, zone, "HH:mm"),
+    language,
+    now,
+  });
+  if (wanted.length > 0 && !(await hasPermission())) {
+    return;
+  }
+  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+    importance: Notifications.AndroidImportance.DEFAULT,
+    name: t(language, "notify.channel"),
+  });
+  await apply(wanted, { channelId: CHANNEL_ID, isOwned: isCalendarId });
 };
 
 /** A notification shown now; a tap opens `url` in the app. */

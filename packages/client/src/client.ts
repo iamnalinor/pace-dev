@@ -61,8 +61,11 @@ export { createPaceClient, type PaceClient, type PaceClientOptions } from "./cre
 export type { EventStore } from "./event-store.ts";
 export {
   activityNotifications,
+  calendarNotifications,
+  type CalendarReminder,
   fetchNotificationPlan,
   isActivityId,
+  isCalendarId,
   type LocalNotification,
   localNotifications,
   type RunningTimer,

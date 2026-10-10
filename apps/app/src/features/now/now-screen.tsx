@@ -8,6 +8,7 @@ import { ZoneBanner } from "#app/shared/zone-banner.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 
+import { CalendarPrompt } from "./calendar-prompt.tsx";
 import { NowHeader } from "./now-header.tsx";
 import { ProjectChips } from "./project-chips.tsx";
 
@@ -26,6 +27,7 @@ export const NowBoard = ({ composeText }: { readonly composeText?: string | unde
     <Screen footer={<TimeBar />} header={<NowHeader inboxCount={board.inboxCount} />}>
       <Composer initialText={composeText} key={composeText ?? ""} />
       <ZoneBanner />
+      <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={projectId} />
       {isEmpty ? <EmptyState>{t("now.empty")}</EmptyState> : null}
       <TaskRows label={t("now.tasks")} rows={board.rows} />
