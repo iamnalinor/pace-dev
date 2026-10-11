@@ -44,6 +44,7 @@ describe("isHotkeyPress", () => {
   it("leaves bare letters to the field being typed in", () => {
     expect(canFireWhileTyping(HOTKEYS.focus)).toBe(false);
     expect(canFireWhileTyping(HOTKEYS.primary)).toBe(true);
+    expect(canFireWhileTyping(HOTKEYS.escape)).toBe(true);
   });
 });
 

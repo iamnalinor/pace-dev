@@ -110,4 +110,18 @@ describe("nowViewModel", () => {
     expect(work.rows.map((entry) => entry.id)).toHaveLength(3);
     expect(work.inboxCount).toBe(3);
   });
+
+  it("offers no filter when it could not narrow the list: one project holding every task", () => {
+    const state = artboardState();
+    const onlyWork = Object.fromEntries(
+      Object.entries(state.tasks.byId).filter(
+        ([, task]) => task.projectId === WORK_ID || task.presetId === "inbox",
+      ),
+    );
+    const board = nowViewModel({ ...state, tasks: { ...state.tasks, byId: onlyWork } }, ctx());
+    expect(board.rows.length).toBeGreaterThan(0);
+    expect(board.projects).toEqual([]);
+    const empty = nowViewModel({ ...state, tasks: { ...state.tasks, byId: {} } }, ctx());
+    expect(empty.projects).toEqual([]);
+  });
 });

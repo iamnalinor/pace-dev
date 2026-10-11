@@ -100,11 +100,10 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "form.estimateDefault": "{duration} по категории",
   "form.estimateTyped": "Другое: 50, 2,5 ч",
   "composer.parse": "Разобрать",
-  "composer.byHand": "Заполнить вручную",
-  "composer.quickHint":
-    "Enter добавит короткую строку как есть. Вставленное сообщение разбирается в форму.",
+  "composer.quickHint": "Enter: ассистент заполнит форму для проверки. Shift+Enter: новая строка.",
   "composer.formTitle": "Проверьте перед добавлением",
-  "composer.backToText": "Назад к тексту",
+  "composer.expand": "Заполнить форму самому",
+  "composer.collapse": "Вернуться к строке",
   "composer.label": "Новая задача",
   "composer.placeholder": "Задача или вставьте сообщение",
   "composer.addTo": "Добавить в {title}",
@@ -133,7 +132,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "composer.aiQueued":
     "Сохранено: ассистент разберёт это, когда вернётся (примерно в {time}), и добавит.",
   "composer.aiQueuedSoon": "Сохранено: ассистент разберёт это, как только вернётся, и добавит.",
-  "composer.aiFailed": "Не удалось связаться с ассистентом. Чипы показывают разбор по правилам.",
+  "composer.aiFailed":
+    "Не удалось связаться с ассистентом: форму заполнили правила. Проверьте её перед добавлением.",
   "composer.aiQuestion": "Ответ добавится в строку",
   "parseField.title": "название",
   "parseField.category": "категория",

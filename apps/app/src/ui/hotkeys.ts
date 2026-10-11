@@ -33,6 +33,8 @@ export const HOTKEYS = {
   focus: { key: "f" },
   /** New task: the cursor into the composer (not while typing). */
   newTask: { key: "n" },
+  /** Folds an open form back. */
+  escape: { key: "Escape" },
 } as const satisfies Readonly<Record<string, Hotkey>>;
 
 const MAC_NAMES: Readonly<Record<string, string>> = { Enter: "↵", Escape: "Esc" };
@@ -72,9 +74,9 @@ export const isHotkeyPress = (hotkey: Hotkey, press: KeyPress, os: KeyboardOs): 
   );
 };
 
-/** A bare key (a letter) never fires while the person types in a field; a chord does. */
+/** A bare key (a letter) never fires while the person types in a field; a chord or Escape does. */
 export const canFireWhileTyping = (hotkey: Hotkey): boolean =>
-  hotkey.mod === true || hotkey.alt === true;
+  hotkey.mod === true || hotkey.alt === true || hotkey.key === "Escape";
 
 /** A Mac, an iPad or an iPhone (a hardware keyboard on one says ⌘); anything else uses Ctrl. */
 export const osOf = (platform: string): KeyboardOs =>

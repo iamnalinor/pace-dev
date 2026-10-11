@@ -73,7 +73,7 @@ export type NowViewModel = {
   /** Tasks that start later, folded under "In future". */
   readonly future: readonly NowRow[];
   readonly inboxCount: number;
-  /** Projects with open tasks, by name. */
+  /** Projects with open tasks, by name; empty when filtering by them would change nothing. */
   readonly projects: readonly ProjectChip[];
 };
 
@@ -169,7 +169,7 @@ const byName = (a: ProjectChip, b: ProjectChip): number => {
   return a.name < b.name ? -1 : 1;
 };
 
-const projectChips = (state: CoreState): readonly ProjectChip[] =>
+const allChips = (state: CoreState): readonly ProjectChip[] =>
   Object.values(state.projects.byId)
     .filter((project) => !project.archived)
     .map((project) => ({
@@ -180,6 +180,21 @@ const projectChips = (state: CoreState): readonly ProjectChip[] =>
     }))
     .filter((chip) => chip.open > 0)
     .toSorted(byName);
+
+/** Open tasks outside the Inbox: what the filter divides. */
+const openTotal = (state: CoreState): number =>
+  Object.values(state.tasks.byId).filter((task) => isOpen(task) && task.presetId !== "inbox")
+    .length;
+
+/**
+One chip per project with open tasks, by name; none when a filter could not narrow the list
+(no project, or one project holding every open task), so no "All" stands there alone.
+*/
+const projectChips = (state: CoreState): readonly ProjectChip[] => {
+  const chips = allChips(state);
+  const [only] = chips;
+  return chips.length === 0 || (chips.length === 1 && only?.open === openTotal(state)) ? [] : chips;
+};
 
 export const nowViewModel = (
   state: CoreState,
