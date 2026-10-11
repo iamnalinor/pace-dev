@@ -11,6 +11,7 @@ import { IconButton } from "./icon-button.tsx";
 import { useIsWide } from "./layout.ts";
 import { BACKDROP_ENTER, DIALOG_ENTER, SHEET_ENTER } from "./motion.ts";
 import { useTheme } from "./theme-provider.tsx";
+import { HotkeyLayer } from "./use-hotkey.tsx";
 
 /** Fills the modal under the sheet; a style object, the animated views take no class names. */
 const FILL = { bottom: 0, left: 0, position: "absolute", right: 0, top: 0 } as const;
@@ -120,55 +121,57 @@ export const Sheet = ({
   const isWide = useIsWide();
   return (
     <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
-      {/* A modal renders outside the app's root (a portal on the web): the theme's variables
+      <HotkeyLayer>
+        {/* A modal renders outside the app's root (a portal on the web): the theme's variables
       are declared again here, or the sheet would lose its surface and ink. */}
-      <View
-        className={cx("flex-1", isWide ? "justify-center" : "justify-end")}
-        style={paletteVars(scheme)}
-      >
-        {/* The animated wrappers only move; the look is on plain views inside (class names
-        on reanimated views are dropped on the web, which left the sheet see-through). */}
-        <Backdrop closeLabel={closeLabel} onClose={onClose} />
-        <Animated.View
-          entering={isWide ? DIALOG_ENTER : SHEET_ENTER}
-          style={isWide ? DIALOG_FRAME : FRAME}
+        <View
+          className={cx("flex-1", isWide ? "justify-center" : "justify-end")}
+          style={paletteVars(scheme)}
         >
-          <View
-            accessibilityViewIsModal
-            {...(formLabel === undefined
-              ? { accessibilityLabel: title, "aria-modal": true, role: "dialog" }
-              : { accessibilityLabel: formLabel, role: "form" })}
-            className={cx(
-              "shrink overflow-hidden bg-surface px-5",
-              isWide
-                ? "rounded-2xl border border-line pt-5 shadow-lg"
-                : "rounded-t-[22px] border-t border-line pt-2.5",
-            )}
-            style={{ paddingBottom: isWide ? 20 : Math.max(insets.bottom, 12) + 12 }}
+          {/* The animated wrappers only move; the look is on plain views inside (class names
+        on reanimated views are dropped on the web, which left the sheet see-through). */}
+          <Backdrop closeLabel={closeLabel} onClose={onClose} />
+          <Animated.View
+            entering={isWide ? DIALOG_ENTER : SHEET_ENTER}
+            style={isWide ? DIALOG_FRAME : FRAME}
           >
-            {isWide ? null : <GrabHandle />}
-            <SheetTitle
-              closeLabel={closeLabel}
-              isWide={isWide}
-              onClose={onClose}
-              subtitle={subtitle}
-              title={title}
-            />
-            {/* The body shrinks and clips inside the frame, under a hairline: scrolled content
-            meets an edge instead of seeming to run into the title. */}
-            <ScrollView
-              className="mt-3 min-h-0 shrink border-t border-line"
-              contentContainerClassName="gap-[18px] pt-[15px]"
-              keyboardShouldPersistTaps="handled"
+            <View
+              accessibilityViewIsModal
+              {...(formLabel === undefined
+                ? { accessibilityLabel: title, "aria-modal": true, role: "dialog" }
+                : { accessibilityLabel: formLabel, role: "form" })}
+              className={cx(
+                "shrink overflow-hidden bg-surface px-5",
+                isWide
+                  ? "rounded-2xl border border-line pt-5 shadow-lg"
+                  : "rounded-t-[22px] border-t border-line pt-2.5",
+              )}
+              style={{ paddingBottom: isWide ? 20 : Math.max(insets.bottom, 12) + 12 }}
             >
-              {children}
-            </ScrollView>
-            {footer === undefined ? null : (
-              <View className="border-t border-line pt-3">{footer}</View>
-            )}
-          </View>
-        </Animated.View>
-      </View>
+              {isWide ? null : <GrabHandle />}
+              <SheetTitle
+                closeLabel={closeLabel}
+                isWide={isWide}
+                onClose={onClose}
+                subtitle={subtitle}
+                title={title}
+              />
+              {/* The body shrinks and clips inside the frame, under a hairline: scrolled content
+            meets an edge instead of seeming to run into the title. */}
+              <ScrollView
+                className="mt-3 min-h-0 shrink border-t border-line"
+                contentContainerClassName="gap-[18px] pt-[15px]"
+                keyboardShouldPersistTaps="handled"
+              >
+                {children}
+              </ScrollView>
+              {footer === undefined ? null : (
+                <View className="border-t border-line pt-3">{footer}</View>
+              )}
+            </View>
+          </Animated.View>
+        </View>
+      </HotkeyLayer>
     </Modal>
   );
 };

@@ -1,6 +1,7 @@
 import { View } from "react-native";
 
 import { Button } from "./button.tsx";
+import { HOTKEYS } from "./hotkeys.ts";
 
 /**
 A closing row. A form's sheet has only its action, full width: leaving is the dim, the
@@ -31,7 +32,7 @@ export const SheetActions = ({
       </View>
     )}
     <View className="flex-[2]">
-      <Button busy={isBusy} disabled={isDisabled} onPress={onPrimary}>
+      <Button busy={isBusy} disabled={isDisabled} hotkey={HOTKEYS.primary} onPress={onPrimary}>
         {primaryLabel}
       </Button>
     </View>

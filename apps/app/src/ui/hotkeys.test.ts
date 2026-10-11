@@ -1,0 +1,57 @@
+import {
+  ariaHotkey,
+  canFireWhileTyping,
+  formatHotkey,
+  HOTKEYS,
+  isHotkeyPress,
+  osOf,
+} from "./hotkeys.ts";
+
+const press = (
+  key: string,
+  modifiers: Partial<Record<"alt" | "ctrl" | "meta" | "shift", boolean>> = {},
+) => ({
+  altKey: modifiers.alt === true,
+  ctrlKey: modifiers.ctrl === true,
+  key,
+  metaKey: modifiers.meta === true,
+  shiftKey: modifiers.shift === true,
+});
+
+describe("formatHotkey", () => {
+  it("names the keys the way each computer does", () => {
+    expect(formatHotkey(HOTKEYS.primary, "mac")).toBe("⌘↵");
+    expect(formatHotkey(HOTKEYS.primary, "other")).toBe("Ctrl+Enter");
+    expect(formatHotkey(HOTKEYS.toInbox, "mac")).toBe("⌥↵");
+    expect(formatHotkey(HOTKEYS.toInbox, "other")).toBe("Alt+Enter");
+    expect(formatHotkey(HOTKEYS.enter, "mac")).toBe("↵");
+    expect(formatHotkey(HOTKEYS.focus, "other")).toBe("F");
+    expect(ariaHotkey(HOTKEYS.primary, "mac")).toBe("Meta+Enter");
+    expect(ariaHotkey(HOTKEYS.toInbox, "other")).toBe("Alt+Enter");
+  });
+});
+
+describe("isHotkeyPress", () => {
+  it("takes ⌘ on a Mac and Ctrl elsewhere, with exactly the shortcut's modifiers", () => {
+    expect(isHotkeyPress(HOTKEYS.primary, press("Enter", { meta: true }), "mac")).toBe(true);
+    expect(isHotkeyPress(HOTKEYS.primary, press("Enter", { ctrl: true }), "mac")).toBe(false);
+    expect(isHotkeyPress(HOTKEYS.primary, press("Enter", { ctrl: true }), "other")).toBe(true);
+    expect(isHotkeyPress(HOTKEYS.primary, press("Enter"), "other")).toBe(false);
+    expect(isHotkeyPress(HOTKEYS.focus, press("F"), "other")).toBe(true);
+    expect(isHotkeyPress(HOTKEYS.focus, press("f", { ctrl: true }), "other")).toBe(false);
+  });
+
+  it("leaves bare letters to the field being typed in", () => {
+    expect(canFireWhileTyping(HOTKEYS.focus)).toBe(false);
+    expect(canFireWhileTyping(HOTKEYS.primary)).toBe(true);
+  });
+});
+
+describe("osOf", () => {
+  it("reads the platform string", () => {
+    expect(osOf("MacIntel")).toBe("mac");
+    expect(osOf("macOS")).toBe("mac");
+    expect(osOf("Linux x86_64")).toBe("other");
+    expect(osOf("Win32")).toBe("other");
+  });
+});
