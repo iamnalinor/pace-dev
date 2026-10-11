@@ -137,9 +137,9 @@ export const Sheet = ({
           >
             <View
               accessibilityViewIsModal
-              {...(formLabel === undefined
-                ? { accessibilityLabel: title, "aria-modal": true, role: "dialog" }
-                : { accessibilityLabel: formLabel, role: "form" })}
+              {...(formLabel !== undefined && { accessibilityLabel: formLabel, role: "form" })}
+              // The modal is the dialog already (react-native-web gives it the role); this is its surface.
+              {...({ dataSet: { paceSurface: "sheet" } } as object)}
               className={cx(
                 "shrink overflow-hidden bg-surface px-5",
                 isWide

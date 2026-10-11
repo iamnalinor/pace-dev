@@ -14,7 +14,8 @@ export const addTask = async (page: Page, text: string): Promise<void> => {
     exact: true,
     name: "Title",
   });
-  await expect(title).toBeVisible();
-  await title.press("Enter");
+  // The cursor is already in the title: the second Enter is just a key, nothing to click.
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(line).toHaveValue("");
 };
