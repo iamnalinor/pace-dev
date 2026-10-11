@@ -1,17 +1,13 @@
-import { ChevronDown } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Pressable, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Button } from "#app/ui/button.tsx";
 import { Expandable } from "#app/ui/expandable.tsx";
-import { HOTKEYS } from "#app/ui/hotkeys.ts";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useToast } from "#app/ui/toast.tsx";
-import { KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
+import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 import {
   type AiOutcome,
   type AiReading,
@@ -24,6 +20,7 @@ import { useAiRead } from "@pace/client/react";
 
 import { AiStatus } from "./ai-status.tsx";
 import { ComposerForm } from "./composer-form.tsx";
+import { QuickActions, QuickLine } from "./quick-line.tsx";
 
 /** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
 const useDraft = (initialText: string, assistant: Assistant) => {
@@ -75,70 +72,6 @@ const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void)
   };
 };
 
-const MIN_INPUT_HEIGHT = 44;
-/** Eight lines of 24 px and the padding: a longer message scrolls inside. */
-const MAX_INPUT_HEIGHT = 212;
-
-const heightOf = (content: number): number =>
-  Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
-
-type KeyActions = { readonly enter: () => void; readonly toInbox: () => void };
-
-/** Enter reads the line, Alt+Enter sends it to the Inbox, Shift+Enter starts a new line. */
-const onEnter =
-  (isEmpty: boolean, keys: KeyActions) =>
-  (event: TextInputKeyPressEvent): void => {
-    const native = event.nativeEvent as TextInputKeyPressEvent["nativeEvent"] & {
-      altKey?: boolean;
-      shiftKey?: boolean;
-    };
-    if (isEmpty || native.key !== "Enter" || native.shiftKey === true) {
-      return;
-    }
-    // Handled here: the page's own ⌘↵ (a task's Done) stays out of the line.
-    event.preventDefault();
-    if (native.altKey === true) {
-      keys.toInbox();
-    } else {
-      keys.enter();
-    }
-  };
-
-/** Parse (Enter) and To Inbox (Alt+Enter), with their keys shown on a computer. */
-const QuickActions = ({
-  canParse,
-  isReading,
-  onInbox,
-  onParse,
-}: {
-  readonly canParse: boolean;
-  readonly isReading: boolean;
-  readonly onParse: () => void;
-  readonly onInbox: () => void;
-}) => {
-  const t = useT();
-  return (
-    <View className="flex-row flex-wrap gap-2 pt-2">
-      <View className="min-w-36 flex-[2]">
-        <Button
-          busy={isReading}
-          disabled={!canParse}
-          hotkey={HOTKEYS.enter}
-          hotkeyMode="hint"
-          onPress={onParse}
-        >
-          {t("composer.parse")}
-        </Button>
-      </View>
-      <View className="min-w-36 flex-1">
-        <Button hotkey={HOTKEYS.toInbox} hotkeyMode="hint" onPress={onInbox} variant="ghost">
-          {t("composer.toInbox")}
-        </Button>
-      </View>
-    </View>
-  );
-};
-
 /** The composer's state and moves: the text, the reading, the form, and what each key does. */
 const useComposerFlow = (initialText: string) => {
   const { actions, assistant, hooks } = usePace();
@@ -148,6 +81,8 @@ const useComposerFlow = (initialText: string) => {
   const [form, setForm] = useState<"by-hand" | "read" | null>(null);
   const [isAdded, setIsAdded] = useState(false);
   const previousRef = useRef(text);
+  // A held Enter or a double press adds once.
+  const isAddingRef = useRef(false);
   const done = (): void => {
     reset();
     setForm(null);
@@ -161,9 +96,17 @@ const useComposerFlow = (initialText: string) => {
     }
   };
   const add = async (): Promise<void> => {
+    if (isAddingRef.current) {
+      return;
+    }
+    isAddingRef.current = true;
     const isReadByAssistant = ai.state.status === "read";
-    if (await run(actions.createFromComposer(model, { readByAssistant: isReadByAssistant }))) {
-      done();
+    try {
+      if (await run(actions.createFromComposer(model, { readByAssistant: isReadByAssistant }))) {
+        done();
+      }
+    } finally {
+      isAddingRef.current = false;
     }
   };
   const toInbox = async (): Promise<void> => {
@@ -177,9 +120,20 @@ const useComposerFlow = (initialText: string) => {
     collapse: (): void => {
       setForm(null);
     },
-    /** Enter: the assistant reads the line into the form; a line too short to read opens it as is. */
+    /** An answer to the assistant's question joins the line, which is read again. */
+    answer: (answer: string): void => {
+      const next = `${text.trimEnd()} ${answer}`;
+      onText(next);
+      void parse(next);
+    },
+    /**
+    Enter: the assistant reads the line into the form (a line it already read reopens as it was
+    left); a line too short to read opens the form as it is.
+    */
     enter: (): void => {
-      if (canAiRead(text)) {
+      if (ai.state.status === "read") {
+        setForm("read");
+      } else if (canAiRead(text)) {
         void parse(text);
       } else {
         setForm("read");
@@ -208,55 +162,6 @@ const useComposerFlow = (initialText: string) => {
   };
 };
 
-type Flow = ReturnType<typeof useComposerFlow>;
-
-/** The line: what to add, the chevron that unfolds the form by hand; N puts the cursor here. */
-const QuickLine = ({ flow, isFocused }: { readonly flow: Flow; readonly isFocused: boolean }) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const inputRef = useRef<TextInput>(null);
-  // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
-  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
-  useHotkey(HOTKEYS.newTask, () => {
-    inputRef.current?.focus();
-  });
-  return (
-    <View className="flex-row items-start">
-      <TextInput
-        accessibilityHint={t("composer.quickHint")}
-        accessibilityLabel={t("composer.label")}
-        autoFocus={isFocused || flow.isAdded}
-        // Grows with a pasted message up to about eight lines.
-        className="mb-1 flex-1 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
-        multiline
-        onChangeText={flow.type}
-        onContentSizeChange={(event) => {
-          setInputHeight(heightOf(event.nativeEvent.contentSize.height));
-        }}
-        onKeyPress={onEnter(flow.model.isEmpty, {
-          enter: flow.enter,
-          toInbox: () => void flow.toInbox(),
-        })}
-        placeholder={t("composer.placeholder")}
-        placeholderTextColor={palette.muted}
-        ref={inputRef}
-        style={{ height: inputHeight }}
-        textAlignVertical="top"
-        value={flow.text}
-      />
-      <Pressable
-        accessibilityLabel={t("composer.expand")}
-        accessibilityRole="button"
-        aria-expanded={false}
-        className="h-11 w-11 items-center justify-center rounded-md active:opacity-70"
-        onPress={flow.expand}
-      >
-        <ChevronDown color={palette.muted} size={18} strokeWidth={2} />
-      </Pressable>
-    </View>
-  );
-};
-
 /**
 The app's entry point on Now, one card that changes shape. The line takes a task in words:
 Enter has the assistant read it, and the card unfolds in place into the task form with every
@@ -275,13 +180,7 @@ export const Composer = ({
   const flow = useComposerFlow(initialText);
   const { ai, model, text } = flow;
   const status = (
-    <AiStatus
-      onAnswer={(answer) => {
-        flow.onText(`${text.trimEnd()} ${answer}`);
-      }}
-      onLater={() => void flow.readLater()}
-      state={ai.state}
-    />
+    <AiStatus onAnswer={flow.answer} onLater={() => void flow.readLater()} state={ai.state} />
   );
   return (
     <View className="mx-4 mb-3 rounded-xl border border-line bg-surface p-2">
@@ -309,7 +208,7 @@ export const Composer = ({
       ) : null}
       <Expandable isOpen={flow.form !== null}>
         <ComposerForm
-          isTitleFocused={flow.form === "by-hand"}
+          isTitleFocused
           model={model}
           onAdd={() => void flow.add()}
           onCollapse={flow.collapse}

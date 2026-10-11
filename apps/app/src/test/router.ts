@@ -13,5 +13,7 @@ export const routerModule = () => ({
   // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
   usePathname: () => "/",
   // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
+  useIsFocused: () => true,
+  // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
   useRouter: () => router,
 });

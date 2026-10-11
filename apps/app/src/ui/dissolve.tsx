@@ -114,6 +114,8 @@ export const Dissolve = ({
   });
   useEffect(() => {
     if (!isActive) {
+      // A refused close puts the row back: the content shows again.
+      progress.value = 0;
       return;
     }
     // Reduced motion makes the timing instant: the row simply goes.
@@ -122,11 +124,20 @@ export const Dissolve = ({
       easing: Easing.out(Easing.quad),
       reduceMotion: ReduceMotion.System,
     });
-    const timer = setTimeout(() => {
+    const run = { isDone: false };
+    const finish = (): void => {
+      if (run.isDone) {
+        return;
+      }
+
+      run.isDone = true;
       onDoneRef.current();
-    }, DISSOLVE_MS);
+    };
+    const timer = setTimeout(finish, DISSOLVE_MS);
     return () => {
       clearTimeout(timer);
+      // Gone before the dust settled (the list moved on): the check still counts.
+      finish();
     };
   }, [isActive, progress]);
   const contentStyle = useAnimatedStyle(() => ({

@@ -8,11 +8,9 @@ import { Composer } from "./composer.tsx";
 
 const line = () => screen.getByLabelText(en("composer.label"));
 
+/** The keyboard's Enter on a phone submits the line (the web reads the key itself). */
 const enter = async (): Promise<void> => {
-  await fireEvent(line(), "keyPress", {
-    nativeEvent: { key: "Enter" },
-    preventDefault: () => undefined,
-  });
+  await fireEvent(line(), "submitEditing");
 };
 
 const title = () => screen.getByLabelText(en("edit.taskTitle"));

@@ -14,6 +14,7 @@ import "#app/platform/phone-background.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
+import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { Sidebar } from "#app/ui/sidebar.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
@@ -38,6 +39,7 @@ const Navigator = () => {
       {hasSidebar ? <Sidebar /> : null}
       <View className="flex-1">
         <Stack
+          screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
           screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
         >
           <Stack.Screen name="(tabs)" />

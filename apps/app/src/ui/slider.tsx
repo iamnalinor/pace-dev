@@ -33,10 +33,8 @@ export const Slider = ({ label, max, onChange, onSlide, value }: SliderProps) =>
       slideTo(stepAt(event.x));
     })
     .onEnd((event) => {
-      const next = stepAt(event.x);
-      if (next !== value) {
-        onChange(next);
-      }
+      // `value` follows the finger (the readouts), so every release is reported.
+      onChange(stepAt(event.x));
     })
     .onFinalize(() => {
       slideTo(null);

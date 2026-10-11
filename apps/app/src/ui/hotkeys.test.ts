@@ -39,6 +39,9 @@ describe("isHotkeyPress", () => {
     expect(isHotkeyPress(HOTKEYS.primary, press("Enter"), "other")).toBe(false);
     expect(isHotkeyPress(HOTKEYS.focus, press("F"), "other")).toBe(true);
     expect(isHotkeyPress(HOTKEYS.focus, press("f", { ctrl: true }), "other")).toBe(false);
+    // A Russian layout: the F key types «а», the shortcut still answers.
+    expect(isHotkeyPress(HOTKEYS.focus, { ...press("а"), code: "KeyF" }, "other")).toBe(true);
+    expect(isHotkeyPress(HOTKEYS.newTask, { ...press("а"), code: "KeyF" }, "other")).toBe(false);
   });
 
   it("leaves bare letters to the field being typed in", () => {

@@ -15,6 +15,8 @@ export type KeyboardOs = "mac" | "other";
 /** The parts of a keydown that decide a match. */
 export type KeyPress = {
   readonly key: string;
+  /** The physical key ("KeyF"): a letter shortcut works on any layout, Russian included. */
+  readonly code?: string;
   readonly metaKey: boolean;
   readonly ctrlKey: boolean;
   readonly shiftKey: boolean;
@@ -65,8 +67,13 @@ export const formatHotkey = (hotkey: Hotkey, os: KeyboardOs): string => {
 export const isHotkeyPress = (hotkey: Hotkey, press: KeyPress, os: KeyboardOs): boolean => {
   const isMod = os === "mac" ? press.metaKey : press.ctrlKey;
   const isOther = os === "mac" ? press.ctrlKey : press.metaKey;
+  const isLetter = /^[a-z]$/iu.test(hotkey.key);
+  const isKey = isLetter
+    ? press.code === `Key${hotkey.key.toUpperCase()}` ||
+      press.key.toLowerCase() === hotkey.key.toLowerCase()
+    : press.key === hotkey.key;
   return (
-    press.key.toLowerCase() === hotkey.key.toLowerCase() &&
+    isKey &&
     isMod === (hotkey.mod === true) &&
     !isOther &&
     press.shiftKey === (hotkey.shift === true) &&

@@ -25,16 +25,22 @@ export const useLiveProgress = (view: TaskViewModel): LiveProgress => {
   const run = useRunAction();
   const [sliding, setSliding] = useState<null | number>(null);
   const [saving, setSaving] = useState<null | number>(null);
+  const stored = view.progress.slider ?? 0;
   return {
     commit: (step) => {
+      setSliding(null);
+      if (step === stored) {
+        return;
+      }
       setSaving(step);
       void (async () => {
         await run(actions.setProgress(view.id, step));
-        setSaving(null);
+        // A later release already on its way keeps its own value on screen.
+        setSaving((current) => (current === step ? null : current));
       })();
     },
     slide: setSliding,
-    step: sliding ?? saving ?? view.progress.slider ?? 0,
+    step: sliding ?? saving ?? stored,
   };
 };
 

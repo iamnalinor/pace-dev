@@ -91,10 +91,18 @@ const TargetRow = ({
 };
 
 /** "Check before adding" and the fold back to the line, where the line's own chevron was. */
-const FormHeader = ({ onCollapse }: { readonly onCollapse: () => void }) => {
+const FormHeader = ({
+  onAdd,
+  onCollapse,
+}: {
+  readonly onAdd: () => void;
+  readonly onCollapse: () => void;
+}) => {
   const t = useT();
   const { palette } = useTheme();
   useHotkey(HOTKEYS.escape, onCollapse);
+  // The second Enter, wherever the focus is outside a field or a button.
+  useHotkey(HOTKEYS.enter, onAdd);
   return (
     <View className="flex-row items-center justify-between">
       <Text accessibilityRole="header" className="font-sans text-[13px] font-medium text-fg2">
@@ -103,6 +111,7 @@ const FormHeader = ({ onCollapse }: { readonly onCollapse: () => void }) => {
       <Pressable
         accessibilityLabel={t("composer.collapse")}
         accessibilityRole="button"
+        aria-expanded
         className="h-9 w-9 items-center justify-center rounded-md active:opacity-70"
         hitSlop={4}
         onPress={onCollapse}
@@ -193,7 +202,7 @@ export const ComposerForm = ({
   return (
     <HotkeyLayer>
       <View accessibilityLabel={t("composer.formTitle")} className="gap-3.5 p-2" role="form">
-        <FormHeader onCollapse={onCollapse} />
+        <FormHeader onAdd={onAdd} onCollapse={onCollapse} />
         {status}
         <FormFields isTitleFocused={isTitleFocused} model={model} onAdd={onAdd} onEdit={onEdit} />
         <Button disabled={!isInstance && title === ""} hotkey={HOTKEYS.primary} onPress={onAdd}>

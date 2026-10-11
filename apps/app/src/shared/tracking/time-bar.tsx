@@ -45,8 +45,8 @@ length in them as the Expect); the assistant's reading of it follows in the back
 const TypedStart = ({
   onReading,
 }: {
-  /** The activity whose words the assistant is reading, then `null` once it answered. */
-  readonly onReading: (activityId: null | string) => void;
+  /** The activity whose words the assistant reads (`true`), then once it answered (`false`). */
+  readonly onReading: (activityId: string, isReading: boolean) => void;
 }) => {
   const t = useT();
   const { actions, assistant } = usePace();
@@ -67,14 +67,14 @@ const TypedStart = ({
     if (activityId === null) {
       return;
     }
-    onReading(activityId);
+    onReading(activityId, true);
     try {
       const reading = await assistant.readActivity(typed);
       if (reading !== null) {
         await actions.refineActivity(activityId, { ...reading, typed });
       }
     } finally {
-      onReading(null);
+      onReading(activityId, false);
     }
   };
   return (
@@ -213,7 +213,8 @@ export const TimeBar = () => {
   const { hooks } = usePace();
   const { alongside, buttons, running } = hooks.useTimeBar();
   const [opened, setOpened] = useState<null | Opened>(null);
-  const [reading, setReading] = useState<null | string>(null);
+  // The typed activities the assistant is still reading (two can be in flight).
+  const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
   const { more, tap } = useTap(setOpened);
   return (
     <View
@@ -222,9 +223,16 @@ export const TimeBar = () => {
       role="region"
     >
       {[...(running === null ? [] : [running]), ...alongside].map((item) => (
-        <RunningRow isDraft={item.activityId === reading} key={item.activityId} running={item} />
+        <RunningRow isDraft={reading.has(item.activityId)} key={item.activityId} running={item} />
       ))}
-      <TypedStart onReading={setReading} />
+      <TypedStart
+        onReading={(activityId, isReading) => {
+          setReading((current) => {
+            const others = [...current].filter((id) => id !== activityId);
+            return new Set(isReading ? [...others, activityId] : others);
+          });
+        }}
+      />
       <View className="flex-row gap-2">
         {buttons.map((button) => (
           <BarButton

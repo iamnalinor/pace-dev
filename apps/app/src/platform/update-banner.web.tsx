@@ -48,8 +48,8 @@ const useWaitingWorker = (): null | Workbox => {
 };
 
 /**
-A quiet card in the corner, not a bar over the header: what happened, that nothing is lost,
-Refresh (hands control to the new worker) and Later (until the next visit).
+A quiet card at the top, not a lime bar across the header: what happened, Refresh (hands
+control to the new worker) and Later (until the next visit).
 */
 export const UpdateBanner = () => {
   const t = useT();
@@ -61,7 +61,7 @@ export const UpdateBanner = () => {
   return (
     <View
       accessibilityLiveRegion="polite"
-      className="absolute bottom-4 left-4 right-4 z-50 mx-auto max-w-[400px] gap-3 rounded-xl border border-line bg-surface p-4 shadow-lg"
+      className="absolute left-4 right-4 top-3 z-50 mx-auto max-w-[400px] gap-3 rounded-xl border border-line bg-surface p-4 shadow-lg"
       role="status"
     >
       <View className="gap-1">

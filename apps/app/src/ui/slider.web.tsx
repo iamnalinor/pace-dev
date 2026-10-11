@@ -11,7 +11,8 @@ export const Slider = ({ label, max, onChange, onSlide, value }: SliderProps) =>
   const [draft, setDraft] = useState<null | number>(null);
   const shown = draft ?? value;
   const commit = (): void => {
-    if (draft !== null && draft !== value) {
+    // `value` follows the thumb while it moves (the readouts), so every release is reported.
+    if (draft !== null) {
       onChange(draft);
     }
     setDraft(null);

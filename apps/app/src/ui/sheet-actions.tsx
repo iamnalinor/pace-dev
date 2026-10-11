@@ -22,19 +22,28 @@ export const SheetActions = ({
   readonly onCancel?: () => void;
   readonly onPrimary: () => void;
   readonly primaryLabel: string;
-}) => (
-  <View className="flex-row gap-2">
-    {onCancel === undefined || cancelLabel === undefined ? null : (
-      <View className="flex-1">
-        <Button onPress={onCancel} variant="secondary">
-          {cancelLabel}
+}) => {
+  // A confirmation (Delete for good) is never one keystroke away; a form's action is.
+  const isConfirmation = onCancel !== undefined && cancelLabel !== undefined;
+  return (
+    <View className="flex-row gap-2">
+      {isConfirmation ? (
+        <View className="flex-1">
+          <Button onPress={onCancel} variant="secondary">
+            {cancelLabel}
+          </Button>
+        </View>
+      ) : null}
+      <View className="flex-[2]">
+        <Button
+          busy={isBusy}
+          disabled={isDisabled}
+          hotkey={isConfirmation ? undefined : HOTKEYS.primary}
+          onPress={onPrimary}
+        >
+          {primaryLabel}
         </Button>
       </View>
-    )}
-    <View className="flex-[2]">
-      <Button busy={isBusy} disabled={isDisabled} hotkey={HOTKEYS.primary} onPress={onPrimary}>
-        {primaryLabel}
-      </Button>
     </View>
-  </View>
-);
+  );
+};

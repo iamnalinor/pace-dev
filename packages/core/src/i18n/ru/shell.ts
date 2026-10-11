@@ -183,7 +183,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "errors.pageNotFound": "Страница не найдена",
   "errors.pageNotFoundBody": "По адресу {path} ничего нет.",
   "update.ready": "Вышла новая версия Pace",
-  "update.detail": "Обновите страницу, чтобы получить исправления. Введённое не потеряется.",
+  "update.detail": "Обновите страницу, чтобы получить исправления.",
   "update.reload": "Обновить",
   "update.later": "Позже",
   "settings.digestWindows.hint": "Когда приходят дневные сводки, по часовому поясу аккаунта.",

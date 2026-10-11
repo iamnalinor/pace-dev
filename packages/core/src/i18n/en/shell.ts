@@ -182,7 +182,7 @@ export const enShell = {
   "errors.pageNotFound": "Page not found",
   "errors.pageNotFoundBody": "There is nothing at {path}.",
   "update.ready": "A new version of Pace is ready",
-  "update.detail": "Refresh to get the latest fixes. Nothing you entered is lost.",
+  "update.detail": "Refresh the page to get the latest fixes.",
   "update.reload": "Refresh",
   "update.later": "Later",
   "common.and": "and",
