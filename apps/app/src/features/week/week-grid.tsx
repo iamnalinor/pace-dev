@@ -171,7 +171,7 @@ const DayItems = ({
           <Text
             className={cx(
               "font-sans text-[10px]",
-              isEvent ? "text-fg2" : "font-medium text-accentFg",
+              isEvent ? "text-fg2" : "font-medium text-onColor",
             )}
             numberOfLines={1}
           >

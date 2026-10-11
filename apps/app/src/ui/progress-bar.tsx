@@ -5,7 +5,7 @@ const PERCENT = 100;
 const share = (fraction: number): `${number}%` =>
   `${Math.min(Math.max(fraction, 0), 1) * PERCENT}%`;
 
-/** The 3px bar of a task row: progress in the foreground colour, the pace marker in lime. */
+/** The 3px bar of a task row: progress in the foreground colour, the marker in the accent. */
 export const ProgressBar = ({
   label,
   marker,

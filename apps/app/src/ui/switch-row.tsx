@@ -2,7 +2,7 @@ import { Switch, Text, View } from "react-native";
 
 import { useTheme } from "./theme-provider.tsx";
 
-/** The native switch in Pace's colors: off, a light knob on a grey track; on, a dark knob on lime. */
+/** The native switch in Pace's colors: off, a light knob on a grey track; on, a white knob on the indigo accent. */
 export const PaceSwitch = ({
   isOn,
   label,

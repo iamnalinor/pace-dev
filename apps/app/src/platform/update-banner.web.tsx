@@ -47,29 +47,49 @@ const useWaitingWorker = (): null | Workbox => {
   return waiting;
 };
 
+/**
+A quiet card in the corner, not a bar over the header: what happened, that nothing is lost,
+Refresh (hands control to the new worker) and Later (until the next visit).
+*/
 export const UpdateBanner = () => {
   const t = useT();
   const waiting = useWaitingWorker();
-  if (waiting === null) {
+  const [isDismissed, setIsDismissed] = useState(false);
+  if (waiting === null || isDismissed) {
     return null;
   }
   return (
     <View
       accessibilityLiveRegion="polite"
-      className="absolute inset-x-0 top-0 z-50 flex-row items-center justify-center gap-3 bg-accent px-4 py-2"
+      className="absolute bottom-4 left-4 right-4 z-50 mx-auto max-w-[400px] gap-3 rounded-xl border border-line bg-surface p-4 shadow-lg"
+      role="status"
     >
-      <Text className="font-sans text-[14px] font-medium text-accentFg">{t("update.ready")}</Text>
-      <Pressable
-        accessibilityRole="button"
-        className="rounded-md border border-accentFg px-3 py-1 active:opacity-70"
-        onPress={() => {
-          waiting.messageSkipWaiting();
-        }}
-      >
-        <Text className="font-sans text-[14px] font-semibold text-accentFg">
-          {t("update.reload")}
-        </Text>
-      </Pressable>
+      <View className="gap-1">
+        <Text className="font-sans text-[14px] font-semibold text-fg">{t("update.ready")}</Text>
+        <Text className="font-sans text-[13px] text-muted">{t("update.detail")}</Text>
+      </View>
+      <View className="flex-row justify-end gap-2">
+        <Pressable
+          accessibilityRole="button"
+          className="h-9 justify-center rounded-md px-3 active:opacity-70"
+          onPress={() => {
+            setIsDismissed(true);
+          }}
+        >
+          <Text className="font-sans text-[14px] text-fg2">{t("update.later")}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          className="h-9 justify-center rounded-md bg-accent px-4 active:opacity-80"
+          onPress={() => {
+            waiting.messageSkipWaiting();
+          }}
+        >
+          <Text className="font-sans text-[14px] font-medium text-accentFg">
+            {t("update.reload")}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 };

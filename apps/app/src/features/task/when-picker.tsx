@@ -84,7 +84,7 @@ export const WhenPicker = ({
         ))}
         <Chip
           label={t("close.pickExact")}
-          leading={<CalendarDays color={isCustom ? palette.inverseFg : palette.fg2} size={16} />}
+          leading={<CalendarDays color={isCustom ? palette.fg : palette.fg2} size={16} />}
           onPress={() => {
             form.choose("custom");
           }}

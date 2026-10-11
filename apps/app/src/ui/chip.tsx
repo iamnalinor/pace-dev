@@ -23,7 +23,7 @@ const chipFill = (color: null | ProjectColorName, isSelected: boolean): string =
 
 const chipText = (color: null | ProjectColorName, isSelected: boolean): string => {
   if (isSelected) {
-    return color === null ? "font-medium text-fg" : "font-medium text-accentFg";
+    return color === null ? "font-medium text-fg" : "font-medium text-onColor";
   }
   return color === null ? "text-fg2" : inkClass(color);
 };

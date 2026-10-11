@@ -22,6 +22,7 @@ export type PaletteName =
   | "inverseFg"
   | "line"
   | "muted"
+  | "onColor"
   | "question"
   | "raised"
   | "surface"
@@ -60,17 +61,27 @@ export type Tokens = {
 export const tokens: Tokens = tokensJson;
 
 /**
-Each importance's color from the project palette: hot for ASAP, warm for Prioritized, none
-for Normal, cool for Nice-to-have. Shown as a tinted tag (`ink-*` text on a light wash of
-the color) and as the row's edge.
+Each importance's color from the project palette: red for ASAP, warm for Prioritized, green
+for Normal (the calm default), cool for Nice-to-have. Shown as a tinted tag (`ink-*` text on
+a light wash of the color).
 */
 export const IMPORTANCE_COLORS: Readonly<
   Record<"asap" | "nice_to_have" | "normal" | "prioritized", null | ProjectColorName>
 > = {
   asap: "coral",
   prioritized: "amber",
-  normal: null,
+  normal: "green",
   nice_to_have: "slate",
+};
+
+/** A task status's tag color: work under way stands out in blue; the rest stay neutral. */
+export const STATUS_COLORS: Readonly<
+  Record<"in_progress" | "not_started" | "paused" | "waiting", null | ProjectColorName>
+> = {
+  not_started: null,
+  in_progress: "blue",
+  paused: null,
+  waiting: null,
 };
 
 /** The text color of a tag in `color`: the project color itself on dark, a deeper shade on light. */

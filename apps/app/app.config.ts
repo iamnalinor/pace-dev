@@ -96,7 +96,7 @@ const config: ExpoConfig = {
     ],
     [
       "expo-notifications",
-      { color: "#d4ff3a", defaultChannel: "default", icon: "./assets/notification-icon.png" },
+      { color: "#4263eb", defaultChannel: "default", icon: "./assets/notification-icon.png" },
     ],
     ["expo-share-intent", { androidIntentFilters: ["text/*"] }],
     "expo-sqlite",

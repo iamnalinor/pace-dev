@@ -182,7 +182,7 @@ type ButtonProps = {
 };
 
 /**
-A big button in its fixed place: icon over name, its color's outline, lime while it runs.
+A big button in its fixed place: icon over name, its color's outline, filled with the accent while it runs.
 A long press, a right click or "⋯" opens what it can start and "alongside".
 */
 const BarButton = ({ button, onMore, onTap }: ButtonProps) => {

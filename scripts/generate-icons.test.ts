@@ -40,16 +40,17 @@ describe("generate-icons", () => {
     expect(renderPng(first.svg, first.size).equals(renderPng(first.svg, first.size))).toBe(true);
   });
 
-  it("ships the logo SVGs with the board 08 palettes", () => {
+  it("ships the logo SVGs with the board 08 shapes in the indigo accent", () => {
     const svg = Object.fromEntries(LOGO_FILES.map((file) => [file.path, file.svg]));
-    expect(svg["assets/logo/pace-mark.svg"]).toContain("#d4ff3a");
+    expect(svg["assets/logo/pace-mark.svg"]).toContain("#91a7ff");
     expect(svg["assets/logo/pace-mark.svg"]).toContain("#6a6a74");
     expect(svg["assets/logo/pace-mark.svg"]).not.toContain("#0b0b0c");
     expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#b9bcc6");
-    expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#17181c");
+    expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#3b5bdb");
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain(">pace<");
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain("Inter, system-ui, sans-serif");
-    expect(svg["assets/logo/favicon.svg"]).toContain("#d4ff3a");
+    expect(svg["assets/logo/favicon.svg"]).toContain("#4263eb");
+    expect(Object.values(svg).join("")).not.toContain("#d4ff3a");
     expect(svg["assets/logo/favicon.svg"]).not.toContain("<circle");
     expect(svg["apps/app/public/favicon.svg"]).toBe(svg["assets/logo/favicon.svg"]);
   });
