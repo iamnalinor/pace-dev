@@ -135,7 +135,21 @@ export const EditTaskSheet = ({
     onClose();
   };
   return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} title={t("edit.title")} visible>
+    <Sheet
+      closeLabel={t("common.close")}
+      footer={
+        <SheetActions
+          isDisabled={values.title.trim() === ""}
+          onPrimary={() => {
+            void save();
+          }}
+          primaryLabel={t("common.save")}
+        />
+      }
+      onClose={onClose}
+      title={t("edit.title")}
+      visible
+    >
       <TaskFields
         onChange={(patch) => {
           setValues((current) => ({ ...current, ...patch }));
@@ -156,13 +170,6 @@ export const EditTaskSheet = ({
         onRemoveKept={(id) => {
           setRemoved((current) => [...current, id]);
         }}
-      />
-      <SheetActions
-        isDisabled={values.title.trim() === ""}
-        onPrimary={() => {
-          void save();
-        }}
-        primaryLabel={t("common.save")}
       />
     </Sheet>
   );

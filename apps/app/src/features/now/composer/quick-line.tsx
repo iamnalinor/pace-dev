@@ -15,7 +15,7 @@ import { KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 type LineFlow = {
   readonly text: string;
   readonly model: Pick<ComposerModel, "isEmpty">;
-  readonly isAdded: boolean;
+  readonly isLineFocused: boolean;
   readonly type: (next: string) => void;
   readonly enter: () => void;
   readonly expand: () => void;
@@ -90,9 +90,12 @@ export const QuickActions = ({
 export const QuickLine = ({
   flow,
   isFocused,
+  onFocusChange,
 }: {
   readonly flow: LineFlow;
   readonly isFocused: boolean;
+  /** The card shows a focus ring while the cursor is in the line. */
+  readonly onFocusChange: (isInFocus: boolean) => void;
 }) => {
   const t = useT();
   const { palette } = useTheme();
@@ -107,13 +110,19 @@ export const QuickLine = ({
       <TextInput
         {...(KEYBOARD !== null && { accessibilityHint: t("composer.quickHint") })}
         accessibilityLabel={t("composer.label")}
-        autoFocus={isFocused || flow.isAdded}
+        autoFocus={isFocused || flow.isLineFocused}
         // Grows with a pasted message up to about eight lines.
         className="mb-1 flex-1 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
         multiline
+        onBlur={() => {
+          onFocusChange(false);
+        }}
         onChangeText={flow.type}
         onContentSizeChange={(event) => {
           setInputHeight(heightOf(event.nativeEvent.contentSize.height));
+        }}
+        onFocus={() => {
+          onFocusChange(true);
         }}
         {...lineEnterProps({
           onEnter: () => {

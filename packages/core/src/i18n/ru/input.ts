@@ -102,6 +102,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "composer.parse": "Разобрать",
   "composer.quickHint": "Enter: ассистент заполнит форму для проверки. Shift+Enter: новая строка.",
   "composer.formTitle": "Проверьте перед добавлением",
+  "composer.formHint": "Enter добавит задачу, Esc свернёт форму.",
   "composer.expand": "Заполнить форму самому",
   "composer.collapse": "Вернуться к строке",
   "composer.label": "Новая задача",

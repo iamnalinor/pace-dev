@@ -100,6 +100,7 @@ export const enInput = {
   "composer.parse": "Parse",
   "composer.quickHint": "Enter: the assistant fills in a form to check. Shift+Enter: a new line.",
   "composer.formTitle": "Check before adding",
+  "composer.formHint": "Enter adds the task, Esc folds the form back.",
   "composer.expand": "Fill in the form yourself",
   "composer.collapse": "Back to the line",
   "composer.label": "New task",

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { ChevronLeft } from "lucide-react-native";
+import { ChevronLeft, type LucideIcon } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { cx } from "./cx.ts";
@@ -8,11 +8,14 @@ import { useTheme } from "./theme-provider.tsx";
 
 /** The pushed-screen header (Inbox, Project, Task): a 44px back chevron, a title, actions. */
 export const BackHeader = ({
+  backIcon: BackIcon = ChevronLeft,
   backLabel,
   children,
   onBack,
   right,
 }: {
+  /** A cross for a pane that closes rather than a screen to go back from. */
+  readonly backIcon?: LucideIcon;
   readonly backLabel: string;
   readonly children?: ReactNode;
   /** Without it there is no back chevron (a top-level screen beside the sidebar). */
@@ -34,7 +37,7 @@ export const BackHeader = ({
           className="h-11 w-11 items-center justify-center active:opacity-70"
           onPress={onBack}
         >
-          <ChevronLeft color={palette.fg2} size={20} strokeWidth={1.75} />
+          <BackIcon color={palette.fg2} size={20} strokeWidth={1.75} />
         </Pressable>
       )}
       <View className="flex-1 flex-row items-center gap-1.5">{children}</View>

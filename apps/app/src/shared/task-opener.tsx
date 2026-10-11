@@ -56,3 +56,6 @@ export const useTaskBack = (): (() => void) => {
   const closePane = use(PaneContext);
   return closePane ?? router.back;
 };
+
+/** Whether the task sits in the pane beside the list (its "back" closes the pane). */
+export const useIsInPane = (): boolean => use(PaneContext) !== null;

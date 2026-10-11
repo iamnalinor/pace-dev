@@ -11,7 +11,7 @@ import { Chip } from "#app/ui/chip.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { HotkeyLayer, useHotkey } from "#app/ui/use-hotkey.tsx";
+import { HotkeyLayer, KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
 /** The form's values from the composer's reading: the edits over the rules' reading of the text. */
@@ -25,7 +25,7 @@ const valuesOf = (model: ComposerModel): TaskFormValues => ({
   presetId: model.preset.id,
   projectId: model.project?.id ?? null,
   start: model.start,
-  title: model.title === "" ? model.text.trim() : model.title,
+  title: model.title,
 });
 
 /** A changed link: a blank one clears the link. */
@@ -90,34 +90,54 @@ const TargetRow = ({
   );
 };
 
-/** "Check before adding" and the fold back to the line, where the line's own chevron was. */
+/**
+"Check before adding", the action and the fold back to the line, all at the top: the action is
+in sight however long the form, and on a computer a line says which keys do what.
+*/
 const FormHeader = ({
+  actionLabel,
+  canAdd,
   onAdd,
   onCollapse,
 }: {
+  readonly actionLabel: string;
+  readonly canAdd: boolean;
   readonly onAdd: () => void;
   readonly onCollapse: () => void;
 }) => {
   const t = useT();
   const { palette } = useTheme();
   useHotkey(HOTKEYS.escape, onCollapse);
-  // The second Enter, wherever the focus is outside a field or a button.
+  // The second Enter, wherever the focus is outside a field or a button; ⌘↵ from anywhere.
   useHotkey(HOTKEYS.enter, onAdd);
+  useHotkey(HOTKEYS.primary, onAdd);
   return (
-    <View className="flex-row items-center justify-between">
-      <Text accessibilityRole="header" className="font-sans text-[13px] font-medium text-fg2">
-        {t("composer.formTitle")}
-      </Text>
-      <Pressable
-        accessibilityLabel={t("composer.collapse")}
-        accessibilityRole="button"
-        aria-expanded
-        className="h-9 w-9 items-center justify-center rounded-md active:opacity-70"
-        hitSlop={4}
-        onPress={onCollapse}
-      >
-        <ChevronUp color={palette.muted} size={18} strokeWidth={2} />
-      </Pressable>
+    <View className="gap-1">
+      <View className="flex-row items-center gap-2">
+        <Text
+          accessibilityRole="header"
+          className="flex-1 font-sans text-[13px] font-medium text-fg2"
+        >
+          {t("composer.formTitle")}
+        </Text>
+        <View className="shrink">
+          <Button disabled={!canAdd} hotkey={HOTKEYS.enter} hotkeyMode="hint" onPress={onAdd}>
+            {actionLabel}
+          </Button>
+        </View>
+        <Pressable
+          accessibilityLabel={t("composer.collapse")}
+          accessibilityRole="button"
+          aria-expanded
+          className="h-11 w-11 items-center justify-center rounded-md active:opacity-70"
+          onPress={onCollapse}
+        >
+          <ChevronUp color={palette.muted} size={18} strokeWidth={2} />
+        </Pressable>
+      </View>
+      {KEYBOARD === null ? null : (
+        <Text className="font-sans text-[12px] text-muted">{t("composer.formHint")}</Text>
+      )}
     </View>
   );
 };
@@ -198,18 +218,21 @@ export const ComposerForm = ({
 }) => {
   const t = useT();
   const isInstance = model.target.kind === "instance";
-  const title = model.title === "" ? model.text.trim() : model.title;
   return (
     <HotkeyLayer>
       <View accessibilityLabel={t("composer.formTitle")} className="gap-3.5 p-2" role="form">
-        <FormHeader onAdd={onAdd} onCollapse={onCollapse} />
+        <FormHeader
+          actionLabel={
+            model.target.kind === "instance"
+              ? t("composer.addTo", { title: model.target.title })
+              : t("form.create")
+          }
+          canAdd={model.title.trim() !== "" || isInstance}
+          onAdd={onAdd}
+          onCollapse={onCollapse}
+        />
         {status}
         <FormFields isTitleFocused={isTitleFocused} model={model} onAdd={onAdd} onEdit={onEdit} />
-        <Button disabled={!isInstance && title === ""} hotkey={HOTKEYS.primary} onPress={onAdd}>
-          {model.target.kind === "instance"
-            ? t("composer.addTo", { title: model.target.title })
-            : t("form.create")}
-        </Button>
       </View>
     </HotkeyLayer>
   );

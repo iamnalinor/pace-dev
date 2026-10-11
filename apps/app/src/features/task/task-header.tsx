@@ -1,10 +1,10 @@
-import { Ban, ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react-native";
+import { Ban, ChevronDown, Pause, Pencil, Play, Trash2, X } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { useTaskBack } from "#app/shared/task-opener.tsx";
+import { useIsInPane, useTaskBack } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { BackHeader } from "#app/ui/back-header.tsx";
 import { inkClass } from "#app/ui/color.tsx";
@@ -101,10 +101,13 @@ export const TaskHeader = ({
 }) => {
   const t = useT();
   const back = useTaskBack();
+  const isInPane = useIsInPane();
   const { palette } = useTheme();
   return (
     <BackHeader
-      backLabel={t("common.back")}
+      // Beside the list the task is a pane: it closes, there is nothing to go back to.
+      {...(isInPane && { backIcon: X })}
+      backLabel={t(isInPane ? "common.close" : "common.back")}
       onBack={back}
       right={actions === undefined ? null : <TaskActions {...actions} />}
     >

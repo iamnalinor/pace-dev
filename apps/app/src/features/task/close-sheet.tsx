@@ -73,6 +73,10 @@ export const CloseSheet = ({
   return (
     <Sheet
       closeLabel={t("common.close")}
+      // In sight however short the window: the action stays under the scrolling body.
+      footer={
+        <SheetActions isDisabled={form.at === null} onPrimary={submit} primaryLabel={primary} />
+      }
       onClose={onClose}
       subtitle={isSubmit ? t("close.subtitleSolved", { title: view.title }) : view.title}
       title={isSubmit ? submitTitle : t("close.closeTitle")}
@@ -82,7 +86,6 @@ export const CloseSheet = ({
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
       <PrecisionRow form={form} />
       <ClosePreview form={form} view={view} />
-      <SheetActions isDisabled={form.at === null} onPrimary={submit} primaryLabel={primary} />
       {form.mode === "other" ? null : (
         <Pressable
           accessibilityRole="button"

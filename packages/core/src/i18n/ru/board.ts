@@ -51,7 +51,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "task.due": "Срок",
   "task.start": "Начало",
   "task.noDue": "Без срока",
-  "task.workLeft": "Осталось",
+  "task.workLeft": "Осталось работы",
   "task.tracked": "Затрачено",
   "task.problems": "Задачи",
   "task.problemsSummary": "{solved} решено · {sent} отправлено",

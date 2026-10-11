@@ -29,7 +29,10 @@ export const TaskRows = ({
   const { check, opensSheet } = useCheckTask();
   // Rows turning to dust after their check; each closes once its dust has gone.
   const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
+  // Rows that turned to dust leave without the fade: it would bring them back for a moment.
+  const [dissolved] = useState(() => new Set<string>());
   const settle = (row: NowRow): void => {
+    dissolved.add(row.id);
     check(row);
     setDissolving((current) => new Set([...current].filter((id) => id !== row.id)));
   };
@@ -38,8 +41,8 @@ export const TaskRows = ({
       {rows.map((row) => (
         <Animated.View
           entering={ROW_ENTER}
-          exiting={ROW_EXIT}
           key={row.id}
+          {...(!dissolved.has(row.id) && { exiting: ROW_EXIT })}
           layout={ROW_LAYOUT}
           role="listitem"
         >
