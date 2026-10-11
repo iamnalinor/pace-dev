@@ -64,7 +64,7 @@ for (const size of SIZES) {
       await expect(heading).toBeVisible();
       // The sheet's surface is opaque: it once lost its background and showed the page through.
       const isOpaque = await heading.evaluate((element) => {
-        const panel = element.parentElement;
+        const panel = element.closest('[role="dialog"]');
         return panel !== null && getComputedStyle(panel).backgroundColor.startsWith("rgb(");
       });
       expect(isOpaque).toBe(true);

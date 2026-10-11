@@ -8,16 +8,20 @@ import { resolvePreset } from "@pace/core";
 
 import { useRunAction } from "./use-run-action.ts";
 
-/**
-The row's check: a task submitted problem by problem opens its submit sheet (which problems,
-when); anything else is closed as done at once (History undoes it).
-*/
-export const useCheckTask = (): ((row: NowRow) => void) => {
+export type CheckTask = {
+  /** A task submitted problem by problem: the check opens its submit sheet (which, when). */
+  readonly opensSheet: (row: NowRow) => boolean;
+  /** The sheet for such a task; anything else is closed as done (History undoes it). */
+  readonly check: (row: NowRow) => void;
+};
+
+/** The row's check: close as done, or the submit sheet of a task sent problem by problem. */
+export const useCheckTask = (): CheckTask => {
   const { actions, state } = usePace();
   const openTask = useOpenTask();
   const run = useRunAction();
-  return useCallback(
-    (row: NowRow) => {
+  const opensSheet = useCallback(
+    (row: NowRow): boolean => {
       const current = state.store.getState();
       const task = current.tasks.byId[row.id];
       const preset =
@@ -25,12 +29,19 @@ export const useCheckTask = (): ((row: NowRow) => void) => {
           ? undefined
           : resolvePreset(current.presets, task.presetId, task.overrides ?? undefined);
       const hasProblems = (task?.subtasks.length ?? 0) > 0;
-      if (hasProblems && preset?.ok === true && preset.value.submission === "per_subtask") {
+      return hasProblems && preset?.ok === true && preset.value.submission === "per_subtask";
+    },
+    [state],
+  );
+  const check = useCallback(
+    (row: NowRow) => {
+      if (opensSheet(row)) {
         openTask(row.id, { close: true });
         return;
       }
       void run(actions.closeTask({ outcome: "done", taskId: row.id }));
     },
-    [actions, openTask, run, state],
+    [actions, openTask, opensSheet, run],
   );
+  return { check, opensSheet };
 };

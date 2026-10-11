@@ -79,12 +79,21 @@ describe("NowBoard", () => {
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
   });
 
-  it("checks a task off at once, without a toast (History undoes it)", async () => {
+  it("checks a task off: it dissolves, then closes, without a toast (History undoes it)", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<NowBoard />, runtime);
-    await fireEvent.press(
-      screen.getByRole("checkbox", { name: "Mark Reply to course curator done" }),
-    );
+    const check = screen.getByRole("checkbox", { name: "Mark Reply to course curator done" });
+    await fireEvent.press(check);
+    // Checked at once while it turns to dust; written once the dust has gone.
+    expect(check).toBeChecked();
+    const closed = () =>
+      Object.values(runtime.state.store.getState().tasks.byId).find(
+        (task) => task.title === "Reply to course curator",
+      )?.closed;
+    expect(closed()).toBeNull();
+    await waitFor(() => {
+      expect(closed()).not.toBeNull();
+    });
     await waitFor(() => {
       expect(screen.queryByText("Reply to course curator")).toBeNull();
     });

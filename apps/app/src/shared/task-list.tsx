@@ -26,7 +26,13 @@ export const TaskRows = ({
   readonly withTag?: boolean;
 }) => {
   const openTask = useOpenTask();
-  const check = useCheckTask();
+  const { check, opensSheet } = useCheckTask();
+  // Rows turning to dust after their check; each closes once its dust has gone.
+  const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
+  const settle = (row: NowRow): void => {
+    check(row);
+    setDissolving((current) => new Set([...current].filter((id) => id !== row.id)));
+  };
   return (
     <View aria-label={label} className="px-2" role="list">
       {rows.map((row) => (
@@ -39,6 +45,10 @@ export const TaskRows = ({
         >
           <TaskRow
             checked={checked}
+            isDissolving={dissolving.has(row.id)}
+            onDissolved={() => {
+              settle(row);
+            }}
             onOpen={() => {
               openTask(row.id);
             }}
@@ -46,7 +56,11 @@ export const TaskRows = ({
             withTag={withTag}
             {...(!checked && {
               onCheck: () => {
-                check(row);
+                if (opensSheet(row)) {
+                  check(row);
+                } else {
+                  setDissolving((current) => new Set([...current, row.id]));
+                }
               },
             })}
           />

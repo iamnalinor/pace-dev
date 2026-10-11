@@ -4,7 +4,7 @@ import * as Calendar from "expo-calendar";
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -95,6 +95,35 @@ describe("TimeBar", () => {
       ]);
     });
     expect(field).toHaveDisplayValue("");
+  });
+
+  it("shows the typed words as a draft while the assistant reads them", async () => {
+    const answer: { resolve: (value: unknown) => void } = { resolve: () => undefined };
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/parse/activity": async () =>
+          await new Promise((resolve) => {
+            answer.resolve = resolve;
+          }),
+      },
+    });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    // Outlined, not a category's colored tag: it is still being read.
+    expect(
+      await screen.findByLabelText(en("time.draft", { label: "Пошел в ЦСС" })),
+    ).toBeOnTheScreen();
+    answer.resolve({
+      provider: "fake",
+      reading: { category: "sport", expectMinutes: 20, label: "ЦСС" },
+      status: "parsed",
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("time.draft", { label: "Пошел в ЦСС" }))).toBeNull();
+    });
+    expect(screen.getByText("ЦСС")).toBeOnTheScreen();
   });
 
   it("starts the calendar's event going on now, from its start", async () => {

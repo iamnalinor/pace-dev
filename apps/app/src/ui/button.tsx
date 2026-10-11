@@ -23,7 +23,7 @@ const LABEL: Readonly<Record<ButtonVariant, string>> = {
 
 const HINT: Readonly<Record<ButtonVariant, string>> = {
   ghost: "text-muted",
-  primary: "text-accentFg opacity-70",
+  primary: "text-accentFg",
   secondary: "text-muted",
 };
 
