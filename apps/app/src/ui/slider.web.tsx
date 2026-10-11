@@ -4,9 +4,10 @@ import type { SliderProps } from "./slider-props.ts";
 
 /**
 The web slider is the browser's own range input (styled in `global.css` by its `data-pace-slider` attribute): drag, click on the
-track, arrow keys and screen readers come with it. The value is committed on release.
+track, arrow keys and screen readers come with it. The value is committed on release; while
+it moves, `onSlide` reports every step so the readouts follow the thumb.
 */
-export const Slider = ({ label, max, onChange, value }: SliderProps) => {
+export const Slider = ({ label, max, onChange, onSlide, value }: SliderProps) => {
   const [draft, setDraft] = useState<null | number>(null);
   const shown = draft ?? value;
   const commit = (): void => {
@@ -14,6 +15,7 @@ export const Slider = ({ label, max, onChange, value }: SliderProps) => {
       onChange(draft);
     }
     setDraft(null);
+    onSlide?.(null);
   };
   return (
     <input
@@ -23,7 +25,9 @@ export const Slider = ({ label, max, onChange, value }: SliderProps) => {
       min={0}
       onBlur={commit}
       onChange={(event) => {
-        setDraft(Number(event.target.value));
+        const next = Number(event.target.value);
+        setDraft(next);
+        onSlide?.(next);
       }}
       onKeyUp={commit}
       onPointerUp={commit}

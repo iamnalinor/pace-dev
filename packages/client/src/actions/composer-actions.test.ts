@@ -9,7 +9,7 @@ const read = (world: Awaited<ReturnType<typeof setupActions>>, text: string) =>
   composerModel(world.state.store.getState(), { text }, ctx());
 
 describe("createFromComposer", () => {
-  it("creates a task from the chips, storing the importance and the typed line", async () => {
+  it("creates a task from the chips, storing the importance, not the typed line", async () => {
     const world = await setupActions();
     const text = "синк по дашборду завтра 15:00 1ч https://meet.example.com/abc";
     const [created] = unwrap(await world.actions.createFromComposer(read(world, text)));
@@ -22,9 +22,19 @@ describe("createFromComposer", () => {
       dueAt: "2026-10-07T12:00:00.000Z",
       dueTz: MOSCOW,
       estimateMinutes: 60,
-      sourceText: text,
       fields: { link: "https://meet.example.com/abc" },
     });
+    // Typed by hand, the line is the task: there is no original message to keep.
+    expect(created?.type === "task.created" && created.payload.sourceText).toBeUndefined();
+  });
+
+  it("keeps the message the assistant read as the task's source", async () => {
+    const world = await setupActions();
+    const text = "пришло дз: разобрать почту до пятницы";
+    const [created] = unwrap(
+      await world.actions.createFromComposer(read(world, text), { readByAssistant: true }),
+    );
+    expect(created?.type === "task.created" && created.payload.sourceText).toBe(text);
   });
 
   it("adds typed problems to this week's homework instead of a new task", async () => {

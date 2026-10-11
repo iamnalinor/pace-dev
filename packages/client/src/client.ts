@@ -189,6 +189,7 @@ export {
   type TaskTag,
   type TaskViewModel,
   taskViewModel,
+  workLeftAt,
 } from "./view-models/task.ts";
 export {
   type ChoiceView,

@@ -56,7 +56,12 @@ const Stat = ({
   readonly note?: string;
   readonly value: string;
 }) => (
-  <View className="flex-1 gap-0.5">
+  <View
+    accessibilityLabel={label}
+    accessibilityValue={{ text: value }}
+    accessible
+    className="flex-1 gap-0.5"
+  >
     <Text className="font-sans text-[11px] text-muted">{label}</Text>
     <Text className="font-sans text-[15px] tabular-nums text-fg">{value}</Text>
     {note === undefined ? null : <Text className="font-sans text-[11px] text-faint">{note}</Text>}
@@ -94,7 +99,14 @@ const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
 };
 
 /** Title, link and tags; the stats card: start, due, work left, tracked. */
-export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
+export const TaskSummary = ({
+  view,
+  workLeftMinutes = view.stats.workLeftMinutes,
+}: {
+  readonly view: TaskViewModel;
+  /** The work left at the progress being dragged, before it is saved. */
+  readonly workLeftMinutes?: number;
+}) => {
   const t = useT();
   const viewer = useViewer();
   const { stats } = view;
@@ -139,7 +151,7 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
             note={t("task.estimate", {
               duration: formatDuration(stats.estimateMinutes, viewer.language),
             })}
-            value={formatDuration(stats.workLeftMinutes, viewer.language)}
+            value={formatDuration(workLeftMinutes, viewer.language)}
           />
           <Stat
             label={t("task.tracked")}

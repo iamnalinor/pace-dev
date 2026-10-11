@@ -115,9 +115,16 @@ describe("TaskScreen — work", () => {
     expect(screen.queryByRole("button", { name: "Waiting" })).toBeNull();
   });
 
-  it("moves the progress slider and pauses the task", async () => {
+  it("moves the progress slider in percent, the work left following at once", async () => {
     const runtime = await trkScreen();
-    expect(screen.getByText("4 / 10")).toBeOnTheScreen();
+    expect(screen.getByText("40%")).toBeOnTheScreen();
+    const workLeft = (): string => {
+      const value = screen.getByLabelText(en("task.workLeft")).props["accessibilityValue"] as
+        | undefined
+        | { readonly text?: string };
+      return value?.text ?? "";
+    };
+    const before = workLeft();
     await fireEvent(
       screen.getByRole("adjustable", { name: en("task.progressAria") }),
       "accessibilityAction",
@@ -125,9 +132,13 @@ describe("TaskScreen — work", () => {
         nativeEvent: { actionName: "increment" },
       },
     );
+    // Shown before the store answers: the thumb never jumps back to where it was.
+    expect(screen.getByText("50%")).toBeOnTheScreen();
+    expect(workLeft()).not.toBe(before);
     await waitFor(() => {
-      expect(screen.getByText("5 / 10")).toBeOnTheScreen();
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.slider).toBe(5);
     });
+    expect(screen.getByText("50%")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.pause") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.status).toBe("paused");

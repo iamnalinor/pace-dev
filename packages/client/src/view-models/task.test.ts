@@ -14,7 +14,7 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
-import { type TaskViewModel, taskViewModel } from "./task.ts";
+import { type TaskViewModel, taskViewModel, workLeftAt } from "./task.ts";
 
 const view = (taskId: string, now: string, deviceTz?: string): TaskViewModel => {
   const result = taskViewModel(artboardState(now), taskId, ctx(now, deviceTz));
@@ -23,6 +23,43 @@ const view = (taskId: string, now: string, deviceTz?: string): TaskViewModel => 
   }
   return result.value;
 };
+
+/** The books task with another source text: what the original-message disclosure is about. */
+const withSource = (sourceText: null | string): TaskViewModel => {
+  const state = artboardState(TRK_NOW);
+  const task = state.tasks.byId[BOOKS_ID];
+  if (task === undefined) {
+    throw new Error("fixture lost the books task");
+  }
+  const changed = {
+    ...state,
+    tasks: { byId: { ...state.tasks.byId, [BOOKS_ID]: { ...task, sourceText } } },
+  };
+  const result = taskViewModel(changed, BOOKS_ID, ctx(TRK_NOW));
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.value;
+};
+
+describe("sourceText", () => {
+  it("is only the message the title was read from, never a copy of the title", () => {
+    const title = withSource(null).title;
+    expect(withSource(` ${title}  `).sourceText).toBeNull();
+    expect(withSource(null).sourceText).toBeNull();
+    const message = `Please ${title.toLowerCase()} before Friday, the link is in the chat`;
+    expect(withSource(message).sourceText).toBe(message);
+  });
+});
+
+describe("workLeftAt", () => {
+  it("counts the work left from a progress being dragged, before it is saved", () => {
+    const trk = view(TRK_ID, TRK_NOW, "UTC");
+    expect(workLeftAt(trk, 0)).toBe(trk.stats.estimateMinutes);
+    expect(workLeftAt(trk, 3)).toBe(Math.round(trk.stats.estimateMinutes * 0.7));
+    expect(workLeftAt(trk, 10)).toBe(0);
+  });
+});
 
 describe("taskViewModel", () => {
   it("takes the link from the description when none was set", () => {
