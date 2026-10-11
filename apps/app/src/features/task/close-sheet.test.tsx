@@ -48,7 +48,11 @@ describe("CloseSheet — submitting problems", () => {
   it("submits an hour ago as an approximate time", async () => {
     const runtime = await openSubmit();
     await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.hour-ago") }));
-    await fireEvent(screen.getByRole("switch", { name: en("close.exact") }), "valueChange", false);
+    // Both choices in sight as chips, not a switch to decode.
+    expect(screen.getByRole("radio", { checked: true, name: en("close.exact") })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.approx") }));
+    // Leaving is the dim (or the cross on a wide window), not a Back button.
+    expect(screen.queryByRole("button", { name: en("common.back") })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("close.submit") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().log.at(-1)?.type).toBe("task.submitted");

@@ -1,4 +1,4 @@
-import { ChevronDown, CircleX, Pause, Pencil, Play } from "lucide-react-native";
+import { Ban, ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
@@ -11,26 +11,56 @@ import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { useToast } from "#app/ui/toast.tsx";
+
+/** Deletes the task at once and goes back; the toast's Undo brings it back. */
+const useDeleteTask = (view: TaskViewModel): (() => void) => {
+  const t = useT();
+  const { actions } = usePace();
+  const back = useTaskBack();
+  const toast = useToast();
+  const run = useRunAction();
+  return () => {
+    void (async () => {
+      const result = await actions.deleteTask(view.id);
+      if (!(await run(Promise.resolve(result))) || !result.ok) {
+        return;
+      }
+      back();
+      const [revocation] = result.value;
+      toast.show({
+        message: t("task.deleted", { title: view.title }),
+        ...(revocation !== undefined && {
+          action: {
+            label: t("common.undo"),
+            onPress: () => void run(actions.revoke(revocation.id)),
+          },
+        }),
+      });
+    })();
+  };
+};
 
 /**
-Edit, pause or resume, close without doing: the task's actions as icons, no menu in between.
-Nothing is deleted (History keeps every task); the last one closes as Cancelled or Skipped.
+Edit, pause or resume, give up (Cancelled or Skipped, kept in History) and delete (gone, with
+Undo in the toast): the task's actions as icons, no menu in between.
 */
 const TaskActions = ({
-  onDelete,
+  onGiveUp,
   onEdit,
   view,
 }: {
   readonly view: TaskViewModel;
   readonly onEdit: () => void;
   /** Opens the close sheet on Cancelled · Skipped, which is the confirmation. */
-  readonly onDelete: () => void;
+  readonly onGiveUp: () => void;
 }) => {
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
   const isOpen = view.closed === null;
   const isPaused = view.tags.some((tag) => tag.kind === "status" && tag.status === "paused");
+  const remove = useDeleteTask(view);
   return (
     <View className="flex-row">
       <IconButton icon={Pencil} label={t("task.edit")} onPress={onEdit} variant="plain" />
@@ -45,8 +75,9 @@ const TaskActions = ({
         />
       ) : null}
       {isOpen ? (
-        <IconButton icon={CircleX} label={t("task.delete")} onPress={onDelete} variant="plain" />
+        <IconButton icon={Ban} label={t("task.giveUp")} onPress={onGiveUp} variant="plain" />
       ) : null}
+      <IconButton icon={Trash2} label={t("task.delete")} onPress={remove} variant="plain" />
     </View>
   );
 };
@@ -54,7 +85,7 @@ const TaskActions = ({
 export type TaskHeaderActions = {
   readonly view: TaskViewModel;
   readonly onEdit: () => void;
-  readonly onDelete: () => void;
+  readonly onGiveUp: () => void;
 };
 
 /** Back, the project (tap to move the task), and the task's actions. */

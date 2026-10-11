@@ -164,17 +164,30 @@ describe("TaskScreen — work", () => {
     });
   });
 
-  it("deletes from the header's trash: the close sheet opens on Cancelled · Skipped", async () => {
+  it("gives up from the header's ⊘: the close sheet opens on Cancelled · Skipped", async () => {
     await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("task.giveUp") }));
     expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeOnTheScreen();
+  });
+
+  it("deletes from the header's trash at once, goes back, and Undo brings it back", async () => {
+    const runtime = await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeUndefined();
+    });
+    expect(router.back).toHaveBeenCalled();
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+    });
   });
 
   it("finishes in one tap on Done; a long press opens the sheet for another time", async () => {
     const runtime = await trkScreen();
     await fireEvent(screen.getByRole("button", { name: en("task.done") }), "longPress");
     expect(screen.getByText(en("close.whenDone"))).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("common.back") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.close") }));
     await fireEvent.press(screen.getByRole("button", { name: en("task.done") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed).toMatchObject({

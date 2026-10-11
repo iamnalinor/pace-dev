@@ -3,22 +3,45 @@ import { Pressable, Text } from "react-native";
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
+import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { SwitchRow } from "#app/ui/switch-row.tsx";
 
 import type { CloseMode } from "./close-model.ts";
 
 import { ClosePreview } from "./close-preview.tsx";
 import { GiveUpFields } from "./give-up-fields.tsx";
-import { useCloseForm } from "./use-close-form.ts";
+import { type CloseForm, useCloseForm } from "./use-close-form.ts";
 import { useSubmitClose } from "./use-submit-close.ts";
 import { useSubmitTitle } from "./use-submit-title.ts";
 import { WhenPicker } from "./when-picker.tsx";
 
+/** Exactly or about then: both choices in sight as chips, like the rest of the sheet. */
+const PrecisionRow = ({ form }: { readonly form: CloseForm }) => {
+  const t = useT();
+  return (
+    <OptionRow label={t("close.precision")}>
+      {([true, false] as const).map((isExact) => (
+        <Chip
+          key={String(isExact)}
+          onPress={() => {
+            form.setIsExact(isExact);
+          }}
+          selected={form.isExact === isExact}
+          tall
+        >
+          {t(isExact ? "close.exact" : "close.approx")}
+        </Chip>
+      ))}
+    </OptionRow>
+  );
+};
+
 /**
-The Close artboard: when it happened (pills or an exact time), whether that time is exact,
+The Close artboard: when it happened (pills or an exact time), exactly or about then (two
+chips, so both choices are in sight),
 a preview of what gets recorded, and the way out ("Close task as… Cancelled · Skipped").
 */
 export const CloseSheet = ({
@@ -57,21 +80,9 @@ export const CloseSheet = ({
     >
       {form.mode === "other" ? <GiveUpFields form={form} /> : null}
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
-      <SwitchRow
-        hint={t("close.exactHint")}
-        isOn={form.isExact}
-        label={t("close.exact")}
-        onChange={form.setIsExact}
-      />
+      <PrecisionRow form={form} />
       <ClosePreview form={form} view={view} />
-      <SheetActions
-        // "Back", not "Cancel": next to Cancelled and "Close as Cancelled" it read as a third.
-        cancelLabel={t("common.back")}
-        isDisabled={form.at === null}
-        onCancel={onClose}
-        onPrimary={submit}
-        primaryLabel={primary}
-      />
+      <SheetActions isDisabled={form.at === null} onPrimary={submit} primaryLabel={primary} />
       {form.mode === "other" ? null : (
         <Pressable
           accessibilityRole="button"

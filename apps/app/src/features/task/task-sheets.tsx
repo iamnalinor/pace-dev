@@ -158,9 +158,7 @@ export const EditTaskSheet = ({
         }}
       />
       <SheetActions
-        cancelLabel={t("common.cancel")}
         isDisabled={values.title.trim() === ""}
-        onCancel={onClose}
         onPrimary={() => {
           void save();
         }}

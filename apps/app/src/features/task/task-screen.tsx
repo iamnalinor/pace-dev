@@ -19,7 +19,7 @@ import { EditTaskSheet } from "./task-sheets.tsx";
 import { TaskSummary } from "./task-summary.tsx";
 import { WorkProgress } from "./work-progress.tsx";
 
-/** Delete opens the close sheet on Cancelled · Skipped. */
+/** Give up opens the close sheet on Cancelled · Skipped. */
 const CLOSE_AS: CloseMode = "other";
 
 type Open = "close" | "close-as" | "edit" | "project" | null;
@@ -106,7 +106,7 @@ export const TaskScreen = ({
           header={
             <TaskHeader
               actions={{
-                onDelete: () => {
+                onGiveUp: () => {
                   setOpen("close-as");
                 },
                 onEdit: () => {

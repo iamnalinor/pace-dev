@@ -214,8 +214,6 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         patch={patch}
       />
       <SheetActions
-        cancelLabel={t("common.cancel")}
-        onCancel={onClose}
         onPrimary={() => {
           void save();
         }}
