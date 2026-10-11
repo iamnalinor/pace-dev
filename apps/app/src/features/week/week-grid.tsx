@@ -42,7 +42,8 @@ export const dayLabel = (date: string, zone: string, language: Language): string
   );
 
 /** Text inside a box only when it has room for a line. */
-const MIN_LABEL_PX = 16;
+/** A block or an event is at least this tall: a two-minute one is still something to tap. */
+const MIN_TARGET_PX = 24;
 
 const px = (minutes: number, hourPx: number): number => (minutes / 60) * hourPx;
 
@@ -163,21 +164,16 @@ const DayItems = ({
         }}
         style={{
           ...laneStyle(lanes[index] ?? { lane: 0, lanes: 1 }),
-          height: Math.max(2, height),
+          height: Math.max(MIN_TARGET_PX, height),
           top: px(item.at.top, grid.hourPx),
         }}
       >
-        {height >= MIN_LABEL_PX ? (
-          <Text
-            className={cx(
-              "font-sans text-[10px]",
-              isEvent ? "text-fg2" : "font-medium text-onColor",
-            )}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-        ) : null}
+        <Text
+          className={cx("font-sans text-[10px]", isEvent ? "text-fg2" : "font-medium text-onColor")}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
       </Pressable>
     );
   });

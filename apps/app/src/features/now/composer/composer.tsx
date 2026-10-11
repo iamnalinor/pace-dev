@@ -1,6 +1,5 @@
 import { type ReactNode, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import Animated from "react-native-reanimated";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
@@ -8,7 +7,6 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { AnimatedHeight } from "#app/ui/animated-height.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { ROW_ENTER } from "#app/ui/motion.ts";
 import { useToast } from "#app/ui/toast.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 import {
@@ -234,7 +232,8 @@ export const Composer = ({
       )}
     >
       <AnimatedHeight>
-        <Animated.View entering={ROW_ENTER} key={flow.form === null ? "line" : "form"}>
+        {/* No entering animation here: it would keep the field from taking the cursor. */}
+        <View key={flow.form === null ? "line" : "form"}>
           {flow.form === null ? (
             <LineBlock
               flow={flow}
@@ -254,7 +253,7 @@ export const Composer = ({
               status={status}
             />
           )}
-        </Animated.View>
+        </View>
       </AnimatedHeight>
     </View>
   );
