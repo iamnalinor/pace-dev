@@ -32,7 +32,6 @@ const useHasSidebar = (): boolean => {
 const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
-  const isWide = useIsWide();
   useNotificationLinks();
   return (
     <View className="flex-1 flex-row bg-bg">
@@ -44,7 +43,6 @@ const Navigator = () => {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" options={{ animation: "fade" }} />
           <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
-          <Stack.Screen name="settings" options={{ presentation: isWide ? "card" : "modal" }} />
           <Stack.Screen name="task/[id]" />
           <Stack.Screen name="project/[id]" />
           <Stack.Screen name="inbox" />

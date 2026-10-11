@@ -1,29 +1,29 @@
 import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
-import { ChartColumn, Clock, Folder, type LucideIcon, Plus, Zap } from "lucide-react-native";
+import { ChartColumn, Clock, Folder, type LucideIcon, Settings, Zap } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useT } from "../app-state.tsx";
-import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
+/** The tabs a phone shows, in order; New task is the composer on Now, not a tab of its own. */
 const ICONS: Readonly<Record<string, LucideIcon>> = {
-  add: Plus,
-  day: Clock,
   index: Zap,
-  insights: ChartColumn,
+  day: Clock,
   projects: Folder,
+  insights: ChartColumn,
+  settings: Settings,
 };
 
 const ICON_SIZE = 20;
 const STROKE = 1.75;
 
-/** Bottom tabs from the Main artboard: five 56×44 targets, the Add one a filled light square. */
+/** Bottom tabs: five 56×44 targets, Now, Day, Projects, Insights and Settings. */
 const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   const t = useT();
   const { palette } = useTheme();
@@ -36,9 +36,13 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
       style={{ paddingBottom: Math.max(insets.bottom, 12) + 8 }}
     >
       {state.routes.map((route, index) => {
-        const isFocused = state.index === index;
-        const isAdd = route.name === "add";
-        const Icon = ICONS[route.name] ?? Zap;
+        const Icon = ICONS[route.name];
+        if (Icon === undefined) {
+          return null;
+        }
+        // On /add (New task, a share) Now is the screen, with the cursor in the composer.
+        const current = state.routes[state.index]?.name;
+        const isFocused = state.index === index || (route.name === "index" && current === "add");
         const activeColor = isFocused ? palette.fg : palette.faint;
         const onPress = (): void => {
           const event = navigation.emit({
@@ -55,15 +59,11 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
             accessibilityLabel={descriptors[route.key]?.options.title ?? route.name}
             accessibilityRole="tab"
             aria-selected={isFocused}
-            className={cx("h-11 w-14 items-center justify-center", isAdd && "rounded-lg bg-accent")}
+            className="h-11 w-14 items-center justify-center"
             key={route.key}
             onPress={onPress}
           >
-            <Icon
-              color={isAdd ? palette.accentFg : activeColor}
-              size={ICON_SIZE}
-              strokeWidth={STROKE}
-            />
+            <Icon color={activeColor} size={ICON_SIZE} strokeWidth={STROKE} />
           </Pressable>
         );
       })}

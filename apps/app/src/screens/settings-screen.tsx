@@ -13,7 +13,6 @@ import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { Button } from "#app/ui/button.tsx";
-import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
@@ -97,29 +96,12 @@ export const SettingsScreen = () => {
   const t = useT();
   const router = useRouter();
   const { auth } = useAuth();
-  // Beside the sidebar Settings is a destination, not a sheet to dismiss.
-  const isWide = useIsWide();
   const logout = async (): Promise<void> => {
     await auth.logout();
     router.replace("/login");
   };
-  const header = (
-    <ScreenHeader
-      right={
-        isWide ? null : (
-          <Button
-            onPress={() => {
-              router.back();
-            }}
-            variant="ghost"
-          >
-            {t("common.done")}
-          </Button>
-        )
-      }
-      title={t("settings.title")}
-    />
-  );
+  // A tab on a phone and a sidebar destination on a wide window: nothing to dismiss.
+  const header = <ScreenHeader title={t("settings.title")} />;
   return (
     <Screen header={header}>
       <LookRows />

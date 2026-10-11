@@ -1,10 +1,9 @@
 import { useRouter } from "expo-router";
-import { Inbox, Settings } from "lucide-react-native";
+import { Inbox } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { decisionsOf } from "#app/screens/review-card.tsx";
-import { IconButton } from "#app/ui/icon-button.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { formatEyebrow } from "@pace/core";
@@ -38,7 +37,7 @@ const CounterButton = ({
   );
 };
 
-/** Date eyebrow and "Now"; on the right the Inbox (captures and decisions) and Settings. */
+/** Date eyebrow and "Now"; on the right the Inbox (captures and decisions). Settings is a tab. */
 export const NowHeader = ({ inboxCount }: { readonly inboxCount: number }) => {
   const t = useT();
   const router = useRouter();
@@ -57,13 +56,6 @@ export const NowHeader = ({ inboxCount }: { readonly inboxCount: number }) => {
             label={t("now.inbox", { count: waiting })}
             onPress={() => {
               router.push("/inbox");
-            }}
-          />
-          <IconButton
-            icon={Settings}
-            label={t("nav.settings")}
-            onPress={() => {
-              router.push("/settings");
             }}
           />
         </View>
