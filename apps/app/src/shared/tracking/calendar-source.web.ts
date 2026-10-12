@@ -20,6 +20,7 @@ export const calendarToday = async ({ api, now, zone }: CalendarSource): Promise
       events: events.filter((event) => event.endAt > addMinutesIso(now, -RECENT_MINUTES)),
     };
   } catch {
-    return { access: "denied", events: [] };
+    // Offline or the server failed: nothing to link now, but nothing to allow either.
+    return { access: "granted", events: [] };
   }
 };

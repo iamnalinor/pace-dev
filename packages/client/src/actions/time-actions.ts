@@ -13,7 +13,7 @@ import {
   typedActivity,
 } from "@pace/core";
 
-import { editActions, type EditActions } from "./activity-edits.ts";
+import { editActions, type EditActions, logPast } from "./activity-edits.ts";
 import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
 export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
@@ -154,13 +154,24 @@ const startChoice = async (
   });
 };
 
-/** The calendar's event, begun at its start when that has passed, expected to last until its end. */
+/**
+The calendar's event, begun at its start when that has passed, expected to last until its end;
+one already over is logged as the block it was, and what runs now keeps running.
+*/
 const startCalendar = async (
   deps: ActionDeps,
   event: CalendarStart,
   options: StartOptions = {},
 ): ActionResult => {
   const now = deps.clock.now();
+  if (Date.parse(event.endAt) <= Date.parse(now)) {
+    return await logPast(deps, {
+      category: "other",
+      endAt: event.endAt,
+      label: event.title,
+      startAt: event.startAt,
+    });
+  }
   // A main activity begun since the event started keeps its time: the event takes over from it.
   const since =
     options.alongside === true ? null : (runningActivity(timeOf(deps), now)?.startAt ?? null);

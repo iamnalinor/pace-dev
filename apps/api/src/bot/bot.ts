@@ -32,6 +32,12 @@ export type BotDeps = {
   readonly webOrigin: string;
 };
 
+/** A button back to where the login started (the app's App Link or the website), if any. */
+const returnButton = (url: string | undefined) =>
+  url === undefined
+    ? {}
+    : { reply_markup: { inline_keyboard: [[{ text: REPLIES.returnToPace, url }]] } };
+
 export const REPLIES = {
   loggedIn: "Logged in. Return to Pace.",
   returnToPace: "Return to Pace",
@@ -108,11 +114,7 @@ export const createBot = (deps: BotDeps): Bot => {
       await ctx.reply(loginReply(outcome));
       return;
     }
-    // A button back to where the login started: the app (its App Link) or the website.
-    const url = returnUrl(deps.webOrigin, login.from);
-    await ctx.reply(loginReply(outcome), {
-      reply_markup: { inline_keyboard: [[{ text: REPLIES.returnToPace, url }]] },
-    });
+    await ctx.reply(loginReply(outcome), returnButton(returnUrl(deps.webOrigin, login.from)));
   });
   const { assistant } = deps;
   if (assistant !== undefined) {

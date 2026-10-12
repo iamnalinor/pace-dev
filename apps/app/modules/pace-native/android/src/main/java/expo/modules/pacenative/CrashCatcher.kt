@@ -76,7 +76,7 @@ object CrashCatcher {
    * Returns where the file is, as a file manager shows it.
    */
   private fun save(context: Context, trace: String): String {
-    val name = "crash-${SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.ROOT).format(Date())}.txt"
+    val name = "crash-${SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.ROOT).format(Date())}.txt"
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
       // Android 9 and older: Android/data/<package>/files, reachable over USB or a file manager.
       File(context.getExternalFilesDir(null) ?: context.filesDir, name).writeText(trace)

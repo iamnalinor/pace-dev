@@ -22,7 +22,7 @@ import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 
 /** Screens without the app's navigation: signing in and the first-run walk-through. */
-const BARE_PATHS = ["/login", "/auth", "/app/auth", "/onboarding", "/oauth"];
+const BARE_PATHS = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
 
 /** On a wide window the sidebar stays beside every signed-in screen, pushed ones included. */
 const useHasSidebar = (): boolean => {
@@ -32,14 +32,20 @@ const useHasSidebar = (): boolean => {
   return isWide && status === "signed-in" && BARE_PATHS.every((bare) => !path.startsWith(bare));
 };
 
+/** Keeps what a crash file says about the app current; apart, so syncs do not redraw the Stack. */
+const CrashContext = () => {
+  useCrashContext(usePathname());
+  return null;
+};
+
 const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
   useNotificationLinks();
   useCrashNotice();
-  useCrashContext(usePathname());
   return (
     <View className="flex-1 flex-row bg-bg">
+      <CrashContext />
       {hasSidebar ? <Sidebar /> : null}
       <View className="flex-1">
         <Stack

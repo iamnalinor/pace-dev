@@ -140,6 +140,29 @@ describe("TimeBar", () => {
     expect(running(runtime)).toEqual([]);
   });
 
+  it("reads the calendar again on a tap: access granted since then counts at once", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    const button = screen.getByRole("switch", { name: "Calendar" });
+    await waitFor(() => {
+      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.noAccess"));
+    });
+    calendar.state.status = "granted";
+    calendar.state.events = [
+      {
+        allDay: false,
+        endDate: addMinutesIso(NOW, 50),
+        id: "e1",
+        startDate: addMinutesIso(NOW, -10),
+        title: "Seminar",
+      },
+    ];
+    await fireEvent.press(button);
+    await waitFor(() => {
+      expect(running(runtime)).toEqual(["Seminar"]);
+    });
+  });
+
   it("is greyed with nothing in the calendar within 15 minutes of now", async () => {
     calendar.state.status = "granted";
     calendar.state.events = [

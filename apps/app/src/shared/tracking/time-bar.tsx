@@ -139,8 +139,9 @@ const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
         aria-checked={button.isRunning}
         className={cx(
           "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
-          button.isRunning ? "border-accent bg-accent" : cx(OUTLINE[button.color], "bg-surface"),
-          unavailable !== undefined && "border-line opacity-60",
+          button.isRunning ? "border-accent bg-accent" : "bg-surface",
+          !button.isRunning &&
+            (unavailable === undefined ? OUTLINE[button.color] : "border-dashed border-line"),
         )}
         delayLongPress={450}
         onAccessibilityAction={(event) => {
@@ -158,8 +159,9 @@ const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
         <Text
           className={cx(
             "text-center font-sans text-[12px] leading-[14px]",
-            button.isRunning ? "font-medium text-accentFg" : inkClass(button.color),
-            unavailable !== undefined && "text-muted",
+            button.isRunning && "font-medium text-accentFg",
+            !button.isRunning &&
+              (unavailable === undefined ? inkClass(button.color) : "text-muted"),
           )}
           numberOfLines={1}
         >
@@ -190,8 +192,8 @@ const useTap = (open: (opened: Opened) => void, calendar: CalendarButton) => {
     if (button.isRunning) {
       await run(actions.stopActivity());
     } else if (button.kind === "calendar") {
-      await calendar.tap(() => {
-        open({ button, calendar: calendar.today });
+      await calendar.tap(async () => {
+        open({ button, calendar: await calendar.forPicker() });
       });
     } else if (only !== undefined && button.choices.length === 1) {
       await run(actions.startChoice(only.id));
@@ -200,7 +202,9 @@ const useTap = (open: (opened: Opened) => void, calendar: CalendarButton) => {
     }
   };
   const more = (button: TimeButtonView): void => {
-    open({ button, calendar: button.kind === "calendar" ? calendar.today : null });
+    void (async () => {
+      open({ button, calendar: button.kind === "calendar" ? await calendar.forPicker() : null });
+    })();
   };
   return { more, tap };
 };

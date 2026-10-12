@@ -10,11 +10,11 @@ const envString = (name: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-/** The last release tag, the commits since it and the commit; empty without git or tags. */
-const gitDescribe = (): string => {
+/** `git <args>`'s output, empty without git (or tags). */
+const git = (args: readonly string[]): string => {
   try {
     // eslint-disable-next-line sonarjs/no-os-command-from-path -- the build machine's git (Node runs this config at prebuild); fixed arguments, no input
-    return execFileSync("git", ["describe", "--tags", "--long", "--match", "v*"], {
+    return execFileSync("git", args, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -23,10 +23,20 @@ const gitDescribe = (): string => {
   }
 };
 
+/** The last release tag, the commits since it and the commit. */
+const describe = git(["describe", "--tags", "--long", "--match", "v*"]);
+const tag = describe.replace(/-\d+-g[0-9a-f]+$/u, "");
+/** A commit's committer time in seconds (0 when unknown). */
+const committedAt = (ref: string): number => {
+  const seconds = Number(git(["log", "-1", "--format=%ct", ref]));
+  return Number.isFinite(seconds) ? seconds : 0;
+};
+
 // Release builds are tagged vX.Y.Z; PACE_RELEASE_TAG is set by release.yml (a run by hand
 // releases from a branch, not a tag ref). Any other build sits on the last tag (app-version.ts).
 const { version, versionCode } = appVersion({
-  describe: gitDescribe(),
+  describe,
+  hoursSinceTag: tag === "" ? 0 : (committedAt("HEAD") - committedAt(tag)) / 3600,
   releaseTag: envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
 });
 

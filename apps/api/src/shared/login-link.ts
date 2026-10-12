@@ -19,9 +19,17 @@ export const readLoginPayload = (
     : undefined;
 };
 
+/** Hosts of a local web origin (a dev Worker): Telegram refuses buttons leading there. */
+const LOCAL_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "localhost"]);
+
 /**
 Where "Return to Pace" leads: back into the app through its App Link (`/app/*` opens Pace on
-Android, else a page with a button that does), or the website a browser login came from.
+Android, else a page with a button that does), or the website a browser login came from;
+undefined (no button) for a local origin, whose button would fail the whole reply.
 */
-export const returnUrl = (webOrigin: string, from: LoginFrom): string =>
-  from === "app" ? `${webOrigin}/app/login` : `${webOrigin}/`;
+export const returnUrl = (webOrigin: string, from: LoginFrom): string | undefined => {
+  if (LOCAL_HOSTS.has(new URL(webOrigin).hostname)) {
+    return undefined;
+  }
+  return from === "app" ? `${webOrigin}/app/login` : `${webOrigin}/`;
+};

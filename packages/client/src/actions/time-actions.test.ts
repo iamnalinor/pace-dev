@@ -203,6 +203,25 @@ describe("time actions", () => {
     expect(open.map((activity) => activity.label)).toEqual(["Seminar"]);
   });
 
+  it("logs a calendar event already over as a closed block and leaves what runs alone", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.startChoice("rest"));
+    world.setNow(later(70));
+    unwrap(
+      await world.actions.startCalendar({
+        endAt: later(60),
+        startAt: later(-30),
+        title: "Seminar",
+      }),
+    );
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(71)));
+    expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("rest");
+    const seminar = Object.values(world.state.store.getState().time.activities).find(
+      (activity) => activity.label === "Seminar",
+    );
+    expect(seminar).toMatchObject({ endAt: later(60), startAt: later(-30) });
+  });
+
   it("keeps a typed activity within the limits: 80 characters, a day at most", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startTyped(`${"чтение ".repeat(20)}30 ч`));
