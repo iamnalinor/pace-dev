@@ -103,6 +103,20 @@ const config: ExpoConfig = {
     "expo-calendar",
     "expo-web-browser",
     "expo-secure-store",
+    [
+      "expo-build-properties",
+      {
+        // The release APK without these is ~50 MB: every class of every library stays (all of
+        // Jetpack Compose among them, which expo-router links through @expo/ui) and native
+        // libraries are stored uncompressed. R8 keeps what is used; compressed libraries are
+        // unpacked once at install, which trades some storage for a smaller download.
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          useLegacyPackaging: true,
+        },
+      },
+    ],
     "./plugins/with-release-signing.js",
   ],
   // No OTA updates: releases ship as APKs through GitHub Releases.
