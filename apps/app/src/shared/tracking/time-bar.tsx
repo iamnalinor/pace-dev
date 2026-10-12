@@ -246,7 +246,10 @@ export const TimeBar = () => {
             key={button.id}
             onMore={more}
             onTap={(pressed) => void tap(pressed)}
-            unavailable={button.kind === "calendar" ? calendar.unavailable : undefined}
+            // Running its own activity, it is on (a tap stops it), whatever the calendar says.
+            unavailable={
+              button.kind === "calendar" && !button.isRunning ? calendar.unavailable : undefined
+            }
           />
         ))}
       </View>

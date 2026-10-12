@@ -221,6 +221,10 @@ describe("TimeBar", () => {
     await waitFor(() => {
       expect(running(runtime)).toEqual([en("time.calendarUntitled")]);
     });
+    // Its own activity runs: on, not greyed, and a tap stops it like any running button.
+    expect(screen.getByRole("switch", { name: "Calendar" }).props["accessibilityHint"]).toBe(
+      en("time.buttonHint"),
+    );
   });
 
   it("starts the calendar's event going on now, from its start", async () => {

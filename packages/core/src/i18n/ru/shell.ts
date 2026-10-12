@@ -40,9 +40,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "login.devId": "Telegram id",
   "login.devSubmit": "Войти как dev",
   "loginReturn.title": "Вернуться в Pace",
-  "loginReturn.body": "Вы вошли. Если Pace не открылся сам, откройте его здесь.",
+  "loginReturn.body": "Telegram подтвердил вход. Если Pace не открылся сам, откройте его здесь.",
   "loginReturn.open": "Открыть Pace",
-  "loginReturn.web": "Открыть Pace в браузере",
+  "loginReturn.web": "Продолжить в браузере",
   "appLink.title": "Открыть в Pace",
   "appLink.open": "Открыть в Pace",
   "appLink.fallback":
