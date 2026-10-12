@@ -5,6 +5,7 @@ import type { BotLogin, BotLoginError } from "@pace/client";
 
 import { useAuth } from "../app-state.tsx";
 import { openTelegram } from "../auth/open-telegram.ts";
+import { LOGIN_FROM } from "../platform/login-from.ts";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
@@ -64,7 +65,7 @@ export const useBotLogin = (): {
   const start = useCallback(async () => {
     setPhase({ kind: "starting" });
     try {
-      const created = await auth.startBotLogin();
+      const created = await auth.startBotLogin(LOGIN_FROM);
       await openTelegram(created.deepLink);
       setLogin(created);
       setPhase({ kind: "waiting" });

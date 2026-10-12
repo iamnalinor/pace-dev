@@ -119,11 +119,29 @@ describe("POST /telegram/webhook", () => {
     expect(response.status).toBe(200);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.method).toBe("sendMessage");
-    expect(sent[0]?.body).toMatchObject({ chat_id: 1001, text: "Logged in — return to Pace" });
+    // Started in the app: the button is the App Link that brings the app back to the front.
+    expect(sent[0]?.body).toMatchObject({
+      chat_id: 1001,
+      reply_markup: {
+        inline_keyboard: [[{ text: "Return to Pace", url: `${env.WEB_ORIGIN}/app/login` }]],
+      },
+      text: "Logged in. Return to Pace.",
+    });
     const ready = await json<{ status: string; user: { telegramId: string; name: string } }>(
       `/api/auth/nonce/${nonce}`,
     );
     expect(ready).toMatchObject({ status: "ready", user: { name: "Ada", telegramId: "1001" } });
+  });
+
+  it("sends a login started in the browser back to the website", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=web", {
+      method: "POST",
+    });
+    await webhook(startUpdate(1001, `/start weblogin_${nonce}`));
+    expect(sent[0]?.body).toMatchObject({
+      reply_markup: { inline_keyboard: [[{ text: "Return to Pace", url: `${env.WEB_ORIGIN}/` }]] },
+    });
+    expect(await json(`/api/auth/nonce/${nonce}`)).toMatchObject({ status: "ready" });
   });
 
   it("tells a user outside the whitelist that they are not allowed", async () => {

@@ -131,6 +131,13 @@ describe("login nonce", () => {
     expect(await json(`/api/auth/nonce/${created.nonce}`)).toEqual({ status: "pending" });
   });
 
+  it("marks a login started in the browser, so the bot sends the person back there", async () => {
+    const created = await json<{ nonce: string; deepLink: string }>("/api/auth/nonce?from=web", {
+      method: "POST",
+    });
+    expect(created.deepLink).toBe(`https://t.me/PaceTestBot?start=weblogin_${created.nonce}`);
+  });
+
   it("hands out the session once after the bot bound it", async () => {
     const { nonce } = await json<{ nonce: string }>("/api/auth/nonce", { method: "POST" });
     const user = await upsertTelegramUser(

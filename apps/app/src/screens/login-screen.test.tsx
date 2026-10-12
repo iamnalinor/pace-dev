@@ -91,6 +91,8 @@ describe("LoginScreen", () => {
     await waitFor(() => {
       expect(openURL).toHaveBeenCalledWith("https://t.me/PaceTaskTrackerBot?start=login_abc");
     });
+    // From the app: the bot's "Return to Pace" button leads back into it.
+    expect(auth.startBotLogin).toHaveBeenCalledWith("app");
     expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
     const [options] = waitForToken.mock.calls[0] ?? [];
     expect(options?.intervalMs).toBe(2000);

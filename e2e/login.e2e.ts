@@ -64,6 +64,14 @@ test("the App Link landing offers to open the app", async ({ page }) => {
   await expectNoA11yViolations(page);
 });
 
+test("the bot's Return to Pace lands on a page that opens the app", async ({ page }) => {
+  await page.goto("/app/login");
+  await expect(page.getByRole("heading", { name: "Back to Pace" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Pace" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Use Pace in the browser" })).toBeVisible();
+  await expectNoA11yViolations(page);
+});
+
 test("/oauth/authorize exists as the API's redirect target", async ({ page }) => {
   await page.goto("/oauth/authorize?client_id=x");
   await expect(page.getByRole("heading", { name: "Connecting an app" })).toBeVisible();

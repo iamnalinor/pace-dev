@@ -37,6 +37,10 @@ export const enShell = {
   "login.dev": "Dev login",
   "login.devId": "Telegram id",
   "login.devSubmit": "Sign in as dev",
+  "loginReturn.title": "Back to Pace",
+  "loginReturn.body": "You are logged in. If Pace did not open by itself, open it here.",
+  "loginReturn.open": "Open Pace",
+  "loginReturn.web": "Use Pace in the browser",
   "appLink.title": "Open in Pace",
   "appLink.open": "Open in Pace",
   "appLink.fallback":

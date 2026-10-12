@@ -7,6 +7,7 @@ import type { Config } from "../shared/config.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
+import { loginPayload } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { readBearer } from "./auth-middleware.ts";
 import { mountDeviceRoutes } from "./device-routes.ts";
@@ -114,9 +115,10 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
 
 export const mountAuthRoutes = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.auth.telegram, telegramLogin);
-  mount(app, endpoints.auth.nonceCreate, async ({ c }) => {
+  mount(app, endpoints.auth.nonceCreate, async ({ c, query }) => {
     const { nonce } = await createNonce(d1(c.env.DB), Date.now());
-    const deepLink = `https://t.me/${c.get("config").telegramBotUsername}?start=login_${nonce}`;
+    const payload = loginPayload(nonce, query.from ?? "app");
+    const deepLink = `https://t.me/${c.get("config").telegramBotUsername}?start=${payload}`;
     return ok({ deepLink, nonce });
   });
   mount(app, endpoints.auth.noncePoll, pollNonce);
