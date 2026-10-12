@@ -29,7 +29,7 @@ object CrashCatcher {
     val previous = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, error ->
       try {
-        val location = save(application, traceOf(application, thread, error))
+        val location = save(application, withHeader(application, "thread ${thread.name}", stackOf(error)))
         File(application.filesDir, PENDING_FILE).writeText(location)
       } catch (_: Throwable) {
         // Saving the trace is best effort; the crash itself goes on below either way.
@@ -41,6 +41,17 @@ object CrashCatcher {
       }
     }
   }
+
+  /**
+   * A trace the app caught itself (the JS crash screen), saved as a crash's. Returns where, or
+   * null when it could not be written: the screen showing it must not fail on that.
+   */
+  fun saveCaught(context: Context, trace: String): String? =
+    try {
+      save(context, withHeader(context, "caught", trace))
+    } catch (_: Exception) {
+      null
+    }
 
   /** Where the last crash's trace was saved, once: the next call answers null. */
   fun takeLastCrash(context: Context): String? {
@@ -57,36 +68,40 @@ object CrashCatcher {
    * Downloads/Pace through MediaStore (no permission on Android 10+), else the app's own folder.
    * Returns where the file is, as a file manager shows it.
    */
-  private fun save(application: Application, trace: String): String {
+  private fun save(context: Context, trace: String): String {
     val name = "crash-${SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.ROOT).format(Date())}.txt"
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
       // Android 9 and older: Android/data/<package>/files, reachable over USB or a file manager.
-      File(application.getExternalFilesDir(null) ?: application.filesDir, name).writeText(trace)
-      return "Android/data/${application.packageName}/files/$name"
+      File(context.getExternalFilesDir(null) ?: context.filesDir, name).writeText(trace)
+      return "Android/data/${context.packageName}/files/$name"
     }
     val values = ContentValues().apply {
       put(MediaStore.MediaColumns.DISPLAY_NAME, name)
       put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
       put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$FOLDER")
     }
-    val resolver = application.contentResolver
+    val resolver = context.contentResolver
     val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
       ?: error("MediaStore refused the crash file")
     resolver.openOutputStream(uri)?.use { it.write(trace.toByteArray()) }
     return "${Environment.DIRECTORY_DOWNLOADS}/$FOLDER/$name"
   }
 
-  private fun traceOf(application: Application, thread: Thread, error: Throwable): String {
+  private fun stackOf(error: Throwable): String {
     val writer = StringWriter()
     error.printStackTrace(PrintWriter(writer))
-    val header = "Pace ${versionOf(application)} · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}) · " +
-      "${Build.MANUFACTURER} ${Build.MODEL} · thread ${thread.name}"
-    return "$header\n\n$writer"
+    return writer.toString()
   }
 
-  private fun versionOf(application: Application): String =
+  private fun withHeader(context: Context, where: String, trace: String): String {
+    val header = "Pace ${versionOf(context)} · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}) · " +
+      "${Build.MANUFACTURER} ${Build.MODEL} · $where"
+    return "$header\n\n$trace"
+  }
+
+  private fun versionOf(context: Context): String =
     try {
-      application.packageManager.getPackageInfo(application.packageName, 0).versionName ?: "?"
+      context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
     } catch (_: Exception) {
       "?"
     }

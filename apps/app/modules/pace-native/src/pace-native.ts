@@ -33,6 +33,8 @@ export type PaceNative = {
   readonly appLabels: (packages: readonly string[]) => Promise<Readonly<Record<string, string>>>;
   /** Where the last crash's trace was saved (`Download/Pace/crash-….txt`), once; else null. */
   readonly takeLastCrash: () => null | string;
+  /** Saves a trace the app caught itself (the crash screen) as a crash's; where it went, or null. */
+  readonly saveCrashTrace: (trace: string) => null | string;
 };
 
 const noop = (): void => undefined;
@@ -49,6 +51,7 @@ export const fallbackPaceNative: PaceNative = {
   queryUsageEvents: async () => [],
   queryUsageStats: async () => [],
   setDnd: () => false,
+  saveCrashTrace: () => null,
   takeLastCrash: () => null,
 };
 

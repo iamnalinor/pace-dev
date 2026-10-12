@@ -7,6 +7,7 @@ export const enShell = {
   "crash.retry": "Reload",
   "crash.saved":
     "Pace closed on an error last time. Its details are saved in {path}: send that file along.",
+  "crash.savedAt": "Saved with its details in {path}.",
   "nav.now": "Now",
   "nav.day": "Day",
   "nav.add": "Add",

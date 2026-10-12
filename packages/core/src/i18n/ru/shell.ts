@@ -9,6 +9,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "crash.retry": "Перезапустить",
   "crash.saved":
     "В прошлый раз Pace закрылся из-за ошибки. Подробности сохранены в {path}: пришлите этот файл.",
+  "crash.savedAt": "Сохранено с подробностями в {path}.",
   "nav.now": "Сейчас",
   "nav.day": "День",
   "nav.add": "Добавить",

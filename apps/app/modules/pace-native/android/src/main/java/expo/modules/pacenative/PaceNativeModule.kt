@@ -68,6 +68,9 @@ class PaceNativeModule : Module() {
     // Where the last crash's trace was saved (CrashCatcher), once; null when none is pending.
     Function("takeLastCrash") { CrashCatcher.takeLastCrash(context) }
 
+    // A trace the JS crash screen caught (the app kept running), saved next to the crashes'.
+    Function("saveCrashTrace") { trace: String -> CrashCatcher.saveCaught(context, trace) }
+
     Function("hasUsageAccess") { hasUsageAccess() }
 
     Function("openUsageAccessSettings") {
