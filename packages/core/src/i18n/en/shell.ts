@@ -97,9 +97,9 @@ export const enShell = {
   "permissions.usage": "Usage access",
   "permissions.usage.why":
     "When the screen was on and which apps were open: last night's sleep and the phone time inside each block.",
-  "permissions.exactAlarms": "Alarms on time",
-  "permissions.exactAlarms.why":
-    "Lets timers ring at the exact minute instead of when Android finds it convenient.",
+  "permissions.usage.restricted":
+    "If Android says “App was denied access”: open App info, tap ⋮ in the corner, choose “Allow restricted settings”, then open settings here again.",
+  "permissions.appInfo": "App info",
   "permissions.on": "On",
   "permissions.off": "Off",
   "permissions.blocked": "Turned off in Android settings",

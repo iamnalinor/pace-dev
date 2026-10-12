@@ -7,20 +7,18 @@ import { AppState, type AppStateStatus, Linking } from "react-native";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { OnboardingScreen } from "./onboarding-screen.tsx";
 import { PermissionsScreen } from "./permissions-screen.tsx";
 
-const mockPhone = { exactAlarms: false, usage: false };
+const mockPhone = { usage: false };
 
 jest.mock("../../../modules/pace-native/index.ts", () => ({
   paceNative: {
-    canScheduleExactAlarms: () => mockPhone.exactAlarms,
     hasUsageAccess: () => mockPhone.usage,
-    openExactAlarmSettings: jest.fn(),
     openUsageAccessSettings: jest.fn(),
   },
 }));
@@ -44,7 +42,6 @@ const comeBack = async (): Promise<void> => {
 
 beforeEach(() => {
   (SecureStore as unknown as FakeSecureStore).values.clear();
-  mockPhone.exactAlarms = false;
   mockPhone.usage = false;
   notifications.state.granted = false;
   notifications.state.canAskAgain = true;
@@ -76,7 +73,12 @@ describe("Settings → Permissions", () => {
     await fireEvent.press(within(calendarCard).getByRole("button", { name: "Open settings" }));
     expect(openSettings).toHaveBeenCalled();
 
+    // Sideloaded, Pace meets Android's "restricted settings": the card says how to lift them.
     const usageCard = screen.getByLabelText("Usage access");
+    expect(within(usageCard).getByText(en("permissions.usage.restricted"))).toBeOnTheScreen();
+    openSettings.mockClear();
+    await fireEvent.press(within(usageCard).getByRole("button", { name: "App info" }));
+    expect(openSettings).toHaveBeenCalled();
     await fireEvent.press(within(usageCard).getByRole("button", { name: "Open settings" }));
     mockPhone.usage = true;
     await comeBack();
@@ -89,25 +91,27 @@ describe("the first-run onboarding", () => {
     await renderScreen(<OnboardingScreen />, await createTestRuntime());
     expect(await screen.findByText("A few permissions")).toBeOnTheScreen();
     expect(screen.getByText("Usage access")).toBeOnTheScreen();
+    // Timers ring through plain notifications: no exact alarms to ask for.
+    expect(screen.queryByText("Alarms on time")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
 
-    expect(await screen.findByText("1 of 4")).toBeOnTheScreen();
+    expect(await screen.findByText("1 of 3")).toBeOnTheScreen();
     expect(screen.getByText("Notifications")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Allow" }));
 
-    expect(await screen.findByText("2 of 4")).toBeOnTheScreen();
+    expect(await screen.findByText("2 of 3")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Allow" }));
     expect(calendar.state.status).toBe("granted");
 
-    // A settings screen: the step waits until the person is back with it turned on.
-    expect(await screen.findByText("3 of 4")).toBeOnTheScreen();
+    // A settings screen: the step waits until the person is back with it turned on, and says
+    // how to lift Android's restricted settings first.
+    expect(await screen.findByText("3 of 3")).toBeOnTheScreen();
+    expect(screen.getByText(en("permissions.usage.restricted"))).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Open settings" }));
-    expect(screen.getByText("3 of 4")).toBeOnTheScreen();
+    expect(screen.getByText("3 of 3")).toBeOnTheScreen();
     mockPhone.usage = true;
     await comeBack();
 
-    expect(await screen.findByText("4 of 4")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() => {
       expect(router.replace).toHaveBeenCalledWith("/");
     });

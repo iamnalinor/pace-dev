@@ -2,7 +2,6 @@ package expo.modules.pacenative
 
 import android.Manifest
 import android.app.ActivityManager
-import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -93,13 +92,8 @@ internal object DebugInfo {
   private fun permissions(context: Context): String {
     val notifications = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val calendar = context.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
-    val exactAlarms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      onOff((context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms())
-    } else {
-      "on"
-    }
     return "notifications ${onOff(notifications.areNotificationsEnabled())}, calendar ${onOff(calendar)}, " +
-      "usage access ${onOff(usageAccessGranted(context))}, exact alarms $exactAlarms, " +
+      "usage access ${onOff(usageAccessGranted(context))}, " +
       "do not disturb ${onOff(notifications.isNotificationPolicyAccessGranted)}"
   }
 }

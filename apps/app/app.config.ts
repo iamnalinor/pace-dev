@@ -52,10 +52,11 @@ const config: ExpoConfig = {
       foregroundImage: "./assets/adaptive-icon.png",
       monochromeImage: "./assets/adaptive-icon-mono.png",
     },
-    permissions: [
-      "android.permission.READ_CALENDAR",
-      "android.permission.POST_NOTIFICATIONS",
+    permissions: ["android.permission.READ_CALENDAR", "android.permission.POST_NOTIFICATIONS"],
+    // Reminders are plain notifications: a few minutes late in Doze is fine, no alarm access.
+    blockedPermissions: [
       "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.USE_EXACT_ALARM",
     ],
     intentFilters: [
       {

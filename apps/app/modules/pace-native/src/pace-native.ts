@@ -19,8 +19,6 @@ export type UsageStats = {
 
 /** The Kotlin module's surface (`modules/pace-native/android`). */
 export type PaceNative = {
-  readonly canScheduleExactAlarms: () => boolean;
-  readonly openExactAlarmSettings: () => void;
   readonly hasUsageAccess: () => boolean;
   readonly openUsageAccessSettings: () => void;
   readonly isDndAccessGranted: () => boolean;
@@ -44,11 +42,9 @@ const noop = (): void => undefined;
 /** What the app sees without the native module (Jest, Expo Go): nothing granted, nothing to do. */
 export const fallbackPaceNative: PaceNative = {
   appLabels: async (packages) => Object.fromEntries(packages.map((name) => [name, name])),
-  canScheduleExactAlarms: () => false,
   hasUsageAccess: () => false,
   isDndAccessGranted: () => false,
   openDndAccessSettings: noop,
-  openExactAlarmSettings: noop,
   openUsageAccessSettings: noop,
   queryUsageEvents: async () => [],
   queryUsageStats: async () => [],

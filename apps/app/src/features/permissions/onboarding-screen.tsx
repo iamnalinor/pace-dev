@@ -8,7 +8,7 @@ import { markOnboarded } from "#app/platform/onboarding.ts";
 import { type Permission, PERMISSION_IDS, type PermissionId } from "#app/platform/permissions.ts";
 import { Button } from "#app/ui/button.tsx";
 
-import { PermissionText } from "./permission-card.tsx";
+import { PermissionText, RestrictedSettingsHint } from "./permission-card.tsx";
 import { usePermissions } from "./use-permissions.ts";
 
 type Phase =
@@ -102,6 +102,7 @@ const Step = ({
       {isOpensSettings ? (
         <Text className="font-sans text-[13px] text-muted">{t("permissions.settingsHint")}</Text>
       ) : null}
+      {permission.id === "usage" ? <RestrictedSettingsHint /> : null}
     </Frame>
   );
 };

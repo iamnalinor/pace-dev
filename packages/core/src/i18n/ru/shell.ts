@@ -99,8 +99,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.usage": "Доступ к статистике",
   "permissions.usage.why":
     "Когда был включён экран и какие приложения были открыты: сон прошлой ночью и время в телефоне внутри каждого блока.",
-  "permissions.exactAlarms": "Точные будильники",
-  "permissions.exactAlarms.why": "Таймеры звенят ровно в нужную минуту, а не когда Android удобно.",
+  "permissions.usage.restricted":
+    "Если Android пишет «App was denied access»: откройте «О приложении», нажмите ⋮ в углу, выберите «Разрешить ограниченные настройки» и снова откройте настройки здесь.",
+  "permissions.appInfo": "О приложении",
   "permissions.on": "Включено",
   "permissions.off": "Выключено",
   "permissions.blocked": "Выключено в настройках Android",

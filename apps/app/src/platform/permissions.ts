@@ -1,12 +1,11 @@
 import * as Notifications from "expo-notifications";
 import { Linking } from "react-native";
 
-import { paceNative } from "../../modules/pace-native/index.ts";
 import { calendarAccess, requestCalendarAccess } from "./phone-calendar.ts";
 import { hasUsageAccess, openUsageAccessSettings } from "./phone-data.ts";
 
 /** Everything Pace may ask Android for, in the order it is explained and asked. */
-export const PERMISSION_IDS = ["notifications", "calendar", "usage", "exactAlarms"] as const;
+export const PERMISSION_IDS = ["notifications", "calendar", "usage"] as const;
 
 export type PermissionId = (typeof PERMISSION_IDS)[number];
 
@@ -44,15 +43,20 @@ const readOne = async (id: PermissionId): Promise<Permission> => {
     case "usage": {
       return { id, kind: "settings", state: hasUsageAccess() ? "on" : "off" };
     }
-    case "exactAlarms": {
-      return { id, kind: "settings", state: paceNative.canScheduleExactAlarms() ? "on" : "off" };
-    }
   }
 };
 
 /** Where each permission stands right now. */
 export const readPermissions = async (): Promise<readonly Permission[]> =>
   await Promise.all(PERMISSION_IDS.map(async (id) => await readOne(id)));
+
+/**
+Pace's own App info page in Android settings: where a sideloaded app's "restricted settings"
+are lifted (⋮ → Allow restricted settings) before usage access can be granted.
+*/
+export const openAppInfo = async (): Promise<void> => {
+  await Linking.openSettings();
+};
 
 /** Asks in a dialog, or opens the Android screen where it is granted (or unblocked). */
 export const requestPermission = async (permission: Permission): Promise<void> => {
@@ -71,10 +75,6 @@ export const requestPermission = async (permission: Permission): Promise<void> =
     }
     case "usage": {
       openUsageAccessSettings();
-      return;
-    }
-    case "exactAlarms": {
-      paceNative.openExactAlarmSettings();
       return;
     }
   }

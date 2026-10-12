@@ -5,8 +5,6 @@
       tools:ignore="ProtectedPermissions" />
   <!-- Do Not Disturb during focus sessions (policy access granted in system settings). -->
   <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-  <!-- Expect/Limit timers fire at exact times. -->
-  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
   <!-- Android 11+ package visibility: launcher apps, so their names can be shown next to usage. -->
   <queries>
     <intent>

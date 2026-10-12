@@ -1,8 +1,7 @@
 import { Text, View } from "react-native";
 
-import type { Permission } from "#app/platform/permissions.ts";
-
 import { useT } from "#app/app-state.tsx";
+import { openAppInfo, type Permission } from "#app/platform/permissions.ts";
 import { Button } from "#app/ui/button.tsx";
 import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -22,6 +21,27 @@ const STATE_CLASS: Readonly<Record<Permission["state"], string>> = {
   blocked: inkClass("coral"),
   off: "text-muted",
   on: inkClass("green"),
+};
+
+/**
+How to lift Android's "restricted settings" (Pace is installed from an APK, not a store, so
+usage access is greyed out until they are): the steps and a way to Pace's App info page.
+*/
+export const RestrictedSettingsHint = () => {
+  const t = useT();
+  return (
+    <View className="items-start gap-2">
+      <Text className="font-sans text-[13px] text-muted">{t("permissions.usage.restricted")}</Text>
+      <Button
+        onPress={() => {
+          void openAppInfo();
+        }}
+        variant="ghost"
+      >
+        {t("permissions.appInfo")}
+      </Button>
+    </View>
+  );
 };
 
 /** The button that turns it on: a dialog, or the Android screen where it is granted. */
@@ -70,6 +90,7 @@ export const PermissionCard = ({
           <PermissionAction onRequest={onRequest} permission={permission} />
         )}
       </View>
+      {permission.id === "usage" && permission.state !== "on" ? <RestrictedSettingsHint /> : null}
     </View>
   );
 };
