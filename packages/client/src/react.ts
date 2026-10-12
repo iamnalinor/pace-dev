@@ -19,14 +19,7 @@ import type { AppState, AppStateHandle } from "./state.ts";
 import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
-import {
-  type ComposerDraft,
-  composerModel,
-  type ComposerModel,
-  requiresAiFirst,
-  shouldAiRead,
-  SLOW_READ_MS,
-} from "./view-models/composer.ts";
+import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
 import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
@@ -36,7 +29,9 @@ import { type ProjectViewModel, projectViewModel } from "./view-models/project.t
 import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
+import { type WeekModel, weekModel } from "./view-models/week.ts";
 
+export { type Devices, type DevicesPhase, type NewDevice, useDevices } from "./react/devices.ts";
 export {
   type Consent,
   type ConsentPhase,
@@ -46,6 +41,7 @@ export {
   useConsent,
   useGrants,
 } from "./react/oauth.ts";
+export { useCalendarRange, useUsage } from "./react/usage.ts";
 export { useStore } from "zustand";
 
 export type AppHooks = {
@@ -68,6 +64,7 @@ export type AppHooks = {
   readonly useDay: (date: null | string) => DayModel;
   /** One week of insights; `null` is this week. */
   readonly useInsights: (weekOf: null | string) => InsightsModel;
+  readonly useWeek: (weekOf: null | string) => WeekModel;
 };
 
 /** Relative times ("5 h ago", "due today") drift slowly: half a minute is fine. */
@@ -106,6 +103,7 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     useAppState: (selector) => useStore(state.store, selector),
     useClock,
     useDay: (date) => useView((current, ctx) => dayModel(current, date, ctx), date ?? ""),
+    useWeek: (weekOf) => useView((current, ctx) => weekModel(current, weekOf, ctx), weekOf ?? ""),
     useInsights: (weekOf) =>
       useView((current, ctx) => insightsModel(current, weekOf, ctx), weekOf ?? ""),
     useTimeBar: () => useView(timeBarModel),
@@ -138,21 +136,23 @@ export type AiState =
 export type AiRead = {
   readonly state: AiState;
   /**
-  Asks the assistant; `onReading` receives the chips it filled. A reset meanwhile drops the
-  answer. A `draft` reading (while typing) stays out of the decision log.
+  Asks the assistant; `onReading` receives the chips it filled, and the answer is how it went.
+  A reset (or a newer read) meanwhile drops the answer: `null`. A `draft` reading (while
+  typing) stays out of the decision log.
   */
   readonly read: (
     text: string,
     onReading: (reading: AiReading) => void,
     options?: { readonly draft?: boolean },
-  ) => Promise<void>;
+  ) => Promise<AiOutcome | null>;
   /**
   "Read it when it's back": the line is kept on the server and written once the assistant can
   read it. Resolves to `queued` (the composer can clear), or to a reading if it is back already.
   */
-  readonly readLater: (text: string, onReading: (reading: AiReading) => void) => Promise<AiOutcome>;
-  /** Waits for the reading in flight, up to `ms`: `slow` when it is still not back. */
-  readonly settle: (ms: number) => Promise<"done" | "slow">;
+  readonly readLater: (
+    text: string,
+    onReading: (reading: AiReading) => void,
+  ) => Promise<AiOutcome | null>;
   readonly reset: () => void;
 };
 
@@ -161,19 +161,18 @@ export const useAiRead = (assistant: Assistant): AiRead => {
   const [state, setState] = useState<AiState>({ status: "idle" });
   // Each read and reset starts a new generation: a late answer to an older one is dropped.
   const generation = useRef(0);
-  const pending = useRef<Promise<unknown>>(Promise.resolve());
   const ask = async (
     text: string,
     onReading: (reading: AiReading) => void,
     options: { readonly defer?: boolean; readonly draft?: boolean },
-  ): Promise<AiOutcome> => {
+  ): Promise<AiOutcome | null> => {
     generation.current += 1;
     const mine = generation.current;
     setState({ status: "reading" });
-    const reading = (async (): Promise<AiOutcome> => {
+    const reading = (async (): Promise<AiOutcome | null> => {
       const outcome = await assistant.read(text, options);
       if (mine !== generation.current) {
-        return outcome;
+        return null;
       }
       if (outcome.status === "read") {
         onReading(outcome.reading);
@@ -181,59 +180,17 @@ export const useAiRead = (assistant: Assistant): AiRead => {
       setState(outcome);
       return outcome;
     })();
-    pending.current = reading;
     return await reading;
   };
   return {
-    read: async (text, onReading, options = {}) => {
-      await ask(text, onReading, options);
-    },
+    read: async (text, onReading, options = {}) => await ask(text, onReading, options),
     readLater: async (text, onReading) => await ask(text, onReading, { defer: true }),
     reset: () => {
       generation.current += 1;
       setState({ status: "idle" });
     },
-    settle: async (ms) => {
-      const done = async (): Promise<"done"> => {
-        await pending.current;
-        return "done";
-      };
-      const slow = new Promise<"slow">((resolve) => {
-        setTimeout(() => {
-          resolve("slow");
-        }, ms);
-      });
-      return await Promise.race([done(), slow]);
-    },
     state,
   };
-};
-
-/** A pause in typing before the line is sent to the assistant on its own. */
-const AUTO_READ_DELAY_MS = 700;
-
-/**
-Reads whatever is typed with the assistant as soon as typing pauses, so its reading is on the
-chips before the user presses Enter (the rules fill them until then).
-*/
-export const useAutoAiRead = (
-  ai: AiRead,
-  text: string,
-  onReading: (reading: AiReading) => void,
-): void => {
-  const isWanted = shouldAiRead(text) && ai.state.status === "idle";
-  useEffect(() => {
-    if (!isWanted) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      void ai.read(text, onReading, { draft: true });
-    }, AUTO_READ_DELAY_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-    // Only a new text (or a reset) restarts the pause; the callbacks change every render.
-  }, [isWanted, text]);
 };
 
 const DECISIONS_LIMIT = 100;
@@ -279,43 +236,4 @@ export const useDraft = <T extends object>(
     setDraft((current) => ({ ...current, ...next }));
   };
   return [draft, patch];
-};
-
-/**
-A long text is never added on the rules alone: Enter (Add) first waits for the assistant's reading
-(shown on the chips, for a second press), and when the assistant is slow the text goes to
-Inbox so nothing is lost and nothing waits.
-*/
-export type ReadFirst = {
-  readonly isWaiting: boolean;
-  /** Starts or awaits the reading when the text needs one; `false` when it may be added now. */
-  readonly isPending: (text: string, onReading: (reading: AiReading) => void) => boolean;
-};
-
-export const useReadFirst = (ai: AiRead, toInbox: (text: string) => Promise<void>): ReadFirst => {
-  const [isWaiting, setIsWaiting] = useState(false);
-  const wait = async (text: string): Promise<void> => {
-    setIsWaiting(true);
-    const settled = await ai.settle(SLOW_READ_MS);
-    setIsWaiting(false);
-    if (settled !== "slow") {
-      return;
-    }
-
-    ai.reset();
-    await toInbox(text);
-  };
-  return {
-    isWaiting,
-    isPending: (text: string, onReading: (reading: AiReading) => void): boolean => {
-      if (!requiresAiFirst(text) || ai.state.status === "read" || ai.state.status === "failed") {
-        return false;
-      }
-      if (ai.state.status === "idle") {
-        void ai.read(text, onReading);
-      }
-      void wait(text);
-      return true;
-    },
-  };
 };

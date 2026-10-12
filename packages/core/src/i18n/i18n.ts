@@ -18,9 +18,16 @@ const interpolate = (text: string, params: MessageParams | undefined): string =>
     return value === undefined ? match : String(value);
   });
 
-/** Looks up `key` in the language's catalog and fills `{name}` placeholders. */
+/**
+Looks up `key` in the language's catalog and fills `{name}` placeholders. A key the catalog
+lacks (only possible through a cast or an old client) reads as itself rather than taking the
+screen down with it.
+*/
 export const t = (language: Language, key: MessageKey, params?: MessageParams): string =>
-  interpolate(catalogs[language][key], params);
+  interpolate(
+    (catalogs[language] as Readonly<Partial<Record<string, string>>>)[key] ?? key,
+    params,
+  );
 
 export type PluralForms = {
   readonly one: string;
@@ -85,9 +92,8 @@ export type RelativeDayContext = {
 };
 
 /**
-`today` / `tomorrow` / `yesterday`, otherwise the exact date with its weekday ("Tue Oct 13",
-"вт 13 окт."; the year is added when it differs). Never a bare weekday: "Tuesday" a week
-away is ambiguous. Days are the zone's calendar days.
+`today` / `tomorrow` / `yesterday`, otherwise the exact date ("Oct 13", "13 окт."; the year
+is added when it differs). No weekday: the date says it all. Days are the zone's calendar days.
 */
 export const formatRelativeDay = (
   atIso: string,
@@ -109,7 +115,6 @@ export const formatRelativeDay = (
     day: "numeric",
     month: "short",
     timeZone: zone,
-    weekday: "short",
     ...(!isSameYear && { year: "numeric" }),
   })
     .formatToParts(date)

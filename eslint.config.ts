@@ -170,6 +170,11 @@ export default defineConfig([
           message: "for..in iterates inherited keys; use Object.entries/keys.",
           selector: "ForInStatement",
         },
+        {
+          message:
+            "A cast hides a missing translation from the type checker; map the value to its key with a typed Record instead.",
+          selector: "TSAsExpression > TSTypeReference[typeName.name='MessageKey']",
+        },
       ],
       "no-useless-rename": "error",
       "object-shorthand": ["error", "always"],

@@ -6,9 +6,7 @@ import { PresetDefinitionSchema } from "./preset-schema.ts";
 const DEFAULT_NOTIFY = {
   criticalHours: 24,
   criticalProgress: 0.5,
-  criticalScore: 10,
   inProgressIdleDays: 5,
-  waitingDays: 7,
 };
 
 const NO_FIELDS = { description: false, startAt: false, submitVia: false, link: false };
@@ -40,7 +38,7 @@ describe("BASE_PRESETS", () => {
     }
   });
 
-  it("hw: pace, per-subtask homework with a weekly rhythm slot left open", () => {
+  it("hw: per-subtask homework with a weekly rhythm slot left open", () => {
     expect(BASE_PRESETS.hw.definition).toEqual({
       color: "yellow",
       deadlinePolicy: { kind: "hard" },
@@ -51,11 +49,10 @@ describe("BASE_PRESETS", () => {
       progressMode: "subtasks",
       recurrence: null,
       submission: "per_subtask",
-      urgencyPolicy: "pace",
     });
   });
 
-  it("work: lag policy with a slider and link/description/start fields", () => {
+  it("work: with a slider and link/description/start fields", () => {
     expect(BASE_PRESETS.work.definition).toEqual({
       color: "violet",
       deadlinePolicy: { kind: "hard" },
@@ -66,11 +63,10 @@ describe("BASE_PRESETS", () => {
       progressMode: "slider",
       recurrence: null,
       submission: "whole",
-      urgencyPolicy: "lag",
     });
   });
 
-  it("personal: age policy with subtasks and no extra fields", () => {
+  it("personal: with subtasks and no extra fields", () => {
     expect(BASE_PRESETS.personal.definition).toEqual({
       color: "orange",
       deadlinePolicy: { kind: "hard" },
@@ -81,7 +77,6 @@ describe("BASE_PRESETS", () => {
       progressMode: "subtasks",
       recurrence: null,
       submission: "whole",
-      urgencyPolicy: "age",
     });
   });
 
@@ -96,7 +91,6 @@ describe("BASE_PRESETS", () => {
       progressMode: "none",
       recurrence: null,
       submission: "whole",
-      urgencyPolicy: "age",
     });
   });
 
@@ -111,7 +105,6 @@ describe("BASE_PRESETS", () => {
       progressMode: "none",
       recurrence: null,
       submission: "whole",
-      urgencyPolicy: "age",
     });
   });
 });

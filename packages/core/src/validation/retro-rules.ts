@@ -12,6 +12,7 @@ export type RetroError =
   | "retro/future"
   | "retro/nothing-to-submit"
   | "retro/task-closed"
+  | "subtask/submitted"
   | "subtask/unknown"
   | "task/unknown";
 
@@ -73,9 +74,15 @@ const checkDetails = (
   if (input.type === "task.preset.set") {
     return checkPreset(presets, input.payload.presetId);
   }
-  if (input.type === "task.subtask.solved") {
-    const isKnown = task.subtasks.some((item) => item.id === input.payload.subtaskId);
-    return isKnown ? undefined : "subtask/unknown";
+  if (input.type === "task.subtask.solved" || input.type === "task.subtask.removed") {
+    const subtask = task.subtasks.find((item) => item.id === input.payload.subtaskId);
+    if (subtask === undefined) {
+      return "subtask/unknown";
+    }
+    // A sent problem is on the record: it stays.
+    return input.type === "task.subtask.removed" && subtask.submittedAt !== null
+      ? "subtask/submitted"
+      : undefined;
   }
   return input.type === "task.submitted"
     ? checkSubmission(presets, task, input.payload.subtaskIds)

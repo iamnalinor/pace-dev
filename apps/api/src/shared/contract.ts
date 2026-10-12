@@ -1,13 +1,14 @@
 import type {
+  CalendarEvent,
   CoreState,
   EventInput,
-  Importance,
   NotifyMessage,
   PresetDefinition,
   Result,
   RetroError,
   SyncEvent,
   Task,
+  UsageRow,
 } from "@pace/core";
 
 export type { Observation, SyncEvent } from "@pace/core";
@@ -70,6 +71,16 @@ export type DryRunResult = {
 /** The part of the user store that readers outside the Durable Object (MCP, bot) use. */
 export type UserStoreApi = {
   readonly read: (now: string) => Promise<ReadResult>;
+  /** The phone's calendar copy overlapping a range. */
+  readonly calendar: (range: {
+    readonly from: string;
+    readonly to: string;
+  }) => Promise<readonly CalendarEvent[]>;
+  /** App sessions on every device overlapping a range. */
+  readonly usage: (range: {
+    readonly from: string;
+    readonly to: string;
+  }) => Promise<readonly UsageRow[]>;
   readonly apply: (
     inputs: readonly EventInput[],
     meta: ApplyMeta,
@@ -111,8 +122,6 @@ export type SqlRows = {
 export type SimulationArgs = {
   readonly from: string;
   readonly to: string;
-  /** Importance multipliers to rank with instead of the built-in ones. */
-  readonly multipliers?: Partial<Readonly<Record<Importance, number>>>;
 };
 
 export type SimulatedMessage = {
@@ -122,20 +131,8 @@ export type SimulatedMessage = {
   readonly text: string;
 };
 
-export type SimulatedRank = {
-  readonly taskId: string;
-  readonly title: string;
-  readonly importance: Importance;
-  readonly urgency: number;
-  readonly score: number;
-  /** The score with the simulated multipliers. */
-  readonly simulatedScore: number;
-};
-
 export type Simulation = {
   readonly messages: readonly SimulatedMessage[];
-  /** Now at `to`, ordered by the simulated score. */
-  readonly ranking: readonly SimulatedRank[];
   /** The step limit cut the range short. */
   readonly isCut: boolean;
 };

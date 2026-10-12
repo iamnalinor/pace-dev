@@ -7,9 +7,10 @@ import { isAllowed } from "../shared/telegram-identity.ts";
 import { readGrant } from "./grant.ts";
 import { registerTools, type Tool, type ToolContext } from "./registry.ts";
 import { describeSchema, exportAll, querySql, simulateTool } from "./tools/analytics-tools.ts";
+import { calendarTool, usageTool, weekTool } from "./tools/cloud-tools.ts";
 import { reviewAction, revokeEvent } from "./tools/correction-tools.ts";
 import { searchDecisions } from "./tools/decision-tools.ts";
-import { importanceTool, rankTool, statusTool, subtasksTool } from "./tools/edit-tools.ts";
+import { importanceTool, statusTool, subtasksTool } from "./tools/edit-tools.ts";
 import { taskTool } from "./tools/get-task.ts";
 import {
   listInbox,
@@ -37,8 +38,8 @@ const SERVER_INFO = { name: "pace", version: "0.1.0" };
 const INSTRUCTIONS = [
   "Pace is a personal task and time tracker. Every tool acts as the person who authorized this connection.",
   "Read tools (tasks:read): whoami, list_now, get_task, list_projects, list_project_tasks, list_presets, list_inbox, list_review, search, fetch, search_decisions (why a reminder was or was not sent).",
-  "Time tools: list_activity_buttons, get_day and summary_time (time:read); start_activity, stop_activity and log_activity (time:write).",
-  "Analytics (analytics:read): describe_schema, query_sql (one read-only SELECT over the store's tables), simulate (replay the reminder rules over a past range; rank Now with other importance weights) and export_all (the event log as NDJSON).",
+  "Time tools: list_activity_buttons, get_day, summary_time, get_calendar, get_usage and get_week (time:read); start_activity, stop_activity and log_activity (time:write).",
+  "Analytics (analytics:read): describe_schema, query_sql (one read-only SELECT over the store's tables), simulate (replay the reminder rules over a past range) and export_all (the event log as NDJSON).",
   "Mutating tools (tasks:write, time:write) take `at` (ISO instant, default now; use the past to record retroactively), `precision` (exact|approx) and `dryRun` (true = validate and preview the events, write nothing).",
   "Ids are opaque strings; find them with list_now, search or get_task. Times are ISO 8601 UTC; deadlines carry the IANA zone they were set in.",
   "A refusal is a tool error whose text starts with a code such as task/unknown, retro/task-closed or preset/exists.",
@@ -66,7 +67,6 @@ export const TOOLS: readonly Tool[] = [
   updateTask,
   importanceTool,
   statusTool,
-  rankTool,
   subtasksTool,
   revokeEvent,
   reviewAction,
@@ -77,6 +77,9 @@ export const TOOLS: readonly Tool[] = [
   listActivityButtons,
   dayTool,
   summaryTime,
+  calendarTool,
+  usageTool,
+  weekTool,
   startActivity,
   stopActivity,
   logActivity,

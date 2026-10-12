@@ -45,6 +45,17 @@ const read = (
   );
 
 describe("aiReading", () => {
+  it("keeps the assistant's description for the task form", () => {
+    const reading = read("дз по алгебре 290, 292 — методом линейных множителей", {
+      description: "методом линейных множителей",
+      subtasks: [
+        { label: "290", number: 290 },
+        { label: "292", number: 292 },
+      ],
+    });
+    expect(reading.edits.description).toBe("методом линейных множителей");
+  });
+
   it("fills the chips from the assistant's reading, keeping the text verbatim", () => {
     const text = "надо бы до пятницы 18:00 закончить отчёт для Алгебры, часа на два";
     const reading = read(text, {

@@ -60,7 +60,6 @@ const walk = (
 
 /** A child key replaces the parent's; `fields` and `notify` merge key by key. */
 const merge = (base: ResolvedPreset, delta: PresetDefinition): ResolvedPreset => ({
-  urgencyPolicy: delta.urgencyPolicy ?? base.urgencyPolicy,
   defaultImportance: delta.defaultImportance ?? base.defaultImportance,
   deadlinePolicy: delta.deadlinePolicy ?? base.deadlinePolicy,
   submission: delta.submission ?? base.submission,

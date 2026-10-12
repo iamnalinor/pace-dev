@@ -15,6 +15,21 @@ import { json, loginAsDev, readJson } from "./helpers.ts";
 const parse = async (token: string, text: string): Promise<ParseResponse> =>
   await json<ParseResponse>("/api/parse", { body: { text }, token });
 
+describe("POST /api/parse/activity", () => {
+  it("reads a note of what the person is doing into a label and a length", async () => {
+    const token = await loginAsDev("1001");
+    const answer = await json("/api/parse/activity", {
+      body: { text: "Пошел в ЦСС, 20мин" },
+      token,
+    });
+    expect(answer).toEqual({
+      provider: "fake",
+      reading: { category: "other", expectMinutes: 20, label: "Пошел в ЦСС" },
+      status: "parsed",
+    });
+  });
+});
+
 describe("POST /api/parse", () => {
   it("reads a message into a checked parse and writes nothing", async () => {
     const token = await loginAsDev("1001");

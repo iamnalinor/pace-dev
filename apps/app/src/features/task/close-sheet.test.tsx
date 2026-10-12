@@ -16,6 +16,18 @@ const openSubmit = async () => {
 
 const preview = (label: string) => screen.getByTestId(`preview-${label}`);
 
+describe("CloseSheet — a task without a deadline", () => {
+  it("previews plain Done, no deadline words or pill", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    const result = await runtime.actions.createTask({ presetId: "personal", title: "Call mom" });
+    const [created] = result.ok ? result.value : [];
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} openClose />, runtime);
+    expect(preview("outcome")).toHaveTextContent(`${en("close.outcome")}${en("outcome.done")}`);
+    expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
+  });
+});
+
 describe("CloseSheet — submitting problems", () => {
   it("offers the quick times and previews the outcome", async () => {
     await openSubmit();
@@ -36,7 +48,11 @@ describe("CloseSheet — submitting problems", () => {
   it("submits an hour ago as an approximate time", async () => {
     const runtime = await openSubmit();
     await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.hour-ago") }));
-    await fireEvent(screen.getByRole("switch", { name: en("close.exact") }), "valueChange", false);
+    // Both choices in sight as chips, not a switch to decode.
+    expect(screen.getByRole("radio", { checked: true, name: en("close.exact") })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.approx") }));
+    // Leaving is the dim (or the cross on a wide window), not a Back button.
+    expect(screen.queryByRole("button", { name: en("common.back") })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("close.submit") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().log.at(-1)?.type).toBe("task.submitted");

@@ -9,7 +9,7 @@ const read = (world: Awaited<ReturnType<typeof setupActions>>, text: string) =>
   composerModel(world.state.store.getState(), { text }, ctx());
 
 describe("createFromComposer", () => {
-  it("creates a task from the chips, storing the importance and the typed line", async () => {
+  it("creates a task from the chips, storing the importance, not the typed line", async () => {
     const world = await setupActions();
     const text = "синк по дашборду завтра 15:00 1ч https://meet.example.com/abc";
     const [created] = unwrap(await world.actions.createFromComposer(read(world, text)));
@@ -22,9 +22,19 @@ describe("createFromComposer", () => {
       dueAt: "2026-10-07T12:00:00.000Z",
       dueTz: MOSCOW,
       estimateMinutes: 60,
-      sourceText: text,
       fields: { link: "https://meet.example.com/abc" },
     });
+    // Typed by hand, the line is the task: there is no original message to keep.
+    expect(created?.type === "task.created" && created.payload.sourceText).toBeUndefined();
+  });
+
+  it("keeps the message the assistant read as the task's source", async () => {
+    const world = await setupActions();
+    const text = "пришло дз: разобрать почту до пятницы";
+    const [created] = unwrap(
+      await world.actions.createFromComposer(read(world, text), { readByAssistant: true }),
+    );
+    expect(created?.type === "task.created" && created.payload.sourceText).toBe(text);
   });
 
   it("adds typed problems to this week's homework instead of a new task", async () => {
@@ -67,6 +77,47 @@ describe("createFromComposer", () => {
       description: "the one from the seminar",
       subtasks: [{ label: "intro" }],
     });
+  });
+
+  it("stores the start and the assistant's description on a new task", async () => {
+    const world = await setupActions();
+    const start = { at: "2026-10-08T06:00:00.000Z", tz: MOSCOW };
+    const model = composerModel(
+      world.state.store.getState(),
+      { edits: { description: "the seminar one", start }, text: "read the paper" },
+      ctx(),
+    );
+    const [created] = unwrap(await world.actions.createFromComposer(model));
+    expect(created?.payload).toMatchObject({
+      description: "the seminar one",
+      startAt: start.at,
+      startTz: MOSCOW,
+    });
+  });
+
+  it("brings the description, the link and a stated estimate to this week's homework", async () => {
+    const world = await setupActions();
+    const model = composerModel(
+      world.state.store.getState(),
+      {
+        edits: { description: "Метод линейных множителей", estimateMinutes: 120 },
+        text: "дз по алгебре 8, 9 https://example.com/sheet",
+      },
+      ctx(),
+    );
+    const events = unwrap(await world.actions.createFromComposer(model));
+    expect(events.map((event) => event.type)).toEqual([
+      "task.subtasks.added",
+      "task.updated",
+      "task.estimate.set",
+      "task.source.attached",
+    ]);
+    const task = world.state.store.getState().tasks.byId[HW_ID];
+    expect(task).toMatchObject({
+      estimateMinutes: 120,
+      fields: { link: "https://example.com/sheet" },
+    });
+    expect(task?.description).toContain("Метод линейных множителей");
   });
 
   it("refuses an empty line", async () => {

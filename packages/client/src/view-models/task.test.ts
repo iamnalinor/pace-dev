@@ -14,7 +14,7 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
-import { type TaskViewModel, taskViewModel } from "./task.ts";
+import { type TaskViewModel, taskViewModel, workLeftAt } from "./task.ts";
 
 const view = (taskId: string, now: string, deviceTz?: string): TaskViewModel => {
   const result = taskViewModel(artboardState(now), taskId, ctx(now, deviceTz));
@@ -23,6 +23,43 @@ const view = (taskId: string, now: string, deviceTz?: string): TaskViewModel => 
   }
   return result.value;
 };
+
+/** The books task with another source text: what the original-message disclosure is about. */
+const withSource = (sourceText: null | string): TaskViewModel => {
+  const state = artboardState(TRK_NOW);
+  const task = state.tasks.byId[BOOKS_ID];
+  if (task === undefined) {
+    throw new Error("fixture lost the books task");
+  }
+  const changed = {
+    ...state,
+    tasks: { byId: { ...state.tasks.byId, [BOOKS_ID]: { ...task, sourceText } } },
+  };
+  const result = taskViewModel(changed, BOOKS_ID, ctx(TRK_NOW));
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.value;
+};
+
+describe("sourceText", () => {
+  it("is only the message the title was read from, never a copy of the title", () => {
+    const title = withSource(null).title;
+    expect(withSource(` ${title}  `).sourceText).toBeNull();
+    expect(withSource(null).sourceText).toBeNull();
+    const message = `Please ${title.toLowerCase()} before Friday, the link is in the chat`;
+    expect(withSource(message).sourceText).toBe(message);
+  });
+});
+
+describe("workLeftAt", () => {
+  it("counts the work left from a progress being dragged, before it is saved", () => {
+    const trk = view(TRK_ID, TRK_NOW, "UTC");
+    expect(workLeftAt(trk, 0)).toBe(trk.stats.estimateMinutes);
+    expect(workLeftAt(trk, 3)).toBe(Math.round(trk.stats.estimateMinutes * 0.7));
+    expect(workLeftAt(trk, 10)).toBe(0);
+  });
+});
 
 describe("taskViewModel", () => {
   it("takes the link from the description when none was set", () => {
@@ -69,29 +106,8 @@ describe("taskViewModel", () => {
       trackedMinutes: 0,
       workLeftMinutes: 288,
     });
-    expect(trk.stats.windowElapsed).toBeCloseTo(0.65, 10);
     expect(trk.progress).toMatchObject({ mode: "slider", slider: 4 });
     expect(trk.progress.value).toBeCloseTo(0.4, 10);
-    expect(trk.rank).toEqual({ position: 2, size: 3 });
-    expect(trk.why.policy).toBe("lag");
-    expect(trk.why.groups.map((group) => group.name)).toEqual([
-      "work",
-      "time",
-      "importance",
-      "result",
-    ]);
-    const rows = Object.fromEntries(
-      trk.why.groups.flatMap((group) => group.rows).map((entry) => [entry.key, entry]),
-    );
-    expect(
-      trk.why.formula.map((part) => (part.kind === "text" ? part.text : part.row.key)),
-    ).toEqual(["0.25 + 1.5 · max(0, ", "windowElapsed", " − ", "progress", ")", " = ", "urgency"]);
-    expect(rows["windowElapsed"]).toMatchObject({ unit: "percent" });
-    expect(rows["windowElapsed"]?.value).toBeCloseTo(65, 10);
-    expect(rows["progress"]?.value).toBeCloseTo(40, 10);
-    expect(rows["multiplier"]).toEqual({ key: "multiplier", unit: "x", value: 5 });
-    expect(rows["behindPace"]?.value).toBeCloseTo(0.25, 10);
-    expect(rows["rank"]).toEqual({ key: "rank", unit: null, value: 2 });
     expect(trk.primaryAction).toEqual({ kind: "done" });
     expect(trk.problems).toEqual([]);
     expect(trk.outcome).toBeNull();
@@ -124,6 +140,7 @@ describe("taskViewModel", () => {
     expect(hw.stats.workLeftMinutes).toBe(103);
     expect(hw.progress).toMatchObject({ mode: "subtasks", slider: null });
     expect(hw.tags).toEqual([
+      { importance: "normal", kind: "importance" },
       { kind: "status", status: "in_progress" },
       { kind: "submission", submission: "per_subtask" },
     ]);
@@ -140,7 +157,6 @@ describe("taskViewModel", () => {
       overrides: null,
       presetId: "hw.algebra",
       presetName: "Algebra HW",
-      urgencyPolicy: "resubmission",
     });
     expect(hw.overrideSheet.presets.map((preset) => preset.id)).toEqual([
       "hw",
@@ -166,7 +182,10 @@ describe("taskViewModel", () => {
     const sheet = view(sheetId(3), HW_VIEW_NOW);
     expect(sheet.primaryAction).toEqual({ kind: "none" });
     expect(sheet.outcome).toBe("done_late");
-    expect(sheet.rank).toBeNull();
+    // Closed: its outcome instead of a status, and no work left.
+    expect(sheet.tags).toContainEqual({ kind: "outcome", outcome: "done_late" });
+    expect(sheet.tags.some((tag) => tag.kind === "status")).toBe(false);
+    expect(sheet.stats.workLeftMinutes).toBe(0);
     expect(taskViewModel(artboardState(), "t-nope", ctx())).toEqual({
       error: "task/unknown",
       ok: false,

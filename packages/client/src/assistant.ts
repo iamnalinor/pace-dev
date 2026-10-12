@@ -1,4 +1,4 @@
-import { endpoints } from "@pace/core";
+import { type ActivityReading, endpoints } from "@pace/core";
 
 import type { ApiClient } from "./api-client.ts";
 import type { AppStateHandle } from "./state.ts";
@@ -23,6 +23,11 @@ export type Assistant = {
     text: string,
     options?: { readonly defer?: boolean; readonly draft?: boolean },
   ) => Promise<AiOutcome>;
+  /**
+  Reads a note of what the person is doing (`POST /api/parse/activity`) into a label, a
+  category and a length; `null` when no model answers (the activity keeps its words).
+  */
+  readonly readActivity: (text: string) => Promise<ActivityReading | null>;
 };
 
 export const createAssistant = (deps: {
@@ -49,6 +54,14 @@ export const createAssistant = (deps: {
       return { reading, status: "read" };
     } catch {
       return { status: "failed" };
+    }
+  },
+  readActivity: async (text) => {
+    try {
+      const answer = await deps.api.call(endpoints.parse.activity, { body: { text } });
+      return answer.status === "parsed" ? answer.reading : null;
+    } catch {
+      return null;
     }
   },
 });

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ExplainKey } from "../urgency/trace.ts";
-
-import { at, HW_ID, TRK_ID } from "../materialize/task-fixture.fake.ts";
-import { TRK_NOW } from "../urgency/fixture.fake.ts";
+import { at, HW_ID, TRK_ID, TRK_NOW } from "../materialize/task-fixture.fake.ts";
 import {
   artboardState,
   BOOKS_ID,
@@ -24,30 +21,15 @@ const view = (taskId: string, now: string, deviceTz?: string): TaskView => {
   return result.value;
 };
 
-const inputValue = (why: TaskView["explanation"], key: ExplainKey) =>
-  why.inputs.find((row) => row.key === key)?.value;
-const stepValue = (why: TaskView["explanation"], key: ExplainKey) =>
-  why.steps.find((row) => row.key === key)?.value;
-
 describe("taskView", () => {
-  it("shows TRK-231 on Thursday: window 65 %, progress 40 %, rank 2 of 3 and the why rows", () => {
+  it("shows TRK-231 on Thursday: progress 40 % of an 8 h estimate", () => {
     const trk = view(TRK_ID, TRK_NOW, "UTC");
     expect(trk.project?.id).toBe(WORK_ID);
     expect(trk.importance).toBe("prioritized");
     expect(trk.status).toBe("in_progress");
-    expect(trk.windowElapsed).toBeCloseTo(0.65, 10);
-    expect(trk.rank).toEqual({ position: 2, size: 3 });
     // 8 h estimate at 40 %: 4 h 48 min left.
     expect(trk.workLeftMinutes).toBe(288);
     expect(trk.trackedMinutes).toBe(0);
-    expect(trk.explanation.policy).toBe("lag");
-    expect(inputValue(trk.explanation, "windowElapsed")).toBeCloseTo(65, 10);
-    expect(inputValue(trk.explanation, "progress")).toBeCloseTo(40, 10);
-    expect(inputValue(trk.explanation, "multiplier")).toBe(5);
-    expect(inputValue(trk.explanation, "rank")).toBe(2);
-    expect(inputValue(trk.explanation, "rankSize")).toBe(3);
-    expect(stepValue(trk.explanation, "behindPace")).toBeCloseTo(0.25, 10);
-    expect(stepValue(trk.explanation, "score")).toBeCloseTo(3.158, 3);
     expect(trk.submitPreview).toEqual({ kind: "whole", canClose: true });
   });
 
@@ -58,32 +40,22 @@ describe("taskView", () => {
     expect(view(BOOKS_ID, NOW, "UTC").dueZoneDiffers).toBe(false);
   });
 
-  it("shows Algebra HW 6 on Wednesday: 82 % of the window gone, ~1 h 40 m left, submit 3 and 4", () => {
+  it("shows Algebra HW 6 on Wednesday: ~1 h 40 m left, submit 3 and 4", () => {
     const hw = view(HW_ID, HW_VIEW_NOW);
     expect(hw.preset.submission).toBe("per_subtask");
     expect(hw.status).toBe("in_progress");
-    expect(hw.windowElapsed).toBeCloseTo(0.82, 2);
     // 4 h estimate, 4 of 7 solved: 240 × 3/7 = 102.86 → 103 min, shown as "~1h 40m".
     expect(hw.workLeftMinutes).toBe(103);
     expect(hw.submitPreview).toEqual({ kind: "per_subtask", subtaskIds: ["s3", "s4"] });
-    expect(hw.explanation.policy).toBe("resubmission");
-    expect(hw.rank).toEqual({ position: 2, size: 2 });
   });
 
-  it("has no window without a due and freezes a waiting task's clock", () => {
-    const books = view(BOOKS_ID, NOW);
-    expect(books.windowElapsed).toBeNull();
-    expect(books.rank).toEqual({ position: 1, size: 5 });
-    expect(books.workLeftMinutes).toBe(30);
-    const demo = view(DEMO_ID, NOW);
-    expect(demo.status).toBe("waiting");
-    expect(inputValue(demo.explanation, "waitingSince")).toBe("2026-10-06T09:00:00.000Z");
-    expect(demo.explanation.score.frozenAt).toBe("2026-10-06T09:00:00.000Z");
+  it("falls back to the preset's estimate and reads an old waiting status as in progress", () => {
+    expect(view(BOOKS_ID, NOW).workLeftMinutes).toBe(30);
+    expect(view(DEMO_ID, NOW).status).toBe("in_progress");
   });
 
-  it("has no rank and nothing to close for a closed task", () => {
+  it("has nothing to close for a closed task", () => {
     const sheet = view(sheetId(1), NOW);
-    expect(sheet.rank).toBeNull();
     // The closed sheet has no subtasks, so it is tracked and closed as a whole.
     expect(sheet.submitPreview).toEqual({ canClose: false, kind: "whole" });
     const state = artboardState(NOW, [
@@ -94,7 +66,6 @@ describe("taskView", () => {
     ]);
     const books = taskView(state, BOOKS_ID, ctx());
     expect(books.ok && books.value.submitPreview).toEqual({ kind: "whole", canClose: false });
-    expect(books.ok && books.value.rank).toBeNull();
   });
 
   it("rejects an unknown task and a broken preset", () => {

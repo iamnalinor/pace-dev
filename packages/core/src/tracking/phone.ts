@@ -118,6 +118,15 @@ const foregroundIntervals = (
     });
 };
 
+/** Each app's spells in front (a minute or longer), by start; one still open ends at `now`. */
+export const appSessions = (
+  events: readonly PhoneEvent[],
+  now: string,
+): readonly (Interval & { readonly app: string })[] =>
+  foregroundIntervals(events, now)
+    .filter((interval) => Date.parse(interval.endAt) - Date.parse(interval.startAt) >= 60_000)
+    .toSorted((a, b) => a.startAt.localeCompare(b.startAt));
+
 const clipMinutes = (interval: Interval, from: string, to: string): number => {
   const start = Math.max(Date.parse(interval.startAt), Date.parse(from));
   const end = Math.min(Date.parse(interval.endAt), Date.parse(to));
@@ -167,38 +176,4 @@ export const phonePickupAt = (events: readonly PhoneEvent[], now: string): null 
   );
   const session = joined === -1 ? earlier : earlier.slice(0, joined);
   return session.at(-1)?.startAt ?? last.startAt;
-};
-
-/** Apps whose time is talk, not work, unless the activity was about talking. */
-export const MESSENGER_PACKAGES: ReadonlySet<string> = new Set([
-  "com.discord",
-  "com.facebook.orca",
-  "com.slack",
-  "com.viber.voip",
-  "com.vkontakte.android",
-  "com.whatsapp",
-  "org.telegram.messenger",
-  "org.thoughtcrime.securesms",
-]);
-
-/** The share of messenger time taken off a block. */
-export const MESSENGER_PENALTY = 0.25;
-
-export type Counted = { readonly counted: number; readonly messengerMinutes: number };
-
-/** A block's minutes less a quarter of the messenger time inside it (none when on purpose). */
-export const countedMinutes = (
-  minutes: number,
-  usage: readonly AppMinutes[],
-  { messengers = MESSENGER_PACKAGES, onPurpose = false } = {},
-): Counted => {
-  const messengerMinutes = usage
-    .filter((row) => messengers.has(row.app))
-    .reduce((sum, row) => sum + row.minutes, 0);
-  return {
-    counted: onPurpose
-      ? minutes
-      : Math.max(0, Math.round(minutes - MESSENGER_PENALTY * messengerMinutes)),
-    messengerMinutes,
-  };
 };

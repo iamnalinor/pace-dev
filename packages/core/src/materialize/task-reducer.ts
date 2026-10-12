@@ -10,7 +10,6 @@ import {
   type TaskFields,
   type TasksState,
 } from "../model/task.ts";
-import { minutesBetween } from "../time.ts";
 
 /** Events applied to an existing task; `task.created` is the one that needs the state instead. */
 type AppliedEventType = Exclude<
@@ -107,9 +106,7 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
     overrides: emptyToNull(payload.overrides),
     status: "not_started",
     statusSince: occurredAt,
-    waitingMinutes: 0,
     touched: false,
-    rank: null,
     createdAt: occurredAt,
     submittedAt: null,
     closed: null,
@@ -118,18 +115,9 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
   };
 };
 
-/** Minutes of the waiting spell that started at `statusSince`, never negative. */
-const spell = (task: Task, at: string): number => Math.max(0, minutesBetween(task.statusSince, at));
-
-/** Folds the running waiting spell into the total when the task leaves (or is closed while) waiting. */
-const endWaiting = (task: Task, at: string): Task =>
-  task.status === "waiting"
-    ? { ...task, waitingMinutes: task.waitingMinutes + spell(task, at), statusSince: at }
-    : task;
-
 /**
-Work implies "in progress", but only from "not started": an explicit paused or waiting
-status set by the user is never overridden by an implicit one.
+Work implies "in progress", but only from "not started": an explicit pause set by the user
+is never overridden by an implicit one.
 */
 const touched = (task: Task, at: string): Task => {
   if (task.status === "not_started") {
@@ -138,7 +126,7 @@ const touched = (task: Task, at: string): Task => {
   return task.touched ? task : { ...task, touched: true };
 };
 
-/** The first closure stays until a reopen; an open waiting spell ends here. */
+/** The first closure stays until a reopen. */
 const close = (
   task: Task,
   event: TaskEvent<"task.closed" | "task.submitted">,
@@ -150,18 +138,19 @@ const close = (
 ): Task =>
   task.closed === null
     ? {
-        ...endWaiting(task, event.occurredAt),
+        ...task,
         closed: { ...closure, at: event.occurredAt, source: event.source, eventId: event.id },
       }
     : task;
 
+/** "waiting" (removed in stage 6) is read as in progress. */
 const statusSet: Handler<"task.status.set"> = (task, event) => {
-  const { status } = event.payload;
+  const status = event.payload.status === "waiting" ? "in_progress" : event.payload.status;
   if (status === task.status) {
     return task;
   }
   return {
-    ...endWaiting(task, event.occurredAt),
+    ...task,
     status,
     statusSince: event.occurredAt,
     touched: task.touched || status === "in_progress",
@@ -209,6 +198,28 @@ const isSamePatch = (a: Task, b: Task): boolean =>
   a.fields.link === b.fields.link &&
   a.fields.submitVia === b.fields.submitVia;
 
+type UpdatedPayload = EventOf<"task.updated">["payload"];
+
+/** A patched time: a new one with its zone, `null` clears both, absent keeps the old. */
+const patchedTime = (
+  at: null | string | undefined,
+  tz: string | undefined,
+  current: { readonly at: null | string; readonly tz: null | string },
+): { readonly at: null | string; readonly tz: null | string } =>
+  at === null ? { at: null, tz: null } : { at: at ?? current.at, tz: tz ?? current.tz };
+
+const patchedSchedule = (
+  task: Task,
+  payload: UpdatedPayload,
+): Pick<Task, "dueAt" | "dueTz" | "startAt" | "startTz"> => {
+  const due = patchedTime(payload.dueAt, payload.dueTz, { at: task.dueAt, tz: task.dueTz });
+  const start = patchedTime(payload.startAt, payload.startTz, {
+    at: task.startAt,
+    tz: task.startTz,
+  });
+  return { dueAt: due.at, dueTz: due.tz, startAt: start.at, startTz: start.tz };
+};
+
 /** `description: null` clears; `fields` replaces both fields when present. */
 const updated: Handler<"task.updated"> = (task, event) => {
   const { payload } = event;
@@ -216,10 +227,7 @@ const updated: Handler<"task.updated"> = (task, event) => {
     ...task,
     title: payload.title ?? task.title,
     description: payload.description === undefined ? task.description : payload.description,
-    dueAt: payload.dueAt ?? task.dueAt,
-    dueTz: payload.dueTz ?? task.dueTz,
-    startAt: payload.startAt ?? task.startAt,
-    startTz: payload.startTz ?? task.startTz,
+    ...patchedSchedule(task, payload),
     fields: payload.fields === undefined ? task.fields : toFields(payload.fields),
   };
   return isSamePatch(next, task) ? task : next;
@@ -228,6 +236,11 @@ const updated: Handler<"task.updated"> = (task, event) => {
 const overridesSet: Handler<"task.overrides.set"> = (task, event) => {
   const overrides = emptyToNull(event.payload.overrides);
   return overrides === null && task.overrides === null ? task : { ...task, overrides };
+};
+
+const subtaskRemoved: Handler<"task.subtask.removed"> = (task, event) => {
+  const subtasks = task.subtasks.filter((item) => item.id !== event.payload.subtaskId);
+  return subtasks.length === task.subtasks.length ? task : { ...task, subtasks };
 };
 
 const subtasksAdded: Handler<"task.subtasks.added"> = (task, event) => {
@@ -242,6 +255,7 @@ const HANDLERS: Handlers = {
   "task.overrides.set": overridesSet,
   "task.status.set": statusSet,
   "task.subtask.solved": subtaskSolved,
+  "task.subtask.removed": subtaskRemoved,
   "task.subtasks.added": subtasksAdded,
   "task.submitted": submitted,
   "task.closed": (task, event) =>
@@ -273,8 +287,8 @@ const HANDLERS: Handlers = {
     event.payload.estimateMinutes === task.estimateMinutes
       ? task
       : { ...task, estimateMinutes: event.payload.estimateMinutes },
-  "task.rank.set": (task, event) =>
-    event.payload.rank === task.rank ? task : { ...task, rank: event.payload.rank },
+  // Manual ranks were removed in stage 6: old events stay in the log and change nothing.
+  "task.rank.set": (task) => task,
   "task.source.attached": (task, event) => ({
     ...task,
     sourceText: task.sourceText ?? event.payload.sourceText,

@@ -1,40 +1,30 @@
+import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
-import { type Tabs, useRouter } from "expo-router";
-import {
-  ChartColumn,
-  Clock,
-  Folder,
-  History,
-  Inbox,
-  type LucideIcon,
-  Plus,
-  Settings,
-  Zap,
-} from "lucide-react-native";
+import { ChartColumn, Clock, Folder, type LucideIcon, Settings, Zap } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useT } from "../app-state.tsx";
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
-import { PaceMark } from "./logo.tsx";
 import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
+/** The tabs a phone shows, in order; New task is the composer on Now, not a tab of its own. */
 const ICONS: Readonly<Record<string, LucideIcon>> = {
-  add: Plus,
-  day: Clock,
   index: Zap,
-  insights: ChartColumn,
+  day: Clock,
   projects: Folder,
+  insights: ChartColumn,
+  settings: Settings,
 };
 
 const ICON_SIZE = 20;
 const STROKE = 1.75;
 
-/** Bottom tabs from the Main artboard: five 56×44 targets, the Add one a filled light square. */
+/** Bottom tabs: Now, Day, Projects, Insights and Settings, each an icon over its name. */
 const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   const t = useT();
   const { palette } = useTheme();
@@ -42,15 +32,20 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="flex-row justify-around border-t border-line bg-bg px-3 pt-2"
+      className="flex-row border-t border-line bg-bg px-1 pt-1.5"
       role="tablist"
-      style={{ paddingBottom: Math.max(insets.bottom, 12) + 8 }}
+      style={{ paddingBottom: Math.max(insets.bottom, 8) + 4 }}
     >
       {state.routes.map((route, index) => {
-        const isFocused = state.index === index;
-        const isAdd = route.name === "add";
-        const Icon = ICONS[route.name] ?? Zap;
-        const activeColor = isFocused ? palette.fg : palette.faint;
+        const Icon = ICONS[route.name];
+        if (Icon === undefined) {
+          return null;
+        }
+        // On /add (New task, a share) Now is the screen, with the cursor in the composer.
+        const current = state.routes[state.index]?.name;
+        const isFocused = state.index === index || (route.name === "index" && current === "add");
+        const activeColor = isFocused ? palette.accentText : palette.muted;
+        const title = descriptors[route.key]?.options.title ?? route.name;
         const onPress = (): void => {
           const event = navigation.emit({
             canPreventDefault: true,
@@ -63,18 +58,23 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         };
         return (
           <Pressable
-            accessibilityLabel={descriptors[route.key]?.options.title ?? route.name}
+            accessibilityLabel={title}
             accessibilityRole="tab"
             aria-selected={isFocused}
-            className={cx("h-11 w-14 items-center justify-center", isAdd && "rounded-lg bg-accent")}
+            className="min-h-12 flex-1 items-center justify-center gap-0.5"
             key={route.key}
             onPress={onPress}
           >
-            <Icon
-              color={isAdd ? palette.accentFg : activeColor}
-              size={ICON_SIZE}
-              strokeWidth={STROKE}
-            />
+            <Icon color={activeColor} size={ICON_SIZE} strokeWidth={STROKE} />
+            <Text
+              className={cx(
+                "font-sans text-[11px]",
+                isFocused ? "font-medium text-accentText" : "text-muted",
+              )}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
           </Pressable>
         );
       })}
@@ -82,104 +82,5 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   );
 };
 
-/** A tab of the sidebar (`isActive` set), or a link to a pushed screen (without it). */
-const SidebarLink = ({
-  icon: Icon,
-  isActive,
-  label,
-  onPress,
-}: {
-  readonly icon: LucideIcon;
-  readonly isActive?: boolean;
-  readonly label: string;
-  readonly onPress: () => void;
-}) => {
-  const { palette } = useTheme();
-  const isCurrent = isActive === true;
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole={isActive === undefined ? "link" : "tab"}
-      aria-selected={isActive}
-      className={cx(
-        "h-10 flex-row items-center gap-3 rounded-lg px-3 active:opacity-70",
-        isCurrent && "bg-raised",
-      )}
-      onPress={onPress}
-    >
-      <Icon color={isCurrent ? palette.fg : palette.muted} size={18} strokeWidth={STROKE} />
-      <Text className={cx("font-sans text-[14px]", isCurrent ? "text-fg" : "text-fg2")}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-};
-
-/** On a wide window the tabs become a sidebar, with the pushed screens (Inbox, History, Settings) below. */
-const Sidebar = ({ descriptors, navigation, state }: TabBarProps) => {
-  const t = useT();
-  const router = useRouter();
-  const { palette } = useTheme();
-  const tabs = state.routes.filter((route) => route.name !== "add");
-  return (
-    <View
-      aria-label={t("nav.main")}
-      className="w-56 gap-1 border-r border-line bg-bg px-3 pb-4 pt-5"
-      role="navigation"
-    >
-      <View className="mb-3 flex-row items-center gap-2 px-2">
-        <PaceMark size={22} />
-        <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
-      </View>
-      <Pressable
-        accessibilityLabel={t("nav.newTask")}
-        accessibilityRole="button"
-        className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3 active:opacity-80"
-        onPress={() => {
-          navigation.navigate("add");
-        }}
-      >
-        <Plus color={palette.accentFg} size={18} strokeWidth={STROKE} />
-        <Text className="font-sans text-[14px] font-medium text-accentFg">{t("nav.newTask")}</Text>
-      </Pressable>
-      <View className="gap-1" role="tablist">
-        {tabs.map((route) => (
-          <SidebarLink
-            icon={ICONS[route.name] ?? Zap}
-            isActive={state.routes[state.index]?.key === route.key}
-            key={route.key}
-            label={descriptors[route.key]?.options.title ?? route.name}
-            onPress={() => {
-              navigation.navigate(route.name, route.params);
-            }}
-          />
-        ))}
-      </View>
-      <SidebarLink
-        icon={Inbox}
-        label={t("nav.inbox")}
-        onPress={() => {
-          router.push("/inbox");
-        }}
-      />
-      <SidebarLink
-        icon={History}
-        label={t("nav.history")}
-        onPress={() => {
-          router.push("/history");
-        }}
-      />
-      <SidebarLink
-        icon={Settings}
-        label={t("nav.settings")}
-        onPress={() => {
-          router.push("/settings");
-        }}
-      />
-    </View>
-  );
-};
-
-/** Bottom tabs on a phone, a sidebar on a wide window. */
-export const TabBar = (props: TabBarProps) =>
-  useIsWide() ? <Sidebar {...props} /> : <BottomTabs {...props} />;
+/** Bottom tabs on a phone; a wide window has the root layout's sidebar instead. */
+export const TabBar = (props: TabBarProps) => (useIsWide() ? null : <BottomTabs {...props} />);

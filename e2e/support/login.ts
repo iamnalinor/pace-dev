@@ -56,9 +56,13 @@ export const resetAccount = async (telegramId: string): Promise<void> => {
 
 /**
 Starts the test on an empty account of its own, signed in before any page script runs (the
-login UI is skipped). Call before the first `page.goto`.
+login UI is skipped). Call before the first `page.goto`. Answers the session's token, for
+seeding the account through the API.
 */
-export const loginViaApi = async (page: Page, telegramId = freshTelegramId()): Promise<void> => {
+export const loginViaApi = async (
+  page: Page,
+  telegramId = freshTelegramId(),
+): Promise<{ readonly token: string }> => {
   await resetAccount(telegramId);
   const { token } = await createDevSession(telegramId);
   await page.addInitScript(
@@ -67,4 +71,5 @@ export const loginViaApi = async (page: Page, telegramId = freshTelegramId()): P
     },
     { key: SESSION_KEY, value: token },
   );
+  return { token };
 };

@@ -11,7 +11,10 @@ monotonic counter. One factory per process keeps the counter shared.
 */
 export const createIdFactory = (prng?: Prng): IdFactory => {
   const make = monotonicFactory(prng);
-  return (seedTime?: number): string => make(seedTime);
+  // A time at or before the epoch is no time: ulidx would try to increment a counter it has
+  // not made yet and throw, so the clock is used instead.
+  return (seedTime?: number): string =>
+    make(seedTime === undefined || seedTime <= 0 ? undefined : seedTime);
 };
 
 export const newId: IdFactory = createIdFactory();

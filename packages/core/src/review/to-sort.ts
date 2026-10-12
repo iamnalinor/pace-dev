@@ -4,7 +4,7 @@ import type { ResolvedPreset } from "../model/preset.ts";
 import type { QueryContext } from "../queries/context.ts";
 
 import { isOpen, progressOf, type Task } from "../model/task.ts";
-import { isCompeting, isInboxTask, presetOf } from "../queries/classify.ts";
+import { isActiveTask, isInboxTask, presetOf } from "../queries/classify.ts";
 import { UNSORTED_TOO_LONG_MINUTES } from "../queries/inbox.ts";
 import { suggestFor, type Suggestion } from "../queries/suggest.ts";
 import { minutesBetween } from "../time.ts";
@@ -214,7 +214,7 @@ const itemFor = (state: CoreState, task: Task, ctx: QueryContext): ReviewItem | 
     return unsortedItem(state, task, ctx);
   }
   const preset = presetOf(state, task);
-  return !preset.ok || !isCompeting(task)
+  return !preset.ok || !isActiveTask(task)
     ? undefined
     : (submittedItem(task, preset.value, ctx.now) ?? deadlinePassedItem(task, ctx.now));
 };

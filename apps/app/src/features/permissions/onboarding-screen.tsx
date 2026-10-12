@@ -95,7 +95,7 @@ const Step = ({
         </>
       }
     >
-      <Text className="font-mono text-[12px] text-muted">
+      <Text className="font-sans text-[12px] tabular-nums text-muted">
         {t("onboarding.step", { index: index + 1, total })}
       </Text>
       <PermissionText id={permission.id} />

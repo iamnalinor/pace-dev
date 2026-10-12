@@ -10,14 +10,12 @@ import {
   type ProgressMode,
   ProjectColorSchema,
   type Submission,
-  type UrgencyPolicy,
 } from "@pace/core";
 
 import { DeadlineRow } from "./deadline-row.tsx";
 import { RecurrenceRow } from "./recurrence-row.tsx";
 import { ChoiceRow, EstimateRow, FieldToggleRow, NotifyRow, type SectionProps } from "./rows.tsx";
 
-const POLICIES: readonly UrgencyPolicy[] = ["pace", "lag", "age", "resubmission"];
 const IMPORTANCES: readonly Importance[] = ["asap", "prioritized", "normal", "nice_to_have"];
 const SUBMISSIONS: readonly Submission[] = ["per_subtask", "whole"];
 const PROGRESS_MODES: readonly ProgressMode[] = ["subtasks", "slider", "none"];
@@ -25,8 +23,6 @@ const FIELD_KEYS: readonly (keyof PresetFields)[] = ["description", "link", "sta
 const NOTIFY_KEYS: readonly (keyof NotifyParams)[] = [
   "criticalHours",
   "criticalProgress",
-  "criticalScore",
-  "waitingDays",
   "inProgressIdleDays",
 ];
 
@@ -38,7 +34,7 @@ const Section = ({ children, title }: { readonly children: ReactNode; readonly t
   >
     <Text
       accessibilityRole="header"
-      className="pb-1 pt-2.5 font-mono text-[11px] uppercase tracking-[0.06em] text-muted"
+      className="pb-1 pt-2.5 font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted"
     >
       {title}
     </Text>
@@ -52,13 +48,6 @@ export const PresetSections = (section: SectionProps) => {
   return (
     <>
       <Section title={t("presets.section.urgency")}>
-        <ChoiceRow
-          {...section}
-          field="urgencyPolicy"
-          label={t("presets.field.urgencyPolicy")}
-          labelOf={(value) => t(`policy.${value}`)}
-          values={POLICIES}
-        />
         <ChoiceRow
           {...section}
           field="defaultImportance"

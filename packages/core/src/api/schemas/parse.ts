@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ACTIVITY_CATEGORIES } from "../../events/payloads.ts";
 import { ParseFieldSchema, ParseResultSchema } from "../../parse/schema.ts";
 
 export const ParseRequestSchema = z.strictObject({
@@ -32,6 +33,34 @@ export const ParseResponseSchema = z.discriminatedUnion("status", [
     retryAt: z.iso.datetime().nullable(),
   }),
 ]);
+
+/** What the assistant reads from a note of what the person is doing ("Пошёл в ЦСС, 20 мин"). */
+export const ActivityReadingSchema = z.object({
+  label: z.string().trim().min(1).max(80),
+  category: z.enum(ACTIVITY_CATEGORIES),
+  expectMinutes: z.number().int().min(1).max(1440).nullable(),
+});
+
+export type ActivityReading = z.output<typeof ActivityReadingSchema>;
+
+export const ActivityParseRequestSchema = z.strictObject({
+  text: z.string().trim().min(1).max(200),
+});
+
+/** The reading, or the news that no model can answer now (the activity keeps its words). */
+export const ActivityParseResponseSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    status: z.literal("parsed"),
+    reading: ActivityReadingSchema,
+    provider: z.string(),
+  }),
+  z.strictObject({
+    status: z.literal("unavailable"),
+    retryAt: z.iso.datetime().nullable(),
+  }),
+]);
+
+export type ActivityParseResponse = z.output<typeof ActivityParseResponseSchema>;
 
 /** Whether the assistant can read now, or when it should again. */
 export const LlmStatusSchema = z.strictObject({

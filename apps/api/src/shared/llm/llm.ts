@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import { generateText, type LanguageModel, Output } from "ai";
 
 import { err, ok, type ParseResult, ParseResultSchema, type Result } from "@pace/core";
@@ -22,11 +24,16 @@ export type LlmError = {
   readonly limited: Cooldowns;
 };
 
-export type ParseAnswer = {
-  readonly result: ParseResult;
+/** A structured answer: what the model said, which provider said it, the limits met on the way. */
+export type Answer<T> = {
+  readonly result: T;
   readonly provider: string;
   readonly limited: Cooldowns;
 };
+
+export type ParseAnswer = Answer<ParseResult>;
+
+type RunOptions = { readonly cooldowns?: Cooldowns; readonly now?: () => number };
 
 const DEFAULT_RETRY_MS = 60_000;
 
@@ -72,24 +79,21 @@ export const availability = (
 };
 
 /**
-Asks each provider in turn for the structured parse. A provider known to be rate limited
-(`cooldowns`) is skipped until its time; a new rate limit moves on to the next one. When
-every one is out, the answer says when the soonest will be back. Both outcomes report the
-limits this call ran into, for the caller to remember.
+Asks each provider in turn for an answer of `schema`'s shape. A provider known to be rate
+limited (`cooldowns`) is skipped until its time; a new rate limit moves on to the next one.
+When every one is out, the answer says when the soonest will be back. Both outcomes report
+the limits this call ran into, for the caller to remember.
 */
-export const runParse = async (
+export const runStructured = async <T>(
   providers: readonly ParseProvider[],
   prompt: ParsePrompt,
-  {
-    cooldowns = {},
-    now = Date.now,
-  }: { readonly cooldowns?: Cooldowns; readonly now?: () => number } = {},
-): Promise<Result<ParseAnswer, LlmError>> => {
+  { cooldowns = {}, now = Date.now, schema }: RunOptions & { readonly schema: z.ZodType<T> },
+): Promise<Result<Answer<T>, LlmError>> => {
   const limited: Record<string, string> = {};
   const attempt = async (
     index: number,
     retryAt: null | string,
-  ): Promise<Result<ParseAnswer, LlmError>> => {
+  ): Promise<Result<Answer<T>, LlmError>> => {
     const provider = providers[index];
     if (provider === undefined) {
       return err({ code: "llm/unavailable", limited, retryAt });
@@ -99,7 +103,7 @@ export const runParse = async (
       return await attempt(index + 1, earliest(retryAt, cooling));
     }
     try {
-      const output = Output.object({ schema: ParseResultSchema });
+      const output = Output.object({ schema });
       const answer = await generateText({
         maxRetries: 0,
         model: provider.model,
@@ -110,7 +114,7 @@ export const runParse = async (
           providerOptions: provider.providerOptions,
         }),
       });
-      const parsed = ParseResultSchema.safeParse(answer.output);
+      const parsed = schema.safeParse(answer.output);
       return parsed.success
         ? ok({ limited, provider: provider.name, result: parsed.data })
         : err({ code: "llm/invalid-output", limited, retryAt: null });
@@ -124,3 +128,11 @@ export const runParse = async (
   };
   return await attempt(0, null);
 };
+
+/** The task parse: free text read into a task, or changes to one. */
+export const runParse = async (
+  providers: readonly ParseProvider[],
+  prompt: ParsePrompt,
+  options: RunOptions = {},
+): Promise<Result<ParseAnswer, LlmError>> =>
+  await runStructured(providers, prompt, { ...options, schema: ParseResultSchema });

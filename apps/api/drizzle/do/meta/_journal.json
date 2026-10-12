@@ -15,6 +15,13 @@
       "when": 1791367331377,
       "tag": "0001_loving_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791636160255,
+      "tag": "0002_daffy_layla_miller",
+      "breakpoints": true
     }
   ]
 }

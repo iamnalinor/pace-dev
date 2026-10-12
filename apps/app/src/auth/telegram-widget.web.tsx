@@ -105,8 +105,8 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
         <Text className="font-sans text-[13px] text-warn">{texts.failed}</Text>
       ) : null}
       {phase === "loading" || phase === "slow" ? (
-        <View accessibilityRole="progressbar" className="flex-row items-center gap-2">
-          <ActivityIndicator size="small" />
+        <View className="flex-row items-center gap-2">
+          <ActivityIndicator accessibilityLabel={texts.loading} size="small" />
           <Text className="font-sans text-[13px] text-muted">{texts.loading}</Text>
         </View>
       ) : null}

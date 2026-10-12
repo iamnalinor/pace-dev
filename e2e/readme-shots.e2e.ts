@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { addTask } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { API_URL, createDevSession, README_TELEGRAM_ID, resetAccount } from "./support/login.ts";
 
@@ -98,12 +99,7 @@ const signIn = async (page: Page, token: string, theme: "dark" | "light"): Promi
   );
 };
 
-const add = async (page: Page, text: string): Promise<void> => {
-  const line = page.getByRole("textbox", { name: "New task" });
-  await line.fill(text);
-  await line.press("Enter");
-  await expect(line).toHaveValue("");
-};
+const add = addTask;
 
 /** Waits for the toasts to go, so the shot shows the screen itself. */
 const shoot = async (page: Page, name: string): Promise<void> => {
@@ -133,7 +129,7 @@ if (SHOT_DIR !== undefined) {
       ]) {
         await add(desktop, line);
       }
-      await desktop.getByRole("button", { name: "Work", exact: true }).click();
+      await desktop.getByRole("switch", { name: "Rest", exact: true }).click();
       await shoot(desktop, "now-desktop");
       await desktop.goto("/day");
       await shoot(desktop, "day-desktop");

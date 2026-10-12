@@ -42,8 +42,8 @@ tool error (`isError: true`, explaining which scope is missing) instead of runni
 | Scope | Lets a client | Tools |
 |---|---|---|
 | `tasks:read` | see tasks, subtasks, projects, presets, the inbox and the review block | `whoami`, `list_now`, `get_task`, `list_projects`, `list_project_tasks`, `list_presets`, `list_inbox`, `list_review`, `search`, `fetch`, `search_decisions` |
-| `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `set_rank`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
-| `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons | `list_activity_buttons`, `get_day`, `summary_time` |
+| `tasks:write` | add and change tasks, projects and presets | `create_task`, `capture_inbox`, `mark_subtasks`, `submit`, `close_task`, `reopen`, `update_task`, `set_importance`, `set_status`, `add_subtasks`, `revoke_event`, `review_action`, `seed_example_presets`, `create_preset`, `update_preset`, `archive_preset` |
+| `time:read` | see the time ledger: the day's blocks and gaps, sums by category and project, the time bar's buttons, the calendar copy and app usage on every device | `list_activity_buttons`, `get_day`, `summary_time`, `get_calendar`, `get_usage`, `get_week` |
 | `time:write` | start, stop and log activities | `start_activity`, `stop_activity`, `log_activity` |
 | `analytics:read` | query the store read-only, replay the reminder rules, export the log | `describe_schema`, `query_sql`, `simulate`, `export_all` |
 | `offline_access` | keep a refresh token, so the connection survives the 24 h access token | — |
@@ -69,10 +69,10 @@ shows.
 | Tool | Scope | What it does | Key inputs |
 |---|---|---|---|
 | `whoami` | read | the account behind the token, its scopes, the server time | — |
-| `list_now` | read | the Now list (score order) with lateness and progress, the waiting tasks, `laterCount`, `inboxCount` | `projectId?` |
-| `get_task` | read | one task with subtasks, closure and derived outcome, window elapsed, work left, the "why it is here" explanation, the submit preview | `id` |
+| `list_now` | read | the Now list (the nearest deadline first, undated tasks after) with lateness and progress, the tasks that start later (`future`), `inboxCount` | `projectId?` |
+| `get_task` | read | one task with subtasks, closure and derived outcome, work left, the submit preview | `id` |
 | `list_projects` | read | projects (active first) with the project page's open count and links | — |
-| `list_project_tasks` | read | the project page: open, awaiting assignment, done with outcomes, stats | `projectId` or `projectName` |
+| `list_project_tasks` | read | the project page: open (by deadline), future, done with outcomes (the latest deadline first), stats | `projectId` or `projectName` |
 | `list_presets` | read | built-in and user presets, each with its own definition and the resolved settings | — |
 | `list_inbox` | read | unsorted captures with a rule-based suggestion each | — |
 | `list_review` | read | the "to sort" block: finished-looking tasks, passed deadlines, stale inbox items, automatic outcomes to confirm, with their action keys | — |
@@ -87,8 +87,7 @@ shows.
 | `reopen` | write | reopens a closed task, subtasks and history kept | `taskId` |
 | `update_task` | write | only the fields given: title, description (`null` clears), deadline, start, estimate (`null` clears), preset, project (by id or name) | `taskId`, `title?`, `description?`, `dueAt?`, `dueTz?`, `startAt?`, `startTz?`, `estimateMinutes?`, `presetId?`, `projectId?`/`projectName?` |
 | `set_importance` | write | `asap` / `prioritized` / `normal` / `nice_to_have` | `taskId`, `importance` |
-| `set_status` | write | `in_progress` / `paused` / `waiting` / `not_started` | `taskId`, `status` |
-| `set_rank` | write | moves a task to a 1-based position in its importance category and renumbers the category (`rank/not-competing` for closed, inbox and empty tasks) | `taskId`, `position` |
+| `set_status` | write | `in_progress` / `paused` / `not_started` | `taskId`, `status` |
 | `add_subtasks` | write | appends subtasks and answers their ids | `taskId`, `labels` (labels or `{ label, number }`) |
 | `revoke_event` | write | undoes one event by id (the log keeps it); revoking a revocation restores the original | `eventId`, `reason?` |
 | `review_action` | write | runs a review item's action (`submit-now`, `mark-done`, `cancel`, `skip`, `keep-open`, `sort`, `confirm`, `undo`; `review/no-item`, `review/no-action` otherwise) | `taskId`, `key` |
@@ -96,15 +95,18 @@ shows.
 | `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
 | `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
 | `archive_preset` | write | archives a user preset; its tasks keep working (`preset/built-in` for built-ins) | `id` |
-| `list_activity_buttons` | time read | the time bar's buttons in order: id, label, category, Expect/Limit minutes, linked task | — |
-| `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running | `date?` (YYYY-MM-DD, default today) |
+| `list_activity_buttons` | time read | what the time bar's buttons start (Rest, Sport by length, Chores by name): each choice's id, its button, label in the account language, category and Expect minutes | — |
+| `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running, what ran alongside the main line | `date?` (YYYY-MM-DD, default today) |
 | `summary_time` | time read | minutes per category and per project (through the task) over a range, largest first | `from`, `to` |
-| `start_activity` | time write | starts an activity; the running one ends at the same instant. A button's defaults, or a label and category; `taskId` counts the time as work on the task | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `limitMinutes?`, `at?` |
-| `stop_activity` | time write | stops what is running (`activity/none-running` otherwise) | `at?` |
+| `get_calendar` | time read | the calendar events the phone sends (own and accepted) overlapping a range | `from`, `to` |
+| `get_usage` | time read | app sessions on every device overlapping a range: device, app name, start, end (never titles) | `from`, `to`, `device?` |
+| `get_week` | time read | a range as lived: tracked blocks with `sat` (the apps in front on each device during each), what ran alongside, and the calendar | `from`, `to` |
+| `start_activity` | time write | starts an activity; the main one running ends at the same instant, unless `alongside` (then both run, each stopped on its own). A choice's defaults, or a label and category; `taskId` counts the time as work on the task. At twice its Expect the person is asked whether it still goes on | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `alongside?`, `at?` |
+| `stop_activity` | time write | stops the main activity, or the one `activityId` names (`activity/none-running` otherwise) | `activityId?`, `at?` |
 | `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |
 | `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `observations`) with their CREATE statements | — |
 | `query_sql` | analytics | one read-only SQLite `SELECT` (or `WITH … SELECT`), at most 500 rows, run in a transaction that always rolls back; a second statement, `PRAGMA`, `ATTACH` or any write is refused (`sql/forbidden`, `sql/not-select`) | `sql` |
-| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and Limit alert they would send; ranks Now at `to`, optionally with other importance multipliers (`simulate/range` for a bad range) | `from`, `to`, `multipliers?` |
+| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and "still doing this?" they would send (`simulate/range` for a bad range) | `from`, `to` |
 | `export_all` | analytics | the event log as NDJSON (one event per line, corrections included), a page at a time | `since?`, `limit?` (default 1000, max 5000) |
 
 ### Writes: `at`, `precision`, `dryRun`
@@ -143,7 +145,7 @@ Claude, Cursor and the Inspector as usual.
   `dueAt` + `dueTz`.
 - "I solved 3 and 4 an hour ago" → `mark_subtasks` with `numbers: [3, 4]` and `at`.
 - "Send them" → `submit`; "mark the report done" → `close_task` or `submit`.
-- "Why is the dashboard task on top?" → `get_task` (`explanation`).
+- "What is due first?" → `list_now` (ordered by deadline).
 - "Undo that" → `revoke_event` with the id from the previous answer.
 - "Anything to sort out?" → `list_review`, then `review_action`.
 - "Save this for later: …" → `capture_inbox`.

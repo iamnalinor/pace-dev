@@ -1,65 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { TimeButtonView } from "./time-bar.ts";
-
-import {
-  activityFormOf,
-  buttonFormOf,
-  buttonSaveOf,
-  typeTime,
-  withCategory,
-} from "./time-forms.ts";
-
-const commute: TimeButtonView = {
-  category: "commute",
-  color: "blue",
-  expectMinutes: 45,
-  id: "btn:commute",
-  isRunning: false,
-  label: "Commute",
-  limitMinutes: null,
-  taskId: null,
-  shouldAskDetails: false,
-};
+import { activityFormOf, typeTime } from "./time-forms.ts";
 
 /** `HH:mm` of a UTC instant, standing in for a platform's time input. */
 const clock = (iso: string): string => iso.slice(11, 16);
 
 describe("time forms", () => {
-  it("round-trips a button through the editor form", () => {
-    const form = buttonFormOf({ button: commute, kind: "edit" });
-    expect(form).toEqual({
-      category: "commute",
-      expect: "45",
-      label: "Commute",
-      limit: "",
-      taskId: "",
-    });
-    expect(
-      buttonSaveOf({ button: commute, kind: "edit" }, { ...form, expect: " 35 ", limit: "1.5" }),
-    ).toEqual({
-      buttonId: "btn:commute",
-      draft: {
-        category: "commute",
-        expectMinutes: 35,
-        label: "Commute",
-        limitMinutes: null,
-        taskId: null,
-      },
-    });
-    expect(buttonSaveOf({ kind: "new" }, buttonFormOf({ kind: "new" })).buttonId).toBeNull();
-  });
-
-  it("brings a category's defaults and keeps typed values it has none for", () => {
-    const form = { ...buttonFormOf({ kind: "new" }), expect: "20", limit: "40" };
-    expect(withCategory(form, "hygiene")).toMatchObject({
-      category: "hygiene",
-      expect: "20",
-      limit: "60",
-    });
-    expect(withCategory(form, "food")).toMatchObject({ expect: "30", limit: "40" });
-  });
-
   it("opens the Day sheet on the block's own fields", () => {
     expect(
       activityFormOf(

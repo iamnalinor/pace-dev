@@ -140,6 +140,7 @@ describe("parseEvent", () => {
     const taskId = created.payload.taskId;
     const cases: readonly (readonly [Event["type"], unknown])[] = [
       ["task.updated", { taskId, title: "New title" }],
+      ["task.updated", { dueAt: null, startAt: null, taskId }],
       ["task.preset.set", { presetId: "preset-hw", taskId }],
       ["task.overrides.set", { overrides: { softDays: 2 }, taskId }],
       ["task.status.set", { status: "in_progress", taskId }],
@@ -226,8 +227,9 @@ describe("EVENT_TYPES", () => {
     expect(new Set(EVENT_TYPES).size).toBe(EVENT_TYPES.length);
   });
 
-  it("covers every stage-1 type from the plan and the stage-3 activity types", () => {
-    expect(EVENT_TYPES).toHaveLength(33);
+  it("covers every stage-1 type from the plan, the stage-3 activity types and problem removal", () => {
+    expect(EVENT_TYPES).toHaveLength(34);
+    expect(EVENT_TYPES).toContain("task.subtask.removed");
     expect(EVENT_TYPES.filter((type) => type.startsWith("activity."))).toEqual([
       "activity.started",
       "activity.stopped",

@@ -5,12 +5,19 @@ import { isOpen, type Task } from "../model/task.ts";
 import { type Outcome, taskOutcome } from "../outcomes/outcome.ts";
 import { err, ok, type Result } from "../result.ts";
 import { weeklyProjectMinutes } from "../tracking/insights.ts";
-import { isEmptyInstance, presetOf } from "./classify.ts";
+import { presetOf } from "./classify.ts";
 import { accountTz, type QueryContext } from "./context.ts";
-import { compareNowItems, type NowItem, nowItem } from "./now-item.ts";
+import {
+  compareFutureItems,
+  compareNowItems,
+  hasLaterStart,
+  type NowItem,
+  nowItem,
+} from "./now-item.ts";
 
+/** A closed task: the same row as an open one, plus how it ended. */
 export type DoneItem = {
-  readonly task: Task;
+  readonly item: NowItem;
   readonly outcome: Outcome;
 };
 
@@ -28,11 +35,11 @@ export type ProjectStats = {
 
 export type ProjectView = {
   readonly project: Project;
-  /** Every open task but the empty instances, hidden and waiting ones included, best score first. */
+  /** Open tasks that have started, in the Now order (the nearest deadline first). */
   readonly open: readonly NowItem[];
-  /** Empty recurring instances awaiting an assignment, earliest due first. */
-  readonly awaiting: readonly Task[];
-  /** Closed tasks, newest closure first. */
+  /** Open tasks that start later, the earliest start first. */
+  readonly future: readonly NowItem[];
+  /** Closed tasks, the latest deadline first (undated ones by their closure, after them). */
   readonly done: readonly DoneItem[];
   readonly stats: ProjectStats;
 };
@@ -42,30 +49,30 @@ const WEEKS_SHOWN = 6;
 const DEADLINE_OUTCOMES: ReadonlySet<Outcome> = new Set(["done", "done_late", "cancelled_missed"]);
 const LATE_OUTCOMES: ReadonlySet<Outcome> = new Set(["done_late", "cancelled_missed"]);
 
-/** Earliest due first; instances always carry a due date, the id breaks the rare tie. */
-const byDue = (a: Task, b: Task): number => {
-  const dueA = a.dueAt ?? "";
-  const dueB = b.dueAt ?? "";
-  if (dueA !== dueB) {
-    return dueA < dueB ? -1 : 1;
+/** Descending by a key that sorts as text; an empty key sorts last. */
+const laterFirst = (a: string, b: string): number => {
+  if (a === b) {
+    return 0;
   }
-  return a.id < b.id ? -1 : 1;
+  return a > b ? -1 : 1;
 };
 
-const newestFirst = (a: DoneItem, b: DoneItem): number => {
-  const closedA = a.task.closed?.at ?? "";
-  const closedB = b.task.closed?.at ?? "";
-  if (closedA !== closedB) {
-    return closedA > closedB ? -1 : 1;
+/** Dated before undated; the later deadline (or, undated, the later closure) first. */
+const latestFirst = (a: DoneItem, b: DoneItem): number => {
+  const byDue = laterFirst(a.item.dueAt ?? "", b.item.dueAt ?? "");
+  if (byDue !== 0) {
+    return byDue;
   }
-  return a.task.id < b.task.id ? -1 : 1;
+  const byClosure = laterFirst(a.item.task.closed?.at ?? "", b.item.task.closed?.at ?? "");
+  return byClosure === 0 ? a.item.task.id.localeCompare(b.item.task.id) : byClosure;
 };
 
 /** A closed task with its derived outcome; one whose preset is broken has no outcome to show. */
-const doneItem = (state: CoreState, task: Task): readonly DoneItem[] => {
+const doneItem = (state: CoreState, task: Task, ctx: QueryContext): readonly DoneItem[] => {
   const preset = presetOf(state, task);
   const outcome = preset.ok ? taskOutcome(task, preset.value) : null;
-  return outcome === null ? [] : [{ task, outcome }];
+  const item = nowItem(state, task, ctx);
+  return outcome === null || !item.ok ? [] : [{ item: item.value, outcome }];
 };
 
 const MINUTES_PER_HOUR = 60;
@@ -73,11 +80,11 @@ const MINUTES_PER_HOUR = 60;
 const toHours = (minutes: number): number => Math.round((minutes / MINUTES_PER_HOUR) * 10) / 10;
 
 const stats = (
-  open: readonly NowItem[],
+  openCount: number,
   done: readonly DoneItem[],
   weeklyMinutes: readonly number[],
 ): ProjectStats => ({
-  open: open.length,
+  open: openCount,
   onTime: {
     done: done.filter((entry) => entry.outcome === "done").length,
     total: done.filter((entry) => DEADLINE_OUTCOMES.has(entry.outcome)).length,
@@ -87,7 +94,7 @@ const stats = (
   weeklyHours: weeklyMinutes.map((minutes) => toHours(minutes)),
 });
 
-/** The project page: its open, awaiting and done lists with the header figures. */
+/** The project page: its open, future and done lists with the header figures. */
 export const projectView = (
   state: CoreState,
   projectId: string,
@@ -98,17 +105,18 @@ export const projectView = (
     return err("project/unknown");
   }
   const tasks = Object.values(state.tasks.byId).filter((task) => task.projectId === projectId);
-  const open = tasks
-    .filter((task) => isOpen(task) && !isEmptyInstance(task))
-    .flatMap((task) => {
-      const item = nowItem(state, task, ctx);
-      return item.ok ? [item.value] : [];
-    })
-    .toSorted(compareNowItems);
+  const rows = tasks.filter(isOpen).flatMap((task) => {
+    const item = nowItem(state, task, ctx);
+    return item.ok ? [item.value] : [];
+  });
+  const open = rows.filter((item) => !hasLaterStart(item.task, ctx.now)).toSorted(compareNowItems);
+  const future = rows
+    .filter((item) => hasLaterStart(item.task, ctx.now))
+    .toSorted(compareFutureItems);
   const done = tasks
     .filter((task) => !isOpen(task))
-    .flatMap((task) => doneItem(state, task))
-    .toSorted(newestFirst);
+    .flatMap((task) => doneItem(state, task, ctx))
+    .toSorted(latestFirst);
   const weeklyMinutes = weeklyProjectMinutes(state, projectId, {
     now: ctx.now,
     weeks: WEEKS_SHOWN,
@@ -117,8 +125,8 @@ export const projectView = (
   return ok({
     project,
     open,
-    awaiting: tasks.filter((task) => isOpen(task) && isEmptyInstance(task)).toSorted(byDue),
+    future,
     done,
-    stats: stats(open, done, weeklyMinutes),
+    stats: stats(rows.length, done, weeklyMinutes),
   });
 };

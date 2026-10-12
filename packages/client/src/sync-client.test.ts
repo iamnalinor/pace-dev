@@ -191,3 +191,50 @@ describe("createSyncClient scheduling", () => {
     sync.stop();
   });
 });
+
+describe("createSyncClient soon", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("sends a local change within a second, one run for a burst of changes", async () => {
+    vi.useFakeTimers();
+    const { calls, sync } = await setup({
+      "GET /api/sync/pull": noPull,
+      "POST /api/sync/push": acceptAll,
+    });
+    sync.start({ intervalMs: 300_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    const before = calls.length;
+    sync.soon();
+    sync.soon();
+    await vi.advanceTimersByTimeAsync(400);
+    // A later change does not push the first one back: it goes at most 0.8 s after it.
+    sync.soon();
+    await vi.advanceTimersByTimeAsync(399);
+    expect(calls).toHaveLength(before);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls.length).toBeGreaterThan(before);
+    const after = calls.length;
+    // Then back to the slow interval, not every second.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(calls).toHaveLength(after);
+    sync.stop();
+  });
+
+  it("takes a new interval at once (live channel up: rarely; down: often)", async () => {
+    vi.useFakeTimers();
+    const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+    sync.start({ intervalMs: 300_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(1);
+    sync.setInterval(30_000);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(calls).toHaveLength(2);
+    sync.stop();
+    sync.soon();
+    await vi.advanceTimersByTimeAsync(5000);
+    // Stopped (signed out): nothing runs.
+    expect(calls).toHaveLength(2);
+  });
+});

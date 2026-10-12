@@ -1,23 +1,11 @@
 import { z } from "zod";
 
-import {
-  type CoreState,
-  err,
-  type EventInput,
-  type Importance,
-  importanceOf,
-  ok,
-  presetOf,
-  rankWithinCategory,
-  type Result,
-  type Task,
-  TaskStatusSchema,
-} from "@pace/core";
+import { ok } from "@pace/core";
 
 import { forTask, IMPORTANCE, SUBTASK_INPUT, TASK_ID, toSubtasks, WRITE_INPUT } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
 import { labelOf, renderTask, rowOf, TaskRowSchema } from "../rows.ts";
-import { runWrite, stamp, type ToolFailure, WRITE_OUTPUT } from "../tool-kit.ts";
+import { runWrite, stamp, WRITE_OUTPUT } from "../tool-kit.ts";
 
 const SETTER = { destructiveHint: false, idempotentHint: true, readOnlyHint: false };
 
@@ -26,7 +14,7 @@ const TASK_OUTPUT = { ...WRITE_OUTPUT, task: TaskRowSchema.nullable(), taskId: z
 export const importanceTool = defineTool({
   annotations: SETTER,
   description:
-    "Sets a task's importance: asap (wants to be done today), prioritized (within about three days of being set), normal, nice_to_have. Setting it again restarts the prioritized horizon.",
+    "Sets a task's importance, the label shown after its project: asap, prioritized, normal, nice_to_have. It does not change the order: Now is sorted by deadline.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forTask(args.taskId, (_scope, when) =>
@@ -49,7 +37,7 @@ export const importanceTool = defineTool({
 export const statusTool = defineTool({
   annotations: SETTER,
   description:
-    "Sets a task's status: in_progress, paused, waiting (on someone else: its urgency freezes and the waiting time is counted) or not_started. Work on subtasks moves a task to in_progress by itself; use this for pauses and waiting.",
+    "Sets a task's status: in_progress, paused or not_started. Work on subtasks moves a task to in_progress by itself; use this for pauses.",
   handler: async (args, ctx) =>
     await runWrite(ctx, args, {
       build: forTask(args.taskId, (_scope, when) =>
@@ -65,90 +53,14 @@ export const statusTool = defineTool({
   input: {
     ...WRITE_INPUT,
     taskId: TASK_ID,
-    status: TaskStatusSchema.describe("not_started | in_progress | paused | waiting"),
+    status: z
+      .enum(["not_started", "in_progress", "paused"])
+      .describe("not_started | in_progress | paused"),
   },
   name: "set_status",
   output: TASK_OUTPUT,
   scope: "tasks:write",
   title: "Set status",
-});
-
-type Member = { readonly task: Task; readonly position: number };
-
-/** The importance the rank categories group by; `undefined` when the preset chain is broken. */
-const categoryKey = (state: CoreState, task: Task): Importance | undefined => {
-  const preset = presetOf(state, task);
-  return preset.ok ? importanceOf(task, preset.value) : undefined;
-};
-
-/** The open, competing tasks of the target's importance category in their current order. */
-const categoryOf = (state: CoreState, target: Task): readonly Task[] => {
-  const importance = categoryKey(state, target);
-  return Object.values(state.tasks.byId)
-    .flatMap((task): readonly Member[] => {
-      const rank = rankWithinCategory(state, task);
-      return rank === null || categoryKey(state, task) !== importance
-        ? []
-        : [{ position: rank.position, task }];
-    })
-    .toSorted((a, b) => a.position - b.position)
-    .map((member) => member.task);
-};
-
-const reorder = (
-  state: CoreState,
-  target: Task,
-  position: number,
-): Result<readonly Task[], ToolFailure> => {
-  const category = categoryOf(state, target);
-  if (category.every((task) => task.id !== target.id)) {
-    return err({ code: "rank/not-competing", message: `${target.title} has no rank` });
-  }
-  const others = category.filter((task) => task.id !== target.id);
-  const index = Math.min(Math.max(position - 1, 0), others.length);
-  return ok([...others.slice(0, index), target, ...others.slice(index)]);
-};
-
-export const rankTool = defineTool({
-  annotations: SETTER,
-  description:
-    "Moves a task to a 1-based position among the open tasks of its importance category (asap, prioritized, normal or nice_to_have) and renumbers the whole category, as dragging on the Now list does. The rank adds a small bonus to the score, so it only orders tasks whose urgency is close. Returns the resulting order of ids.",
-  handler: async (args, ctx) => {
-    const order: string[] = [];
-    return await runWrite(ctx, args, {
-      build: forTask(args.taskId, (scope, when, target) => {
-        const ordered = reorder(scope.state, target, args.position);
-        if (!ordered.ok) {
-          return ordered;
-        }
-        order.push(...ordered.value.map((task) => task.id));
-        const events: readonly EventInput[] = ordered.value.flatMap((task, index) =>
-          task.rank === index + 1
-            ? []
-            : [
-                stamp(when, {
-                  payload: { rank: index + 1, taskId: task.id },
-                  type: "task.rank.set",
-                }),
-              ],
-        );
-        return ok(events);
-      }),
-      render: () => ({
-        structured: { order, position: order.indexOf(args.taskId) + 1, taskId: args.taskId },
-        summary: `Moved to position ${order.indexOf(args.taskId) + 1} of ${order.length}.`,
-      }),
-    });
-  },
-  input: {
-    ...WRITE_INPUT,
-    taskId: TASK_ID,
-    position: z.int().min(1).describe("1 = first in its category."),
-  },
-  name: "set_rank",
-  output: { ...WRITE_OUTPUT, order: z.array(z.string()), position: z.int(), taskId: z.string() },
-  scope: "tasks:write",
-  title: "Set rank",
 });
 
 const AddedSchema = z.object({ id: z.string(), label: z.string(), number: z.int().nullable() });

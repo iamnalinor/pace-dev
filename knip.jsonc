@@ -51,8 +51,7 @@
       ],
       "ignoreDependencies": [
         // The expo-font config plugin references these packages by file path in app.config.ts.
-        "@expo-google-fonts/geist",
-        "@expo-google-fonts/geist-mono"
+        "@expo-google-fonts/inter"
       ]
     }
   }

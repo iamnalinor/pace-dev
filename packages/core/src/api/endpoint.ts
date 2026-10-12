@@ -11,6 +11,8 @@ export type EndpointShape = {
   readonly path: `/${string}`;
   /** Requires a bearer session. */
   readonly auth: boolean;
+  /** The one thing a device token may call besides nothing: its scope (`usage:write`). */
+  readonly scope?: "usage:write";
   readonly params?: z.ZodObject;
   readonly query?: z.ZodObject;
   readonly body?: z.ZodType;

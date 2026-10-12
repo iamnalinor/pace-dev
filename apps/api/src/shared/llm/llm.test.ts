@@ -22,6 +22,12 @@ describe("buildParsePrompt", () => {
     expect(prompt.prompt).toBe("купить кабель");
     expect(approxTokens(prompt.system + prompt.prompt)).toBeLessThan(PROMPT_TOKEN_BUDGET);
   });
+
+  it("describes a weekly course with its rhythm and its open weeks", () => {
+    expect(prompt.system).toMatch(/hw\.algebra: Algebra HW \(weekly homework, due Wed 23:59/u);
+    expect(prompt.system).toContain("Algebra HW 6, due 2026-10-07");
+    expect(prompt.system).toMatch(/description:/u);
+  });
 });
 
 describe("runParse", () => {

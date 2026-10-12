@@ -14,6 +14,7 @@ import {
   emit,
   fromStore,
   presetOf,
+  serially,
   stamp,
   taskOf,
   type When,
@@ -37,6 +38,8 @@ export type WorkActions = {
   /** Revokes the latest solve of the problem. */
   readonly unmarkSolved: (taskId: string, subtaskId: string) => ActionResult;
   readonly addSubtasks: (taskId: string, items: readonly (string | SubtaskForm)[]) => ActionResult;
+  /** Takes an unsent problem off the task (History brings it back). */
+  readonly removeSubtask: (taskId: string, subtaskId: string) => ActionResult;
   /** Per problem: sends the given (or every solved) problem, closing with the last one; whole: closes as done. */
   readonly submit: (input: SubmitInput) => ActionResult;
   readonly closeTask: (input: CloseInput) => ActionResult;
@@ -127,33 +130,35 @@ type ActionErrorOf = Extract<Awaited<ActionResult>, { readonly ok: false }>["err
 
 const submit =
   (deps: ActionDeps): WorkActions["submit"] =>
-  async (input) => {
-    const prepared = submission(deps, input);
-    return prepared.ok ? await emit(deps, [prepared.value]) : prepared;
-  };
+  async (input) =>
+    await serially(deps, async () => {
+      const prepared = submission(deps, input);
+      return prepared.ok ? await emit(deps, [prepared.value]) : prepared;
+    });
 
 const closeTask =
   (deps: ActionDeps): WorkActions["closeTask"] =>
-  async (input) => {
-    const task = taskOf(deps, input.taskId);
-    if (!task.ok) {
-      return task;
-    }
-    if (task.value.closed !== null) {
-      return err("action/nothing-to-do");
-    }
-    const { taskId, outcome, reason } = input;
-    return await emit(deps, [
-      stamp(
-        deps,
-        {
-          type: "task.closed",
-          payload: { taskId, outcome, ...(reason !== undefined && { reason }) },
-        },
-        input,
-      ),
-    ]);
-  };
+  async (input) =>
+    await serially(deps, async () => {
+      const task = taskOf(deps, input.taskId);
+      if (!task.ok) {
+        return task;
+      }
+      if (task.value.closed !== null) {
+        return err("action/nothing-to-do");
+      }
+      const { taskId, outcome, reason } = input;
+      return await emit(deps, [
+        stamp(
+          deps,
+          {
+            type: "task.closed",
+            payload: { taskId, outcome, ...(reason !== undefined && { reason }) },
+          },
+          input,
+        ),
+      ]);
+    });
 
 const reopen =
   (deps: ActionDeps): WorkActions["reopen"] =>
@@ -200,6 +205,10 @@ export const workActions = (deps: ActionDeps): WorkActions => ({
   markSolved: async (taskId, subtaskId, when) =>
     await emit(deps, [
       stamp(deps, { type: "task.subtask.solved", payload: { taskId, subtaskId } }, when),
+    ]),
+  removeSubtask: async (taskId, subtaskId) =>
+    await emit(deps, [
+      stamp(deps, { type: "task.subtask.removed", payload: { taskId, subtaskId } }),
     ]),
   reopen: reopen(deps),
   setEstimate: async (taskId, estimateMinutes) =>

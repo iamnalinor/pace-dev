@@ -5,6 +5,7 @@ import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
 
 import { formatInZone, startOfDayIn } from "../time.ts";
+import { atDate, dateOf } from "./quick-date.ts";
 import { findAll, findFirst, type Found } from "./quick-spans.ts";
 
 export type QuickSubtask = { readonly label: string; readonly number: null | number };
@@ -106,6 +107,10 @@ const isDayWord = (word: string): boolean => {
   return RELATIVE_DAYS[lower] !== undefined || weekdayOf(lower) !== undefined;
 };
 
+/** A date with its preposition: "до 12 октября". */
+export const withDayPreposition = (text: string, found: Found | undefined): Found | undefined =>
+  found === undefined ? undefined : withPreposition(text, found, DAY_PREPOSITION);
+
 /** A day word with its preposition: "до среды", "tomorrow", "on friday". */
 export const findDay = (text: string): Found | undefined => {
   const day = findAll(text, WORD, "due").find((word) => isDayWord(word.match[0]));
@@ -152,16 +157,26 @@ const atClock = ({ now, zone }: Zoned, days: number, clock: Clock): string => {
   return new Date(set(day, wall, context)).toISOString();
 };
 
-/** The due from a day and a time; a bare time that has already passed means tomorrow. */
+/**
+The due from a date, a day and a time: a date by the month's name wins over a weekday next to
+it; a bare time that has already passed means tomorrow.
+*/
 export const dueOf = (
-  found: { readonly day: Found | undefined; readonly time: Found | undefined },
+  found: {
+    readonly date: Found | undefined;
+    readonly day: Found | undefined;
+    readonly time: Found | undefined;
+  },
   at: Zoned,
 ): null | string => {
-  const { day, time } = found;
+  const { date, day, time } = found;
+  const clock = time === undefined ? END_OF_DAY : clockOf(time);
+  if (date !== undefined) {
+    return atDate(at, dateOf(date), clock);
+  }
   if (day === undefined && time === undefined) {
     return null;
   }
-  const clock = time === undefined ? END_OF_DAY : clockOf(time);
   const days = day === undefined ? 0 : daysAheadOf(day.match[0], at.now, at.zone);
   const due = atClock(at, days, clock);
   return day === undefined && due <= at.now ? atClock(at, 1, clock) : due;
@@ -219,13 +234,22 @@ const problemRuns = (text: string): readonly (readonly Found[])[] => {
   return starts.map((start, position) => problems.slice(start, starts[position + 1]));
 };
 
-/** A list of two or more problems, or one problem after a word like "задача". */
+/** "Домашнее задание №2": the number names the assignment, it is not a problem. */
+const ASSIGNMENT_WORD =
+  /(?<![\p{L}\p{N}])(?:задание|дз|работа|лабораторная|homework|hw|assignment|lab) ?[№#]? ?$/iu;
+
+/** One problem after a word like "задача" (and not an assignment's own number). */
+const isSingleProblem = (text: string, problem: Found | undefined): boolean => {
+  const before = text.slice(0, problem?.start ?? 0);
+  return problem !== undefined && PROBLEM_WORD.test(before) && !ASSIGNMENT_WORD.test(before);
+};
+
+/** The first list of two or more problems, else one problem after a word like "задача". */
 export const problemsOf = (text: string): Problems => {
-  const run = problemRuns(text).find(
-    (problems) =>
-      problems.length > 1 ||
-      (problems[0] !== undefined && PROBLEM_WORD.test(text.slice(0, problems[0].start))),
-  );
+  const runs = problemRuns(text);
+  const run =
+    runs.find((problems) => problems.length > 1) ??
+    runs.find((problems) => problems.length === 1 && isSingleProblem(text, problems[0]));
   const first = run?.[0];
   const last = run?.at(-1);
   if (run === undefined || first === undefined || last === undefined) {

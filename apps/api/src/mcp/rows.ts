@@ -22,7 +22,7 @@ import { describeCode, type Rendered, type Scope, type ToolFailure } from "./too
 export const taskUrl = (webOrigin: string, taskId: string): string => `${webOrigin}/task/${taskId}`;
 
 export const projectUrl = (webOrigin: string, projectId: string): string =>
-  `${webOrigin}/projects/${projectId}`;
+  `${webOrigin}/project/${projectId}`;
 
 export const TaskRowSchema = z.object({
   id: z.string(),
@@ -32,17 +32,16 @@ export const TaskRowSchema = z.object({
   projectId: z.string().nullable(),
   projectName: z.string().nullable(),
   importance: z.string().describe("Effective importance: the task's own, else the preset default."),
-  status: z.string().describe("not_started | in_progress | paused | waiting"),
-  score: z.number().describe("Urgency score; Now is sorted by it, highest first."),
-  dueAt: z.string().nullable().describe("The explicit deadline (ISO, UTC)."),
-  dueTz: z.string().nullable().describe("The zone the deadline was set in."),
-  effectiveDueAt: z
+  status: z.string().describe("not_started | in_progress | paused"),
+  dueAt: z
     .string()
     .nullable()
-    .describe(
-      "The deadline or the horizon the importance implies (ASAP: end of day), whichever is first.",
-    ),
-  startAt: z.string().nullable(),
+    .describe("The deadline (ISO, UTC); Now is sorted by it, nearest first."),
+  dueTz: z.string().nullable().describe("The zone the deadline was set in."),
+  startAt: z
+    .string()
+    .nullable()
+    .describe("When the task starts; a start still ahead puts it under 'In future'."),
   isLate: z.boolean(),
   lateMinutes: z.number().nullable(),
   progress: z.number().describe("0..1 in the preset's progress mode."),
@@ -75,13 +74,12 @@ export type ProjectRow = z.output<typeof ProjectRowSchema>;
 const presetNameOf = (state: CoreState, task: Task): string =>
   presetById(state.presets, task.presetId)?.name ?? task.presetId;
 
-/** A Now-list item as a row: the task's own deadline next to the effective one the score used. */
+/** A Now-list item as a row. */
 export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => {
   const { task } = item;
   return {
     dueAt: task.dueAt,
     dueTz: task.dueTz,
-    effectiveDueAt: item.score.effectiveDue,
     estimateMinutes: task.estimateMinutes,
     id: task.id,
     importance: item.importance,
@@ -93,7 +91,6 @@ export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => {
     progress: item.progress,
     projectId: task.projectId,
     projectName: item.project?.name ?? null,
-    score: item.score.score,
     solved: item.solved,
     startAt: task.startAt,
     status: task.status,
@@ -106,7 +103,7 @@ export const rowFromItem = (scope: Scope, item: NowItem): TaskRow => {
 
 const problem = (code: string): ToolFailure => ({ code, message: describeCode(code) });
 
-/** One task as a row, scored exactly as the Now list scores it (closed tasks included). */
+/** One task as a row, as the Now list shows it (closed tasks included). */
 export const taskRow = (scope: Scope, taskId: string): Result<TaskRow, ToolFailure> => {
   const task = taskById(scope.state.tasks, taskId);
   if (task === undefined) {
@@ -122,7 +119,7 @@ export const rowOf = (scope: Scope, taskId: string): null | TaskRow => {
   return row.ok ? row.value : null;
 };
 
-/** The open count is the project page's: empty homework instances awaiting assignment excluded. */
+/** The open count is the project page's. */
 export const projectRow = (scope: Scope, project: Project): ProjectRow => {
   const view = projectView(scope.state, project.id, scope.qctx);
   return {

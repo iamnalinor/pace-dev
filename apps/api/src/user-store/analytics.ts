@@ -8,7 +8,6 @@ import {
   materializeAt,
   type NotifyMemory,
   type NotifyMessage,
-  nowList,
   ok,
   type Result,
 } from "@pace/core";
@@ -110,7 +109,7 @@ const describeMessage = (message: NotifyMessage): Omit<SimulatedMessage, "at"> =
       return {
         kind: "critical",
         taskId: message.taskId,
-        text: `${message.title}: critical (${message.rule})`,
+        text: `${message.title}: critical`,
       };
     }
     case "digest": {
@@ -123,18 +122,18 @@ const describeMessage = (message: NotifyMessage): Omit<SimulatedMessage, "at"> =
             : `Digest: ${message.top.map((row) => row.title).join(", ")}`,
       };
     }
-    case "limit": {
+    case "long": {
       return {
-        kind: "limit",
+        kind: "long",
         taskId: null,
-        text: `${message.label} past its ${String(message.limitMinutes)} min limit`,
+        text: `${message.label}: still going at twice its ${String(message.expectMinutes)} min`,
       };
     }
     case "stuck": {
       return {
         kind: "stuck",
         taskId: message.taskId,
-        text: `${message.title}: stuck (${message.rule}, ${String(message.days)} d)`,
+        text: `${message.title}: stuck (${String(message.days)} d)`,
       };
     }
   }
@@ -145,13 +144,10 @@ const stateAt = (events: readonly Event[], at: string) =>
 
 /**
 Replays the notification rules over the log from `from` to `to`, evaluating at each instant
-the notifier would have woken up (from a fresh memory, so earlier sends are not known), and
-ranks Now at `to` with optional importance multipliers. Reads only.
+the notifier would have woken up (from a fresh memory, so earlier sends are not known). Reads
+only.
 */
-export const simulate = (
-  events: readonly Event[],
-  { from, multipliers = {}, to }: SimulationArgs,
-): Simulation => {
+export const simulate = (events: readonly Event[], { from, to }: SimulationArgs): Simulation => {
   const messages: SimulatedMessage[] = [];
   let memory: NotifyMemory = INITIAL_NOTIFY_MEMORY;
   let at: null | string = from;
@@ -170,17 +166,5 @@ export const simulate = (
     at = evaluation.nextAt;
     steps += 1;
   }
-  const ranking = nowList(stateAt(events, to), { deviceTz: SERVER_TZ, now: to })
-    .items.map((item) => ({
-      importance: item.importance,
-      score: item.score.score,
-      simulatedScore:
-        (multipliers[item.importance] ?? item.score.multiplier) * item.score.urgency +
-        item.score.rankBonus,
-      taskId: item.task.id,
-      title: item.task.title,
-      urgency: item.score.urgency,
-    }))
-    .toSorted((a, b) => b.simulatedScore - a.simulatedScore);
-  return { isCut: steps >= MAX_STEPS, messages, ranking };
+  return { isCut: steps >= MAX_STEPS, messages };
 };

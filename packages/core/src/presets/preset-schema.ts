@@ -76,6 +76,7 @@ const FieldsSchema = z.preprocess(
 const NotifySchema = z.strictObject({
   criticalHours: z.number().min(0).exactOptional(),
   criticalProgress: z.number().min(0).max(1).exactOptional(),
+  // Legacy (score alerts and the waiting status were removed in stage 6): accepted, ignored.
   criticalScore: z.number().min(0).exactOptional(),
   waitingDays: z.number().min(0).exactOptional(),
   inProgressIdleDays: z.number().min(0).exactOptional(),
@@ -87,6 +88,7 @@ an ignored setting. Every key is exact-optional (absent, never `undefined`) beca
 preset stores only what it changes.
 */
 export const PresetDefinitionSchema = z.strictObject({
+  // Legacy (urgency scoring was removed in stage 6): accepted so old events parse, ignored.
   urgencyPolicy: z.enum(["age", "lag", "pace", "resubmission"]).exactOptional(),
   defaultImportance: ImportanceSchema.exactOptional(),
   deadlinePolicy: DeadlinePolicySchema.exactOptional(),

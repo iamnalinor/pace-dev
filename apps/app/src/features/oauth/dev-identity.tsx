@@ -18,7 +18,7 @@ export const DevIdentity = ({
   const trimmed = telegramId.trim();
   return (
     <View className="gap-2 rounded-lg border border-dashed border-line p-3">
-      <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
         {t("login.dev")}
       </Text>
       <TextField

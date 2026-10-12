@@ -1,5 +1,7 @@
 import * as Calendar from "expo-calendar";
 
+import { isTakenEvent } from "./calendar-filter.ts";
+
 /** An event from the phone's calendars, read on the device and never uploaded. */
 export type PhoneCalendarEvent = {
   readonly id: string;
@@ -29,21 +31,44 @@ export const requestCalendarAccess = async (): Promise<CalendarAccess> => {
   return accessOf(permission.status, permission.canAskAgain);
 };
 
-/** The timed events of every visible calendar overlapping [from, to); all-day ones are left out. */
+/** Whether the person takes part: their own event, or an invitation they accepted. */
+type ListedEvent = Awaited<ReturnType<typeof Calendar.listEvents>>[number];
+
+const isTaken = async (event: ListedEvent, ownerAccount: string | undefined): Promise<boolean> => {
+  try {
+    const attendees = await event.getAttendees();
+    return isTakenEvent({ attendees, organizerEmail: event.organizerEmail, ownerAccount });
+  } catch {
+    // The attendees cannot be read: the event stays, as it did before the filter.
+    return true;
+  }
+};
+
+/**
+The timed events of every visible calendar overlapping [from, to) that the person takes part
+in (see `isTakenEvent`); all-day ones are left out.
+*/
 export const calendarEvents = async (
   from: string,
   to: string,
 ): Promise<readonly PhoneCalendarEvent[]> => {
   const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
-  const ids = calendars
-    .filter((calendar) => calendar.isVisible !== false)
-    .map((calendar) => calendar.id);
-  if (ids.length === 0) {
+  const visible = calendars.filter((calendar) => calendar.isVisible !== false);
+  if (visible.length === 0) {
     return [];
   }
-  const events = await Calendar.listEvents(ids, new Date(from), new Date(to));
-  return events
-    .filter((event) => !event.allDay)
+  const owners = new Map(visible.map((calendar) => [calendar.id, calendar.ownerAccount]));
+  const listed = await Calendar.listEvents(
+    visible.map((calendar) => calendar.id),
+    new Date(from),
+    new Date(to),
+  );
+  const timed = listed.filter((event) => !event.allDay);
+  const taken = await Promise.all(
+    timed.map(async (event) => await isTaken(event, owners.get(event.calendarId))),
+  );
+  return timed
+    .filter((_event, index) => taken[index] === true)
     .map((event) => {
       const title = event.title.trim() === "" ? "—" : event.title.trim();
       return {

@@ -4,6 +4,12 @@ import { describe, expect, it } from "vitest";
 import { autoOutcomeId, createIdFactory, instanceId, isUlid, newId } from "./ids.ts";
 
 describe("newId", () => {
+  it("makes an id from a fresh factory even for a time of 0 (no counter to increment yet)", () => {
+    const make = createIdFactory(() => 0.5);
+    expect(isUlid(make(0))).toBe(true);
+    expect(isUlid(make(0))).toBe(true);
+  });
+
   it("returns a valid ULID", () => {
     expect(isUlid(newId())).toBe(true);
   });

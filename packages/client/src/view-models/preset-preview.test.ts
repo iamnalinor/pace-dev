@@ -14,16 +14,16 @@ describe("presetPreview", () => {
     const preview = presetPreview(presets, newDraft("hw"), { ...ctx, zone: MOSCOW });
     expect(preview?.color).toBe("yellow");
     expect(preview?.progressMode).toBe("subtasks");
-    expect(preview?.meta.map((part) => part.kind)).toEqual(["due", "solved"]);
+    expect(preview?.meta.map((part) => part.kind)).toEqual(["importance", "due", "solved"]);
   });
 
-  it("shows importance and the pace for a slider preset", () => {
+  it("shows importance and no pace for a slider preset", () => {
     const draft = {
       ...newDraft("work"),
       definition: { defaultImportance: "asap", progressMode: "slider" },
     } as const;
     const preview = presetPreview(presets, draft, { ...ctx, zone: MOSCOW });
-    expect(preview?.meta.map((part) => part.kind)).toEqual(["importance", "due", "behind-pace"]);
+    expect(preview?.meta.map((part) => part.kind)).toEqual(["importance", "due"]);
   });
 
   it("previews a default preset's own edits, and nothing for a broken chain", () => {
@@ -33,7 +33,7 @@ describe("presetPreview", () => {
     };
     const preview = presetPreview(presets, draft, { ...ctx, zone: MOSCOW });
     expect(preview?.color).toBe("orange");
-    expect(preview?.meta.map((part) => part.kind)).toEqual(["due"]);
+    expect(preview?.meta.map((part) => part.kind)).toEqual(["importance", "due"]);
     expect(presetPreview(presets, newDraft("gone"), { ...ctx, zone: MOSCOW })).toBeNull();
   });
 
@@ -48,7 +48,7 @@ describe("presetPreview", () => {
         },
       },
     } as const;
-    const due = presetPreview(presets, draft, { ...ctx, zone: MOSCOW })?.meta[0];
+    const due = presetPreview(presets, draft, { ...ctx, zone: MOSCOW })?.meta[1];
     expect(due?.kind === "due" && due.tz).toBe(MOSCOW);
     expect(due?.kind === "due" && Date.parse(due.at) > Date.parse(ctx.now)).toBe(true);
   });

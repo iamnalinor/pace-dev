@@ -1,18 +1,22 @@
 import {
   type ActivityCategory,
+  type ActivityReading,
+  choiceById,
   defaultsFor,
-  effectiveButtons,
   err,
   newId,
   ok,
+  runningActivities,
   runningActivity,
+  t,
   taskById,
+  typedActivity,
 } from "@pace/core";
 
-import { buttonActions, type ButtonActions, positive } from "./button-actions.ts";
+import { editActions, type EditActions } from "./activity-edits.ts";
 import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
-export type { ButtonDraft } from "./button-actions.ts";
+export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
 
 export type ActivityInput = {
   readonly label: string;
@@ -20,79 +24,63 @@ export type ActivityInput = {
   readonly taskId?: string | undefined;
   /** Omitted: learned from the label's past runs, else the category's default. */
   readonly expectMinutes?: null | number | undefined;
-  readonly limitMinutes?: null | number | undefined;
+  /** The button (or its choice) it came from: a second tap on it stops it. */
+  readonly buttonId?: string | undefined;
+  /** Runs next to the main activity instead of replacing it. */
+  readonly alongside?: boolean | undefined;
 };
 
-/** What the Day sheet edits: an existing block (move and rename) or a new past one. */
-export type ActivityTarget =
-  | {
-      readonly kind: "edit";
-      readonly activityId: string;
-      readonly label: string;
-      readonly category: ActivityCategory;
-      readonly startAt: string;
-      /** `null` while it runs: only the start can move. */
-      readonly endAt: null | string;
-    }
-  | { readonly kind: "log"; readonly startAt: string; readonly endAt: string };
+/** How a button's activity starts: in place of the running one, or alongside it. */
+export type StartOptions = { readonly alongside?: boolean | undefined };
 
-/** The sheet's fields once read: the end is `null` for a block still running. */
-export type ActivityEntry = {
-  readonly label: string;
-  readonly category: ActivityCategory;
-  readonly startAt: string;
-  readonly endAt: null | string;
-};
-
-export type PastActivity = {
-  readonly label: string;
-  readonly category: ActivityCategory;
+/** A calendar event the "From calendar" button starts. */
+export type CalendarStart = {
+  readonly title: string;
   readonly startAt: string;
   readonly endAt: string;
-  readonly taskId?: string | undefined;
 };
 
-/** What the details sheet may change before a button's activity starts. */
-export type ButtonStart = {
-  readonly label?: string | undefined;
-  readonly taskId?: null | string | undefined;
-  readonly expectMinutes?: null | number | undefined;
-  readonly limitMinutes?: null | number | undefined;
-};
-
-export type TimeActions = ButtonActions & {
+export type TimeActions = EditActions & {
   /**
-  One tap on the time bar: starts the button's activity (ending the running one), or stops it
-  if it is the one running. With `details` (the sheet behind the button) it always starts.
+  A choice of a time-bar button ("sport:60", "chores:ready"): starts it in the account's
+  language, or stops it if it is the main activity running (alongside, it always starts).
   */
-  readonly tapButton: (buttonId: string, details?: ButtonStart) => ActionResult;
+  readonly startChoice: (choiceId: string, options?: StartOptions) => ActionResult;
+  /** "From calendar": the event's title, from its start if it is on already, until its end. */
+  readonly startCalendar: (event: CalendarStart, options?: StartOptions) => ActionResult;
   /**
-  "What are you doing?": a button's name taps that button; a label used before starts in
-  its category again; anything else starts as Other.
+  "What are you doing?": starts at once with the words as typed, a length in them ("20 min")
+  as the Expect; a label used before keeps its category, anything else starts as Other.
   */
-  readonly startTyped: (label: string) => ActionResult;
+  readonly startTyped: (text: string, options?: StartOptions) => ActionResult;
   readonly startActivity: (input: ActivityInput, when?: When) => ActionResult;
   /** Time on a task: its title as the label, its estimate as the Expect. */
   readonly focusTask: (taskId: string) => ActionResult;
-  readonly stopActivity: (when?: When) => ActionResult;
-  readonly logPast: (activity: PastActivity) => ActionResult;
-  /** The Day sheet's save: logs a new block, or moves and renames an existing one. */
-  readonly saveActivity: (target: ActivityTarget, entry: ActivityEntry) => ActionResult;
-  readonly adjustActivity: (
+  /** Stops the main activity, or the one named (an activity run alongside). */
+  readonly stopActivity: (when?: StopWhen) => ActionResult;
+  /**
+  The assistant's reading of a typed activity, written over it unless the person renamed it
+  meanwhile (or it is gone): its label, category and, when it found one, its length.
+  */
+  readonly refineActivity: (
     activityId: string,
-    change: { readonly startAt?: string; readonly endAt?: string },
+    reading: ActivityReading & { readonly typed: string },
   ) => ActionResult;
-  readonly relabelActivity: (
-    activityId: string,
-    change: {
-      readonly label?: string;
-      readonly category?: ActivityCategory;
-      readonly taskId?: null | string;
-      readonly messengersOnPurpose?: boolean;
-    },
-  ) => ActionResult;
-  /** Saves a button (`null` adds one). The first edit writes the default buttons as the account's own. */
 };
+
+/** When to stop, and which activity: the main one unless named. */
+export type StopWhen = When & { readonly activityId?: string | undefined };
+
+/** An activity's Expect is a day at most (what the events accept). */
+const MAX_MINUTES = 24 * 60;
+/** A label is at most this long (what the events accept). */
+const MAX_LABEL = 80;
+
+/** Whole positive minutes up to a day, or nothing. */
+const positive = (minutes: null | number | undefined): number | undefined =>
+  minutes === null || minutes === undefined || minutes <= 0
+    ? undefined
+    : Math.min(MAX_MINUTES, Math.round(minutes));
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 
@@ -101,16 +89,13 @@ const startActivity = async (
   input: Parameters<TimeActions["startActivity"]>[0],
   when: When = {},
 ): ActionResult => {
-  const label = input.label.trim();
+  const label = input.label.trim().slice(0, MAX_LABEL).trim();
   if (label === "") {
     return err("action/empty-text");
   }
   const learned = defaultsFor(timeOf(deps), { category: input.category, label });
   const expectMinutes = positive(
     input.expectMinutes === undefined ? learned.expectMinutes : input.expectMinutes,
-  );
-  const limitMinutes = positive(
-    input.limitMinutes === undefined ? learned.limitMinutes : input.limitMinutes,
   );
   return await emit(deps, [
     stamp(
@@ -121,8 +106,9 @@ const startActivity = async (
           category: input.category,
           label,
           ...(input.taskId !== undefined && { taskId: input.taskId }),
+          ...(input.buttonId !== undefined && { buttonId: input.buttonId }),
           ...(expectMinutes !== undefined && { expectMinutes }),
-          ...(limitMinutes !== undefined && { limitMinutes }),
+          ...(input.alongside === true && { alongside: true as const }),
         },
         type: "activity.started",
       },
@@ -131,8 +117,13 @@ const startActivity = async (
   ]);
 };
 
-const stopActivity = async (deps: ActionDeps, when: When = {}): ActionResult => {
-  const running = runningActivity(timeOf(deps), when.at ?? deps.clock.now());
+const stopActivity = async (deps: ActionDeps, when: StopWhen = {}): ActionResult => {
+  const at = when.at ?? deps.clock.now();
+  const running =
+    when.activityId === undefined
+      ? runningActivity(timeOf(deps), at)
+      : (runningActivities(timeOf(deps), at).find((activity) => activity.id === when.activityId) ??
+        null);
   return running === null
     ? err("action/nothing-to-do")
     : await emit(deps, [
@@ -140,186 +131,116 @@ const stopActivity = async (deps: ActionDeps, when: When = {}): ActionResult => 
       ]);
 };
 
-/** The button's own values, the sheet's changes on top; a missing Expect/Limit is learned. */
-const startOfButton = (
+const startChoice = async (
   deps: ActionDeps,
-  button: ReturnType<typeof effectiveButtons>[number],
-  details: ButtonStart,
-): ActivityInput => {
-  const label = details.label?.trim() ?? button.label;
-  const taskId = details.taskId === undefined ? button.taskId : details.taskId;
-  const learned = defaultsFor(timeOf(deps), { category: button.category, label });
-  return {
-    category: button.category,
-    expectMinutes: details.expectMinutes ?? button.expectMinutes ?? learned.expectMinutes,
-    label: label === "" ? button.label : label,
-    limitMinutes: details.limitMinutes ?? button.limitMinutes ?? learned.limitMinutes,
-    taskId: taskId ?? undefined,
-  };
-};
-
-const tapButton = async (
-  deps: ActionDeps,
-  buttonId: string,
-  details?: ButtonStart,
+  choiceId: string,
+  options: StartOptions = {},
 ): ActionResult => {
-  const button = effectiveButtons(timeOf(deps)).find((candidate) => candidate.id === buttonId);
-  if (button === undefined) {
+  const found = choiceById(choiceId);
+  if (found === null) {
     return err("action/nothing-to-do");
   }
-  const isRunning = runningActivity(timeOf(deps), deps.clock.now())?.buttonId === buttonId;
-  if (isRunning && details === undefined) {
+  const isRunning = runningActivity(timeOf(deps), deps.clock.now())?.buttonId === choiceId;
+  if (isRunning && options.alongside !== true) {
     return await stopActivity(deps);
   }
-  const input = startOfButton(deps, button, details ?? {});
-  const expectMinutes = positive(input.expectMinutes);
-  const limitMinutes = positive(input.limitMinutes);
-  return await emit(deps, [
-    stamp(deps, {
-      payload: {
-        activityId: newId(),
-        buttonId,
-        category: input.category,
-        label: input.label,
-        ...(input.taskId !== undefined && { taskId: input.taskId }),
-        ...(expectMinutes !== undefined && { expectMinutes }),
-        ...(limitMinutes !== undefined && { limitMinutes }),
-      },
-      type: "activity.started",
-    }),
-  ]);
+  const { language } = deps.state.store.getState().settings;
+  return await startActivity(deps, {
+    alongside: options.alongside,
+    buttonId: choiceId,
+    category: found.choice.category,
+    expectMinutes: found.choice.expectMinutes,
+    label: t(language, found.choice.labelKey ?? found.button.labelKey),
+  });
 };
 
-const logPast = async (deps: ActionDeps, activity: PastActivity): ActionResult => {
-  const label = activity.label.trim();
-  if (label === "" || Date.parse(activity.endAt) <= Date.parse(activity.startAt)) {
-    return err("action/invalid-input");
-  }
-  return await emit(deps, [
-    stamp(
-      deps,
-      {
-        payload: {
-          activityId: newId(),
-          category: activity.category,
-          endAt: activity.endAt,
-          label,
-          startAt: activity.startAt,
-          ...(activity.taskId !== undefined && { taskId: activity.taskId }),
-        },
-        type: "activity.logged",
-      },
-      { at: activity.endAt },
-    ),
-  ]);
-};
-
-/** Corrections of a block already on the ledger: its boundaries and its name. */
-const editActions = (
+/** The calendar's event, begun at its start when that has passed, expected to last until its end. */
+const startCalendar = async (
   deps: ActionDeps,
-): Pick<TimeActions, "adjustActivity" | "relabelActivity"> => ({
-  adjustActivity: async (activityId, change) => {
-    const activity = timeOf(deps).activities[activityId];
-    if (activity === undefined) {
-      return err("event/not-found");
-    }
-    const startAt = change.startAt ?? activity.startAt;
-    const endAt = change.endAt ?? activity.endAt;
-    if (endAt !== null && Date.parse(endAt) <= Date.parse(startAt)) {
-      return err("action/invalid-input");
-    }
-    return await emit(deps, [
-      stamp(deps, { payload: { activityId, ...change }, type: "activity.adjusted" }),
-    ]);
-  },
-  relabelActivity: async (activityId, change) =>
-    timeOf(deps).activities[activityId] === undefined
-      ? err("event/not-found")
-      : await emit(deps, [
-          stamp(deps, { payload: { activityId, ...change }, type: "activity.labelled" }),
-        ]),
-});
-
-/** Moves the block if its boundaries changed, then renames it if its name or category did. */
-const saveEdit = async (
-  deps: ActionDeps,
-  target: Extract<ActivityTarget, { kind: "edit" }>,
-  entry: ActivityEntry,
+  event: CalendarStart,
+  options: StartOptions = {},
 ): ActionResult => {
-  const edits = editActions(deps);
-  const isMoved =
-    entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
-  const moved = isMoved
-    ? await edits.adjustActivity(target.activityId, {
-        startAt: entry.startAt,
-        ...(entry.endAt !== null && target.endAt !== null && { endAt: entry.endAt }),
-      })
-    : ok([]);
-  if (!moved.ok) {
-    return moved;
-  }
-  const isRenamed = entry.label.trim() !== target.label || entry.category !== target.category;
-  const renamed = isRenamed
-    ? await edits.relabelActivity(target.activityId, {
-        category: entry.category,
-        label: entry.label.trim(),
-      })
-    : ok([]);
-  return renamed.ok ? ok([...moved.value, ...renamed.value]) : renamed;
+  const now = deps.clock.now();
+  // A main activity begun since the event started keeps its time: the event takes over from it.
+  const since =
+    options.alongside === true ? null : (runningActivity(timeOf(deps), now)?.startAt ?? null);
+  const begun = Math.min(Date.parse(event.startAt), Date.parse(now));
+  const startAt = new Date(
+    since === null ? begun : Math.max(begun, Date.parse(since)),
+  ).toISOString();
+  const minutes = Math.round((Date.parse(event.endAt) - Date.parse(startAt)) / 60_000);
+  return await startActivity(
+    deps,
+    {
+      alongside: options.alongside,
+      buttonId: "calendar",
+      category: "other",
+      expectMinutes: minutes > 0 ? minutes : null,
+      label: event.title,
+    },
+    { at: startAt },
+  );
 };
 
-const saveActivity = async (
+const startTyped = async (
   deps: ActionDeps,
-  target: ActivityTarget,
-  entry: ActivityEntry,
+  text: string,
+  options: StartOptions = {},
 ): ActionResult => {
-  if (target.kind === "edit") {
-    return await saveEdit(deps, target, entry);
-  }
-  return entry.endAt === null
-    ? err("action/invalid-input")
-    : await logPast(deps, {
-        category: entry.category,
-        endAt: entry.endAt,
-        label: entry.label,
-        startAt: entry.startAt,
-      });
-};
-
-const startTyped = async (deps: ActionDeps, typed: string): ActionResult => {
-  const label = typed.trim();
-  const key = label.toLowerCase();
-  const time = timeOf(deps);
-  const button = effectiveButtons(time).find((candidate) => candidate.label.toLowerCase() === key);
-  if (button !== undefined) {
-    return await tapButton(deps, button.id);
-  }
-  const before = Object.values(time.activities)
+  const typed = typedActivity(text);
+  const key = typed.label.toLowerCase();
+  const before = Object.values(timeOf(deps).activities)
     .filter((activity) => activity.label.trim().toLowerCase() === key)
     .toSorted((a, b) => b.startAt.localeCompare(a.startAt))[0];
-  // No Expect or Limit given: the ones learned for this label apply.
-  return await startActivity(deps, { category: before?.category ?? "other", label });
+  // No length typed: the one learned for this label applies.
+  return await startActivity(deps, {
+    alongside: options.alongside,
+    category: before?.category ?? "other",
+    label: typed.label,
+    ...(typed.expectMinutes !== null && { expectMinutes: typed.expectMinutes }),
+  });
+};
+
+const refineActivity = async (
+  deps: ActionDeps,
+  activityId: string,
+  { category, expectMinutes, label, typed }: ActivityReading & { readonly typed: string },
+): ActionResult => {
+  const activity = timeOf(deps).activities[activityId];
+  if (activity?.label !== typedActivity(typed).label) {
+    return ok([]);
+  }
+  return await editActions(deps).relabelActivity(activityId, {
+    category,
+    label,
+    ...(expectMinutes !== null && { expectMinutes }),
+  });
 };
 
 export const timeActions = (deps: ActionDeps): TimeActions => ({
-  ...buttonActions(deps),
   ...editActions(deps),
-  saveActivity: async (target, entry) => await saveActivity(deps, target, entry),
+  refineActivity: async (activityId, reading) => await refineActivity(deps, activityId, reading),
   focusTask: async (taskId) => {
     const task = taskById(deps.state.store.getState().tasks, taskId);
-    return task === undefined
-      ? err("task/unknown")
-      : await startActivity(deps, {
-          category: "task",
-          expectMinutes: task.estimateMinutes,
-          label: task.title.slice(0, 80),
-          limitMinutes: null,
-          taskId,
-        });
+    if (task === undefined) {
+      return err("task/unknown");
+    }
+    const started = await startActivity(deps, {
+      category: "task",
+      expectMinutes: task.estimateMinutes,
+      label: task.title,
+      taskId,
+    });
+    // Focusing on a paused task picks it up again.
+    return started.ok && task.status === "paused"
+      ? await emit(deps, [
+          stamp(deps, { payload: { status: "in_progress", taskId }, type: "task.status.set" }),
+        ])
+      : started;
   },
-  logPast: async (activity) => await logPast(deps, activity),
   startActivity: async (input, when) => await startActivity(deps, input, when),
-  startTyped: async (label) => await startTyped(deps, label),
+  startCalendar: async (event, options) => await startCalendar(deps, event, options),
+  startChoice: async (choiceId, options) => await startChoice(deps, choiceId, options),
+  startTyped: async (text, options) => await startTyped(deps, text, options),
   stopActivity: async (when) => await stopActivity(deps, when),
-  tapButton: async (buttonId, details) => await tapButton(deps, buttonId, details),
 });

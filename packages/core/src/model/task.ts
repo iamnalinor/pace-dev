@@ -1,10 +1,14 @@
 import type { z } from "zod";
 
 import type { Event } from "../events/event-schema.ts";
-import type { CloseOutcomeSchema, TaskStatusSchema } from "../events/payloads.ts";
+import type { CloseOutcomeSchema } from "../events/payloads.ts";
 import type { Importance, ProgressMode } from "./preset.ts";
 
-export type TaskStatus = z.output<typeof TaskStatusSchema>;
+/**
+An open task's status. Old logs may carry "waiting"; it reads as in progress (the waiting
+state and its frozen urgency were removed in stage 6).
+*/
+export type TaskStatus = "in_progress" | "not_started" | "paused";
 
 export type CloseOutcome = z.output<typeof CloseOutcomeSchema>;
 
@@ -65,12 +69,8 @@ export type Task = {
   readonly overrides: null | Readonly<Record<string, unknown>>;
   readonly status: TaskStatus;
   readonly statusSince: string;
-  /** Waiting time of the finished spells; the running spell is added when it ends. */
-  readonly waitingMinutes: number;
   /** True once the user did anything that implies work; survives the close for analytics. */
   readonly touched: boolean;
-  /** Manual position inside the importance category. */
-  readonly rank: null | number;
   readonly createdAt: string;
   /** Whole-task submission; per-subtask submissions live on the subtasks. */
   readonly submittedAt: null | string;

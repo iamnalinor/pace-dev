@@ -5,6 +5,7 @@ import { extractLink } from "../links.ts";
 import { presetChain, resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { suggestFor } from "../queries/suggest.ts";
+import { findDate } from "./quick-date.ts";
 import {
   dueOf,
   estimateOf,
@@ -14,6 +15,7 @@ import {
   problemsOf,
   projectTagOf,
   type QuickSubtask,
+  withDayPreposition,
 } from "./quick-fields.ts";
 import { findFirst, type Found, mask, type QuickSpan, titleOf, toSpan } from "./quick-spans.ts";
 
@@ -38,6 +40,8 @@ export type QuickInput = {
   readonly link: null | string;
   readonly subtasks: readonly QuickSubtask[];
   readonly spans: readonly QuickSpan[];
+  /** The message's details beyond the title and the problems (the assistant's reading only). */
+  readonly description: null | string;
 };
 
 const linkSpansOf = (text: string, link: null | string): readonly QuickSpan[] => {
@@ -62,13 +66,57 @@ const optional = (found: Found | undefined): readonly Found[] =>
 const inOrder = (links: readonly QuickSpan[], found: readonly Found[]): readonly QuickSpan[] =>
   [...links, ...found.map((item) => toSpan(item))].toSorted((a, b) => a.start - b.start);
 
+/** A title is at most this long; a longer line is cut at a word. */
+const MAX_TITLE = 100;
+
+const capTitle = (title: string): string => {
+  if (title.length <= MAX_TITLE) {
+    return title;
+  }
+  const cut = title.slice(0, MAX_TITLE - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > MAX_TITLE / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+};
+
+/** A title of one line and at most `MAX_TITLE` characters, cut at a word. */
+export const shortTitle = (text: string): string =>
+  capTitle(titleOf(text.split(/\r?\n/u).find((line) => line.trim() !== "") ?? "", []));
+
+/**
+A pasted message: its first line (what is left of it once the chips are taken out) is the
+title, the lines after it the description. A first line too long for a title is cut, and
+then the description starts with that whole line, so nothing of it is lost.
+*/
+const titleAndDescription = (
+  text: string,
+  spans: readonly QuickSpan[],
+): { readonly title: string; readonly description: null | string } => {
+  const lines = text.split(/\r?\n/u);
+  const masked = mask(text, spans).split(/\r?\n/u);
+  const first = masked.findIndex((line) => line.trim() !== "");
+  const whole = titleOf(masked[first] ?? "", []);
+  const title = capTitle(whole);
+  const isCut = title !== whole;
+  const rest = lines
+    .slice(isCut ? first : first + 1)
+    .join("\n")
+    .trim();
+  return {
+    description: first === -1 || rest === "" ? null : rest,
+    title,
+  };
+};
+
 /** Date, time and project come first: their digits must not read as problems or estimates. */
 const readDated = (state: CoreState, text: string) => {
   const project = projectTagOf(state, text);
-  const time = findTime(text);
-  const day = findDay(mask(text, optional(time)));
-  const spans = [...project.spans, ...optional(time), ...optional(day)];
-  return { day, project, rest: mask(text, spans), spans, time };
+  // A date first: the "12" of "до 12 октября" is a day, not an hour.
+  const date = withDayPreposition(text, findDate(text));
+  const undated = mask(text, optional(date));
+  const time = findTime(undated);
+  const day = findDay(mask(undated, optional(time)));
+  const spans = [...project.spans, ...optional(date), ...optional(time), ...optional(day)];
+  return { date, day, project, rest: mask(text, spans), spans, time };
 };
 
 export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContext): QuickInput => {
@@ -92,8 +140,9 @@ export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContex
     ...problems.spans,
   ]);
   const dueAt = dueOf(dated, { now: ctx.now, zone });
-  const { project } = dated;
+  const { description, title } = titleAndDescription(text, spans);
   return {
+    description,
     dueAt,
     dueTz: dueAt === null ? null : zone,
     estimateMinutes: estimate.minutes,
@@ -101,11 +150,12 @@ export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContex
     isImportanceExplicit: named.importance !== null,
     link,
     presetId: suggestion.presetId,
-    projectId: project.projectId ?? (project.projectName === null ? suggestion.projectId : null),
-    projectName: project.projectName,
+    projectId:
+      dated.project.projectId ?? (dated.project.projectName === null ? suggestion.projectId : null),
+    projectName: dated.project.projectName,
     spans,
     subtasks: problems.subtasks,
     text,
-    title: titleOf(text, spans),
+    title,
   };
 };

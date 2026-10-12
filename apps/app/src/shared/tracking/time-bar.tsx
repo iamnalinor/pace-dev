@@ -1,89 +1,107 @@
-import { ChevronDown, Plus, Square } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import {
+  CalendarDays,
+  Coffee,
+  Dumbbell,
+  Ellipsis,
+  House,
+  type LucideIcon,
+  Play,
+} from "lucide-react-native";
+import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
-import { useAppState, usePace, useT } from "#app/app-state.tsx";
+import type { TimeButtonView } from "@pace/client";
+import type { Event } from "@pace/core";
+
+import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Chip } from "#app/ui/chip.tsx";
-import { ColorTag, inkClass, OUTLINE, PROJECT_FILL } from "#app/ui/color.tsx";
+import { inkClass, OUTLINE } from "#app/ui/color.tsx";
+import { contextMenuProps } from "#app/ui/context-menu.ts";
 import { cx } from "#app/ui/cx.ts";
-import { PulseDot } from "#app/ui/pulse-dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import {
-  PACE_STATUS_TEXT,
-  recentLabels,
-  type RunningView,
-  type TimeButtonView,
-} from "@pace/client";
-import { formatDuration } from "@pace/core";
 
-import { ButtonEditor, type EditorTarget } from "./button-editor.tsx";
-import { DetailsSheet } from "./details-sheet.tsx";
+import { calendarToday } from "./calendar-source.ts";
+import { type CalendarToday, eventOnNow } from "./calendar-today.ts";
+import { ChoicesSheet } from "./choices-sheet.tsx";
+import { RunningRow } from "./running-row.tsx";
 
-const percent = (share: number): `${number}%` => `${Math.round(share * 100)}%`;
+const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
+  calendar: CalendarDays,
+  chores: House,
+  rest: Coffee,
+  sport: Dumbbell,
+};
 
-const RunningRow = ({
-  onStop,
-  running,
+const startedId = (events: readonly Event[]): null | string => {
+  const started = events.find((event) => event.type === "activity.started");
+  return started?.type === "activity.started" ? started.payload.activityId : null;
+};
+
+/**
+"What are you doing?" and ▶ on one line: Enter starts it at once with the words as typed (a
+length in them as the Expect); the assistant's reading of it follows in the background.
+*/
+const TypedStart = ({
+  onReading,
 }: {
-  readonly running: RunningView;
-  readonly onStop: () => void;
+  /** The activity whose words the assistant reads (`true`), then once it answered (`false`). */
+  readonly onReading: (activityId: string, isReading: boolean) => void;
 }) => {
   const t = useT();
-  const { language } = useViewer();
+  const { actions, assistant } = usePace();
   const { palette } = useTheme();
-  const target = running.expectMinutes ?? running.limitMinutes;
-  const isOver = running.status === "over-limit" || running.status === "over-expect";
-  const statusKey = PACE_STATUS_TEXT[running.status];
+  const run = useRunAction();
+  const [text, setText] = useState("");
+  const typed = text.trim();
+  const start = async (): Promise<void> => {
+    if (typed === "") {
+      return;
+    }
+    const result = await actions.startTyped(typed);
+    if (!(await run(Promise.resolve(result))) || !result.ok) {
+      return;
+    }
+    setText("");
+    const activityId = startedId(result.value);
+    if (activityId === null) {
+      return;
+    }
+    onReading(activityId, true);
+    try {
+      const reading = await assistant.readActivity(typed);
+      if (reading !== null) {
+        await actions.refineActivity(activityId, { ...reading, typed });
+      }
+    } finally {
+      onReading(activityId, false);
+    }
+  };
   return (
-    <View className="flex-row items-center gap-2.5">
-      <View accessibilityLiveRegion="polite" className="flex-1 gap-1">
-        <View className="flex-row flex-wrap items-center gap-2">
-          <PulseDot className={PROJECT_FILL[running.color]} />
-          <ColorTag color={running.color}>{running.label}</ColorTag>
-          <Text className="font-mono text-[13px] text-fg">
-            {formatDuration(running.minutes, language)}
-          </Text>
-          {target === null ? null : (
-            <Text className="font-sans text-[12px] text-muted">
-              {t(running.expectMinutes === null ? "time.limitOf" : "time.expectOf", {
-                duration: formatDuration(target, language),
-              })}
-            </Text>
-          )}
-          {statusKey === null ? null : (
-            <Text
-              className={cx(
-                "font-sans text-[12px] font-medium",
-                isOver ? "text-warn" : "text-question",
-              )}
-            >
-              {t(statusKey)}
-            </Text>
-          )}
-        </View>
-        {running.share === null ? null : (
-          <View className="h-1 overflow-hidden rounded-full bg-track">
-            <View
-              className={cx(
-                "h-full rounded-full",
-                isOver ? "bg-warn" : PROJECT_FILL[running.color],
-              )}
-              style={{ width: percent(running.share) }}
-            />
-          </View>
-        )}
-      </View>
+    <View className="flex-row items-center gap-2">
+      <TextInput
+        accessibilityLabel={t("time.whatDoing")}
+        className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
+        maxLength={200}
+        onChangeText={setText}
+        onSubmitEditing={() => void start()}
+        placeholder={t("time.whatDoing")}
+        placeholderTextColor={palette.muted}
+        returnKeyType="go"
+        value={text}
+      />
       <Pressable
-        accessibilityLabel={t("time.stop")}
+        accessibilityLabel={t("time.start")}
         accessibilityRole="button"
-        className="h-9 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
-        hitSlop={6}
-        onPress={onStop}
+        accessibilityState={{ disabled: typed === "" }}
+        className={cx(
+          "h-11 w-11 items-center justify-center rounded-lg bg-accent active:opacity-80",
+          typed === "" && "opacity-50",
+        )}
+        disabled={typed === ""}
+        onPress={() => void start()}
       >
-        <Square color={palette.fg} size={14} />
-        <Text className="font-sans text-[13px] text-fg">{t("time.stop")}</Text>
+        <Play color={palette.accentFg} fill={palette.accentFg} size={16} />
       </Pressable>
     </View>
   );
@@ -92,177 +110,147 @@ const RunningRow = ({
 type ButtonProps = {
   readonly button: TimeButtonView;
   readonly onTap: (button: TimeButtonView) => void;
-  readonly onDetails: (button: TimeButtonView) => void;
+  readonly onMore: (button: TimeButtonView) => void;
 };
 
 /**
-A compact activity chip: the surface in its color's outline, filled while it runs. A button
-that asks for details (a chevron) opens them on a tap; any opens them on a long press.
+A big button in its fixed place: icon over name, its color's outline, filled with the accent while it runs.
+A long press, a right click or "⋯" opens what it can start and "alongside".
 */
-const ActivityButton = ({ button, onDetails, onTap }: ButtonProps) => {
+const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
   const t = useT();
   const { palette } = useTheme();
-  const details = (): void => {
-    onDetails(button);
+  const label = t(button.labelKey);
+  const Icon = ICONS[button.id];
+  const more = (): void => {
+    onMore(button);
   };
-  const isAsks = button.shouldAskDetails && !button.isRunning;
   return (
-    <Pressable
-      accessibilityActions={[{ label: t("time.details.what"), name: "longpress" }]}
-      accessibilityHint={t("time.buttonHint")}
-      accessibilityLabel={button.label}
-      accessibilityRole="switch"
-      aria-checked={button.isRunning}
-      className={cx(
-        "h-10 flex-row items-center gap-1 rounded-pill border-2 px-3.5 active:opacity-80",
-        OUTLINE[button.color],
-        button.isRunning ? PROJECT_FILL[button.color] : "bg-surface",
-      )}
-      delayLongPress={450}
-      onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === "longpress") {
-          details();
-        }
-      }}
-      onLongPress={details}
-      onPress={() => {
-        if (isAsks) {
-          details();
-        } else {
-          onTap(button);
-        }
-      }}
-    >
-      <Text
+    <View className="relative flex-1">
+      <Pressable
+        accessibilityActions={[{ label: t("time.more", { label }), name: "longpress" }]}
+        accessibilityHint={t("time.buttonHint")}
+        accessibilityLabel={label}
+        accessibilityRole="switch"
+        aria-checked={button.isRunning}
         className={cx(
-          "font-sans text-[13px]",
-          button.isRunning ? "font-medium text-accentFg" : inkClass(button.color),
+          "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
+          button.isRunning ? "border-accent bg-accent" : cx(OUTLINE[button.color], "bg-surface"),
         )}
-        numberOfLines={1}
-      >
-        {button.label}
-      </Text>
-      {isAsks ? <ChevronDown color={palette.muted} size={14} strokeWidth={2} /> : null}
-    </Pressable>
-  );
-};
-
-/** "What are you doing?": a free line that starts at Enter, and the last few labels at a tap. */
-const TypedStart = () => {
-  const t = useT();
-  const { actions } = usePace();
-  const { palette } = useTheme();
-  const run = useRunAction();
-  const time = useAppState((state) => state.time);
-  const recent = useMemo(() => recentLabels(time, undefined, 3), [time]);
-  const [text, setText] = useState("");
-  const start = async (label: string): Promise<void> => {
-    if (await run(actions.startTyped(label))) {
-      setText("");
-    }
-  };
-  return (
-    <View className="gap-2">
-      <TextInput
-        accessibilityLabel={t("time.whatDoing")}
-        className="h-10 rounded-lg border border-line bg-surface px-3 font-sans text-[14px] text-fg"
-        onChangeText={setText}
-        onSubmitEditing={() => {
-          if (text.trim() !== "") {
-            void start(text);
+        delayLongPress={450}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === "longpress") {
+            more();
           }
         }}
-        placeholder={t("time.whatDoing")}
-        placeholderTextColor={palette.muted}
-        returnKeyType="go"
-        value={text}
-      />
-      {recent.length === 0 ? null : (
-        <View className="flex-row flex-wrap gap-1.5">
-          {recent.map((label) => (
-            <Chip
-              key={label}
-              label={`${t("time.start")}: ${label}`}
-              onPress={() => void start(label)}
-            >
-              {label}
-            </Chip>
-          ))}
-        </View>
-      )}
+        onLongPress={more}
+        onPress={() => {
+          onTap(button);
+        }}
+        {...contextMenuProps(more)}
+      >
+        <Icon color={button.isRunning ? palette.accentFg : palette.fg2} size={18} />
+        <Text
+          className={cx(
+            "text-center font-sans text-[12px] leading-[14px]",
+            button.isRunning ? "font-medium text-accentFg" : inkClass(button.color),
+          )}
+          numberOfLines={2}
+        >
+          {label}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={t("time.more", { label })}
+        accessibilityRole="button"
+        className="absolute -right-1 -top-1 h-11 w-11 items-start justify-start rounded-md pl-4 pt-2 active:opacity-60"
+        hitSlop={6}
+        onPress={more}
+      >
+        <Ellipsis color={palette.muted} size={16} />
+      </Pressable>
     </View>
   );
 };
 
+type Opened = { readonly button: TimeButtonView; readonly calendar: CalendarToday | null };
+
+/** What a tap does: stop the running button, start the calendar's event or a single choice, or ask. */
+const useTap = (open: (opened: Opened) => void) => {
+  const { actions, api } = usePace();
+  const { deviceTz, now } = useViewer();
+  const run = useRunAction();
+  const calendarOf = async (button: TimeButtonView): Promise<CalendarToday | null> =>
+    button.kind === "calendar" ? await calendarToday({ api, now, zone: deviceTz }) : null;
+  const tap = async (button: TimeButtonView): Promise<void> => {
+    if (button.isRunning) {
+      await run(actions.stopActivity());
+      return;
+    }
+    const calendar = await calendarOf(button);
+    const current = calendar === null ? null : eventOnNow(calendar.events, now);
+    const [only] = button.choices;
+    if (current !== null) {
+      await run(actions.startCalendar(current));
+    } else if (only !== undefined && button.choices.length === 1) {
+      await run(actions.startChoice(only.id));
+    } else {
+      open({ button, calendar });
+    }
+  };
+  const more = async (button: TimeButtonView): Promise<void> => {
+    open({ button, calendar: await calendarOf(button) });
+  };
+  return { more, tap };
+};
+
 /**
-The time bar under Now, where the thumb rests: one tap on an activity starts it and ends the
-running one (a tap on the running one stops it); press and hold to change a button.
+The time bar under Now, where the thumb rests: what runs (and what runs alongside), "What are
+you doing?", and four buttons that never move: From calendar, Rest, Sport and Chores.
 */
 export const TimeBar = () => {
   const t = useT();
-  const { actions, hooks } = usePace();
-  const { palette } = useTheme();
-  const run = useRunAction();
-  const { buttons, running } = hooks.useTimeBar();
-  const [editing, setEditing] = useState<EditorTarget | null>(null);
-  const [details, setDetails] = useState<null | TimeButtonView>(null);
-  const tap = (button: TimeButtonView): void => {
-    void run(actions.tapButton(button.id));
-  };
+  const { hooks } = usePace();
+  const { alongside, buttons, running } = hooks.useTimeBar();
+  const [opened, setOpened] = useState<null | Opened>(null);
+  // The typed activities the assistant is still reading (two can be in flight).
+  const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
+  const { more, tap } = useTap(setOpened);
   return (
     <View
       accessibilityLabel={t("time.bar")}
-      className="border-t border-line bg-bg px-3 pb-2.5 pt-2.5"
+      className="gap-2 border-t border-line bg-bg px-3 pb-2.5 pt-2.5"
       role="region"
     >
-      <View className="min-h-9 flex-row items-center gap-2">
-        <View className="flex-1">
-          {running === null ? (
-            <TypedStart />
-          ) : (
-            <RunningRow
-              onStop={() => {
-                void run(actions.stopActivity());
-              }}
-              running={running}
-            />
-          )}
-        </View>
-        <Pressable
-          accessibilityLabel={t("time.addButton")}
-          accessibilityRole="button"
-          className="h-9 w-9 items-center justify-center rounded-lg active:opacity-70"
-          hitSlop={6}
-          onPress={() => {
-            setEditing({ kind: "new" });
-          }}
-        >
-          <Plus color={palette.fg2} size={18} />
-        </Pressable>
-      </View>
-      <View className="mt-2 flex-row flex-wrap gap-1.5">
+      {[...(running === null ? [] : [running]), ...alongside].map((item) => (
+        <RunningRow isDraft={reading.has(item.activityId)} key={item.activityId} running={item} />
+      ))}
+      <TypedStart
+        onReading={(activityId, isReading) => {
+          setReading((current) => {
+            const others = [...current].filter((id) => id !== activityId);
+            return new Set(isReading ? [...others, activityId] : others);
+          });
+        }}
+      />
+      <View className="flex-row gap-2">
         {buttons.map((button) => (
-          <ActivityButton button={button} key={button.id} onDetails={setDetails} onTap={tap} />
+          <BarButton
+            button={button}
+            key={button.id}
+            onMore={(pressed) => void more(pressed)}
+            onTap={(pressed) => void tap(pressed)}
+          />
         ))}
       </View>
-      {details === null ? null : (
-        <DetailsSheet
-          button={details}
+      {opened === null ? null : (
+        <ChoicesSheet
+          button={opened.button}
+          calendar={opened.calendar}
+          canGoAlongside={running !== null && !opened.button.isRunning}
           onClose={() => {
-            setDetails(null);
+            setOpened(null);
           }}
-          onEditButton={() => {
-            setDetails(null);
-            setEditing({ button: details, kind: "edit" });
-          }}
-        />
-      )}
-      {editing === null ? null : (
-        <ButtonEditor
-          onClose={() => {
-            setEditing(null);
-          }}
-          target={editing}
         />
       )}
     </View>

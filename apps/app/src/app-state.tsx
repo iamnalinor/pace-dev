@@ -18,11 +18,19 @@ import {
   type User,
 } from "@pace/core";
 
+import { IS_PHONE } from "./platform/device.ts";
 import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
 import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
+import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
+import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
-const SYNC_INTERVAL_MS = 30_000;
+/**
+How often the client pulls on its own. While the live channel is up the server says when
+something changed, so the poll is only a safety net; while it is down it polls as before.
+*/
+const POLL_OFFLINE_MS = 30_000;
+const POLL_LIVE_MS = 5 * 60_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 
@@ -36,20 +44,32 @@ const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
   return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
 };
 
+/** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
+const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
+  if (IS_PHONE) {
+    await uploadPhoneData(runtime.api, runtime.clock.now());
+  }
+};
+
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
   await syncLocalNotifications(runtime);
+  await remindCalendar(runtime);
+  await sendPhoneData(runtime);
   await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
-  if (auth.store.getState().status === "signed-in") {
-    sync.start({ intervalMs: SYNC_INTERVAL_MS });
+  if (auth.store.getState().status !== "signed-in") {
+    return;
   }
+
+  sync.start({ intervalMs: POLL_OFFLINE_MS });
+  runtime.live.start();
 };
 
-/** The running activity and its targets: the timers change only when this does. */
+/** The running activity and when it asks next: the timers change only when this does. */
 const timerKey = (runtime: PaceRuntime): string => {
   const { running } = timeBarModel(runtime.state.store.getState(), {
     deviceTz: runtime.clock.deviceTz,
@@ -57,16 +77,10 @@ const timerKey = (runtime: PaceRuntime): string => {
   });
   return running === null
     ? ""
-    : [
-        running.activityId,
-        running.startAt,
-        running.label,
-        running.expectMinutes,
-        running.limitMinutes,
-      ].join("|");
+    : [running.activityId, running.startAt, running.label, running.remindAt].join("|");
 };
 
-/** Reschedules the phone's Expect/Limit timers on every switch, stop or edit of the running activity. */
+/** Reschedules the phone's "still doing this?" timer on every switch, stop or edit of the running activity. */
 const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
   let last = timerKey(runtime);
   void syncActivityTimers(runtime);
@@ -89,6 +103,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       void bootstrap(runtime);
     } else {
       sync.stop();
+      runtime.live.stop();
     }
   };
   follow(auth.store.getState().status);
@@ -101,15 +116,29 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       void runtime.resetLocalData();
     }
   });
+  // The poll is a safety net while the server can say "changed" itself.
+  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }) => {
+    sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
+  });
   const subscription = AppState.addEventListener("change", (next) => {
-    if (!(next === "active" && auth.store.getState().status === "signed-in")) {
+    if (auth.store.getState().status !== "signed-in") {
       return;
     }
+    if (next !== "active") {
+      // Leaving (a hidden tab, the app in the background): what is unsent goes now, and the
+      // socket rests until the person is back.
+      void sync.syncNow();
+      runtime.live.stop();
+      return;
+    }
+    runtime.live.start();
 
     void actions.ensureInstances();
     void (async () => {
       await sync.syncNow();
       await syncLocalNotifications(runtime);
+      await remindCalendar(runtime);
+      await sendPhoneData(runtime);
       await startPhoneChecks(phoneContextOf(runtime));
     })();
   });
@@ -118,7 +147,9 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     unsubscribe();
     subscription.remove();
     stopTimers();
+    stopFollowingLive();
     sync.stop();
+    runtime.live.stop();
   };
 };
 

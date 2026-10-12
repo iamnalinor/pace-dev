@@ -43,3 +43,22 @@ build history) is in [context/](context/README.md).
   stand-ins in `src/platform/web/`; never `if (Platform.OS === "web")` for whole screens.
   Never import a `.web.tsx` file from its own base file (it would resolve to itself).
 - Code, comments and identifiers in English.
+- **Exploratory QA before every release and after UI changes**: launch a Sonnet agent that
+  clicks through the web build in a browser and writes `context/qa-round-<n>.md`
+  (procedure and prompt: [docs/qa.md](docs/qa.md)); in parallel, a code-review agent over
+  `git diff origin/main...HEAD`. Fix the findings (TDD), then run the next round until only
+  cosmetic findings are left. Tests do not replace this pass.
+
+## Plugins and working method
+
+Use these when the session has them (`/plugin` → Anthropic Directory); without them, follow
+the same methods by hand:
+- **Superpowers** (obra/superpowers): `brainstorming` and `writing-plans` before larger work,
+  `test-driven-development`, `systematic-debugging` for every bug (root cause before a fix),
+  `verification-before-completion` (run the checks, show the output, then claim done),
+  `requesting-code-review` / `receiving-code-review`, `dispatching-parallel-agents`.
+- **ux-superpowers**: `user-journey`, `jobs-to-be-done` and `ux-validate` for a new flow or
+  screen: walk the owner's scenarios (`context/feedback-*.md`) end to end before and after.
+- **Design** (Anthropic): `design-critique`, `accessibility-review` and `ux-copy` on screenshots
+  of changed screens (both themes, phone and desktop, Russian text) before pushing UI work.
+

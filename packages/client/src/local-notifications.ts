@@ -1,11 +1,4 @@
-import {
-  addMinutesIso,
-  endpoints,
-  formatDuration,
-  type Language,
-  type PlannedNotification,
-  t,
-} from "@pace/core";
+import { endpoints, type Language, type PlannedNotification, t } from "@pace/core";
 
 import type { ApiClient } from "./api-client.ts";
 
@@ -21,88 +14,91 @@ export type LocalNotification = {
 /** Every id this module schedules starts with this, so it never touches anyone else's. */
 export const LOCAL_ID_PREFIX = "pace:";
 
-/** The running activity's timers: Expect, then the Limit's warning and crossing. */
+/** The running activity's timer: "still doing this?". */
 export const ACTIVITY_ID_PREFIX = `${LOCAL_ID_PREFIX}activity:`;
 
 export const isActivityId = (id: string): boolean => id.startsWith(ACTIVITY_ID_PREFIX);
 
-/** The server plan's reminders: every id of ours that is not an activity timer. */
-export const isPlanId = (id: string): boolean =>
-  id.startsWith(LOCAL_ID_PREFIX) && !isActivityId(id);
+/** The calendar's events, each asked about as it starts. */
+export const CALENDAR_ID_PREFIX = `${LOCAL_ID_PREFIX}calendar:`;
 
-/** Minutes before the Limit at which the warning goes out. */
-const NEAR_LIMIT_MINUTES = 10;
+export const isCalendarId = (id: string): boolean => id.startsWith(CALENDAR_ID_PREFIX);
+
+/** The server plan's reminders: every id of ours that is not an activity or calendar one. */
+export const isPlanId = (id: string): boolean =>
+  id.startsWith(LOCAL_ID_PREFIX) && !isActivityId(id) && !isCalendarId(id);
 
 export type RunningTimer = {
   readonly activityId: string;
   readonly label: string;
   readonly startAt: string;
-  readonly expectMinutes: null | number;
-  readonly limitMinutes: null | number;
+  /** When to ask "still doing this?" (core's `remindAt`); `null` never. */
+  readonly remindAt: null | string;
 };
 
 /**
-The phone's own timers for the running activity, so they ring offline: Expect passed, ten
-minutes to the Limit, the Limit passed. Moments already behind `now` are left out.
+The phone's own timer for the running activity, so it rings offline: "still doing this?" at
+its reminder (twice its Expect, moved on by each "yes"). A moment already behind `now` is left
+out.
 */
 export const activityNotifications = (
   running: null | RunningTimer,
   now: string,
   language: Language,
 ): readonly LocalNotification[] => {
-  if (running === null) {
+  const at = running?.remindAt ?? null;
+  if (running === null || at === null) {
     return [];
   }
-  const timer = (kind: string, minutes: number, body: string): readonly LocalNotification[] => {
-    const at = addMinutesIso(running.startAt, minutes);
-    return Date.parse(at) > Date.parse(now)
-      ? [
-          {
-            at,
-            body,
-            id: `${ACTIVITY_ID_PREFIX}${running.activityId}:${kind}`,
-            title: t(language, "notify.localTitle"),
-          },
-        ]
-      : [];
-  };
-  const { expectMinutes, label, limitMinutes } = running;
-  const expect =
-    expectMinutes === null
-      ? []
-      : timer(
-          "expect",
-          expectMinutes,
-          t(language, "notify.activityExpect", {
-            duration: formatDuration(expectMinutes, language),
-            label,
-          }),
-        );
-  const limit =
-    limitMinutes === null
-      ? []
-      : [
-          ...(limitMinutes > NEAR_LIMIT_MINUTES
-            ? timer(
-                "near-limit",
-                limitMinutes - NEAR_LIMIT_MINUTES,
-                t(language, "notify.activityNearLimit", {
-                  duration: formatDuration(limitMinutes, language),
-                  label,
-                }),
-              )
-            : []),
-          ...timer(
-            "over-limit",
-            limitMinutes,
-            t(language, "notify.activityOverLimit", {
-              duration: formatDuration(limitMinutes, language),
-              label,
-            }),
-          ),
-        ];
-  return [...expect, ...limit];
+  return Date.parse(at) <= Date.parse(now)
+    ? []
+    : [
+        {
+          at,
+          body: t(language, "notify.activityLong", { label: running.label }),
+          // The moment is in the id: a new Expect replaces the timer instead of keeping the old one.
+          id: `${ACTIVITY_ID_PREFIX}${running.activityId}:long@${at}`,
+          title: t(language, "notify.localTitle"),
+        },
+      ];
 };
+
+/** A calendar event the phone may remind about. */
+export type CalendarReminder = {
+  readonly id: string;
+  readonly title: string;
+  readonly startAt: string;
+  readonly endAt: string;
+};
+
+/**
+"Seminar, 10:00–11:30. Attend?" as each event starts, for the events still ahead; `clock`
+writes an instant as the wall clock the person reads.
+*/
+export const calendarNotifications = (
+  events: readonly CalendarReminder[],
+  {
+    clock,
+    language,
+    now,
+  }: {
+    readonly now: string;
+    readonly language: Language;
+    readonly clock: (atIso: string) => string;
+  },
+): readonly LocalNotification[] =>
+  events
+    .filter((event) => Date.parse(event.startAt) > Date.parse(now))
+    .map((event) => ({
+      at: event.startAt,
+      body: t(language, "phone.notify.eventStart", {
+        from: clock(event.startAt),
+        title: event.title,
+        to: clock(event.endAt),
+      }),
+      id: `${CALENDAR_ID_PREFIX}${event.id}@${event.startAt}`,
+      title: t(language, "phone.notify.eventStartTitle"),
+    }));
 
 /** The plan as notifications in the account language. */
 export const localNotifications = (

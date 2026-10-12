@@ -13,7 +13,6 @@ const EXAMPLES: Readonly<
   "hw.algebra": {
     name: "Algebra HW",
     definition: {
-      urgencyPolicy: "resubmission",
       deadlinePolicy: { kind: "resubmission", softDays: 7, finalAt: null, finalTz: null },
       recurrence: {
         issued: { weekday: 1, time: "10:00" },

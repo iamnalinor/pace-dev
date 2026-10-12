@@ -9,7 +9,7 @@ import { type PresetError, taskPreset } from "../presets/resolve-preset.ts";
 
 /**
 A recurring instance nobody filled in yet: no problems, no source, no progress, never
-touched. It waits on the project page instead of competing on Now.
+touched. It is on Now (the week's plan) but nothing to review or remind about yet.
 */
 export const isEmptyInstance = (task: Task): boolean =>
   task.id.startsWith("hw:") &&
@@ -21,8 +21,8 @@ export const isEmptyInstance = (task: Task): boolean =>
 /** Captured but unsorted: the inbox is its own list, with a counter on Now. */
 export const isInboxTask = (task: Task): boolean => task.presetId === "inbox";
 
-/** Open tasks that compete on Now and inside their importance category. */
-export const isCompeting = (task: Task): boolean =>
+/** Open tasks with something in them: not an untouched instance, not an inbox item. */
+export const isActiveTask = (task: Task): boolean =>
   isOpen(task) && !isEmptyInstance(task) && !isInboxTask(task);
 
 export const importanceOf = (task: Task, preset: ResolvedPreset): Importance =>

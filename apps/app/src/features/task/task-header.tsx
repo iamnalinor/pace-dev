@@ -1,32 +1,66 @@
-import { ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react-native";
-import { Pressable, View } from "react-native";
+import { Ban, ChevronDown, Pause, Pencil, Play, Trash2, X } from "lucide-react-native";
+import { Pressable, Text, View } from "react-native";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { useTaskBack } from "#app/shared/task-opener.tsx";
+import { useIsInPane, useTaskBack } from "#app/shared/task-opener.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { BackHeader } from "#app/ui/back-header.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
+import { inkClass } from "#app/ui/color.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { useToast } from "#app/ui/toast.tsx";
 
-/** Edit, pause or resume, delete: the task's actions as icons, no menu in between. */
+/** Deletes the task at once and goes back; the toast's Undo brings it back. */
+const useDeleteTask = (view: TaskViewModel): (() => void) => {
+  const t = useT();
+  const { actions } = usePace();
+  const back = useTaskBack();
+  const toast = useToast();
+  const run = useRunAction();
+  return () => {
+    void (async () => {
+      const result = await actions.deleteTask(view.id);
+      if (!(await run(Promise.resolve(result))) || !result.ok) {
+        return;
+      }
+      back();
+      const [revocation] = result.value;
+      toast.show({
+        message: t("task.deleted", { title: view.title }),
+        ...(revocation !== undefined && {
+          action: {
+            label: t("common.undo"),
+            onPress: () => void run(actions.revoke(revocation.id)),
+          },
+        }),
+      });
+    })();
+  };
+};
+
+/**
+Edit, pause or resume, give up (Cancelled or Skipped, kept in History) and delete (gone, with
+Undo in the toast): the task's actions as icons, no menu in between.
+*/
 const TaskActions = ({
-  onDelete,
+  onGiveUp,
   onEdit,
   view,
 }: {
   readonly view: TaskViewModel;
   readonly onEdit: () => void;
   /** Opens the close sheet on Cancelled · Skipped, which is the confirmation. */
-  readonly onDelete: () => void;
+  readonly onGiveUp: () => void;
 }) => {
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
   const isOpen = view.closed === null;
   const isPaused = view.tags.some((tag) => tag.kind === "status" && tag.status === "paused");
+  const remove = useDeleteTask(view);
   return (
     <View className="flex-row">
       <IconButton icon={Pencil} label={t("task.edit")} onPress={onEdit} variant="plain" />
@@ -41,8 +75,9 @@ const TaskActions = ({
         />
       ) : null}
       {isOpen ? (
-        <IconButton icon={Trash2} label={t("task.delete")} onPress={onDelete} variant="plain" />
+        <IconButton icon={Ban} label={t("task.giveUp")} onPress={onGiveUp} variant="plain" />
       ) : null}
+      <IconButton icon={Trash2} label={t("task.delete")} onPress={remove} variant="plain" />
     </View>
   );
 };
@@ -50,7 +85,7 @@ const TaskActions = ({
 export type TaskHeaderActions = {
   readonly view: TaskViewModel;
   readonly onEdit: () => void;
-  readonly onDelete: () => void;
+  readonly onGiveUp: () => void;
 };
 
 /** Back, the project (tap to move the task), and the task's actions. */
@@ -66,10 +101,13 @@ export const TaskHeader = ({
 }) => {
   const t = useT();
   const back = useTaskBack();
+  const isInPane = useIsInPane();
   const { palette } = useTheme();
   return (
     <BackHeader
-      backLabel={t("common.back")}
+      // Beside the list the task is a pane: it closes, there is nothing to go back to.
+      {...(isInPane && { backIcon: X })}
+      backLabel={t(isInPane ? "common.close" : "common.back")}
       onBack={back}
       right={actions === undefined ? null : <TaskActions {...actions} />}
     >
@@ -82,8 +120,18 @@ export const TaskHeader = ({
         disabled={onProject === undefined}
         onPress={onProject}
       >
-        <ColorTag color={project?.color ?? null}>{project?.name ?? t("task.noProject")}</ColorTag>
-        {onProject === undefined ? null : <ChevronDown color={palette.muted} size={14} />}
+        <Text
+          className={cx(
+            "font-sans text-[15px] font-medium",
+            project === null ? "text-fg2" : inkClass(project.color),
+          )}
+          numberOfLines={1}
+        >
+          {project?.name ?? t("task.noProject")}
+        </Text>
+        {onProject === undefined ? null : (
+          <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+        )}
       </Pressable>
     </BackHeader>
   );

@@ -30,7 +30,7 @@ const SeriesRules = () => {
       className="gap-1 border-t border-line px-5 py-4"
       role="group"
     >
-      <Text className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
         {t("permissions.rules")}
       </Text>
       {rules.map((rule) => (

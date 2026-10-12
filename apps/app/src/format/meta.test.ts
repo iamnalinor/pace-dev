@@ -18,16 +18,12 @@ describe("metaTexts", () => {
         { kind: "sent", submitted: 2 },
       ]),
     ).toEqual(["plain:Due tomorrow 23:59", "plain:4/7 solved", "plain:2 sent"]);
-    expect(texts([{ importance: "asap", kind: "importance" }, { kind: "end-of-day" }])).toEqual([
-      "strong:ASAP",
-      "plain:by end of day",
-    ]);
     expect(
       texts([
         { importance: "prioritized", kind: "importance" },
-        { kind: "behind-pace", percent: 25 },
+        { at: HW_DUE, kind: "starts", tz: MOSCOW },
       ]),
-    ).toEqual(["strong:Prioritized", "plain:25% behind pace"]);
+    ).toEqual(["strong:Prioritized", "plain:Starts tomorrow 23:59"]);
     expect(
       texts([
         { isSoft: false, kind: "late", minutes: 901 },
@@ -52,5 +48,6 @@ describe("metaTexts", () => {
   it("follows the account language with the right plural forms", () => {
     expect(texts([{ count: 3, kind: "problems-left" }], "ru")).toHaveLength(1);
     expect(texts([{ kind: "age", minutes: 5 * 24 * 60 }], "ru")[0]).toContain("5");
+    expect(texts([{ kind: "age", minutes: 0 }], "ru")).toEqual(["plain:только что"]);
   });
 });

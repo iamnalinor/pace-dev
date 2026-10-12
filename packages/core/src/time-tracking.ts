@@ -1,19 +1,25 @@
 /** The time-tracking layer of @pace/core: activities, the time bar's buttons, the timeline. */
-export { BUTTON_CATEGORIES, DEFAULT_BUTTONS, effectiveButtons } from "./tracking/buttons.ts";
+export {
+  type ButtonChoice,
+  choiceById,
+  TIME_BUTTONS,
+  type TimeButton,
+  timeButton,
+} from "./tracking/buttons.ts";
 export {
   ACTIVITY_CATEGORIES,
   CATEGORY_COLORS,
-  CATEGORY_DEFAULTS,
-  type ExpectLimit,
+  CATEGORY_EXPECT,
   FOCUS_CATEGORIES,
 } from "./tracking/categories.ts";
 export {
   type Defaults,
   defaultsFor,
-  NEAR_LIMIT_MINUTES,
   paceStatus,
   type PaceStatus,
-} from "./tracking/expect-limit.ts";
+  REMIND_FACTOR,
+  remindAt,
+} from "./tracking/expect.ts";
 export {
   type CategoryRow,
   type EstimateRow,
@@ -28,7 +34,6 @@ export {
 } from "./tracking/insights.ts";
 export {
   type Activity,
-  type ActivityButton,
   type ActivityCategory,
   INITIAL_TIME_STATE,
   type TimeState,
@@ -43,12 +48,10 @@ export {
 } from "./tracking/patterns.ts";
 export {
   type AppMinutes,
+  appSessions,
   appUsage,
-  type Counted,
-  countedMinutes,
   detectSleep,
   type Interval,
-  MESSENGER_PACKAGES,
   type PhoneEvent,
   phonePickupAt,
   screenOnIntervals,
@@ -59,8 +62,11 @@ export {
   type Gap,
   GAP_MINUTES,
   type Range,
+  runningActivities,
   runningActivity,
   type Segment,
   timeline,
   type Timeline,
 } from "./tracking/timeline.ts";
+export { typedActivity, type TypedActivity } from "./tracking/typed.ts";
+export { type SatRow, whereSat } from "./tracking/where-sat.ts";

@@ -47,17 +47,18 @@ const OpaqueRecordSchema = z.record(z.string(), z.unknown());
 const taskRef = { taskId: z.string().min(1) };
 
 type ZonedFields = {
-  readonly dueAt?: string | undefined;
+  readonly dueAt?: null | string | undefined;
   readonly dueTz?: string | undefined;
-  readonly startAt?: string | undefined;
+  readonly startAt?: null | string | undefined;
   readonly startTz?: string | undefined;
 };
 
+/** A time that is set carries its zone; a cleared one (`null`) needs none. */
 const zonePaired = (value: ZonedFields, ctx: z.RefinementCtx): void => {
-  if (value.dueAt !== undefined && value.dueTz === undefined) {
+  if (typeof value.dueAt === "string" && value.dueTz === undefined) {
     ctx.addIssue({ code: "custom", message: "dueTz is required with dueAt", path: ["dueTz"] });
   }
-  if (value.startAt !== undefined && value.startTz === undefined) {
+  if (typeof value.startAt === "string" && value.startTz === undefined) {
     ctx.addIssue({
       code: "custom",
       message: "startTz is required with startAt",
@@ -90,12 +91,16 @@ export const TaskCreatedPayload = z
   })
   .superRefine(zonePaired);
 
+/** `null` clears the due date or the start (and their zones with them). */
 export const TaskUpdatedPayload = z
   .object({
     ...taskRef,
     title: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
-    ...zonedShape,
+    dueAt: InstantSchema.nullable().optional(),
+    dueTz: TimeZoneSchema.optional(),
+    startAt: InstantSchema.nullable().optional(),
+    startTz: TimeZoneSchema.optional(),
     fields: TaskFieldsSchema.optional(),
   })
   .superRefine(zonePaired);
@@ -104,6 +109,8 @@ export const TaskPresetSetPayload = z.object({ ...taskRef, presetId: z.string().
 export const TaskOverridesSetPayload = z.object({ ...taskRef, overrides: OpaqueRecordSchema });
 export const TaskStatusSetPayload = z.object({ ...taskRef, status: TaskStatusSchema });
 export const TaskSubtaskSolvedPayload = z.object({ ...taskRef, subtaskId: z.string().min(1) });
+/** A problem taken off the task (an unsent one: a sent problem stays on the record). */
+export const TaskSubtaskRemovedPayload = z.object({ ...taskRef, subtaskId: z.string().min(1) });
 export const TaskSubtasksAddedPayload = z.object({
   ...taskRef,
   subtasks: z.array(SubtaskSchema).min(1),
@@ -211,13 +218,18 @@ const activityFields = {
   taskId: z.string().min(1).optional(),
 };
 
-/** A new primary activity from `occurredAt`; whatever ran until then stops there. */
+/**
+A new activity from `occurredAt`. A main one stops the main one running until then; one run
+`alongside` (music over work) stops nothing and is stopped only by its own stop.
+*/
 export const ActivityStartedPayload = z.object({
   activityId: z.string().min(1),
   ...activityFields,
   buttonId: z.string().min(1).optional(),
   expectMinutes: minutes.optional(),
+  /** Retired (activities have no limits any more): still parsed in old events, never read. */
   limitMinutes: minutes.optional(),
+  alongside: z.literal(true).optional(),
 });
 export const ActivityStoppedPayload = z.object({ activityId: z.string().min(1) });
 /** A block recorded afterwards; it takes precedence over the live activities it overlaps. */
@@ -239,10 +251,14 @@ export const ActivityLabelledPayload = z.object({
   label: activityFields.label.optional(),
   category: ActivityCategorySchema.optional(),
   taskId: z.string().min(1).nullable().optional(),
-  /** Messaging was the point of it (a call, a chat about work): no phone penalty. */
+  /** How long it is expected to take (the assistant's reading of "20 min"); null clears it. */
+  expectMinutes: minutes.nullable().optional(),
+  /** Answered "still doing this?" with yes at this instant (the Expect stays as it was). */
+  stillAt: InstantSchema.optional(),
+  /** Retired with the messenger penalty: still parsed in old events, never read. */
   messengersOnPurpose: z.boolean().optional(),
 });
-/** One button of the time bar, with the defaults an activity started from it gets. */
+/** Retired (the time bar's buttons are fixed now): still parsed in old events, never read. */
 export const ActivityButtonSetPayload = z.object({
   buttonId: z.string().min(1),
   ...activityFields,
@@ -252,6 +268,7 @@ export const ActivityButtonSetPayload = z.object({
   order: z.number().int().nonnegative(),
   shouldAskDetails: z.boolean().optional(),
 });
+/** Retired with the editable buttons: still parsed in old events, never read. */
 export const ActivityButtonRemovedPayload = z.object({ buttonId: z.string().min(1) });
 
 export const FocusStartedPayload = z.object(taskRef);

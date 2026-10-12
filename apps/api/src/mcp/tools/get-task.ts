@@ -23,21 +23,6 @@ const ClosedSchema = z.object({
   source: z.string(),
 });
 
-const ExplainInputSchema = z.object({
-  key: z.string(),
-  unit: z.string().optional(),
-  value: z.union([z.null(), z.number(), z.string()]),
-});
-
-const ExplainStepSchema = z.object({ key: z.string(), value: z.number() });
-
-const ExplanationSchema = z.object({
-  formula: z.string(),
-  inputs: z.array(ExplainInputSchema),
-  policy: z.string(),
-  steps: z.array(ExplainStepSchema),
-});
-
 const SubmitPreviewSchema = z.object({
   canClose: z.boolean().optional(),
   kind: z
@@ -48,33 +33,24 @@ const SubmitPreviewSchema = z.object({
 
 /** The task screen as structured data, with the row the list tools answer on top. */
 const render = (view: TaskView, row: TaskRow): Rendered => {
-  const { task, explanation } = view;
+  const { task } = view;
   return {
     structured: {
       ...row,
       closed: task.closed,
       createdAt: task.createdAt,
       description: task.description,
-      explanation: {
-        formula: explanation.formula,
-        inputs: explanation.inputs,
-        policy: explanation.policy,
-        steps: explanation.steps,
-      },
       overrides: task.overrides,
-      rank: view.rank,
       slider: task.slider,
       sourceText: task.sourceText,
       startTz: task.startTz,
       submitPreview: view.submitPreview,
       subtasks: task.subtasks,
-      waitingMinutes: task.waitingMinutes,
-      windowElapsed: view.windowElapsed,
       workLeftMinutes: view.workLeftMinutes,
     },
     summary: [
       describeRow(row),
-      `Status ${task.status}; progress ${Math.round(row.progress * 100)}%; score ${row.score.toFixed(2)} (${explanation.policy}).`,
+      `Status ${task.status}; progress ${Math.round(row.progress * 100)}%.`,
       ...(task.closed === null ? [] : [`Closed: ${task.closed.outcome} at ${task.closed.at}.`]),
       ...task.subtasks.map(
         (item) =>
@@ -87,7 +63,7 @@ const render = (view: TaskView, row: TaskRow): Rendered => {
 export const taskTool = defineTool({
   annotations: { destructiveHint: false, idempotentHint: true, readOnlyHint: true },
   description:
-    "Everything about one task: its fields, subtasks with solved/submitted marks, the closure and derived outcome, progress, how much of its time window has elapsed, the work left, the 'why it is ranked here' explanation (policy, formula, inputs, steps) and what submit would do next. Use it before mark_subtasks (to learn subtask ids and numbers), before submit, or to answer questions about a task's deadline and urgency.",
+    "Everything about one task: its fields, subtasks with solved/submitted marks, the closure and derived outcome, progress, the work left and what submit would do next. Use it before mark_subtasks (to learn subtask ids and numbers), before submit, or to answer questions about a task's deadline.",
   handler: async (args, ctx) =>
     await runRead(ctx, (scope) => {
       const view = taskView(scope.state, args.id, scope.qctx);
@@ -104,16 +80,12 @@ export const taskTool = defineTool({
     closed: ClosedSchema.nullable(),
     createdAt: z.string(),
     description: z.string().nullable(),
-    explanation: ExplanationSchema,
     overrides: z.record(z.string(), z.unknown()).nullable(),
-    rank: z.object({ position: z.int(), size: z.int() }).nullable(),
     slider: z.int().nullable(),
     sourceText: z.string().nullable(),
     startTz: z.string().nullable(),
     submitPreview: SubmitPreviewSchema,
     subtasks: z.array(SubtaskSchema),
-    waitingMinutes: z.number(),
-    windowElapsed: z.number().nullable(),
     workLeftMinutes: z.int(),
   },
   scope: "tasks:read",

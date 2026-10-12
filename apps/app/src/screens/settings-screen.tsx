@@ -31,7 +31,7 @@ const Row = ({
   <View accessibilityLabel={label} className="gap-2 border-b border-line px-5 py-4" role="group">
     <Text
       accessibilityRole="header"
-      className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted"
+      className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted"
     >
       {label}
     </Text>
@@ -100,21 +100,8 @@ export const SettingsScreen = () => {
     await auth.logout();
     router.replace("/login");
   };
-  const header = (
-    <ScreenHeader
-      right={
-        <Button
-          onPress={() => {
-            router.back();
-          }}
-          variant="ghost"
-        >
-          {t("common.done")}
-        </Button>
-      }
-      title={t("settings.title")}
-    />
-  );
+  // A tab on a phone and a sidebar destination on a wide window: nothing to dismiss.
+  const header = <ScreenHeader title={t("settings.title")} />;
   return (
     <Screen header={header}>
       <LookRows />
@@ -136,6 +123,16 @@ export const SettingsScreen = () => {
           <ExportRow />
         </Row>
       )}
+      <Row label={t("settings.devices")}>
+        <Button
+          onPress={() => {
+            router.push("/devices");
+          }}
+          variant="secondary"
+        >
+          {t("devices.title")}
+        </Button>
+      </Row>
       <Row label={t("settings.connectedApps")}>
         <ConnectedApps />
       </Row>

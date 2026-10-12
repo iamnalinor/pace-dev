@@ -58,7 +58,7 @@ export const AuthScreen = () => {
   }
   return (
     <View className="flex-1 items-center justify-center gap-3 bg-bg">
-      <ActivityIndicator />
+      <ActivityIndicator accessibilityLabel={t("auth.signingIn")} />
       <Text className="font-sans text-[14px] text-muted">{t("auth.signingIn")}</Text>
     </View>
   );

@@ -31,6 +31,8 @@ export type MissingInstancesInput = {
   readonly tasks: TasksState;
   readonly presets: PresetsState;
   readonly now: string;
+  /** Ids already in the log: an instance taken back (revoked) counts as made. */
+  readonly existingEventIds?: ReadonlySet<string> | undefined;
 };
 
 /** Inverse of `instanceId`; `undefined` for every id that is not a homework instance. */
@@ -131,6 +133,10 @@ export const expectedInstances = (presets: PresetsState, now: string): readonly 
 const isIssuedBy = (slot: InstanceSlot, now: string): boolean =>
   Date.parse(slot.issuedAt) <= Date.parse(now);
 
+/** A deadline that passed before the course was added: there was nothing to do in Pace. */
+const isBeforeCourse = (slot: InstanceSlot, source: RecurringPreset): boolean =>
+  Date.parse(slot.dueAt) < Date.parse(source.preset.createdAt);
+
 /** The instances of one preset already in the state, whatever their outcome. */
 const instancesOf = (tasks: TasksState, presetId: string): readonly Task[] =>
   Object.values(tasks.byId).filter((task) => instanceWeekOf(task.id)?.presetId === presetId);
@@ -140,21 +146,31 @@ const latestOf = (instances: readonly Task[]): Task | undefined =>
   instances.find((task) => instances.every((other) => other.id <= task.id));
 
 /**
+When an instance made ahead of its issue is recorded: a week before the issue (the previous
+week's issue, already past), never before the course. It depends only on the slot and the
+preset, so every device and the server write the same event; it starts at the issue instant
+and waits under "In future".
+*/
+const aheadAt = ({ slot, source }: Expected, now: string): string => {
+  const weekBefore = toIso(addDays(slot.issuedAt, -7, { in: tz(source.recurrence.tz) }));
+  const at = Math.max(Date.parse(weekBefore), Date.parse(source.preset.createdAt));
+  // A course is never created after `now`; the guard only keeps an event out of the future.
+  return new Date(Math.min(at, Date.parse(now))).toISOString();
+};
+
+/**
 The creation of one instance. It is numbered after every instance of the preset so far,
 closed ones included, and inherits the estimate of the most recent one: the student
 knows better than the preset how long a sheet takes.
 */
-const instanceEvent = (
-  slot: InstanceSlot,
-  source: RecurringPreset,
-  tasks: TasksState,
-): EventInput => {
+const instanceEvent = (item: Expected, tasks: TasksState, now: string): EventInput => {
+  const { slot, source } = item;
   const id = instanceId(slot.presetId, slot.isoWeek);
   const existing = instancesOf(tasks, slot.presetId);
   return {
     id,
     type: "task.created",
-    occurredAt: slot.issuedAt,
+    occurredAt: isIssuedBy(slot, now) ? slot.issuedAt : aheadAt(item, now),
     precision: "exact",
     source: "system",
     payload: {
@@ -173,17 +189,55 @@ const instanceEvent = (
   };
 };
 
+/** Not made yet: no task, and not made and taken back either. */
+const isMissing = (input: MissingInstancesInput, slot: InstanceSlot): boolean => {
+  const id = instanceId(slot.presetId, slot.isoWeek);
+  return taskById(input.tasks, id) === undefined && input.existingEventIds?.has(id) !== true;
+};
+
 /**
-One `task.created` per expected slot that is already issued and has no task yet.
-The deterministic id (`hw:<presetId>:<isoWeek>`) makes this idempotent across devices
-and the server. At most one slot per preset can be issued at a time (the next week's
-issue instant is always after `now`), so numbering within one batch cannot collide.
+What one preset needs now: its issued slot if it has no task yet (unless its deadline passed
+before the course was added), else, while no instance of it is open, the next slot ahead of
+its issue, so the week's homework is on the plan before it is given.
 */
-export const missingInstanceEvents = (input: MissingInstancesInput): readonly EventInput[] =>
-  expected(input.presets, input.now)
-    .filter(
-      ({ slot }) =>
-        isIssuedBy(slot, input.now) &&
-        taskById(input.tasks, instanceId(slot.presetId, slot.isoWeek)) === undefined,
+const missingFor = (
+  slots: readonly Expected[],
+  input: MissingInstancesInput,
+): readonly Expected[] => {
+  const { now, tasks } = input;
+  const issued = slots.filter(
+    (item) =>
+      isIssuedBy(item.slot, now) &&
+      !isBeforeCourse(item.slot, item.source) &&
+      isMissing(input, item.slot),
+  );
+  if (issued.length > 0) {
+    return issued;
+  }
+  const [first] = slots;
+  const hasOpen =
+    first !== undefined &&
+    instancesOf(tasks, first.slot.presetId).some((task) => task.closed === null);
+  const ahead = slots.find((item) => !isIssuedBy(item.slot, now));
+  return hasOpen || ahead === undefined || !isMissing(input, ahead.slot) ? [] : [ahead];
+};
+
+/**
+One `task.created` per instance a preset needs (see `missingFor`). The deterministic id
+(`hw:<presetId>:<isoWeek>`) makes this idempotent across devices and the server, and a
+slot made ahead is not made again at its issue. At most one slot per preset is created in a
+batch, so numbering within one batch cannot collide.
+*/
+export const missingInstanceEvents = (input: MissingInstancesInput): readonly EventInput[] => {
+  const all = expected(input.presets, input.now);
+  const presetIds = [...new Set(all.map((item) => item.slot.presetId))];
+  return presetIds
+    .flatMap((presetId) =>
+      missingFor(
+        all.filter((item) => item.slot.presetId === presetId),
+        input,
+      ),
     )
-    .map(({ slot, source }) => instanceEvent(slot, source, input.tasks));
+    .toSorted(compareExpected)
+    .map((item) => instanceEvent(item, input.tasks, input.now));
+};

@@ -8,7 +8,6 @@ import { type InboxActions, inboxActions } from "./inbox-actions.ts";
 import { type InstanceActions, instanceActions } from "./instances.ts";
 import { type PresetActions, presetActions } from "./preset-actions.ts";
 import { type ProjectActions, projectActions } from "./project-actions.ts";
-import { type RankActions, rankActions } from "./rank-actions.ts";
 import { type ReviewActions, reviewActions } from "./review-actions.ts";
 import { type SettingsActions, settingsActions } from "./settings-actions.ts";
 import { type TaskActions, taskActions } from "./task-actions.ts";
@@ -28,7 +27,6 @@ export type Actions = ComposerActions &
   InstanceActions &
   PresetActions &
   ProjectActions &
-  RankActions &
   ReviewActions &
   SettingsActions &
   TaskActions &
@@ -54,7 +52,6 @@ export const createActions = (options: ActionsOptions): Actions => {
     ...instanceActions(deps),
     ...presetActions(deps),
     ...projectActions(deps),
-    ...rankActions(deps),
     ...reviewActions(deps),
     ...settingsActions(deps),
     ...taskActions(deps),

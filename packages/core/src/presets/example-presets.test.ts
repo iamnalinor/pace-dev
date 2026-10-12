@@ -57,7 +57,6 @@ describe("exampleCoursePresetEvents", () => {
           tz: "Europe/Moscow",
         },
         submission: "per_subtask",
-        urgencyPolicy: "resubmission",
       },
     });
   });
@@ -73,7 +72,6 @@ describe("exampleCoursePresetEvents", () => {
           issued: { time: "12:00", weekday: 2 },
           tz: "Europe/Moscow",
         },
-        urgencyPolicy: "pace",
       },
     });
   });

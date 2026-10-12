@@ -28,6 +28,9 @@ const untouchedStore: UserStoreApi = {
   apply: async () => {
     throw new Error("store not expected");
   },
+  calendar: async () => {
+    throw new Error("store not expected");
+  },
   decisions: async () => {
     throw new Error("store not expected");
   },
@@ -35,6 +38,9 @@ const untouchedStore: UserStoreApi = {
     throw new Error("store not expected");
   },
   dryRun: async () => {
+    throw new Error("store not expected");
+  },
+  usage: async () => {
     throw new Error("store not expected");
   },
   find: async () => {

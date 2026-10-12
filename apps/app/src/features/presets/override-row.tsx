@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
-import { Switch, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { PaceSwitch } from "#app/ui/switch-row.tsx";
 
 /** Not overridden: the control shows the inherited value and cannot be changed. */
 export type RowState = { readonly disabled: boolean; readonly invalid: boolean };
@@ -29,19 +29,16 @@ export const OverrideRow = ({
   readonly children: (state: RowState) => ReactNode;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const isDisabled = !isOverridden;
   return (
     <View accessibilityLabel={label} className="gap-2 border-t border-line py-3" role="group">
       <View className="flex-row items-center justify-between gap-3">
         <Text className="flex-1 font-sans text-[14px] text-fg2">{label}</Text>
         <Text className="font-sans text-[12px] text-muted">{t("presets.overrideShort")}</Text>
-        <Switch
-          accessibilityLabel={t("presets.override", { field: label })}
-          onValueChange={onToggle}
-          thumbColor={isOverridden ? palette.accentFg : palette.fg2}
-          trackColor={{ false: palette.raised, true: palette.accent }}
-          value={isOverridden}
+        <PaceSwitch
+          isOn={isOverridden}
+          label={t("presets.override", { field: label })}
+          onChange={onToggle}
         />
       </View>
       <View

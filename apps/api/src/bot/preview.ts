@@ -1,4 +1,5 @@
 import {
+  dueOfInput,
   type EventBody,
   type Language,
   newId,
@@ -75,7 +76,10 @@ const previewOf = async (turn: Turn, { ctx, text, verified }: Reading): Promise<
   await store.remember(id, { bodies, text } satisfies Pending);
   const instance =
     plan.value.kind === "create"
-      ? openInstanceOf(state, plan.value.input.presetId, now)
+      ? openInstanceOf(state, plan.value.input.presetId, {
+          due: dueOfInput(plan.value.input),
+          now,
+        })
       : undefined;
   return {
     buttons: buttonsFor(id, language, true),

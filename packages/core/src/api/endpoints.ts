@@ -11,6 +11,18 @@ import {
   TelegramLoginSchema,
   UserSchema,
 } from "./schemas/auth.ts";
+import {
+  CalendarOutputSchema,
+  CalendarSyncSchema,
+  DeviceCreatedSchema,
+  DeviceCreateSchema,
+  DevicesOutputSchema,
+  DoneSchema,
+  RangeQuerySchema,
+  StoredSchema,
+  UsageOutputSchema,
+  UsageUploadSchema,
+} from "./schemas/cloud.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import {
   DecisionsOutputSchema,
@@ -26,7 +38,13 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
-import { LlmStatusSchema, ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
+import {
+  ActivityParseRequestSchema,
+  ActivityParseResponseSchema,
+  LlmStatusSchema,
+  ParseRequestSchema,
+  ParseResponseSchema,
+} from "./schemas/parse.ts";
 import {
   SyncObservationsBodySchema,
   SyncObservationsOutputSchema,
@@ -128,6 +146,14 @@ export const endpoints = {
       output: ParseResponseSchema,
       path: "/api/parse",
     }),
+    /** A note of what the person is doing, read into a label, a category and a length. */
+    activity: endpoint({
+      auth: true,
+      body: ActivityParseRequestSchema,
+      method: "POST",
+      output: ActivityParseResponseSchema,
+      path: "/api/parse/activity",
+    }),
     /** Whether a model can answer now (none configured counts as never). */
     status: endpoint({
       auth: true,
@@ -207,6 +233,75 @@ export const endpoints = {
         path: "/api/oauth/grants/:id",
       }),
     },
+  },
+  calendar: {
+    /** A phone's calendar over a range, replacing what that phone sent for it before. */
+    sync: endpoint({
+      auth: true,
+      body: CalendarSyncSchema,
+      method: "POST",
+      output: StoredSchema,
+      path: "/api/calendar/sync",
+    }),
+    /** The calendar's events overlapping a range, from every phone that sends it. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: CalendarOutputSchema,
+      path: "/api/calendar",
+      query: RangeQuerySchema,
+    }),
+    /** Forgets one phone's calendar copy (it turned sending off). */
+    clear: endpoint({
+      auth: true,
+      method: "DELETE",
+      output: DoneSchema,
+      path: "/api/calendar",
+      query: z.object({ deviceId: z.string().min(1).max(64) }),
+    }),
+  },
+  usage: {
+    /** A device's app sessions; the same device, app and start is one session (it may grow). */
+    upload: endpoint({
+      auth: true,
+      body: UsageUploadSchema,
+      method: "POST",
+      output: StoredSchema,
+      path: "/api/usage/sessions",
+      scope: "usage:write",
+    }),
+    /** App sessions on every device overlapping a range. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: UsageOutputSchema,
+      path: "/api/usage",
+      query: RangeQuerySchema,
+    }),
+  },
+  devices: {
+    /** The computers connected with a token of their own. */
+    list: endpoint({
+      auth: true,
+      method: "GET",
+      output: DevicesOutputSchema,
+      path: "/api/devices",
+    }),
+    /** Connects a computer: a token that can only upload its usage, shown once. */
+    create: endpoint({
+      auth: true,
+      body: DeviceCreateSchema,
+      method: "POST",
+      output: DeviceCreatedSchema,
+      path: "/api/devices",
+    }),
+    revoke: endpoint({
+      auth: true,
+      method: "DELETE",
+      output: DoneSchema,
+      params: z.object({ id: z.string().min(1).max(64) }),
+      path: "/api/devices/:id",
+    }),
   },
 } as const;
 

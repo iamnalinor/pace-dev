@@ -91,3 +91,25 @@ export const removeSeriesRule = async (series: string): Promise<void> => {
   const current = await seriesRules();
   await saveRules(current.filter((item) => item.series !== series));
 };
+
+const CALENDAR_SYNC_KEY = "pace.phone.calendarSync";
+
+/** Whether this phone sends its calendar to Pace (on until turned off in Settings). */
+export const isCalendarSyncOn = async (): Promise<boolean> =>
+  (await readJson(CALENDAR_SYNC_KEY)) !== false;
+
+export const setCalendarSync = async (isOn: boolean): Promise<void> => {
+  await SecureStore.setItemAsync(CALENDAR_SYNC_KEY, JSON.stringify(isOn));
+};
+
+const USAGE_CURSOR_KEY = "pace.phone.usageCursor";
+
+/** Where the next usage upload starts: the start of the last session sent (it may have grown). */
+export const usageCursor = async (): Promise<null | string> => {
+  const value = await readJson(USAGE_CURSOR_KEY);
+  return typeof value === "string" ? value : null;
+};
+
+export const setUsageCursor = async (at: string): Promise<void> => {
+  await SecureStore.setItemAsync(USAGE_CURSOR_KEY, JSON.stringify(at));
+};

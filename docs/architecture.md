@@ -176,6 +176,12 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 | `POST /api/sync/push` | `{ events: Event[] }` (≤ 500) | `{ accepted: id[], rejected: { id, reason }[], seq }` | each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
 | `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again |
 | `POST /api/sync/observations` | `{ observations }` (≤ 1000) | `{ accepted: n }` | append-only, idempotent by `kind+key` |
+| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
+
+The client sends a local change within 0.8 s of writing it (and what is unsent when the tab
+is hidden or the app goes to the background), pulls on every `changed` and on every
+reconnect of the live socket (back after 1 s, 2 s, … 60 s), and polls as a safety net: every
+5 minutes while the socket is up, every 30 s while it is down.
 
 The transport validates only the envelope (`SyncEventSchema`); the per-type payload is
 checked by the Durable Object. `seq` is a server-assigned integer, so a client that
@@ -201,8 +207,9 @@ order (nothing before the last applied `occurredAt`, no correction: core's
 (a preset change rewrites every task row, since it moves their derived columns); anything
 else rebuilds the state and every projection row (`user-store/projections.ts`). After every
 append (a client's sync push, an `apply`) and before every read and every `apply`,
-`derive(now)` appends the system events the state calls for: this week's homework instances and the automatic
-`cancelled_missed` / `skipped` outcomes, with deterministic ids, so they are idempotent
+`derive(now)` appends the system events the state calls for: this week's homework instances, the automatic
+`cancelled_missed` / `skipped` outcomes, then the next instance of a course left with none open
+(`user-store/derive-steps.ts`), with deterministic ids, so they are idempotent
 against clients that derived the same events.
 
 Methods: `append` and `list` (sync), `appendObservations`, `find(id)`, `read(now)`,

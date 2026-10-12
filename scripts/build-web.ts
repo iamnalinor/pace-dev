@@ -1,6 +1,6 @@
 /**
 The web build: Expo's static export of the app into `apps/app/dist/` (the files of `public/`
-are copied along), then a Workbox service worker that precaches it. The worker waits instead of taking
+are copied along) with the desktop bridge script, then a Workbox service worker that precaches it. The worker waits instead of taking
 over, so the page can offer "Reload" when a new version is ready (`src/platform/sw.web.tsx`).
 */
 import path from "node:path";
@@ -26,6 +26,12 @@ const exported = Bun.spawnSync(
 if (exported.exitCode !== 0) {
   process.exit(exported.exitCode);
 }
+
+// The desktop bridge is served next to the app, so Settings → Devices can give one command.
+await Bun.write(
+  path.join(OUT, "pace_aw_bridge.py"),
+  Bun.file(path.join(import.meta.dir, "../tools/pace-aw-bridge/pace_aw_bridge.py")),
+);
 
 const { count, size, warnings } = await generateSW({
   cleanupOutdatedCaches: true,

@@ -106,6 +106,27 @@ export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): Act
   return rejected === undefined ? await dispatchAll(deps, inputs) : err(rejected.error);
 };
 
+/** Per client: the last check-then-write still running. */
+const queues = new WeakMap<ActionDeps, Promise<unknown>>();
+
+/**
+Runs a check-then-write after the previous one finished, so a double tap cannot pass the
+same check twice before the first write lands (two closes of one task).
+*/
+export const serially = async <T>(deps: ActionDeps, run: () => Promise<T>): Promise<T> => {
+  const previous = queues.get(deps) ?? Promise.resolve();
+  const next = (async () => {
+    try {
+      await previous;
+    } catch {
+      // The previous write answered its own caller; this one runs regardless.
+    }
+    return await run();
+  })();
+  queues.set(deps, next);
+  return await next;
+};
+
 export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unknown"> => {
   const task = taskById(deps.state.store.getState().tasks, taskId);
   return task === undefined ? err("task/unknown") : ok(task);

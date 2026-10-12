@@ -3,9 +3,10 @@ import { z } from "zod";
 import {
   accountTz,
   addDaysIn,
-  effectiveButtons,
   ok,
   startOfDayIn,
+  t,
+  TIME_BUTTONS,
   timeByCategory,
   timeByProject,
   timeline,
@@ -24,17 +25,19 @@ const ROW = z.record(z.string(), z.unknown());
 export const listActivityButtons = defineTool({
   annotations: READ,
   description:
-    "Lists the time bar's activity buttons in their order: id, label, category, Expect and Limit minutes and the linked task. Pass an id to start_activity to start that activity with its defaults.",
+    "Lists what the time bar's four buttons start (From calendar aside): each choice's id, the button it sits under, its label in the account language, category and Expect minutes. Pass an id to start_activity to start that activity.",
   handler: async (_args, ctx) =>
     await runRead(ctx, ({ state }) => {
-      const buttons = effectiveButtons(state.time).map((button) => ({
-        category: button.category,
-        expectMinutes: button.expectMinutes,
-        id: button.id,
-        label: button.label,
-        limitMinutes: button.limitMinutes,
-        taskId: button.taskId,
-      }));
+      const { language } = state.settings;
+      const buttons = TIME_BUTTONS.flatMap((button) =>
+        button.choices.map((choice) => ({
+          button: button.id,
+          category: choice.category,
+          expectMinutes: choice.expectMinutes,
+          id: choice.id,
+          label: t(language, choice.labelKey ?? button.labelKey),
+        })),
+      );
       return ok({
         structured: { buttons },
         summary: buttons
@@ -53,7 +56,7 @@ export const listActivityButtons = defineTool({
 export const dayTool = defineTool({
   annotations: READ,
   description:
-    "Returns one day of tracked time in the account's time zone: the blocks in order (label, category, start, end, minutes, linked task), the gaps of 15 minutes or more nothing covers, minutes per category, and what is running. date is YYYY-MM-DD (default today).",
+    "Returns one day of tracked time in the account's time zone: the blocks in order (label, category, start, end, minutes, linked task), the gaps of 15 minutes or more nothing covers, minutes per category, what is running, and what ran alongside the main line (not in the totals). date is YYYY-MM-DD (default today).",
   handler: async (args, ctx) =>
     await runRead(ctx, ({ qctx, state }) => {
       const zone = accountTz(state, qctx);
@@ -62,6 +65,7 @@ export const dayTool = defineTool({
       const day = timeline(state.time, { from, now: qctx.now, to: addDaysIn(from, 1, zone) });
       return ok({
         structured: {
+          alongside: [...day.alongside],
           from,
           gaps: [...day.gaps],
           running: day.running,
@@ -90,6 +94,7 @@ export const dayTool = defineTool({
   },
   name: "get_day",
   output: {
+    alongside: z.array(z.unknown()),
     from: z.string(),
     gaps: z.array(z.unknown()),
     running: z.unknown(),

@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { ALGEBRA_ID, artboardState, ctx, HW_ID, MOSCOW, WORK_ID } from "@pace/core/testing";
+import {
+  ALGEBRA_ID,
+  artboardState,
+  CALC_W41_ID,
+  ctx,
+  HW_ID,
+  MOSCOW,
+  WORK_ID,
+} from "@pace/core/testing";
 
-import { type ComposerEdits, composerModel, requiresAiFirst, shouldAiRead } from "./composer.ts";
+import { type ComposerEdits, composerModel, isPasted, requiresAiFirst } from "./composer.ts";
 
 const state = artboardState();
 const model = (text: string, edits: ComposerEdits = {}) =>
@@ -25,6 +33,48 @@ describe("composerModel", () => {
       subtasks: [{ label: "1" }, { label: "3" }, { label: "5а" }],
       target: { kind: "instance", taskId: HW_ID },
     });
+  });
+
+  it("routes a pasted course homework with its deadline to that week, project untouched", () => {
+    const calc = model(
+      "Calculus HW: №№ 12, 14, 16 — найти пределы, сдать до 12 октября https://example.com/calc/3",
+    );
+    expect(calc).toMatchObject({
+      preset: { id: "hw.calculus" },
+      subtasks: [{ label: "12" }, { label: "14" }, { label: "16" }],
+      target: { kind: "instance", taskId: CALC_W41_ID },
+    });
+    expect(calc.project?.id).not.toBe(ALGEBRA_ID);
+  });
+
+  it("gives homework with a deadline on another day a task of its own", () => {
+    const friday = { at: "2026-10-09T20:59:00.000Z", tz: MOSCOW };
+    expect(model("дз по алгебре 8", { due: friday }).target).toEqual({ kind: "new" });
+    // HW 6 is due Wednesday: the same day keeps it in that week's homework.
+    const wednesday = { at: "2026-10-07T15:00:00.000Z", tz: MOSCOW };
+    expect(model("дз по алгебре 8", { due: wednesday }).target).toMatchObject({
+      kind: "instance",
+      taskId: HW_ID,
+    });
+  });
+
+  it("lists the course's open weeks and lets a tap pick one, or a new task", () => {
+    const hw = model("дз по алгебре 8");
+    expect(hw.instances.map((option) => option.id)).toContain(HW_ID);
+    expect(model("дз по алгебре 8", { targetTaskId: null }).target).toEqual({ kind: "new" });
+    expect(model("дз по алгебре 8", { targetTaskId: HW_ID }).target).toMatchObject({
+      kind: "instance",
+      taskId: HW_ID,
+    });
+  });
+
+  it("carries the assistant's description and a picked start", () => {
+    const start = { at: "2026-10-08T06:00:00.000Z", tz: MOSCOW };
+    expect(model("read the paper", { description: "the seminar one", start })).toMatchObject({
+      description: "the seminar one",
+      start,
+    });
+    expect(model("read the paper")).toMatchObject({ description: null, start: null });
   });
 
   it("shows a work sync's chips: project, due, estimate and link", () => {
@@ -69,12 +119,7 @@ describe("composerModel", () => {
   });
 });
 
-describe("shouldAiRead and requiresAiFirst", () => {
-  it("reads any line with the assistant", () => {
-    expect(shouldAiRead("call mom tomorrow")).toBe(true);
-    expect(shouldAiRead(" hw ")).toBe(false);
-  });
-
+describe("requiresAiFirst and isPasted", () => {
   it("makes Enter wait only for long or multi-line text", () => {
     expect(requiresAiFirst("call mom tomorrow")).toBe(false);
     expect(requiresAiFirst("first line\nsecond line")).toBe(true);
@@ -84,5 +129,11 @@ describe("shouldAiRead and requiresAiFirst", () => {
         "№№ 290, 292, 293 — решить методом выделения линейных множителей (в 292 можно воспользоваться решением)",
       ),
     ).toBe(true);
+  });
+
+  it("tells a paste from typing: a jump of many characters at once", () => {
+    expect(isPasted("", "№№ 290, 292, 293 — решить методом")).toBe(true);
+    expect(isPasted("call mo", "call mom")).toBe(false);
+    expect(isPasted("abc", "")).toBe(false);
   });
 });

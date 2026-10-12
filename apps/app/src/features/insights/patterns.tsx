@@ -61,7 +61,7 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
       </View>
       <View className="flex-row">
         {HOUR_TICKS.map((hour) => (
-          <Text className="flex-1 font-mono text-[11px] text-muted" key={hour}>
+          <Text className="flex-1 font-sans text-[11px] tabular-nums text-muted" key={hour}>
             {hourLabel(hour)}
           </Text>
         ))}
@@ -89,7 +89,7 @@ const FragmentationCard = ({
             role="group"
           >
             <Text className="font-sans text-[11px] text-fg2">{t(tile.key)}</Text>
-            <Text className="font-mono text-[16px] text-fg">{tile.value}</Text>
+            <Text className="font-sans text-[16px] tabular-nums text-fg">{tile.value}</Text>
           </View>
         ))}
       </View>
@@ -127,13 +127,13 @@ const FocusSleepCard = ({
           <Text className="w-10 font-sans text-[12px] text-fg2">{row.weekday}</Text>
           <View className="flex-1 gap-1">
             <Bar fill={SLEEP_FILL} share={row.sleepShare} />
-            <Text className="font-mono text-[12px] text-fg">
+            <Text className="font-sans text-[12px] tabular-nums text-fg">
               {row.sleepText ?? t("insights.notLogged")}
             </Text>
           </View>
           <View className="flex-1 gap-1">
             <Bar fill={FOCUS_FILL} share={row.focusShare} />
-            <Text className="font-mono text-[12px] text-fg">{row.focusText}</Text>
+            <Text className="font-sans text-[12px] tabular-nums text-fg">{row.focusText}</Text>
           </View>
         </View>
       ))}

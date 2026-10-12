@@ -59,10 +59,15 @@ const taskIdOf = (event: Event, log: readonly Event[]): null | string => {
     : null;
 };
 
+/** What the line names: the task, else the activity (as it is called now). */
 const titleOf = (state: HistorySource, event: Event, taskId: null | string): null | string => {
   const current = taskId === null ? undefined : taskById(state.tasks, taskId);
   if (current !== undefined) {
     return current.title;
+  }
+  if ("activityId" in event.payload) {
+    const activity = state.time.activities[event.payload.activityId];
+    return activity?.label ?? ("label" in event.payload ? (event.payload.label ?? null) : null);
   }
   return event.type === "task.created" ? event.payload.title : null;
 };

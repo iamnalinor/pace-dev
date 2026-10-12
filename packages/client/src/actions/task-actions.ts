@@ -1,6 +1,14 @@
 import { err, type Importance, newId, type Result } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
+import {
+  type ActionDeps,
+  type ActionResult,
+  emit,
+  fromStore,
+  stamp,
+  taskOf,
+  type When,
+} from "./deps.ts";
 import { type ProjectTarget, type ResolvedProject, resolveProject } from "./projects.ts";
 
 export type SubtaskForm = {
@@ -37,7 +45,12 @@ export type CreateTaskForm = ScheduleForm &
     readonly fields?: TaskFieldsForm | undefined;
   };
 
-export type TaskPatch = ScheduleForm & {
+export type TaskPatch = {
+  /** `null` clears the due date or the start. */
+  readonly dueAt?: null | string | undefined;
+  readonly dueTz?: string | undefined;
+  readonly startAt?: null | string | undefined;
+  readonly startTz?: string | undefined;
   readonly title?: string | undefined;
   /** `null` clears the description. */
   readonly description?: null | string | undefined;
@@ -49,6 +62,11 @@ export type TaskActions = {
   readonly updateTask: (taskId: string, patch: TaskPatch) => ActionResult;
   /** `null` takes the task out of its project. */
   readonly setProject: (taskId: string, target: null | ProjectTarget) => ActionResult;
+  /**
+  Takes the task back as if it never was (its creation is revoked): gone from every list.
+  The answer is the revocation, which Undo revokes in turn.
+  */
+  readonly deleteTask: (taskId: string) => ActionResult;
 };
 
 type SubtaskInput = { readonly id: string; readonly label: string; readonly number?: number };
@@ -76,6 +94,25 @@ type Schedule = {
   readonly startAt?: string;
   readonly startTz?: string;
 };
+
+/** A patch's dates: a set one with its zone (the device's by default), a cleared one as `null`. */
+const patchSchedule = (
+  patch: TaskPatch,
+  deviceTz: string,
+): {
+  readonly dueAt?: null | string;
+  readonly dueTz?: string;
+  readonly startAt?: null | string;
+  readonly startTz?: string;
+} => ({
+  ...(patch.dueAt === null && { dueAt: null }),
+  ...(typeof patch.dueAt === "string" && { dueAt: patch.dueAt, dueTz: patch.dueTz ?? deviceTz }),
+  ...(patch.startAt === null && { startAt: null }),
+  ...(typeof patch.startAt === "string" && {
+    startAt: patch.startAt,
+    startTz: patch.startTz ?? deviceTz,
+  }),
+});
 
 const schedule = (form: ScheduleForm, deviceTz: string): Schedule => ({
   ...(form.dueAt !== undefined && { dueAt: form.dueAt, dueTz: form.dueTz ?? deviceTz }),
@@ -133,7 +170,7 @@ const updateTask =
     const payload = {
       ...(patch.title !== undefined && { title: patch.title }),
       ...(patch.description !== undefined && { description: patch.description }),
-      ...schedule(patch, deps.clock.deviceTz),
+      ...patchSchedule(patch, deps.clock.deviceTz),
       ...(patch.fields !== undefined && { fields: fieldsInput(patch.fields) }),
     };
     if (Object.keys(payload).length === 0) {
@@ -159,8 +196,24 @@ const setProject =
     ]);
   };
 
+const deleteTask =
+  (deps: ActionDeps): TaskActions["deleteTask"] =>
+  async (taskId) => {
+    const task = taskOf(deps, taskId);
+    if (!task.ok) {
+      return task;
+    }
+    const created = deps.state.store
+      .getState()
+      .events.find((event) => event.type === "task.created" && event.payload.taskId === taskId);
+    return created === undefined
+      ? err("task/unknown")
+      : fromStore(await deps.state.revoke(created.id));
+  };
+
 export const taskActions = (deps: ActionDeps): TaskActions => ({
   createTask: createTask(deps),
+  deleteTask: deleteTask(deps),
   setProject: setProject(deps),
   updateTask: updateTask(deps),
 });

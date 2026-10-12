@@ -16,5 +16,7 @@ export type AppEnv = {
     config: Config;
     /** Set by the auth guard on endpoints declared `auth: true`. */
     user?: CurrentUser;
+    /** Set for a device token: the computer it belongs to, whatever its requests claim. */
+    device?: undefined | { readonly id: string; readonly name: string };
   };
 };
