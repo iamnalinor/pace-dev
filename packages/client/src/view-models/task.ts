@@ -180,6 +180,19 @@ const problems = (task: Task): readonly ProblemRow[] =>
     submittedAt: item.submittedAt,
   }));
 
+const normalized = (text: string): string => text.trim().replaceAll(/\s+/gu, " ").toLowerCase();
+
+/**
+The message a task was read from, worth showing only when it says more than the title: a line
+typed as it is (or an Inbox capture) is the title itself.
+*/
+const originalMessage = (sourceText: null | string, title: string): null | string =>
+  sourceText === null || normalized(sourceText) === normalized(title) ? null : sourceText;
+
+/** The work left at a slider step (0..10) still being dragged: the estimate less that share. */
+export const workLeftAt = (view: TaskViewModel, step: number): number =>
+  Math.round(view.stats.estimateMinutes * (1 - Math.min(Math.max(step, 0), 10) / 10));
+
 export const taskViewModel = (
   state: CoreState,
   taskId: string,
@@ -199,7 +212,7 @@ export const taskViewModel = (
       description: task.description,
       link: taskLink(task.fields.link, task.sourceText, task.description),
       submitVia: task.fields.submitVia,
-      sourceText: task.sourceText,
+      sourceText: originalMessage(task.sourceText, task.title),
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
       tags: tags(view, taskOutcome(task, preset)),

@@ -24,7 +24,14 @@ export type SyncClient = {
   /** Runs now, then every `intervalMs`; failures retry with exponential backoff (1s..60s). */
   readonly start: (options: { readonly intervalMs: number }) => void;
   readonly stop: () => void;
+  /** A local change or a server's "changed": a run within a second, a burst making one. */
+  readonly soon: () => void;
+  /** The pause between runs from the next one on (rare while the live channel is up). */
+  readonly setInterval: (intervalMs: number) => void;
 };
+
+/** How long a burst of changes may gather before it is sent. */
+const SOON_MS = 800;
 
 const PUSH_BATCH = 200;
 const PULL_LIMIT = "200";
@@ -117,6 +124,54 @@ const runSync = async (
 const backoffMs = (failures: number): number =>
   Math.min(BACKOFF_MIN_MS * 2 ** (failures - 1), BACKOFF_MAX_MS);
 
+/** One pending run at a time: when it is due, and moving it earlier or later. */
+const createTimer = (run: () => void) => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let dueAt: number | undefined;
+  const cancel = (): void => {
+    clearTimeout(timer);
+    timer = undefined;
+    dueAt = undefined;
+  };
+  return {
+    cancel,
+    /** Replaces the pending run with one in `delayMs`. */
+    in: (delayMs: number): void => {
+      cancel();
+      dueAt = Date.now() + delayMs;
+      timer = setTimeout(() => {
+        timer = undefined;
+        dueAt = undefined;
+        run();
+      }, delayMs);
+    },
+    /** Whether a run is already due within `delayMs`. */
+    isDueWithin: (delayMs: number): boolean => dueAt !== undefined && dueAt <= Date.now() + delayMs,
+  };
+};
+
+/** Runs at most one sync at a time; a second caller shares the run in flight. */
+const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
+  let inFlight: Promise<Result<SyncSummary, string>> | undefined;
+  let failures = 0;
+  return {
+    failures: (): number => failures,
+    syncNow: async (): Promise<Result<SyncSummary, string>> => {
+      if (inFlight !== undefined) {
+        return await inFlight;
+      }
+      inFlight = runSync(deps, status);
+      try {
+        const result = await inFlight;
+        failures = result.ok ? 0 : failures + 1;
+        return result;
+      } finally {
+        inFlight = undefined;
+      }
+    },
+  };
+};
+
 export const createSyncClient = (deps: SyncDeps): SyncClient => {
   const status = createStore<SyncStatus>(() => ({
     lastError: null,
@@ -124,58 +179,44 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
     online: true,
     syncing: false,
   }));
-  let inFlight: Promise<Result<SyncSummary, string>> | undefined;
-  let failures = 0;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const runner = createRunner(deps, status);
   let intervalMs: number | undefined;
-
-  const syncNow = async (): Promise<Result<SyncSummary, string>> => {
-    if (inFlight !== undefined) {
-      return await inFlight;
-    }
-    inFlight = runSync(deps, status);
-    try {
-      const result = await inFlight;
-      failures = result.ok ? 0 : failures + 1;
-      return result;
-    } finally {
-      inFlight = undefined;
-    }
-  };
-
-  const tick = async (): Promise<void> => {
-    const result = await syncNow();
-    if (intervalMs !== undefined) {
-      schedule(result.ok ? intervalMs : backoffMs(failures));
-    }
-  };
-
-  const schedule = (delayMs: number): void => {
-    timer = setTimeout(() => {
-      timer = undefined;
-      void tick();
-    }, delayMs);
-  };
-
+  const timer = createTimer(() => {
+    void (async () => {
+      const result = await runner.syncNow();
+      if (intervalMs !== undefined) {
+        timer.in(result.ok ? intervalMs : backoffMs(runner.failures()));
+      }
+    })();
+  });
   return {
+    setInterval: (next) => {
+      if (intervalMs === undefined || next === intervalMs) {
+        return;
+      }
+
+      intervalMs = next;
+      timer.in(next);
+    },
+    // A run already due sooner stays: a burst of changes goes at most this long after the first.
+    soon: () => {
+      if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
+        timer.in(SOON_MS);
+      }
+    },
     start: (options) => {
       if (intervalMs !== undefined) {
         return;
       }
 
       intervalMs = options.intervalMs;
-      schedule(0);
+      timer.in(0);
     },
     status,
     stop: () => {
       intervalMs = undefined;
-      if (timer === undefined) {
-        return;
-      }
-
-      clearTimeout(timer);
-      timer = undefined;
+      timer.cancel();
     },
-    syncNow,
+    syncNow: runner.syncNow,
   };
 };

@@ -1,5 +1,4 @@
-import type { Page } from "@playwright/test";
-
+import { addTask } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -11,12 +10,7 @@ const SIZES = [
 /** A word of its own per run, so a reused server or a parallel copy never shows the same line. */
 const unique = (): string => crypto.randomUUID().slice(0, 6);
 
-const add = async (page: Page, text: string): Promise<void> => {
-  const line = page.getByRole("textbox", { name: "New task" });
-  await line.pressSequentially(text);
-  await line.press("Enter");
-  await expect(line).toHaveValue("");
-};
+const add = addTask;
 
 for (const size of SIZES) {
   test.describe(`${size.name} (${String(size.width)}px)`, () => {
@@ -70,7 +64,7 @@ for (const size of SIZES) {
       await expect(heading).toBeVisible();
       // The sheet's surface is opaque: it once lost its background and showed the page through.
       const isOpaque = await heading.evaluate((element) => {
-        const panel = element.parentElement;
+        const panel = element.closest('[data-pace-surface="sheet"]');
         return panel !== null && getComputedStyle(panel).backgroundColor.startsWith("rgb(");
       });
       expect(isOpaque).toBe(true);

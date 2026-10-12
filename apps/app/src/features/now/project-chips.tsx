@@ -5,7 +5,7 @@ import type { ProjectChip } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 
-/** "All" and one chip per project with open tasks; the selected one filters the list. */
+/** "All" and one chip per project with open tasks; nothing when there is nothing to filter. */
 export const ProjectChips = ({
   chips,
   onSelect,
@@ -16,6 +16,9 @@ export const ProjectChips = ({
   readonly selected: null | string;
 }) => {
   const t = useT();
+  if (chips.length === 0) {
+    return null;
+  }
   return (
     <ScrollView
       accessibilityLabel={t("now.filterByProject")}

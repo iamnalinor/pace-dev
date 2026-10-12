@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { addTask } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -102,10 +103,7 @@ for (const width of [1440, 1920]) {
     await page.setViewportSize({ height: 960, width });
     await loginViaApi(page);
     await page.goto("/");
-    const line = page.getByRole("textbox", { name: "New task" });
-    await line.pressSequentially(`renew the passport ${String(width)}`);
-    await line.press("Enter");
-    await expect(line).toHaveValue("");
+    await addTask(page, `renew the passport ${String(width)}`);
     const list = page.getByRole("list", { name: "Tasks" });
     const box = await boxOf(list);
     const row = await boxOf(list.getByRole("listitem").first());

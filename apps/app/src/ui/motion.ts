@@ -4,6 +4,7 @@ import {
   LinearTransition,
   ReduceMotion,
   SlideInDown,
+  ZoomIn,
 } from "react-native-reanimated";
 
 /*
@@ -25,3 +26,6 @@ export const BACKDROP_ENTER = FadeIn.duration(180).reduceMotion(ReduceMotion.Sys
 
 /** A sheet rising from the bottom edge, over the backdrop that is already there. */
 export const SHEET_ENTER = SlideInDown.duration(240).reduceMotion(ReduceMotion.System);
+
+/** A dialog in the middle of a wide window: it grows in place from slightly smaller. */
+export const DIALOG_ENTER = ZoomIn.duration(160).reduceMotion(ReduceMotion.System);

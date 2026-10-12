@@ -16,9 +16,12 @@ import { Pressable, Text, View } from "react-native";
 import type { MessageKey } from "@pace/core";
 
 import { useT } from "../app-state.tsx";
+import { KeyHint } from "./button.tsx";
 import { cx } from "./cx.ts";
+import { HOTKEYS } from "./hotkeys.ts";
 import { PaceMark } from "./logo.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { useHotkey } from "./use-hotkey.tsx";
 
 const STROKE = 1.75;
 
@@ -104,6 +107,11 @@ export const Sidebar = () => {
   const router = useRouter();
   const path = usePathname();
   const { palette } = useTheme();
+  const newTask = (): void => {
+    router.navigate("/add");
+  };
+  // Elsewhere than Now, N opens it with the cursor in the composer (Now's composer takes N itself).
+  useHotkey(HOTKEYS.newTask, newTask);
   return (
     <View
       aria-label={t("nav.main")}
@@ -118,12 +126,13 @@ export const Sidebar = () => {
         accessibilityLabel={t("nav.newTask")}
         accessibilityRole="button"
         className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3 active:opacity-80"
-        onPress={() => {
-          router.navigate("/add");
-        }}
+        onPress={newTask}
       >
         <Plus color={palette.accentFg} size={18} strokeWidth={STROKE} />
-        <Text className="font-sans text-[14px] font-medium text-accentFg">{t("nav.newTask")}</Text>
+        <Text className="flex-1 font-sans text-[14px] font-medium text-accentFg">
+          {t("nav.newTask")}
+        </Text>
+        <KeyHint hotkey={HOTKEYS.newTask} variant="primary" />
       </Pressable>
       {DESTINATIONS.map((destination) => (
         <SidebarLink

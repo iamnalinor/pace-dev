@@ -26,19 +26,32 @@ export const TaskRows = ({
   readonly withTag?: boolean;
 }) => {
   const openTask = useOpenTask();
-  const check = useCheckTask();
+  const { check, opensSheet } = useCheckTask();
+  // Rows turning to dust after their check; each closes once its dust has gone.
+  const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
+  // Rows that turned to dust leave without the fade: it would bring them back for a moment.
+  const [dissolved] = useState(() => new Set<string>());
+  const settle = (row: NowRow): void => {
+    dissolved.add(row.id);
+    check(row);
+    setDissolving((current) => new Set([...current].filter((id) => id !== row.id)));
+  };
   return (
     <View aria-label={label} className="px-2" role="list">
       {rows.map((row) => (
         <Animated.View
           entering={ROW_ENTER}
-          exiting={ROW_EXIT}
           key={row.id}
+          {...(!dissolved.has(row.id) && { exiting: ROW_EXIT })}
           layout={ROW_LAYOUT}
           role="listitem"
         >
           <TaskRow
             checked={checked}
+            isDissolving={dissolving.has(row.id)}
+            onDissolved={() => {
+              settle(row);
+            }}
             onOpen={() => {
               openTask(row.id);
             }}
@@ -46,7 +59,11 @@ export const TaskRows = ({
             withTag={withTag}
             {...(!checked && {
               onCheck: () => {
-                check(row);
+                if (opensSheet(row)) {
+                  check(row);
+                } else {
+                  setDissolving((current) => new Set([...current, row.id]));
+                }
               },
             })}
           />

@@ -1,6 +1,14 @@
 import { err, type Importance, newId, type Result } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
+import {
+  type ActionDeps,
+  type ActionResult,
+  emit,
+  fromStore,
+  stamp,
+  taskOf,
+  type When,
+} from "./deps.ts";
 import { type ProjectTarget, type ResolvedProject, resolveProject } from "./projects.ts";
 
 export type SubtaskForm = {
@@ -54,6 +62,11 @@ export type TaskActions = {
   readonly updateTask: (taskId: string, patch: TaskPatch) => ActionResult;
   /** `null` takes the task out of its project. */
   readonly setProject: (taskId: string, target: null | ProjectTarget) => ActionResult;
+  /**
+  Takes the task back as if it never was (its creation is revoked): gone from every list.
+  The answer is the revocation, which Undo revokes in turn.
+  */
+  readonly deleteTask: (taskId: string) => ActionResult;
 };
 
 type SubtaskInput = { readonly id: string; readonly label: string; readonly number?: number };
@@ -183,8 +196,24 @@ const setProject =
     ]);
   };
 
+const deleteTask =
+  (deps: ActionDeps): TaskActions["deleteTask"] =>
+  async (taskId) => {
+    const task = taskOf(deps, taskId);
+    if (!task.ok) {
+      return task;
+    }
+    const created = deps.state.store
+      .getState()
+      .events.find((event) => event.type === "task.created" && event.payload.taskId === taskId);
+    return created === undefined
+      ? err("task/unknown")
+      : fromStore(await deps.state.revoke(created.id));
+  };
+
 export const taskActions = (deps: ActionDeps): TaskActions => ({
   createTask: createTask(deps),
+  deleteTask: deleteTask(deps),
   setProject: setProject(deps),
   updateTask: updateTask(deps),
 });

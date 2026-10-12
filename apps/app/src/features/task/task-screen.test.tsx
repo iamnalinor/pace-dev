@@ -115,9 +115,16 @@ describe("TaskScreen — work", () => {
     expect(screen.queryByRole("button", { name: "Waiting" })).toBeNull();
   });
 
-  it("moves the progress slider and pauses the task", async () => {
+  it("moves the progress slider in percent, the work left following at once", async () => {
     const runtime = await trkScreen();
-    expect(screen.getByText("4 / 10")).toBeOnTheScreen();
+    expect(screen.getByText("40%")).toBeOnTheScreen();
+    const workLeft = (): string => {
+      const value = screen.getByLabelText(en("task.workLeft")).props["accessibilityValue"] as
+        | undefined
+        | { readonly text?: string };
+      return value?.text ?? "";
+    };
+    const before = workLeft();
     await fireEvent(
       screen.getByRole("adjustable", { name: en("task.progressAria") }),
       "accessibilityAction",
@@ -125,9 +132,13 @@ describe("TaskScreen — work", () => {
         nativeEvent: { actionName: "increment" },
       },
     );
+    // Shown before the store answers: the thumb never jumps back to where it was.
+    expect(screen.getByText("50%")).toBeOnTheScreen();
+    expect(workLeft()).not.toBe(before);
     await waitFor(() => {
-      expect(screen.getByText("5 / 10")).toBeOnTheScreen();
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.slider).toBe(5);
     });
+    expect(screen.getByText("50%")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.pause") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.status).toBe("paused");
@@ -164,17 +175,30 @@ describe("TaskScreen — work", () => {
     });
   });
 
-  it("deletes from the header's trash: the close sheet opens on Cancelled · Skipped", async () => {
+  it("gives up from the header's ⊘: the close sheet opens on Cancelled · Skipped", async () => {
     await trkScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("task.giveUp") }));
     expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeOnTheScreen();
+  });
+
+  it("deletes from the header's trash at once, goes back, and Undo brings it back", async () => {
+    const runtime = await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.delete") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeUndefined();
+    });
+    expect(router.back).toHaveBeenCalled();
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]).toBeDefined();
+    });
   });
 
   it("finishes in one tap on Done; a long press opens the sheet for another time", async () => {
     const runtime = await trkScreen();
     await fireEvent(screen.getByRole("button", { name: en("task.done") }), "longPress");
     expect(screen.getByText(en("close.whenDone"))).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("common.back") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.close") }));
     await fireEvent.press(screen.getByRole("button", { name: en("task.done") }));
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed).toMatchObject({

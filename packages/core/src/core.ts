@@ -65,6 +65,7 @@ export {
   type PaletteName,
   type ProjectColorName,
   type RadiusName,
+  STATUS_COLORS,
   type ThemeName,
   THEMES,
   type Tokens,

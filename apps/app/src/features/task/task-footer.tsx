@@ -7,6 +7,7 @@ import type { TaskViewModel } from "@pace/client";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
 
 import { useFinishTask } from "./use-finish-task.ts";
 import { useSubmitTitle } from "./use-submit-title.ts";
@@ -19,6 +20,7 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
   const isFocused = hooks.useTimeBar().running?.taskId === view.id;
   return (
     <Button
+      hotkey={HOTKEYS.focus}
       icon={isFocused ? Square : Timer}
       onPress={() => {
         void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
@@ -68,7 +70,12 @@ export const TaskFooter = ({
       </View>
       {view.primaryAction.kind === "none" ? null : (
         <View className="flex-1">
-          <Button hint={t("task.doneHint")} onLongPress={onClose} onPress={finish}>
+          <Button
+            hint={t("task.doneHint")}
+            hotkey={HOTKEYS.primary}
+            onLongPress={onClose}
+            onPress={finish}
+          >
             {primary}
           </Button>
         </View>

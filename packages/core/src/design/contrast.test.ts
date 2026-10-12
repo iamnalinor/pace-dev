@@ -6,6 +6,7 @@ import {
   inkOf,
   type PaletteName,
   type ProjectColorName,
+  STATUS_COLORS,
   TAG_TINT,
   THEMES,
   tokens,
@@ -101,6 +102,13 @@ describe("tokens", () => {
     expect(contrastRatio(tokens[theme].accentFg, tokens[theme].accent)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(THEMES)("%s accent is a calm indigo, never the old acid lime", (theme) => {
+    expect(tokens[theme].accent.toLowerCase()).not.toBe("#d4ff3a");
+    const accent = parseHex(tokens[theme].accent);
+    // Blue leads: an indigo, not a green or a yellow.
+    expect(accent !== null && accent.b > accent.g && accent.b > accent.r).toBe(true);
+  });
+
   it.each(THEMES)(
     "%s colored tags reach 4.5:1: ink on its wash, dark text on the solid color",
     (theme) => {
@@ -109,7 +117,7 @@ describe("tokens", () => {
         (["surface", "raised"] as const).map((background) => {
           const tinted = wash(tokens.project[color], palette[background], TAG_TINT);
           const ink = contrastRatio(palette[inkOf(color)], tinted) ?? 0;
-          const solid = contrastRatio(palette.accentFg, tokens.project[color]) ?? 0;
+          const solid = contrastRatio(palette.onColor, tokens.project[color]) ?? 0;
           return { background, color, ink, solid };
         }),
       ).filter(({ ink, solid }) => ink < 4.5 || solid < 4.5);
@@ -125,12 +133,27 @@ describe("tokens", () => {
 });
 
 describe("IMPORTANCE_COLORS", () => {
-  it("marks every importance, Normal without a color", () => {
+  it("marks every importance with a color of its own, Normal green", () => {
     expect(IMPORTANCE_COLORS).toEqual({
       asap: "coral",
       prioritized: "amber",
-      normal: null,
+      normal: "green",
       nice_to_have: "slate",
     });
+  });
+});
+
+describe("STATUS_COLORS", () => {
+  it("draws In progress in blue, never in the gray of the other tags", () => {
+    expect(STATUS_COLORS.in_progress).toBe("blue");
+    expect(STATUS_COLORS.not_started).toBeNull();
+  });
+});
+
+describe("project colors", () => {
+  it("keeps ASAP's red and Personal's tangerine apart: red leans further from orange", () => {
+    const red = parseHex(tokens.project.coral);
+    const tangerine = parseHex(tokens.project.orange);
+    expect(red !== null && tangerine !== null && tangerine.g - red.g >= 10).toBe(true);
   });
 });

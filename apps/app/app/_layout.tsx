@@ -14,6 +14,7 @@ import "#app/platform/phone-background.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
+import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { Sidebar } from "#app/ui/sidebar.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
@@ -32,19 +33,18 @@ const useHasSidebar = (): boolean => {
 const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
-  const isWide = useIsWide();
   useNotificationLinks();
   return (
     <View className="flex-1 flex-row bg-bg">
       {hasSidebar ? <Sidebar /> : null}
       <View className="flex-1">
         <Stack
+          screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
           screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
         >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" options={{ animation: "fade" }} />
           <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
-          <Stack.Screen name="settings" options={{ presentation: isWide ? "card" : "modal" }} />
           <Stack.Screen name="task/[id]" />
           <Stack.Screen name="project/[id]" />
           <Stack.Screen name="inbox" />

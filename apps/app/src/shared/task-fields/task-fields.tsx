@@ -186,23 +186,33 @@ The fields of a task, labelled one by one: title, category, importance, project,
 estimate, description and link. The composer's form and the task editor both draw it.
 */
 export const TaskFields = ({
+  isTitleFocused = false,
   onChange,
+  onSubmit,
   options,
   values,
 }: {
   readonly values: TaskFormValues;
   readonly options: TaskFormOptions;
   readonly onChange: (patch: Partial<TaskFormValues>) => void;
+  /** Enter in the title: the composer's second Enter adds the task. */
+  readonly onSubmit?: () => void;
+  /** The cursor lands in the title (the composer's line moved there). */
+  readonly isTitleFocused?: boolean;
 }) => {
   const t = useT();
   return (
     <View className="gap-3.5">
       <TextField
+        autoFocus={isTitleFocused}
         error={values.title.trim() === "" ? t("edit.titleRequired") : null}
         label={t("edit.taskTitle")}
         onChangeText={(title) => {
           onChange({ title });
         }}
+        onSubmitEditing={onSubmit}
+        returnKeyType={onSubmit === undefined ? "default" : "done"}
+        submitBehavior={onSubmit === undefined ? "blurAndSubmit" : "submit"}
         value={values.title}
       />
       <ChoiceFields onChange={onChange} options={options} values={values} />

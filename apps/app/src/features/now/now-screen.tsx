@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import type { NowRow } from "@pace/client";
+
 import { usePace, useT } from "#app/app-state.tsx";
 import { Composer } from "#app/features/now/composer/composer.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
@@ -21,8 +23,13 @@ export const NowBoard = ({ composeText }: { readonly composeText?: string | unde
   const t = useT();
   const { hooks } = usePace();
   const [projectId, setProjectId] = useState<null | string>(null);
-  const board = hooks.useNow(projectId === null ? undefined : { projectId });
-  const isEmpty = board.rows.length === 0 && board.future.length === 0;
+  const board = hooks.useNow();
+  // A filter whose project has nothing open any more lets go, or the list would stay empty.
+  const selected = board.projects.some((chip) => chip.id === projectId) ? projectId : null;
+  const isInProject = (row: NowRow): boolean => selected === null || row.projectId === selected;
+  const rows = board.rows.filter((row) => isInProject(row));
+  const future = board.future.filter((row) => isInProject(row));
+  const isEmpty = rows.length === 0 && future.length === 0;
   return (
     <Screen footer={<TimeBar />} header={<NowHeader inboxCount={board.inboxCount} />}>
       {/* On /add (New task, the "+" tab, a share) the cursor is in the composer. */}
@@ -33,11 +40,11 @@ export const NowBoard = ({ composeText }: { readonly composeText?: string | unde
       />
       <ZoneBanner />
       <CalendarPrompt />
-      <ProjectChips chips={board.projects} onSelect={setProjectId} selected={projectId} />
+      <ProjectChips chips={board.projects} onSelect={setProjectId} selected={selected} />
       {isEmpty ? <EmptyState>{t("now.empty")}</EmptyState> : null}
-      <TaskRows label={t("now.tasks")} rows={board.rows} />
-      <FoldedSection count={board.future.length} title={t("now.future")}>
-        <TaskRows label={t("now.future")} rows={board.future} />
+      <TaskRows label={t("now.tasks")} rows={rows} />
+      <FoldedSection count={future.length} title={t("now.future")}>
+        <TaskRows label={t("now.future")} rows={future} />
       </FoldedSection>
     </Screen>
   );

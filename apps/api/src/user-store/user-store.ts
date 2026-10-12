@@ -1,4 +1,3 @@
-import { DurableObject } from "cloudflare:workers";
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
@@ -44,6 +43,7 @@ import * as cloud from "./cloud-data.ts";
 import { insertDecisions, listDecisions } from "./decision-log.ts";
 import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
+import { announceChange, LiveStore } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
 import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
@@ -85,7 +85,7 @@ projections, decisions and alarms. Migrations run before the first request touch
 storage. The state is cached in memory with the log sequence it was built at and
 rebuilt when the cache is stale or a batch cannot be applied in order.
 */
-export class UserStore extends DurableObject {
+export class UserStore extends LiveStore {
   #cache: Materialized | undefined;
 
   readonly db: Db;
@@ -97,14 +97,6 @@ export class UserStore extends DurableObject {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
     });
-  }
-
-  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
-    const events = inputs.flatMap((input) => {
-      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
-      return parsed.ok ? [parsed.value] : [];
-    });
-    return await this.#insert(events);
   }
 
   /** The cached state, rebuilt from the log when the cache is missing or behind it. */
@@ -131,6 +123,7 @@ export class UserStore extends DurableObject {
       return inserted;
     }
     const seq = await log.latestSeq(this.db);
+    announceChange(this.ctx, inserted, seq);
     if (canApplyInOrder(before, inserted)) {
       const next = applyInOrder(before, inserted, seq);
       await updateProjections(this.db, next.state, touchedBy(inserted));
@@ -151,6 +144,13 @@ export class UserStore extends DurableObject {
     await notifier.rearm(this.ctx.storage, await this.#state(), now);
   }
 
+  async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
+    const events = inputs.flatMap((input) => {
+      const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
+      return parsed.ok ? [parsed.value] : [];
+    });
+    return await this.#insert(events);
+  }
   /**
   Deletes the account's data: the event log, every projection, reminders and the alarm.
   The empty store migrates again, so it serves the next login of the same person from scratch.

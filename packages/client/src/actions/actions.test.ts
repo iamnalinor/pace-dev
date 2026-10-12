@@ -199,6 +199,26 @@ describe("discardInbox", () => {
   });
 });
 
+describe("deleteTask", () => {
+  it("takes the task out of every list, history included, and Undo brings it back", async () => {
+    const world = await setupActions();
+    unwrap(await world.actions.updateTask(TRK_ID, { title: "Renamed" }));
+    const [revoked] = unwrap(await world.actions.deleteTask(TRK_ID));
+    expect(revoked?.type).toBe("event.revoked");
+    expect(taskOf(world, TRK_ID)).toBeUndefined();
+    unwrap(await world.actions.revoke(revoked?.id ?? ""));
+    expect(taskOf(world, TRK_ID)?.title).toBe("Renamed");
+  });
+
+  it("refuses a task it does not know", async () => {
+    const world = await setupActions();
+    await expect(world.actions.deleteTask("t-nope")).resolves.toEqual({
+      error: "task/unknown",
+      ok: false,
+    });
+  });
+});
+
 describe("subtasks", () => {
   it("marks a problem solved at the given instant and unmarks it by revoking", async () => {
     const world = await setupActions();

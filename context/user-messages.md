@@ -205,3 +205,9 @@ On the example course presets:
 
 Taken as: the owner's own courses are never written into the code; the shipped presets
 (and the example courses behind the button) stay defaults the person edits.
+
+## 2026-10-11, stage 7 session
+
+The third feedback document («pace замечания 3», text in `feedback-3.md`), with:
+
+> реализуй что тут написано. думай продуктово пж

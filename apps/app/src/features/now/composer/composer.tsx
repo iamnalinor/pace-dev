@@ -1,13 +1,14 @@
-import { useRef, useState } from "react";
-import { Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
+import { type ReactNode, useRef, useState } from "react";
+import { Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Button } from "#app/ui/button.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
+import { AnimatedHeight } from "#app/ui/animated-height.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { useToast } from "#app/ui/toast.tsx";
+import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 import {
   type AiOutcome,
   type AiReading,
@@ -15,12 +16,12 @@ import {
   canAiRead,
   type ComposerEdits,
   isPasted,
-  requiresAiFirst,
 } from "@pace/client";
 import { useAiRead } from "@pace/client/react";
 
 import { AiStatus } from "./ai-status.tsx";
 import { ComposerForm } from "./composer-form.tsx";
+import { QuickActions, QuickLine } from "./quick-line.tsx";
 
 /** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
 const useDraft = (initialText: string, assistant: Assistant) => {
@@ -53,13 +54,13 @@ const useDraft = (initialText: string, assistant: Assistant) => {
 };
 
 /** "Read it when it's back" went through: the server keeps the line, so the composer clears. */
-const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
+const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void) => {
   const t = useT();
   const toast = useToast();
   const { deviceTz } = useViewer();
   return async (): Promise<void> => {
     const outcome = await ask();
-    if (outcome.status !== "queued") {
+    if (outcome?.status !== "queued") {
       return;
     }
     toast.show({
@@ -72,129 +73,141 @@ const useReadLater = (ask: () => Promise<AiOutcome>, onSaved: () => void) => {
   };
 };
 
-const MIN_INPUT_HEIGHT = 44;
-/** Eight lines of 24 px and the padding: a longer message scrolls inside. */
-const MAX_INPUT_HEIGHT = 212;
-
-const heightOf = (content: number): number =>
-  Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
-
-/** A keyboard (the web, a tablet with one): Enter acts, Shift+Enter starts a new line. */
-const onEnter =
-  (isEmpty: boolean, act: () => void) =>
-  (event: TextInputKeyPressEvent): void => {
-    const native = event.nativeEvent as TextInputKeyPressEvent["nativeEvent"] & {
-      shiftKey?: boolean;
-    };
-    if (isEmpty || native.key !== "Enter" || native.shiftKey === true) {
-      return;
-    }
-    event.preventDefault();
-    act();
-  };
-
-/** Parse (the assistant), Fill in by hand (the form, empty but for the rules' reading), To Inbox. */
-const QuickActions = ({
-  canParse,
-  isReading,
-  onByHand,
-  onInbox,
-  onParse,
-}: {
-  readonly canParse: boolean;
-  readonly isReading: boolean;
-  readonly onParse: () => void;
-  readonly onByHand: () => void;
-  readonly onInbox: () => void;
-}) => {
-  const t = useT();
-  return (
-    <View className="flex-row flex-wrap gap-2 pt-2">
-      <View className="min-w-36 flex-[2]">
-        <Button busy={isReading} disabled={!canParse} onPress={onParse}>
-          {t("composer.parse")}
-        </Button>
-      </View>
-      {/* Wide enough for the label on one line: a narrow column wraps the button, not its text. */}
-      <View className="min-w-48 flex-1">
-        <Button onPress={onByHand} variant="secondary">
-          {t("composer.byHand")}
-        </Button>
-      </View>
-      <View className="min-w-36 flex-1">
-        <Button onPress={onInbox} variant="ghost">
-          {t("composer.toInbox")}
-        </Button>
-      </View>
-    </View>
-  );
-};
-
-/** The composer's state and moves: the text, the reading, the form, and what each key or button does. */
+/** The composer's state and moves: the text, the reading, the form, and what each key does. */
 const useComposerFlow = (initialText: string) => {
   const { actions, assistant, hooks } = usePace();
   const run = useRunAction();
   const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
   const model = hooks.useComposer({ edits, text });
-  const [isForm, setIsForm] = useState(false);
-  const previousRef = useRef(text);
+  const [form, setForm] = useState<"by-hand" | "read" | null>(null);
+  // Back at the line after adding or folding the form: the cursor goes with it.
+  const [isLineFocused, setIsLineFocused] = useState(false);
+  // A held Enter or a double press adds once.
+  const isAddingRef = useRef(false);
   const done = (): void => {
     reset();
-    setIsForm(false);
+    setForm(null);
+    setIsLineFocused(true);
   };
-  const toForm = (reading: AiReading): void => {
-    onReading(reading);
-    setIsForm(true);
-  };
-  const parse = (line: string): void => {
-    void ai.read(line, toForm);
+  /** The assistant's reading (or, when it cannot read, the rules') unfolds the form. */
+  const parse = async (line: string): Promise<void> => {
+    const outcome = await ai.read(line, onReading);
+    if (outcome !== null && outcome.status !== "queued") {
+      setForm("read");
+    }
   };
   const add = async (): Promise<void> => {
-    if (await run(actions.createFromComposer(model))) {
+    // A title cleared in the form is not filled back from the line behind the user's back.
+    const isUntitled = model.target.kind === "new" && model.title.trim() === "";
+    if (isUntitled || isAddingRef.current) {
+      return;
+    }
+    isAddingRef.current = true;
+    const isReadByAssistant = ai.state.status === "read";
+    try {
+      if (await run(actions.createFromComposer(model, { readByAssistant: isReadByAssistant }))) {
+        done();
+      }
+    } finally {
+      isAddingRef.current = false;
+    }
+  };
+  const toInbox = async (): Promise<void> => {
+    if (await run(actions.captureInbox(text))) {
       done();
     }
   };
   return {
     add,
     ai,
-    isForm,
+    collapse: (): void => {
+      setForm(null);
+      setIsLineFocused(true);
+    },
+    /** An answer to the assistant's question joins the line, which is read again. */
+    answer: (answer: string): void => {
+      const next = `${text.trimEnd()} ${answer}`;
+      onText(next);
+      void parse(next);
+    },
+    /**
+    Enter: the assistant reads the line into the form (a line it already read reopens as it was
+    left); a line too short to read opens the form as it is.
+    */
+    enter: (): void => {
+      if (ai.state.status === "read") {
+        setForm("read");
+      } else if (canAiRead(text)) {
+        void parse(text);
+      } else {
+        setForm("read");
+      }
+    },
+    expand: (): void => {
+      setForm("by-hand");
+    },
+    form,
+    isLineFocused,
     model,
     onText,
-    parse,
-    readLater: useReadLater(async () => await ai.readLater(text, toForm), done),
+    readLater: useReadLater(async () => await ai.readLater(text, onReading), done),
     setEdits,
-    setIsForm,
     text,
+    toInbox,
     /** A paste is read at once; typing never is. */
     type: (next: string): void => {
-      const isPaste = isPasted(previousRef.current, next) && canAiRead(next);
-      previousRef.current = next;
+      // Against the line as it stands: after adding, the line is empty again.
+      const isPaste = isPasted(text, next) && canAiRead(next);
       onText(next);
       if (isPaste) {
-        parse(next);
-      }
-    },
-    /** Enter adds a short line as it is and reads a long one into the form. */
-    enter: (): void => {
-      if (requiresAiFirst(text)) {
-        parse(text);
-      } else {
-        void add();
-      }
-    },
-    toInbox: async (): Promise<void> => {
-      if (await run(actions.captureInbox(text))) {
-        done();
+        void parse(next);
       }
     },
   };
 };
 
+/** The line with, once something is typed, the keys, what is going on and the two actions. */
+const LineBlock = ({
+  flow,
+  isFocused,
+  onFocusChange,
+  status,
+}: {
+  readonly flow: ReturnType<typeof useComposerFlow>;
+  readonly isFocused: boolean;
+  readonly onFocusChange: (isInFocus: boolean) => void;
+  readonly status: ReactNode;
+}) => {
+  const t = useT();
+  const { ai, model, text } = flow;
+  return (
+    <>
+      <QuickLine flow={flow} isFocused={isFocused} onFocusChange={onFocusChange} />
+      {model.isEmpty ? null : (
+        <>
+          {KEYBOARD === null ? null : (
+            <Text className="px-2 font-sans text-[12px] text-muted">{t("composer.quickHint")}</Text>
+          )}
+          {/* The reading belongs to the form; at the line only what is still going on shows. */}
+          {ai.state.status === "read" ? null : status}
+          <QuickActions
+            canParse={canAiRead(text)}
+            isReading={ai.state.status === "reading"}
+            onInbox={() => void flow.toInbox()}
+            onParse={flow.enter}
+          />
+        </>
+      )}
+    </>
+  );
+};
+
 /**
-The app's entry point on Now, in two steps that look different on purpose. The quick input
-takes a short line (Enter adds it as it is) or a message: a paste, a long text or Parse sends
-it to the assistant, whose reading opens the task form, where every field is labelled and
-checked before anything is written. Nothing is sent to the assistant while typing.
+The app's entry point on Now, one card that changes shape. The line takes a task in words:
+Enter has the assistant read it, and the card unfolds in place into the task form with every
+field filled and labelled; a second Enter adds it. The chevron unfolds the same form by hand
+(the line moves into the title). Alt+Enter keeps the raw line in the Inbox. Nothing is sent to
+the assistant while typing; a paste is read at once.
 */
 export const Composer = ({
   initialText = "",
@@ -203,74 +216,45 @@ export const Composer = ({
   readonly initialText?: string | undefined;
   readonly isFocused?: boolean;
 }) => {
-  const t = useT();
-  const { palette } = useTheme();
   const flow = useComposerFlow(initialText);
-  // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
-  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
-  const { ai, model, text } = flow;
+  const { ai, model } = flow;
   const status = (
-    <AiStatus
-      onAnswer={(answer) => {
-        flow.onText(`${text.trimEnd()} ${answer}`);
-      }}
-      onLater={() => void flow.readLater()}
-      state={ai.state}
-    />
+    <AiStatus onAnswer={flow.answer} onLater={() => void flow.readLater()} state={ai.state} />
   );
-  if (flow.isForm) {
-    return (
-      <ComposerForm
-        model={model}
-        onAdd={() => void flow.add()}
-        onBack={() => {
-          flow.setIsForm(false);
-        }}
-        onEdit={(next) => {
-          flow.setEdits((current) => ({ ...current, ...next }));
-        }}
-        status={status}
-      />
-    );
-  }
+  const [isLineInFocus, setIsLineInFocus] = useState(false);
   return (
-    <View className="mx-4 mb-3 rounded-xl border border-line bg-surface p-2">
-      <TextInput
-        accessibilityHint={t("composer.quickHint")}
-        accessibilityLabel={t("composer.label")}
-        autoFocus={isFocused}
-        // Grows with a pasted message up to about eight lines.
-        className="mb-1 px-2 py-2.5 font-sans text-[15px] leading-6 text-fg"
-        multiline
-        onChangeText={flow.type}
-        onContentSizeChange={(event) => {
-          setInputHeight(heightOf(event.nativeEvent.contentSize.height));
-        }}
-        onKeyPress={onEnter(model.isEmpty, flow.enter)}
-        placeholder={t("composer.placeholder")}
-        placeholderTextColor={palette.muted}
-        style={{ height: inputHeight }}
-        textAlignVertical="top"
-        value={text}
-      />
-      {model.isEmpty ? null : (
-        <>
-          <Text className="px-2 font-sans text-[12px] text-muted">{t("composer.quickHint")}</Text>
-          {/* The reading belongs to the form; back at the text only what is still going on shows. */}
-          {ai.state.status === "read" ? null : status}
-          <QuickActions
-            canParse={canAiRead(text)}
-            isReading={ai.state.status === "reading"}
-            onByHand={() => {
-              flow.setIsForm(true);
-            }}
-            onInbox={() => void flow.toInbox()}
-            onParse={() => {
-              flow.parse(text);
-            }}
-          />
-        </>
+    // One card that changes shape: its height follows the line or the form, and the focused
+    // line rings it in the accent.
+    <View
+      className={cx(
+        "mx-4 mb-3 rounded-xl border bg-surface p-2",
+        isLineInFocus && flow.form === null ? "border-accent" : "border-line",
       )}
+    >
+      <AnimatedHeight>
+        {/* No entering animation here: it would keep the field from taking the cursor. */}
+        <View key={flow.form === null ? "line" : "form"}>
+          {flow.form === null ? (
+            <LineBlock
+              flow={flow}
+              isFocused={isFocused}
+              onFocusChange={setIsLineInFocus}
+              status={status}
+            />
+          ) : (
+            <ComposerForm
+              isTitleFocused
+              model={model}
+              onAdd={() => void flow.add()}
+              onCollapse={flow.collapse}
+              onEdit={(next) => {
+                flow.setEdits((current) => ({ ...current, ...next }));
+              }}
+              status={status}
+            />
+          )}
+        </View>
+      </AnimatedHeight>
     </View>
   );
 };

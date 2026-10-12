@@ -12,29 +12,32 @@ const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0
 
 /**
 A volume-style slider: drag the thumb or tap anywhere on the track; the value snaps to whole
-steps and is committed when the finger lifts. TalkBack reads it as adjustable.
+steps and is committed when the finger lifts (`onSlide` reports each step on the way).
+TalkBack reads it as adjustable.
 */
-export const Slider = ({ label, max, onChange, value }: SliderProps) => {
+export const Slider = ({ label, max, onChange, onSlide, value }: SliderProps) => {
   const [width, setWidth] = useState(1);
   const [draft, setDraft] = useState<null | number>(null);
+  const slideTo = (next: null | number): void => {
+    setDraft(next);
+    onSlide?.(next);
+  };
   const stepAt = (x: number): number => clamp(Math.round(((x - THUMB / 2) / width) * max), max);
   const pan = Gesture.Pan()
     .minDistance(0)
     .runOnJS(true)
     .onBegin((event) => {
-      setDraft(stepAt(event.x));
+      slideTo(stepAt(event.x));
     })
     .onUpdate((event) => {
-      setDraft(stepAt(event.x));
+      slideTo(stepAt(event.x));
     })
     .onEnd((event) => {
-      const next = stepAt(event.x);
-      if (next !== value) {
-        onChange(next);
-      }
+      // `value` follows the finger (the readouts), so every release is reported.
+      onChange(stepAt(event.x));
     })
     .onFinalize(() => {
-      setDraft(null);
+      slideTo(null);
     });
   const shown = draft ?? value;
   const share = max === 0 ? 0 : shown / max;

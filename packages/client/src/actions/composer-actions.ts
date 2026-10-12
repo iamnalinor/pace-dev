@@ -9,6 +9,8 @@ import { type CreateTaskForm, type SubtaskForm, taskActions } from "./task-actio
 export type ComposerExtras = {
   readonly description?: string | undefined;
   readonly subtasks?: readonly string[] | undefined;
+  /** The assistant read the text: it is kept as the task's original message. */
+  readonly readByAssistant?: boolean | undefined;
 };
 
 export type ComposerActions = {
@@ -92,7 +94,11 @@ const scheduleOf = (
 
 const newTaskForm = (
   model: ComposerModel,
-  details: { readonly description: null | string; readonly subtasks: readonly SubtaskForm[] },
+  details: {
+    readonly description: null | string;
+    readonly subtasks: readonly SubtaskForm[];
+    readonly readByAssistant: boolean;
+  },
 ): CreateTaskForm => ({
   title: model.title === "" ? model.text.trim() : model.title,
   presetId: model.preset.id,
@@ -103,7 +109,8 @@ const newTaskForm = (
   estimateMinutes: model.estimateMinutes ?? undefined,
   subtasks: details.subtasks,
   description: details.description ?? undefined,
-  sourceText: model.text,
+  // A line typed as it is is the title; only a message the assistant read is worth keeping.
+  sourceText: details.readByAssistant ? model.text : undefined,
   fields: model.link === null ? {} : { link: model.link.url },
 });
 
@@ -120,6 +127,8 @@ export const composerActions = (deps: ActionDeps): ComposerActions => ({
     const details = { description, subtasks };
     return model.target.kind === "instance"
       ? await addToInstance(deps, { ...model, target: model.target }, details)
-      : await taskActions(deps).createTask(newTaskForm(model, details));
+      : await taskActions(deps).createTask(
+          newTaskForm(model, { ...details, readByAssistant: extras.readByAssistant === true }),
+        );
   },
 });

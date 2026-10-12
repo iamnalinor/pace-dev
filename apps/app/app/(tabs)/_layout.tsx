@@ -3,6 +3,7 @@ import { Redirect, Tabs } from "expo-router";
 import { useAuth, useT } from "#app/app-state.tsx";
 import { useOnboarded } from "#app/features/permissions/use-onboarded.ts";
 import { useIsWide } from "#app/ui/layout.ts";
+import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { TabBar } from "#app/ui/tab-bar.tsx";
 
 /**
@@ -25,14 +26,17 @@ export default function TabsLayout() {
   }
   return (
     <Tabs
+      screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
       screenOptions={{ headerShown: false, tabBarPosition: isWide ? "left" : "bottom" }}
       tabBar={(props) => <TabBar {...props} />}
     >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />
       <Tabs.Screen name="day" options={{ title: t("nav.day") }} />
-      <Tabs.Screen name="add" options={{ title: t("nav.add") }} />
       <Tabs.Screen name="projects" options={{ title: t("nav.projects") }} />
       <Tabs.Screen name="insights" options={{ title: t("nav.insights") }} />
+      <Tabs.Screen name="settings" options={{ title: t("nav.settings") }} />
+      {/* New task and the share target: Now with the cursor in the composer, not a tab. */}
+      <Tabs.Screen name="add" options={{ href: null, title: t("nav.add") }} />
     </Tabs>
   );
 }

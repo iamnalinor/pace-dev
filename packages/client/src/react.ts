@@ -136,19 +136,23 @@ export type AiState =
 export type AiRead = {
   readonly state: AiState;
   /**
-  Asks the assistant; `onReading` receives the chips it filled. A reset meanwhile drops the
-  answer. A `draft` reading (while typing) stays out of the decision log.
+  Asks the assistant; `onReading` receives the chips it filled, and the answer is how it went.
+  A reset (or a newer read) meanwhile drops the answer: `null`. A `draft` reading (while
+  typing) stays out of the decision log.
   */
   readonly read: (
     text: string,
     onReading: (reading: AiReading) => void,
     options?: { readonly draft?: boolean },
-  ) => Promise<void>;
+  ) => Promise<AiOutcome | null>;
   /**
   "Read it when it's back": the line is kept on the server and written once the assistant can
   read it. Resolves to `queued` (the composer can clear), or to a reading if it is back already.
   */
-  readonly readLater: (text: string, onReading: (reading: AiReading) => void) => Promise<AiOutcome>;
+  readonly readLater: (
+    text: string,
+    onReading: (reading: AiReading) => void,
+  ) => Promise<AiOutcome | null>;
   readonly reset: () => void;
 };
 
@@ -161,14 +165,14 @@ export const useAiRead = (assistant: Assistant): AiRead => {
     text: string,
     onReading: (reading: AiReading) => void,
     options: { readonly defer?: boolean; readonly draft?: boolean },
-  ): Promise<AiOutcome> => {
+  ): Promise<AiOutcome | null> => {
     generation.current += 1;
     const mine = generation.current;
     setState({ status: "reading" });
-    const reading = (async (): Promise<AiOutcome> => {
+    const reading = (async (): Promise<AiOutcome | null> => {
       const outcome = await assistant.read(text, options);
       if (mine !== generation.current) {
-        return outcome;
+        return null;
       }
       if (outcome.status === "read") {
         onReading(outcome.reading);
@@ -179,9 +183,7 @@ export const useAiRead = (assistant: Assistant): AiRead => {
     return await reading;
   };
   return {
-    read: async (text, onReading, options = {}) => {
-      await ask(text, onReading, options);
-    },
+    read: async (text, onReading, options = {}) => await ask(text, onReading, options),
     readLater: async (text, onReading) => await ask(text, onReading, { defer: true }),
     reset: () => {
       generation.current += 1;

@@ -7,7 +7,12 @@ import { zonedText } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { inkClass, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { formatDuration, IMPORTANCE_COLORS } from "@pace/core";
+import {
+  formatDuration,
+  IMPORTANCE_COLORS,
+  type ProjectColorName,
+  STATUS_COLORS,
+} from "@pace/core";
 
 const tagKey = (tag: TaskTag) => {
   switch (tag.kind) {
@@ -26,6 +31,22 @@ const tagKey = (tag: TaskTag) => {
   }
 };
 
+/** Importance and a status under way are colored; the rest stays neutral. */
+const tagColor = (tag: TaskTag): null | ProjectColorName => {
+  switch (tag.kind) {
+    case "importance": {
+      return IMPORTANCE_COLORS[tag.importance];
+    }
+    case "status": {
+      return STATUS_COLORS[tag.status];
+    }
+    case "outcome":
+    case "submission": {
+      return null;
+    }
+  }
+};
+
 const Stat = ({
   label,
   note,
@@ -35,44 +56,57 @@ const Stat = ({
   readonly note?: string;
   readonly value: string;
 }) => (
-  <View className="flex-1 gap-0.5">
+  <View
+    accessibilityLabel={label}
+    accessibilityValue={{ text: value }}
+    accessible
+    className="flex-1 gap-0.5"
+  >
     <Text className="font-sans text-[11px] text-muted">{label}</Text>
     <Text className="font-sans text-[15px] tabular-nums text-fg">{value}</Text>
     {note === undefined ? null : <Text className="font-sans text-[11px] text-faint">{note}</Text>}
   </View>
 );
 
-/** Importance (with its colour), status and submission as small tags. */
+/** Importance and status in their colours, submission and outcome neutral, as small tags. */
 const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
   const t = useT();
   return (
     <View className="flex-row flex-wrap gap-1.5">
-      {tags.map((tag) => (
-        <View
-          className={cx(
-            "flex-row items-center gap-1.5 rounded-sm px-2 py-1",
-            tag.kind === "importance" ? washClass(IMPORTANCE_COLORS[tag.importance]) : "bg-track",
-          )}
-          key={tag.kind}
-        >
-          <Text
+      {tags.map((tag) => {
+        const color = tagColor(tag);
+        return (
+          <View
             className={cx(
-              "font-sans text-[11px]",
-              tag.kind === "importance"
-                ? cx("font-medium", inkClass(IMPORTANCE_COLORS[tag.importance]))
-                : "text-fg2",
+              "flex-row items-center gap-1.5 rounded-sm px-2 py-1",
+              color === null ? "bg-track" : washClass(color),
             )}
+            key={tag.kind}
           >
-            {t(tagKey(tag))}
-          </Text>
-        </View>
-      ))}
+            <Text
+              className={cx(
+                "font-sans text-[11px]",
+                color === null ? "text-fg2" : cx("font-medium", inkClass(color)),
+              )}
+            >
+              {t(tagKey(tag))}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 };
 
 /** Title, link and tags; the stats card: start, due, work left, tracked. */
-export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
+export const TaskSummary = ({
+  view,
+  workLeftMinutes = view.stats.workLeftMinutes,
+}: {
+  readonly view: TaskViewModel;
+  /** The work left at the progress being dragged, before it is saved. */
+  readonly workLeftMinutes?: number;
+}) => {
   const t = useT();
   const viewer = useViewer();
   const { stats } = view;
@@ -117,7 +151,7 @@ export const TaskSummary = ({ view }: { readonly view: TaskViewModel }) => {
             note={t("task.estimate", {
               duration: formatDuration(stats.estimateMinutes, viewer.language),
             })}
-            value={formatDuration(stats.workLeftMinutes, viewer.language)}
+            value={formatDuration(workLeftMinutes, viewer.language)}
           />
           <Stat
             label={t("task.tracked")}

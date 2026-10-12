@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import type { ProjectColorName } from "@pace/core";
 
@@ -23,12 +23,15 @@ const chipFill = (color: null | ProjectColorName, isSelected: boolean): string =
 
 const chipText = (color: null | ProjectColorName, isSelected: boolean): string => {
   if (isSelected) {
-    return color === null ? "font-medium text-fg" : "font-medium text-accentFg";
+    return color === null ? "font-medium text-fg" : "font-medium text-onColor";
   }
   return color === null ? "text-fg2" : inkClass(color);
 };
 
-/** A 32px pill: the project filter and the pickers of the forms. */
+/**
+A 32px pill (36 when tall): the project filter and the pickers of the forms. The pill sits in
+a 44px-tall target that does not take room in the layout, so a thumb never misses it.
+*/
 export const Chip = ({
   children,
   color = null,
@@ -53,15 +56,18 @@ export const Chip = ({
     accessibilityLabel={label ?? children}
     accessibilityRole="radio"
     aria-checked={selected}
-    className={cx(
-      "flex-row items-center gap-1.5 rounded-pill px-3 active:opacity-80",
-      tall ? "h-9" : "h-8",
-      chipFill(color, selected),
-    )}
-    hitSlop={6}
+    className={cx("justify-center active:opacity-80", tall ? "-my-1 h-11" : "-my-1.5 h-11")}
     onPress={onPress}
   >
-    {leading}
-    <Text className={cx("font-sans text-[12px]", chipText(color, selected))}>{children}</Text>
+    <View
+      className={cx(
+        "flex-row items-center gap-1.5 rounded-pill px-3",
+        tall ? "h-9" : "h-8",
+        chipFill(color, selected),
+      )}
+    >
+      {leading}
+      <Text className={cx("font-sans text-[12px]", chipText(color, selected))}>{children}</Text>
+    </View>
   </Pressable>
 );

@@ -6,112 +6,31 @@ import {
   House,
   type LucideIcon,
   Play,
-  Square,
 } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
+import type { TimeButtonView } from "@pace/client";
+import type { Event } from "@pace/core";
+
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ColorTag, inkClass, OUTLINE, PROJECT_FILL } from "#app/ui/color.tsx";
+import { inkClass, OUTLINE } from "#app/ui/color.tsx";
 import { contextMenuProps } from "#app/ui/context-menu.ts";
 import { cx } from "#app/ui/cx.ts";
-import { PulseDot } from "#app/ui/pulse-dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { PACE_STATUS_TEXT, type RunningView, type TimeButtonView } from "@pace/client";
-import { type Event, formatDuration } from "@pace/core";
 
 import { calendarToday } from "./calendar-source.ts";
 import { type CalendarToday, eventOnNow } from "./calendar-today.ts";
 import { ChoicesSheet } from "./choices-sheet.tsx";
+import { RunningRow } from "./running-row.tsx";
 
 const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
   calendar: CalendarDays,
   chores: House,
   rest: Coffee,
   sport: Dumbbell,
-};
-
-const percent = (share: number): `${number}%` => `${Math.round(share * 100)}%`;
-
-/** The running activity's line: the label, the time and the Expect. */
-const RunningMeta = ({ running }: { readonly running: RunningView }) => {
-  const t = useT();
-  const { language } = useViewer();
-  return (
-    <View className="flex-row flex-wrap items-center gap-2">
-      <PulseDot className={PROJECT_FILL[running.color]} />
-      <ColorTag color={running.color}>{running.label}</ColorTag>
-      <Text className="font-sans text-[13px] tabular-nums text-fg">
-        {formatDuration(running.minutes, language)}
-      </Text>
-      {running.expectMinutes === null ? null : (
-        <Text className="font-sans text-[12px] text-muted">
-          {t("time.expectOf", { duration: formatDuration(running.expectMinutes, language) })}
-        </Text>
-      )}
-      {running.isAlongside ? (
-        <Text className="font-sans text-[12px] text-muted">{t("time.alongsideTag")}</Text>
-      ) : null}
-    </View>
-  );
-};
-
-/** One running activity: what, how long, its progress to the Expect; "Yes, still" and Stop. */
-const RunningRow = ({ running }: { readonly running: RunningView }) => {
-  const t = useT();
-  const { actions } = usePace();
-  const { palette } = useTheme();
-  const run = useRunAction();
-  const isLong = running.status === "long";
-  const statusKey = PACE_STATUS_TEXT[running.status];
-  return (
-    <View className="flex-row items-center gap-2">
-      <View accessibilityLiveRegion="polite" className="flex-1 gap-1">
-        <RunningMeta running={running} />
-        {/* Its own line, so the bar does not move as the minutes grow. */}
-        {statusKey === null ? null : (
-          <Text className="font-sans text-[12px] font-medium text-warn">{t(statusKey)}</Text>
-        )}
-        {running.share === null ? null : (
-          <View className="h-1 overflow-hidden rounded-full bg-track">
-            <View
-              className={cx(
-                "h-full rounded-full",
-                isLong ? "bg-warn" : PROJECT_FILL[running.color],
-              )}
-              style={{ width: percent(running.share) }}
-            />
-          </View>
-        )}
-      </View>
-      {isLong ? (
-        <Pressable
-          accessibilityRole="button"
-          className="h-9 justify-center rounded-lg border border-line px-3 active:opacity-70"
-          onPress={() => {
-            // Still going: the next ask moves on as far again; the Expect stays what it was.
-            void run(actions.stillGoing(running.activityId));
-          }}
-        >
-          <Text className="font-sans text-[13px] text-fg">{t("time.stillYes")}</Text>
-        </Pressable>
-      ) : null}
-      <Pressable
-        accessibilityLabel={`${t("time.stop")}: ${running.label}`}
-        accessibilityRole="button"
-        className="h-9 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
-        hitSlop={6}
-        onPress={() => {
-          void run(actions.stopActivity({ activityId: running.activityId }));
-        }}
-      >
-        <Square color={palette.fg} size={14} />
-        <Text className="font-sans text-[13px] text-fg">{t("time.stop")}</Text>
-      </Pressable>
-    </View>
-  );
 };
 
 const startedId = (events: readonly Event[]): null | string => {
@@ -123,7 +42,12 @@ const startedId = (events: readonly Event[]): null | string => {
 "What are you doing?" and ▶ on one line: Enter starts it at once with the words as typed (a
 length in them as the Expect); the assistant's reading of it follows in the background.
 */
-const TypedStart = () => {
+const TypedStart = ({
+  onReading,
+}: {
+  /** The activity whose words the assistant reads (`true`), then once it answered (`false`). */
+  readonly onReading: (activityId: string, isReading: boolean) => void;
+}) => {
   const t = useT();
   const { actions, assistant } = usePace();
   const { palette } = useTheme();
@@ -140,9 +64,17 @@ const TypedStart = () => {
     }
     setText("");
     const activityId = startedId(result.value);
-    const reading = activityId === null ? null : await assistant.readActivity(typed);
-    if (activityId !== null && reading !== null) {
-      await actions.refineActivity(activityId, { ...reading, typed });
+    if (activityId === null) {
+      return;
+    }
+    onReading(activityId, true);
+    try {
+      const reading = await assistant.readActivity(typed);
+      if (reading !== null) {
+        await actions.refineActivity(activityId, { ...reading, typed });
+      }
+    } finally {
+      onReading(activityId, false);
     }
   };
   return (
@@ -182,7 +114,7 @@ type ButtonProps = {
 };
 
 /**
-A big button in its fixed place: icon over name, its color's outline, lime while it runs.
+A big button in its fixed place: icon over name, its color's outline, filled with the accent while it runs.
 A long press, a right click or "⋯" opens what it can start and "alongside".
 */
 const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
@@ -231,7 +163,7 @@ const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
       <Pressable
         accessibilityLabel={t("time.more", { label })}
         accessibilityRole="button"
-        className="absolute right-0 top-0 h-8 w-8 items-center justify-center rounded-md active:opacity-60"
+        className="absolute -right-1 -top-1 h-11 w-11 items-start justify-start rounded-md pl-4 pt-2 active:opacity-60"
         hitSlop={6}
         onPress={more}
       >
@@ -281,6 +213,8 @@ export const TimeBar = () => {
   const { hooks } = usePace();
   const { alongside, buttons, running } = hooks.useTimeBar();
   const [opened, setOpened] = useState<null | Opened>(null);
+  // The typed activities the assistant is still reading (two can be in flight).
+  const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
   const { more, tap } = useTap(setOpened);
   return (
     <View
@@ -289,9 +223,16 @@ export const TimeBar = () => {
       role="region"
     >
       {[...(running === null ? [] : [running]), ...alongside].map((item) => (
-        <RunningRow key={item.activityId} running={item} />
+        <RunningRow isDraft={reading.has(item.activityId)} key={item.activityId} running={item} />
       ))}
-      <TypedStart />
+      <TypedStart
+        onReading={(activityId, isReading) => {
+          setReading((current) => {
+            const others = [...current].filter((id) => id !== activityId);
+            return new Set(isReading ? [...others, activityId] : others);
+          });
+        }}
+      />
       <View className="flex-row gap-2">
         {buttons.map((button) => (
           <BarButton

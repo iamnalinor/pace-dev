@@ -23,7 +23,7 @@ const Figure = ({ label, value }: { readonly label: string; readonly value: stri
     className="flex-1 gap-0.5"
     role="group"
   >
-    <Text className="font-sans text-[11px] text-muted">{label}</Text>
+    <Text className="font-sans text-[11px] text-fg2">{label}</Text>
     <Text className="font-sans text-[18px] tabular-nums text-fg">{value}</Text>
   </View>
 );

@@ -48,6 +48,25 @@ the test suites).
 > gaps and raw keys; text overflow, contrast, tap targets; anything that contradicts itself.
 > Compare with what the owner asked for and list every request that is still not met.
 >
+> Then walk every screen once more against the UX heuristics below and report each breach as a
+> finding, even when nothing is "broken" (feedback round 3 was all of this kind, and the tests
+> cannot see it):
+> - **Every control earns its place**: a filter that cannot filter (a lone «All»), a button that
+>   only moves the cursor, a Back next to a dismissable sheet — remove or merge.
+> - **One way per job**: no two buttons that do the same thing on one screen.
+> - **Platform conventions**: a phone sheet slides from the bottom and closes on the dim; a
+>   desktop dialog sits in the middle with a ✕ and closes on Escape and a click outside; Cancel
+>   only in confirmations; tabs hold destinations, not actions.
+> - **The keyboard on a computer**: Enter submits, Escape closes, the main actions have shortcuts
+>   named the OS's way (⌘ on a Mac, Ctrl elsewhere) and shown on the buttons.
+> - **State you can see**: neighbouring tags in different colours when they mean different things
+>   (no two grays side by side), a draft looks like a draft, a value follows the finger live.
+> - **Feedback and motion**: a structural change (a form unfolding, a row leaving) is animated,
+>   never a jump; a saved value never snaps back for a moment.
+> - **Copy**: plain words that say what happened and what to do («A new version is ready ·
+>   Refresh»), never vague («We changed a few things»).
+> - **Color**: one calm accent for actions; no colour that shouts without a reason.
+>
 > Report (English): a summary with counts by severity; findings most severe first, each with an
 > id, severity (blocker/high/medium/low), screen + width + theme + language, exact steps, what
 > happened vs what should happen, and a screenshot path; owner requests not met (with
