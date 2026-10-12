@@ -61,7 +61,7 @@ const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 const isAhead = (deps: ActionDeps, at: string | undefined): boolean =>
   at !== undefined && Date.parse(at) > Date.parse(deps.clock.now());
 
-const logPast = async (deps: ActionDeps, activity: PastActivity): ActionResult => {
+export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionResult => {
   const label = activity.label.trim();
   if (label === "" || Date.parse(activity.endAt) <= Date.parse(activity.startAt)) {
     return err("action/invalid-input");

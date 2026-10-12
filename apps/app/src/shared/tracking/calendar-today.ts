@@ -17,13 +17,6 @@ export type CalendarToday = {
   readonly events: readonly PhoneCalendarEvent[];
 };
 
-/** The event going on at `now`, if any. */
-export const eventOnNow = (
-  events: readonly PhoneCalendarEvent[],
-  now: string,
-): null | PhoneCalendarEvent =>
-  events.find((event) => event.startAt <= now && now < event.endAt) ?? null;
-
 /** How long before its start an event is offered on Now. */
 const AHEAD_MINUTES = 10;
 
@@ -60,3 +53,36 @@ export const promptedEvent = (
     .filter((event) => !isTracked(event, memory.activities))
     .toSorted((a, b) => a.startAt.localeCompare(b.startAt))
     .at(0) ?? null;
+
+/** How far from now an event can be and still be linked from the Calendar button. */
+const NEAR_MINUTES = 15;
+
+export type CalendarButtonState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "noAccess" }
+  | { readonly kind: "nothingNear" }
+  | { readonly kind: "ready"; readonly events: readonly PhoneCalendarEvent[] };
+
+/**
+What the Calendar button can link an activity to now: the events starting, going on or just
+over within fifteen minutes of now (earliest first), or why there is nothing to link.
+*/
+export const calendarButtonState = (
+  today: CalendarToday | null,
+  now: string,
+): CalendarButtonState => {
+  if (today === null) {
+    return { kind: "loading" };
+  }
+  if (today.access !== "granted") {
+    return { kind: "noAccess" };
+  }
+  const events = today.events
+    .filter(
+      (event) =>
+        addMinutesIso(event.startAt, -NEAR_MINUTES) <= now &&
+        now <= addMinutesIso(event.endAt, NEAR_MINUTES),
+    )
+    .toSorted((a, b) => a.startAt.localeCompare(b.startAt));
+  return events.length === 0 ? { kind: "nothingNear" } : { events, kind: "ready" };
+};

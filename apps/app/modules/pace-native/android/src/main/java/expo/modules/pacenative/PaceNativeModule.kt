@@ -1,32 +1,27 @@
 package expo.modules.pacenative
 
-import android.app.AlarmManager
-import android.app.AppOpsManager
 import android.app.NotificationManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
- * Android capabilities Pace needs beyond Expo's packages: exact-alarm permission state,
- * usage access (screen on/off, app foreground events, aggregated stats) and Do Not Disturb.
+ * Android capabilities Pace needs beyond Expo's packages: usage access (screen on/off, app
+ * foreground events, aggregated stats) and Do Not Disturb.
  * Every `open*Settings` function opens the matching system screen; none of them block.
  */
 class PaceNativeModule : Module() {
   private val context: Context
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
-
-  private val alarmManager: AlarmManager
-    get() = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
   private val notificationManager: NotificationManager
     get() = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -39,36 +34,36 @@ class PaceNativeModule : Module() {
     context.startActivity(intent)
   }
 
-  private fun hasUsageAccess(): Boolean {
-    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-    val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    } else {
-      @Suppress("DEPRECATION")
-      appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    }
-    return mode == AppOpsManager.MODE_ALLOWED
-  }
+  private fun hasUsageAccess(): Boolean = usageAccessGranted(context)
 
   override fun definition() = ModuleDefinition {
     Name("PaceNative")
 
-    Function("canScheduleExactAlarms") {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
-    }
+    // Where the last crash's trace was saved (CrashCatcher), once; null when none is pending.
+    Function("takeLastCrash") { CrashCatcher.takeLastCrash(context) }
 
-    Function("openExactAlarmSettings") {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        openSettings(
-          Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
-        )
-      }
-    }
+    // A trace the JS crash screen caught (the app kept running), saved next to the crashes'.
+    Function("saveCrashTrace") { trace: String -> CrashCatcher.saveCaught(context, trace) }
+
+    // What the app is doing (screen, sync…), for the next crash file; never personal content.
+    Function("setCrashContext") { text: String -> CrashCatcher.appContext = text.take(2_000) }
 
     Function("hasUsageAccess") { hasUsageAccess() }
 
+    // Android 13+ greys usage access out for an app installed from an APK until the person
+    // allows "restricted settings" on its App info page.
+    Function("restrictsSettings") { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU }
+
+    // Straight to Pace's own switch (Android 10+ settings take the package); a settings app
+    // that does not, opens the list of apps instead.
     Function("openUsageAccessSettings") {
-      openSettings(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+      try {
+        openSettings(
+          Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}"))
+        )
+      } catch (_: ActivityNotFoundException) {
+        openSettings(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+      }
     }
 
     Function("isDndAccessGranted") { notificationManager.isNotificationPolicyAccessGranted }

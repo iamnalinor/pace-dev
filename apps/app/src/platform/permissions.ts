@@ -6,7 +6,7 @@ import { calendarAccess, requestCalendarAccess } from "./phone-calendar.ts";
 import { hasUsageAccess, openUsageAccessSettings } from "./phone-data.ts";
 
 /** Everything Pace may ask Android for, in the order it is explained and asked. */
-export const PERMISSION_IDS = ["notifications", "calendar", "usage", "exactAlarms"] as const;
+export const PERMISSION_IDS = ["notifications", "calendar", "usage"] as const;
 
 export type PermissionId = (typeof PERMISSION_IDS)[number];
 
@@ -18,6 +18,8 @@ export type Permission = {
   readonly id: PermissionId;
   readonly state: "blocked" | "off" | "on";
   readonly kind: "dialog" | "settings";
+  /** Android greys it out until "restricted settings" are allowed (usage access, APK install). */
+  readonly restricted: boolean;
 };
 
 const dialogState = (isGranted: boolean, canAskAgain: boolean): Permission["state"] => {
@@ -31,21 +33,29 @@ const readOne = async (id: PermissionId): Promise<Permission> => {
   switch (id) {
     case "notifications": {
       const current = await Notifications.getPermissionsAsync();
-      return { id, kind: "dialog", state: dialogState(current.granted, current.canAskAgain) };
+      return {
+        id,
+        kind: "dialog",
+        restricted: false,
+        state: dialogState(current.granted, current.canAskAgain),
+      };
     }
     case "calendar": {
       const access = await calendarAccess();
       return {
         id,
         kind: "dialog",
+        restricted: false,
         state: dialogState(access === "granted", access !== "denied"),
       };
     }
     case "usage": {
-      return { id, kind: "settings", state: hasUsageAccess() ? "on" : "off" };
-    }
-    case "exactAlarms": {
-      return { id, kind: "settings", state: paceNative.canScheduleExactAlarms() ? "on" : "off" };
+      return {
+        id,
+        kind: "settings",
+        restricted: paceNative.restrictsSettings(),
+        state: hasUsageAccess() ? "on" : "off",
+      };
     }
   }
 };
@@ -53,6 +63,14 @@ const readOne = async (id: PermissionId): Promise<Permission> => {
 /** Where each permission stands right now. */
 export const readPermissions = async (): Promise<readonly Permission[]> =>
   await Promise.all(PERMISSION_IDS.map(async (id) => await readOne(id)));
+
+/**
+Pace's own App info page in Android settings: where a sideloaded app's "restricted settings"
+are lifted (⋮ → Allow restricted settings) before usage access can be granted.
+*/
+export const openAppInfo = async (): Promise<void> => {
+  await Linking.openSettings();
+};
 
 /** Asks in a dialog, or opens the Android screen where it is granted (or unblocked). */
 export const requestPermission = async (permission: Permission): Promise<void> => {
@@ -71,10 +89,6 @@ export const requestPermission = async (permission: Permission): Promise<void> =
     }
     case "usage": {
       openUsageAccessSettings();
-      return;
-    }
-    case "exactAlarms": {
-      paceNative.openExactAlarmSettings();
       return;
     }
   }

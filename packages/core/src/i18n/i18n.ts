@@ -1,10 +1,11 @@
+import type { Language } from "./language.ts";
+
 import { addDaysIn, minutesBetween, startOfDayIn } from "../time.ts";
 import { en } from "./en.ts";
+import { pluralCategory } from "./plural-rules.ts";
 import { ru } from "./ru.ts";
 
-export type Language = "en" | "ru";
-
-export const LANGUAGES: readonly Language[] = ["en", "ru"];
+export { type Language, LANGUAGES } from "./language.ts";
 
 export type MessageKey = keyof typeof en;
 
@@ -38,7 +39,7 @@ export type PluralForms = {
 
 /** Chooses the CLDR plural form for `count` and fills `{count}` in it. */
 export const plural = (language: Language, count: number, forms: PluralForms): string => {
-  const category = new Intl.PluralRules(language).select(count);
+  const category = pluralCategory(language, count);
   const chosen = (): string => {
     switch (category) {
       case "one": {
@@ -50,8 +51,6 @@ export const plural = (language: Language, count: number, forms: PluralForms): s
       case "many": {
         return forms.many ?? forms.other;
       }
-      case "zero":
-      case "two":
       case "other": {
         return forms.other;
       }

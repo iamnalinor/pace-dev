@@ -43,6 +43,8 @@ build history) is in [context/](context/README.md).
   stand-ins in `src/platform/web/`; never `if (Platform.OS === "web")` for whole screens.
   Never import a `.web.tsx` file from its own base file (it would resolve to itself).
 - Code, comments and identifiers in English.
+- **Merge pull requests with squash only** (Dependabot's included), never a merge commit or a
+  rebase merge.
 - **Exploratory QA before every release and after UI changes**: launch a Sonnet agent that
   clicks through the web build in a browser and writes `context/qa-round-<n>.md`
   (procedure and prompt: [docs/qa.md](docs/qa.md)); in parallel, a code-review agent over

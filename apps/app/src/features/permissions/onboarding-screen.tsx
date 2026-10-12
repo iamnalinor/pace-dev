@@ -8,7 +8,7 @@ import { markOnboarded } from "#app/platform/onboarding.ts";
 import { type Permission, PERMISSION_IDS, type PermissionId } from "#app/platform/permissions.ts";
 import { Button } from "#app/ui/button.tsx";
 
-import { PermissionText } from "./permission-card.tsx";
+import { PermissionText, type UsageStep, UsageSteps, useUsageGuide } from "./permission-card.tsx";
 import { usePermissions } from "./use-permissions.ts";
 
 type Phase =
@@ -66,6 +66,24 @@ const Intro = ({
   );
 };
 
+/** The step's main action and what it says: the usage guide's current step, or the permission's. */
+const useStepAction = (
+  permission: Permission,
+  onRequest: () => void,
+): { readonly label: string; readonly act: () => void; readonly guide: null | UsageStep } => {
+  const t = useT();
+  const guide = useUsageGuide(onRequest);
+  if (permission.restricted && permission.state === "off") {
+    return { act: guide.act, guide: guide.step, label: guide.label };
+  }
+  const isOpensSettings = permission.kind === "settings" || permission.state === "blocked";
+  return {
+    act: onRequest,
+    guide: null,
+    label: t(isOpensSettings ? "permissions.openSettings" : "permissions.allow"),
+  };
+};
+
 /** One permission at a time: why, then the system's own dialog or settings screen. */
 const Step = ({
   index,
@@ -81,14 +99,13 @@ const Step = ({
   readonly onSkip: () => void;
 }) => {
   const t = useT();
+  const action = useStepAction(permission, onRequest);
   const isOpensSettings = permission.kind === "settings" || permission.state === "blocked";
   return (
     <Frame
       footer={
         <>
-          <Button onPress={onRequest}>
-            {t(isOpensSettings ? "permissions.openSettings" : "permissions.allow")}
-          </Button>
+          <Button onPress={action.act}>{action.label}</Button>
           <Button onPress={onSkip} variant="ghost">
             {t("common.skip")}
           </Button>
@@ -99,25 +116,59 @@ const Step = ({
         {t("onboarding.step", { index: index + 1, total })}
       </Text>
       <PermissionText id={permission.id} />
-      {isOpensSettings ? (
+      {isOpensSettings && action.guide === null ? (
         <Text className="font-sans text-[13px] text-muted">{t("permissions.settingsHint")}</Text>
       ) : null}
+      {action.guide === null ? null : <UsageSteps step={action.guide} />}
     </Frame>
   );
 };
 
-/**
-The first run: what Pace will ask for and why, then each permission that is not on yet in
-turn. A dialog's answer moves on by itself; a settings screen moves on once it is granted
-(or skipped). Seen once per phone; Settings → Permissions has the same buttons later.
-*/
-export const OnboardingScreen = () => {
-  const router = useRouter();
-  const { byId, list, request } = usePermissions();
-  const [phase, setPhase] = useState<Phase>({ kind: "intro" });
-  const [asked, setAsked] = useState<ReadonlySet<PermissionId>>(() => new Set());
-  // The step shown is the first one still waiting for an answer: granted on a settings screen
-  // or answered in a dialog, it is passed over.
+const STATE_INK: Readonly<Record<Permission["state"], string>> = {
+  blocked: "text-muted",
+  off: "text-muted",
+  on: "text-fg",
+};
+
+/** The walk-through's end: what is on now, and where the rest is turned on later. */
+const Summary = ({
+  list,
+  onStart,
+}: {
+  readonly list: readonly Permission[];
+  readonly onStart: () => void;
+}) => {
+  const t = useT();
+  return (
+    <Frame footer={<Button onPress={onStart}>{t("onboarding.done.start")}</Button>}>
+      <Text accessibilityRole="header" className="font-sans text-[26px] font-semibold text-fg">
+        {t("onboarding.done.title")}
+      </Text>
+      <Text className="font-sans text-[15px] text-fg2">{t("onboarding.done.body")}</Text>
+      {list.map((permission) => (
+        <View
+          accessibilityLabel={t(`permissions.${permission.id}`)}
+          className="flex-row items-center justify-between gap-3"
+          key={permission.id}
+          role="group"
+        >
+          <Text className="font-sans text-[15px] text-fg">{t(`permissions.${permission.id}`)}</Text>
+          <Text className={`font-sans text-[13px] ${STATE_INK[permission.state]}`}>
+            {t(`permissions.${permission.state}`)}
+          </Text>
+        </View>
+      ))}
+    </Frame>
+  );
+};
+
+/** The step shown: the first one still waiting for an answer (-1: none left), and its permission. */
+const shownStepOf = (
+  phase: Phase,
+  byId: (id: PermissionId) => Permission | undefined,
+  asked: ReadonlySet<PermissionId>,
+): { readonly shown: number; readonly current: Permission | undefined } => {
+  // Granted on a settings screen or answered in a dialog, a step is passed over.
   const isWaiting = (id: PermissionId): boolean => {
     const permission = byId(id);
     return (
@@ -130,7 +181,13 @@ export const OnboardingScreen = () => {
     phase.kind === "step"
       ? phase.queue.findIndex((id, index) => index >= phase.index && isWaiting(id))
       : -1;
-  const isDone = phase.kind === "done" || (phase.kind === "step" && shown === -1);
+  const currentId = phase.kind === "step" ? phase.queue[shown] : undefined;
+  return { current: currentId === undefined ? undefined : byId(currentId), shown };
+};
+
+/** Once the walk-through is done: remembered, then on to Now. */
+const useLeaveWhenDone = (isDone: boolean): void => {
+  const router = useRouter();
   useEffect(() => {
     if (!isDone) {
       return;
@@ -140,12 +197,27 @@ export const OnboardingScreen = () => {
       router.replace("/");
     })();
   }, [isDone, router]);
-  const currentId = phase.kind === "step" ? phase.queue[shown] : undefined;
-  const current = currentId === undefined ? undefined : byId(currentId);
+};
+
+/**
+The first run: what Pace will ask for and why, then each permission that is not on yet in
+turn. A dialog's answer moves on by itself; a settings screen moves on once it is granted
+(or skipped). Seen once per phone; Settings → Permissions has the same buttons later.
+*/
+export const OnboardingScreen = () => {
+  const { byId, list, request } = usePermissions();
+  const [phase, setPhase] = useState<Phase>({ kind: "intro" });
+  const [asked, setAsked] = useState<ReadonlySet<PermissionId>>(() => new Set());
+  const { current, shown } = shownStepOf(phase, byId, asked);
+  // Every step answered or skipped: the summary, then Now once the person starts.
+  const isSummary = phase.kind === "step" && shown === -1;
+  const isDone = phase.kind === "done";
+  useLeaveWhenDone(isDone);
   if (current !== undefined && phase.kind === "step") {
     return (
       <Step
         index={shown}
+        key={current.id}
         onRequest={() => {
           void (async () => {
             await request(current);
@@ -157,6 +229,16 @@ export const OnboardingScreen = () => {
         }}
         permission={current}
         total={phase.queue.length}
+      />
+    );
+  }
+  if (isSummary) {
+    return (
+      <Summary
+        list={list ?? []}
+        onStart={() => {
+          setPhase({ kind: "done" });
+        }}
       />
     );
   }

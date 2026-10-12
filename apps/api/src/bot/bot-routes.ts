@@ -69,6 +69,7 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
       }),
       isAllowed: (telegramId) => deps.isAllowed(telegramId, config.allowedTelegramIds),
       token: config.telegramBotToken,
+      webOrigin: config.webOrigin,
     });
     const handle = webhookCallback(bot, "cloudflare-mod", {
       secretToken: config.telegramWebhookSecret,

@@ -8,10 +8,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
+import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
+import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the background phone check before Android may run it.
 import "#app/platform/phone-background.ts";
-import { UpdateBanner } from "#app/platform/update-banner.tsx";
+import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
@@ -20,7 +22,7 @@ import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 
 /** Screens without the app's navigation: signing in and the first-run walk-through. */
-const BARE_PATHS = ["/login", "/auth", "/app/auth", "/onboarding", "/oauth"];
+const BARE_PATHS = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
 
 /** On a wide window the sidebar stays beside every signed-in screen, pushed ones included. */
 const useHasSidebar = (): boolean => {
@@ -30,12 +32,20 @@ const useHasSidebar = (): boolean => {
   return isWide && status === "signed-in" && BARE_PATHS.every((bare) => !path.startsWith(bare));
 };
 
+/** Keeps what a crash file says about the app current; apart, so syncs do not redraw the Stack. */
+const CrashContext = () => {
+  useCrashContext(usePathname());
+  return null;
+};
+
 const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
   useNotificationLinks();
+  useCrashNotice();
   return (
     <View className="flex-1 flex-row bg-bg">
+      <CrashContext />
       {hasSidebar ? <Sidebar /> : null}
       <View className="flex-1">
         <Stack

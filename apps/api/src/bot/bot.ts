@@ -6,6 +6,7 @@ import type { TelegramTransport } from "../shared/telegram-api.ts";
 import type { Assistant, BotReply } from "./assistant.ts";
 
 import { NOTIFY_ACTIONS } from "../shared/contract.ts";
+import { readLoginPayload, returnUrl } from "../shared/login-link.ts";
 
 /** Who opened the bot, as the login flow needs them. */
 export type BotUser = {
@@ -27,12 +28,19 @@ export type BotDeps = {
   readonly bindLogin: (user: BotUser, nonce: string) => Promise<LoginOutcome>;
   /** Free text, `/now` and the preview buttons; without it the bot only handles login. */
   readonly assistant?: Assistant | undefined;
+  /** The website: "Return to Pace" after a login leads to it or to the app's App Link there. */
+  readonly webOrigin: string;
 };
 
-const LOGIN_PREFIX = "login_";
+/** A button back to where the login started (the app's App Link or the website), if any. */
+const returnButton = (url: string | undefined) =>
+  url === undefined
+    ? {}
+    : { reply_markup: { inline_keyboard: [[{ text: REPLIES.returnToPace, url }]] } };
 
 export const REPLIES = {
-  loggedIn: "Logged in — return to Pace",
+  loggedIn: "Logged in. Return to Pace.",
+  returnToPace: "Return to Pace",
   notAllowed: "Not allowed",
   linkExpired: "This login link has expired. Open Pace and try again.",
   welcome: "Hi! This is the Pace bot. Log in from the app to connect it.",
@@ -96,13 +104,17 @@ export const createBot = (deps: BotDeps): Bot => {
     await next();
   });
   bot.command("start", async (ctx) => {
-    if (ctx.from === undefined || !ctx.match.startsWith(LOGIN_PREFIX)) {
+    const login = readLoginPayload(ctx.match);
+    if (login === undefined || ctx.from === undefined) {
       await ctx.reply(REPLIES.welcome);
       return;
     }
-    const nonce = ctx.match.slice(LOGIN_PREFIX.length);
-    const outcome = await deps.bindLogin(toBotUser(ctx.from), nonce);
-    await ctx.reply(loginReply(outcome));
+    const outcome = await deps.bindLogin(toBotUser(ctx.from), login.nonce);
+    if (outcome !== "ok") {
+      await ctx.reply(loginReply(outcome));
+      return;
+    }
+    await ctx.reply(loginReply(outcome), returnButton(returnUrl(deps.webOrigin, login.from)));
   });
   const { assistant } = deps;
   if (assistant !== undefined) {

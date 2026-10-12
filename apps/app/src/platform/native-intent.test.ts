@@ -4,6 +4,8 @@ describe("mapSystemPath", () => {
   it("maps App Links under /app to in-app routes", () => {
     expect(mapSystemPath("https://pace.nalinor.dev/app/settings")).toBe("/settings");
     expect(mapSystemPath("https://pace.nalinor.dev/app/auth?token=abc")).toBe("/auth?token=abc");
+    // The bot's "Return to Pace" after a login: back on the login screen, which moves on.
+    expect(mapSystemPath("https://pace.nalinor.dev/app/login")).toBe("/login");
   });
 
   it("maps the bare /app link to the root", () => {

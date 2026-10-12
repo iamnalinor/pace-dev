@@ -100,9 +100,10 @@ jobs:
             test-results/
           retention-days: 7
 
-  android-debug:
-    name: Android debug APK (arm64)
-    # Gradle is the costliest job by far: on demand only (release.yml builds the shipped APK).
+  android-apk:
+    name: Android release APK (arm64)
+    # Gradle is the costliest job by far: on demand only. It builds what release.yml ships (R8,
+    # the bundled JS) without publishing it; a debug APK would need a Metro server to start.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -111,6 +112,9 @@ jobs:
       EXPO_NO_TELEMETRY: 1
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The tags and history: a build between releases is versioned on the last tag.
+          fetch-depth: 0
       - uses: ./.github/actions/setup
       - uses: actions/setup-java@v6
         with:
@@ -124,12 +128,14 @@ jobs:
       - name: Expo prebuild (continuous native generation, android/ is gitignored)
         working-directory: apps/app
         run: bun expo prebuild --platform android --no-install
-      - name: Assemble debug APK (signed with the committed debug keystore)
+      - name: Assemble release APK (signed with the committed debug keystore)
         working-directory: apps/app/android
-        run: ./gradlew :app:assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - name: APK size
+        run: du -h apps/app/android/app/build/outputs/apk/release/app-release.apk | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: pace-debug-apk
-          path: apps/app/android/app/build/outputs/apk/debug/app-debug.apk
+          name: pace-release-apk
+          path: apps/app/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14

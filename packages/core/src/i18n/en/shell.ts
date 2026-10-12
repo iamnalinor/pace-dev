@@ -5,6 +5,9 @@ export const enShell = {
   "crash.body":
     "This screen hit an error. Reload the app; if it happens again, send this text along:",
   "crash.retry": "Reload",
+  "crash.saved":
+    "Pace closed on an error last time. Its details are saved in {path}: send that file along.",
+  "crash.savedAt": "Saved with its details in {path}.",
   "nav.now": "Now",
   "nav.day": "Day",
   "nav.add": "Add",
@@ -34,6 +37,11 @@ export const enShell = {
   "login.dev": "Dev login",
   "login.devId": "Telegram id",
   "login.devSubmit": "Sign in as dev",
+  "loginReturn.title": "Back to Pace",
+  "loginReturn.body":
+    "Telegram has confirmed the login. If Pace did not open by itself, open it here.",
+  "loginReturn.open": "Open Pace",
+  "loginReturn.web": "Use Pace in the browser",
   "appLink.title": "Open in Pace",
   "appLink.open": "Open in Pace",
   "appLink.fallback":
@@ -94,9 +102,13 @@ export const enShell = {
   "permissions.usage": "Usage access",
   "permissions.usage.why":
     "When the screen was on and which apps were open: last night's sleep and the phone time inside each block.",
-  "permissions.exactAlarms": "Alarms on time",
-  "permissions.exactAlarms.why":
-    "Lets timers ring at the exact minute instead of when Android finds it convenient.",
+  "permissions.usage.step1":
+    "1. Open usage access and switch Pace on. Android refuses the first time (“App was denied access”): that is expected.",
+  "permissions.usage.step2":
+    "2. Open App info, tap ⋮ in the top right corner, choose “Allow restricted settings” and confirm.",
+  "permissions.usage.step3": "3. Open usage access again and switch Pace on.",
+  "permissions.usage.open": "Open usage access",
+  "permissions.appInfo": "App info",
   "permissions.on": "On",
   "permissions.off": "Off",
   "permissions.blocked": "Turned off in Android settings",
@@ -108,6 +120,10 @@ export const enShell = {
   "permissions.rule.attended": "{title}: always attended",
   "permissions.rule.skip": "{title}: always skipped",
   "permissions.rule.remove": "Forget",
+  "onboarding.done.title": "All set",
+  "onboarding.done.body":
+    "This is what Pace can use now. Anything off can be turned on later in Settings → Permissions.",
+  "onboarding.done.start": "Start",
   "onboarding.title": "A few permissions",
   "onboarding.intro":
     "Pace works without them, but can do more with them. You can change each one later in Settings → Permissions.",
@@ -122,43 +138,6 @@ export const enShell = {
   "settings.quietHours": "Quiet hours",
   "settings.connectedApps": "Connected apps",
   "settings.devices": "Phones and computers",
-  "devices.title": "Devices",
-  "devices.hint":
-    "Phones and computers that tell Pace which app is on screen (names and times only, never what is in them), so Day and Week show where you sat.",
-  "devices.loading": "Loading the devices…",
-  "devices.failed": "Could not load the devices. Check the connection.",
-  "devices.empty": "Nothing sends app usage yet.",
-  "devices.computer": "Computer",
-  "devices.phone": "Phone",
-  "devices.lastActivity": "Last data {duration} ago",
-  "devices.justNow": "Last data just now",
-  "devices.nothingYet": "Nothing sent yet",
-  "devices.connected": "Connected {date}",
-  "devices.disconnect": "Disconnect",
-  "devices.disconnectConfirm": "Disconnect {name}? Its token stops working at once.",
-  "devices.disconnectFailed": "Could not disconnect. Try again.",
-  "devices.add": "Add a computer",
-  "devices.name": "Name",
-  "devices.defaultName": "My computer",
-  "devices.create": "Create the token",
-  "devices.createFailed": "Could not create the token. Check the connection.",
-  "devices.step1":
-    "1. Install ActivityWatch on that computer and start it: it records which app is in front. Turn on “Start on login” in its tray menu.",
-  "devices.openActivityWatch": "Open activitywatch.net",
-  "devices.step2":
-    "2. Paste this into a terminal there. It downloads the bridge, saves this computer's token and sends every 5 minutes:",
-  "devices.step3": "3. Within 5 minutes its line in the list shows when it last sent data.",
-  "devices.tokenOnce":
-    "The token is in the command and is shown only now. Lost it? Disconnect the computer and add it again.",
-  "devices.copy": "Copy the command",
-  "devices.copied": "Copied",
-  "devices.share": "Send the command",
-  "devices.otherSystems":
-    "macOS or Windows: run the same python3 command; without systemd, schedule “pace_aw_bridge.py run” every 5 minutes (launchd, Task Scheduler).",
-  "devices.calendar": "Send this phone's calendar",
-  "devices.calendarHint":
-    "Your own and accepted events go to Pace, so the web and the week show them. Turning it off deletes the copy.",
-  "devices.done": "Done",
   "settings.logout": "Log out",
   "settings.deleteAccount": "Delete account",
   "settings.deleteAccount.warning":

@@ -16,8 +16,8 @@ route list is read from `apps/app/app`, so a new screen is swept without anyone 
 
 const APP_DIR = path.resolve(import.meta.dirname, "../apps/app/app");
 
-/** Screens that are not meant to have the sidebar: signing in and the walk-through. */
-const BARE = ["/login", "/auth", "/app/auth", "/onboarding", "/oauth"];
+/** Screens that are not meant to have the sidebar: signing in (and its way back) and the walk-through. */
+const BARE = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
 
 const routeFiles = (dir: string): readonly string[] =>
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- the app's own route folder, fixed above

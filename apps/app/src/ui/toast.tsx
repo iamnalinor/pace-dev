@@ -20,8 +20,12 @@ type ToastHandle = { readonly show: (toast: ToastInput) => void };
 
 const ToastContext = createContext<null | ToastHandle>(null);
 
-/** Long enough to read a refusal or reach for its offer, short enough not to cover a row for long. */
-const VISIBLE_MS = 5000;
+/**
+Long enough to read a refusal or reach for its offer (about 60 ms a character, at least five
+seconds), short enough not to cover a row for long (ten at most).
+*/
+const visibleMs = (message: string): number =>
+  Math.min(10_000, Math.max(5000, message.length * 60));
 
 const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toast: Shown }) => (
   <View
@@ -29,9 +33,9 @@ const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toa
     accessibilityRole="alert"
     className="absolute inset-x-4 bottom-24 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg"
   >
-    {/* Two lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
+    {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
     <Pressable className="flex-1" onPress={onDone}>
-      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={2}>
+      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={3}>
         {toast.message}
       </Text>
     </Pressable>
@@ -63,7 +67,7 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
     if (toast === null) {
       return;
     }
-    const timer = setTimeout(hide, VISIBLE_MS);
+    const timer = setTimeout(hide, visibleMs(toast.message));
     return () => {
       clearTimeout(timer);
     };

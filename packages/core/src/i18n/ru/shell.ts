@@ -7,6 +7,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "crash.body":
     "На этом экране произошла ошибка. Перезапустите приложение; если повторится, пришлите этот текст:",
   "crash.retry": "Перезапустить",
+  "crash.saved":
+    "В прошлый раз Pace закрылся из-за ошибки. Подробности сохранены в {path}: пришлите этот файл.",
+  "crash.savedAt": "Сохранено с подробностями в {path}.",
   "nav.now": "Сейчас",
   "nav.day": "День",
   "nav.add": "Добавить",
@@ -36,6 +39,10 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "login.dev": "Вход для разработки",
   "login.devId": "Telegram id",
   "login.devSubmit": "Войти как dev",
+  "loginReturn.title": "Вернуться в Pace",
+  "loginReturn.body": "Telegram подтвердил вход. Если Pace не открылся сам, откройте его здесь.",
+  "loginReturn.open": "Открыть Pace",
+  "loginReturn.web": "Продолжить в браузере",
   "appLink.title": "Открыть в Pace",
   "appLink.open": "Открыть в Pace",
   "appLink.fallback":
@@ -96,8 +103,13 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.usage": "Доступ к статистике",
   "permissions.usage.why":
     "Когда был включён экран и какие приложения были открыты: сон прошлой ночью и время в телефоне внутри каждого блока.",
-  "permissions.exactAlarms": "Точные будильники",
-  "permissions.exactAlarms.why": "Таймеры звенят ровно в нужную минуту, а не когда Android удобно.",
+  "permissions.usage.step1":
+    "1. Откройте доступ к статистике и включите Pace. В первый раз Android откажет («App was denied access»): так и должно быть.",
+  "permissions.usage.step2":
+    "2. Откройте «О приложении», нажмите ⋮ в правом верхнем углу, выберите «Разрешить ограниченные настройки» и подтвердите.",
+  "permissions.usage.step3": "3. Снова откройте доступ к статистике и включите Pace.",
+  "permissions.usage.open": "Открыть доступ к статистике",
+  "permissions.appInfo": "О приложении",
   "permissions.on": "Включено",
   "permissions.off": "Выключено",
   "permissions.blocked": "Выключено в настройках Android",
@@ -109,6 +121,10 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.rule.attended": "{title}: всегда был(а)",
   "permissions.rule.skip": "{title}: всегда пропускаю",
   "permissions.rule.remove": "Забыть",
+  "onboarding.done.title": "Готово",
+  "onboarding.done.body":
+    "Вот что Pace может использовать. Выключенное можно включить позже в «Настройки → Разрешения».",
+  "onboarding.done.start": "Начать",
   "onboarding.title": "Несколько разрешений",
   "onboarding.intro":
     "Pace работает и без них, но с ними умеет больше. Каждое можно поменять потом в Настройки → Разрешения.",
@@ -123,43 +139,6 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.quietHours": "Тихие часы",
   "settings.connectedApps": "Подключённые приложения",
   "settings.devices": "Телефоны и компьютеры",
-  "devices.title": "Устройства",
-  "devices.hint":
-    "Телефоны и компьютеры, которые сообщают Pace, какое приложение на экране (только названия и время, без содержимого), чтобы День и Неделя показывали, где вы сидели.",
-  "devices.loading": "Загружаем устройства…",
-  "devices.failed": "Не удалось загрузить устройства. Проверьте соединение.",
-  "devices.empty": "Пока ничего не присылает данные.",
-  "devices.computer": "Компьютер",
-  "devices.phone": "Телефон",
-  "devices.lastActivity": "Данные {duration} назад",
-  "devices.justNow": "Данные только что",
-  "devices.nothingYet": "Ещё ничего не прислал",
-  "devices.connected": "Подключён {date}",
-  "devices.disconnect": "Отключить",
-  "devices.disconnectConfirm": "Отключить «{name}»? Его токен сразу перестанет работать.",
-  "devices.disconnectFailed": "Не удалось отключить. Попробуйте ещё раз.",
-  "devices.add": "Добавить компьютер",
-  "devices.name": "Название",
-  "devices.defaultName": "Мой компьютер",
-  "devices.create": "Создать токен",
-  "devices.createFailed": "Не удалось создать токен. Проверьте соединение.",
-  "devices.step1":
-    "1. Установите на этом компьютере ActivityWatch и запустите его: он записывает, какое приложение на экране. В меню в трее включите «Запускать при входе».",
-  "devices.openActivityWatch": "Открыть activitywatch.net",
-  "devices.step2":
-    "2. Вставьте это в терминал на нём. Команда скачает мост, сохранит токен компьютера и будет отправлять данные каждые 5 минут:",
-  "devices.step3": "3. В течение 5 минут в его строке появится время последней отправки.",
-  "devices.tokenOnce":
-    "Токен — внутри команды и показывается только сейчас. Потеряли? Отключите компьютер и добавьте заново.",
-  "devices.copy": "Скопировать команду",
-  "devices.copied": "Скопировано",
-  "devices.share": "Отправить команду",
-  "devices.otherSystems":
-    "macOS или Windows: та же команда python3; без systemd запускайте «pace_aw_bridge.py run» каждые 5 минут (launchd, Планировщик заданий).",
-  "devices.calendar": "Отправлять календарь телефона",
-  "devices.calendarHint":
-    "Ваши и принятые события уходят в Pace, чтобы веб и неделя их показывали. Если выключить, копия удалится.",
-  "devices.done": "Готово",
   "settings.logout": "Выйти",
   "settings.deleteAccount": "Удалить аккаунт",
   "settings.deleteAccount.warning":

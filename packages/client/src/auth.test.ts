@@ -100,14 +100,29 @@ describe("createAuth login", () => {
   });
 });
 
-const nonceRoute: FakeRoute = () => ({
+const NONCE_CREATED = {
   deepLink: "https://t.me/PaceTaskTrackerBot?start=login_n1",
   nonce: "n1",
-});
+};
+
+const nonceRoute: FakeRoute = () => NONCE_CREATED;
 
 describe("createAuth bot login", () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("tells the server where the login started, so the bot's button leads back there", async () => {
+    const asked: (null | string)[] = [];
+    const { auth } = await setup({
+      "POST /api/auth/nonce": ({ url }) => {
+        asked.push(url.searchParams.get("from"));
+        return NONCE_CREATED;
+      },
+    });
+    await auth.startBotLogin("web");
+    await auth.startBotLogin("app");
+    expect(asked).toEqual(["web", "app"]);
   });
 
   it("polls until the nonce is ready and stores the token", async () => {
@@ -122,7 +137,7 @@ describe("createAuth bot login", () => {
       },
       "POST /api/auth/nonce": nonceRoute,
     });
-    const login = await auth.startBotLogin();
+    const login = await auth.startBotLogin("app");
     expect(login.nonce).toBe("n1");
     expect(login.deepLink).toContain("login_n1");
     const waiting = login.waitForToken({ intervalMs: 100, timeoutMs: 10_000 });
@@ -139,7 +154,7 @@ describe("createAuth bot login", () => {
       "GET /api/auth/nonce/n1": () => problem(403, "auth/not-allowed"),
       "POST /api/auth/nonce": nonceRoute,
     });
-    const deniedLogin = await denied.auth.startBotLogin();
+    const deniedLogin = await denied.auth.startBotLogin("app");
     await expect(deniedLogin.waitForToken({ intervalMs: 10, timeoutMs: 100 })).resolves.toEqual({
       error: "not-allowed",
       ok: false,
@@ -149,7 +164,7 @@ describe("createAuth bot login", () => {
       "GET /api/auth/nonce/n1": () => ({ status: "pending" }),
       "POST /api/auth/nonce": nonceRoute,
     });
-    const timing = (await pending.auth.startBotLogin()).waitForToken({
+    const timing = (await pending.auth.startBotLogin("app")).waitForToken({
       intervalMs: 10,
       timeoutMs: 100,
     });
@@ -157,7 +172,7 @@ describe("createAuth bot login", () => {
     await expect(timing).resolves.toEqual({ error: "timeout", ok: false });
 
     const controller = new AbortController();
-    const cancelling = (await pending.auth.startBotLogin()).waitForToken({
+    const cancelling = (await pending.auth.startBotLogin("app")).waitForToken({
       intervalMs: 10,
       signal: controller.signal,
       timeoutMs: 10_000,
@@ -178,7 +193,10 @@ describe("createAuth bot login", () => {
       },
       "POST /api/auth/nonce": nonceRoute,
     });
-    const waiting = (await auth.startBotLogin()).waitForToken({ intervalMs: 10, timeoutMs: 1000 });
+    const waiting = (await auth.startBotLogin("app")).waitForToken({
+      intervalMs: 10,
+      timeoutMs: 1000,
+    });
     await vi.advanceTimersByTimeAsync(50);
     await expect(waiting).resolves.toEqual({ error: "timeout", ok: false });
     expect(polls).toBe(2);

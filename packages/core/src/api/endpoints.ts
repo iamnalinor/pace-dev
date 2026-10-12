@@ -84,12 +84,16 @@ export const endpoints = {
       output: AuthSessionSchema,
       path: "/api/auth/telegram",
     }),
-    /** App login, step 1: mint a nonce and the bot deep link that binds it. */
+    /**
+    App login, step 1: mint a nonce and the bot deep link that binds it. `from` is where the
+    login started (the app when absent): the bot's "Return to Pace" leads back there.
+    */
     nonceCreate: endpoint({
       auth: false,
       method: "POST",
       output: NonceCreatedSchema,
       path: "/api/auth/nonce",
+      query: z.object({ from: z.enum(["app", "web"]).optional() }),
     }),
     /** App login, step 2: poll until the bot bound the nonce; `ready` consumes it. */
     noncePoll: endpoint({

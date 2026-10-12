@@ -1,6 +1,9 @@
-import { addDaysIn, endpoints, startOfDayIn } from "@pace/core";
+import { addDaysIn, addMinutesIso, endpoints, startOfDayIn } from "@pace/core";
 
 import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
+
+/** An event over this recently still counts: the Calendar button links to it. */
+const RECENT_MINUTES = 15;
 
 /**
 In a browser there is no calendar to read: today's events come from the copy the phone sends
@@ -12,8 +15,12 @@ export const calendarToday = async ({ api, now, zone }: CalendarSource): Promise
     const { events } = await api.call(endpoints.calendar.list, {
       query: { from, to: addDaysIn(from, 1, zone) },
     });
-    return { access: "granted", events: events.filter((event) => event.endAt > now) };
+    return {
+      access: "granted",
+      events: events.filter((event) => event.endAt > addMinutesIso(now, -RECENT_MINUTES)),
+    };
   } catch {
-    return { access: "denied", events: [] };
+    // Offline or the server failed: nothing to link now, but nothing to allow either.
+    return { access: "granted", events: [] };
   }
 };

@@ -16,7 +16,11 @@ import { ThemeProvider } from "../ui/theme-provider.tsx";
 import { LoginScreen } from "./login-screen.tsx";
 
 jest.mock("expo-secure-store", () => mockSecureStoreModule.createFakeSecureStore());
-jest.mock("expo-linking", () => ({ openURL: jest.fn(async () => true) }));
+jest.mock("expo-linking", () => ({
+  // No Telegram app in the test: the bot opens through t.me.
+  canOpenURL: jest.fn(async () => false),
+  openURL: jest.fn(async () => true),
+}));
 jest.mock("expo-web-browser", () => ({
   openAuthSessionAsync: jest.fn(async () => ({ type: "cancel" })),
 }));
@@ -87,6 +91,8 @@ describe("LoginScreen", () => {
     await waitFor(() => {
       expect(openURL).toHaveBeenCalledWith("https://t.me/PaceTaskTrackerBot?start=login_abc");
     });
+    // From the app: the bot's "Return to Pace" button leads back into it.
+    expect(auth.startBotLogin).toHaveBeenCalledWith("app");
     expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
     const [options] = waitForToken.mock.calls[0] ?? [];
     expect(options?.intervalMs).toBe(2000);

@@ -1,21 +1,44 @@
 import type { ExpoConfig } from "expo/config";
 
+import { execFileSync } from "node:child_process";
+
+import { appVersion } from "./app-version.ts";
+
 // Expo types `process.env` loosely (EXPO_PUBLIC_* are injected at bundle time): narrow it here.
 const envString = (name: string): string | undefined => {
   const value: unknown = process.env[name];
   return typeof value === "string" ? value : undefined;
 };
 
-// Release builds are tagged vX.Y.Z; the tag drives both the version and the versionCode.
-// PACE_RELEASE_TAG is set by release.yml (a run by hand releases from a branch, not a tag ref).
-const tag = /^v(\d+)\.(\d+)\.(\d+)$/.exec(
-  envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
-);
-const version = tag === null ? "0.0.0" : `${tag[1]}.${tag[2]}.${tag[3]}`;
-const versionCode =
-  tag === null
-    ? Number(envString("GITHUB_RUN_NUMBER") ?? "1")
-    : Number(tag[1]) * 10_000 + Number(tag[2]) * 100 + Number(tag[3]);
+/** `git <args>`'s output, empty without git (or tags). */
+const git = (args: readonly string[]): string => {
+  try {
+    // eslint-disable-next-line sonarjs/no-os-command-from-path -- the build machine's git (Node runs this config at prebuild); fixed arguments, no input
+    return execFileSync("git", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+};
+
+/** The last release tag, the commits since it and the commit. */
+const describe = git(["describe", "--tags", "--long", "--match", "v*"]);
+const tag = describe.replace(/-\d+-g[0-9a-f]+$/u, "");
+/** A commit's committer time in seconds (0 when unknown). */
+const committedAt = (ref: string): number => {
+  const seconds = Number(git(["log", "-1", "--format=%ct", ref]));
+  return Number.isFinite(seconds) ? seconds : 0;
+};
+
+// Release builds are tagged vX.Y.Z; PACE_RELEASE_TAG is set by release.yml (a run by hand
+// releases from a branch, not a tag ref). Any other build sits on the last tag (app-version.ts).
+const { version, versionCode } = appVersion({
+  describe,
+  hoursSinceTag: tag === "" ? 0 : (committedAt("HEAD") - committedAt(tag)) / 3600,
+  releaseTag: envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
+});
 
 const config: ExpoConfig = {
   name: "Pace",
@@ -39,10 +62,11 @@ const config: ExpoConfig = {
       foregroundImage: "./assets/adaptive-icon.png",
       monochromeImage: "./assets/adaptive-icon-mono.png",
     },
-    permissions: [
-      "android.permission.READ_CALENDAR",
-      "android.permission.POST_NOTIFICATIONS",
+    permissions: ["android.permission.READ_CALENDAR", "android.permission.POST_NOTIFICATIONS"],
+    // Reminders are plain notifications: a few minutes late in Doze is fine, no alarm access.
+    blockedPermissions: [
       "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.USE_EXACT_ALARM",
     ],
     intentFilters: [
       {
@@ -103,6 +127,24 @@ const config: ExpoConfig = {
     "expo-calendar",
     "expo-web-browser",
     "expo-secure-store",
+    [
+      "expo-build-properties",
+      {
+        // The release APK without these is ~50 MB: every class of every library stays (all of
+        // Jetpack Compose among them, which expo-router links through @expo/ui) and native
+        // libraries are stored uncompressed. R8 keeps what is used; compressed libraries are
+        // unpacked once at install, which trades some storage for a smaller download.
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          // Android 11+ hides other apps unless asked: lets login see whether tg:// opens Telegram.
+          manifestQueries: {
+            intent: [{ action: "android.intent.action.VIEW", data: { scheme: "tg" } }],
+          },
+          useLegacyPackaging: true,
+        },
+      },
+    ],
     "./plugins/with-release-signing.js",
   ],
   // No OTA updates: releases ship as APKs through GitHub Releases.

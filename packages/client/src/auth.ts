@@ -38,7 +38,8 @@ export type Auth = {
   /** Errors are the API's code (`auth/not-allowed`, ...) or `network`. */
   readonly loginWithTelegram: (payload: TelegramLogin) => Promise<Result<User, string>>;
   readonly loginWithDev: (telegramId: string) => Promise<Result<User, string>>;
-  readonly startBotLogin: () => Promise<BotLogin>;
+  /** `from`: where the login starts; the bot's "Return to Pace" leads back there. */
+  readonly startBotLogin: (from: "app" | "web") => Promise<BotLogin>;
   /** Tells the server, then forgets the token even when the server could not be reached. */
   readonly logout: () => Promise<void>;
   /**
@@ -212,8 +213,8 @@ export const createAuth = (options: {
     },
     me,
     ready: session.ready,
-    startBotLogin: async () => {
-      const created = await api.call(endpoints.auth.nonceCreate, {});
+    startBotLogin: async (from) => {
+      const created = await api.call(endpoints.auth.nonceCreate, { query: { from } });
       return { ...created, waitForToken: waitForToken(api, session, created.nonce) };
     },
     store: session.store,

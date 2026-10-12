@@ -1,10 +1,11 @@
-import { openURL } from "expo-linking";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { BotLogin, BotLoginError } from "@pace/client";
 
 import { useAuth } from "../app-state.tsx";
+import { openTelegram } from "../auth/open-telegram.ts";
+import { LOGIN_FROM } from "../platform/login-from.ts";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
@@ -16,7 +17,7 @@ export type BotLoginPhase =
   | { readonly kind: "waiting" };
 
 /**
-The Telegram bot flow: mint a nonce, open the deep link, poll while this screen is
+The Telegram bot flow: mint a nonce, open the bot (in the app when it is there), poll while this screen is
 focused. A successful poll stores the token through `Auth`, so the caller only watches
 the auth status; the poll is aborted whenever the screen loses focus or unmounts.
 */
@@ -64,8 +65,8 @@ export const useBotLogin = (): {
   const start = useCallback(async () => {
     setPhase({ kind: "starting" });
     try {
-      const created = await auth.startBotLogin();
-      await openURL(created.deepLink);
+      const created = await auth.startBotLogin(LOGIN_FROM);
+      await openTelegram(created.deepLink);
       setLogin(created);
       setPhase({ kind: "waiting" });
     } catch {
