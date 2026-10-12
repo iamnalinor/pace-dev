@@ -101,8 +101,12 @@ export const enShell = {
   "permissions.usage": "Usage access",
   "permissions.usage.why":
     "When the screen was on and which apps were open: last night's sleep and the phone time inside each block.",
-  "permissions.usage.restricted":
-    "If Android says “App was denied access”: open App info, tap ⋮ in the corner, choose “Allow restricted settings”, then open settings here again.",
+  "permissions.usage.step1":
+    "1. Open usage access and switch Pace on. Android refuses the first time (“App was denied access”): that is expected.",
+  "permissions.usage.step2":
+    "2. Open App info, tap ⋮ in the top right corner, choose “Allow restricted settings” and confirm.",
+  "permissions.usage.step3": "3. Open usage access again and switch Pace on.",
+  "permissions.usage.open": "Open usage access",
   "permissions.appInfo": "App info",
   "permissions.on": "On",
   "permissions.off": "Off",

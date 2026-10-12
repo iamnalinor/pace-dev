@@ -20,6 +20,8 @@ export type UsageStats = {
 /** The Kotlin module's surface (`modules/pace-native/android`). */
 export type PaceNative = {
   readonly hasUsageAccess: () => boolean;
+  /** Android 13+: an app installed from an APK meets "restricted settings" for usage access. */
+  readonly restrictsSettings: () => boolean;
   readonly openUsageAccessSettings: () => void;
   readonly isDndAccessGranted: () => boolean;
   readonly openDndAccessSettings: () => void;
@@ -48,6 +50,7 @@ export const fallbackPaceNative: PaceNative = {
   openUsageAccessSettings: noop,
   queryUsageEvents: async () => [],
   queryUsageStats: async () => [],
+  restrictsSettings: () => false,
   setDnd: () => false,
   saveCrashTrace: () => null,
   setCrashContext: noop,

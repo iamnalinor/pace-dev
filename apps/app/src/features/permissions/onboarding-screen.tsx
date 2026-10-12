@@ -8,7 +8,7 @@ import { markOnboarded } from "#app/platform/onboarding.ts";
 import { type Permission, PERMISSION_IDS, type PermissionId } from "#app/platform/permissions.ts";
 import { Button } from "#app/ui/button.tsx";
 
-import { PermissionText, RestrictedSettingsHint } from "./permission-card.tsx";
+import { PermissionText, type UsageStep, UsageSteps, useUsageGuide } from "./permission-card.tsx";
 import { usePermissions } from "./use-permissions.ts";
 
 type Phase =
@@ -66,6 +66,24 @@ const Intro = ({
   );
 };
 
+/** The step's main action and what it says: the usage guide's current step, or the permission's. */
+const useStepAction = (
+  permission: Permission,
+  onRequest: () => void,
+): { readonly label: string; readonly act: () => void; readonly guide: null | UsageStep } => {
+  const t = useT();
+  const guide = useUsageGuide(onRequest);
+  if (permission.restricted && permission.state === "off") {
+    return { act: guide.act, guide: guide.step, label: guide.label };
+  }
+  const isOpensSettings = permission.kind === "settings" || permission.state === "blocked";
+  return {
+    act: onRequest,
+    guide: null,
+    label: t(isOpensSettings ? "permissions.openSettings" : "permissions.allow"),
+  };
+};
+
 /** One permission at a time: why, then the system's own dialog or settings screen. */
 const Step = ({
   index,
@@ -81,14 +99,13 @@ const Step = ({
   readonly onSkip: () => void;
 }) => {
   const t = useT();
+  const action = useStepAction(permission, onRequest);
   const isOpensSettings = permission.kind === "settings" || permission.state === "blocked";
   return (
     <Frame
       footer={
         <>
-          <Button onPress={onRequest}>
-            {t(isOpensSettings ? "permissions.openSettings" : "permissions.allow")}
-          </Button>
+          <Button onPress={action.act}>{action.label}</Button>
           <Button onPress={onSkip} variant="ghost">
             {t("common.skip")}
           </Button>
@@ -99,10 +116,10 @@ const Step = ({
         {t("onboarding.step", { index: index + 1, total })}
       </Text>
       <PermissionText id={permission.id} />
-      {isOpensSettings ? (
+      {isOpensSettings && action.guide === null ? (
         <Text className="font-sans text-[13px] text-muted">{t("permissions.settingsHint")}</Text>
       ) : null}
-      {permission.id === "usage" ? <RestrictedSettingsHint /> : null}
+      {action.guide === null ? null : <UsageSteps step={action.guide} />}
     </Frame>
   );
 };
@@ -147,6 +164,7 @@ export const OnboardingScreen = () => {
     return (
       <Step
         index={shown}
+        key={current.id}
         onRequest={() => {
           void (async () => {
             await request(current);

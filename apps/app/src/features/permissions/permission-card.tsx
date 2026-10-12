@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
@@ -23,22 +24,69 @@ const STATE_CLASS: Readonly<Record<Permission["state"], string>> = {
   on: inkClass("green"),
 };
 
+const USAGE_STEPS = [
+  "permissions.usage.step1",
+  "permissions.usage.step2",
+  "permissions.usage.step3",
+] as const;
+
+export type UsageStep = 0 | 1 | 2;
+
 /**
-How to lift Android's "restricted settings" (Pace is installed from an APK, not a store, so
-usage access is greyed out until they are): the steps and a way to Pace's App info page.
+Usage access for an app installed from an APK (Android 13+ "restricted settings"): try the
+switch (Android refuses, and only then offers the way out), allow restricted settings on App
+info, then the switch again. One action at a time, the one for the step the person is on.
 */
-export const RestrictedSettingsHint = () => {
+export const useUsageGuide = (
+  openUsageAccess: () => void,
+): { readonly step: UsageStep; readonly label: string; readonly act: () => void } => {
+  const t = useT();
+  const [step, setStep] = useState<UsageStep>(0);
+  if (step === 1) {
+    return {
+      act: () => {
+        void openAppInfo();
+        setStep(2);
+      },
+      label: t("permissions.appInfo"),
+      step,
+    };
+  }
+  return {
+    act: () => {
+      openUsageAccess();
+      setStep((current) => (current === 0 ? 1 : current));
+    },
+    label: t("permissions.usage.open"),
+    step,
+  };
+};
+
+/** The three steps, the current one in full ink. */
+export const UsageSteps = ({ step }: { readonly step: UsageStep }) => {
   const t = useT();
   return (
-    <View className="items-start gap-2">
-      <Text className="font-sans text-[13px] text-muted">{t("permissions.usage.restricted")}</Text>
-      <Button
-        onPress={() => {
-          void openAppInfo();
-        }}
-        variant="ghost"
-      >
-        {t("permissions.appInfo")}
+    <View className="gap-1.5">
+      {USAGE_STEPS.map((key, index) => (
+        <Text
+          className={cx("font-sans text-[13px]", index === step ? "text-fg" : "text-muted")}
+          key={key}
+        >
+          {t(key)}
+        </Text>
+      ))}
+    </View>
+  );
+};
+
+/** The card's body for restricted usage access: the steps and the action of the current one. */
+const UsageGuide = ({ onRequest }: { readonly onRequest: () => void }) => {
+  const guide = useUsageGuide(onRequest);
+  return (
+    <View className="items-start gap-3">
+      <UsageSteps step={guide.step} />
+      <Button onPress={guide.act} variant="secondary">
+        {guide.label}
       </Button>
     </View>
   );
@@ -75,6 +123,7 @@ export const PermissionCard = ({
   readonly onRequest: (permission: Permission) => void;
 }) => {
   const t = useT();
+  const isGuided = permission.restricted && permission.state === "off";
   return (
     <View
       accessibilityLabel={t(`permissions.${permission.id}`)}
@@ -86,11 +135,17 @@ export const PermissionCard = ({
         <Text className={cx("font-sans text-[13px]", STATE_CLASS[permission.state])}>
           {t(`permissions.${permission.state}`)}
         </Text>
-        {permission.state === "on" ? null : (
+        {isGuided || permission.state === "on" ? null : (
           <PermissionAction onRequest={onRequest} permission={permission} />
         )}
       </View>
-      {permission.id === "usage" && permission.state !== "on" ? <RestrictedSettingsHint /> : null}
+      {isGuided ? (
+        <UsageGuide
+          onRequest={() => {
+            onRequest(permission);
+          }}
+        />
+      ) : null}
     </View>
   );
 };

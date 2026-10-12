@@ -14,11 +14,12 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { OnboardingScreen } from "./onboarding-screen.tsx";
 import { PermissionsScreen } from "./permissions-screen.tsx";
 
-const mockPhone = { usage: false };
+const mockPhone = { restricted: false, usage: false };
 
 jest.mock("../../../modules/pace-native/index.ts", () => ({
   paceNative: {
     hasUsageAccess: () => mockPhone.usage,
+    restrictsSettings: () => mockPhone.restricted,
     openUsageAccessSettings: jest.fn(),
   },
 }));
@@ -42,6 +43,7 @@ const comeBack = async (): Promise<void> => {
 
 beforeEach(() => {
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  mockPhone.restricted = false;
   mockPhone.usage = false;
   notifications.state.granted = false;
   notifications.state.canAskAgain = true;
@@ -73,16 +75,53 @@ describe("Settings → Permissions", () => {
     await fireEvent.press(within(calendarCard).getByRole("button", { name: "Open settings" }));
     expect(openSettings).toHaveBeenCalled();
 
-    // Sideloaded, Pace meets Android's "restricted settings": the card says how to lift them.
     const usageCard = screen.getByLabelText("Usage access");
-    expect(within(usageCard).getByText(en("permissions.usage.restricted"))).toBeOnTheScreen();
-    openSettings.mockClear();
-    await fireEvent.press(within(usageCard).getByRole("button", { name: "App info" }));
-    expect(openSettings).toHaveBeenCalled();
     await fireEvent.press(within(usageCard).getByRole("button", { name: "Open settings" }));
     mockPhone.usage = true;
     await comeBack();
     expect(await within(usageCard).findByText("On")).toBeOnTheScreen();
+  });
+});
+
+describe("usage access on Android 13+ (restricted settings for an APK)", () => {
+  it("leads through the three steps, one action at a time", async () => {
+    mockPhone.restricted = true;
+    const openSettings = jest.spyOn(Linking, "openSettings").mockResolvedValue();
+    await renderScreen(<PermissionsScreen />, await createTestRuntime());
+    const card = await screen.findByLabelText("Usage access");
+    for (const step of [
+      "permissions.usage.step1",
+      "permissions.usage.step2",
+      "permissions.usage.step3",
+    ] as const) {
+      expect(within(card).getByText(en(step))).toBeOnTheScreen();
+    }
+
+    // 1: try the switch (Android refuses the first time); only then is the menu item there.
+    await fireEvent.press(within(card).getByRole("button", { name: "Open usage access" }));
+    await comeBack();
+    // 2: App info → ⋮ → Allow restricted settings.
+    await fireEvent.press(await within(card).findByRole("button", { name: "App info" }));
+    expect(openSettings).toHaveBeenCalled();
+    await comeBack();
+    // 3: the switch again, now it turns on.
+    await fireEvent.press(await within(card).findByRole("button", { name: "Open usage access" }));
+    mockPhone.usage = true;
+    await comeBack();
+    expect(await within(card).findByText("On")).toBeOnTheScreen();
+  });
+
+  it("makes the walk-through's main button the step to take now", async () => {
+    mockPhone.restricted = true;
+    notifications.state.granted = true;
+    calendar.state.status = "granted";
+    jest.spyOn(Linking, "openSettings").mockResolvedValue();
+    await renderScreen(<OnboardingScreen />, await createTestRuntime());
+    await fireEvent.press(await screen.findByRole("button", { name: "Continue" }));
+    expect(await screen.findByText(en("permissions.usage.step2"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Open usage access" }));
+    await comeBack();
+    expect(await screen.findByRole("button", { name: "App info" })).toBeOnTheScreen();
   });
 });
 
@@ -103,10 +142,8 @@ describe("the first-run onboarding", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Allow" }));
     expect(calendar.state.status).toBe("granted");
 
-    // A settings screen: the step waits until the person is back with it turned on, and says
-    // how to lift Android's restricted settings first.
+    // A settings screen: the step waits until the person is back with it turned on.
     expect(await screen.findByText("3 of 3")).toBeOnTheScreen();
-    expect(screen.getByText(en("permissions.usage.restricted"))).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Open settings" }));
     expect(screen.getByText("3 of 3")).toBeOnTheScreen();
     mockPhone.usage = true;

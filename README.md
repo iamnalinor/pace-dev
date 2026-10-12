@@ -245,8 +245,9 @@ installs over it.
   CI uses JDK 17, NDK 27.1 and builds `arm64-v8a` only.
 - **Installing from the APK**: Pace is not in a store, so Android 13+ treats usage access as a
   "restricted setting" and greys it out ("App was denied access"). Lift it once: *Settings →
-  Apps → Pace → ⋮ → Allow restricted settings*, then grant usage access. The permissions screen
-  and the first-run walk-through say so and open App info. Reminders are plain notifications:
+  Apps → Pace → ⋮ → Allow restricted settings*, then grant usage access. The ⋮ item appears only
+  after a first, refused try at the switch, so on Android 13+ the usage step of the permissions
+  screen and the walk-through leads through the three steps, its button the step to take now. Reminders are plain notifications:
   no exact-alarm permission (the manifest blocks it), so one may come a few minutes late in Doze.
 - **Size**: release builds run R8 and drop unused resources, and native libraries are
   compressed (`expo-build-properties` in `app.config.ts`, guarded by `app.config.test.ts`).

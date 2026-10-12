@@ -103,8 +103,12 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.usage": "Доступ к статистике",
   "permissions.usage.why":
     "Когда был включён экран и какие приложения были открыты: сон прошлой ночью и время в телефоне внутри каждого блока.",
-  "permissions.usage.restricted":
-    "Если Android пишет «App was denied access»: откройте «О приложении», нажмите ⋮ в углу, выберите «Разрешить ограниченные настройки» и снова откройте настройки здесь.",
+  "permissions.usage.step1":
+    "1. Откройте доступ к статистике и включите Pace. В первый раз Android откажет («App was denied access»): так и должно быть.",
+  "permissions.usage.step2":
+    "2. Откройте «О приложении», нажмите ⋮ в правом верхнем углу, выберите «Разрешить ограниченные настройки» и подтвердите.",
+  "permissions.usage.step3": "3. Снова откройте доступ к статистике и включите Pace.",
+  "permissions.usage.open": "Открыть доступ к статистике",
   "permissions.appInfo": "О приложении",
   "permissions.on": "Включено",
   "permissions.off": "Выключено",

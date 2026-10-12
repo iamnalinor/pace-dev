@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
@@ -48,6 +49,10 @@ class PaceNativeModule : Module() {
     Function("setCrashContext") { text: String -> CrashCatcher.appContext = text.take(2_000) }
 
     Function("hasUsageAccess") { hasUsageAccess() }
+
+    // Android 13+ greys usage access out for an app installed from an APK until the person
+    // allows "restricted settings" on its App info page.
+    Function("restrictsSettings") { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU }
 
     // Straight to Pace's own switch (Android 10+ settings take the package); a settings app
     // that does not, opens the list of apps instead.
