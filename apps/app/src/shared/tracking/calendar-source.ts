@@ -6,7 +6,7 @@ import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
 /** An event over this recently still counts: the Calendar button links to it. */
 const RECENT_MINUTES = 15;
 
-/** What "From calendar" can start on a phone: today's events from now on, read on the phone. */
+/** What "Calendar" can start on a phone: today's events from just now on, read on the phone. */
 export const calendarToday = async ({ now, zone }: CalendarSource): Promise<CalendarToday> => {
   try {
     const access = await calendarAccess();

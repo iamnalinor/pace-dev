@@ -301,7 +301,9 @@ the native code and runs the JS logic against mocks).
 - **Calendar**: "From your calendar" lists the day's timed events from every visible
   calendar that are yours to attend: your own events and subscriptions, and invitations you
   accepted (declined, tentative and unanswered ones, and all-day events, are skipped). The
-  time bar's *From calendar* starts the event going on now under its title, from its start. *Attended* logs the event as a block, *Skip* hides it
+  time bar's *Calendar* starts the event near now (starting, going on or just over within 15
+  minutes) under its title, from its start; with none, or no access, it is greyed and a tap
+  says why. *Attended* logs the event as a block, *Skip* hides it
   on this phone. For a repeating event, the toast offers *Every time*: the whole series is
   then logged when it ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.
