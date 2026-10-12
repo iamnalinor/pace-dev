@@ -8,12 +8,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
-import { useCrashContext } from "#app/platform/crash-context.ts";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
+import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the background phone check before Android may run it.
 import "#app/platform/phone-background.ts";
-import { UpdateBanner } from "#app/platform/update-banner.tsx";
+import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
