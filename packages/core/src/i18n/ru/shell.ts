@@ -121,6 +121,10 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.rule.attended": "{title}: всегда был(а)",
   "permissions.rule.skip": "{title}: всегда пропускаю",
   "permissions.rule.remove": "Забыть",
+  "onboarding.done.title": "Готово",
+  "onboarding.done.body":
+    "Вот что Pace может использовать. Выключенное можно включить позже в «Настройки → Разрешения».",
+  "onboarding.done.start": "Начать",
   "onboarding.title": "Несколько разрешений",
   "onboarding.intro":
     "Pace работает и без них, но с ними умеет больше. Каждое можно поменять потом в Настройки → Разрешения.",

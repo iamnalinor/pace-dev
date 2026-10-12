@@ -149,6 +149,12 @@ describe("the first-run onboarding", () => {
     mockPhone.usage = true;
     await comeBack();
 
+    // A closing screen, not a jump to Now: what is on, and where the rest is turned on later.
+    expect(await screen.findByRole("header", { name: "All set" })).toBeOnTheScreen();
+    const summary = screen.getByLabelText("Usage access");
+    expect(within(summary).getByText("On")).toBeOnTheScreen();
+    expect(router.replace).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("button", { name: "Start" }));
     await waitFor(() => {
       expect(router.replace).toHaveBeenCalledWith("/");
     });

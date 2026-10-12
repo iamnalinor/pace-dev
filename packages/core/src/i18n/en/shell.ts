@@ -119,6 +119,10 @@ export const enShell = {
   "permissions.rule.attended": "{title}: always attended",
   "permissions.rule.skip": "{title}: always skipped",
   "permissions.rule.remove": "Forget",
+  "onboarding.done.title": "All set",
+  "onboarding.done.body":
+    "This is what Pace can use now. Anything off can be turned on later in Settings → Permissions.",
+  "onboarding.done.start": "Start",
   "onboarding.title": "A few permissions",
   "onboarding.intro":
     "Pace works without them, but can do more with them. You can change each one later in Settings → Permissions.",
