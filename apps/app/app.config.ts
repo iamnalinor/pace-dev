@@ -127,6 +127,10 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           enableShrinkResourcesInReleaseBuilds: true,
+          // Android 11+ hides other apps unless asked: lets login see whether tg:// opens Telegram.
+          manifestQueries: {
+            intent: [{ action: "android.intent.action.VIEW", data: { scheme: "tg" } }],
+          },
           useLegacyPackaging: true,
         },
       },

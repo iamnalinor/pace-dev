@@ -16,7 +16,11 @@ import { ThemeProvider } from "../ui/theme-provider.tsx";
 import { LoginScreen } from "./login-screen.tsx";
 
 jest.mock("expo-secure-store", () => mockSecureStoreModule.createFakeSecureStore());
-jest.mock("expo-linking", () => ({ openURL: jest.fn(async () => true) }));
+jest.mock("expo-linking", () => ({
+  // No Telegram app in the test: the bot opens through t.me.
+  canOpenURL: jest.fn(async () => false),
+  openURL: jest.fn(async () => true),
+}));
 jest.mock("expo-web-browser", () => ({
   openAuthSessionAsync: jest.fn(async () => ({ type: "cancel" })),
 }));
