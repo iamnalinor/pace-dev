@@ -3,9 +3,11 @@ package expo.modules.pacenative
 import android.app.NotificationManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
@@ -47,8 +49,16 @@ class PaceNativeModule : Module() {
 
     Function("hasUsageAccess") { hasUsageAccess() }
 
+    // Straight to Pace's own switch (Android 10+ settings take the package); a settings app
+    // that does not, opens the list of apps instead.
     Function("openUsageAccessSettings") {
-      openSettings(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+      try {
+        openSettings(
+          Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}"))
+        )
+      } catch (_: ActivityNotFoundException) {
+        openSettings(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+      }
     }
 
     Function("isDndAccessGranted") { notificationManager.isNotificationPolicyAccessGranted }
