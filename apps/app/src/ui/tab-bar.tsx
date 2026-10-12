@@ -2,10 +2,11 @@ import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
 import { ChartColumn, Clock, Folder, type LucideIcon, Settings, Zap } from "lucide-react-native";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useT } from "../app-state.tsx";
+import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
 import { useTheme } from "./theme-provider.tsx";
 
@@ -23,7 +24,7 @@ const ICONS: Readonly<Record<string, LucideIcon>> = {
 const ICON_SIZE = 20;
 const STROKE = 1.75;
 
-/** Bottom tabs: five 56×44 targets, Now, Day, Projects, Insights and Settings. */
+/** Bottom tabs: Now, Day, Projects, Insights and Settings, each an icon over its name. */
 const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   const t = useT();
   const { palette } = useTheme();
@@ -31,9 +32,9 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="flex-row justify-around border-t border-line bg-bg px-3 pt-2"
+      className="flex-row border-t border-line bg-bg px-1 pt-1.5"
       role="tablist"
-      style={{ paddingBottom: Math.max(insets.bottom, 12) + 8 }}
+      style={{ paddingBottom: Math.max(insets.bottom, 8) + 4 }}
     >
       {state.routes.map((route, index) => {
         const Icon = ICONS[route.name];
@@ -43,7 +44,8 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         // On /add (New task, a share) Now is the screen, with the cursor in the composer.
         const current = state.routes[state.index]?.name;
         const isFocused = state.index === index || (route.name === "index" && current === "add");
-        const activeColor = isFocused ? palette.fg : palette.faint;
+        const activeColor = isFocused ? palette.accentText : palette.muted;
+        const title = descriptors[route.key]?.options.title ?? route.name;
         const onPress = (): void => {
           const event = navigation.emit({
             canPreventDefault: true,
@@ -56,14 +58,23 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         };
         return (
           <Pressable
-            accessibilityLabel={descriptors[route.key]?.options.title ?? route.name}
+            accessibilityLabel={title}
             accessibilityRole="tab"
             aria-selected={isFocused}
-            className="h-11 w-14 items-center justify-center"
+            className="min-h-12 flex-1 items-center justify-center gap-0.5"
             key={route.key}
             onPress={onPress}
           >
             <Icon color={activeColor} size={ICON_SIZE} strokeWidth={STROKE} />
+            <Text
+              className={cx(
+                "font-sans text-[11px]",
+                isFocused ? "font-medium text-accentText" : "text-muted",
+              )}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
           </Pressable>
         );
       })}

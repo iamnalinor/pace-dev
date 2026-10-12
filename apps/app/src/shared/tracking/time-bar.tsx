@@ -163,7 +163,7 @@ const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
       <Pressable
         accessibilityLabel={t("time.more", { label })}
         accessibilityRole="button"
-        className="absolute right-0 top-0 h-8 w-8 items-center justify-center rounded-md active:opacity-60"
+        className="absolute -right-1 -top-1 h-11 w-11 items-start justify-start rounded-md pl-4 pt-2 active:opacity-60"
         hitSlop={6}
         onPress={more}
       >

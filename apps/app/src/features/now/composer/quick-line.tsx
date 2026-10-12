@@ -66,7 +66,7 @@ export const QuickActions = ({
   const t = useT();
   return (
     <View className="flex-row flex-wrap gap-2 pt-2">
-      <View className="min-w-36 flex-[2]">
+      <View className="min-w-40 flex-1">
         <Button
           busy={isReading}
           disabled={!canParse}
@@ -77,7 +77,7 @@ export const QuickActions = ({
           {t("composer.parse")}
         </Button>
       </View>
-      <View className="min-w-36 flex-1">
+      <View className="min-w-40 flex-1">
         <Button hotkey={HOTKEYS.toInbox} hotkeyMode="hint" onPress={onInbox} variant="ghost">
           {t("composer.toInbox")}
         </Button>

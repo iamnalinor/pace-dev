@@ -43,7 +43,10 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "time.alongsideTag": "параллельно",
   "time.calendarNone": "Сейчас в календаре ничего нет.",
   "time.calendarNoneWeb":
-    "Сейчас в календаре с телефона ничего нет. События присылает Pace на Android: откройте его на телефоне с доступом к календарю.",
+    "Сегодня в календаре с телефона ничего нет (Pace на Android, календарь включён в Настройках → Устройства).",
+  "time.calendarUntitled": "Встреча",
+  "time.calendarStartUntitled": "Начать встречу без события",
+  "time.calendarSetUp": "Календарь с телефона",
   "time.calendarToday": "Сегодня в календаре",
   "time.attend": "Иду",
   "time.focusing": "В фокусе",

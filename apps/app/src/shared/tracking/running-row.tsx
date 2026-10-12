@@ -102,7 +102,7 @@ export const RunningRow = ({
       {isLong ? (
         <Pressable
           accessibilityRole="button"
-          className="h-9 justify-center rounded-lg border border-line px-3 active:opacity-70"
+          className="h-11 justify-center rounded-lg border border-line px-3 active:opacity-70"
           onPress={() => {
             // Still going: the next ask moves on as far again; the Expect stays what it was.
             void run(actions.stillGoing(running.activityId));
@@ -114,7 +114,7 @@ export const RunningRow = ({
       <Pressable
         accessibilityLabel={`${t("time.stop")}: ${running.label}`}
         accessibilityRole="button"
-        className="h-9 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
+        className="h-11 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
         hitSlop={6}
         onPress={() => {
           void run(actions.stopActivity({ activityId: running.activityId }));

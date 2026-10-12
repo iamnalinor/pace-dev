@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { Check } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -50,6 +51,7 @@ type ListProps = {
   readonly calendar: CalendarToday | null;
   readonly start: (result: ActionResult) => void;
   readonly options: StartOptions;
+  readonly close: () => void;
 };
 
 /** A button's choices: sport by its length, chores by name, each with its usual length. */
@@ -90,14 +92,54 @@ const noEventsKey = (calendar: CalendarToday | null): MessageKey => {
   return calendar?.access === "granted" ? "time.calendarNone" : "phone.calendarAsk";
 };
 
+/**
+Nothing in the calendar: why, and the way on anyway — a meeting without an event (named later
+on Day), and on the web where the calendar comes from.
+*/
+const NoEvents = ({ calendar, close, options, start }: ListProps) => {
+  const t = useT();
+  const router = useRouter();
+  const { actions } = usePace();
+  return (
+    <View className="gap-2">
+      <Text className="font-sans text-[14px] text-muted">{t(noEventsKey(calendar))}</Text>
+      <ChoiceRow
+        aside={null}
+        label={t("time.calendarStartUntitled")}
+        onPress={() => {
+          start(
+            actions.startActivity({
+              alongside: options.alongside,
+              buttonId: "calendar",
+              category: "other",
+              label: t("time.calendarUntitled"),
+            }),
+          );
+        }}
+      />
+      {IS_PHONE ? null : (
+        <ChoiceRow
+          aside={null}
+          label={t("time.calendarSetUp")}
+          onPress={() => {
+            close();
+            router.push("/devices");
+          }}
+        />
+      )}
+    </View>
+  );
+};
+
 /** Today's events from the calendar (own or accepted), or why there are none. */
-const CalendarChoices = ({ calendar, options, start }: ListProps) => {
+const CalendarChoices = (props: ListProps) => {
   const t = useT();
   const { deviceTz } = useViewer();
   const { actions } = usePace();
+  const { calendar, options, start } = props;
   const events = calendar?.events ?? [];
   if (events.length === 0) {
-    return <Text className="font-sans text-[14px] text-muted">{t(noEventsKey(calendar))}</Text>;
+    return <NoEvents {...props} />;
   }
   return (
     <View aria-label={t("time.calendarToday")} className="gap-2" role="list">
@@ -136,6 +178,7 @@ export const ChoicesSheet = ({
   const props: ListProps = {
     button,
     calendar,
+    close: onClose,
     options: { alongside: isAlongside },
     start: (result) => {
       void (async () => {

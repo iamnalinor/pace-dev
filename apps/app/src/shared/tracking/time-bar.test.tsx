@@ -126,6 +126,20 @@ describe("TimeBar", () => {
     expect(screen.getByText("ЦСС")).toBeOnTheScreen();
   });
 
+  it("offers a meeting without an event when the calendar has nothing on", async () => {
+    calendar.state.status = "granted";
+    calendar.state.events = [];
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.press(screen.getByRole("switch", { name: "From calendar" }));
+    await fireEvent.press(
+      await screen.findByRole("button", { name: en("time.calendarStartUntitled") }),
+    );
+    await waitFor(() => {
+      expect(running(runtime)).toEqual([en("time.calendarUntitled")]);
+    });
+  });
+
   it("starts the calendar's event going on now, from its start", async () => {
     calendar.state.status = "granted";
     calendar.state.events = [
