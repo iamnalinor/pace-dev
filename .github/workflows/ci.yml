@@ -112,6 +112,9 @@ jobs:
       EXPO_NO_TELEMETRY: 1
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The tags and history: a build between releases is versioned on the last tag.
+          fetch-depth: 0
       - uses: ./.github/actions/setup
       - uses: actions/setup-java@v6
         with:

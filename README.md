@@ -219,8 +219,10 @@ Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_U
 ## Android release
 
 Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA updates.
-`apps/app/app.config.ts` derives `version` and `versionCode` from the tag (`v1.2.3` →
-`1.2.3`, `10203`); untagged CI builds use the run number.
+`apps/app/app-version.ts` derives `version` and `versionCode` from the tag (`v1.2.3` →
+`1.2.3`, `10203000`). A build between releases sits on the last tag (`git describe`):
+`1.2.3-dev.7+cfd5334`, code `10203007`, so it installs over that release and the next release
+installs over it.
 
 - **Signing today: the standard Android debug keystore**, committed at
   `apps/app/keystores/debug.keystore` (`android` / `androiddebugkey` / `android`).

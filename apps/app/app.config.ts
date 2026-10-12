@@ -1,21 +1,34 @@
 import type { ExpoConfig } from "expo/config";
 
+import { execFileSync } from "node:child_process";
+
+import { appVersion } from "./app-version.ts";
+
 // Expo types `process.env` loosely (EXPO_PUBLIC_* are injected at bundle time): narrow it here.
 const envString = (name: string): string | undefined => {
   const value: unknown = process.env[name];
   return typeof value === "string" ? value : undefined;
 };
 
-// Release builds are tagged vX.Y.Z; the tag drives both the version and the versionCode.
-// PACE_RELEASE_TAG is set by release.yml (a run by hand releases from a branch, not a tag ref).
-const tag = /^v(\d+)\.(\d+)\.(\d+)$/.exec(
-  envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
-);
-const version = tag === null ? "0.0.0" : `${tag[1]}.${tag[2]}.${tag[3]}`;
-const versionCode =
-  tag === null
-    ? Number(envString("GITHUB_RUN_NUMBER") ?? "1")
-    : Number(tag[1]) * 10_000 + Number(tag[2]) * 100 + Number(tag[3]);
+/** The last release tag, the commits since it and the commit; empty without git or tags. */
+const gitDescribe = (): string => {
+  try {
+    // eslint-disable-next-line sonarjs/no-os-command-from-path -- the build machine's git (Node runs this config at prebuild); fixed arguments, no input
+    return execFileSync("git", ["describe", "--tags", "--long", "--match", "v*"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+};
+
+// Release builds are tagged vX.Y.Z; PACE_RELEASE_TAG is set by release.yml (a run by hand
+// releases from a branch, not a tag ref). Any other build sits on the last tag (app-version.ts).
+const { version, versionCode } = appVersion({
+  describe: gitDescribe(),
+  releaseTag: envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
+});
 
 const config: ExpoConfig = {
   name: "Pace",
