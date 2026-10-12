@@ -1,3 +1,6 @@
+// Before anything that makes ids: Hermes has no crypto.getRandomValues of its own.
+import "#app/platform/random-values.ts";
+
 import "../global.css";
 
 import { type ErrorBoundaryProps, Stack, usePathname } from "expo-router";
