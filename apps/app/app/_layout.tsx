@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
+import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 // Defines the background phone check before Android may run it.
 import "#app/platform/phone-background.ts";
@@ -37,6 +38,7 @@ const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
   useNotificationLinks();
+  useCrashNotice();
   return (
     <View className="flex-1 flex-row bg-bg">
       {hasSidebar ? <Sidebar /> : null}

@@ -248,7 +248,7 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
 - **Crash traces**: a crash, a JS error at start included, writes its trace to
   *Downloads/Pace/crash-<date-time>.txt* (Android 10+; on older ones
   `Android/data/dev.nalinor.pace/files`) before the app closes, so it can be shared without
-  adb (`CrashCatcher.kt` in `modules/pace-native`).
+  adb (`CrashCatcher.kt` in `modules/pace-native`); the next start says where in a toast.
 
 ## Devices: calendar and app usage in the cloud
 

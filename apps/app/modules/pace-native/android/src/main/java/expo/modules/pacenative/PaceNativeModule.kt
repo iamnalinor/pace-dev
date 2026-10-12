@@ -65,6 +65,9 @@ class PaceNativeModule : Module() {
       }
     }
 
+    // Where the last crash's trace was saved (CrashCatcher), once; null when none is pending.
+    Function("takeLastCrash") { CrashCatcher.takeLastCrash(context) }
+
     Function("hasUsageAccess") { hasUsageAccess() }
 
     Function("openUsageAccessSettings") {

@@ -31,6 +31,8 @@ export type PaceNative = {
   readonly queryUsageStats: (beginMs: number, endMs: number) => Promise<readonly UsageStats[]>;
   /** Package id → the app's name as the launcher shows it (unknown ids map to themselves). */
   readonly appLabels: (packages: readonly string[]) => Promise<Readonly<Record<string, string>>>;
+  /** Where the last crash's trace was saved (`Download/Pace/crash-….txt`), once; else null. */
+  readonly takeLastCrash: () => null | string;
 };
 
 const noop = (): void => undefined;
@@ -47,6 +49,7 @@ export const fallbackPaceNative: PaceNative = {
   queryUsageEvents: async () => [],
   queryUsageStats: async () => [],
   setDnd: () => false,
+  takeLastCrash: () => null,
 };
 
 /** The native module when it is linked, otherwise the fallback. */
