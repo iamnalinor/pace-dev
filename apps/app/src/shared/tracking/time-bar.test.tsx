@@ -35,7 +35,7 @@ describe("TimeBar", () => {
       within(time)
         .getAllByRole("switch")
         .map((button): unknown => button.props["accessibilityLabel"]),
-    ).toEqual(["From calendar", "Rest", "Sport", "Chores"]);
+    ).toEqual(["Calendar", "Rest", "Sport", "Chores"]);
     await fireEvent.press(screen.getByRole("switch", { name: "Rest" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Rest"]);
@@ -126,12 +126,72 @@ describe("TimeBar", () => {
     expect(screen.getByText("ЦСС")).toBeOnTheScreen();
   });
 
-  it("offers a meeting without an event when the calendar has nothing on", async () => {
+  it("is greyed without calendar access, and a tap says what it is and why not now", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    const button = screen.getByRole("switch", { name: "Calendar" });
+    await waitFor(() => {
+      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.noAccess"));
+    });
+    await fireEvent.press(button);
+    expect(
+      await screen.findByText(`${en("time.calendar.what")} ${en("time.calendar.noAccess")}`),
+    ).toBeOnTheScreen();
+    expect(running(runtime)).toEqual([]);
+  });
+
+  it("is greyed with nothing in the calendar within 15 minutes of now", async () => {
+    calendar.state.status = "granted";
+    calendar.state.events = [
+      {
+        allDay: false,
+        endDate: addMinutesIso(NOW, 90),
+        id: "ev-later",
+        startDate: addMinutesIso(NOW, 40),
+        title: "Later",
+      },
+    ];
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    const button = screen.getByRole("switch", { name: "Calendar" });
+    await waitFor(() => {
+      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.nothingNear"));
+    });
+    await fireEvent.press(button);
+    expect(
+      await screen.findByText(`${en("time.calendar.what")} ${en("time.calendar.nothingNear")}`),
+    ).toBeOnTheScreen();
+  });
+
+  it("starts the event that begins within 15 minutes", async () => {
+    calendar.state.status = "granted";
+    calendar.state.events = [
+      {
+        allDay: false,
+        endDate: addMinutesIso(NOW, 70),
+        id: "ev-soon",
+        startDate: addMinutesIso(NOW, 10),
+        title: "Standup",
+      },
+    ];
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    const button = screen.getByRole("switch", { name: "Calendar" });
+    await waitFor(() => {
+      expect(button.props["accessibilityHint"]).toBe(en("time.buttonHint"));
+    });
+    await fireEvent.press(button);
+    await waitFor(() => {
+      expect(running(runtime)).toEqual(["Standup"]);
+    });
+  });
+
+  it("offers a meeting without an event from its menu when the calendar has nothing on", async () => {
     calendar.state.status = "granted";
     calendar.state.events = [];
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("switch", { name: "From calendar" }));
+    await fireEvent.press(screen.getByRole("button", { name: "More about Calendar" }));
     await fireEvent.press(
       await screen.findByRole("button", { name: en("time.calendarStartUntitled") }),
     );
@@ -153,7 +213,11 @@ describe("TimeBar", () => {
     ];
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("switch", { name: "From calendar" }));
+    const button = screen.getByRole("switch", { name: "Calendar" });
+    await waitFor(() => {
+      expect(button.props["accessibilityHint"]).toBe(en("time.buttonHint"));
+    });
+    await fireEvent.press(button);
     await waitFor(() => {
       expect(activities(runtime)).toEqual([
         expect.objectContaining({

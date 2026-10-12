@@ -1,6 +1,6 @@
 import { addMinutesIso } from "@pace/core";
 
-import { promptedEvent } from "./calendar-today.ts";
+import { calendarButtonState, promptedEvent } from "./calendar-today.ts";
 
 const NOW = "2026-10-06T09:55:00.000Z";
 
@@ -43,5 +43,35 @@ describe("the calendar event Now asks about", () => {
         activities: [{ endAt: null, label: "Event soon", startAt: addMinutesIso(NOW, -1) }],
       }),
     ).toBeNull();
+  });
+});
+
+const today = (events: readonly ReturnType<typeof event>[]) => ({
+  access: "granted" as const,
+  events,
+});
+
+describe("what the Calendar button can do now", () => {
+  it("waits for the calendar, and says when there is no access", () => {
+    expect(calendarButtonState(null, NOW)).toEqual({ kind: "loading" });
+    expect(calendarButtonState({ access: "denied", events: [] }, NOW)).toEqual({
+      kind: "noAccess",
+    });
+  });
+
+  it("links to events within 15 minutes of now: soon, going on, just over", () => {
+    const soon = event("soon", 15);
+    const on = event("on", -30);
+    const over = { ...event("over", -100), endAt: addMinutesIso(NOW, -10) };
+    expect(calendarButtonState(today([soon, on, over]), NOW)).toEqual({
+      events: [over, on, soon],
+      kind: "ready",
+    });
+  });
+
+  it("has nothing to link to further away", () => {
+    const later = event("later", 16);
+    const long = { ...event("long", -200), endAt: addMinutesIso(NOW, -16) };
+    expect(calendarButtonState(today([later, long]), NOW)).toEqual({ kind: "nothingNear" });
   });
 });

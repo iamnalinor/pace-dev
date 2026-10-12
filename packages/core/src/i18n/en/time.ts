@@ -21,7 +21,7 @@ export const enTime = {
   "time.expectOf": "of ~{duration}",
   "time.long": "Still doing this?",
   "time.stillYes": "Yes, still",
-  "time.button.calendar": "From calendar",
+  "time.button.calendar": "Calendar",
   "time.button.rest": "Rest",
   "time.button.sport": "Sport",
   "time.button.chores": "Chores",
@@ -39,6 +39,12 @@ export const enTime = {
   "time.more": "More about {label}",
   "time.alongside": "Alongside what is running",
   "time.alongsideTag": "alongside",
+  "time.calendar.what":
+    "Calendar starts the meeting from your calendar that is on now or within 15 minutes.",
+  "time.calendar.loading": "The calendar has not loaded yet.",
+  "time.calendar.noAccess":
+    "Pace has no access to the calendar yet: allow it in Settings → Permissions.",
+  "time.calendar.nothingNear": "There is nothing in the calendar within 15 minutes of now.",
   "time.calendarNone": "Nothing on in your calendar right now.",
   "time.calendarNoneWeb":
     "Nothing on today in the calendar your phone sends (Pace on Android, with the calendar on in Settings → Devices).",

@@ -15,16 +15,16 @@ import type { Event } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { useViewer } from "#app/shared/use-viewer.ts";
 import { inkClass, OUTLINE } from "#app/ui/color.tsx";
 import { contextMenuProps } from "#app/ui/context-menu.ts";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
-import { calendarToday } from "./calendar-source.ts";
-import { type CalendarToday, eventOnNow } from "./calendar-today.ts";
+import type { CalendarToday } from "./calendar-today.ts";
+
 import { ChoicesSheet } from "./choices-sheet.tsx";
 import { RunningRow } from "./running-row.tsx";
+import { type CalendarButton, useCalendarButton } from "./use-calendar-button.ts";
 
 const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
   calendar: CalendarDays,
@@ -109,6 +109,8 @@ const TypedStart = ({
 
 type ButtonProps = {
   readonly button: TimeButtonView;
+  /** Greyed: a tap only explains why it cannot start anything now (the Calendar button). */
+  readonly unavailable?: string | undefined;
   readonly onTap: (button: TimeButtonView) => void;
   readonly onMore: (button: TimeButtonView) => void;
 };
@@ -117,11 +119,13 @@ type ButtonProps = {
 A big button in its fixed place: icon over name, its color's outline, filled with the accent while it runs.
 A long press, a right click or "⋯" opens what it can start and "alongside".
 */
-const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
+const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
   const t = useT();
   const { palette } = useTheme();
   const label = t(button.labelKey);
   const Icon = ICONS[button.id];
+  const restingColor = unavailable === undefined ? palette.fg2 : palette.muted;
+  const iconColor = button.isRunning ? palette.accentFg : restingColor;
   const more = (): void => {
     onMore(button);
   };
@@ -129,13 +133,14 @@ const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
     <View className="relative flex-1">
       <Pressable
         accessibilityActions={[{ label: t("time.more", { label }), name: "longpress" }]}
-        accessibilityHint={t("time.buttonHint")}
+        accessibilityHint={unavailable ?? t("time.buttonHint")}
         accessibilityLabel={label}
         accessibilityRole="switch"
         aria-checked={button.isRunning}
         className={cx(
           "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
           button.isRunning ? "border-accent bg-accent" : cx(OUTLINE[button.color], "bg-surface"),
+          unavailable !== undefined && "border-line opacity-60",
         )}
         delayLongPress={450}
         onAccessibilityAction={(event) => {
@@ -149,13 +154,14 @@ const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
         }}
         {...contextMenuProps(more)}
       >
-        <Icon color={button.isRunning ? palette.accentFg : palette.fg2} size={18} />
+        <Icon color={iconColor} size={18} />
         <Text
           className={cx(
             "text-center font-sans text-[12px] leading-[14px]",
             button.isRunning ? "font-medium text-accentFg" : inkClass(button.color),
+            unavailable !== undefined && "text-muted",
           )}
-          numberOfLines={2}
+          numberOfLines={1}
         >
           {label}
         </Text>
@@ -176,37 +182,32 @@ const BarButton = ({ button, onMore, onTap }: ButtonProps) => {
 type Opened = { readonly button: TimeButtonView; readonly calendar: CalendarToday | null };
 
 /** What a tap does: stop the running button, start the calendar's event or a single choice, or ask. */
-const useTap = (open: (opened: Opened) => void) => {
-  const { actions, api } = usePace();
-  const { deviceTz, now } = useViewer();
+const useTap = (open: (opened: Opened) => void, calendar: CalendarButton) => {
+  const { actions } = usePace();
   const run = useRunAction();
-  const calendarOf = async (button: TimeButtonView): Promise<CalendarToday | null> =>
-    button.kind === "calendar" ? await calendarToday({ api, now, zone: deviceTz }) : null;
   const tap = async (button: TimeButtonView): Promise<void> => {
+    const [only] = button.choices;
     if (button.isRunning) {
       await run(actions.stopActivity());
-      return;
-    }
-    const calendar = await calendarOf(button);
-    const current = calendar === null ? null : eventOnNow(calendar.events, now);
-    const [only] = button.choices;
-    if (current !== null) {
-      await run(actions.startCalendar(current));
+    } else if (button.kind === "calendar") {
+      await calendar.tap(() => {
+        open({ button, calendar: calendar.today });
+      });
     } else if (only !== undefined && button.choices.length === 1) {
       await run(actions.startChoice(only.id));
     } else {
-      open({ button, calendar });
+      open({ button, calendar: null });
     }
   };
-  const more = async (button: TimeButtonView): Promise<void> => {
-    open({ button, calendar: await calendarOf(button) });
+  const more = (button: TimeButtonView): void => {
+    open({ button, calendar: button.kind === "calendar" ? calendar.today : null });
   };
   return { more, tap };
 };
 
 /**
 The time bar under Now, where the thumb rests: what runs (and what runs alongside), "What are
-you doing?", and four buttons that never move: From calendar, Rest, Sport and Chores.
+you doing?", and four buttons that never move: Calendar, Rest, Sport and Chores.
 */
 export const TimeBar = () => {
   const t = useT();
@@ -215,7 +216,8 @@ export const TimeBar = () => {
   const [opened, setOpened] = useState<null | Opened>(null);
   // The typed activities the assistant is still reading (two can be in flight).
   const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
-  const { more, tap } = useTap(setOpened);
+  const calendar = useCalendarButton();
+  const { more, tap } = useTap(setOpened, calendar);
   return (
     <View
       accessibilityLabel={t("time.bar")}
@@ -238,8 +240,9 @@ export const TimeBar = () => {
           <BarButton
             button={button}
             key={button.id}
-            onMore={(pressed) => void more(pressed)}
+            onMore={more}
             onTap={(pressed) => void tap(pressed)}
+            unavailable={button.kind === "calendar" ? calendar.unavailable : undefined}
           />
         ))}
       </View>
