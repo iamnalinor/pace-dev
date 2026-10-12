@@ -1,7 +1,6 @@
 package expo.modules.pacenative
 
 import android.app.AlarmManager
-import android.app.AppOpsManager
 import android.app.NotificationManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -10,7 +9,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
@@ -39,16 +37,7 @@ class PaceNativeModule : Module() {
     context.startActivity(intent)
   }
 
-  private fun hasUsageAccess(): Boolean {
-    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-    val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    } else {
-      @Suppress("DEPRECATION")
-      appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    }
-    return mode == AppOpsManager.MODE_ALLOWED
-  }
+  private fun hasUsageAccess(): Boolean = usageAccessGranted(context)
 
   override fun definition() = ModuleDefinition {
     Name("PaceNative")
@@ -70,6 +59,9 @@ class PaceNativeModule : Module() {
 
     // A trace the JS crash screen caught (the app kept running), saved next to the crashes'.
     Function("saveCrashTrace") { trace: String -> CrashCatcher.saveCaught(context, trace) }
+
+    // What the app is doing (screen, sync…), for the next crash file; never personal content.
+    Function("setCrashContext") { text: String -> CrashCatcher.appContext = text.take(2_000) }
 
     Function("hasUsageAccess") { hasUsageAccess() }
 

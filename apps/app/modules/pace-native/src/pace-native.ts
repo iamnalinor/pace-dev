@@ -35,6 +35,8 @@ export type PaceNative = {
   readonly takeLastCrash: () => null | string;
   /** Saves a trace the app caught itself (the crash screen) as a crash's; where it went, or null. */
   readonly saveCrashTrace: (trace: string) => null | string;
+  /** What the app is doing (screen, sync…), written into the next crash file. */
+  readonly setCrashContext: (text: string) => void;
 };
 
 const noop = (): void => undefined;
@@ -52,6 +54,7 @@ export const fallbackPaceNative: PaceNative = {
   queryUsageStats: async () => [],
   setDnd: () => false,
   saveCrashTrace: () => null,
+  setCrashContext: noop,
   takeLastCrash: () => null,
 };
 

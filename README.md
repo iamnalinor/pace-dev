@@ -246,9 +246,19 @@ Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA u
   Without that the APK is ~50 MB: every class of every library stays, all of Jetpack Compose
   among them (expo-router links it through `@expo/ui`).
 - **Crash traces**: a crash, a JS error at start included, writes its trace to
-  *Downloads/Pace/crash-<date-time>.txt* (Android 10+; on older ones
+  *Download/Pace/crash-<date-time>.txt* (Android 10+; on older ones
   `Android/data/dev.nalinor.pace/files`) before the app closes, so it can be shared without
-  adb (`CrashCatcher.kt` in `modules/pace-native`); the next start says where in a toast.
+  adb (`CrashCatcher.kt` in `modules/pace-native`); the next start says where in a toast. An
+  error the crash screen shows is saved there too, and the screen gives the path.
+  Next to the trace: the build, device model, Android version, language and UTC offset,
+  memory, power saving, dark mode, granted permissions (`DebugInfo.kt`) and what the app was
+  doing: the screen with ids masked, signed in or not, sync state (`crash-context.ts`). Never
+  names, the Telegram account, tokens, account or device ids, tasks, events, calendar, app
+  usage or the time zone's name.
+- **Hermes**: React Native 0.86's Hermes lacks `Array.prototype.toSorted`, `Object/Map.groupBy`,
+  the iterator helpers and `Intl.PluralRules`. `entry.ts` loads `src/platform/polyfills.ts`
+  (core-js, plus `crypto.getRandomValues` from expo-crypto) before any route; `@pace/core`
+  writes the plural rules out. A newer builtin needs a line there, or the phone crashes.
 
 ## Devices: calendar and app usage in the cloud
 

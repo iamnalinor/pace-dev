@@ -24,12 +24,19 @@ object CrashCatcher {
   private const val FOLDER = "Pace"
   /** Where the last trace went, until the app has said so once. */
   private const val PENDING_FILE = "pending-crash.txt"
+  private const val PRIVACY =
+    "Not in this file: names, Telegram account, tokens, account or device ids, tasks, events, " +
+      "calendar, app usage, the time zone's name."
+
+  /** What the app was doing, set from JS (crash-context.ts); empty before the first screen. */
+  @Volatile
+  var appContext: String = ""
 
   fun install(application: Application) {
     val previous = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, error ->
       try {
-        val location = save(application, withHeader(application, "thread ${thread.name}", stackOf(error)))
+        val location = save(application, report(application, "crash on thread ${thread.name}", stackOf(error)))
         File(application.filesDir, PENDING_FILE).writeText(location)
       } catch (_: Throwable) {
         // Saving the trace is best effort; the crash itself goes on below either way.
@@ -48,7 +55,7 @@ object CrashCatcher {
    */
   fun saveCaught(context: Context, trace: String): String? =
     try {
-      save(context, withHeader(context, "caught", trace))
+      save(context, report(context, "error shown on the crash screen", trace))
     } catch (_: Exception) {
       null
     }
@@ -93,16 +100,13 @@ object CrashCatcher {
     return writer.toString()
   }
 
-  private fun withHeader(context: Context, where: String, trace: String): String {
-    val header = "Pace ${versionOf(context)} · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}) · " +
-      "${Build.MANUFACTURER} ${Build.MODEL} · $where"
-    return "$header\n\n$trace"
-  }
-
-  private fun versionOf(context: Context): String =
-    try {
-      context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
-    } catch (_: Exception) {
-      "?"
-    }
+  /** The file: what happened, the device, the app, what is left out, then the trace. */
+  private fun report(context: Context, what: String, trace: String): String =
+    listOf(
+      "Pace $what",
+      DebugInfo.describe(context),
+      appContext.ifEmpty { "app: no screen yet (the crash came first)" },
+      PRIVACY,
+      trace,
+    ).joinToString("\n\n")
 }
