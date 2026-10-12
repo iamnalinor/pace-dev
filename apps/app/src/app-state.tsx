@@ -25,7 +25,12 @@ import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
-const SYNC_INTERVAL_MS = 30_000;
+/**
+How often the client pulls on its own. While the live channel is up the server says when
+something changed, so the poll is only a safety net; while it is down it polls as before.
+*/
+const POLL_OFFLINE_MS = 30_000;
+const POLL_LIVE_MS = 5 * 60_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 
@@ -56,9 +61,12 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   await sendPhoneData(runtime);
   await startPhoneChecks(phoneContextOf(runtime));
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
-  if (auth.store.getState().status === "signed-in") {
-    sync.start({ intervalMs: SYNC_INTERVAL_MS });
+  if (auth.store.getState().status !== "signed-in") {
+    return;
   }
+
+  sync.start({ intervalMs: POLL_OFFLINE_MS });
+  runtime.live.start();
 };
 
 /** The running activity and when it asks next: the timers change only when this does. */
@@ -95,6 +103,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       void bootstrap(runtime);
     } else {
       sync.stop();
+      runtime.live.stop();
     }
   };
   follow(auth.store.getState().status);
@@ -107,10 +116,22 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       void runtime.resetLocalData();
     }
   });
+  // The poll is a safety net while the server can say "changed" itself.
+  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }) => {
+    sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
+  });
   const subscription = AppState.addEventListener("change", (next) => {
-    if (!(next === "active" && auth.store.getState().status === "signed-in")) {
+    if (auth.store.getState().status !== "signed-in") {
       return;
     }
+    if (next !== "active") {
+      // Leaving (a hidden tab, the app in the background): what is unsent goes now, and the
+      // socket rests until the person is back.
+      void sync.syncNow();
+      runtime.live.stop();
+      return;
+    }
+    runtime.live.start();
 
     void actions.ensureInstances();
     void (async () => {
@@ -126,7 +147,9 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     unsubscribe();
     subscription.remove();
     stopTimers();
+    stopFollowingLive();
     sync.stop();
+    runtime.live.stop();
   };
 };
 

@@ -6,6 +6,7 @@ import { type ApiClient, createApiClient } from "./api-client.ts";
 import { type Assistant, createAssistant } from "./assistant.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { type Clock, systemClock } from "./clock.ts";
+import { createLiveChannel, type LiveChannel, type SocketLike } from "./live.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
 
@@ -18,6 +19,8 @@ export type PaceClient = {
   readonly clock: Clock;
   readonly state: AppStateHandle;
   readonly sync: SyncClient;
+  /** The server's "your log grew" line; started and stopped with the sync loop. */
+  readonly live: LiveChannel;
 };
 
 export type PaceClientOptions = {
@@ -32,7 +35,44 @@ export type PaceClientOptions = {
   readonly session: SessionStore;
   readonly source: "app" | "web";
   readonly store: EventStore;
+  /** Defaults to the global `WebSocket`; tests pass a fake. */
+  readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
+
+/** The local state and its sync: a local change is sent within a second. */
+const stateAndSync = (
+  options: PaceClientOptions,
+  api: ApiClient,
+  now: () => string,
+): { readonly state: AppStateHandle; readonly sync: SyncClient } => {
+  // The sync is wired after the state it reads, so the state reaches it through this.
+  const wiring = { sendSoon: (): void => undefined };
+  const state = createAppState({
+    deviceId: options.deviceId,
+    now,
+    onLocal: () => {
+      wiring.sendSoon();
+    },
+    source: options.source,
+    store: options.store,
+  });
+  const sync = createSyncClient({ api, now, state, store: options.store });
+  wiring.sendSoon = sync.soon;
+  return { state, sync };
+};
+
+/** The live channel next to the API: a server's "changed" asks the sync for a run. */
+const liveChannelOf = (
+  options: PaceClientOptions,
+  wiring: { readonly onChange: () => void; readonly token: () => string | undefined },
+): LiveChannel =>
+  createLiveChannel({
+    baseUrl: options.baseUrl,
+    ...(options.createSocket !== undefined && { createSocket: options.createSocket }),
+    deviceId: options.deviceId,
+    onChange: wiring.onChange,
+    token: wiring.token,
+  });
 
 /**
 Wires API client → auth → app state → sync → actions on the platform adapters: the one
@@ -53,13 +93,8 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   });
   const auth = createAuth({ api, session: options.session });
   token = auth.token;
-  const state = createAppState({
-    deviceId: options.deviceId,
-    now,
-    source: options.source,
-    store: options.store,
-  });
-  const sync = createSyncClient({ api, now, state, store: options.store });
+  const { state, sync } = stateAndSync(options, api, now);
+  const live = liveChannelOf(options, { onChange: sync.soon, token: auth.token });
   const actions = createActions({ clock, source: options.source, state });
 
   void (async (): Promise<void> => {
@@ -70,5 +105,5 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   })();
 
   const assistant = createAssistant({ api, clock, state });
-  return { actions, api, assistant, auth, clock, state, sync };
+  return { actions, api, assistant, auth, clock, live, state, sync };
 };

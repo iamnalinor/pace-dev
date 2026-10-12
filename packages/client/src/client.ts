@@ -59,6 +59,7 @@ export {
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export type { EventStore } from "./event-store.ts";
+export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
 export {
   activityNotifications,
   calendarNotifications,

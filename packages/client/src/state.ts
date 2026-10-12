@@ -246,6 +246,8 @@ export const createAppState = (options: {
   readonly now: () => string;
   readonly source: "app" | "web";
   readonly store: EventStore;
+  /** Told after each event written here (the sync sends it within a second). */
+  readonly onLocal?: () => void;
 }): AppStateHandle => {
   const { deviceId, now } = options;
   const store = createStore<AppState>(() => initialState(deviceId));
@@ -263,6 +265,7 @@ export const createAppState = (options: {
         return err("event/duplicate");
       }
       await log.persistLocal(parsed.value);
+      options.onLocal?.();
       return ok(parsed.value);
     });
 
