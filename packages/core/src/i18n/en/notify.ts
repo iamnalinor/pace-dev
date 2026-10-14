@@ -44,6 +44,8 @@ export const enNotify = {
   "notifications.delivery.queued": "Waiting for {device} via {method} · {time}",
   "notifications.delivery.failed": "Not delivered to {device} via {method} · {time}",
   "notifications.delivery.dismissed": "Taken back from {device} · {time}",
+  "notifications.delivery.telegram.sent": "Sent to Telegram · {time}",
+  "notifications.delivery.telegram.failed": "Not sent to Telegram · {time}",
   "notifications.method.fcm": "Google",
   "notifications.method.poll": "Pace",
   "settings.notifications": "Notifications",

@@ -195,6 +195,18 @@ describe("an event starting", () => {
       expect(telegram.calls.filter((entry) => entry.method === "deleteMessage")).toEqual([
         { body: { chat_id: "1002", message_id: 41 }, method: "deleteMessage" },
       ]);
+      // The log has the Telegram copy: sent at the start, taken back at the answer.
+      const page = await instance.listNotifications({ limit: 5 });
+      expect(page.deliveries[id]).toEqual([
+        {
+          at: SEMINAR.startAt,
+          device: "Telegram",
+          dismissedAt: now,
+          method: "telegram",
+          reason: null,
+          result: "sent",
+        },
+      ]);
       // A second answer changes nothing.
       const again = await instance.resolveNotification(id, "skipped", {
         couriers,
@@ -614,7 +626,11 @@ describe("Firebase push", () => {
       });
       expect(fcm.sends().at(-1)?.message.data).toEqual({ notificationId: id, type: "dismiss" });
       const after = await instance.listNotifications({ limit: 5 });
-      expect(after.deliveries[id]?.[0]).toMatchObject({ result: "dismissed" });
+      expect(after.deliveries[id]?.[0]).toMatchObject({
+        at: CROSSED,
+        dismissedAt: "2026-10-07T08:02:00.000Z",
+        result: "sent",
+      });
       // The access token is reused: one token call for three messages.
       expect(fcm.calls.filter((entry) => entry.url.includes("oauth2"))).toHaveLength(1);
     });
@@ -715,6 +731,26 @@ describe("Firebase push", () => {
       await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
       expect(fcm.sends()).toHaveLength(2);
       expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now)).toEqual(["poll"]);
+      // While broken, a device on it is not pushed to, and the log says why.
+      const login = await instance.notify(
+        {
+          kind: "login",
+          payload: {
+            country: "Germany",
+            ip: SIGN_IN_IP,
+            kind: "web",
+            name: "Chrome",
+            sessionId: "s",
+          },
+        },
+        CROSSED,
+        couriersOf(telegramRecorder().target, fcm.target),
+      );
+      expect(fcm.sends()).toHaveLength(2);
+      const page = await instance.listNotifications({ limit: 5 });
+      expect(page.deliveries[login.id]).toContainEqual(
+        expect.objectContaining({ method: "fcm", reason: "unavailable", result: "failed" }),
+      );
       expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now + 59 * 60_000)).toEqual([
         "poll",
       ]);
@@ -775,6 +811,7 @@ describe("polling", () => {
       token: laptop,
     });
     expect(before.deliveries[login.id]).toEqual([
+      expect.objectContaining({ method: "telegram", result: "sent" }),
       expect.objectContaining({ method: "poll", result: "queued" }),
     ]);
 
@@ -794,7 +831,9 @@ describe("polling", () => {
     const after = await answerOf(endpoints.notifications.list, "/api/notifications", {
       token: laptop,
     });
-    expect(after.deliveries[login.id]?.[0]?.result).toBe("sent");
+    expect(after.deliveries[login.id]?.find((entry) => entry.method === "poll")?.result).toBe(
+      "sent",
+    );
 
     await call(`/api/notifications/${login.id}/resolve`, {
       body: { resolution: "read" },

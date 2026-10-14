@@ -110,6 +110,16 @@ const sendToTelegram = async (deps: PoolDeps, stored: StoredNotification): Promi
     sentAt: messageId === null ? null : deps.now,
     state: messageId === null ? "failed" : "sent",
   });
+  // In the delivery log beside the pushes; taken back with them (`withdraw`).
+  const attempt = {
+    device: "Telegram",
+    endpoint: chatId,
+    method: "telegram",
+    reason: messageId === null ? "failed" : null,
+    result: messageId === null ? ("failed" as const) : ("sent" as const),
+    sessionId: "telegram",
+  };
+  await logAttempt(deps.db, { attempt, notificationId: notification.id, now: deps.now });
 };
 
 /** After a push: a dead device address goes; refused credentials break the method for all. */
@@ -137,7 +147,10 @@ const afterSend = async (
   }
 };
 
-/** One device by its push method, logged; nothing when it got this one already. */
+/**
+One device by its push method, logged; nothing when it got this one already. A method not set
+up on this server, or found broken, sends nothing: the log says it was unavailable.
+*/
 const pushToDevice = async (
   deps: PoolDeps,
   message: PushMessage,
@@ -145,14 +158,21 @@ const pushToDevice = async (
 ): Promise<void> => {
   const transport = transportFor(deps.couriers.push, subscription.transport);
   const { notification } = message;
-  if (
-    transport === null ||
-    (await isBroken(deps.binding, transport, Date.now())) ||
-    (await wasDelivered(deps.db, notification.id, subscription.sessionId))
-  ) {
+  if (await wasDelivered(deps.db, notification.id, subscription.sessionId)) {
     return;
   }
   const address = { endpoint: subscription.endpoint, sessionId: subscription.sessionId };
+  if (transport === null || (await isBroken(deps.binding, transport, Date.now()))) {
+    const attempt = {
+      ...address,
+      device: subscription.device,
+      method: subscription.transport,
+      reason: "unavailable",
+      result: "failed" as const,
+    };
+    await logAttempt(deps.db, { attempt, notificationId: notification.id, now: deps.now });
+    return;
+  }
   const outcome = await transport.send(address, message);
   const isOk = outcome === "sent" || outcome === "queued";
   const attempt = {

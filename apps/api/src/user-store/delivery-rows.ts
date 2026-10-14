@@ -8,7 +8,10 @@ import * as schema from "./schema.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
-/** One push attempt of a notification to a device, as the delivery log keeps it. */
+/**
+One attempt to deliver a notification, as the delivery log keeps it: a push to a device, or the
+Telegram copy (`method` `telegram`, the chat as its endpoint).
+*/
 export type DeliveryAttempt = {
   readonly sessionId: string;
   readonly device: string;
@@ -18,13 +21,16 @@ export type DeliveryAttempt = {
   readonly reason: null | string;
 };
 
-/** A delivery as the feed shows it: which device, how, when, and whether it was taken back. */
+/** A delivery as the feed shows it: which device, how, when, and when it was taken back. */
 export type DeliveryEntry = {
   readonly device: string;
   readonly method: string;
+  /** When it was sent (or queued, or failed). */
   readonly at: string;
-  readonly result: "dismissed" | "failed" | "queued" | "sent";
+  readonly result: DeliveryAttempt["result"];
   readonly reason: null | string;
+  /** When it was taken back (resolved somewhere); `null` while it stands. */
+  readonly dismissedAt: null | string;
 };
 
 const { notificationDeliveries } = schema;
@@ -100,12 +106,12 @@ export const deliveriesOf = async (
       logged
         .filter((row) => row.notificationId === id)
         .map((row) => ({
-          at: row.dismissedAt ?? row.attemptedAt,
+          at: row.attemptedAt,
           device: row.device,
+          dismissedAt: row.dismissedAt,
           method: row.method,
           reason: row.reason,
-          result:
-            row.dismissedAt === null ? (row.result as DeliveryAttempt["result"]) : "dismissed",
+          result: row.result as DeliveryAttempt["result"],
         })),
     ]),
   );

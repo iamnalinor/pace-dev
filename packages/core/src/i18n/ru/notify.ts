@@ -46,6 +46,8 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notifications.delivery.queued": "Ждёт {device} через {method} · {time}",
   "notifications.delivery.failed": "Не доставлено на {device} через {method} · {time}",
   "notifications.delivery.dismissed": "Убрано с {device} · {time}",
+  "notifications.delivery.telegram.sent": "Отправлено в Telegram · {time}",
+  "notifications.delivery.telegram.failed": "Не отправлено в Telegram · {time}",
   "notifications.method.fcm": "Google",
   "notifications.method.poll": "Pace",
   "settings.notifications": "Уведомления",

@@ -13,13 +13,19 @@ export const NotificationsQuerySchema = z.object({
 Every notification, whatever its channels: each client shows the kinds whose channel for its
 platform is on (the app on Android, the web in a browser) and counts the unread among those.
 */
-/** One push attempt of a notification to a device, as the delivery log keeps it. */
+/**
+One attempt to deliver a notification, as the delivery log keeps it: a push to a device, or the
+Telegram copy (`method` `telegram`).
+*/
 const DeliveryEntrySchema = z.object({
   device: z.string(),
   method: z.string(),
+  /** When it was sent (or queued, or failed). */
   at: z.iso.datetime(),
-  result: z.enum(["sent", "queued", "failed", "dismissed"]),
+  result: z.enum(["sent", "queued", "failed"]),
   reason: z.string().nullable(),
+  /** When it was taken back (resolved somewhere); `null` while it stands (or from a server before it). */
+  dismissedAt: z.iso.datetime().nullable().default(null),
 });
 
 /** An entry with a result this client does not know is left out of the log. */

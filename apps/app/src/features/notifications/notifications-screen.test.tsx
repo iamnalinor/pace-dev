@@ -1,10 +1,10 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
-import type { PoolNotification } from "@pace/core";
-
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { formatRelativeDay, type PoolNotification } from "@pace/core";
+import { MOSCOW, NOW } from "@pace/core/testing";
 
 import { NotificationsScreen } from "./notifications-screen.tsx";
 
@@ -102,6 +102,65 @@ beforeEach(() => {
 });
 
 describe("NotificationsScreen", () => {
+  it("puts an item under the day its time is on: one zone, the device's, for both", async () => {
+    // 01:30 in Moscow (the device) is today; in New York (the account) it is still yesterday.
+    const lateLogin = { ...login, createdAt: "2026-10-05T22:30:00.000Z", id: "n-late" };
+    const { runtime } = await feedRuntime([lateLogin]);
+    await runtime.state.ingest([
+      {
+        ...digestOnApp,
+        id: "01ARZ3NDEKTSV4RRFFQ69G5FZY",
+        payload: { timezone: "America/New_York" },
+      },
+    ]);
+    await renderScreen(<NotificationsScreen />, runtime);
+    expect(await screen.findByText("01:30")).toBeOnTheScreen();
+    const today = formatRelativeDay(lateLogin.createdAt, NOW, { language: "en", tz: MOSCOW });
+    expect(screen.getByRole("header", { name: today })).toBeOnTheScreen();
+  });
+
+  it("shows where each notification went, when, and when it was taken back", async () => {
+    const { runtime } = await feedRuntime([login], {
+      "GET /api/notifications": () => ({
+        deliveries: {
+          "n-login": [
+            {
+              at: "2026-10-06T08:00:00.000Z",
+              device: "Telegram",
+              dismissedAt: null,
+              method: "telegram",
+              reason: null,
+              result: "sent",
+            },
+            {
+              at: "2026-10-06T08:00:00.000Z",
+              device: "Pixel",
+              dismissedAt: "2026-10-06T08:05:00.000Z",
+              method: "fcm",
+              reason: null,
+              result: "sent",
+            },
+          ],
+        },
+        items: [login],
+        more: false,
+      }),
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    expect(
+      await screen.findByText(en("notifications.delivery.telegram.sent", { time: "11:00" })),
+    ).toBeOnTheScreen();
+    const google = en("notifications.method.fcm");
+    expect(
+      screen.getByText(
+        en("notifications.delivery.sent", { device: "Pixel", method: google, time: "11:00" }),
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByText(en("notifications.delivery.dismissed", { device: "Pixel", time: "11:05" })),
+    ).toBeOnTheScreen();
+  });
+
   it("shows a sign-in and a digest whose tasks open, and marks what it shows read", async () => {
     const { read, runtime } = await feedRuntime([login, digest]);
     await renderScreen(<NotificationsScreen />, runtime);
