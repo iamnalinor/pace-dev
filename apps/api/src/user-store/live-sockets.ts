@@ -58,6 +58,13 @@ export const broadcast = (ctx: DurableObjectState, message: object): void => {
   }
 };
 
+/** Codes a socket only ever receives (none given, dropped, TLS failed): sending one throws. */
+const RECEIVE_ONLY: ReadonlySet<number> = new Set([1005, 1006, 1015]);
+
+/** The code to close with in answer to a device's close: its own, unless that may not be sent. */
+export const replyCloseCode = (received: number): number =>
+  RECEIVE_ONLY.has(received) ? 1000 : received;
+
 /**
 The live channel's half of a user's store: it accepts live clients (the Worker has checked the
 bearer), answers their keep-alive without waking (no duration billed) and closes cleanly.
@@ -73,6 +80,6 @@ export class LiveStore extends DurableObject {
   }
 
   override webSocketClose(socket: WebSocket, code: number): void {
-    socket.close(code === 1005 ? 1000 : code, "closing");
+    socket.close(replyCloseCode(code), "closing");
   }
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { newId } from "@pace/core";
 
+import { replyCloseCode } from "../src/user-store/live-sockets.ts";
 import { api, loginAsDev, pushEvents } from "./helpers.ts";
 
 /** A complete task.created event written on the phone. */
@@ -84,6 +85,16 @@ describe("live sync channel", () => {
     socket.send("ping");
     expect(await waiting).toBe("pong");
     socket.close();
+  });
+
+  it("closes in answer with a code a socket may send, whatever the device's close said", () => {
+    // 1005 (no code), 1006 (dropped) and 1015 (TLS) are only ever received; sending one throws.
+    for (const received of [1005, 1006, 1015]) {
+      expect(replyCloseCode(received)).toBe(1000);
+    }
+    for (const sent of [1000, 1001, 1011, 4001]) {
+      expect(replyCloseCode(sent)).toBe(sent);
+    }
   });
 
   it("refuses a missing or wrong token, and a plain request", async () => {
