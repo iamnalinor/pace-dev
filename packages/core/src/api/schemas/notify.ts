@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { NotificationSchema } from "../../notify/pool.ts";
+import { ALL_ANSWERS, NotificationSchema } from "../../notify/pool.ts";
 import { knownOrNull, knownValue, knownValues } from "../tolerant.ts";
 
 /** A page of the pool, newest first: `before` is the id the previous page ended at. */
@@ -49,7 +49,7 @@ export const ReadNotificationsSchema = z.union([
 
 /** An answer from the app or the web (`expired` is the server's own). */
 export const ResolveNotificationSchema = z.strictObject({
-  resolution: z.enum(["attended", "skipped", "still", "stopped", "read"]),
+  resolution: z.enum([...ALL_ANSWERS, "read"]),
   /** The client answering: what it writes is recorded as coming from there. */
   from: z.enum(["app", "web"]).default("app"),
 });
@@ -57,7 +57,11 @@ export const ResolveNotificationSchema = z.strictObject({
 export const ResolvedNotificationSchema = z.object({ notification: NotificationSchema });
 
 /** Skips one occurrence of a calendar event everywhere (`calendarEventKey`). */
-export const CalendarSkipSchema = z.strictObject({ eventKey: z.string().min(1).max(400) });
+export const CalendarSkipSchema = z.strictObject({
+  eventKey: z.string().min(1).max(400),
+  /** The client skipping it, as for an answer. */
+  from: z.enum(["app", "web"]).default("app"),
+});
 
 /**
 How this session's device gets system notifications, exactly one way: Firebase Cloud Messaging

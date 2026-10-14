@@ -165,6 +165,18 @@ describe("createNotificationFeed", () => {
     expect(feed.store.getState().items[0]?.resolution).toBe("attended");
   });
 
+  it("skips a calendar occurrence everywhere as the client it is", async () => {
+    const { fake, feed } = feedWith({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "POST /api/calendar/skip": () => ({ ok: true }),
+    });
+    expect(await feed.skipEvent("2026-10-07T07:00:00.000Z@Seminar")).toBe(true);
+    expect(fake.calls.find((call) => call.path === "/api/calendar/skip")?.body).toEqual({
+      eventKey: "2026-10-07T07:00:00.000Z@Seminar",
+      from: "web",
+    });
+  });
+
   it("says a refused answer failed and keeps the item open", async () => {
     const { feed } = feedWith({
       "GET /api/notifications": () => ({ deliveries: {}, items: [seminar(null)], more: false }),

@@ -373,7 +373,7 @@ describe("Day and the notification pool", () => {
     await fireEvent.press(within(list).getByRole("button", { name: "Skip" }));
     await waitFor(() => {
       expect(skip).toHaveBeenCalledWith(
-        expect.objectContaining({ body: { eventKey: calendarEventKey(seminar) } }),
+        expect.objectContaining({ body: { eventKey: calendarEventKey(seminar), from: "app" } }),
       );
     });
   });

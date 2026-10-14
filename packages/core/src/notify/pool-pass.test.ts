@@ -91,6 +91,20 @@ describe("the deadline digest in a pass", () => {
     expect(pass(evening, { events: [report], memory: first.memory }).created).toEqual([]);
   });
 
+  it("forgets what it reported about a task once the task is closed", () => {
+    const first = pass("2026-10-07T11:05:00.000Z", { events: [report] });
+    expect(first.memory.reported).toHaveLength(1);
+    const closed = at(2, "2026-10-07T12:00:00.000Z", {
+      payload: { outcome: "done", taskId: "t-report" },
+      type: "task.closed",
+    });
+    const evening = pass("2026-10-07T18:01:00.000Z", {
+      events: [report, closed],
+      memory: first.memory,
+    });
+    expect(evening.memory.reported).toEqual([]);
+  });
+
   it("sends nothing for an empty slot and arms for the next one", () => {
     const result = pass("2026-10-07T11:05:00.000Z");
     expect(result.created).toEqual([]);
