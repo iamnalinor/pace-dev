@@ -1,9 +1,13 @@
+import { ACTIVITY_LABEL_MAX } from "../events/payloads.ts";
 import { estimateOf } from "../input/quick-fields.ts";
 import { findFirst, type Found, titleOf, toSpan } from "../input/quick-spans.ts";
 import { addDaysIn, addMinutesIso, formatInZone, wallClockInstant } from "../time.ts";
 
 /** What "What are you doing?" reads at once, before the assistant looks: the words and a length. */
 export type TypedActivity = { readonly label: string; readonly expectMinutes: null | number };
+
+/** A label as an activity takes it: trimmed, at most `ACTIVITY_LABEL_MAX` characters. */
+export const fitLabel = (label: string): string => label.trim().slice(0, ACTIVITY_LABEL_MAX).trim();
 
 /** "Пошёл в ЦСС, 20 мин" → the label "Пошёл в ЦСС", expected to take 20 minutes. */
 export const typedActivity = (text: string): TypedActivity => {
@@ -12,7 +16,7 @@ export const typedActivity = (text: string): TypedActivity => {
     text,
     estimate.spans.map((found) => toSpan(found)),
   );
-  return { expectMinutes: estimate.minutes, label: label === "" ? text.trim() : label };
+  return { expectMinutes: estimate.minutes, label: fitLabel(label === "" ? text : label) };
 };
 
 /** A stretch of time typed with its words: "7:30 - 8:30 - ходил в военкомат". */
@@ -64,9 +68,7 @@ const placed = (at: At, from: Clock, to: Clock): null | { startAt: string; endAt
 
 /** The words around a span, with a period at the end and dangling dashes taken off. */
 const labelOf = (text: string, found: Found): string =>
-  titleOf(text, [toSpan(found)])
-    .replace(/\.$/u, "")
-    .trim();
+  fitLabel(titleOf(text, [toSpan(found)]).replace(/\.$/u, ""));
 
 const clockSpan = (text: string, at: At): null | TypedSpan => {
   const found = findFirst(text, DASHED, "time") ?? findFirst(text, WORDED, "time");

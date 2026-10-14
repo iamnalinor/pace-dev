@@ -79,10 +79,11 @@ const renamed = (task: Task, rename: Rename): Result<readonly SubtaskDraft[], Pr
     : ok([{ label: rename.label.trim(), number: subtask.value.number }]);
 };
 
-/** Removed problems, renamed ones (off and back), then the new ones. */
+/** Removed problems, renamed ones (off and back), then the new ones; a removal wins over a rename. */
 const subtaskBodies = (task: Task, edits: TaskPatch["subtasks"], ctx: PlanContext): Bodies => {
-  const renames = edits?.rename ?? [];
-  const removed = collectAll(edits?.remove ?? [], (id) => {
+  const removals = new Set(edits?.remove);
+  const renames = (edits?.rename ?? []).filter((rename) => !removals.has(rename.subtaskId));
+  const removed = collectAll([...removals], (id) => {
     const subtask = subtaskById(task, id);
     return subtask.ok ? ok([removedBody(task, id)]) : subtask;
   });
@@ -206,6 +207,21 @@ const markBodies = (task: Task, subtaskIds: readonly string[]): Bodies => {
   return open.ok && open.value.length === 0 ? err("proposal/empty-patch") : open;
 };
 
+/**
+The message problems were added or solved from, kept as the task's source (as a homework
+message is): what the person wrote stays next to what it did.
+*/
+const withSource = (
+  bodies: Bodies,
+  { ctx, task }: { readonly ctx: PlanContext; readonly task: Task },
+): Bodies =>
+  !bodies.ok || ctx.sourceText === undefined || isBlank(ctx.sourceText)
+    ? bodies
+    : ok([
+        ...bodies.value,
+        { payload: { sourceText: ctx.sourceText, taskId: task.id }, type: "task.source.attached" },
+      ]);
+
 /** The events of a proposal about an existing task. */
 const editBodies = (
   world: World,
@@ -225,10 +241,13 @@ const editBodies = (
     case "task.addSubtasks": {
       return proposal.subtasks.some((subtask) => isBlank(subtask.label))
         ? err("proposal/invalid")
-        : ok(subtasksAddedBodies(task.id, proposal.subtasks, () => world.ctx.newId()));
+        : withSource(ok(subtasksAddedBodies(task.id, proposal.subtasks, () => world.ctx.newId())), {
+            ctx: world.ctx,
+            task,
+          });
     }
     case "task.markSubtasks": {
-      return markBodies(task, proposal.subtaskIds);
+      return withSource(markBodies(task, proposal.subtaskIds), { ctx: world.ctx, task });
     }
   }
 };

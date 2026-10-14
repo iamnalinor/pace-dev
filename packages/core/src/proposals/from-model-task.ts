@@ -1,7 +1,7 @@
 import type { CoreState } from "../materialize/core-state.ts";
 import type { Task } from "../model/task.ts";
 import type { ModelAction } from "../parse/schema.ts";
-import type { TaskPatch } from "./schema.ts";
+import type { SubtaskDraft, TaskPatch } from "./schema.ts";
 
 import { shortTitle } from "../input/parse-quick-input.ts";
 import { findProjectByName } from "../model/project.ts";
@@ -47,6 +47,12 @@ export const dueOf = (action: ModelAction, zone: string): null | string =>
     ? null
     : wallClockInstant(action.dueDate, action.dueTime ?? END_OF_DAY, zone);
 
+/** The subtasks the model gave, without blank ones. */
+export const subtasksOf = (action: ModelAction): readonly SubtaskDraft[] =>
+  action.subtasks
+    .map((subtask) => ({ label: subtask.label.trim(), number: subtask.number }))
+    .filter((subtask) => subtask.label !== "");
+
 const isNamed = (ref: string, subtask: Task["subtasks"][number]): boolean =>
   subtask.label.toLowerCase() === ref.trim().toLowerCase() || String(subtask.number) === ref.trim();
 
@@ -56,14 +62,15 @@ export const subtaskIdsOf = (task: Task, refs: readonly string[]): readonly stri
 
 const subtaskPatch = (task: Task, action: ModelAction): TaskPatch => {
   const remove = subtaskIdsOf(task, action.subtaskRefs);
-  const rename = action.renames.flatMap(({ label, subtask }) =>
+  const renames = action.renames.filter((rename) => rename.label.trim() !== "");
+  const rename = renames.flatMap(({ label, subtask }) =>
     task.subtasks
       .filter((item) => isNamed(subtask, item))
       .slice(0, 1)
       .map(({ id }) => ({ label, subtaskId: id })),
   );
   const edits = {
-    ...(action.subtasks.length > 0 && { add: action.subtasks }),
+    ...(subtasksOf(action).length > 0 && { add: [...subtasksOf(action)] }),
     ...(remove.length > 0 && { remove: [...remove] }),
     ...(rename.length > 0 && { rename }),
   };
@@ -73,9 +80,14 @@ const subtaskPatch = (task: Task, action: ModelAction): TaskPatch => {
 type Cleared = ReadonlySet<ModelAction["clear"][number]>;
 
 const textPatch = (action: ModelAction, cleared: Cleared): TaskPatch => ({
-  ...(isGiven(action.title) && { title: shortTitle(action.title) }),
+  ...(isGiven(action.title) &&
+    shortTitle(action.title) !== "" && {
+      title: shortTitle(action.title),
+    }),
   ...(action.description !== null && { description: action.description }),
   ...(cleared.has("description") && { description: null }),
+  ...(action.link !== null && { link: action.link }),
+  ...(cleared.has("link") && { link: null }),
 });
 
 const duePatch = (

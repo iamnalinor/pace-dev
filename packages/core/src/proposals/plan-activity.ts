@@ -6,6 +6,7 @@ import type { ActivityPatch, ProposalBody, ProposalBodyOf } from "./schema.ts";
 import { err, ok } from "../result.ts";
 import { defaultsFor } from "../tracking/expect.ts";
 import { runningActivity } from "../tracking/timeline.ts";
+import { fitMinutes, PROPOSAL_LIMITS } from "./limits.ts";
 import {
   type Bodies,
   isAfter,
@@ -38,9 +39,12 @@ const startActivity = (
   if (label === "") {
     return err("proposal/invalid");
   }
-  const expectMinutes =
+  // A length learned from long runs may pass a day: the event takes a day at most.
+  const expectMinutes = fitMinutes(
     proposal.expectMinutes ??
-    defaultsFor(state.time, { category: proposal.category, label }).expectMinutes;
+      defaultsFor(state.time, { category: proposal.category, label }).expectMinutes,
+    PROPOSAL_LIMITS.expectMinutes,
+  );
   const body: EventBody = {
     payload: {
       activityId: ctx.newId(),

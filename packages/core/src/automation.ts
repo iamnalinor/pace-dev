@@ -1,9 +1,12 @@
 export type { Decision } from "./api/schemas/notify.ts";
 export {
   type ParseRequest,
+  type ParseRequestBody,
   ParseRequestSchema,
   type ParseResponse,
   ParseResponseSchema,
+  REQUEST_DOMAINS,
+  type RequestDomain,
 } from "./api/schemas/parse.ts";
 export type { EventBody } from "./input/bodies.ts";
 export {
@@ -66,7 +69,13 @@ export {
   PROPOSAL_KINDS,
   type ProposalKind,
 } from "./proposals/kinds.ts";
-export { type PlanContext, planProposal, type ProposalError } from "./proposals/plan.ts";
+export {
+  type BatchError,
+  type PlanContext,
+  planProposal,
+  planProposals,
+  type ProposalError,
+} from "./proposals/plan.ts";
 export {
   categoryOfLabel,
   domainByRules,

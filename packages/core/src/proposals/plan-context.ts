@@ -18,6 +18,8 @@ export type PlanContext = {
   readonly deviceTz: string;
   readonly source: Event["source"];
   readonly newId: () => string;
+  /** The message the proposal was read from: kept as the source of a task it adds to. */
+  readonly sourceText?: string | undefined;
 };
 
 export type Planned = Result<readonly EventInput[], ProposalError>;

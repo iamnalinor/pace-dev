@@ -143,6 +143,25 @@ describe("proposalsFromModel: tasks", () => {
     });
   });
 
+  it("sets a link the message gives, and clears one it asks to drop", () => {
+    const link = "https://tracker.example.com/T-1";
+    const set = read(`к книгам ссылка ${link}`, [
+      { evidence: [], kind: "task.update", link, task: aliasOf(BOOKS_ID) },
+    ]);
+    expect(set.readings[0]).toEqual({
+      body: { kind: "task.update", patch: { link }, taskId: BOOKS_ID },
+      doubtful: [],
+    });
+    const cleared = read("у книг убери ссылку", [
+      { clear: ["link"], kind: "task.update", task: aliasOf(BOOKS_ID) },
+    ]);
+    expect(cleared.readings[0]?.body).toMatchObject({ patch: { link: null } });
+    const invented = read("книги", [{ kind: "task.update", link, task: aliasOf(BOOKS_ID) }]);
+    expect(invented.readings[0]?.doubtful).toEqual(["link"]);
+    const created = read(`отчёт ${link}`, [{ kind: "task.create", link, title: "отчёт" }]);
+    expect(created.readings[0]?.body).toMatchObject({ task: { link } });
+  });
+
   it("reads subtasks by label or number for marking, removing and renaming", () => {
     const hw = aliasOf(HW_ID);
     const { readings } = read("в алгебре решил 5 и 6, убери 7a Bonus, 4 переименуй в Det", [

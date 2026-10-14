@@ -6,6 +6,7 @@ import type { ProposalBody, TaskDraft } from "./schema.ts";
 import { parseQuickInput, type QuickInput, shortTitle } from "../input/parse-quick-input.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { typedActivity, typedSpan } from "../tracking/typed.ts";
+import { fitMinutes, fitText, PROPOSAL_LIMITS as LIMITS } from "./limits.ts";
 
 /** A label used before keeps the category it had last; anything new is Other. */
 export const categoryOfLabel = (time: TimeState, label: string): ActivityCategory => {
@@ -17,20 +18,30 @@ export const categoryOfLabel = (time: TimeState, label: string): ActivityCategor
   );
 };
 
+/** The rules' title; a line of nothing but punctuation is its own title. */
+const titleOfInput = (input: QuickInput): string =>
+  [input.title, shortTitle(input.text), fitText(input.text.trim(), LIMITS.title)].find(
+    (title) => title !== "",
+  ) ?? input.text;
+
 /** The composer's rule-based reading as a create form's fields. */
 export const draftOfInput = (input: QuickInput): TaskDraft => ({
   description: input.description,
   dueAt: input.dueAt,
   dueTz: input.dueTz,
-  estimateMinutes: input.estimateMinutes,
+  estimateMinutes: fitMinutes(input.estimateMinutes, LIMITS.estimateMinutes),
   importance: input.isImportanceExplicit ? input.importance : null,
-  link: input.link,
+  // A link too long to keep is left in the text, where it stays as typed.
+  link: input.link !== null && input.link.length <= LIMITS.link ? input.link : null,
   presetId: input.presetId,
   projectId: input.projectId,
-  projectName: input.projectName,
+  projectName: input.projectName === null ? null : fitText(input.projectName, LIMITS.projectName),
   sourceText: input.text,
-  subtasks: [...input.subtasks],
-  title: input.title === "" ? shortTitle(input.text) : input.title,
+  subtasks: input.subtasks.slice(0, LIMITS.subtasks).map((subtask) => ({
+    label: fitText(subtask.label, LIMITS.subtaskLabel),
+    number: subtask.number,
+  })),
+  title: titleOfInput(input),
 });
 
 const MINUTE = 60_000;
@@ -47,7 +58,7 @@ const activityByRules = (text: string, world: World): ProposalBody => {
     const typed = typedActivity(text);
     return {
       category: categoryOfLabel(state.time, typed.label),
-      expectMinutes: typed.expectMinutes,
+      expectMinutes: fitMinutes(typed.expectMinutes, LIMITS.expectMinutes),
       kind: "activity.start",
       label: typed.label,
     };
@@ -57,7 +68,10 @@ const activityByRules = (text: string, world: World): ProposalBody => {
     ? { category, end: span.endAt, kind: "activity.log", label: span.label, start: span.startAt }
     : {
         category,
-        expectMinutes: Math.round((Date.parse(span.endAt) - Date.parse(span.startAt)) / MINUTE),
+        expectMinutes: fitMinutes(
+          (Date.parse(span.endAt) - Date.parse(span.startAt)) / MINUTE,
+          LIMITS.expectMinutes,
+        ),
         kind: "activity.start",
         label: span.label,
         startAt: span.startAt,

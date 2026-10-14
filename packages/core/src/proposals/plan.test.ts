@@ -7,7 +7,7 @@ import type { ProposalBody, TaskDraft } from "./schema.ts";
 import { at, HW_ID, hwCreated } from "../materialize/task-fixture.fake.ts";
 import { artboardState, BOOKS_ID, NOW, REPLY_ID, WORK_ID } from "../queries/fixture.fake.ts";
 import { addMinutesIso } from "../time.ts";
-import { planProposal } from "./plan.ts";
+import { planProposal, planProposals } from "./plan.ts";
 
 const ids = () => {
   const counter = { next: 0 };
@@ -213,6 +213,14 @@ describe("planProposal: task.update", () => {
     ]);
   });
 
+  it("takes a subtask both removed and renamed off once, and does not bring it back", () => {
+    expect(
+      bodies(
+        updateTask({ subtasks: { remove: ["s5"], rename: [{ label: "KC", subtaskId: "s5" }] } }),
+      ),
+    ).toEqual([{ payload: { subtaskId: "s5", taskId: HW_ID }, type: "task.subtask.removed" }]);
+  });
+
   it("refuses an unknown task, an empty or invalid patch, and unknown or done subtasks", () => {
     expect(updateTask({ title: "x" }, "t-nope")).toEqual({
       error: "proposal/unknown-task",
@@ -275,6 +283,29 @@ describe("planProposal: subtasks", () => {
     expect(
       plan({ kind: "task.addSubtasks", subtasks: [{ label: "8", number: 8 }], taskId: "x" }),
     ).toEqual({ error: "proposal/unknown-task", ok: false });
+  });
+
+  it("keeps the message an addition or a mark came from as the task's source", () => {
+    const text = "в алгебру добавь 8, а 5 я решил";
+    const withSource = (proposal: ProposalBody) =>
+      bodies(planProposal(artboardState(), proposal, { ...world, newId: ids(), sourceText: text }));
+    expect(
+      withSource({
+        kind: "task.addSubtasks",
+        subtasks: [{ label: "8", number: 8 }],
+        taskId: HW_ID,
+      }),
+    ).toEqual([
+      {
+        payload: { subtasks: [{ id: "id-1", label: "8", number: 8 }], taskId: HW_ID },
+        type: "task.subtasks.added",
+      },
+      { payload: { sourceText: text, taskId: HW_ID }, type: "task.source.attached" },
+    ]);
+    expect(withSource({ kind: "task.markSubtasks", subtaskIds: ["s5"], taskId: HW_ID })).toEqual([
+      { payload: { subtaskId: "s5", taskId: HW_ID }, type: "task.subtask.solved" },
+      { payload: { sourceText: text, taskId: HW_ID }, type: "task.source.attached" },
+    ]);
   });
 
   it("marks the open ones of the named subtasks solved", () => {
@@ -440,5 +471,44 @@ describe("planProposal: activity.update, activity.delete", () => {
       },
     ]);
     expect(occurred(result)).toEqual([minutes(-120), NOW]);
+  });
+});
+
+describe("planProposals", () => {
+  it("plans in order over what the earlier ones write: a new project named twice is made once", () => {
+    const result = planProposals(
+      artboardState(),
+      [
+        {
+          kind: "task.create",
+          task: draft({ projectName: "Paperwork", title: "Renew the passport" }),
+        },
+        { kind: "task.create", task: draft({ projectName: "paperwork", title: "Book the photo" }) },
+      ],
+      { ...world, newId: ids() },
+    );
+    const inputs = result.ok ? result.value : [];
+    expect(inputs.map((input) => input.type)).toEqual([
+      "project.created",
+      "task.created",
+      "task.created",
+    ]);
+    const projects = inputs
+      .map((input) => (input.type === "task.created" ? input.payload.projectId : null))
+      .filter((projectId) => projectId !== null);
+    expect(new Set(projects).size).toBe(1);
+  });
+
+  it("refuses the whole batch at the first proposal that cannot be planned, and says which", () => {
+    expect(
+      planProposals(
+        artboardState(),
+        [
+          { kind: "task.close", outcome: "done", taskId: REPLY_ID },
+          { kind: "task.delete", taskId: "t-nope" },
+        ],
+        { ...world, newId: ids() },
+      ),
+    ).toEqual({ error: { error: "proposal/unknown-task", index: 1 }, ok: false });
   });
 });

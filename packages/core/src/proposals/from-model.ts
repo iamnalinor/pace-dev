@@ -10,7 +10,15 @@ import { type ActionRejection, type VerifiedAction, verifyAction } from "../pars
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { err, ok, type Result } from "../result.ts";
 import { activityOf } from "./from-model-activity.ts";
-import { dueOf, isGiven, patchOf, presetOf, projectOf, subtaskIdsOf } from "./from-model-task.ts";
+import {
+  dueOf,
+  isGiven,
+  patchOf,
+  presetOf,
+  projectOf,
+  subtaskIdsOf,
+  subtasksOf,
+} from "./from-model-task.ts";
 import { domainOf, type ParseDomain, type ProposalKind } from "./kinds.ts";
 import { draftOfInput } from "./rules.ts";
 
@@ -62,17 +70,23 @@ const createOf = (action: ModelAction, world: ModelWorld): Converted => {
       dueTz: dueAt === null ? rules.dueTz : (rules.dueTz ?? zone),
       estimateMinutes: action.estimateMinutes ?? rules.estimateMinutes,
       importance: action.importance ?? rules.importance,
-      link: extractLink(text),
+      link: linkOf(action, text),
       presetId: presetOf(state, action.category) ?? rules.presetId,
-      subtasks: action.subtasks.length === 0 ? rules.subtasks : action.subtasks,
+      subtasks: subtasksOf(action).length === 0 ? rules.subtasks : [...subtasksOf(action)],
       ...titleOf(action),
     },
   });
 };
 
+/** The link the model gave, else the first one in the message. */
+const linkOf = (action: ModelAction, text: string): null | string =>
+  action.link ?? extractLink(text);
+
 /** A title the model kept long (the whole message) is cut like a typed one. */
-const titleOf = (action: ModelAction): { readonly title?: string } =>
-  isGiven(action.title) ? { title: shortTitle(action.title) } : {};
+const titleOf = (action: ModelAction): { readonly title?: string } => {
+  const title = isGiven(action.title) ? shortTitle(action.title) : "";
+  return title === "" ? {} : { title };
+};
 
 const nonEmpty = (body: ProposalBody, size: number): Converted =>
   size === 0 ? err("proposal/incomplete") : ok(body);
@@ -85,8 +99,8 @@ type TaskEdit = (task: Task, action: ModelAction, world: ModelWorld) => Converte
 const TASK_EDITS: Readonly<Record<TaskEditKind, TaskEdit>> = {
   "task.addSubtasks": (task, action) =>
     nonEmpty(
-      { kind: "task.addSubtasks", subtasks: action.subtasks, taskId: task.id },
-      action.subtasks.length,
+      { kind: "task.addSubtasks", subtasks: [...subtasksOf(action)], taskId: task.id },
+      subtasksOf(action).length,
     ),
   "task.close": (task, action) =>
     ok({ kind: "task.close", outcome: action.outcome ?? "done", taskId: task.id }),

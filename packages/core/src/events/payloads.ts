@@ -212,8 +212,11 @@ const minutes = z
   .positive()
   .max(24 * 60);
 
+/** An activity's name is at most this long. */
+export const ACTIVITY_LABEL_MAX = 80;
+
 const activityFields = {
-  label: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(ACTIVITY_LABEL_MAX),
   category: ActivityCategorySchema,
   taskId: z.string().min(1).optional(),
 };

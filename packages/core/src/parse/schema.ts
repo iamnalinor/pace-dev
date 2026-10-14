@@ -53,8 +53,8 @@ const RenameSchema = z.strictObject({ subtask: SubtaskNameSchema, label: Subtask
 /** `YYYY-MM-DD HH:MM` on the account's wall clock. */
 const WALL_CLOCK = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/u;
 
-/** What an edit may empty: a due date, an estimate, a project, a description. */
-export const CLEARABLE = ["dueDate", "estimateMinutes", "project", "description"] as const;
+/** What an edit may empty: a due date, an estimate, a project, a description, a link. */
+export const CLEARABLE = ["dueDate", "estimateMinutes", "project", "description", "link"] as const;
 
 /**
 One thing the model proposes, flat and strict (every key present, `null` or empty when it does
@@ -90,6 +90,8 @@ export const ModelActionSchema = z.strictObject({
     .nullable(),
   estimateMinutes: z.number().int().min(1).max(10_080).nullable(),
   description: z.string().max(4000).nullable(),
+  /** A web address the task is about, copied from the message. */
+  link: z.string().max(2000).nullable(),
   /** Subtasks to add (a create's, an edit's or an add's). */
   subtasks: z.array(ParsedSubtaskSchema).max(100),
   /** Existing subtasks by label or number: to mark solved, or (an edit) to remove. */
@@ -126,6 +128,7 @@ export const blankModelAction = (overrides: Partial<ModelAction>): ModelAction =
   importance: null,
   kind: "task.create",
   label: null,
+  link: null,
   outcome: null,
   project: null,
   quote: null,

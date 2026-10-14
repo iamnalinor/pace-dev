@@ -5,6 +5,7 @@ import type { Proposal, ProposalBody, TaskPatch } from "./schema.ts";
 
 import { t } from "../i18n/i18n.ts";
 import { formatInZone, startOfDayIn } from "../time.ts";
+import { fitText, PROPOSAL_LIMITS } from "./limits.ts";
 
 type World = {
   readonly state: CoreState;
@@ -50,12 +51,21 @@ const fieldsOf = (keys: readonly ParseField[], language: Language): string =>
 const taskTitle = (state: CoreState, taskId: string): string =>
   state.tasks.byId[taskId]?.title ?? taskId;
 
+/** At most this many items of a list are named; the rest are counted ("+3"). */
+const LISTED = 5;
+
+const listOf = (items: readonly string[]): string =>
+  [
+    ...items.slice(0, LISTED),
+    ...(items.length > LISTED ? [`+${String(items.length - LISTED)}`] : []),
+  ].join(", ");
+
 const subtaskLabels = (state: CoreState, taskId: string, ids: readonly string[]): string =>
-  ids
-    .map(
+  listOf(
+    ids.map(
       (id) => state.tasks.byId[taskId]?.subtasks.find((subtask) => subtask.id === id)?.label ?? id,
-    )
-    .join(", ");
+    ),
+  );
 
 const taskSummary = (
   body: Extract<ProposalBody, { kind: `task.${string}` }>,
@@ -86,7 +96,7 @@ const taskSummary = (
     }
     case "task.addSubtasks": {
       return t(language, "proposal.task.addSubtasks", {
-        subtasks: body.subtasks.map((subtask) => subtask.label).join(", "),
+        subtasks: listOf(body.subtasks.map((subtask) => subtask.label)),
         title: taskTitle(state, body.taskId),
       });
     }
@@ -152,11 +162,14 @@ const activitySummary = (
   }
 };
 
-/** One line saying what a proposal does, written by code in the person's language. */
-export const summarize = (body: ProposalBody, world: World): string =>
+const sentenceOf = (body: ProposalBody, world: World): string =>
   body.kind.startsWith("task.")
     ? taskSummary(body as Extract<ProposalBody, { kind: `task.${string}` }>, world)
     : activitySummary(body as Extract<ProposalBody, { kind: `activity.${string}` }>, world);
+
+/** One line saying what a proposal does, written by code in the person's language. */
+export const summarize = (body: ProposalBody, world: World): string =>
+  fitText(sentenceOf(body, world), PROPOSAL_LIMITS.summary);
 
 /** A proposal as the API answers it: its body, its summary and the fields to double-check. */
 export const withSummary = (

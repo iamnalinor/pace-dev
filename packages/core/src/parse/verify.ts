@@ -3,7 +3,7 @@ import type { ModelAction, ParseField } from "./schema.ts";
 
 import { err, ok, type Result } from "../result.ts";
 import { formatInZone, wallClockInstant } from "../time.ts";
-import { isQuotedFrom, isWordFrom } from "./normalize.ts";
+import { hasWords, isQuotedFrom, isWordFrom, normalizeForEvidence } from "./normalize.ts";
 
 /** Why an action the model gave cannot be proposed at all. */
 export type ActionRejection =
@@ -76,6 +76,7 @@ const textDoubts = (
   ...(isFittingTitle(action.title, source) ? [] : ["title" as const]),
   ...(isFittingTitle(action.label, source) ? [] : ["label" as const]),
   ...(isVerbatim(action.description, source) ? [] : ["description" as const]),
+  ...(isVerbatim(action.link, source) ? [] : ["link" as const]),
   ...(isKnownProject(action.project, projectNames) || isVerbatim(action.project, source)
     ? []
     : ["project" as const]),
@@ -124,6 +125,15 @@ const refsOf = (action: ModelAction, context: ProposalContext): Result<Refs, Act
     : ok({ activity, task });
 };
 
+/** Shorter than this a title could hide inside another word: it must stand as whole words. */
+const SHORT_TITLE = 4;
+
+/** The listed name occurs in the quote; a short one only as whole words. */
+const isNamedIn = (name: string, quote: string): boolean =>
+  normalizeForEvidence(name).length < SHORT_TITLE
+    ? hasWords(name, quote)
+    : isQuotedFrom(name, quote);
+
 /** A delete names the item as listed: a wrong alias then deletes nothing instead of something else. */
 const isQuotedDelete = (action: ModelAction, refs: Refs): boolean => {
   const listed: Partial<Record<ModelAction["kind"], string | undefined>> = {
@@ -131,7 +141,7 @@ const isQuotedDelete = (action: ModelAction, refs: Refs): boolean => {
     "task.delete": refs.task?.title,
   };
   const name = listed[action.kind];
-  return name === undefined || (action.quote !== null && isQuotedFrom(name, action.quote));
+  return name === undefined || (action.quote !== null && isNamedIn(name, action.quote));
 };
 
 type Times = Pick<VerifiedAction, "end" | "start">;

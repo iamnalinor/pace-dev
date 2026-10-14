@@ -140,6 +140,19 @@ describe("client.assistant", () => {
     });
   });
 
+  it("reads an answer from a newer server with keys it does not know yet", async () => {
+    const newer = {
+      ...parsed,
+      extra: "top",
+      proposals: [{ ...parsed.proposals[0], extra: "proposal", task: { ...task, extra: "draft" } }],
+    };
+    const { client } = await setup({ "POST /api/parse": () => newer });
+    expect(await client.assistant.read("разобрать почту, полтора часа")).toMatchObject({
+      reading: { edits: { title: "разобрать почту" } },
+      status: "read",
+    });
+  });
+
   it("passes on when the assistant is out of requests, and a failure as failed", async () => {
     const retryAt = "2026-10-06T12:05:00.000Z";
     const { client } = await setup({

@@ -20,7 +20,10 @@ const context: ProposalContext = {
       startAt: "2026-10-14T04:30:00.000Z",
     },
   ],
-  tasks: [{ alias: "t1", id: "task-1", title: "Algebra HW 6" }],
+  tasks: [
+    { alias: "t1", id: "task-1", title: "Algebra HW 6" },
+    { alias: "t2", id: "task-2", title: "Ян" },
+  ],
 };
 
 const verify = (action: Partial<ModelAction>, source = SOURCE) =>
@@ -105,7 +108,7 @@ describe("verifyAction: references", () => {
   });
 
   it("refuses an alias that was not in the lists, or an id instead of one", () => {
-    expect(verify({ kind: "task.close", task: "t2" })).toEqual({
+    expect(verify({ kind: "task.close", task: "t3" })).toEqual({
       error: "proposal/unknown-task",
       ok: false,
     });
@@ -121,6 +124,16 @@ describe("verifyAction: references", () => {
       error: "proposal/unknown-activity",
       ok: false,
     });
+  });
+
+  it("takes a short title as quoted only as whole words, not inside another word", () => {
+    expect(verify({ kind: "task.delete", quote: "позвонить Ян", task: "t2" }).ok).toBe(true);
+    for (const quote of ["Янтарь", "купить янтарь"]) {
+      expect(verify({ kind: "task.delete", quote, task: "t2" })).toEqual({
+        error: "proposal/unquoted-delete",
+        ok: false,
+      });
+    }
   });
 
   it("deletes only an item whose title the model quoted as listed", () => {
