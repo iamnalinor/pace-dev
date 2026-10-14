@@ -59,7 +59,7 @@ export const ParseResponseSchema = z.discriminatedUnion("status", [
 export type ParseResponse = z.output<typeof ParseResponseSchema>;
 
 /** Whether the assistant can read now, or when it should again. */
-export const LlmStatusSchema = z.strictObject({
+export const LlmStatusSchema = z.object({
   available: z.boolean(),
   retryAt: z.iso.datetime().nullable(),
 });

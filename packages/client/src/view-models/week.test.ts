@@ -32,6 +32,7 @@ const world = ({
             isAlongside: false,
             isLogged: true,
             label: "Reading",
+            originEventId: `e-a${String(index)}`,
             startAt: stretch.startAt,
             stillAt: null,
             taskId: null,

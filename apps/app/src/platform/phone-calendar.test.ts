@@ -23,6 +23,8 @@ describe("the phone's calendar events", () => {
     const events = await calendarEvents("2026-10-13T21:00:00.000Z", "2026-10-14T21:00:00.000Z");
     expect(events).toEqual([
       {
+        // The calendar it sits in comes along for the event's details.
+        calendarName: "University",
         endAt: "2026-10-14T12:20:00.000Z",
         id: "ev-1",
         series: null,

@@ -1,5 +1,7 @@
 import type { z } from "zod";
 
+import { loosen } from "./loose.ts";
+
 export type HttpMethod = "DELETE" | "GET" | "POST" | "PUT";
 
 /**
@@ -19,7 +21,15 @@ export type EndpointShape = {
   readonly output: z.ZodType;
 };
 
-export const endpoint = <const E extends EndpointShape>(definition: E): E => definition;
+/**
+Declares an endpoint. Its output is loosened (`loosen`): a key a newer server adds is dropped by
+an older client rather than refused, so adding a field to an answer is never a breaking change.
+Inputs stay as strict as they are written.
+*/
+export const endpoint = <const E extends EndpointShape>(definition: E): E => ({
+  ...definition,
+  output: loosen(definition.output),
+});
 
 type InferInput<T> = T extends z.ZodType ? z.input<T> : never;
 
