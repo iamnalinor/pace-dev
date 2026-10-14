@@ -18,14 +18,14 @@ const hwScreen = async () => {
 };
 
 describe("TaskScreen — homework", () => {
-  it("shows the start, the due, the work left and the problems with their states", async () => {
+  it("shows the start, the due, the work left and the subtasks with their states", async () => {
     await hwScreen();
     expect(screen.getByRole("header", { name: "Algebra HW 6" })).toBeOnTheScreen();
     expect(screen.getByText("today 23:59")).toBeOnTheScreen();
     expect(screen.getByText("1h 43m")).toBeOnTheScreen();
     expect(screen.getByText(en("task.start"))).toBeOnTheScreen();
     expect(screen.queryByText(/of window gone/u)).toBeNull();
-    expect(screen.getByText(en("task.problemsSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
+    expect(screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Submit 3 and 4" })).toBeOnTheScreen();
@@ -48,11 +48,11 @@ describe("TaskScreen — homework", () => {
     });
   });
 
-  it("toggles a problem solved and back", async () => {
+  it("toggles a subtask solved and back", async () => {
     const runtime = await hwScreen();
-    const problem = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
-    expect(problem).not.toBeChecked();
-    await fireEvent.press(problem);
+    const subtask = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
+    expect(subtask).not.toBeChecked();
+    await fireEvent.press(subtask);
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeChecked();
     });
@@ -83,8 +83,8 @@ const trkScreen = async () => {
   return runtime;
 };
 
-describe("TaskScreen — editing problems", () => {
-  it("takes an unsent problem off in the editor; a sent one has no remove", async () => {
+describe("TaskScreen — editing subtasks", () => {
+  it("takes an unsent subtask off in the editor; a sent one has no remove", async () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
     expect(

@@ -53,7 +53,7 @@ const createLines = (input: QuickInput, state: CoreState, language: Language): r
     line(null, "bot.field.importance", t(language, `importance.${input.importance}`)),
     line(
       "subtasks",
-      "bot.field.problems",
+      "bot.field.subtasks",
       input.subtasks.length === 0
         ? null
         : input.subtasks.map((subtask) => subtask.label).join(", "),
@@ -61,7 +61,7 @@ const createLines = (input: QuickInput, state: CoreState, language: Language): r
   ];
 };
 
-const problemsOf = (bodies: readonly EventBody[], state: CoreState, taskId: string): string => {
+const subtasksOf = (bodies: readonly EventBody[], state: CoreState, taskId: string): string => {
   const task = state.tasks.byId[taskId];
   const labelsOf = (body: EventBody): readonly string[] => {
     if (body.type === "task.subtask.solved") {
@@ -81,15 +81,15 @@ const updateText = (
   language: Language,
 ): string => {
   const first = plan.bodies[0];
-  const problems = problemsOf(plan.bodies, state, plan.taskId);
+  const subtasks = subtasksOf(plan.bodies, state, plan.taskId);
   if (first?.type === "task.closed") {
     return t(language, "bot.close", {
       outcome: t(language, `outcome.${first.payload.outcome}`),
       title: plan.title,
     });
   }
-  return t(language, first?.type === "task.subtask.solved" ? "bot.markSolved" : "bot.addProblems", {
-    problems,
+  return t(language, first?.type === "task.subtask.solved" ? "bot.markSolved" : "bot.addSubtasks", {
+    subtasks,
     title: plan.title,
   });
 };

@@ -189,8 +189,8 @@ export { type ReviewRow, type ReviewViewModel, reviewViewModel } from "./view-mo
 export {
   type OverrideSheet,
   type PrimaryAction,
-  type ProblemRow,
-  type ProblemState,
+  type SubtaskRow,
+  type SubtaskState,
   type TaskLink,
   type TaskTag,
   type TaskViewModel,

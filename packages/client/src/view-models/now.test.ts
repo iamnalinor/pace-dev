@@ -79,12 +79,12 @@ describe("nowViewModel", () => {
     ]);
   });
 
-  it("describes Calculus HW 5 as 1 day late · 2 problems left", () => {
+  it("describes Calculus HW 5 as 1 day late · 2 subtasks left", () => {
     const calc = row(board.rows, CALC_HW5_ID);
     expect(calc.meta).toEqual([
       { importance: "normal", kind: "importance" },
       { isSoft: false, kind: "late", minutes: 15 * 60 + 1 },
-      { count: 2, kind: "problems-left" },
+      { count: 2, kind: "subtasks-left" },
     ]);
     expect(CALC_HW5_DUE < ctx().now).toBe(true);
   });

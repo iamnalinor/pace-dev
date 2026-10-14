@@ -66,9 +66,9 @@ type SaveInput = {
   readonly view: TaskViewModel;
   readonly before: TaskFormValues;
   readonly values: TaskFormValues;
-  /** Problems added in the sheet. */
+  /** Subtasks added in the sheet. */
   readonly added: readonly string[];
-  /** Problems taken off in the sheet. */
+  /** Subtasks taken off in the sheet. */
   readonly removed: readonly string[];
 };
 
@@ -104,7 +104,7 @@ const saveSteps = ({ actions, added, before, removed, values, view }: SaveInput)
 
 /**
 Everything about a task, editable in one place: title, category, importance, project, start,
-due (clearable), estimate (clearable), description, link, new problems and unsent ones taken
+due (clearable), estimate (clearable), description, link, new subtasks and unsent ones taken
 off. Only what changed is written.
 */
 export const EditTaskSheet = ({
@@ -159,12 +159,12 @@ export const EditTaskSheet = ({
       />
       <SubtaskList
         items={added}
-        kept={view.problems
-          .filter((problem) => !removed.includes(problem.id))
-          .map((problem) => ({
-            id: problem.id,
-            isSent: problem.submittedAt !== null,
-            label: problem.label,
+        kept={view.subtasks
+          .filter((subtask) => !removed.includes(subtask.id))
+          .map((subtask) => ({
+            id: subtask.id,
+            isSent: subtask.submittedAt !== null,
+            label: subtask.label,
           }))}
         onChange={setAdded}
         onRemoveKept={(id) => {

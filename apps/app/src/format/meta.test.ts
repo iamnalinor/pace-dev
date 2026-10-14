@@ -27,9 +27,9 @@ describe("metaTexts", () => {
     expect(
       texts([
         { isSoft: false, kind: "late", minutes: 901 },
-        { count: 2, kind: "problems-left" },
+        { count: 2, kind: "subtasks-left" },
       ]),
-    ).toEqual(["warn:15h late", "plain:2 problems left"]);
+    ).toEqual(["warn:15h late", "plain:2 subtasks left"]);
     expect(
       texts([
         { importance: "nice_to_have", kind: "importance" },
@@ -46,7 +46,7 @@ describe("metaTexts", () => {
   });
 
   it("follows the account language with the right plural forms", () => {
-    expect(texts([{ count: 3, kind: "problems-left" }], "ru")).toHaveLength(1);
+    expect(texts([{ count: 3, kind: "subtasks-left" }], "ru")).toHaveLength(1);
     expect(texts([{ kind: "age", minutes: 5 * 24 * 60 }], "ru")[0]).toContain("5");
     expect(texts([{ kind: "age", minutes: 0 }], "ru")).toEqual(["plain:только что"]);
   });

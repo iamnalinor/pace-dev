@@ -10,7 +10,7 @@ const presets = INITIAL_PRESETS_STATE;
 const ctx = contextAt();
 
 describe("presetPreview", () => {
-  it("draws a homework sample: its color, a due tomorrow and the solved problems", () => {
+  it("draws a homework sample: its color, a due tomorrow and the solved subtasks", () => {
     const preview = presetPreview(presets, newDraft("hw"), { ...ctx, zone: MOSCOW });
     expect(preview?.color).toBe("yellow");
     expect(preview?.progressMode).toBe("subtasks");

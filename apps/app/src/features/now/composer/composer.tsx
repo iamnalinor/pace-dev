@@ -35,7 +35,7 @@ const useDraft = (initialText: string, assistant: Assistant) => {
     onReading: (reading: AiReading): void => {
       setEdits((current) => ({ ...current, ...reading.edits }));
     },
-    /** New text makes the assistant's reading stale: its title and problems give way to the rules. */
+    /** New text makes the assistant's reading stale: its title and subtasks give way to the rules. */
     onText: (next: string): void => {
       if (ai.state.status === "read") {
         setEdits(({ projectName: _name, subtasks: _subtasks, title: _title, ...rest }) => rest);

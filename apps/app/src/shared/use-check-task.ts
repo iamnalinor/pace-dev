@@ -9,7 +9,7 @@ import { resolvePreset } from "@pace/core";
 import { useRunAction } from "./use-run-action.ts";
 
 export type CheckTask = {
-  /** A task submitted problem by problem: the check opens its submit sheet (which, when). */
+  /** A task submitted subtask by subtask: the check opens its submit sheet (which, when). */
   readonly opensSheet: (row: NowRow) => boolean;
   /**
   The sheet for such a task; anything else is closed as done (History undoes it). Resolves to
@@ -18,7 +18,7 @@ export type CheckTask = {
   readonly check: (row: NowRow) => Promise<boolean>;
 };
 
-/** The row's check: close as done, or the submit sheet of a task sent problem by problem. */
+/** The row's check: close as done, or the submit sheet of a task sent subtask by subtask. */
 export const useCheckTask = (): CheckTask => {
   const { actions, state } = usePace();
   const openTask = useOpenTask();
@@ -31,8 +31,8 @@ export const useCheckTask = (): CheckTask => {
         task === undefined
           ? undefined
           : resolvePreset(current.presets, task.presetId, task.overrides ?? undefined);
-      const hasProblems = (task?.subtasks.length ?? 0) > 0;
-      return hasProblems && preset?.ok === true && preset.value.submission === "per_subtask";
+      const hasSubtasks = (task?.subtasks.length ?? 0) > 0;
+      return hasSubtasks && preset?.ok === true && preset.value.submission === "per_subtask";
     },
     [state],
   );

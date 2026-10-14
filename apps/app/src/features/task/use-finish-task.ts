@@ -6,7 +6,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { sendingIds } from "./close-model.ts";
 
 /**
-The footer's Done in one tap: sends the solved problems, or closes the task as done, now
+The footer's Done in one tap: sends the solved subtasks, or closes the task as done, now
 (History undoes it). Another time or outcome is the long press on Done.
 */
 export const useFinishTask = (view: TaskViewModel): (() => void) => {

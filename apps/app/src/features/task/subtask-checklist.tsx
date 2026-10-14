@@ -1,7 +1,7 @@
 import { Check } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
-import type { ProblemRow, TaskViewModel } from "@pace/client";
+import type { SubtaskRow, TaskViewModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -12,7 +12,7 @@ import { useTheme } from "#app/ui/theme-provider.tsx";
 const weekday = (atIso: string, tz: string, language: string): string =>
   new Intl.DateTimeFormat(language, { timeZone: tz, weekday: "short" }).format(new Date(atIso));
 
-const Mark = ({ state }: { readonly state: ProblemRow["state"] }) => {
+const Mark = ({ state }: { readonly state: SubtaskRow["state"] }) => {
   const { palette } = useTheme();
   return (
     <View
@@ -27,75 +27,75 @@ const Mark = ({ state }: { readonly state: ProblemRow["state"] }) => {
   );
 };
 
-const Problem = ({
-  problem,
+const SubtaskItem = ({
+  subtask,
   taskId,
 }: {
-  readonly problem: ProblemRow;
+  readonly subtask: SubtaskRow;
   readonly taskId: string;
 }) => {
   const t = useT();
   const { deviceTz, language } = useViewer();
   const { actions } = usePace();
   const run = useRunAction();
-  const isSent = problem.state === "submitted";
+  const isSent = subtask.state === "submitted";
   const note = (): string => {
-    if (problem.submittedAt !== null) {
-      return t("task.problemSent", { when: weekday(problem.submittedAt, deviceTz, language) });
+    if (subtask.submittedAt !== null) {
+      return t("task.subtaskSent", { when: weekday(subtask.submittedAt, deviceTz, language) });
     }
-    return problem.state === "solved" ? t("task.problemSolved") : "";
+    return subtask.state === "solved" ? t("task.subtaskSolved") : "";
   };
   return (
     <Pressable
-      accessibilityLabel={problem.label}
+      accessibilityLabel={subtask.label}
       accessibilityRole="checkbox"
-      aria-checked={problem.state !== "pending"}
+      aria-checked={subtask.state !== "pending"}
       aria-disabled={isSent}
       className="min-h-[52px] flex-row items-center gap-3 border-b border-line px-1 active:opacity-70"
       disabled={isSent}
       onPress={() => {
         void run(
-          problem.state === "pending"
-            ? actions.markSolved(taskId, problem.id)
-            : actions.unmarkSolved(taskId, problem.id),
+          subtask.state === "pending"
+            ? actions.markSolved(taskId, subtask.id)
+            : actions.unmarkSolved(taskId, subtask.id),
         );
       }}
     >
-      <Mark state={problem.state} />
+      <Mark state={subtask.state} />
       {/* A bare number label ("290") is the number itself: shown once, in the label. */}
-      {problem.number === null || String(problem.number) === problem.label ? null : (
+      {subtask.number === null || String(subtask.number) === subtask.label ? null : (
         <Text className="min-w-8 font-sans text-[13px] tabular-nums text-muted">
-          {`№${String(problem.number)}`}
+          {`№${String(subtask.number)}`}
         </Text>
       )}
       <Text className={cx("flex-1 font-sans text-[15px]", isSent ? "text-muted" : "text-fg")}>
-        {problem.label}
+        {subtask.label}
       </Text>
       <Text className="font-sans text-[12px] text-muted">{note()}</Text>
     </Pressable>
   );
 };
 
-/** The problems with their states; a tap marks one solved or takes that back (not once sent). */
-export const ProblemsList = ({ view }: { readonly view: TaskViewModel }) => {
+/** The subtasks with their states; a tap marks one solved or takes that back (not once sent). */
+export const SubtaskChecklist = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
-  if (view.problems.length === 0) {
+  if (view.subtasks.length === 0) {
     return null;
   }
-  const solved = view.problems.filter((problem) => problem.state !== "pending").length;
-  const sent = view.problems.filter((problem) => problem.state === "submitted").length;
+  const solved = view.subtasks.filter((subtask) => subtask.state !== "pending").length;
+  const sent = view.subtasks.filter((subtask) => subtask.state === "submitted").length;
   return (
     <View className="px-4">
       <View className="flex-row items-baseline justify-between px-1 pb-1">
         <Text accessibilityRole="header" className="font-sans text-[12px] font-medium text-muted">
-          {t("task.problems")}
+          {t("task.subtasks")}
         </Text>
         <Text className="font-sans text-[12px] text-muted">
-          {t("task.problemsSummary", { sent, solved })}
+          {t("task.subtasksSummary", { sent, solved })}
         </Text>
       </View>
-      {view.problems.map((problem) => (
-        <Problem key={problem.id} problem={problem} taskId={view.id} />
+      {view.subtasks.map((subtask) => (
+        <SubtaskItem key={subtask.id} subtask={subtask} taskId={view.id} />
       ))}
     </View>
   );

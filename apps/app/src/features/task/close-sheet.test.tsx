@@ -28,7 +28,7 @@ describe("CloseSheet — a task without a deadline", () => {
   });
 });
 
-describe("CloseSheet — submitting problems", () => {
+describe("CloseSheet — submitting subtasks", () => {
   it("offers the quick times and previews the outcome", async () => {
     await openSubmit();
     expect(screen.getByRole("header", { name: "Submit 3 and 4" })).toBeOnTheScreen();

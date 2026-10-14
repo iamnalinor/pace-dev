@@ -13,3 +13,9 @@ export const lineEnterProps = ({ onEnter }: EnterHandlers): TextInputProps => ({
   onSubmitEditing: onEnter,
   submitBehavior: "submit",
 });
+
+/**
+A field that takes one entry after another (a subtask, then the next): Enter submits and the
+keyboard stays up. A phone's keyboard has no Escape to claim.
+*/
+export const entryFieldProps: TextInputProps = { submitBehavior: "submit" };

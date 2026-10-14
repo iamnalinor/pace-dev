@@ -43,8 +43,12 @@ const TEXT_FIELD = 'input, textarea, select, [contenteditable="true"]';
 const INTERACTIVE =
   'input, textarea, select, button, a, [contenteditable="true"], [role="button"], [role="radio"], [role="checkbox"], [role="switch"], [role="tab"], [role="link"]';
 
-/** A field that handles its own keys (the composer's line) is left alone entirely. */
+/**
+A field that handles its own keys is left alone: entirely (the composer's line, "own"), or
+only for Escape (a subtask being typed closes itself on it, "escape").
+*/
 const OWNS_KEYS = '[data-pace-keys="own"]';
+const OWNS_ESCAPE = '[data-pace-keys="escape"]';
 
 const isWithin = (target: EventTarget | null, selector: string): boolean =>
   target instanceof Element && target.closest(selector) !== null;
@@ -57,16 +61,12 @@ const isTakenByTarget = (hotkey: Hotkey, target: EventTarget | null): boolean =>
   return isWithin(target, hotkey.key === "Enter" ? INTERACTIVE : TEXT_FIELD);
 };
 
-const hasOwnKeys = (target: EventTarget | null): boolean =>
-  target instanceof Element && target.closest(OWNS_KEYS) !== null;
+const hasOwnKeys = (event: KeyboardEvent): boolean =>
+  isWithin(event.target, OWNS_KEYS) ||
+  (event.key === "Escape" && isWithin(event.target, OWNS_ESCAPE));
 
 const onKeyDown = (event: KeyboardEvent): void => {
-  if (
-    KEYBOARD === null ||
-    event.defaultPrevented ||
-    event.isComposing ||
-    hasOwnKeys(event.target)
-  ) {
+  if (KEYBOARD === null || event.defaultPrevented || event.isComposing || hasOwnKeys(event)) {
     return;
   }
   const top = layers.at(-1) ?? 0;

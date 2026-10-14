@@ -37,7 +37,7 @@ describe("createFromComposer", () => {
     expect(created?.type === "task.created" && created.payload.sourceText).toBe(text);
   });
 
-  it("adds typed problems to this week's homework instead of a new task", async () => {
+  it("adds typed subtasks to this week's homework instead of a new task", async () => {
     const world = await setupActions();
     const before = world.state.store.getState().tasks.byId[HW_ID]?.subtasks.length ?? 0;
     const events = unwrap(
@@ -65,7 +65,7 @@ describe("createFromComposer", () => {
     expect(events.map((event) => event.type)).toEqual(["project.created", "task.created"]);
   });
 
-  it("keeps the description and extra problems of the expanded composer", async () => {
+  it("keeps the description and extra subtasks of the expanded composer", async () => {
     const world = await setupActions();
     const [created] = unwrap(
       await world.actions.createFromComposer(read(world, "read the paper"), {

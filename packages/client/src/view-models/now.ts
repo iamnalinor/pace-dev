@@ -34,11 +34,11 @@ export type MetaPart =
   | { readonly kind: "left"; readonly minutes: number }
   /** Time until the due, shown next to it: "6d 12h left". */
   | { readonly kind: "paused" }
-  | { readonly kind: "problems-left"; readonly count: number }
   | { readonly kind: "sent"; readonly submitted: number }
   | { readonly kind: "solved"; readonly solved: number; readonly total: number }
+  | { readonly kind: "starts"; readonly at: string; readonly tz: string }
   /** A start still ahead: the row waits under "In future". */
-  | { readonly kind: "starts"; readonly at: string; readonly tz: string };
+  | { readonly kind: "subtasks-left"; readonly count: number };
 
 export type RowTag =
   | { readonly kind: "preset"; readonly presetId: string; readonly name: string }
@@ -111,11 +111,11 @@ const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   return [];
 };
 
-/** Problems solved and sent; a late sheet shows what is still owed. */
+/** Subtasks solved and sent; a late sheet shows what is still owed. */
 const progressParts = (item: NowItem): readonly MetaPart[] => {
   if (item.total > 0) {
     if (item.isLate) {
-      return [{ kind: "problems-left", count: item.total - item.submitted }];
+      return [{ kind: "subtasks-left", count: item.total - item.submitted }];
     }
     return [
       { kind: "solved", solved: item.solved, total: item.total },

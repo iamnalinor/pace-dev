@@ -220,7 +220,7 @@ describe("deleteTask", () => {
 });
 
 describe("subtasks", () => {
-  it("marks a problem solved at the given instant and unmarks it by revoking", async () => {
+  it("marks a subtask solved at the given instant and unmarks it by revoking", async () => {
     const world = await setupActions();
     const [solved] = unwrap(
       await world.actions.markSolved(HW_ID, "s5", { at: HOUR_AGO, precision: "approx" }),
@@ -246,7 +246,7 @@ describe("subtasks", () => {
     });
   });
 
-  it("adds problems with fresh ids", async () => {
+  it("adds subtasks with fresh ids", async () => {
     const world = await setupActions();
     const [added] = unwrap(
       await world.actions.addSubtasks(HW_ID, ["Problem 8", { label: "Problem 9", number: 9 }]),
@@ -263,8 +263,8 @@ describe("subtasks", () => {
   });
 });
 
-describe("removing a problem", () => {
-  it("takes an unsent problem off the task; a sent or unknown one stays", async () => {
+describe("removing a subtask", () => {
+  it("takes an unsent subtask off the task; a sent or unknown one stays", async () => {
     const world = await setupActions();
     const [removed] = unwrap(await world.actions.removeSubtask(HW_ID, "s7"));
     expect(removed?.type).toBe("task.subtask.removed");
@@ -281,7 +281,7 @@ describe("removing a problem", () => {
 });
 
 describe("submit", () => {
-  it("sends the solved problems by default and closes with the last ones", async () => {
+  it("sends the solved subtasks by default and closes with the last ones", async () => {
     const world = await setupActions();
     const [partial] = unwrap(await world.actions.submit({ taskId: HW_ID }));
     expect(partial?.type === "task.submitted" && partial.payload).toEqual({

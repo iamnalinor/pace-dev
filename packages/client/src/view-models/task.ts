@@ -29,13 +29,13 @@ export type TaskTag =
   | { readonly kind: "status"; readonly status: TaskStatus }
   | { readonly kind: "submission"; readonly submission: Submission };
 
-export type ProblemState = "pending" | "solved" | "submitted";
+export type SubtaskState = "pending" | "solved" | "submitted";
 
-export type ProblemRow = {
+export type SubtaskRow = {
   readonly id: string;
   readonly number: null | number;
   readonly label: string;
-  readonly state: ProblemState;
+  readonly state: SubtaskState;
   readonly solvedAt: null | string;
   readonly submittedAt: null | string;
 };
@@ -107,7 +107,7 @@ export type TaskViewModel = {
     readonly value: number;
     readonly slider: null | number;
   };
-  readonly problems: readonly ProblemRow[];
+  readonly subtasks: readonly SubtaskRow[];
   readonly primaryAction: PrimaryAction;
   readonly quickTimes: readonly QuickTime[];
   readonly overrideSheet: OverrideSheet;
@@ -115,7 +115,7 @@ export type TaskViewModel = {
   readonly outcome: null | Outcome;
 };
 
-const problemState = (solvedAt: null | string, submittedAt: null | string): ProblemState => {
+const subtaskState = (solvedAt: null | string, submittedAt: null | string): SubtaskState => {
   if (submittedAt !== null) {
     return "submitted";
   }
@@ -170,12 +170,12 @@ const stats = (view: TaskView): TaskViewModel["stats"] => ({
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
 });
 
-const problems = (task: Task): readonly ProblemRow[] =>
+const subtaskRows = (task: Task): readonly SubtaskRow[] =>
   task.subtasks.map((item) => ({
     id: item.id,
     number: item.number,
     label: item.label,
-    state: problemState(item.solvedAt, item.submittedAt),
+    state: subtaskState(item.solvedAt, item.submittedAt),
     solvedAt: item.solvedAt,
     submittedAt: item.submittedAt,
   }));
@@ -222,7 +222,7 @@ export const taskViewModel = (
         value: progressOf(task, preset.progressMode),
         slider: task.slider,
       },
-      problems: problems(task),
+      subtasks: subtaskRows(task),
       primaryAction: primaryAction(view.submitPreview),
       quickTimes: quickTimes({ deviceTz: ctx.deviceTz, now: () => ctx.now }, task),
       overrideSheet: overrideSheet(state, view),

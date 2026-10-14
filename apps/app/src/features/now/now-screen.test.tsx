@@ -64,7 +64,7 @@ describe("NowBoard", () => {
     // The project (else the category) and the importance are coloured tags before the meta text.
     expect(screen.getAllByText("ASAP").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Normal").length).toBeGreaterThan(0);
-    expect(screen.getByText("15h late · 2 problems left")).toBeOnTheScreen();
+    expect(screen.getByText("15h late · 2 subtasks left")).toBeOnTheScreen();
     expect(screen.getByText("12d old")).toBeOnTheScreen();
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
     expect(screen.getByText("Due Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
@@ -152,7 +152,7 @@ describe("NowBoard", () => {
     });
   });
 
-  it("opens the submit sheet for a per-problem task instead of closing it", async () => {
+  it("opens the submit sheet for a per-subtask task instead of closing it", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<NowBoard />, runtime);
     await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));

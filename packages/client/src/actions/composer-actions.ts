@@ -5,7 +5,7 @@ import type { ComposerModel } from "../view-models/composer.ts";
 import { type ActionDeps, type ActionResult, emit, stamp } from "./deps.ts";
 import { type CreateTaskForm, type SubtaskForm, taskActions } from "./task-actions.ts";
 
-/** What the expanded composer adds to the line: a description and problems typed one by one. */
+/** What the expanded composer adds to the line: a description and subtasks typed one by one. */
 export type ComposerExtras = {
   readonly description?: string | undefined;
   readonly subtasks?: readonly string[] | undefined;
@@ -16,7 +16,7 @@ export type ComposerExtras = {
 export type ComposerActions = {
   /**
   Enter in the composer: a new task from the chips (importance always stored explicitly,
-  the typed line kept as its source), or the problems added to this week's homework.
+  the typed line kept as its source), or the subtasks added to this week's homework.
   */
   readonly createFromComposer: (model: ComposerModel, extras?: ComposerExtras) => ActionResult;
 };
@@ -57,7 +57,7 @@ const quickInputOf = (
   title: model.title,
 });
 
-/** The problems, the details and the text itself added to this week's homework. */
+/** The subtasks, the details and the text itself added to this week's homework. */
 const addToInstance = async (
   deps: ActionDeps,
   model: ComposerModel & {

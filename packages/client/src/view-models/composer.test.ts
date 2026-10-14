@@ -34,14 +34,14 @@ describe("composerModel", () => {
     expect(model("read the paper", { title: "  " }).canAdd).toBe(false);
   });
 
-  it("can add problems to this week's homework without a title of its own", () => {
+  it("can add subtasks to this week's homework without a title of its own", () => {
     expect(model("дз по алгебре 8", { title: "" })).toMatchObject({
       canAdd: true,
       target: { kind: "instance", taskId: HW_ID },
     });
   });
 
-  it("routes homework problems to this week's instance of the course", () => {
+  it("routes homework subtasks to this week's instance of the course", () => {
     expect(model("дз по алгебре 1, 3, 5а")).toMatchObject({
       preset: { id: "hw.algebra", name: "Algebra HW", color: "yellow" },
       project: { id: ALGEBRA_ID },

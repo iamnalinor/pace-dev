@@ -31,7 +31,7 @@ export type ComposerEdits = {
   readonly link?: null | string | undefined;
   /** A project to create by name (the assistant named one that does not exist yet). */
   readonly projectName?: null | string | undefined;
-  /** The assistant's reading of the title and the problems, over the rules' one. */
+  /** The assistant's reading of the title and the subtasks, over the rules' one. */
   readonly title?: string | undefined;
   readonly subtasks?: readonly QuickSubtask[] | undefined;
   /** The details beyond the title (the assistant's reading, or typed in the form). */

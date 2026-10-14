@@ -109,13 +109,13 @@ describe("taskViewModel", () => {
     expect(trk.progress).toMatchObject({ mode: "slider", slider: 4 });
     expect(trk.progress.value).toBeCloseTo(0.4, 10);
     expect(trk.primaryAction).toEqual({ kind: "done" });
-    expect(trk.problems).toEqual([]);
+    expect(trk.subtasks).toEqual([]);
     expect(trk.outcome).toBeNull();
   });
 
-  it("shows Algebra HW 6 on Wednesday: the problems, Submit 3 and 4, and the quick times", () => {
+  it("shows Algebra HW 6 on Wednesday: the subtasks, Submit 3 and 4, and the quick times", () => {
     const hw = view(HW_ID, HW_VIEW_NOW);
-    expect(hw.problems.map((problem) => [problem.number, problem.state])).toEqual([
+    expect(hw.subtasks.map((subtask) => [subtask.number, subtask.state])).toEqual([
       [1, "submitted"],
       [2, "submitted"],
       [3, "solved"],
@@ -124,7 +124,7 @@ describe("taskViewModel", () => {
       [6, "pending"],
       [null, "pending"],
     ]);
-    expect(hw.problems[0]).toMatchObject({
+    expect(hw.subtasks[0]).toMatchObject({
       label: "Matrix rank",
       solvedAt: "2026-10-05T12:00:00.000Z",
       submittedAt: "2026-10-05T13:00:00.000Z",

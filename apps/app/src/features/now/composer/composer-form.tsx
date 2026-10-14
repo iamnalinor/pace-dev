@@ -46,7 +46,7 @@ const editsOf = (patch: Partial<TaskFormValues>): ComposerEdits => {
   };
 };
 
-/** A bare number is a problem number ("290"); anything else is a label. */
+/** A bare number is a subtask number ("290"); anything else is a label. */
 const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
   const number = /^\d+$/u.test(label) ? Number(label) : null;
   return { label, number };

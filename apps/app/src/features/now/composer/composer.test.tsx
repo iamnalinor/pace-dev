@@ -151,7 +151,7 @@ describe("Composer", () => {
     });
   });
 
-  it("adds typed problems to this week's homework from the form", async () => {
+  it("adds typed subtasks to this week's homework from the form", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<Composer />, runtime);
     await fireEvent.changeText(line(), "дз по алгебре 8, 9");
