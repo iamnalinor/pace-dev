@@ -41,3 +41,21 @@ For EACH class 1–10, in the CURRENT code (after the stage 8 tasks merged so fa
    none found"), and refine a class rule if the sweep taught something.
 Commit per class ("Bug class N: <rule> — swept, M fixed, guard added"). `bun lint`, `bun test:unit`, `bun test:api`,
 `bun test:app` green; e2e specs you add/touch pass.
+
+## Carried into this sweep (controller, 2026-10-14) — fix each test first, log in bug-lessons
+From the pool re-review:
+- notification-pool.ts:255 `withdraw` marks the Telegram delivery row dismissed even when the answer came from
+  Telegram (message edited and kept) → feed says "Taken back from Telegram"; only mark rows actually withdrawn.
+- Settings push picker: a way back to "Automatic"; follow `push-methods-changed` live (class 8); offline keeps the
+  current method selected.
+- Day's Skip ignores a failed `skipEvent` (use-day-phone.ts:218): keep it pending/retry or tell the person (class 3).
+- fcm.ts:236: a 404 without UNREGISTERED is not "device gone".
+- live-sockets.ts `replyCloseCode`: whitelist sendable close codes (1000–1003, 1007–1014, 3000–4999), else 1000.
+- `wasDelivered` repeats "unavailable" rows while FCM is broken: log once per notification and method.
+- bot.ts:136: a refused notification answer removes the Telegram buttons — keep them (class 3/Imp 6 pattern).
+- README.md:318 Skip text; README push section mentions the Settings picker.
+From the Task 6 re-review:
+- Day's "Open task" links get an accessibility label naming the task.
+- Calendar picker marks the running event (as Chores/Rest/Task do).
+From the pool fix: closed enums in other answers — cloud device `kind`, sync `precision`/`source` — tolerant like
+notify (core/api/tolerant.ts).
