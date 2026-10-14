@@ -113,10 +113,12 @@ const LineButton = ({
 const LineInput = ({
   flow,
   isFocused,
+  isLocked,
   onFocusChange,
 }: {
   readonly flow: LineFlow;
   readonly isFocused: boolean;
+  readonly isLocked: boolean;
   readonly onFocusChange: (isInFocus: boolean) => void;
 }) => {
   const t = useT();
@@ -135,7 +137,11 @@ const LineInput = ({
     <TextInput
       accessibilityLabel={t("composer.label")}
       autoFocus={isFocused}
-      className="flex-1 px-1.5 py-2.5 font-sans text-[15px] leading-6 text-fg"
+      className={cx(
+        "flex-1 px-1.5 py-2.5 font-sans text-[15px] leading-6",
+        isLocked ? "text-muted" : "text-fg",
+      )}
+      editable={!isLocked}
       multiline
       onBlur={() => {
         onFocusChange(false);
@@ -147,17 +153,19 @@ const LineInput = ({
       onFocus={() => {
         onFocusChange(true);
       }}
-      {...lineEnterProps({
-        onEnter: () => {
-          if (!isEmpty) {
-            flow.enter();
-          }
-        },
-        onKeyPress: onEnter(isEmpty, {
-          enter: flow.enter,
-          toInbox: () => void flow.toInbox(),
-        }),
-      })}
+      // Locked, its keys are not its own: Escape reaches the form beside it.
+      {...(!isLocked &&
+        lineEnterProps({
+          onEnter: () => {
+            if (!isEmpty) {
+              flow.enter();
+            }
+          },
+          onKeyPress: onEnter(isEmpty, {
+            enter: flow.enter,
+            toInbox: () => void flow.toInbox(),
+          }),
+        }))}
       placeholder={t("composer.placeholder")}
       placeholderTextColor={palette.muted}
       ref={inputRef}
@@ -177,11 +185,17 @@ Send is lime once there is something to send.
 export const QuickLine = ({
   flow,
   isFocused,
+  isLocked,
   isReading,
   onFocusChange,
 }: {
   readonly flow: LineFlow;
   readonly isFocused: boolean;
+  /**
+  The form beside it (Now's right pane) holds the draft: the line shows it but takes no keys
+  and no presses, so the draft is changed in one place only.
+  */
+  readonly isLocked: boolean;
   /** The assistant is reading the line: Send spins. */
   readonly isReading: boolean;
   /** The card shows a focus ring while the cursor is in the line. */
@@ -189,31 +203,38 @@ export const QuickLine = ({
 }) => {
   const t = useT();
   const isEmpty = flow.text.trim() === "";
+  const isIdle = isEmpty || isLocked;
   return (
     <View className="flex-row items-end gap-0.5">
       <View className="mb-1">
         <LineButton
+          disabled={isLocked}
           hotkey={HOTKEYS.newTask}
           icon={Plus}
           label={t("nav.newTask")}
           onPress={flow.expand}
         />
       </View>
-      <LineInput flow={flow} isFocused={isFocused} onFocusChange={onFocusChange} />
+      <LineInput
+        flow={flow}
+        isFocused={isFocused}
+        isLocked={isLocked}
+        onFocusChange={onFocusChange}
+      />
       <View className="mb-1 flex-row gap-0.5">
         <LineButton
-          disabled={isEmpty}
+          disabled={isIdle}
           hotkey={HOTKEYS.toInbox}
           icon={Inbox}
           label={t("composer.toInbox")}
           onPress={() => void flow.toInbox()}
         />
         <LineButton
-          disabled={isEmpty}
+          disabled={isIdle}
           hotkey={HOTKEYS.enter}
           icon={ArrowUp}
           isBusy={isReading}
-          isLime={!isEmpty}
+          isLime={!isIdle}
           label={t("composer.send")}
           onPress={flow.enter}
         />

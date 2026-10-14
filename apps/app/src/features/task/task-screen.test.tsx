@@ -84,6 +84,19 @@ const trkScreen = async () => {
 };
 
 describe("TaskScreen — editing subtasks", () => {
+  it("saves a subtask still being typed in the editor", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("form.addSubtask") }));
+    await fireEvent.changeText(screen.getByPlaceholderText(en("form.addSubtask")), "Bonus");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(
+        runtime.state.store.getState().tasks.byId[HW_ID]?.subtasks.map((item) => item.label),
+      ).toContain("Bonus");
+    });
+  });
+
   it("takes an unsent subtask off in the editor; a sent one has no remove", async () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));

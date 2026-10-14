@@ -42,6 +42,11 @@ the picked task back. Picking a task while the form is open folds the draft back
 const NowSplit = ({ isComposerFocused }: { readonly isComposerFocused: boolean }) => {
   const flow = useComposerFlow();
   const [picked, setPicked] = useState<null | Picked>(null);
+  // The check's submit sheet opens once: the form taking the pane over has used it up, so
+  // the task coming back after the form does not open the sheet again by itself.
+  if (flow.form !== null && picked?.close === true) {
+    setPicked({ ...picked, close: false });
+  }
   return (
     <TaskOpenerProvider
       open={(id, options) => {

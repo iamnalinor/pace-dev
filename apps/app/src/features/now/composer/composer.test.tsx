@@ -23,7 +23,7 @@ const renderComposer = async (runtime: PaceRuntime, initialText?: string) =>
 const line = () => screen.getByPlaceholderText(en("composer.placeholder"));
 const button = (key: Parameters<typeof en>[0]) => screen.getByRole("button", { name: en(key) });
 /** The open form's title: "New task", or where the suggestion came from. */
-const formTitle = (key: "composer.form.new" | "composer.form.suggested") =>
+const formTitle = (key: "composer.form.suggested" | "form.newTask") =>
   screen.getByRole("header", { name: en(key) });
 
 /** The keyboard's Enter on a phone submits the line (the web reads the key itself). */
@@ -87,10 +87,37 @@ describe("Composer", () => {
     expect(title()).toHaveDisplayValue("разобрать почту");
   });
 
+  it("opens by hand on + after the assistant read the line: its reading gives way, the title says New task", async () => {
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
+    await fireEvent.press(button("common.close"));
+    await fireEvent.press(button("nav.newTask"));
+    expect(formTitle("form.newTask")).toBeOnTheScreen();
+    expect(screen.queryByRole("header", { name: en("composer.form.suggested") })).toBeNull();
+    expect(title()).not.toHaveDisplayValue("разобрать почту");
+  });
+
+  it("keeps a subtask still being typed when Create is pressed", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime);
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.changeText(title(), "read chapter 3");
+    await fireEvent.press(button("form.addSubtask"));
+    await fireEvent.changeText(screen.getByPlaceholderText(en("form.addSubtask")), "exercise 4");
+    await fireEvent.press(button("form.create"));
+    await waitFor(() => {
+      expect(created(runtime, "read chapter 3")?.subtasks.map((item) => item.label)).toEqual([
+        "exercise 4",
+      ]);
+    });
+  });
+
   it("opens an empty form titled New task from its + and on a New task request", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    expect(formTitle("composer.form.new")).toBeOnTheScreen();
+    expect(formTitle("form.newTask")).toBeOnTheScreen();
     expect(title()).toHaveDisplayValue("");
     await fireEvent.press(button("common.close"));
     await waitFor(() => {
@@ -100,7 +127,7 @@ describe("Composer", () => {
     await act(() => {
       requestNewTask();
     });
-    expect(formTitle("composer.form.new")).toBeOnTheScreen();
+    expect(formTitle("form.newTask")).toBeOnTheScreen();
   });
 
   it("reads the line on Enter into the form in place; a second Enter adds it", async () => {
@@ -142,7 +169,7 @@ describe("Composer", () => {
     await enter();
     expect(await screen.findByText(en("composer.aiFailed"))).toBeOnTheScreen();
     // The assistant read nothing: the form is the person's own.
-    expect(formTitle("composer.form.new")).toBeOnTheScreen();
+    expect(formTitle("form.newTask")).toBeOnTheScreen();
     expect(title()).toHaveDisplayValue("синк по дашборду");
     await enterInTitle();
     await waitFor(() => {

@@ -16,6 +16,8 @@ import { Tooltip } from "#app/ui/tooltip.tsx";
 import { HotkeyLayer, KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 import { type ComposerEdits, type ComposerModel, taskFormOptions } from "@pace/client";
 
+import { subtaskOf } from "./composer-flow.tsx";
+
 /** The form's values from the composer's reading: the edits over the rules' reading of the text. */
 const valuesOf = (model: ComposerModel): TaskFormValues => ({
   description: model.description ?? "",
@@ -46,12 +48,6 @@ const editsOf = (patch: Partial<TaskFormValues>): ComposerEdits => {
     ...(newProjectName !== undefined && { projectName: newProjectName }),
     ...linkEdit(link),
   };
-};
-
-/** A bare number is a subtask number ("290"); anything else is a label. */
-const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
-  const number = /^\d+$/u.test(label) ? Number(label) : null;
-  return { label, number };
 };
 
 /** For a weekly course: this week's homework, another open week, or a task of its own. */
@@ -153,14 +149,19 @@ const FormHeader = ({
 };
 
 /** The form's body: where the text goes, then the fields (or only the details for a week). */
+/** The subtask being typed into the form's field (Create keeps it), owned by the composer. */
+type SubtaskDraft = { readonly value: string; readonly onChange: (value: string) => void };
+
 const FormFields = ({
   isTitleFocused,
   model,
   onAdd,
   onEdit,
+  subtaskDraft,
 }: {
   readonly isTitleFocused: boolean;
   readonly model: ComposerModel;
+  readonly subtaskDraft: SubtaskDraft;
   readonly onEdit: (edits: ComposerEdits) => void;
   readonly onAdd: () => void;
 }) => {
@@ -194,10 +195,12 @@ const FormFields = ({
         />
       )}
       <SubtaskList
+        draft={subtaskDraft.value}
         items={model.subtasks.map((subtask) => subtask.label)}
         onChange={(labels) => {
           onEdit({ subtasks: labels.map((label) => subtaskOf(label)) });
         }}
+        onDraftChange={subtaskDraft.onChange}
       />
     </>
   );
@@ -218,10 +221,12 @@ export const ComposerForm = ({
   onClose,
   onEdit,
   status,
+  subtaskDraft,
   title,
   variant,
 }: {
   readonly model: ComposerModel;
+  readonly subtaskDraft: SubtaskDraft;
   /** The form just opened: the cursor goes to the title. */
   readonly isTitleFocused: boolean;
   /** What the assistant made of the message: what to double-check, its questions. */
@@ -254,7 +259,13 @@ export const ComposerForm = ({
           variant={variant}
         />
         {status}
-        <FormFields isTitleFocused={isTitleFocused} model={model} onAdd={onAdd} onEdit={onEdit} />
+        <FormFields
+          isTitleFocused={isTitleFocused}
+          model={model}
+          onAdd={onAdd}
+          onEdit={onEdit}
+          subtaskDraft={subtaskDraft}
+        />
       </View>
     </HotkeyLayer>
   );

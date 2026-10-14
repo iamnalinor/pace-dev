@@ -3,6 +3,7 @@ import { createContext, type ReactNode, use, useRef, useState } from "react";
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useNewTaskRequest } from "#app/shared/new-task-request.ts";
+import { withDraft } from "#app/shared/task-fields/subtask-list.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
@@ -19,13 +20,20 @@ import {
 } from "@pace/client";
 import { useAiRead } from "@pace/client/react";
 
-/** Where the form came from: opened by hand, or holding what was read from the line. */
-type FormOrigin = "by-hand" | "read";
+import type { FormOrigin } from "./form-title.ts";
+
+/** A bare number is a subtask number ("290"); anything else is a label. */
+export const subtaskOf = (label: string): ComposerModel["subtasks"][number] => {
+  const number = /^\d+$/u.test(label) ? Number(label) : null;
+  return { label, number };
+};
 
 /** The typed line, the chip taps and the assistant's reading, kept consistent with each other. */
 const useDraft = (initialText: string, assistant: Assistant) => {
   const [text, setText] = useState(initialText);
   const [edits, setEdits] = useState<ComposerEdits>({});
+  // A subtask typed into the form's field and not yet added with Enter: Create keeps it too.
+  const [subtaskDraft, setSubtaskDraft] = useState("");
   const ai = useAiRead(assistant);
   return {
     ai,
@@ -45,9 +53,12 @@ const useDraft = (initialText: string, assistant: Assistant) => {
     reset: (): void => {
       setText("");
       setEdits({});
+      setSubtaskDraft("");
       ai.reset();
     },
     setEdits,
+    setSubtaskDraft,
+    subtaskDraft,
     text,
   };
 };
@@ -93,6 +104,22 @@ const useFormState = (initialForm: FormOrigin | null) => {
   };
 };
 
+/** The edits with the subtask still being typed added last, as Create takes them. */
+const withSubtaskDraft = (
+  edits: ComposerEdits,
+  model: ComposerModel,
+  draft: string,
+): ComposerEdits =>
+  draft.trim() === ""
+    ? edits
+    : {
+        ...edits,
+        subtasks: withDraft(
+          model.subtasks.map((subtask) => subtask.label),
+          draft,
+        ).map((label) => subtaskOf(label)),
+      };
+
 /** Adds the form's task once (a held Enter or a double press adds once), then `done`. */
 const useAddTask = (model: ComposerModel, isReadByAssistant: boolean, done: () => void) => {
   const { actions } = usePace();
@@ -122,8 +149,14 @@ const useFlowState = (
 ) => {
   const { actions, assistant, hooks } = usePace();
   const run = useRunAction();
-  const { ai, edits, onReading, onText, reset, setEdits, text } = useDraft(initialText, assistant);
+  const draft = useDraft(initialText, assistant);
+  const { ai, edits, onReading, onText, reset, setEdits, text } = draft;
   const model = hooks.useComposer({ edits, text });
+  // What Create adds: the form as shown, with a subtask still being typed.
+  const toAdd = hooks.useComposer({
+    edits: withSubtaskDraft(edits, model, draft.subtaskDraft),
+    text,
+  });
   const { close, form, hide, lineFocus, setForm } = useFormState(initialForm);
   const done = (): void => {
     reset();
@@ -133,10 +166,11 @@ const useFlowState = (
   const parse = async (line: string): Promise<void> => {
     const outcome = await ai.read(line, onReading);
     if (outcome !== null && outcome.status !== "queued") {
-      setForm("read");
+      // The rules' reading when the assistant could not: the person fills it in, by hand.
+      setForm(outcome.status === "read" ? "assistant" : "by-hand");
     }
   };
-  const add = useAddTask(model, ai.state.status === "read", done);
+  const add = useAddTask(toAdd, form === "assistant", done);
   return {
     add,
     ai,
@@ -153,18 +187,25 @@ const useFlowState = (
     */
     enter: (): void => {
       if (ai.state.status === "read") {
-        setForm("read");
+        setForm("assistant");
       } else if (canAiRead(text)) {
         void parse(text);
       } else {
-        setForm("read");
-      }
-    },
-    /** New task: the form by hand, the line (if any) as its title; an open form stays as it is. */
-    expand: (): void => {
-      if (form === null) {
         setForm("by-hand");
       }
+    },
+    /**
+    New task: the form by hand, the line (if any) as its title by the rules; an assistant's
+    reading of it gives way. An open form stays as it is.
+    */
+    expand: (): void => {
+      if (form !== null) {
+        return;
+      }
+      if (ai.state.status === "read") {
+        onText(text);
+      }
+      setForm("by-hand");
     },
     form,
     hide,
@@ -175,6 +216,8 @@ const useFlowState = (
     onText,
     readLater: useReadLater(async () => await ai.readLater(text, onReading), done),
     setEdits,
+    setSubtaskDraft: draft.setSubtaskDraft,
+    subtaskDraft: draft.subtaskDraft,
     text,
     toInbox: async (): Promise<void> => {
       if (await run(actions.captureInbox(text))) {

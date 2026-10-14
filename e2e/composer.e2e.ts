@@ -167,3 +167,62 @@ test("on a computer the form opens in the right pane and closing it brings the t
   await expect(form).toHaveCount(0);
   await expect(details).toBeVisible();
 });
+
+/**
+Samples, frame by frame for a while, where the form's title and the line sit as the right pane
+swaps the task for the form: the title must land in the pane and stay there, the line must not
+move (a swap that reflows the list or scrolls the page shows here).
+*/
+const samplePaneSwap = async (
+  page: Page,
+): Promise<readonly { title: DOMRect | null; line: DOMRect | null; scrollY: number }[]> =>
+  await page.evaluate(
+    async () =>
+      await new Promise<
+        readonly { title: DOMRect | null; line: DOMRect | null; scrollY: number }[]
+      >((resolve) => {
+        const samples: { title: DOMRect | null; line: DOMRect | null; scrollY: number }[] = [];
+        const start = performance.now();
+        const frame = (now: number): void => {
+          const title = globalThis.document.querySelector('[role="form"] [role="heading"]');
+          const line = globalThis.document.querySelector('textarea[aria-label="New task"]');
+          samples.push({
+            line: line?.getBoundingClientRect() ?? null,
+            scrollY: globalThis.scrollY,
+            title: title?.getBoundingClientRect() ?? null,
+          });
+          if (now - start < 700) {
+            globalThis.requestAnimationFrame(frame);
+          } else {
+            resolve(samples);
+          }
+        };
+        globalThis.requestAnimationFrame(frame);
+      }),
+  );
+
+test("on a computer the form swaps into the pane in place: its title inside the pane, the list still", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await page.goto("/");
+  await addTask(page, "Water the plants");
+  await page.getByRole("list", { name: "Tasks" }).getByText("Water the plants").click();
+  await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  const list = await page.getByRole("list", { name: "Tasks" }).boundingBox();
+  const sampling = samplePaneSwap(page);
+  await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
+  const samples = await sampling;
+  const titles = samples.flatMap((sample) => (sample.title === null ? [] : [sample.title]));
+  const lines = samples.flatMap((sample) => (sample.line === null ? [] : [sample.line]));
+  expect(titles.length).toBeGreaterThan(5);
+  // The pane starts where the list's column ends.
+  const paneLeft = (list?.x ?? 0) + (list?.width ?? 0);
+  expect(Math.min(...titles.map((title) => title.left))).toBeGreaterThanOrEqual(paneLeft);
+  expect(Math.max(...titles.map((title) => title.right))).toBeLessThanOrEqual(1280);
+  expect(Math.min(...titles.map((title) => title.top))).toBeGreaterThanOrEqual(0);
+  expect(new Set(titles.map((title) => Math.round(title.top))).size).toBe(1);
+  expect(new Set(lines.map((line) => Math.round(line.top))).size).toBe(1);
+  expect(Math.max(...samples.map((sample) => sample.scrollY))).toBe(0);
+});

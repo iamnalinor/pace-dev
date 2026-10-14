@@ -128,7 +128,7 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
         />
       )}
       {/* The phone without calendar access: the way to grant it (the button's tooltip only says why). */}
-      {IS_PHONE && calendar?.access !== "granted" ? (
+      {IS_PHONE && calendar !== null && calendar.access !== "granted" ? (
         <ChoiceRow
           aside={null}
           label={t("permissions.title")}

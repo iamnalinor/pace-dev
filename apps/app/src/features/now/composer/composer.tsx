@@ -30,7 +30,8 @@ export const ComposerFlowForm = ({ variant }: { readonly variant: FormVariant })
         flow.setEdits((current) => ({ ...current, ...next }));
       }}
       status={<Status flow={flow} />}
-      title={t(formTitleKey(flow.ai.state))}
+      subtaskDraft={{ onChange: flow.setSubtaskDraft, value: flow.subtaskDraft }}
+      title={t(formTitleKey(flow.form ?? "by-hand"))}
       variant={variant}
     />
   );
@@ -50,6 +51,7 @@ const LineBlock = ({
     <QuickLine
       flow={flow}
       isFocused={isFocused}
+      isLocked={flow.form !== null && flow.isFormInPane}
       isReading={flow.ai.state.status === "reading"}
       onFocusChange={onFocusChange}
     />

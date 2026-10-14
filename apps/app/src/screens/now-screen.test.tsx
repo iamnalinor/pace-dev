@@ -23,7 +23,35 @@ const taskDetails = () => screen.queryByRole("button", { name: en("task.edit") }
 const titles = (runtime: PaceRuntime): readonly string[] =>
   Object.values(runtime.state.store.getState().tasks.byId).map((task) => task.title);
 
+/** The submit sheet a per-subtask task's check opens. */
+const submitSheet = () => screen.queryByText(en("close.subtitleSolved", { title: "Algebra HW 6" }));
+
 describe("NowScreen on a wide window", () => {
+  it("opens the submit sheet once: after the form has come and gone, the task is back without it", async () => {
+    await renderScreen(<NowScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
+    expect(submitSheet()).toBeOnTheScreen();
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.press(button("common.close"));
+    expect(taskDetails()).toBeOnTheScreen();
+    expect(submitSheet()).toBeNull();
+  });
+
+  it("keeps the line still while the pane's form holds its draft", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<NowScreen />, runtime);
+    await fireEvent.changeText(line(), "renew the passport");
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.changeText(title(), "renew the passport at the embassy");
+    // The draft is the form's now: the line shows it but takes no keys, Send and To Inbox wait.
+    expect(line()).toHaveProp("editable", false);
+    expect(button("composer.send")).toBeDisabled();
+    expect(button("composer.toInbox")).toBeDisabled();
+    await fireEvent.press(button("common.close"));
+    expect(line()).toHaveProp("editable", true);
+    expect(button("composer.toInbox")).toBeEnabled();
+  });
+
   it("opens the form in the right pane while the line stays in the list, then returns to the picked task", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<NowScreen />, runtime);
@@ -31,7 +59,7 @@ describe("NowScreen on a wide window", () => {
     expect(taskDetails()).toBeOnTheScreen();
     await fireEvent.press(button("nav.newTask"));
     // The pane holds the form in place of the task; the line is still in the list's column.
-    expect(screen.getByRole("header", { name: en("composer.form.new") })).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: en("form.newTask") })).toBeOnTheScreen();
     expect(taskDetails()).toBeNull();
     expect(line()).toBeOnTheScreen();
     await fireEvent.changeText(title(), "pay the rent");

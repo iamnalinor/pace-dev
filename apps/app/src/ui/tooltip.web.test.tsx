@@ -57,6 +57,14 @@ describe("Tooltip on the web", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
+  it("stays while the trigger has the keyboard's focus, whatever the pointer does", async () => {
+    const button = await renderTrigger();
+    await fireEvent(wrapperOf(button), "focus", {});
+    await fireEvent(button, "pointerEnter", pointer("mouse"));
+    await fireEvent(button, "pointerLeave", pointer("mouse"));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(LABEL);
+  });
+
   it("on a touch screen shows on a tap (the press still runs) and goes after a while", async () => {
     const onPress = jest.fn();
     const button = await renderTrigger(onPress);

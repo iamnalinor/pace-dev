@@ -82,11 +82,20 @@ The list's last row: "+ Add a subtask", which turns into a field. Enter adds wha
 keeps the field for the next one; Escape, or leaving it empty, closes it (a typed one stays put
 when the field is left, to come back to).
 */
-const AddSubtask = ({ onAdd }: { readonly onAdd: (label: string) => void }) => {
+const AddSubtask = ({
+  draft,
+  onAdd,
+  onDraftChange,
+}: {
+  readonly draft: string;
+  readonly onAdd: (label: string) => void;
+  readonly onDraftChange: (draft: string) => void;
+}) => {
   const t = useT();
   const { palette } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [isOpenByPress, setIsOpenByPress] = useState(false);
+  // A typed one keeps the field open (its text is part of the form's save).
+  const isOpen = isOpenByPress || draft !== "";
   if (!isOpen) {
     return (
       <Pressable
@@ -94,7 +103,7 @@ const AddSubtask = ({ onAdd }: { readonly onAdd: (label: string) => void }) => {
         accessibilityRole="button"
         className="h-9 flex-row items-center gap-2 self-start rounded-md pr-2 active:opacity-70"
         onPress={() => {
-          setIsOpen(true);
+          setIsOpenByPress(true);
         }}
       >
         <Plus color={palette.muted} size={16} strokeWidth={2} />
@@ -103,8 +112,8 @@ const AddSubtask = ({ onAdd }: { readonly onAdd: (label: string) => void }) => {
     );
   }
   const close = (): void => {
-    setDraft("");
-    setIsOpen(false);
+    onDraftChange("");
+    setIsOpenByPress(false);
   };
   return (
     <View className="min-h-9 flex-row items-center gap-2.5 pl-1">
@@ -119,7 +128,7 @@ const AddSubtask = ({ onAdd }: { readonly onAdd: (label: string) => void }) => {
             close();
           }
         }}
-        onChangeText={setDraft}
+        onChangeText={onDraftChange}
         onKeyPress={(event) => {
           if (event.nativeEvent.key === "Escape") {
             close();
@@ -132,7 +141,7 @@ const AddSubtask = ({ onAdd }: { readonly onAdd: (label: string) => void }) => {
             return;
           }
           onAdd(label);
-          setDraft("");
+          onDraftChange("");
         }}
         placeholder={t("form.addSubtask")}
         placeholderTextColor={palette.muted}
@@ -144,19 +153,30 @@ const AddSubtask = ({ onAdd }: { readonly onAdd: (label: string) => void }) => {
 };
 
 /**
+The new subtasks as a save takes them: a subtask still being typed (not yet added with Enter)
+counts as the last one, so pressing Create or Save never drops it.
+*/
+export const withDraft = (items: readonly string[], draft: string): readonly string[] =>
+  draft.trim() === "" ? items : [...items, draft.trim()];
+
+/**
 The subtasks, a plain list: those a task already has (kept; unsent ones can be taken off), the
 new ones (each removable), and "+ Add a subtask" last. The composer's form and the task editor
-both draw it.
+both draw it; the text being typed is theirs (`draft`), so their save can keep it.
 */
 export const SubtaskList = ({
+  draft,
   items,
   kept = NONE,
   onChange,
+  onDraftChange,
   onRemoveKept,
 }: {
+  readonly draft: string;
   readonly kept?: readonly KeptSubtask[] | undefined;
   readonly items: readonly string[];
   readonly onChange: (items: readonly string[]) => void;
+  readonly onDraftChange: (draft: string) => void;
   readonly onRemoveKept?: (id: string) => void;
 }) => {
   const t = useT();
@@ -192,9 +212,11 @@ export const SubtaskList = ({
         </View>
       )}
       <AddSubtask
+        draft={draft}
         onAdd={(label) => {
           onChange([...items, label]);
         }}
+        onDraftChange={onDraftChange}
       />
     </View>
   );

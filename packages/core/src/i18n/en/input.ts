@@ -98,7 +98,6 @@ export const enInput = {
   "form.estimateDefault": "{duration} by category",
   "form.estimateTyped": "Other: 50, 2.5h",
   "composer.send": "Send to the assistant",
-  "composer.form.new": "New task",
   "composer.form.suggested": "Suggested by the assistant",
   "composer.label": "New task",
   "composer.placeholder": "Add a task or paste text",

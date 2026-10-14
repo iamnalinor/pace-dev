@@ -209,7 +209,8 @@ export const Tooltip = ({
         }
       }}
       onPointerEnter={(event) => {
-        if (!isTouch(event)) {
+        // Shown for the keyboard's focus, it stays that way until the focus moves on.
+        if (!isTouch(event) && shown?.mode !== "focus") {
           show("hover");
         }
       }}

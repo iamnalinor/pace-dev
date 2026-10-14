@@ -17,11 +17,14 @@ const Harness = ({
   readonly onRemoveKept?: (id: string) => void;
 }) => {
   const [items, setItems] = useState(initial);
+  const [draft, setDraft] = useState("");
   return (
     <SubtaskList
+      draft={draft}
       items={items}
       kept={kept}
       onChange={setItems}
+      onDraftChange={setDraft}
       {...(onRemoveKept !== undefined && { onRemoveKept })}
     />
   );
