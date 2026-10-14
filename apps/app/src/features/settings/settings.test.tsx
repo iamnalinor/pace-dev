@@ -1,10 +1,12 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
 
+import { pushStore, registerPush, setPushChoice } from "#app/platform/notifications.ts";
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { problem } from "@pace/client/testing";
 
 /** Settings' switch for Week's night hours. */
 const nightHours = () => screen.getByRole("switch", { name: en("settings.nightHours") });
@@ -146,6 +148,71 @@ describe("SettingsScreen", () => {
     await fireEvent.press(option("fcm"));
     expect(await screen.findByText(en("settings.push.fcm"))).toBeOnTheScreen();
     expect(server.registered.at(-1)).toEqual({ endpoint: "fcm-token", method: "fcm" });
+  });
+
+  it("goes back to automatic after a pick, which then uses what the server prefers", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const server = pushRoutes();
+    const runtime = await createTestRuntime({ routes: server.routes, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const option = (method: "auto" | "fcm" | "none" | "poll") =>
+      screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
+    await waitFor(() => {
+      expect(option("poll")).toBeOnTheScreen();
+    });
+    await fireEvent.press(option("poll"));
+    expect(await screen.findByText(en("settings.push.poll"))).toBeOnTheScreen();
+    await fireEvent.press(option("auto"));
+    expect(await screen.findByText(en("settings.push.fcm"))).toBeOnTheScreen();
+    expect(option("auto")).toBeChecked();
+    expect(pushStore.getState().choice).toBeNull();
+    expect(server.registered.at(-1)).toEqual({ endpoint: "fcm-token", method: "fcm" });
+  });
+
+  it("follows the server's methods while Settings is open", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const offered = { pushMethods: ["poll"] };
+    const runtime = await createTestRuntime({
+      routes: {
+        ...pushRoutes().routes,
+        "GET /api/push/methods": () => offered,
+      },
+      world: "empty",
+    });
+    await setPushChoice(null);
+    await renderScreen(<SettingsScreen />, runtime);
+    const google = () => screen.queryByRole("radio", { name: en("settings.push.option.fcm") });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("radio", { name: en("settings.push.option.poll") }),
+      ).toBeOnTheScreen();
+    });
+    expect(google()).toBeNull();
+    // The server takes Google's push again: the live notice registers the phone anew.
+    offered.pushMethods = ["fcm", "poll"];
+    await act(async () => {
+      await registerPush(runtime.api);
+    });
+    expect(google()).toBeOnTheScreen();
+    expect(await screen.findByText(en("settings.push.fcm"))).toBeOnTheScreen();
+  });
+
+  it("keeps the picked method shown and selected while offline", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/push/methods": () => problem(503, "offline") },
+      world: "empty",
+    });
+    await setPushChoice("fcm");
+    pushStore.setState({ method: "fcm", offered: null });
+    await renderScreen(<SettingsScreen />, runtime);
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: en("settings.push.option.fcm") })).toBeChecked();
+    });
+    expect(screen.getByText(en("settings.push.fcm"))).toBeOnTheScreen();
   });
 
   it("logs out and goes to the login card", async () => {

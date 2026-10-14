@@ -1,13 +1,15 @@
 import { X } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
 
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import {
+  loadOfferedMethods,
   loadPushState,
   type PushMethod,
+  type PushState,
   pushStore,
   registerPush,
   setPushChoice,
@@ -17,7 +19,7 @@ import { IconButton } from "#app/ui/icon-button.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
 import { PaceSwitch } from "#app/ui/switch-row.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
-import { endpoints, isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
+import { isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
 
 /**
 Where each kind of notification goes: a row per kind, a switch per channel (Telegram, the app,
@@ -67,28 +69,30 @@ export const NotificationChannels = () => {
   );
 };
 
-/** The methods the server takes now, read when Settings opens (none until it answers). */
-const useOfferedMethods = (): readonly ("fcm" | "poll")[] => {
+/** What the picker offers: automatic, then a way through the server, then Off. */
+type PushOption = "auto" | PushMethod;
+
+/**
+The methods to pick from: what the server takes (asked again when Settings opens, and on every
+registration, so a change while open shows); before it ever answered (offline), the method in
+use and the one picked, so the current pick stays shown and selected.
+*/
+const offeredMethods = ({
+  choice,
+  method,
+  offered,
+}: Pick<PushState, "choice" | "method" | "offered">): readonly ("fcm" | "poll")[] =>
+  offered ?? (["fcm", "poll"] as const).filter((option) => option === choice || option === method);
+
+/** Reads the stored push state and asks the server's methods when Settings opens. */
+const useLoadPushState = (): void => {
   const { api } = usePace();
-  const [offered, setOffered] = useState<readonly ("fcm" | "poll")[]>([]);
   useEffect(() => {
-    const lifetime = new AbortController();
     void (async () => {
       await loadPushState();
-      try {
-        const { pushMethods } = await api.call(endpoints.notifications.pushMethods, {});
-        if (!lifetime.signal.aborted) {
-          setOffered(pushMethods);
-        }
-      } catch {
-        // Offline: only Off is offered, and what the phone uses is still said.
-      }
+      await loadOfferedMethods(api);
     })();
-    return () => {
-      lifetime.abort();
-    };
   }, [api]);
-  return offered;
 };
 
 /** What the phone uses now, and why when it is not what was picked. */
@@ -116,24 +120,23 @@ const pushLine = (
 
 /**
 On a phone: how system notifications reach it, picked from what the server takes now (Google's
-push, Pace's own check) or Off; automatic until picked. It follows every change (`pushStore`):
-a pick, a start that registered again, the server's methods changing.
+push, Pace's own check) or Off, or left automatic (the default, and a way back after a pick). It
+follows every change (`pushStore`): a pick, a start that registered again, the server's methods
+changing (the live notice registers again).
 */
 export const PushStatus = () => {
   const t = useT();
   const { api } = usePace();
-  const offered = useOfferedMethods();
+  useLoadPushState();
   const state = useStore(pushStore);
   if (!IS_PHONE) {
     return null;
   }
-  const options = [...offered, "none" as const].map((value) => ({
-    label: t(`settings.push.option.${value}`),
-    value,
-  }));
-  const pick = (choice: PushMethod): void => {
+  const values: readonly PushOption[] = ["auto", ...offeredMethods(state), "none"];
+  const options = values.map((value) => ({ label: t(`settings.push.option.${value}`), value }));
+  const pick = (option: PushOption): void => {
     void (async () => {
-      await setPushChoice(choice);
+      await setPushChoice(option === "auto" ? null : option);
       try {
         await registerPush(api);
       } catch {
@@ -144,7 +147,7 @@ export const PushStatus = () => {
   return (
     <View className="gap-2">
       <Text className="font-sans text-[13px] text-muted">{t("settings.push.hint")}</Text>
-      <Segmented onChange={pick} options={options} value={state.choice ?? state.method ?? "none"} />
+      <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
       {state.method === null
         ? null
         : pushLine({ ...state, method: state.method }, t).map((line) => (

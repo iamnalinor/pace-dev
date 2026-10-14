@@ -50,6 +50,7 @@ export const enNotify = {
   "notifications.method.poll": "Pace",
   "settings.notifications": "Notifications",
   "settings.push.hint": "How this phone shows them",
+  "settings.push.option.auto": "Auto",
   "settings.push.option.fcm": "Google",
   "settings.push.option.poll": "Pace checks",
   "settings.push.option.none": "Off",

@@ -52,6 +52,7 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notifications.method.poll": "Pace",
   "settings.notifications": "Уведомления",
   "settings.push.hint": "Как этот телефон их показывает",
+  "settings.push.option.auto": "Авто",
   "settings.push.option.fcm": "Google",
   "settings.push.option.poll": "Проверка Pace",
   "settings.push.option.none": "Выкл.",

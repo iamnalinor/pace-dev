@@ -59,14 +59,30 @@ export type PushState = {
   readonly choice: null | PushMethod;
   /** `false` when it registered none because notifications are not allowed. */
   readonly isAllowed: boolean;
+  /** The methods the server took when last asked; `null` until it answered once. */
+  readonly offered: null | readonly ("fcm" | "poll")[];
 };
 
-/** This phone's push state, for Settings to follow as it changes (registered again, picked). */
+/**
+This phone's push state, for Settings to follow as it changes (registered again, picked, the
+server's methods changed).
+*/
 export const pushStore = createStore<PushState>(() => ({
   choice: null,
   isAllowed: true,
   method: null,
+  offered: null,
 }));
+
+/** Asks the server which methods it takes now, into `pushStore`; offline, what it said last stays. */
+export const loadOfferedMethods = async (api: ApiClient): Promise<void> => {
+  try {
+    const { pushMethods } = await api.call(endpoints.notifications.pushMethods, {});
+    pushStore.setState({ offered: pushMethods });
+  } catch {
+    // Offline: the methods it offered last (or the one in use) are still shown.
+  }
+};
 
 /** Reads what was stored into `pushStore` (Settings opened before this start registered). */
 export const loadPushState = async (): Promise<void> => {
@@ -268,6 +284,7 @@ export const registerPush = async (api: ApiClient): Promise<PushMethod> => {
       return "none";
     }
     const { pushMethods } = await api.call(endpoints.notifications.pushMethods, {});
+    pushStore.setState({ offered: pushMethods });
     const order = choice === "poll" ? (["poll", "fcm"] as const) : (["fcm", "poll"] as const);
     for (const method of order) {
       if (pushMethods.includes(method) && (await isRegistered(api, method))) {
