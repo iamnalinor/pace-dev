@@ -7,10 +7,15 @@ export {
   timeButton,
 } from "./tracking/buttons.ts";
 export {
+  activityExpect,
+  activityLabel,
+  CALENDAR_LEAD_MINUTES,
+  calendarAttend,
   type CalendarOccurrence,
   calendarStart,
   type CalendarStartPlan,
-} from "./tracking/calendar-start.ts";
+  isCalendarRun,
+} from "./tracking/calendar-run.ts";
 export {
   ACTIVITY_CATEGORIES,
   CATEGORY_COLORS,

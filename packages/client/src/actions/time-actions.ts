@@ -1,10 +1,13 @@
 import {
   type ActivityCategory,
+  activityExpect,
+  activityLabel,
   calendarStart,
   categoryOfLabel,
   choiceById,
   defaultsFor,
   err,
+  isCalendarRun,
   newId,
   ok,
   runningActivities,
@@ -15,7 +18,6 @@ import {
 } from "@pace/core";
 
 import { editActions, type EditActions, logPast } from "./activity-edits.ts";
-import { activityLabel, isCalendarRun } from "./calendar-run.ts";
 import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
 export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
@@ -80,14 +82,9 @@ export type TimeActions = EditActions & {
 /** When to stop, and which activity: the main one unless named. */
 export type StopWhen = When & { readonly activityId?: string | undefined };
 
-/** An activity's Expect is a day at most (what the events accept). */
-const MAX_MINUTES = 24 * 60;
-
 /** Whole positive minutes up to a day, or nothing. */
 const positive = (minutes: null | number | undefined): number | undefined =>
-  minutes === null || minutes === undefined || minutes <= 0
-    ? undefined
-    : Math.min(MAX_MINUTES, Math.round(minutes));
+  activityExpect(minutes) ?? undefined;
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 

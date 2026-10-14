@@ -30,7 +30,6 @@ export {
 export { reportedKey } from "./notify/deadline-digest.ts";
 export {
   INITIAL_POOL_MEMORY,
-  isEventTracked,
   type OpenNotification,
   type PoolCalendarEvent,
   type PoolMemory,
