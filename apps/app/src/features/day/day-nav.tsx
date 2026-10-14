@@ -14,15 +14,15 @@ import { type DayModel, trackedDates } from "@pace/client";
 import { formatInZone } from "@pace/core";
 
 /** The week this day sits in, on one grid. */
-const WeekLink = () => {
+const CalendarLink = () => {
   const t = useT();
   const router = useRouter();
   return (
     <IconButton
       icon={CalendarRange}
-      label={t("week.open")}
+      label={t("calendar.open")}
       onPress={() => {
-        router.push("/week");
+        router.push("/calendar");
       }}
       variant="plain"
     />
@@ -51,7 +51,7 @@ export const DayNav = ({
   const today = formatInZone(now, day.zone, "yyyy-MM-dd");
   return (
     <View className="flex-row items-center gap-1">
-      <WeekLink />
+      <CalendarLink />
       <Button
         disabled={day.isToday}
         onPress={() => {

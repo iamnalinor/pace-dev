@@ -12,6 +12,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "crash.savedAt": "Сохранено с подробностями в {path}.",
   "nav.now": "Сейчас",
   "nav.day": "День",
+  "nav.calendar": "Календарь",
+  "nav.more": "Ещё",
   "nav.add": "Добавить",
   "nav.projects": "Проекты",
   "nav.insights": "Аналитика",
@@ -172,8 +174,6 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.quietHours.to": "До",
   "settings.presets": "Пресеты",
   "settings.presets.hint": "Курсы, работа, личное: как ведёт себя каждый вид задач.",
-  "settings.history": "История",
-  "settings.history.hint": "Доска на любую дату и все записанные события.",
   "settings.review": "Разобрать",
   "settings.review.hint": "То, что система не смогла решить сама.",
   "connectedApps.hint":

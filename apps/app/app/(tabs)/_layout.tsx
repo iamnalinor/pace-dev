@@ -32,9 +32,9 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: t("nav.now") }} />
       <Tabs.Screen name="day" options={{ title: t("nav.day") }} />
-      <Tabs.Screen name="projects" options={{ title: t("nav.projects") }} />
-      <Tabs.Screen name="insights" options={{ title: t("nav.insights") }} />
-      <Tabs.Screen name="settings" options={{ title: t("nav.settings") }} />
+      <Tabs.Screen name="calendar" options={{ title: t("nav.calendar") }} />
+      <Tabs.Screen name="inbox" options={{ title: t("nav.inbox") }} />
+      <Tabs.Screen name="more" options={{ title: t("nav.more") }} />
       {/* New task and the share target: Now with the cursor in the composer, not a tab. */}
       <Tabs.Screen name="add" options={{ href: null, title: t("nav.add") }} />
     </Tabs>

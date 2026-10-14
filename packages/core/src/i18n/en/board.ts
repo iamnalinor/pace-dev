@@ -7,7 +7,7 @@ export const enBoard = {
   "task.presetTitle": "Preset",
   "task.presetBuiltIn": "built-in",
   "task.presetSet": "Preset changed",
-  "now.inbox": "Inbox, {count} waiting",
+  "nav.inboxWaiting": "Inbox, {count} waiting",
   "now.filterByProject": "Filter by project",
   "now.allProjects": "All",
   "now.tasks": "Tasks",

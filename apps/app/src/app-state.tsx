@@ -209,6 +209,13 @@ export const useAuth = (): {
   return { auth, status, user };
 };
 
+/** The owner's first name from their Telegram profile; null until the server has told it. */
+export const useOwnerName = (): null | string => {
+  const { user } = useAuth();
+  const name = user?.firstName?.trim();
+  return name === undefined || name === "" ? null : name;
+};
+
 export const useSync = (): {
   readonly status: SyncStatus;
   readonly syncNow: () => Promise<unknown>;

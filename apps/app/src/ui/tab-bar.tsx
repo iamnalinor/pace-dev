@@ -1,34 +1,88 @@
 import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
-import { ChartColumn, Clock, Folder, type LucideIcon, Settings, Zap } from "lucide-react-native";
+import { CalendarRange, Clock, Ellipsis, Inbox, type LucideIcon, Zap } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useT } from "../app-state.tsx";
+import { useWaitingCount } from "../shared/use-waiting-count.ts";
+import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
-/** The tabs a phone shows, in order; New task is the composer on Now, not a tab of its own. */
+/**
+The tabs a phone shows, in order; New task is the composer on Now, not a tab of its own.
+Projects, Insights, History and Settings are behind More.
+*/
 const ICONS: Readonly<Record<string, LucideIcon>> = {
   index: Zap,
   day: Clock,
-  projects: Folder,
-  insights: ChartColumn,
-  settings: Settings,
+  calendar: CalendarRange,
+  inbox: Inbox,
+  more: Ellipsis,
 };
 
 const ICON_SIZE = 20;
 const STROKE = 1.75;
 
-/** Bottom tabs: Now, Day, Projects, Insights and Settings, each an icon over its name. */
-const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
+/** One tab: an icon over its name; the Inbox's carries the count of what waits. */
+const Tab = ({
+  count,
+  Icon,
+  isFocused,
+  onPress,
+  title,
+}: {
+  readonly count: number;
+  readonly Icon: LucideIcon;
+  readonly isFocused: boolean;
+  readonly onPress: () => void;
+  readonly title: string;
+}) => {
   const t = useT();
   const { palette } = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={count > 0 ? t("nav.inboxWaiting", { count }) : title}
+      accessibilityRole="tab"
+      aria-selected={isFocused}
+      className="min-h-12 flex-1 items-center justify-center gap-0.5"
+      onPress={onPress}
+    >
+      <View>
+        <Icon
+          color={isFocused ? palette.accentQuietText : palette.muted}
+          size={ICON_SIZE}
+          strokeWidth={STROKE}
+        />
+        <View className="absolute -right-3 -top-1.5">
+          <CountBadge count={count} />
+        </View>
+      </View>
+      <Text
+        className={cx(
+          "font-sans text-[11px]",
+          isFocused ? "font-medium text-accentQuietText" : "text-muted",
+        )}
+        numberOfLines={1}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
+};
+
+/** Bottom tabs: Now, Day, Calendar, Inbox and More. */
+const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
+  const t = useT();
   const insets = useSafeAreaInsets();
+  const waiting = useWaitingCount();
+  // On /add (New task, a share) Now is the screen, with the cursor in the composer.
+  const current = state.routes[state.index]?.name;
   return (
     <View
       aria-label={t("nav.main")}
@@ -41,41 +95,25 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         if (Icon === undefined) {
           return null;
         }
-        // On /add (New task, a share) Now is the screen, with the cursor in the composer.
-        const current = state.routes[state.index]?.name;
         const isFocused = state.index === index || (route.name === "index" && current === "add");
-        const activeColor = isFocused ? palette.accentQuietText : palette.muted;
-        const title = descriptors[route.key]?.options.title ?? route.name;
-        const onPress = (): void => {
-          const event = navigation.emit({
-            canPreventDefault: true,
-            target: route.key,
-            type: "tabPress",
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
-          }
-        };
         return (
-          <Pressable
-            accessibilityLabel={title}
-            accessibilityRole="tab"
-            aria-selected={isFocused}
-            className="min-h-12 flex-1 items-center justify-center gap-0.5"
+          <Tab
+            count={route.name === "inbox" ? waiting : 0}
+            Icon={Icon}
+            isFocused={isFocused}
             key={route.key}
-            onPress={onPress}
-          >
-            <Icon color={activeColor} size={ICON_SIZE} strokeWidth={STROKE} />
-            <Text
-              className={cx(
-                "font-sans text-[11px]",
-                isFocused ? "font-medium text-accentQuietText" : "text-muted",
-              )}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
-          </Pressable>
+            onPress={() => {
+              const event = navigation.emit({
+                canPreventDefault: true,
+                target: route.key,
+                type: "tabPress",
+              });
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            }}
+            title={descriptors[route.key]?.options.title ?? route.name}
+          />
         );
       })}
     </View>

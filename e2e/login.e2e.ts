@@ -90,3 +90,44 @@ test("/oauth/authorize exists as the API's redirect target", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Connecting an app" })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("not a valid connection request");
 });
+
+test("a desktop's sidebar keeps the owner's order, Calendar after Day", async ({ page }) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await loginViaApi(page);
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Main" });
+  await expect(nav.getByRole("link")).toHaveText([
+    "Now",
+    "Day",
+    "Calendar",
+    "Inbox",
+    "Projects",
+    "Insights",
+    "History",
+    "Settings",
+  ]);
+  await nav.getByRole("link", { name: "Calendar" }).click();
+  await expect(page).toHaveURL(/\/calendar$/u);
+  await expect(page.getByRole("heading", { level: 1, name: "Calendar" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+});
+
+test("a phone has Now, Day, Calendar, Inbox and More; More leads to the rest and back", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  await page.goto("/");
+  const tabs = page.getByRole("tablist", { name: "Main" }).getByRole("tab");
+  await expect(tabs).toHaveText(["Now", "Day", "Calendar", "Inbox", "More"]);
+  await tabs.getByText("More").click();
+  await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
+  for (const name of ["Projects", "Insights", "History", "Settings"]) {
+    await expect(page.getByRole("link", { name })).toBeVisible();
+  }
+  await expectNoA11yViolations(page);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
+});

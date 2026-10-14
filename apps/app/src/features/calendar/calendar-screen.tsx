@@ -144,7 +144,7 @@ const useOpenAt = (
 The week as lived: Monday to Sunday on one hour grid, tracked time filled in its color, the
 calendar's events outlined, a thin strip where some device was in use. A tap tells more.
 */
-export const WeekScreen = () => {
+export const CalendarScreen = () => {
   const t = useT();
   const { api, hooks } = usePace();
   const { language, now } = useViewer();
@@ -159,7 +159,7 @@ export const WeekScreen = () => {
     <ScreenHeader
       eyebrow={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
       right={<WeekNav onWeek={setWeekOf} week={week} />}
-      title={t("week.title")}
+      title={t("nav.calendar")}
     />
   );
   const hourPx = isWide ? 40 : 30;

@@ -5,9 +5,9 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
-import { WeekScreen } from "./week-screen.tsx";
+import { CalendarScreen } from "./calendar-screen.tsx";
 
-describe("WeekScreen", () => {
+describe("CalendarScreen", () => {
   it("lays the week's tracked time and calendar on one grid; a block tells where its time went", async () => {
     const runtime = await createTestRuntime({
       routes: {
@@ -41,7 +41,7 @@ describe("WeekScreen", () => {
       label: "Lecture notes",
       startAt: addMinutesIso(NOW, -240),
     });
-    await renderScreen(<WeekScreen />, runtime);
+    await renderScreen(<CalendarScreen />, runtime);
     expect(
       await screen.findByRole("button", { name: "From the calendar: Seminar" }),
     ).toBeOnTheScreen();

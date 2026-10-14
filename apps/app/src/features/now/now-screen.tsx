@@ -31,7 +31,7 @@ export const NowBoard = ({ composeText }: { readonly composeText?: string | unde
   const future = board.future.filter((row) => isInProject(row));
   const isEmpty = rows.length === 0 && future.length === 0;
   return (
-    <Screen footer={<TimeBar />} header={<NowHeader inboxCount={board.inboxCount} />}>
+    <Screen footer={<TimeBar />} header={<NowHeader />}>
       {/* On /add (New task, the "+" tab, a share) the cursor is in the composer. */}
       <Composer
         initialText={composeText}

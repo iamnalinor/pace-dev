@@ -12,9 +12,8 @@ import { DigestWindows, QuietHours } from "#app/features/settings/notification-s
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
-import { ScreenHeader } from "#app/ui/screen-header.tsx";
-import { Screen } from "#app/ui/screen.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { LANGUAGES } from "@pace/core";
@@ -100,10 +99,8 @@ export const SettingsScreen = () => {
     await auth.logout();
     router.replace("/login");
   };
-  // A tab on a phone and a sidebar destination on a wide window: nothing to dismiss.
-  const header = <ScreenHeader title={t("settings.title")} />;
   return (
-    <Screen header={header}>
+    <DestinationScreen title={t("settings.title")}>
       <LookRows />
       <Row label={t("settings.timezone")}>
         <TimezoneRow />
@@ -142,6 +139,6 @@ export const SettingsScreen = () => {
         </Button>
         <DeleteAccount />
       </View>
-    </Screen>
+    </DestinationScreen>
   );
 };

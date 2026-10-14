@@ -10,6 +10,8 @@ export const enShell = {
   "crash.savedAt": "Saved with its details in {path}.",
   "nav.now": "Now",
   "nav.day": "Day",
+  "nav.calendar": "Calendar",
+  "nav.more": "More",
   "nav.add": "Add",
   "nav.projects": "Projects",
   "nav.insights": "Insights",
@@ -174,8 +176,6 @@ export const enShell = {
   "settings.quietHours.to": "To",
   "settings.presets": "Presets",
   "settings.presets.hint": "Courses, work, personal: how each kind of task behaves.",
-  "settings.history": "History",
-  "settings.history.hint": "The board at any date and every recorded event.",
   "settings.review": "To sort",
   "settings.review.hint": "What the system could not settle on its own.",
   "connectedApps.hint":

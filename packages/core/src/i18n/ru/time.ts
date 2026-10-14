@@ -105,12 +105,10 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "phone.calendarDenied":
     "Доступ к календарю выключен: включите его для Pace в настройках Android.",
   "phone.usageAsk": "Разрешите доступ к статистике, чтобы видеть здесь сон и время в телефоне",
-  "nav.week": "Неделя",
-  "week.title": "Неделя",
   "week.thisWeek": "Эта неделя",
   "week.calendarEvent": "Из календаря",
   "week.openTask": "Открыть задачу",
-  "week.open": "Неделя",
+  "calendar.open": "Календарь",
   "insights.title": "Аналитика",
   "insights.previous": "Предыдущая неделя",
   "insights.next": "Следующая неделя",

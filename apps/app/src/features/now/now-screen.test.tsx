@@ -72,10 +72,9 @@ describe("NowBoard", () => {
     expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
   });
 
-  it("opens the inbox from the counter and a task from its row", async () => {
+  it("opens a task from its row, and has no Inbox counter of its own (that is in the navigation)", async () => {
     await renderScreen(<NowBoard />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("button", { name: "Inbox, 4 waiting" }));
-    expect(router.push).toHaveBeenCalledWith("/inbox");
+    expect(screen.queryByRole("button", { name: /^Inbox/ })).toBeNull();
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
   });
@@ -224,6 +223,5 @@ describe("NowBoard", () => {
   it("shows the empty state on a fresh account", async () => {
     await renderScreen(<NowBoard />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: "Inbox, 0 waiting" })).toBeOnTheScreen();
   });
 });
