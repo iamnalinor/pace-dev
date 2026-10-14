@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
+import { isBarePath, RouteGate } from "#app/auth/route-gate.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
@@ -21,15 +22,12 @@ import { Sidebar } from "#app/ui/sidebar.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 
-/** Screens without the app's navigation: signing in and the first-run walk-through. */
-const BARE_PATHS = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
-
 /** On a wide window the sidebar stays beside every signed-in screen, pushed ones included. */
 const useHasSidebar = (): boolean => {
   const isWide = useIsWide();
   const path = usePathname();
   const { status } = useAuth();
-  return isWide && status === "signed-in" && BARE_PATHS.every((bare) => !path.startsWith(bare));
+  return isWide && status === "signed-in" && !isBarePath(path);
 };
 
 /** Keeps what a crash file says about the app current; apart, so syncs do not redraw the Stack. */
@@ -41,6 +39,7 @@ const CrashContext = () => {
 const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
+  const path = usePathname();
   useNotificationLinks();
   useCrashNotice();
   return (
@@ -50,6 +49,7 @@ const Navigator = () => {
         {hasSidebar ? <Sidebar /> : null}
         <View className="flex-1">
           <Stack
+            layout={({ children }) => <RouteGate path={path}>{children}</RouteGate>}
             screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
             screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
           >

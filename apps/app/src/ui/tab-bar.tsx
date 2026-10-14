@@ -5,6 +5,8 @@ import { CalendarRange, Clock, Ellipsis, Inbox, type LucideIcon, Zap } from "luc
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { MessageKey } from "@pace/core";
+
 import { useT } from "../app-state.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { CountBadge } from "./count-badge.tsx";
@@ -26,6 +28,9 @@ const ICONS: Readonly<Record<string, LucideIcon>> = {
   more: Ellipsis,
 };
 
+/** The tab that carries a count badge, with its accessibility label (it takes the `{count}`). */
+const COUNTED: Readonly<Record<string, MessageKey>> = { inbox: "nav.inboxWaiting" };
+
 const ICON_SIZE = 20;
 const STROKE = 1.75;
 
@@ -34,20 +39,22 @@ const Tab = ({
   count,
   Icon,
   isFocused,
+  label,
   onPress,
   title,
 }: {
   readonly count: number;
+  /** What a screen reader says; the title when nothing more is to be told. */
+  readonly label: string;
   readonly Icon: LucideIcon;
   readonly isFocused: boolean;
   readonly onPress: () => void;
   readonly title: string;
 }) => {
-  const t = useT();
   const { palette } = useTheme();
   return (
     <Pressable
-      accessibilityLabel={count > 0 ? t("nav.inboxWaiting", { count }) : title}
+      accessibilityLabel={label}
       accessibilityRole="tab"
       aria-selected={isFocused}
       className="min-h-12 flex-1 items-center justify-center gap-0.5"
@@ -95,13 +102,17 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         if (Icon === undefined) {
           return null;
         }
+        const countedLabel = COUNTED[route.name];
+        const count = countedLabel === undefined ? 0 : waiting;
+        const title = descriptors[route.key]?.options.title ?? route.name;
         const isFocused = state.index === index || (route.name === "index" && current === "add");
         return (
           <Tab
-            count={route.name === "inbox" ? waiting : 0}
+            count={count}
             Icon={Icon}
             isFocused={isFocused}
             key={route.key}
+            label={countedLabel !== undefined && count > 0 ? t(countedLabel, { count }) : title}
             onPress={() => {
               const event = navigation.emit({
                 canPreventDefault: true,
@@ -112,7 +123,7 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
                 navigation.navigate(route.name, route.params);
               }
             }}
-            title={descriptors[route.key]?.options.title ?? route.name}
+            title={title}
           />
         );
       })}

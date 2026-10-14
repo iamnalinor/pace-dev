@@ -209,10 +209,13 @@ export const useAuth = (): {
   return { auth, status, user };
 };
 
-/** The owner's first name from their Telegram profile; null until the server has told it. */
+/**
+The owner's first name from their Telegram profile. A session that began before the server kept it
+falls back to the first word of their full name; null until the server has told who they are.
+*/
 export const useOwnerName = (): null | string => {
   const { user } = useAuth();
-  const name = user?.firstName?.trim();
+  const name = (user?.firstName ?? user?.name.split(/\s+/u, 1)[0])?.trim();
   return name === undefined || name === "" ? null : name;
 };
 

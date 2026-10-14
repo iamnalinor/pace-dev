@@ -31,8 +31,8 @@ type Destination = {
   readonly href: Href;
   readonly icon: LucideIcon;
   readonly label: MessageKey;
-  /** Whether the row carries the count of what waits in the Inbox. */
-  readonly isCounted?: boolean;
+  /** For a row that carries a count badge: its accessibility label, which takes the `{count}`. */
+  readonly countedLabel?: MessageKey;
   /** Whether a path belongs to this destination (a project page belongs to Projects). */
   readonly owns: (path: string) => boolean;
 };
@@ -54,7 +54,7 @@ const DESTINATIONS: readonly Destination[] = [
   {
     href: "/inbox",
     icon: Inbox,
-    isCounted: true,
+    countedLabel: "nav.inboxWaiting",
     label: "nav.inbox",
     owns: (path) => path === "/inbox",
   },
@@ -100,7 +100,11 @@ const SidebarLink = ({
   const Icon = destination.icon;
   return (
     <Pressable
-      accessibilityLabel={count > 0 ? t("nav.inboxWaiting", { count }) : t(destination.label)}
+      accessibilityLabel={
+        count > 0 && destination.countedLabel !== undefined
+          ? t(destination.countedLabel, { count })
+          : t(destination.label)
+      }
       accessibilityRole="link"
       aria-current={isCurrent ? "page" : undefined}
       className={cx(
@@ -175,7 +179,7 @@ export const Sidebar = () => {
       </Pressable>
       {DESTINATIONS.map((destination) => (
         <SidebarLink
-          count={destination.isCounted === true ? waiting : 0}
+          count={destination.countedLabel === undefined ? 0 : waiting}
           destination={destination}
           isCurrent={destination.owns(path)}
           key={destination.label}

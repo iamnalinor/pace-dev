@@ -209,6 +209,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.timezone.differs": "Пояс аккаунта не совпадает с поясом устройства.",
   "settings.more": "Ещё",
   "nav.inbox": "Входящие",
+  "nav.inboxWaiting": "Входящие, ждут: {count}",
   "nav.history": "История",
   "nav.newTask": "Новая задача",
   "bot.notLinked": "Этот Telegram ещё не связан с Pace. Откройте Pace и войдите через бота.",

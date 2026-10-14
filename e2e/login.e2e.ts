@@ -131,3 +131,11 @@ test("a phone has Now, Day, Calendar, Inbox and More; More leads to the rest and
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
 });
+
+test("a signed-out deep link to a signed-in screen lands on the login screen", async ({ page }) => {
+  for (const path of ["/settings", "/projects", "/insights", "/history", "/calendar"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login$/u);
+    await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+  }
+});

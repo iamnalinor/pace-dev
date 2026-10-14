@@ -208,6 +208,7 @@ export const enShell = {
   "settings.timezone.differs": "The account zone differs from this device.",
   "settings.more": "More",
   "nav.inbox": "Inbox",
+  "nav.inboxWaiting": "Inbox, {count} waiting",
   "nav.history": "History",
   "nav.newTask": "New task",
   "bot.notLinked":

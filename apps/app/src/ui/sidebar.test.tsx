@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { fakeUser } from "@pace/client/testing";
 
 import { Sidebar } from "./sidebar.tsx";
 
@@ -41,6 +42,16 @@ describe("Sidebar", () => {
     await runtime.auth.me();
     await renderScreen(<Sidebar />, runtime);
     expect(screen.getByText(en("app.name"))).toBeOnTheScreen();
+    expect(screen.getByText("Ann")).toBeOnTheScreen();
+  });
+
+  it("falls back to the first word of the full name for a session that predates the first name", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/me": () => ({ ...fakeUser, firstName: null, name: "Ann Lee" }) },
+      world: "empty",
+    });
+    await runtime.auth.me();
+    await renderScreen(<Sidebar />, runtime);
     expect(screen.getByText("Ann")).toBeOnTheScreen();
   });
 
