@@ -55,14 +55,20 @@ export const feedModel = (
   };
 };
 
+/** How a calendar occurrence was answered. */
+export type EventAnswer = "attended" | "skipped";
+
 /**
 Calendar occurrences answered from any channel (Attend or Skip in Telegram, the web, a phone
-notification): Now's offer does not ask about them again.
+notification, Now or Day), by `calendarEventKey`: Now's offer and Day's rows do not ask about
+them again (Day hides a skipped one and reads an attended one as logged).
 */
-export const answeredEventKeys = (all: readonly PoolNotification[]): ReadonlySet<string> =>
-  new Set(
-    all
-      .filter((item) => item.resolution === "attended" || item.resolution === "skipped")
-      .map((item) => (item.kind === "event_start" ? item.payload.eventKey : ""))
-      .filter((key) => key !== ""),
+export const eventAnswers = (all: readonly PoolNotification[]): ReadonlyMap<string, EventAnswer> =>
+  new Map(
+    all.flatMap((item) =>
+      item.kind === "event_start" &&
+      (item.resolution === "attended" || item.resolution === "skipped")
+        ? [[item.payload.eventKey, item.resolution] as const]
+        : [],
+    ),
   );

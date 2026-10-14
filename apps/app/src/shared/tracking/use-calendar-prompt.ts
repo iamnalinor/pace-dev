@@ -7,7 +7,7 @@ import { useAppState, usePace } from "#app/app-state.tsx";
 import { calendarKey, dismiss, dismissedKeys, seriesRules } from "#app/platform/phone-memory.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { answeredEventKeys } from "@pace/client";
+import { eventAnswers } from "@pace/client";
 import { calendarEventKey } from "@pace/core";
 
 import { calendarToday } from "./calendar-source.ts";
@@ -35,7 +35,7 @@ export const useCalendarPrompt = (): {
 } => {
   const { api, clock, notifications } = usePace();
   const { items } = useFeed();
-  const answered = useMemo(() => answeredEventKeys(items), [items]);
+  const answered = useMemo(() => eventAnswers(items), [items]);
   const { deviceTz, now } = useViewer();
   const activities = useAppState((state) => state.time.activities);
   const [loaded, setLoaded] = useState<Loaded>(EMPTY);

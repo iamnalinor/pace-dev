@@ -146,7 +146,8 @@ export {
 } from "./view-models/insights.ts";
 export { type PlainMetaPart, plainMetaText } from "./view-models/meta-text.ts";
 export {
-  answeredEventKeys,
+  type EventAnswer,
+  eventAnswers,
   type FeedDay,
   type FeedModel,
   feedModel,
