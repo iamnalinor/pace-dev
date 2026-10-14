@@ -315,9 +315,11 @@ the native code and runs the JS logic against mocks).
   start. When nothing is near now (starting, going on or just over within 15 minutes), or
   without access, the button is greyed: its tooltip and its picker say why, and the picker
   still offers a meeting without an event. Now shows what runs in one compact row with
-  *Stop*. *Attended* logs the event as a block, *Skip* hides it
-  on this phone. For a repeating event, the toast offers *Every time*: the whole series is
-  then logged when it ends, or always hidden. Exchange or work accounts appear only if
+  *Stop*. *Attended* (offered from 15 minutes before the start) tracks the event from its
+  start, as Now's offer does. *Skip* skips that occurrence on every channel (Telegram, the web
+  and the feed stop asking); one that did not reach the server stays, with a note to try again.
+  For a repeating event, the toast offers *Every time*: the whole series is then logged when it
+  ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.
 - **Notifications** come from the server only (see [Notifications](#notifications)); the
   phone computes and schedules none of its own.
@@ -344,7 +346,9 @@ and "still doing X?"; sign-ins and digests always come.
 
 The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
 server offers it and the phone has a Google token, else polling (it fetches what waits for it;
-the open app does so at once on each live update). `GET /api/push/methods` says what the server
+the open app does so at once on each live update). *Settings → Notifications* on the phone picks
+it by hand (*Auto*, *Google*, *Pace checks* or *Off*) and says which one the phone uses; a pick the
+server or the phone cannot take right now falls back to the other, and is tried again later. `GET /api/push/methods` says what the server
 accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and
 phones switch to polling on their next start or at once while open. Each item's delivery log
 ("Delivered to android via Google · 13:47") is shown under it in the feed.

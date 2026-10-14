@@ -160,11 +160,12 @@ describe("DayScreen", () => {
     await renderScreen(<DayScreen />, runtime);
     // A link inside a button is a nested control: screen readers skip it, axe refuses it.
     expect(controlsInsideControls()).toEqual([]);
-    // The block named after the task says Open task, not its title a second time.
-    await fireEvent.press(screen.getByRole("link", { name: "Open task" }));
+    // The block named after the task says Open task, not its title a second time; the other one
+    // shows the task it was for. A screen reader hears the task's name on both: a list of
+    // "Open task" links says nothing about where each one goes.
+    expect(screen.getAllByRole("link", { name: "Open task: Algebra HW 6" })).toHaveLength(2);
+    await fireEvent.press(screen.getByText("Open task"));
     expect(router.push).toHaveBeenCalledWith(`/task/${taskId}`);
-    // The other one names the task it was for.
-    expect(screen.getByRole("link", { name: "Algebra HW 6" })).toBeOnTheScreen();
   });
 
   it("lists blocks and gaps as one timeline: a gap is a quiet row with its hours and Log", async () => {

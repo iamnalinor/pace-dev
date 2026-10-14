@@ -77,6 +77,7 @@ export const enTime = {
   "day.what": "What",
   "day.edit": "Edit {label}",
   "day.openTask": "Open task",
+  "day.openTaskNamed": "Open task: {title}",
   "day.editTitle": "Edit activity",
   "day.whatMissing": "Say what it was.",
   "day.badTime": "Type a time like 09:30.",

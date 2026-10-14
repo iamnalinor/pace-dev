@@ -79,6 +79,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "day.what": "Что",
   "day.edit": "Изменить «{label}»",
   "day.openTask": "Открыть задачу",
+  "day.openTaskNamed": "Открыть задачу: {title}",
   "day.editTitle": "Изменить занятие",
   "day.whatMissing": "Напишите, что это было.",
   "day.badTime": "Введите время, например 09:30.",

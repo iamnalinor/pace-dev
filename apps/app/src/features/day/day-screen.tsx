@@ -124,9 +124,13 @@ const TaskLine = ({ row }: { readonly row: DayRowProps["row"] }) => {
   if (link === null) {
     return null;
   }
+  // Named after the task for a screen reader: a list of "Open task" links says nothing about
+  // where each goes. Under a block named after the task, its label is that title (as stored).
+  const title = "title" in link.text ? link.text.title : row.label;
   return (
     <View className="flex-row pb-2 pl-[116px]">
       <Text
+        accessibilityLabel={t("day.openTaskNamed", { title })}
         accessibilityRole="link"
         className="min-h-6 shrink py-1 font-sans text-[12px] text-fg2 underline"
         numberOfLines={1}

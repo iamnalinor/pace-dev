@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 
 import type { ActionResult, StartOptions, TimeButtonView } from "@pace/client";
 
+import { useT } from "#app/app-state.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import type { CalendarToday } from "./calendar-today.ts";
@@ -35,9 +36,11 @@ export const ChoiceRow = ({
   readonly onPress: () => void;
 }) => {
   const { palette } = useTheme();
+  const t = useT();
   return (
     <Pressable
-      accessibilityLabel={label}
+      // The check says it runs on the screen; the name says it to a screen reader.
+      accessibilityLabel={isRunning ? t("time.buttonRunning", { label }) : label}
       accessibilityRole="button"
       className="min-h-12 flex-row items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-2 active:opacity-70"
       onPress={onPress}

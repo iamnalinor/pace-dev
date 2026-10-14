@@ -1,12 +1,11 @@
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 
-import type { MessageKey } from "@pace/core";
-
-import { usePace, useT } from "#app/app-state.tsx";
+import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { isCalendarRun, type MessageKey, runningActivities } from "@pace/core";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
@@ -70,28 +69,41 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
   );
 };
 
-/** Calendar's picker: today's events from the calendar (own or accepted), or why there are none. */
+/**
+Calendar's picker: today's events from the calendar (own or accepted), or why there are none.
+The event running already is checked, as in the other pickers, and picking it only closes.
+*/
 export const CalendarChoices = (props: ListProps) => {
   const t = useT();
-  const { deviceTz } = useViewer();
+  const { deviceTz, now } = useViewer();
   const { actions } = usePace();
-  const { calendar, options, start } = props;
+  const time = useAppState((state) => state.time);
+  const { calendar, close, options, start } = props;
   const events = calendar?.events ?? [];
   if (events.length === 0) {
     return <NoEvents {...props} />;
   }
+  const running = runningActivities(time, now);
   return (
     <ChoiceList label={t("time.calendarToday")}>
-      {events.map((event) => (
-        <ChoiceItem
-          aside={`${clockTime(event.startAt, deviceTz)}–${clockTime(event.endAt, deviceTz)}`}
-          key={event.id}
-          label={event.title}
-          onPress={() => {
-            start(actions.startCalendar(event, options));
-          }}
-        />
-      ))}
+      {events.map((event) => {
+        const isRunning = running.some((activity) => isCalendarRun(event, activity));
+        return (
+          <ChoiceItem
+            aside={`${clockTime(event.startAt, deviceTz)}–${clockTime(event.endAt, deviceTz)}`}
+            isRunning={isRunning}
+            key={event.id}
+            label={event.title}
+            onPress={() => {
+              if (isRunning) {
+                close();
+                return;
+              }
+              start(actions.startCalendar(event, options));
+            }}
+          />
+        );
+      })}
     </ChoiceList>
   );
 };

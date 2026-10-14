@@ -195,16 +195,27 @@ describe("TimeBar", () => {
   });
 
   it.each([
-    { button: "Chores", choice: "Getting ready" },
-    { button: "Rest", choice: "Walk" },
-    { button: "Task", choice: "Algebra HW 6" },
+    { button: "Calendar", choice: "Seminar", list: en("time.calendarToday") },
+    { button: "Chores", choice: "Getting ready", list: "Chores" },
+    { button: "Rest", choice: "Walk", list: "Rest" },
+    { button: "Task", choice: "Algebra HW 6", list: "Task" },
   ])(
-    "only closes $button's picker when the choice running already is picked again",
-    async ({ button, choice }) => {
+    "marks the running choice in $button's picker, and only closes it when that is picked again",
+    async ({ button, choice, list }) => {
+      calendar.state.status = "granted";
+      calendar.state.events = [
+        {
+          allDay: false,
+          endDate: addMinutesIso(NOW, 50),
+          id: "e1",
+          startDate: addMinutesIso(NOW, -10),
+          title: "Seminar",
+        },
+      ];
       const runtime = await createTestRuntime();
       await renderScreen(<TimeBar />, runtime);
       await fireEvent.press(screen.getByRole("button", { name: button }));
-      await fireEvent.press(within(await picker(button)).getByRole("button", { name: choice }));
+      await fireEvent.press(within(await picker(list)).getByRole("button", { name: choice }));
       const on = en("time.buttonRunning", { label: button });
       await waitFor(() => {
         expect(screen.getByRole("button", { name: on })).toBeOnTheScreen();
@@ -214,11 +225,16 @@ describe("TimeBar", () => {
       const starts = [
         jest.spyOn(runtime.actions, "startChoice"),
         jest.spyOn(runtime.actions, "focusTask"),
+        jest.spyOn(runtime.actions, "startCalendar"),
       ];
       await fireEvent.press(screen.getByRole("button", { name: on }));
-      await fireEvent.press(within(await picker(button)).getByRole("button", { name: choice }));
+      // The running one is marked: checked, and named so a screen reader hears it too.
+      const again = within(await picker(list)).getByRole("button", {
+        name: en("time.buttonRunning", { label: choice }),
+      });
+      await fireEvent.press(again);
       await waitFor(() => {
-        expect(listsNamed(button)).toEqual([]);
+        expect(listsNamed(list)).toEqual([]);
       });
       // Nothing asked of the actions, nothing written: the same block runs on.
       for (const start of starts) {
