@@ -63,12 +63,11 @@ const rangeText = (startAt: string, end: string, zone: string): string =>
 
 /**
 A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category tag and the
-label when it says more than the tag, its task, then the duration against its Expect or
-Limit and a pencil. The whole row opens the edit sheet.
+label when it says more than the tag, then the duration against its Expect or Limit and a
+pencil. The whole row opens the edit sheet; its task is linked on the line under it.
 */
 const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
   const t = useT();
-  const openTask = useOpenTask();
   const { language } = useViewer();
   const { palette } = useTheme();
   const range = rangeText(
@@ -94,18 +93,6 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
             </Text>
           ) : null}
         </View>
-        {row.taskId !== null && row.taskTitle !== null ? (
-          <Text
-            accessibilityRole="link"
-            className="font-sans text-[12px] text-fg2 underline"
-            numberOfLines={1}
-            onPress={() => {
-              openTask(row.taskId ?? "");
-            }}
-          >
-            {row.taskTitle}
-          </Text>
-        ) : null}
       </View>
       <View className="items-end">
         <Text
@@ -122,6 +109,32 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
       </View>
       <Pencil color={palette.muted} size={16} strokeWidth={1.75} />
     </Pressable>
+  );
+};
+
+/**
+The block's task, a link on its own line under the row, lined up with the block's words: inside
+the row's button it would be a control within a control, which screen readers skip.
+*/
+const TaskLine = ({ row }: { readonly row: DayRowProps["row"] }) => {
+  const openTask = useOpenTask();
+  const { taskId, taskTitle } = row;
+  if (taskId === null || taskTitle === null) {
+    return null;
+  }
+  return (
+    <View className="flex-row pb-2 pl-[116px]">
+      <Text
+        accessibilityRole="link"
+        className="min-h-6 shrink py-1 font-sans text-[12px] text-fg2 underline"
+        numberOfLines={1}
+        onPress={() => {
+          openTask(taskId);
+        }}
+      >
+        {taskTitle}
+      </Text>
+    </View>
   );
 };
 
@@ -205,6 +218,7 @@ const EntryRow = ({
   return (
     <>
       <ActivityRow onEdit={open} row={entry.row} zone={zone} />
+      <TaskLine row={entry.row} />
       <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
       <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />
       <EndedAtPrompt phone={phone} row={entry.row} zone={zone} />

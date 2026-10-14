@@ -1,6 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
+import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { renderScreen } from "#app/test/render.tsx";
+import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -131,6 +133,24 @@ describe("DayScreen", () => {
     });
     expect(screen.getAllByText("Short break").length).toBeGreaterThan(0);
     expect(runtime.state.store.getState().time.activities).not.toEqual({});
+  });
+
+  it("links a block's task on a line of its own, not inside the row's button", async () => {
+    const runtime = await createTestRuntime();
+    const taskId =
+      Object.values(runtime.state.store.getState().tasks.byId).find(
+        (task) => task.title === "Algebra HW 6",
+      )?.id ?? "";
+    // Focus on it for the last 40 minutes.
+    await runtime.actions.startActivity(
+      { category: "task", label: "Algebra HW 6", taskId },
+      { at: addMinutesIso(NOW, -40) },
+    );
+    await renderScreen(<DayScreen />, runtime);
+    // A link inside a button is a nested control: screen readers skip it, axe refuses it.
+    expect(controlsInsideControls()).toEqual([]);
+    await fireEvent.press(screen.getByRole("link", { name: "Algebra HW 6" }));
+    expect(router.push).toHaveBeenCalledWith(`/task/${taskId}`);
   });
 
   it("lists blocks and gaps as one timeline: a gap is a quiet row with its hours and Log", async () => {

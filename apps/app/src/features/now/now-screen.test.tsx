@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
+import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -360,6 +361,8 @@ describe("NowBoard", () => {
       expect(screen.getByLabelText(en("time.running"))).toBeOnTheScreen();
       expect(checks().length).toBeGreaterThan(0);
       expect(rowsInFlattenableBoxes()).toEqual([]);
+      // The row's link to Day and its Stop sit side by side, neither inside the other.
+      expect(controlsInsideControls()).toEqual([]);
     });
   });
 

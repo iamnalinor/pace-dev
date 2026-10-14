@@ -4,6 +4,7 @@ import * as Calendar from "expo-calendar";
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 
+import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -132,6 +133,7 @@ describe("TimeBar", () => {
     const all = await choicesIn("Task");
     expect(all).toContain("Algebra HW 6");
     expect(all).toContain("Calculus HW 6");
+    expect(controlsInsideControls()).toEqual([]);
     await fireEvent.changeText(screen.getByLabelText(en("time.taskSearch")), "calc 6");
     await waitFor(async () => {
       expect(await choicesIn("Task")).toEqual(["Calculus HW 6"]);

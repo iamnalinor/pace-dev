@@ -141,6 +141,21 @@ The classes so far are below. Each has its standing rule, and new code is writte
   may stay strict where it also checks an input. `endpoints.test.ts` walks every endpoint's output
   and fails on any strict object at any depth.
 
+### 14. A control inside a control
+- **Bug.** Day's block row is one button (it opens the edit sheet); a block on a task carried the
+  task's title as a link inside that button. A screen reader never reached the link, the web build
+  nested a focusable inside a focusable (axe `nested-interactive`), and the link was 15 px tall
+  (`target-size`) (stage 8, found by the Task picker's e2e, which is the first to put a block on a
+  task before running axe on Day).
+- **Missed because.** Day's tests and its axe pass ran on blocks without a task; the link only shows
+  for a block on a task. jest cannot see the nesting either: it finds no link by role inside an
+  accessible button, and no test looked for one.
+- **Rule.** A row that is pressable as a whole holds no other control: anything else it offers
+  (a link, Stop, a check) sits beside it or on its own line. `controlsInsideControls()`
+  (apps/app/src/test/nested-controls.ts) runs on screens with such rows, with the fixture that
+  shows every optional part (a block on a task, something running), and the e2e axe pass runs with
+  that fixture too.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -165,3 +180,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | Day's row hairlines missing on the web (class names on a reanimated view are dropped there; found in screenshots before shipping) | 5 | yes (no other `Animated.View` carries a class name) | e2e reads the computed border of every Day row |
 | 2026-10-14 | Strict output schemas: a field added to an answer breaks older clients | 13 | yes: `endpoint()` loosens every output; the cloud, notify and LLM status answers are also plain `z.object`, the calendar event split by direction; requests stay strict | output strictness sweep in `endpoints.test.ts`, extra-key parse test |
 | 2026-10-14 | Week's picked block marked with `accessibilityState.selected`: jest saw it, the web build did not (react-native-web emits no `aria-selected` on a button, and axe refuses it there) | 10 | yes (the only other `accessibilityState` is the time bar's `disabled`, left to its owner to check) | e2e asserts `aria-current` on the picked item and runs axe with it picked |
+| 2026-10-14 | Day's block row held its task as a link inside the row's button: unreachable for a screen reader, `nested-interactive` and a 15 px target on the web | 14 (new) | yes: Day's task link is a line of its own under the row (24 px target); a one-off sweep of `controlsInsideControls()` over Now (something running), Day (a block on a task), Week, the task screen, Inbox, History, Insights, Projects and More found no other | `controlsInsideControls()` on Day (block on a task), Now (running row) and the time bar's Task picker; the time e2e runs axe on Day after Focus from the Task picker |
