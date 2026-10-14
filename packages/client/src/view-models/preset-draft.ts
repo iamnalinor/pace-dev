@@ -1,7 +1,6 @@
 import {
   BASE_PRESETS,
   isBuiltInPreset,
-  type NotifyParams,
   type Preset,
   type PresetDefinition,
   PresetDefinitionSchema,
@@ -12,12 +11,10 @@ import {
 } from "@pace/core";
 
 /** Keys a child preset overrides as a whole. */
-export type WholeKey = Exclude<keyof PresetDefinition, "fields" | "notify">;
+export type WholeKey = Exclude<keyof PresetDefinition, "fields">;
 
-/** A key inside `fields` or `notify`: those merge key by key, so each is its own override. */
-export type SubKey =
-  | { readonly group: "fields"; readonly key: keyof PresetFields }
-  | { readonly group: "notify"; readonly key: keyof NotifyParams };
+/** A key inside `fields`: they merge key by key, so each is its own override. */
+export type SubKey = { readonly group: "fields"; readonly key: keyof PresetFields };
 
 /**
 What the editor holds: the definition stores exactly the overridden keys. A default preset
@@ -64,8 +61,7 @@ export const isOverridden = (definition: PresetDefinition, key: WholeKey): boole
   definition[key] !== undefined;
 
 export const isSubOverridden = (definition: PresetDefinition, sub: SubKey): boolean =>
-  (sub.group === "fields" ? definition.fields?.[sub.key] : definition.notify?.[sub.key]) !==
-  undefined;
+  definition.fields?.[sub.key] !== undefined;
 
 export const setValue = <K extends WholeKey>(
   definition: PresetDefinition,
@@ -91,11 +87,8 @@ export const toggleOverride = (
 export const setSub = (
   definition: PresetDefinition,
   sub: SubKey,
-  value: boolean | number,
-): PresetDefinition =>
-  sub.group === "fields"
-    ? { ...definition, fields: { ...definition.fields, [sub.key]: value } }
-    : { ...definition, notify: { ...definition.notify, [sub.key]: value } };
+  isShown: boolean,
+): PresetDefinition => ({ ...definition, fields: { ...definition.fields, [sub.key]: isShown } });
 
 const withoutSub = (definition: PresetDefinition, sub: SubKey): PresetDefinition => {
   const { [sub.key]: _removed, ...rest }: Readonly<Record<string, unknown>> =
@@ -110,17 +103,12 @@ export const toggleSubOverride = (
   sub: SubKey,
   inherited: ResolvedPreset,
 ): PresetDefinition => {
-  if (isSubOverridden(definition, sub)) {
-    return withoutSub(definition, sub);
-  }
-  return setSub(
-    definition,
-    sub,
-    sub.group === "fields" ? inherited.fields[sub.key] : inherited.notify[sub.key],
-  );
+  return isSubOverridden(definition, sub)
+    ? withoutSub(definition, sub)
+    : setSub(definition, sub, inherited.fields[sub.key]);
 };
 
-/** Where the schema rejects the definition: the top key, or `group.key` inside fields / notify. */
+/** Where the schema rejects the definition: the top key, or `fields.key` inside fields. */
 export const definitionIssues = (definition: PresetDefinition): ReadonlySet<string> => {
   const parsed = PresetDefinitionSchema.safeParse(definition);
   if (parsed.success) {
@@ -129,7 +117,7 @@ export const definitionIssues = (definition: PresetDefinition): ReadonlySet<stri
   return new Set(
     parsed.error.issues.map((issue) => {
       const [top = "", sub] = issue.path.map(String);
-      return sub !== undefined && (top === "fields" || top === "notify") ? `${top}.${sub}` : top;
+      return sub !== undefined && top === "fields" ? `${top}.${sub}` : top;
     }),
   );
 };

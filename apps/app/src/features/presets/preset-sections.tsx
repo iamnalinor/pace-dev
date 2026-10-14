@@ -5,7 +5,6 @@ import { Text, View } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import {
   type Importance,
-  type NotifyParams,
   type PresetFields,
   type ProgressMode,
   ProjectColorSchema,
@@ -14,17 +13,12 @@ import {
 
 import { DeadlineRow } from "./deadline-row.tsx";
 import { RecurrenceRow } from "./recurrence-row.tsx";
-import { ChoiceRow, EstimateRow, FieldToggleRow, NotifyRow, type SectionProps } from "./rows.tsx";
+import { ChoiceRow, EstimateRow, FieldToggleRow, type SectionProps } from "./rows.tsx";
 
 const IMPORTANCES: readonly Importance[] = ["asap", "prioritized", "normal", "nice_to_have"];
 const SUBMISSIONS: readonly Submission[] = ["per_subtask", "whole"];
 const PROGRESS_MODES: readonly ProgressMode[] = ["subtasks", "slider", "none"];
 const FIELD_KEYS: readonly (keyof PresetFields)[] = ["description", "link", "startAt", "submitVia"];
-const NOTIFY_KEYS: readonly (keyof NotifyParams)[] = [
-  "criticalHours",
-  "criticalProgress",
-  "inProgressIdleDays",
-];
 
 const Section = ({ children, title }: { readonly children: ReactNode; readonly title: string }) => (
   <View
@@ -92,16 +86,6 @@ export const PresetSections = (section: SectionProps) => {
             {...section}
             label={t(`presets.taskField.${key}`)}
             sub={{ group: "fields", key }}
-          />
-        ))}
-      </Section>
-      <Section title={t("presets.section.notify")}>
-        {NOTIFY_KEYS.map((key) => (
-          <NotifyRow
-            key={key}
-            {...section}
-            label={t(`presets.notify.${key}`)}
-            sub={{ group: "notify", key }}
           />
         ))}
       </Section>

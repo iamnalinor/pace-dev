@@ -102,7 +102,6 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "presets.section.work": "Работа над задачей",
   "presets.section.schedule": "Расписание",
   "presets.section.fields": "Поля задачи",
-  "presets.section.notify": "Уведомления",
   "presets.field.defaultImportance": "Важность по умолчанию",
   "presets.field.deadlinePolicy": "Срок",
   "presets.field.submission": "Сдача",
@@ -128,7 +127,4 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "presets.taskField.link": "Ссылка",
   "presets.taskField.startAt": "Дата начала",
   "presets.taskField.submitVia": "Куда сдавать",
-  "presets.notify.criticalHours": "Предупредить, если до дедлайна меньше (часов)",
-  "presets.notify.criticalProgress": "…и сделано меньше (0–1)",
-  "presets.notify.inProgressIdleDays": "Напомнить о начатой задаче без движения через (дней)",
 };

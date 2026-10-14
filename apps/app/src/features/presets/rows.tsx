@@ -130,33 +130,12 @@ export const EstimateRow = (section: SectionProps) => {
 
 type SubProps = SectionProps & { readonly sub: SubKey; readonly label: string };
 
-/** One notification threshold; each is overridden on its own. */
-export const NotifyRow = ({ label, sub, ...section }: SubProps) => {
-  const { definition, inherited, onChange } = section;
-  return (
-    <NumberOverrideRow
-      inherited={sub.group === "notify" ? inherited.notify[sub.key] : 0}
-      inheritedHint={section.inheritedHint}
-      isInvalid={section.issues.has(`${sub.group}.${sub.key}`)}
-      isOn={isSubOverridden(definition, sub)}
-      label={label}
-      onToggle={() => {
-        onChange(toggleSubOverride(definition, sub, inherited));
-      }}
-      onValue={(value) => {
-        onChange(setSub(definition, sub, value));
-      }}
-      own={sub.group === "notify" ? definition.notify?.[sub.key] : undefined}
-    />
-  );
-};
-
 /** Whether the task form shows an optional field (link, description, start, submit via). */
 export const FieldToggleRow = ({ label, sub, ...section }: SubProps) => {
   const t = useT();
   const { definition, inherited, onChange } = section;
-  const own = sub.group === "fields" ? definition.fields?.[sub.key] : undefined;
-  const isShown = own ?? (sub.group === "fields" && inherited.fields[sub.key]);
+  const own = definition.fields?.[sub.key];
+  const isShown = own ?? inherited.fields[sub.key];
   return (
     <OverrideRow
       inheritedHint={section.inheritedHint}
