@@ -62,10 +62,36 @@ afterEach(() => {
 });
 
 type FakeNotifications = {
-  state: { granted: boolean; pushToken: null | string };
+  state: {
+    granted: boolean;
+    pushToken: null | string;
+    dismissed: string[];
+    scheduled: { readonly identifier: string }[];
+    responseListeners: ((response: {
+      readonly actionIdentifier: string;
+      readonly notification: { readonly request: { readonly content: object } };
+    }) => void)[];
+  };
 };
 
 const notifications = Notifications as unknown as FakeNotifications;
+
+/** A "still doing X?" in the pool, as the resolve endpoint answers it. */
+const overrunNotice = {
+  createdAt: "2026-10-07T08:00:00.000Z",
+  id: "n-9",
+  kind: "activity_overrun",
+  payload: {
+    activityId: "a-1",
+    askedAt: "2026-10-07T08:00:00.000Z",
+    expectMinutes: 30,
+    label: "Commute",
+    startAt: "2026-10-07T07:00:00.000Z",
+  },
+  readAt: null,
+  resolution: null,
+  resolvedAt: "2026-10-07T08:01:00.000Z",
+};
 
 describe("PaceProvider", () => {
   it("registers how the phone gets notifications once signed in, and fetches what waits", async () => {
@@ -93,6 +119,68 @@ describe("PaceProvider", () => {
       method: "poll",
     });
     expect(api.pathsCalled("/api/notifications")).not.toEqual([]);
+  });
+
+  it("takes a notification away only once its answer button's answer is saved", async () => {
+    notifications.state.granted = true;
+    notifications.state.pushToken = null;
+    notifications.state.dismissed = [];
+    notifications.state.scheduled = [];
+    const answers = { isUp: false };
+    const { runtime } = await setup({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "GET /api/push/methods": () => ({ pushMethods: ["poll"] }),
+      "GET /api/push/poll": () => ({ cursor: 0, entries: [] }),
+      "POST /api/notifications/n-9/resolve": () =>
+        answers.isUp
+          ? { notification: { ...overrunNotice, resolution: "still" } }
+          : Response.json({ code: "server/error", message: "Down" }, { status: 503 }),
+      "PUT /api/push/subscription": () => ({ method: "poll" }),
+    });
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(notifications.state.responseListeners).not.toEqual([]);
+    });
+    const tap = () => {
+      for (const listener of notifications.state.responseListeners) {
+        listener({
+          actionIdentifier: "still",
+          notification: {
+            request: {
+              content: {
+                body: "Still doing Commute?",
+                categoryIdentifier: "activity_overrun",
+                data: { notificationId: "n-9" },
+                title: "Still going?",
+              },
+            },
+          },
+        });
+      }
+    };
+    await act(async () => {
+      tap();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(notifications.state.scheduled.map((item) => item.identifier)).toContain("n-9");
+    });
+    expect(notifications.state.dismissed).not.toContain("n-9");
+    answers.isUp = true;
+    await act(async () => {
+      tap();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(notifications.state.dismissed).toContain("n-9");
+    });
   });
 
   it("exposes the auth status, the language and starts syncing once signed in", async () => {

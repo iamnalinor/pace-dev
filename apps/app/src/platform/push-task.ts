@@ -5,7 +5,13 @@ import { type ApiClient, createApiClient } from "@pace/client";
 import { endpoints } from "@pace/core";
 
 import { API_BASE_URL } from "./api-base.ts";
-import { dismissPoolNotification, isAnswer, notificationIdOf } from "./notifications.ts";
+import {
+  answerFromButton,
+  dismissPoolNotification,
+  isAnswer,
+  notificationIdOf,
+  type ShownContent,
+} from "./notifications.ts";
 import { createSecureSessionStore } from "./secure-session.ts";
 
 /** The task Android runs for a push (Firebase data message) and for an answer button tapped. */
@@ -19,29 +25,39 @@ const backgroundApi = async (): Promise<ApiClient | null> => {
 
 type Payload = {
   readonly actionIdentifier?: unknown;
-  readonly notification?: { readonly request?: { readonly content?: { readonly data?: unknown } } };
+  readonly notification?: { readonly request?: { readonly content?: ShownContent } };
   readonly data?: unknown;
 };
 
 /**
-One push or tap, with the app possibly closed: a `dismiss` data message takes the notification
-away at once; an answer button (Attend, Skip, "Yes, still", Stop) answers through the same
-endpoint as every channel, and the notification goes (the server takes it back elsewhere).
+An answer button (Attend, Skip, "Yes, still", Stop): answered through the same endpoint as
+every channel (the server takes the notification back elsewhere); it goes from this phone once
+the answer is saved, and stays, saying so, when it is not (`answerFromButton`).
 */
-/** An answer button: the notification goes, and the answer goes to the server. */
 const answer = async (
   payload: Payload & { readonly actionIdentifier: string },
   api: ApiClient | null | undefined,
 ): Promise<void> => {
-  const id = notificationIdOf(payload.notification?.request?.content?.data);
-  if (id === null || !isAnswer(payload.actionIdentifier)) {
+  const content = payload.notification?.request?.content ?? {};
+  const id = notificationIdOf(content.data);
+  const resolution = payload.actionIdentifier;
+  if (id === null || !isAnswer(resolution)) {
     return;
   }
   const client = api === undefined ? await backgroundApi() : api;
-  await dismissPoolNotification(id);
-  await client?.call(endpoints.notifications.resolve, {
-    body: { from: "app", resolution: payload.actionIdentifier },
-    params: { id },
+  await answerFromButton({
+    content,
+    id,
+    save: async () => {
+      if (client === null) {
+        return false;
+      }
+      await client.call(endpoints.notifications.resolve, {
+        body: { from: "app", resolution },
+        params: { id },
+      });
+      return true;
+    },
   });
 };
 
@@ -49,6 +65,10 @@ const answer = async (
 const isDismissal = (data: unknown): boolean =>
   typeof data === "object" && data !== null && "type" in data && data.type === "dismiss";
 
+/**
+One push or tap, with the app possibly closed: a `dismiss` data message takes the notification
+away at once; an answer button answers (`answer`).
+*/
 export const handlePushTask = async (payload: Payload, api?: ApiClient | null): Promise<void> => {
   const { actionIdentifier, data } = payload;
   if (typeof actionIdentifier === "string") {

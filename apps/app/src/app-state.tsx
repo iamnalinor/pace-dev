@@ -16,6 +16,7 @@ import {
 
 import { IS_PHONE } from "./platform/device.ts";
 import {
+  answerFromButton,
   dismissPoolNotification,
   isAnswer,
   notificationIdOf,
@@ -133,9 +134,12 @@ const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
     if (id === null || !isAnswer(response.actionIdentifier)) {
       return;
     }
-
-    void dismissPoolNotification(id);
-    void runtime.notifications.resolve(id, response.actionIdentifier);
+    const resolution = response.actionIdentifier;
+    void answerFromButton({
+      content: response.notification.request.content,
+      id,
+      save: async () => await runtime.notifications.resolve(id, resolution),
+    });
   });
   return () => {
     stopNotices();

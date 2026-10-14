@@ -8,6 +8,7 @@ import {
   ANSWERS,
   endpoints,
   type Language,
+  LANGUAGES,
   type NotificationKind,
   t,
 } from "@pace/core";
@@ -20,6 +21,8 @@ export type PushMethod = "fcm" | "none" | "poll";
 
 const METHOD_KEY = "pace.push.method";
 const CURSOR_KEY = "pace.push.cursor";
+/** The language the buttons were set up in: a background answer that fails says so in it. */
+const LANGUAGE_KEY = "pace.notify.language";
 
 /**
 Never asks: the onboarding and Settings → Permissions do, with the reason shown first. Without
@@ -49,6 +52,7 @@ The answer buttons of each answerable kind, as notification categories: tapping 
 the background (the app is not opened), through the same endpoint every channel uses.
 */
 export const setupNotificationCategories = async (language: Language): Promise<void> => {
+  await SecureStore.setItemAsync(LANGUAGE_KEY, language);
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     importance: Notifications.AndroidImportance.HIGH,
     name: t(language, "notify.channel"),
@@ -99,6 +103,61 @@ export const dismissPoolNotification = async (id: string): Promise<void> => {
   } catch {
     // Not shown (any more): nothing to take away.
   }
+};
+
+/** What a shown notification carries, as Android hands it back with a tapped button. */
+export type ShownContent = {
+  readonly title?: null | string;
+  readonly body?: null | string;
+  readonly data?: unknown;
+  readonly categoryIdentifier?: null | string;
+};
+
+const languageOf = async (): Promise<Language> => {
+  const stored = await readKey(LANGUAGE_KEY);
+  return LANGUAGES.find((language) => language === stored) ?? "en";
+};
+
+/** The notification shown again under its id, its text led by the line saying the answer failed. */
+const showNotSent = async (id: string, content: ShownContent): Promise<void> => {
+  const line = t(await languageOf(), "notifications.failedAction");
+  const body = content.body ?? "";
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      body: body.startsWith(line) ? body : `${line}\n${body}`,
+      data: (content.data ?? {}) as Record<string, unknown>,
+      title: content.title ?? "",
+      ...(typeof content.categoryIdentifier === "string" && {
+        categoryIdentifier: content.categoryIdentifier,
+      }),
+    },
+    identifier: id,
+    trigger: { channelId: CHANNEL_ID },
+  });
+};
+
+/**
+An answer button tapped (in the background or with the app open): the answer is saved first,
+and only then does the notification go. When it is not saved (offline, signed out, refused),
+the notification stays, shown again under its id with a line saying the answer did not go
+through, so its buttons can be tapped again.
+*/
+export const answerFromButton = async ({
+  content,
+  id,
+  save,
+}: {
+  readonly id: string;
+  readonly content: ShownContent;
+  readonly save: () => Promise<boolean>;
+}): Promise<void> => {
+  let isSaved = false;
+  try {
+    isSaved = await save();
+  } catch {
+    // Offline or refused: not saved.
+  }
+  await (isSaved ? dismissPoolNotification(id) : showNotSent(id, content));
 };
 
 /**
