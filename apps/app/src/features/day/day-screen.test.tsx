@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -65,14 +65,46 @@ describe("DayScreen", () => {
     expect(await screen.findByText("Type a time like 09:30.")).toBeOnTheScreen();
   });
 
-  it("moves to the previous day and back", async () => {
+  it("offers Back to today only on another day, and it brings today back", async () => {
     await renderScreen(<DayScreen />, await createTestRuntime());
+    const back = () => screen.queryByRole("button", { name: "Back to today" });
+    expect(back()).toBeNull();
     expect(screen.getByRole("button", { name: "Next day" })).toBeDisabled();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
       expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
     });
-    await fireEvent.press(screen.getByRole("button", { name: "Today" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
     expect(await screen.findByText("Tuesday · Oct 6")).toBeOnTheScreen();
+    expect(back()).toBeNull();
+    // A day picked from the month view is another day too.
+    await fireEvent.press(screen.getByRole("button", { name: "Pick a day" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Thursday, October 1" }));
+    expect(await screen.findByText("Thursday · Oct 1")).toBeOnTheScreen();
+    expect(back()).toBeOnTheScreen();
+  });
+
+  it("lists blocks and gaps as one timeline: a gap is a quiet row with its hours and Log", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "food",
+      endAt: addMinutesIso(NOW, -240),
+      label: "Breakfast",
+      startAt: addMinutesIso(NOW, -270),
+    });
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -60),
+      label: "Lecture",
+      startAt: addMinutesIso(NOW, -120),
+    });
+    await renderScreen(<DayScreen />, runtime);
+    // 10:30–11:00 Breakfast, 11:00–13:00 not logged, 13:00–14:00 Lecture, then up to now.
+    const gap = screen.getByRole("button", { name: /2h not logged/u });
+    expect(within(gap).getByText("11:00 – 13:00")).toBeOnTheScreen();
+    expect(within(gap).getByText("Log")).toBeOnTheScreen();
+    await fireEvent.press(gap);
+    expect(await screen.findByLabelText("From")).toHaveProp("value", "11:00");
+    expect(screen.getByLabelText("To")).toHaveProp("value", "13:00");
   });
 });

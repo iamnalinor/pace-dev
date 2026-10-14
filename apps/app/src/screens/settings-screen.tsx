@@ -15,6 +15,7 @@ import { IS_PHONE } from "#app/platform/device.ts";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
+import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { LANGUAGES } from "@pace/core";
 
@@ -60,7 +61,7 @@ const PermissionsRow = () => {
   );
 };
 
-/** Theme (this device) and language (the account). */
+/** Theme (this device), language and the Calendar's night hours (the account). */
 const LookRows = () => {
   const t = useT();
   const theme = useTheme();
@@ -85,6 +86,16 @@ const LookRows = () => {
           }}
           options={LANGUAGES.map((value) => ({ label: t(`settings.language.${value}`), value }))}
           value={settings.language}
+        />
+      </Row>
+      <Row label={t("nav.calendar")}>
+        <SwitchRow
+          hint={t("settings.nightHours.hint")}
+          isOn={settings.nightHours}
+          label={t("settings.nightHours")}
+          onChange={(isOn) => {
+            void actions.setNightHours(isOn);
+          }}
         />
       </Row>
     </>

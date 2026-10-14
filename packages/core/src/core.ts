@@ -116,7 +116,14 @@ export {
 export { parseQuickInput, type QuickInput } from "./input/parse-quick-input.ts";
 export type { QuickSubtask } from "./input/quick-fields.ts";
 export type { QuickSpan, QuickSpanKind } from "./input/quick-spans.ts";
-export { extractLink, isHttpUrl, linkHost } from "./links.ts";
+export {
+  allLinks,
+  extractLink,
+  isHttpUrl,
+  linkHost,
+  splitLinks,
+  type TextPart,
+} from "./links.ts";
 export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/core-state.ts";
 export {
   apply,

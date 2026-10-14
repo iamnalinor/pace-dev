@@ -172,6 +172,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.quietHours.hint": "В это время уведомлений нет.",
   "settings.quietHours.from": "С",
   "settings.quietHours.to": "До",
+  "settings.nightHours": "Показывать ночные часы",
+  "settings.nightHours.hint": "Календарь показывает весь день, с 00 до 24.",
   "settings.presets": "Пресеты",
   "settings.presets.hint": "Курсы, работа, личное: как ведёт себя каждый вид задач.",
   "settings.review": "Разобрать",

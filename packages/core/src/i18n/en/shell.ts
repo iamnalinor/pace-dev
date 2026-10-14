@@ -174,6 +174,8 @@ export const enShell = {
   "settings.quietHours.hint": "No notifications between these times.",
   "settings.quietHours.from": "From",
   "settings.quietHours.to": "To",
+  "settings.nightHours": "Show night hours",
+  "settings.nightHours.hint": "The Calendar shows the whole day, from 00 to 24.",
   "settings.presets": "Presets",
   "settings.presets.hint": "Courses, work, personal: how each kind of task behaves.",
   "settings.review": "To sort",

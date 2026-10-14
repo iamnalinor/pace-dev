@@ -12,7 +12,6 @@ import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
-import { Button } from "#app/ui/button.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
@@ -20,7 +19,14 @@ import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { addDaysIn, formatDuration, formatEyebrow, type Language, type SatRow } from "@pace/core";
+import {
+  addDaysIn,
+  formatDuration,
+  formatEyebrow,
+  type Gap,
+  type Language,
+  type SatRow,
+} from "@pace/core";
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
@@ -44,6 +50,17 @@ const targetText = (
     : t("time.expectOf", { duration: formatDuration(row.expectMinutes, language) });
 
 /**
+One line of the day's rhythm: the same height and the same time column for a block, a gap and
+"Log past activity", so the list reads as one timeline.
+*/
+const ROW = "min-h-14 flex-row items-center gap-3 py-2 active:opacity-70";
+const TIME_COLUMN = "w-[104px] font-sans text-[12px] tabular-nums";
+
+/** "14:06 – 14:40". */
+const rangeText = (startAt: string, end: string, zone: string): string =>
+  `${clockTime(startAt, zone)} – ${end}`;
+
+/**
 A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category tag and the
 label when it says more than the tag, its task, then the duration against its Expect or
 Limit and a pencil. The whole row opens the edit sheet.
@@ -53,16 +70,20 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
   const openTask = useOpenTask();
   const { language } = useViewer();
   const { palette } = useTheme();
-  const range = `${clockTime(row.startAt, zone)} – ${row.isRunning ? t("day.now") : clockTime(row.endAt, zone)}`;
+  const range = rangeText(
+    row.startAt,
+    row.isRunning ? t("day.now") : clockTime(row.endAt, zone),
+    zone,
+  );
   const target = targetText(row, t, language);
   return (
     <Pressable
       accessibilityHint={t("day.edit", { label: row.label })}
       accessibilityRole="button"
-      className="min-h-14 flex-row items-center gap-3 border-t border-line py-2 active:opacity-70"
+      className={ROW}
       onPress={onEdit}
     >
-      <Text className="w-[104px] font-sans text-[12px] tabular-nums text-muted">{range}</Text>
+      <Text className={cx(TIME_COLUMN, "text-muted")}>{range}</Text>
       <View className="flex-1 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
@@ -103,17 +124,56 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
   );
 };
 
-const GapRow = ({ minutes, onLog }: { readonly minutes: number; readonly onLog: () => void }) => {
+/**
+Time with nothing logged: a quiet row in the same rhythm, "11:00 – 13:00 · 2h not logged", and
+Log where a block has its duration. The whole row opens the sheet to log it.
+*/
+const GapRow = ({
+  gap,
+  onLog,
+  zone,
+}: {
+  readonly gap: Gap;
+  readonly onLog: () => void;
+  readonly zone: string;
+}) => {
   const t = useT();
   const { language } = useViewer();
   return (
-    <View className="my-1 flex-row items-center justify-between gap-3 rounded-lg border border-dashed border-line px-3 py-1.5">
-      <Text className="font-sans text-[12px] text-muted">
-        {t("day.gap", { duration: formatDuration(minutes, language) })}
+    <Pressable accessibilityRole="button" className={ROW} onPress={onLog}>
+      <Text className={cx(TIME_COLUMN, "text-muted")}>
+        {rangeText(gap.startAt, clockTime(gap.endAt, zone), zone)}
       </Text>
-      <Button onPress={onLog} variant="ghost">
+      <Text className="flex-1 font-sans text-[13px] text-muted">
+        {t("day.gap", { duration: formatDuration(gap.minutes, language) })}
+      </Text>
+      <Text className="font-sans text-[13px] font-medium text-accentQuietText">
         {t("day.logGap")}
-      </Button>
+      </Text>
+    </Pressable>
+  );
+};
+
+/** The timeline's last row: a quiet "+ Log past activity" in the same rhythm. */
+const LogPastRow = ({
+  hasDivider,
+  onPress,
+}: {
+  readonly hasDivider: boolean;
+  readonly onPress: () => void;
+}) => {
+  const t = useT();
+  const { palette } = useTheme();
+  return (
+    <View className="px-5">
+      <Pressable
+        accessibilityRole="button"
+        className={cx(ROW, hasDivider && "border-t border-line")}
+        onPress={onPress}
+      >
+        <Plus color={palette.fg2} size={16} strokeWidth={1.75} />
+        <Text className="font-sans text-[14px] text-fg2">{t("day.logPast")}</Text>
+      </Pressable>
     </View>
   );
 };
@@ -139,7 +199,7 @@ const EntryRow = ({
     onOpen(entry.target);
   };
   if (entry.kind === "gap") {
-    return <GapRow minutes={entry.gap.minutes} onLog={open} />;
+    return <GapRow gap={entry.gap} onLog={open} zone={zone} />;
   }
   return (
     <>
@@ -151,7 +211,7 @@ const EntryRow = ({
   );
 };
 
-/** The day's blocks and the gaps between them, in time order. */
+/** The day's blocks and the gaps between them, in time order, a hairline between every two. */
 const Entries = ({
   entries,
   onOpen,
@@ -166,8 +226,14 @@ const Entries = ({
   readonly onOpen: (target: SheetTarget) => void;
 }) => (
   <RowList className="px-5">
-    {entries.map((entry) => (
-      <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
+    {entries.map((entry, index) => (
+      <Animated.View
+        className={cx(index > 0 && "border-t border-line")}
+        entering={ROW_ENTER}
+        exiting={ROW_EXIT}
+        key={entry.key}
+        layout={ROW_LAYOUT}
+      >
         <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
       </Animated.View>
     ))}
@@ -200,7 +266,6 @@ export const DayScreen = () => {
   const t = useT();
   const { hooks } = usePace();
   const { language } = useViewer();
-  const { palette } = useTheme();
   const [date, setDate] = useState<null | string>(null);
   const [sheet, setSheet] = useState<null | SheetTarget>(null);
   const day = hooks.useDay(date);
@@ -224,17 +289,13 @@ export const DayScreen = () => {
       ) : (
         <Entries entries={day.entries} onOpen={setSheet} phone={phone} sat={sat} zone={day.zone} />
       )}
-      {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
-      <Pressable
-        accessibilityRole="button"
-        className="mx-5 mt-4 h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line active:opacity-70"
+      <LogPastRow
+        hasDivider={day.entries.length > 0}
         onPress={() => {
           setSheet(day.logTarget);
         }}
-      >
-        <Plus color={palette.fg} size={16} />
-        <Text className="font-sans text-[14px] text-fg">{t("day.logPast")}</Text>
-      </Pressable>
+      />
+      {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
       {sheet === null ? null : (
         <ActivitySheet
           onClose={() => {

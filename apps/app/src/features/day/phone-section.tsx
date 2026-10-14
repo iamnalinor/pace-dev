@@ -99,7 +99,7 @@ export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
     .map((app) => `${app.name} ${formatDuration(app.minutes, language)}`)
     .join(", ");
   return (
-    <Text className="pb-2 pl-[98px] font-sans text-[12px] text-muted" numberOfLines={2}>
+    <Text className="pb-2 pl-[116px] font-sans text-[12px] text-muted" numberOfLines={2}>
       {t("phone.usage", { apps: named, duration: formatDuration(total, language) })}
     </Text>
   );
@@ -125,7 +125,7 @@ export const EndedAtPrompt = ({
   }
   const time = clockTime(pickupAt, zone);
   return (
-    <View className="pb-2 pl-[98px]">
+    <View className="pb-2 pl-[116px]">
       <Button
         onPress={() => {
           void run(actions.stopActivity({ at: pickupAt }));

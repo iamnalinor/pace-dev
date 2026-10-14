@@ -5,6 +5,9 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
+/** Settings' switch for the Calendar's night hours. */
+const nightHours = () => screen.getByRole("switch", { name: en("settings.nightHours") });
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
@@ -44,6 +47,21 @@ describe("SettingsScreen", () => {
     const presetsLink = `${en("settings.presets")} ${en("settings.presets.hint")}`;
     await fireEvent.press(screen.getByRole("link", { name: presetsLink }));
     expect(router.push).toHaveBeenCalledWith("/presets");
+  });
+
+  it("turns the Calendar's night hours on and off", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    expect(nightHours()).not.toBeChecked();
+    await fireEvent(nightHours(), "valueChange", true);
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.nightHours).toBe(true);
+    });
+    expect(nightHours()).toBeChecked();
+    await fireEvent(nightHours(), "valueChange", false);
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.nightHours).toBe(false);
+    });
   });
 
   it("logs out and goes to the login card", async () => {

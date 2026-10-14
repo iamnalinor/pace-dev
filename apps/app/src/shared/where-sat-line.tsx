@@ -2,19 +2,30 @@ import { Text } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { cx } from "#app/ui/cx.ts";
 import { formatDuration, type SatRow } from "@pace/core";
 
 /** Apps per device shown under a block. */
 const TOP_APPS = 3;
 
-/** "Laptop: code 45m, Firefox 15m" under a block, one line per device that was used in it. */
-export const WhereSatLine = ({ rows }: { readonly rows: readonly SatRow[] }) => {
+/**
+"Laptop: code 45m, Firefox 15m" under a block, one line per device that was used in it. On Day
+it lines up with the block's words, past the time column; elsewhere (`isIndented` off) it starts
+at the edge.
+*/
+export const WhereSatLine = ({
+  isIndented = true,
+  rows,
+}: {
+  readonly rows: readonly SatRow[];
+  readonly isIndented?: boolean;
+}) => {
   const t = useT();
   const { language } = useViewer();
   const devices = Object.entries(Object.groupBy(rows, (row) => row.deviceName));
   return devices.map(([device, apps = []]) => (
     <Text
-      className="pb-2 pl-[98px] font-sans text-[12px] text-muted"
+      className={cx("pb-2 font-sans text-[12px] text-muted", isIndented && "pl-[116px]")}
       key={device}
       numberOfLines={2}
     >
