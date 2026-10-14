@@ -8,6 +8,7 @@ import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
+import { calendarEventKey, type PoolNotification, type Resolution } from "@pace/core";
 
 import { DayScreen } from "./day-screen.tsx";
 
@@ -330,5 +331,74 @@ describe("Day with the phone's data", () => {
       expect(activities(runtime).map((activity) => activity.label)).toEqual(["Standup"]);
     });
     expect(screen.queryByText("Gym")).toBeNull();
+  });
+});
+
+const seminar = { startAt: "2026-10-06T10:00:00.000Z", title: "Seminar" };
+
+/** The seminar's "event starting", answered on another channel (Telegram, the web, a phone). */
+const answeredElsewhere = (resolution: Resolution): PoolNotification => ({
+  createdAt: seminar.startAt,
+  id: `n-${resolution}`,
+  kind: "event_start",
+  payload: {
+    end: "2026-10-06T11:00:00.000Z",
+    eventKey: calendarEventKey(seminar),
+    start: seminar.startAt,
+    title: seminar.title,
+  },
+  readAt: null,
+  resolution,
+  resolvedAt: "2026-10-06T10:05:00.000Z",
+});
+
+/** Day open with the pool already fetched as given; the skip route records its calls. */
+const withPool = async (items: readonly PoolNotification[]) => {
+  const skip = jest.fn(() => ({ ok: true }));
+  const runtime = await createTestRuntime({
+    routes: {
+      "GET /api/notifications": () => ({ deliveries: {}, items, more: false }),
+      "POST /api/calendar/skip": skip,
+    },
+  });
+  await runtime.notifications.refresh();
+  await renderScreen(<DayScreen />, runtime);
+  return { runtime, skip };
+};
+
+describe("Day and the notification pool", () => {
+  it("skips an event everywhere from Day, as Now does", async () => {
+    const { skip } = await withPool([]);
+    const list = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(list).getByRole("button", { name: "Skip" }));
+    await waitFor(() => {
+      expect(skip).toHaveBeenCalledWith(
+        expect.objectContaining({ body: { eventKey: calendarEventKey(seminar) } }),
+      );
+    });
+  });
+
+  it("does not ask again about an event skipped on another channel", async () => {
+    calendar.state.events = [
+      ...calendar.state.events,
+      {
+        allDay: false,
+        endDate: "2026-10-06T16:00:00.000Z",
+        id: "ev-later",
+        startDate: "2026-10-06T15:00:00.000Z",
+        title: "Evening lecture",
+      },
+    ];
+    await withPool([answeredElsewhere("skipped")]);
+    const list = await screen.findByLabelText("From your calendar");
+    expect(within(list).getByText("Evening lecture")).toBeOnTheScreen();
+    expect(within(list).queryByText("Seminar")).toBeNull();
+  });
+
+  it("reads an event attended on another channel as logged, with nothing to answer", async () => {
+    await withPool([answeredElsewhere("attended")]);
+    const list = await screen.findByLabelText("From your calendar");
+    expect(within(list).getByText("logged")).toBeOnTheScreen();
+    expect(within(list).queryByRole("button", { name: "Skip" })).toBeNull();
   });
 });

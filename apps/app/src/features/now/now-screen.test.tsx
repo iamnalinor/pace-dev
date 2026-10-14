@@ -11,7 +11,7 @@ import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
-import { addMinutesIso } from "@pace/core";
+import { addMinutesIso, calendarEventKey } from "@pace/core";
 import { HW_ID, NOW } from "@pace/core/testing";
 
 import { ComposerProvider } from "./composer/composer-flow.tsx";
@@ -310,9 +310,10 @@ describe("NowBoard", () => {
     expect(rowsInFlattenableBoxes()).toEqual([]);
   });
 
-  it("hides a calendar event on Skip", async () => {
+  it("hides a calendar event on Skip, and skips it on every channel", async () => {
     seminarSoon();
-    const runtime = await createTestRuntime();
+    const skip = jest.fn(() => ({ ok: true }));
+    const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip } });
     await renderScreen(<Board />, runtime);
     const card = await screen.findByLabelText("From your calendar");
     await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
@@ -320,6 +321,10 @@ describe("NowBoard", () => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
+    const eventKey = calendarEventKey({ startAt: addMinutesIso(NOW, 5), title: "Seminar" });
+    await waitFor(() => {
+      expect(skip).toHaveBeenCalledWith(expect.objectContaining({ body: { eventKey } }));
+    });
   });
 
   describe("what runs, in one compact row (the time bar lives on Day)", () => {

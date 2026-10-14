@@ -57,7 +57,6 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
         <View className="flex-1">
           <Button
             onPress={() => {
-              phone.answered(sleepKey(sleep));
               void run(
                 actions.logPast({
                   category: "sleep",
@@ -194,14 +193,15 @@ const CalendarRow = ({
       <Text className="flex-1 font-sans text-[14px] text-fg" numberOfLines={2}>
         {event.title}
       </Text>
-      {isStarted || isCalendarLogged(entries, event) ? (
+      {isStarted ||
+      phone.calendar.isAttendedElsewhere(event) ||
+      isCalendarLogged(entries, event) ? (
         <Text className="font-sans text-[12px] text-muted">{t("phone.logged")}</Text>
       ) : (
         <View className="flex-row">
           {isAttendableNow(event, now) && (
             <Button
               onPress={() => {
-                phone.answered(calendarKey(event));
                 const action = everyTime("attended");
                 // A recurring event offers to remember the answer for the whole series.
                 void run(
@@ -218,7 +218,7 @@ const CalendarRow = ({
           )}
           <Button
             onPress={() => {
-              phone.dismiss(calendarKey(event));
+              phone.skip(event);
               const action = everyTime("skip");
               if (action !== undefined) {
                 toast.show({ action, message: t("day.skipped") });

@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, type PoolNotification } from "@pace/core";
 import { createApiClient } from "./api-client.ts";
 import { createFakeFetch, problem } from "./fake-fetch.fake.ts";
 import { createNotificationFeed, parseLiveNotice } from "./notifications.ts";
-import { answeredEventKeys, feedModel } from "./view-models/notifications.ts";
+import { eventAnswers, feedModel } from "./view-models/notifications.ts";
 
 const MOSCOW = "Europe/Moscow";
 
@@ -88,10 +88,10 @@ describe("feedModel", () => {
   });
 
   it("knows the calendar occurrences answered anywhere", () => {
-    expect([...answeredEventKeys([seminar("skipped")])]).toEqual([
-      "2026-10-07T07:00:00.000Z@Seminar",
+    expect([...eventAnswers([seminar("skipped")])]).toEqual([
+      ["2026-10-07T07:00:00.000Z@Seminar", "skipped"],
     ]);
-    expect([...answeredEventKeys([seminar(null), seminar("expired")])]).toEqual([]);
+    expect([...eventAnswers([seminar(null), seminar("expired")])]).toEqual([]);
   });
 });
 

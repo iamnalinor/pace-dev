@@ -46,12 +46,9 @@ export const calendarKey = (event: Pick<PhoneCalendarEvent, "id" | "startAt">): 
 
 /** What the person waved away on this phone: a sleep stretch, a calendar event. */
 const dismissed = keyList("pace.phone.dismissed");
-/** What a background check already asked about, so it asks once. */
-const notified = keyList("pace.phone.notified");
 
 export const dismissedKeys = dismissed.all;
 export const dismiss = dismissed.add;
-export const markNotified = notified.add;
 
 /** "Every time" for a repeating calendar event: log it as attended, or never show it. */
 export type SeriesRule = {
