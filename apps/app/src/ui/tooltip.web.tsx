@@ -173,9 +173,12 @@ runs) for a couple of seconds or until the next touch.
 export const Tooltip = ({
   children,
   label,
+  showsOnTap = true,
 }: {
   readonly children: ReactNode;
   readonly label: string | undefined;
+  /** False for a control whose tap changes the screen anyway (a bubble would be left behind). */
+  readonly showsOnTap?: boolean;
 }) => {
   const id = useId();
   const wrapperRef = useRef<View>(null);
@@ -216,7 +219,7 @@ export const Tooltip = ({
         }
       }}
       onPointerUp={(event) => {
-        if (isTouch(event)) {
+        if (showsOnTap && isTouch(event)) {
           show("tap");
         }
       }}

@@ -147,9 +147,12 @@ label there is nothing to explain and the trigger is left as it is.
 export const Tooltip = ({
   children,
   label,
+  showsOnTap = true,
 }: {
   readonly children: ReactNode;
   readonly label: string | undefined;
+  /** False for a control whose tap changes the screen anyway (a bubble would be left behind). */
+  readonly showsOnTap?: boolean;
 }) => {
   const host = use(HostContext);
   const triggerRef = useRef<View>(null);
@@ -165,7 +168,7 @@ export const Tooltip = ({
     <View
       collapsable={false}
       onTouchEnd={() => {
-        if (label !== undefined && host !== null) {
+        if (showsOnTap && label !== undefined && host !== null) {
           shownIdRef.current = host.show(label, triggerRef);
         }
       }}

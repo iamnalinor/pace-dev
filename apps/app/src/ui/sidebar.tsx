@@ -16,6 +16,7 @@ import { Pressable, Text, View } from "react-native";
 import type { MessageKey } from "@pace/core";
 
 import { useOwnerName, useT } from "../app-state.tsx";
+import { requestNewTask } from "../shared/new-task-request.ts";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { KeyHint } from "./button.tsx";
 import { CountBadge } from "./count-badge.tsx";
@@ -142,10 +143,14 @@ export const Sidebar = () => {
   const { palette } = useTheme();
   const owner = useOwnerName();
   const waiting = useWaitingCount();
+  // The empty form opens on Now (in its right pane): asked for, and Now brought to the front.
   const newTask = (): void => {
-    router.navigate("/add");
+    requestNewTask();
+    if (path !== "/" && path !== "/add") {
+      router.navigate("/");
+    }
   };
-  // Elsewhere than Now, N opens it with the cursor in the composer (Now's composer takes N itself).
+  // Elsewhere than Now, N does the same (Now's composer takes N itself).
   useHotkey(HOTKEYS.newTask, newTask);
   return (
     <View

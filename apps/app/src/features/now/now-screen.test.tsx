@@ -12,7 +12,15 @@ import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { addMinutesIso } from "@pace/core";
 import { HW_ID, NOW } from "@pace/core/testing";
 
+import { ComposerProvider } from "./composer/composer-flow.tsx";
 import { NowBoard } from "./now-screen.tsx";
+
+/** Now's list as the screen draws it, over the composer's state. */
+const Board = () => (
+  <ComposerProvider>
+    <NowBoard />
+  </ComposerProvider>
+);
 
 const calendar = Calendar as unknown as FakeCalendar;
 
@@ -44,7 +52,7 @@ const checks = (): readonly string[] =>
 
 describe("NowBoard", () => {
   it("lists the artboard rows by deadline with their meta lines", async () => {
-    await renderScreen(<NowBoard />, await createTestRuntime());
+    await renderScreen(<Board />, await createTestRuntime());
     expect(screen.getByText("Tuesday · Oct 6")).toBeOnTheScreen();
     expect(screen.getByText("Now")).toBeOnTheScreen();
     expect(checks()).toEqual([
@@ -73,7 +81,7 @@ describe("NowBoard", () => {
   });
 
   it("opens a task from its row, and has no Inbox counter of its own (that is in the navigation)", async () => {
-    await renderScreen(<NowBoard />, await createTestRuntime());
+    await renderScreen(<Board />, await createTestRuntime());
     expect(screen.queryByRole("button", { name: /^Inbox/ })).toBeNull();
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
@@ -81,7 +89,7 @@ describe("NowBoard", () => {
 
   it("checks a task off: it dissolves, then closes, without a toast (History undoes it)", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<NowBoard />, runtime);
+    await renderScreen(<Board />, runtime);
     const check = screen.getByRole("checkbox", { name: "Mark Reply to course curator done" });
     await fireEvent.press(check);
     // Checked at once while it turns to dust; written once the dust has gone.
@@ -114,7 +122,7 @@ describe("NowBoard", () => {
       const runtime = await createTestRuntime();
       const close = Promise.withResolvers<Awaited<ReturnType<typeof runtime.actions.closeTask>>>();
       const closeTask = jest.spyOn(runtime.actions, "closeTask").mockReturnValue(close.promise);
-      await renderScreen(<NowBoard />, runtime);
+      await renderScreen(<Board />, runtime);
       await fireEvent.press(screen.getByRole("checkbox", CHECK));
       await act(async () => {
         await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
@@ -154,14 +162,14 @@ describe("NowBoard", () => {
 
   it("opens the submit sheet for a per-subtask task instead of closing it", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<NowBoard />, runtime);
+    await renderScreen(<Board />, runtime);
     await fireEvent.press(screen.getByRole("checkbox", { name: "Mark Algebra HW 6 done" }));
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}?close=1`);
     expect(runtime.state.store.getState().tasks.byId[HW_ID]?.closed).toBeNull();
   });
 
   it("filters by project and folds the tasks that start later under In future", async () => {
-    await renderScreen(<NowBoard />, await createTestRuntime());
+    await renderScreen(<Board />, await createTestRuntime());
     const chips = screen.getByLabelText("Filter by project");
     await fireEvent.press(within(chips).getByRole("radio", { name: "Work" }));
     expect(checks()).toEqual([
@@ -180,7 +188,7 @@ describe("NowBoard", () => {
 
   it("offers the device zone when the account sits in another one", async () => {
     const runtime = await createTestRuntime({ deviceTz: "UTC" });
-    await renderScreen(<NowBoard />, runtime);
+    await renderScreen(<Board />, runtime);
     expect(
       screen.getByText(en("zone.banner", { account: "Europe/Moscow", device: "UTC" })),
     ).toBeOnTheScreen();
@@ -194,7 +202,7 @@ describe("NowBoard", () => {
   it("offers a calendar event about to start: Attend tracks it under its title", async () => {
     seminarSoon();
     const runtime = await createTestRuntime();
-    await renderScreen(<NowBoard />, runtime);
+    await renderScreen(<Board />, runtime);
     const card = await screen.findByLabelText("From your calendar");
     expect(within(card).getByText("Seminar")).toBeOnTheScreen();
     await fireEvent.press(within(card).getByRole("button", { name: "Attend" }));
@@ -211,7 +219,7 @@ describe("NowBoard", () => {
   it("hides a calendar event on Skip", async () => {
     seminarSoon();
     const runtime = await createTestRuntime();
-    await renderScreen(<NowBoard />, runtime);
+    await renderScreen(<Board />, runtime);
     const card = await screen.findByLabelText("From your calendar");
     await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
     await waitFor(() => {
@@ -221,7 +229,7 @@ describe("NowBoard", () => {
   });
 
   it("shows the empty state on a fresh account", async () => {
-    await renderScreen(<NowBoard />, await createTestRuntime({ world: "empty" }));
+    await renderScreen(<Board />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
   });
 });

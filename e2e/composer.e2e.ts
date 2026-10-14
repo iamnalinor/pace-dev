@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { addTask } from "./support/composer.ts";
+import { addTask, formByHand, taskForm } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -33,8 +33,10 @@ for (const [width, height, size] of [
       await page.goto("/");
       const line = page.getByRole("textbox", { name: "New task" });
       await line.pressSequentially(LINES[0] ?? "");
-      await page.getByRole("button", { name: "Fill in the form yourself" }).click();
-      const form = page.getByRole("form", { name: "Check before adding" });
+      await formByHand(page).click();
+      const form = page.getByRole("form", { name: "New task" });
+      // On a computer the form opens in the right pane and the line stays in the list.
+      await expect(line).toBeVisible({ visible: size === "desktop" });
       await expect(form.getByRole("radio", { exact: true, name: "Work" })).toBeChecked();
       await expect(form.getByRole("textbox", { name: "Link" })).toHaveValue(
         "https://example.com/dashboards",
@@ -67,7 +69,7 @@ test("a pasted message opens the form and is written only on Create", async ({ p
   const message = "№№ 290, 292, 293 — решить методом выделения линейных множителей";
   // A fill is a paste: the (fake) assistant reads it at once and the form opens.
   await page.getByRole("textbox", { name: "New task" }).fill(message);
-  const form = page.getByRole("form", { name: "Check before adding" });
+  const form = page.getByRole("form", { name: "Suggested by the assistant" });
   await expect(form.getByRole("textbox", { exact: true, name: "Title" })).toHaveValue(message);
   await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toHaveCount(0);
   await expectNoA11yViolations(page);
@@ -80,11 +82,10 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await page.goto("/");
   const line = page.getByRole("textbox", { name: "New task" });
   await expect(line).toBeVisible();
-  // N puts the cursor in the line; the chevron unfolds the form around the still empty line.
+  // N opens the empty form, the cursor in its title.
   await page.keyboard.press("n");
-  await expect(line).toBeFocused();
-  await page.getByRole("button", { name: "Fill in the form yourself" }).click();
-  const form = page.getByRole("form", { name: "Check before adding" });
+  const form = taskForm(page);
+  await expect(form).toHaveAccessibleName("New task");
   const title = form.getByRole("textbox", { exact: true, name: "Title" });
   await expect(title).toBeFocused();
   await page.keyboard.type("Pay the rent");
@@ -128,10 +129,8 @@ const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scro
       }),
   );
 
-for (const [width, height, size] of [
-  [390, 844, "phone"],
-  [1440, 900, "desktop"],
-] as const) {
+// Only the phone unfolds the card: a computer opens the form in the right pane.
+for (const [width, height, size] of [[390, 844, "phone"]] as const) {
   test(`the form unfolds without sliding out of the card (${size})`, async ({ page }) => {
     await loginViaApi(page);
     await page.setViewportSize({ height, width });
@@ -139,7 +138,7 @@ for (const [width, height, size] of [
     const line = page.getByRole("textbox", { name: "New task" });
     await line.pressSequentially("Pay the rent");
     const sampling = sampleUnfolding(page);
-    await page.getByRole("button", { name: "Fill in the form yourself" }).click();
+    await formByHand(page).click();
     const samples = await sampling;
     // The card grew over several frames, and the form stayed inside it throughout.
     expect(samples.length).toBeGreaterThan(5);
@@ -147,3 +146,24 @@ for (const [width, height, size] of [
     expect(Math.max(...samples.map((sample) => sample.scroll))).toBe(0);
   });
 }
+
+test("on a computer the form opens in the right pane and closing it brings the task back", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await page.goto("/");
+  await addTask(page, "Water the plants");
+  await page.getByRole("list", { name: "Tasks" }).getByText("Water the plants").click();
+  const details = page.getByRole("button", { name: "Edit details" });
+  await expect(details).toBeVisible();
+  await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
+  const form = page.getByRole("form", { name: "New task" });
+  await expect(form.getByRole("textbox", { exact: true, name: "Title" })).toBeFocused();
+  await expect(details).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  await expectNoA11yViolations(page);
+  await page.keyboard.press("Escape");
+  await expect(form).toHaveCount(0);
+  await expect(details).toBeVisible();
+});

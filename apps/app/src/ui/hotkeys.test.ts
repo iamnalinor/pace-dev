@@ -4,6 +4,7 @@ import {
   formatHotkey,
   HOTKEYS,
   isHotkeyPress,
+  labelWithHotkey,
   osOf,
 } from "./hotkeys.ts";
 
@@ -48,6 +49,15 @@ describe("isHotkeyPress", () => {
     expect(canFireWhileTyping(HOTKEYS.focus)).toBe(false);
     expect(canFireWhileTyping(HOTKEYS.primary)).toBe(true);
     expect(canFireWhileTyping(HOTKEYS.escape)).toBe(true);
+  });
+});
+
+describe("labelWithHotkey", () => {
+  it("adds the shortcut the way this computer names it, and nothing without a keyboard", () => {
+    expect(labelWithHotkey("To Inbox", HOTKEYS.toInbox, "mac")).toBe("To Inbox · ⌥↵");
+    expect(labelWithHotkey("To Inbox", HOTKEYS.toInbox, "other")).toBe("To Inbox · Alt+Enter");
+    expect(labelWithHotkey("New task", HOTKEYS.newTask, "mac")).toBe("New task · N");
+    expect(labelWithHotkey("New task", HOTKEYS.newTask, null)).toBe("New task");
   });
 });
 

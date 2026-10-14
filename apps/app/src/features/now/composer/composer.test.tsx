@@ -1,12 +1,30 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
+import type { PaceRuntime } from "#app/runtime.ts";
+
+import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { HW_ID, WORK_ID } from "@pace/core/testing";
 
+import { ComposerProvider } from "./composer-flow.tsx";
 import { Composer } from "./composer.tsx";
 
-const line = () => screen.getByLabelText(en("composer.label"));
+/** The composer as Now draws it: the line's card over the one composer state. */
+const renderComposer = async (runtime: PaceRuntime, initialText?: string) =>
+  await renderScreen(
+    <ComposerProvider initialText={initialText}>
+      <Composer />
+    </ComposerProvider>,
+    runtime,
+  );
+
+/** The line (its label, "New task", is the + button's name as well). */
+const line = () => screen.getByPlaceholderText(en("composer.placeholder"));
+const button = (key: Parameters<typeof en>[0]) => screen.getByRole("button", { name: en(key) });
+/** The open form's title: "New task", or where the suggestion came from. */
+const formTitle = (key: "composer.form.new" | "composer.form.suggested") =>
+  screen.getByRole("header", { name: en(key) });
 
 /** The keyboard's Enter on a phone submits the line (the web reads the key itself). */
 const enter = async (): Promise<void> => {
@@ -47,15 +65,55 @@ const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: 
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
 describe("Composer", () => {
+  it("is one line with New task, To Inbox and Send at its edges, and no hint or chevron", async () => {
+    await renderComposer(await createTestRuntime());
+    expect(
+      screen.getAllByRole("button").map((b): unknown => b.props["accessibilityLabel"]),
+    ).toEqual([en("nav.newTask"), en("composer.toInbox"), en("composer.send")]);
+    // Nothing to send yet: Send and To Inbox wait for words.
+    expect(button("composer.send")).toBeDisabled();
+    expect(button("composer.toInbox")).toBeDisabled();
+    await fireEvent.changeText(line(), "renew the passport");
+    expect(button("composer.send")).toBeEnabled();
+    expect(screen.queryByText(/Shift\+Enter/u)).toBeNull();
+  });
+
+  it("asks the assistant on Send, as on Enter", async () => {
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
+    await fireEvent.changeText(line(), "срочно почта");
+    await fireEvent.press(button("composer.send"));
+    expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
+    expect(formTitle("composer.form.suggested")).toBeOnTheScreen();
+    expect(title()).toHaveDisplayValue("разобрать почту");
+  });
+
+  it("opens an empty form titled New task from its + and on a New task request", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.press(button("nav.newTask"));
+    expect(formTitle("composer.form.new")).toBeOnTheScreen();
+    expect(title()).toHaveDisplayValue("");
+    await fireEvent.press(button("common.close"));
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
+    });
+    // The sidebar's New task (or N elsewhere) asks the Now in front for the form.
+    await act(() => {
+      requestNewTask();
+    });
+    expect(formTitle("composer.form.new")).toBeOnTheScreen();
+  });
+
   it("reads the line on Enter into the form in place; a second Enter adds it", async () => {
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
-    await renderScreen(<Composer />, runtime);
+    await renderComposer(runtime);
     // Typed, not pasted: nothing goes to the assistant until Enter.
     await fireEvent.changeText(line(), "срочно почта");
     expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
     await enter();
-    // The same card turns into the form: no sheet, no second window.
+    // The same card turns into the form, which says where it came from: no sheet, no second window.
     expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
+    expect(formTitle("composer.form.suggested")).toBeOnTheScreen();
+    expect(screen.queryByText(/Check before adding/u)).toBeNull();
     expect(title()).toHaveDisplayValue("разобрать почту");
     expect(screen.getByRole("radio", { checked: true, name: "Work" })).toBeOnTheScreen();
     expect(created(runtime, "разобрать почту")).toBeUndefined();
@@ -71,18 +129,20 @@ describe("Composer", () => {
     // Back to an empty line for the next one.
     expect(line()).toHaveDisplayValue("");
     await waitFor(() => {
-      expect(screen.queryByRole("form")).toBeNull();
+      expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
     });
   });
 
   it("opens the form with the rules' reading when the assistant cannot be reached", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<Composer />, runtime);
+    await renderComposer(runtime);
     // Typed in steps (all at once it would read as a paste).
     await fireEvent.changeText(line(), "синк по дашборду");
     await fireEvent.changeText(line(), "синк по дашборду завтра 15:00 1ч");
     await enter();
     expect(await screen.findByText(en("composer.aiFailed"))).toBeOnTheScreen();
+    // The assistant read nothing: the form is the person's own.
+    expect(formTitle("composer.form.new")).toBeOnTheScreen();
     expect(title()).toHaveDisplayValue("синк по дашборду");
     await enterInTitle();
     await waitFor(() => {
@@ -98,10 +158,10 @@ describe("Composer", () => {
 
   it("expands to the form by hand: the line moves into the title, a category brings its importance", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<Composer />, runtime);
+    await renderComposer(runtime);
     await fireEvent.changeText(line(), "renew the passport");
-    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
-    expect(screen.queryByLabelText(en("composer.label"))).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    expect(screen.queryByPlaceholderText(en("composer.placeholder"))).toBeNull();
     expect(title()).toHaveDisplayValue("renew the passport");
     expect(screen.queryByRole("button", { name: /Fill in by hand/u })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "Deferred" }));
@@ -116,8 +176,8 @@ describe("Composer", () => {
 
   it("adds a title typed into the form over an empty line", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<Composer />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
+    await renderComposer(runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
     // Nothing to create yet.
     expect(screen.getByRole("button", { name: en("form.create") })).toBeDisabled();
     await fireEvent.changeText(title(), "pay the rent");
@@ -130,8 +190,8 @@ describe("Composer", () => {
 
   it("adds it on Enter in the title as well", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<Composer />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
+    await renderComposer(runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
     await fireEvent.changeText(title(), "pay the rent");
     await enterInTitle();
     await waitFor(() => {
@@ -140,10 +200,10 @@ describe("Composer", () => {
   });
 
   it("collapses back to the line, which keeps the text", async () => {
-    await renderScreen(<Composer />, await createTestRuntime());
+    await renderComposer(await createTestRuntime());
     await fireEvent.changeText(line(), "renew the passport");
-    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
-    await fireEvent.press(screen.getByRole("button", { name: en("composer.collapse") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.close") }));
     expect(line()).toHaveDisplayValue("renew the passport");
     // The form folds away once its animation is over.
     await waitFor(() => {
@@ -153,9 +213,9 @@ describe("Composer", () => {
 
   it("adds typed subtasks to this week's homework from the form", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<Composer />, runtime);
+    await renderComposer(runtime);
     await fireEvent.changeText(line(), "дз по алгебре 8, 9");
-    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
     expect(screen.getByRole("radio", { checked: true, name: "Algebra HW 6" })).toBeOnTheScreen();
     await fireEvent.press(
       screen.getByRole("button", { name: en("composer.addTo", { title: "Algebra HW 6" }) }),
@@ -168,7 +228,7 @@ describe("Composer", () => {
 
   it("sends the raw line to Inbox", async () => {
     const runtime = await createTestRuntime();
-    await renderScreen(<Composer initialText="think about the trip" />, runtime);
+    await renderComposer(runtime, "think about the trip");
     await fireEvent.press(screen.getByRole("button", { name: en("composer.toInbox") }));
     await waitFor(() => {
       const titles = Object.values(runtime.state.store.getState().tasks.byId).map((t) => t.title);
@@ -202,7 +262,7 @@ describe("Composer", () => {
       status: "parsed",
     };
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => reading } });
-    await renderScreen(<Composer />, runtime);
+    await renderComposer(runtime);
     await fireEvent.changeText(line(), homework);
     expect(await screen.findByLabelText(en("edit.taskTitle"))).toHaveDisplayValue(
       "ДЗ по алгебре: № 290–365",

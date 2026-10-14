@@ -33,9 +33,9 @@ export const HOTKEYS = {
   toInbox: { key: "Enter", alt: true },
   /** Focus on the open task (not while typing). */
   focus: { key: "f" },
-  /** New task: the cursor into the composer (not while typing). */
+  /** New task: the empty task form (not while typing). */
   newTask: { key: "n" },
-  /** Folds an open form back. */
+  /** Closes an open form. */
   escape: { key: "Escape" },
 } as const satisfies Readonly<Record<string, Hotkey>>;
 
@@ -62,6 +62,10 @@ export const formatHotkey = (hotkey: Hotkey, os: KeyboardOs): string => {
     key,
   ].join("+");
 };
+
+/** A control's name with its shortcut, for its tooltip ("To Inbox · ⌥↵"); no keyboard, no keys. */
+export const labelWithHotkey = (label: string, hotkey: Hotkey, os: KeyboardOs | null): string =>
+  os === null ? label : `${label} · ${formatHotkey(hotkey, os)}`;
 
 /** Whether a keydown is this shortcut: the key and exactly its modifiers. */
 export const isHotkeyPress = (hotkey: Hotkey, press: KeyPress, os: KeyboardOs): boolean => {

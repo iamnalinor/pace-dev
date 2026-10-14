@@ -17,9 +17,13 @@ import { ProjectChips } from "./project-chips.tsx";
 /**
 The Main artboard: open tasks by deadline, the nearest first; the composer on top (shared text
 lands there), the tasks that start later folded under "In future", and the time bar where the
-thumb rests.
+thumb rests. The composer's state comes from the `ComposerProvider` around Now.
 */
-export const NowBoard = ({ composeText }: { readonly composeText?: string | undefined }) => {
+export const NowBoard = ({
+  isComposerFocused = false,
+}: {
+  readonly isComposerFocused?: boolean;
+}) => {
   const t = useT();
   const { hooks } = usePace();
   const [projectId, setProjectId] = useState<null | string>(null);
@@ -32,12 +36,8 @@ export const NowBoard = ({ composeText }: { readonly composeText?: string | unde
   const isEmpty = rows.length === 0 && future.length === 0;
   return (
     <Screen footer={<TimeBar />} header={<NowHeader />}>
-      {/* On /add (New task, the "+" tab, a share) the cursor is in the composer. */}
-      <Composer
-        initialText={composeText}
-        isFocused={composeText !== undefined}
-        key={composeText ?? ""}
-      />
+      {/* On /add (a share) the cursor is in the composer. */}
+      <Composer isFocused={isComposerFocused} />
       <ZoneBanner />
       <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={selected} />
