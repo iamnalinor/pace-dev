@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { heldRoute } from "#app/test/held-route.ts";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
@@ -221,7 +222,9 @@ describe("Day with the phone's data", () => {
   });
 
   it("waves a wrong sleep guess and a calendar event away for good", async () => {
-    const runtime = await createTestRuntime();
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
+    });
     await renderScreen(<DayScreen />, runtime);
     await fireEvent.press(await screen.findByRole("button", { name: "Not sleep" }));
     await waitFor(() => {
@@ -352,13 +355,13 @@ const answeredElsewhere = (resolution: Resolution): PoolNotification => ({
   resolvedAt: "2026-10-06T10:05:00.000Z",
 });
 
-/** Day open with the pool already fetched as given; the skip route records its calls. */
+/** Day open with the pool already fetched as given; the skip route waits for the test. */
 const withPool = async (items: readonly PoolNotification[]) => {
-  const skip = jest.fn(() => ({ ok: true }));
+  const skip = heldRoute();
   const runtime = await createTestRuntime({
     routes: {
       "GET /api/notifications": () => ({ deliveries: {}, items, more: false }),
-      "POST /api/calendar/skip": skip,
+      "POST /api/calendar/skip": skip.route,
     },
   });
   await runtime.notifications.refresh();
@@ -366,16 +369,42 @@ const withPool = async (items: readonly PoolNotification[]) => {
   return { runtime, skip };
 };
 
+/** The Seminar row's Skip, in Day's calendar list. */
+const seminarSkip = async () =>
+  within(await screen.findByLabelText("From your calendar")).getByRole("button", {
+    name: "Skip",
+  });
+
 describe("Day and the notification pool", () => {
-  it("skips an event everywhere from Day, as Now does", async () => {
+  it("skips an event everywhere from Day, as Now does: shown while it is sent, gone once accepted", async () => {
     const { skip } = await withPool([]);
-    const list = await screen.findByLabelText("From your calendar");
-    await fireEvent.press(within(list).getByRole("button", { name: "Skip" }));
+    await fireEvent.press(await seminarSkip());
     await waitFor(() => {
-      expect(skip).toHaveBeenCalledWith(
-        expect.objectContaining({ body: { eventKey: calendarEventKey(seminar), from: "app" } }),
-      );
+      expect(skip.waiting()).toBe(1);
     });
+    expect(skip.calls).toEqual([{ eventKey: calendarEventKey(seminar), from: "app" }]);
+    expect(screen.getByText("Seminar")).toBeOnTheScreen();
+    await act(async () => {
+      skip.answer({ ok: true });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Seminar")).toBeNull();
+    });
+  });
+
+  it("keeps an event whose skip did not go through, and says so", async () => {
+    const { skip } = await withPool([]);
+    await fireEvent.press(await seminarSkip());
+    await waitFor(() => {
+      expect(skip.waiting()).toBe(1);
+    });
+    await act(async () => {
+      skip.refuse();
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
+    expect(screen.getByText("Seminar")).toBeOnTheScreen();
   });
 
   it("does not ask again about an event skipped on another channel", async () => {

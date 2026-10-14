@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
+import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -310,23 +311,47 @@ describe("NowBoard", () => {
     expect(rowsInFlattenableBoxes()).toEqual([]);
   });
 
-  it("hides a calendar event on Skip, and skips it on every channel", async () => {
+  it("skips a calendar event on every channel, and hides it once that went through", async () => {
     seminarSoon();
-    const skip = jest.fn(() => ({ ok: true }));
-    const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip } });
+    const skip = heldRoute();
+    const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } });
     await renderScreen(<Board />, runtime);
     const card = await screen.findByLabelText("From your calendar");
     await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
     await waitFor(() => {
+      expect(skip.waiting()).toBe(1);
+    });
+    const eventKey = calendarEventKey({ startAt: addMinutesIso(NOW, 5), title: "Seminar" });
+    expect(skip.calls).toEqual([{ eventKey, from: "app" }]);
+    expect(screen.getByLabelText("From your calendar")).toBeOnTheScreen();
+    await act(async () => {
+      skip.answer({ ok: true });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
-    const eventKey = calendarEventKey({ startAt: addMinutesIso(NOW, 5), title: "Seminar" });
+  });
+
+  it("keeps the calendar card when its skip did not go through, and says so", async () => {
+    seminarSoon();
+    const skip = heldRoute();
+    await renderScreen(
+      <Board />,
+      await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } }),
+    );
+    const card = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
     await waitFor(() => {
-      expect(skip).toHaveBeenCalledWith(
-        expect.objectContaining({ body: { eventKey, from: "app" } }),
-      );
+      expect(skip.waiting()).toBe(1);
     });
+    await act(async () => {
+      skip.refuse();
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
+    expect(screen.getByLabelText("From your calendar")).toBeOnTheScreen();
   });
 
   describe("what runs, in one compact row (the time bar lives on Day)", () => {

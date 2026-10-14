@@ -149,6 +149,23 @@ export const UsageAccessHint = () => {
   );
 };
 
+/** For a repeating event, the toast's offer to give the same answer for the whole series. */
+const useEveryTime = (phone: DayPhone, event: PhoneCalendarEvent) => {
+  const t = useT();
+  const toast = useToast();
+  const { series } = event;
+  return (rule: "attended" | "skip") =>
+    series === null
+      ? undefined
+      : {
+          label: t("phone.everyTime"),
+          onPress: () => {
+            phone.remember({ rule, series, title: event.title });
+            toast.show({ message: t("phone.ruleSaved") });
+          },
+        };
+};
+
 /**
 One event: its time and title, then Attended (it becomes a block, or starts now if the event
 has not begun) / Skip, or "logged" once it
@@ -174,17 +191,7 @@ const CalendarRow = ({
   const isStarted = useAppState((state) =>
     Object.values(state.time.activities).some((activity) => isCalendarRun(event, activity)),
   );
-  const { series } = event;
-  const everyTime = (rule: "attended" | "skip") =>
-    series === null
-      ? undefined
-      : {
-          label: t("phone.everyTime"),
-          onPress: () => {
-            phone.remember({ rule, series, title: event.title });
-            toast.show({ message: t("phone.ruleSaved") });
-          },
-        };
+  const everyTime = useEveryTime(phone, event);
   return (
     <View className="flex-row items-center gap-2 border-t border-line py-2">
       <Text className="w-[86px] font-sans text-[12px] tabular-nums text-muted">
@@ -218,11 +225,16 @@ const CalendarRow = ({
           )}
           <Button
             onPress={() => {
-              phone.skip(event);
-              const action = everyTime("skip");
-              if (action !== undefined) {
-                toast.show({ action, message: t("day.skipped") });
-              }
+              void (async () => {
+                if (!(await phone.skip(event))) {
+                  toast.show({ message: t("notifications.failedAction") });
+                  return;
+                }
+                const action = everyTime("skip");
+                if (action !== undefined) {
+                  toast.show({ action, message: t("day.skipped") });
+                }
+              })();
             }}
             variant="ghost"
           >

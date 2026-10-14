@@ -61,8 +61,11 @@ export type DayPhone = {
   readonly pickupAt: null | string;
   readonly askCalendar: () => void;
   readonly dismiss: (key: string) => void;
-  /** Skips one occurrence here and on every channel, as Now's Skip does. */
-  readonly skip: (event: PhoneCalendarEvent) => void;
+  /**
+  Skips one occurrence on every channel, then here, as Now's Skip does; `false` (and still shown)
+  when the server did not take it.
+  */
+  readonly skip: (event: PhoneCalendarEvent) => Promise<boolean>;
   /** "Every time" for a repeating event's series. */
   readonly remember: (rule: SeriesRule) => void;
 };
@@ -215,9 +218,13 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
     hasUsageAccess: loaded.hasUsageAccess,
     pickupAt: day.isToday ? phonePickupAt(loaded.events, now) : null,
     remember,
-    skip: (event) => {
-      dismiss(calendarKey(event));
-      void notifications.skipEvent(calendarEventKey(event));
+    skip: async (event) => {
+      // Hidden only once the server took it: a skip that did not go through stays to tap again.
+      const isSkipped = await notifications.skipEvent(calendarEventKey(event));
+      if (isSkipped) {
+        dismiss(calendarKey(event));
+      }
+      return isSkipped;
     },
     sleep: sleepOf(day, loaded, now),
     usageIn: (startAt, endAt) =>
