@@ -108,7 +108,8 @@ once (`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op.
   same rule: rebuild only when a retro edit makes it necessary.
 
 Reducers are `(state, event) => state` and pure. `settings-reducer.ts` is the first one
-(`settings.updated` patches `language`, `timezone`, `digestWindows`, `quietHours` on top
+(`settings.updated` patches `language`, `timezone`, `digestWindows`, `quietHours` and, per kind,
+the `notificationChannels` switches on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
 High-volume phone facts (the calendar copy, app usage) are **not** events. They have
@@ -164,7 +165,8 @@ secrets with zod once per request and stores the result on the context.
   read it with `requireUser(c)`.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
 
-D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`. They are
+D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`,
+`push_subscriptions` (each session's one push method) and `broken_push_methods`. They are
 global; everything per user lives in the Durable Object.
 
 ## Sync protocol
@@ -175,7 +177,7 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 |---|---|---|---|
 | `POST /api/sync/push` | `{ events: Event[] (≤ 500), storeId }` | `{ accepted: id[], rejected: { id, reason }[], seq }` | a `storeId` that is not the store's current one refuses the whole batch with `409 store/changed`; each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
 | `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
-| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
+| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages, and the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
 
 The client sends a local change within 0.8 s of writing it (and what is unsent when the tab
 is hidden or the app goes to the background), pulls on every `changed` and on every
@@ -215,7 +217,9 @@ emptied: `deleteAll` (SQL tables and keys) and its alarm. Raising the epoch drop
 user's data at once, so a breaking change never needs a data migration (and the DO
 migrations could be squashed into one `0000`). Tables (`user-store/schema.ts`): `events`
 (`seq` primary key, `id` unique, indexed by `occurredAt`), `calendar_events`,
-`usage_sessions`, `decisions` (every automatic decision with its inputs, for "why?"),
+`usage_sessions`, `decisions` (every automatic decision with its inputs, for "why?"), the
+notification pool (`notifications`, its delivery log `notification_deliveries`, and
+`poll_outbox` for phones that poll),
 `meta` (cursors, budgets) and the projections `tasks`, `subtasks`, `projects`, `presets`
 (the materialized state as SQL rows for SQL readers; never the source of truth).
 

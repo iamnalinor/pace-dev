@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { autoOutcomeId, type Event, EXAMPLE_PRESET_IDS, isUlid, reviewItems } from "@pace/core";
+import {
+  autoOutcomeId,
+  DEFAULT_SETTINGS,
+  type Event,
+  EXAMPLE_PRESET_IDS,
+  isUlid,
+  reviewItems,
+} from "@pace/core";
 import {
   ALGEBRA_ID,
   CALC_HW5_ID,
@@ -694,10 +701,15 @@ describe("settings", () => {
     unwrap(await world.actions.setDigestWindows(["08:00", "20:00"]));
     unwrap(await world.actions.setQuietHours({ from: "22:00", to: "07:00" }));
     unwrap(await world.actions.setNightHours(true));
+    unwrap(await world.actions.setNotificationChannel("deadline_digest", "web", true));
     expect(world.state.store.getState().settings).toEqual({
       digestWindows: ["08:00", "20:00"],
       language: "ru",
       nightHours: true,
+      notificationChannels: {
+        ...DEFAULT_SETTINGS.notificationChannels,
+        deadline_digest: { app: false, telegram: true, web: true },
+      },
       quietHours: { from: "22:00", to: "07:00" },
       timezone: "UTC",
     });

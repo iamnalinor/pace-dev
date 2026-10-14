@@ -40,6 +40,9 @@ const { version, versionCode } = appVersion({
   releaseTag: envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
 });
 
+/** The Firebase config file, when the build has one (see release.yml). */
+const GOOGLE_SERVICES_FILE = envString("GOOGLE_SERVICES_FILE");
+
 const config: ExpoConfig = {
   name: "Pace",
   slug: "pace",
@@ -56,6 +59,9 @@ const config: ExpoConfig = {
   ios: { bundleIdentifier: "dev.nalinor.pace" },
   android: {
     package: "dev.nalinor.pace",
+    // Firebase (push through FCM): the file release.yml writes from a secret; without it the
+    // build has no Google push and the phone polls instead.
+    ...(GOOGLE_SERVICES_FILE !== undefined && { googleServicesFile: GOOGLE_SERVICES_FILE }),
     versionCode,
     adaptiveIcon: {
       backgroundColor: "#0b0b0c",

@@ -1,0 +1,249 @@
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
+
+import type { DeliveryEntry } from "@pace/client";
+
+import { usePace, useT } from "#app/app-state.tsx";
+import { clockTime } from "#app/format/time.ts";
+import { PushedScreen } from "#app/screens/pushed-screen.tsx";
+import { useFeed } from "#app/shared/notifications/use-feed.ts";
+import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
+import { EmptyState } from "#app/ui/empty-state.tsx";
+import {
+  type Answer,
+  ANSWERS,
+  formatLeft,
+  formatRelativeDay,
+  type Language,
+  minutesBetween,
+  type PoolNotification,
+} from "@pace/core";
+
+type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
+
+/** `Fri 18:00` in the zone and language. */
+const dayClock = (iso: string, { language, zone }: Zoned): string =>
+  `${new Intl.DateTimeFormat(language, { timeZone: zone, weekday: "short" }).format(new Date(iso))} ${clockTime(iso, zone)}`;
+
+const Line = ({
+  children,
+  tone = "fg",
+}: {
+  readonly children: string;
+  readonly tone?: "fg" | "muted";
+}) => (
+  <Text
+    className={tone === "fg" ? "font-sans text-[15px] text-fg" : "font-sans text-[13px] text-muted"}
+  >
+    {children}
+  </Text>
+);
+
+/** What the notification says, per kind. */
+const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned: Zoned }) => {
+  const t = useT();
+  const router = useRouter();
+  switch (item.kind) {
+    case "login": {
+      const { city, country, ip, name } = item.payload;
+      return (
+        <View className="gap-0.5">
+          <Line>{t("notifications.login", { name })}</Line>
+          <Line tone="muted">
+            {[ip, city, country].filter((part) => part !== undefined && part !== "").join(" · ")}
+          </Line>
+        </View>
+      );
+    }
+    case "deadline_digest": {
+      return (
+        <View className="gap-1">
+          <Line>{t("notifications.digestTitle")}</Line>
+          {item.payload.tasks.map((task) => (
+            <Pressable
+              accessibilityRole="link"
+              className="min-h-11 justify-center active:opacity-70"
+              key={task.taskId}
+              onPress={() => {
+                router.push(`/task/${task.taskId}`);
+              }}
+            >
+              <Text className="font-sans text-[14px] text-fg">{task.title}</Text>
+              <Text className="font-sans text-[12px] tabular-nums text-muted">
+                {t("notifications.dueLeft", {
+                  left: formatLeft(minutesBetween(zoned.now, task.dueAt), zoned.language),
+                  when: dayClock(task.dueAt, zoned),
+                })}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      );
+    }
+    case "event_start": {
+      const { end, start, title } = item.payload;
+      return (
+        <Line>
+          {t("notifications.eventStart", {
+            from: clockTime(start, zoned.zone),
+            title,
+            to: clockTime(end, zoned.zone),
+          })}
+        </Line>
+      );
+    }
+    case "activity_overrun": {
+      return <Line>{t("notifications.overrun", { label: item.payload.label })}</Line>;
+    }
+  }
+};
+
+/** The answer buttons of an open notification; the answer stays pending until the server has it. */
+const Answers = ({ item }: { readonly item: PoolNotification }) => {
+  const t = useT();
+  const { feed } = useFeed();
+  const [pending, setPending] = useState<Answer | null>(null);
+  const [hasFailed, setHasFailed] = useState(false);
+  if (item.resolution !== null) {
+    return <Line tone="muted">{t(`notify.resolved.${item.resolution}`)}</Line>;
+  }
+  const answers: readonly Answer[] = ANSWERS[item.kind];
+  if (answers.length === 0) {
+    return null;
+  }
+  return (
+    <View className="gap-1.5">
+      <View className="flex-row flex-wrap gap-2">
+        {answers.map((answer, index) => (
+          <Button
+            busy={pending === answer}
+            disabled={pending !== null}
+            key={answer}
+            onPress={() => {
+              setPending(answer);
+              setHasFailed(false);
+              void (async () => {
+                const isDone = await feed.resolve(item.id, answer);
+                // Released once the store has the answer (or it was refused), never before.
+                setPending(null);
+                setHasFailed(!isDone);
+              })();
+            }}
+            variant={index === 0 ? "primary" : "secondary"}
+          >
+            {t(`notify.action.${answer}`)}
+          </Button>
+        ))}
+      </View>
+      {hasFailed ? <Line tone="muted">{t("notifications.failedAction")}</Line> : null}
+    </View>
+  );
+};
+
+const deliveryText = (entry: DeliveryEntry, t: ReturnType<typeof useT>, zone: string): string => {
+  const method =
+    entry.method === "fcm" || entry.method === "poll"
+      ? t(`notifications.method.${entry.method}`)
+      : entry.method;
+  return t(`notifications.delivery.${entry.result}`, {
+    device: entry.device,
+    method,
+    time: clockTime(entry.at, zone),
+  });
+};
+
+const Item = ({
+  deliveries,
+  item,
+  zoned,
+}: {
+  readonly item: PoolNotification;
+  readonly deliveries: readonly DeliveryEntry[];
+  readonly zoned: Zoned;
+}) => {
+  const t = useT();
+  return (
+    <View className="gap-1.5 border-t border-line px-5 py-3" testID={`notification-${item.id}`}>
+      <View className="flex-row items-start gap-3">
+        <View className="min-w-0 flex-1">
+          <Body item={item} zoned={zoned} />
+        </View>
+        <Text className="font-sans text-[12px] tabular-nums text-muted">
+          {clockTime(item.createdAt, zoned.zone)}
+        </Text>
+      </View>
+      <Answers item={item} />
+      {deliveries.map((entry) => (
+        <Text
+          className="font-sans text-[11px] text-faint"
+          key={`${entry.device}${entry.at}${entry.result}`}
+        >
+          {deliveryText(entry, t, zoned.zone)}
+        </Text>
+      ))}
+    </View>
+  );
+};
+
+/**
+The notification feed: what this client shows (the kinds on for its platform), grouped by day,
+newest first. Opening it marks what it shows as read. The assistant's decision log is one quiet
+link away.
+*/
+export const NotificationsScreen = () => {
+  const t = useT();
+  const router = useRouter();
+  const viewer = useViewer();
+  const { clock } = usePace();
+  const { deliveries, feed, model, status } = useFeed();
+  const zoned: Zoned = { language: viewer.language, now: viewer.now, zone: clock.deviceTz };
+  useEffect(() => {
+    void feed.refresh();
+  }, [feed]);
+  const unread = model.unreadIds.join(",");
+  useEffect(() => {
+    if (unread !== "") {
+      void feed.markRead(unread.split(","));
+    }
+  }, [feed, unread]);
+  return (
+    <PushedScreen
+      right={
+        <Pressable
+          accessibilityRole="link"
+          className="min-h-11 justify-center px-2 active:opacity-70"
+          onPress={() => {
+            router.push("/decisions");
+          }}
+        >
+          <Text className="font-sans text-[13px] text-muted">
+            {t("notifications.assistantLog")}
+          </Text>
+        </Pressable>
+      }
+      title={t("notifications.title")}
+    >
+      {status === "failed" && model.items.length === 0 ? (
+        <EmptyState>{t("notifications.failed")}</EmptyState>
+      ) : null}
+      {status === "ready" && model.items.length === 0 ? (
+        <EmptyState>{t("notifications.empty")}</EmptyState>
+      ) : null}
+      {model.days.map((day) => (
+        <View key={day.day} role="list">
+          <Text
+            accessibilityRole="header"
+            className="px-5 pb-1.5 pt-4 font-sans text-[11px] uppercase tracking-[0.06em] text-muted"
+          >
+            {formatRelativeDay(day.day, viewer.now, { language: viewer.language, tz: zoned.zone })}
+          </Text>
+          {day.items.map((item) => (
+            <Item deliveries={deliveries[item.id] ?? []} item={item} key={item.id} zoned={zoned} />
+          ))}
+        </View>
+      ))}
+    </PushedScreen>
+  );
+};

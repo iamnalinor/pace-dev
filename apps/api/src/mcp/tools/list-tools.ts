@@ -12,6 +12,7 @@ import {
   taskById,
 } from "@pace/core";
 
+import { taskUrl } from "../../shared/web-links.ts";
 import { findProject, PROJECT_REF } from "../inputs.ts";
 import { defineTool } from "../registry.ts";
 import {
@@ -20,7 +21,6 @@ import {
   ProjectRowSchema,
   rowFromItem,
   TaskRowSchema,
-  taskUrl,
   thenBy,
 } from "../rows.ts";
 import { describeCode, runRead } from "../tool-kit.ts";

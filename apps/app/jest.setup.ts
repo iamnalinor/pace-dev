@@ -30,11 +30,6 @@ jest.mock("expo-notifications", () =>
     .requireActual<typeof NotificationsFake>("./src/testing/notifications.fake.ts")
     .createFakeNotifications(),
 );
-jest.mock("expo-background-task", () =>
-  jest
-    .requireActual<typeof BackgroundFake>("./src/testing/background-task.fake.ts")
-    .createFakeBackgroundTask(),
-);
 jest.mock("expo-task-manager", () =>
   jest
     .requireActual<typeof BackgroundFake>("./src/testing/background-task.fake.ts")

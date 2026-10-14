@@ -41,7 +41,7 @@ The three product stages are each meant to be usable daily before the next one s
 ## Architecture
 
 ```
-apps/app (Expo: Android ──┐                         ┌─ Telegram (webhook: bot login, digests)
+apps/app (Expo: Android ──┐                         ┌─ Telegram (webhook: bot login, notifications)
   and the web, through     ├─► packages/client ─► apps/api (Cloudflare Worker, Hono)
   react-native-web; the   │   (typed API client,   │  /api/auth  /api/sync  /telegram/webhook
   web build is served by  │    store, view-models) │
@@ -211,6 +211,8 @@ Secrets and variables read by the workflows:
 | `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; one or more keys separated by commas (or one per line), rotated the same way |
 | `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
+| `GOOGLE_SERVICES_JSON` | secret | release | the Firebase `google-services.json` (raw JSON) for push through FCM; absent → the APK has no Google push and phones poll |
+| `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, Worker | the Firebase service account's JSON key the Worker sends pushes with; absent → push is off, everything else works |
 
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
@@ -317,9 +319,48 @@ the native code and runs the JS logic against mocks).
   on this phone. For a repeating event, the toast offers *Every time*: the whole series is
   then logged when it ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.
-- **In the background**: about every half hour (Android decides exactly when), Pace looks
-  at the phone with the app closed. It sends a notification about last night's sleep and
-  about calendar events that just ended. Each one is asked about once, and a tap opens Day.
+- **Notifications** come from the server only (see [Notifications](#notifications)); the
+  phone computes and schedules none of its own.
+
+## Notifications
+
+One pool on the server holds every notification, and each channel shows it: Telegram, the app
+and the web (a bell with an unread count in the sidebar header and on Now's phone header; the
+`/notifications` screen, grouped by day, with the assistant's log one link away). Kinds and their
+default channels (*Settings → Notifications* switches each kind per channel):
+
+| Kind | What | Default |
+|---|---|---|
+| Sign-in | a new session (who, where from) | Telegram, app, web |
+| Deadline digest | at each digest time: open tasks due before a day after the next digest time, each task and deadline once | Telegram |
+| Event starting | a calendar event (own or accepted, not all-day) as it starts: *Attend* / *Skip* | Telegram |
+| Still doing X? | the running activity at twice its Expect: *Yes, still* / *Stop* | app |
+
+An answer anywhere resolves the notification everywhere: answered in Telegram, the message is
+edited; from anywhere else (the app, the web, Now's offer, a phone notification) the Telegram
+message is deleted and the phone's copy is taken back. An event attended from Now resolves its
+notification too; one not answered by its end expires. Quiet hours hold back "event starting"
+and "still doing X?"; sign-ins and digests always come.
+
+The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
+server offers it and the phone has a Google token, else polling (it fetches what waits for it;
+the open app does so at once on each live update). `GET /api/push/methods` says what the server
+accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and
+phones switch to polling on their next start or at once while open. Each item's delivery log
+("Delivered to android via Google · 13:47") is shown under it in the feed.
+
+### Push notifications (Firebase)
+
+1. In the [Firebase console](https://console.firebase.google.com/) create a project (no
+   Analytics needed).
+2. *Add app → Android*, package name `dev.nalinor.pace`. Download `google-services.json` and
+   store its contents as the GitHub secret `GOOGLE_SERVICES_JSON`; the release workflow writes
+   it next to `app.config.ts` (`GOOGLE_SERVICES_FILE`) before prebuild.
+3. *Project settings → Cloud Messaging*: make sure **Firebase Cloud Messaging API (V1)** is
+   enabled.
+4. *Project settings → Service accounts → Generate new private key*: store the downloaded JSON
+   as the GitHub secret `FIREBASE_SERVICE_ACCOUNT`; the deploy workflow puts it into the Worker.
+5. Release a new APK and deploy. Without either secret everything works and phones poll.
 
 ## Telegram bot setup
 
@@ -353,16 +394,10 @@ What the bot does, in the account language:
   model has requests left, the text goes straight to the Inbox and the reply says when the
   assistant is back.
 - `/now` lists the top five of Now.
-- Notifications: digests at the account's digest times (09:00, 14:00, 21:00 by default)
-  with the top of Now, what is left to sort and the Inbox count; a **critical** alert once
-  per task when its deadline is within the preset's `criticalHours` and progress is below
-  `criticalProgress` (buttons: Snooze until the next digest, Done); a **stuck** report with
-  the digest when a task sits in progress untouched for `inProgressIdleDays` (Snooze, Cancel
-  task). Nothing is sent in the quiet hours (23:00–08:00 by default): a
-  crossing at night is reported in the morning. A deadline that was already critical before
-  the previous check — a back-dated edit, or anything before notifications started — is
-  logged as held back instead of sent; the digest shows it. The Durable Object's alarm
-  drives all of it and re-arms itself after every write.
+- Notifications: the kinds on for Telegram (see [Notifications](#notifications)), with
+  *Attend* / *Skip* under an event starting and *Yes, still* / *Stop* under "still doing X?".
+  An answer there edits the message; an answer anywhere else deletes it. The Durable Object's
+  alarm drives the pool and re-arms itself after every write.
 
 ## MCP
 
@@ -421,9 +456,6 @@ your Durable Object and read at that time, then written as read (History can und
 tasks, problems added or solved, a task closed) or put in the Inbox if it cannot be placed,
 asks for an edit or a delete, or is still unread a day later. The bot does the same with any
 message and writes back once it has read it.
-
-The Android app mirrors `GET /api/notify/plan` into local reminders (digest windows and
-deadline crossings for the next day) after every sync; it has no rules of its own.
 
 ## License
 

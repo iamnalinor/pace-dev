@@ -45,6 +45,8 @@ export const CalendarSyncSchema = z.strictObject({
   from: z.iso.datetime(),
   to: z.iso.datetime(),
   events: z.array(CalendarEventSchema).max(2000),
+  /** Series answered "every time" on the phone: the server never announces them as they start. */
+  ruledSeries: z.array(z.string().max(300)).max(500).optional(),
 });
 
 export const CalendarOutputSchema = z.object({ events: z.array(z.object(CALENDAR_EVENT)) });

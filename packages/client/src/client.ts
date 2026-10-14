@@ -67,18 +67,13 @@ export { createPaceClient, type PaceClient, type PaceClientOptions } from "./cre
 export type { EventStore } from "./event-store.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
 export {
-  activityNotifications,
-  calendarNotifications,
-  type CalendarReminder,
-  fetchNotificationPlan,
-  isActivityId,
-  isCalendarId,
-  type LocalNotification,
-  localNotifications,
-  type RunningTimer,
-  scheduleChanges,
-  type ScheduleChanges,
-} from "./local-notifications.ts";
+  createNotificationFeed,
+  type DeliveryEntry,
+  type FeedAnswer,
+  type FeedState,
+  type NotificationFeed,
+  parseLiveNotice,
+} from "./notifications.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {
   type AppState,
@@ -156,6 +151,13 @@ export {
   type OnTimeView,
 } from "./view-models/insights.ts";
 export { type PlainMetaPart, plainMetaText } from "./view-models/meta-text.ts";
+export {
+  answeredEventKeys,
+  type FeedDay,
+  type FeedModel,
+  feedModel,
+  type FeedPlatform,
+} from "./view-models/notifications.ts";
 export {
   type MetaPart,
   type NowRow,

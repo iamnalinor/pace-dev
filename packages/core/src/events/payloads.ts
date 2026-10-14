@@ -178,12 +178,28 @@ export const PresetUpdatedPayload = z.object({
 });
 export const PresetArchivedPayload = z.object({ id: z.string().min(1) });
 
+/** Switches of one kind's channels; only the ones named change. */
+const ChannelSwitchesPatch = z.strictObject({
+  telegram: z.boolean().optional(),
+  app: z.boolean().optional(),
+  web: z.boolean().optional(),
+});
+
 export const SettingsUpdatedPayload = z.object({
   language: z.enum(["en", "ru"]).optional(),
   timezone: TimeZoneSchema.optional(),
   digestWindows: z.array(ClockSchema).optional(),
   quietHours: z.object({ from: ClockSchema, to: ClockSchema }).optional(),
   nightHours: z.boolean().optional(),
+  /** Per kind of notification (`NOTIFICATION_KINDS`), the channel switches that change. */
+  notificationChannels: z
+    .strictObject({
+      login: ChannelSwitchesPatch.optional(),
+      deadline_digest: ChannelSwitchesPatch.optional(),
+      event_start: ChannelSwitchesPatch.optional(),
+      activity_overrun: ChannelSwitchesPatch.optional(),
+    })
+    .optional(),
 });
 
 /** What an activity is about: one of a fixed set, so totals and defaults can group it. */

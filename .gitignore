@@ -38,6 +38,8 @@ vite.config.ts.timestamp-*
 # Expo (continuous native generation: android/ is produced by `expo prebuild`)
 apps/app/android/
 apps/app/ios/
+# Firebase config, written from the GOOGLE_SERVICES_JSON secret at release time.
+apps/app/google-services.json
 .expo/
 expo-env.d.ts
 

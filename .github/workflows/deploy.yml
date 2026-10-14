@@ -113,6 +113,14 @@ jobs:
           VALUE="$(printf '%s' "$VALUE" | tr -s '[:space:],' ',' | sed 's/^,//; s/,$//')"
           if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GEMINI_API_KEY; fi
 
+      # The Firebase service account's JSON key: the Worker sends pushes through FCM with it.
+      # Without it push is off (the phones poll) and everything else works.
+      - name: Secret FIREBASE_SERVICE_ACCOUNT
+        working-directory: apps/api
+        env:
+          VALUE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put FIREBASE_SERVICE_ACCOUNT; fi
+
       # BOT_INFO is the JSON of getMe, stored at deploy time so the bot never calls Telegram
       # on a cold start. Stored as a secret (same mechanism, not committed to wrangler.jsonc).
       - name: Store BOT_INFO (getMe)

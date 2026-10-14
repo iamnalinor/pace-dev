@@ -35,14 +35,14 @@ const LinkRow = ({ hintKey, titleKey, to }: Entry) => {
 };
 
 /**
-The settings that live on their own pages: presets and the notification log. History is a row
-of More on a phone and of the sidebar beside it; the decisions to sort are on the Inbox.
+The settings that live on their own pages: presets. History is a row of More on a phone and of
+the sidebar beside it; the decisions to sort are on the Inbox; the assistant's log is on the
+notifications page.
 */
 export const SettingsLinks = () => {
   return (
     <View>
       <LinkRow hintKey="settings.presets.hint" titleKey="settings.presets" to="/presets" />
-      <LinkRow hintKey="settings.decisions.hint" titleKey="settings.decisions" to="/decisions" />
     </View>
   );
 };

@@ -1,14 +1,10 @@
+import * as Notifications from "expo-notifications";
 import { createContext, type ReactNode, use, useCallback, useEffect, useState } from "react";
 import { AppState, View } from "react-native";
 import { useStore } from "zustand";
 
-import {
-  type Auth,
-  type AuthState,
-  type AppState as ClientState,
-  type SyncStatus,
-  timeBarModel,
-} from "@pace/client";
+import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
+
 import {
   type Language,
   type MessageKey,
@@ -19,11 +15,18 @@ import {
 } from "@pace/core";
 
 import { IS_PHONE } from "./platform/device.ts";
-import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
-import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
+import {
+  dismissPoolNotification,
+  isAnswer,
+  notificationIdOf,
+  pollNow,
+  type PushMethod,
+  registerPush,
+  setupNotificationCategories,
+} from "./platform/notifications.ts";
 import { uploadPhoneData } from "./platform/phone-upload.ts";
+import { startPushTask } from "./platform/push-task.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
-import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
 /**
 How often the client pulls on its own. While the live channel is up the server says when
@@ -34,16 +37,6 @@ const POLL_LIVE_MS = 5 * 60_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 
-/**
-A signed-in start: this week's homework instances, a first sync, then the account's time
-zone from the device when it has none yet (never "not set").
-*/
-/** The account's language and zone, for the background phone check that runs without a store. */
-const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
-  const { settings } = runtime.state.store.getState();
-  return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
-};
-
 /** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
 const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
   if (IS_PHONE) {
@@ -51,15 +44,41 @@ const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
   }
 };
 
+/** How this phone gets system notifications; the web has none (its feed is the bell). */
+const pushState: { method: PushMethod } = { method: "none" };
+
+/**
+The phone's side of the notification pool, on every start and return: the answer buttons,
+the push method (registered again: a token may have changed) and, when it polls, what waits.
+*/
+const startPhonePush = async (runtime: PaceRuntime): Promise<void> => {
+  if (!IS_PHONE) {
+    return;
+  }
+  try {
+    await setupNotificationCategories(runtime.state.store.getState().settings.language);
+    await startPushTask();
+    pushState.method = await registerPush(runtime.api);
+    if (pushState.method === "poll") {
+      await pollNow(runtime.api);
+    }
+  } catch {
+    // Offline: the next start or return tries again; the feed has everything meanwhile.
+  }
+};
+
+/**
+A signed-in start: this week's homework instances, a first sync, then the account's time
+zone from the device when it has none yet (never "not set").
+*/
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
-  await syncLocalNotifications(runtime);
-  await remindCalendar(runtime);
+  await runtime.notifications.refresh();
   await sendPhoneData(runtime);
-  await startPhoneChecks(phoneContextOf(runtime));
+  await startPhonePush(runtime);
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status !== "signed-in") {
     return;
@@ -69,30 +88,59 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   runtime.live.start();
 };
 
-/** The running activity and when it asks next: the timers change only when this does. */
-const timerKey = (runtime: PaceRuntime): string => {
-  const { running } = timeBarModel(runtime.state.store.getState(), {
-    deviceTz: runtime.clock.deviceTz,
-    now: runtime.clock.now(),
+/**
+What the live socket says about the pool, on a phone: a notification resolved elsewhere goes
+away at once; a polling phone fetches what waits for it right away; changed push methods mean
+registering again. And an answer button tapped while the app is open answers like the feed.
+*/
+const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
+  if (!IS_PHONE) {
+    return () => undefined;
+  }
+  const pollIfPolling = (): void => {
+    if (pushState.method === "poll") {
+      void (async () => {
+        try {
+          await pollNow(runtime.api);
+        } catch {
+          // Offline: the next notice or start fetches it.
+        }
+      })();
+    }
+  };
+  const stopNotices = runtime.onNotice((notice) => {
+    switch (notice.type) {
+      case "push-methods-changed": {
+        void startPhonePush(runtime);
+        break;
+      }
+      case "dismiss": {
+        void dismissPoolNotification(notice.id);
+        pollIfPolling();
+        break;
+      }
+      case "notification": {
+        pollIfPolling();
+        break;
+      }
+      case "read": {
+        break;
+      }
+    }
   });
-  return running === null
-    ? ""
-    : [running.activityId, running.startAt, running.label, running.remindAt].join("|");
-};
-
-/** Reschedules the phone's "still doing this?" timer on every switch, stop or edit of the running activity. */
-const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
-  let last = timerKey(runtime);
-  void syncActivityTimers(runtime);
-  return runtime.state.store.subscribe(() => {
-    const key = timerKey(runtime);
-    if (key === last) {
+  const responses = Notifications.addNotificationResponseReceivedListener((response) => {
+    const id = notificationIdOf(response.notification.request.content.data);
+    if (id === null || !isAnswer(response.actionIdentifier)) {
       return;
     }
 
-    last = key;
-    void syncActivityTimers(runtime);
+    void dismissPoolNotification(id);
+    void runtime.notifications.resolve(id, response.actionIdentifier);
   });
+  return () => {
+    stopNotices();
+    responses.remove();
+  };
 };
 
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
@@ -117,8 +165,12 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     }
   });
   // The poll is a safety net while the server can say "changed" itself.
-  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }) => {
+  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {
     sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
+    // Back on the line: what the pool got meanwhile.
+    if (isConnected && !previous.isConnected) {
+      void runtime.notifications.refresh();
+    }
   });
   const subscription = AppState.addEventListener("change", (next) => {
     if (auth.store.getState().status !== "signed-in") {
@@ -136,17 +188,16 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     void actions.ensureInstances();
     void (async () => {
       await sync.syncNow();
-      await syncLocalNotifications(runtime);
-      await remindCalendar(runtime);
+      await runtime.notifications.refresh();
       await sendPhoneData(runtime);
-      await startPhoneChecks(phoneContextOf(runtime));
+      await startPhonePush(runtime);
     })();
   });
-  const stopTimers = followActivityTimers(runtime);
+  const stopNotices = followPhoneNotices(runtime);
   return () => {
     unsubscribe();
     subscription.remove();
-    stopTimers();
+    stopNotices();
     stopFollowingLive();
     sync.stop();
     runtime.live.stop();

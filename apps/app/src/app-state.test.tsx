@@ -11,7 +11,6 @@ import {
   fakeUser,
   problem,
 } from "@pace/client/testing";
-import { addMinutesIso } from "@pace/core";
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
@@ -63,35 +62,37 @@ afterEach(() => {
 });
 
 type FakeNotifications = {
-  state: { granted: boolean; scheduled: { identifier: string }[] };
+  state: { granted: boolean; pushToken: null | string };
 };
 
 const notifications = Notifications as unknown as FakeNotifications;
 
 describe("PaceProvider", () => {
-  it('schedules the next "still doing this?" once it was answered yes', async () => {
+  it("registers how the phone gets notifications once signed in, and fetches what waits", async () => {
     notifications.state.granted = true;
-    notifications.state.scheduled = [];
-    const { runtime } = await setup();
-    const now = runtime.clock.now();
-    await runtime.actions.startActivity(
-      { category: "rest", expectMinutes: 30, label: "Rest" },
-      { at: addMinutesIso(now, -70) },
-    );
+    notifications.state.pushToken = null;
+    const { api, runtime } = await setup({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "GET /api/push/methods": () => ({ pushMethods: ["fcm", "poll"] }),
+      "GET /api/push/poll": () => ({ cursor: 0, entries: [] }),
+      "PUT /api/push/subscription": () => ({ method: "poll" }),
+    });
     await render(
       <PaceProvider runtime={runtime}>
         <Probe />
       </PaceProvider>,
     );
-    const [running] = Object.values(runtime.state.store.getState().time.activities);
     await act(async () => {
-      await runtime.actions.stillGoing(running?.id ?? "");
+      await runtime.auth.loginWithDev("1");
     });
+    // No Google token on this phone: it polls, and fetches what waits at once.
     await waitFor(() => {
-      expect(notifications.state.scheduled.map((item) => item.identifier)).toEqual([
-        expect.stringContaining(`:long@`),
-      ]);
+      expect(api.pathsCalled("/api/push/poll")).toHaveLength(1);
     });
+    expect(api.calls.find((call) => call.path === "/api/push/subscription")?.body).toEqual({
+      method: "poll",
+    });
+    expect(api.pathsCalled("/api/notifications")).not.toEqual([]);
   });
 
   it("exposes the auth status, the language and starts syncing once signed in", async () => {
