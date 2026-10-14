@@ -15,10 +15,11 @@ import {
   type Result,
 } from "@pace/core";
 
-import type { ResolveError, ResolveMeta } from "../shared/contract.ts";
+import type { NotifyError, ResolveError, ResolveMeta } from "../shared/contract.ts";
 import type { PollEntry } from "../shared/push/poll-transport.ts";
 import type * as schema from "./schema.ts";
 
+import { createLogger } from "../shared/logger.ts";
 import { pushConfigOf } from "../shared/push/registry.ts";
 import * as cloud from "./cloud-data.ts";
 import * as deliveries from "./delivery-rows.ts";
@@ -158,8 +159,9 @@ export class NotificationPool {
     if (!prepared.ok) {
       return err({ code: prepared.error.code });
     }
-    await this.#settle(notification.id, resolution, meta);
+    // Written first: an answer whose events did not go in leaves the notification open.
     await this.#host.insert(prepared.value.events);
+    await this.#settle(notification.id, resolution, meta);
     await this.#host.derive(meta.now);
     await this.afterWrite(meta.now);
     return ok(null);
@@ -183,15 +185,21 @@ export class NotificationPool {
     }
   }
 
-  /** Adds a notification to the pool and delivers it (see `deliverNew`). */
+  /**
+  Adds a notification to the pool and delivers it (see `deliverNew`); one about the same subject
+  is delivered where it did not reach yet instead (see `insertNotification`).
+  */
   async notify(
     created: NewNotification,
     now: string,
     couriers?: Couriers,
-  ): Promise<PoolNotification> {
+  ): Promise<Result<PoolNotification, NotifyError>> {
     const stored = await rows.insertNotification(this.#host.db, created, now);
-    await deliverNew(await this.#deps(now, couriers), stored);
-    return stored.notification;
+    if (!stored.ok) {
+      return stored;
+    }
+    await deliverNew(await this.#deps(now, couriers), stored.value);
+    return ok(stored.value.notification);
   }
 
   /** What waits for a polling device; the cursor of the fetch before acknowledges what it got. */
@@ -288,12 +296,18 @@ export class NotificationPool {
     const { storage } = this.#host.ctx;
     await this.#host.derive(now);
     const pass = await this.#pass(now);
-    // Remembered first: a pass cut short never sends the same thing twice.
-    await savePoolMemory(storage, pass.memory);
     const created: PoolNotification[] = [];
     for (const item of pass.created) {
-      created.push(await this.notify(item, now, couriers));
+      const added = await this.notify(item, now, couriers);
+      if (added.ok) {
+        created.push(added.value);
+      } else {
+        createLogger("info").error("A notification broke its contract", { kind: item.kind });
+      }
     }
+    // Remembered once all of it is in the pool: a pass cut short is planned again next time, and
+    // what it added already is found by its subject, not added or sent twice.
+    await savePoolMemory(storage, pass.memory);
     for (const settled of pass.settled) {
       await this.#settle(settled.id, settled.resolution, { couriers, now, origin: "system" });
     }

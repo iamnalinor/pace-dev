@@ -21,6 +21,45 @@ type Zoned = { readonly language: Language; readonly zone: string; readonly now:
 /** A digest lists every task, but only the first few get a button to open them. */
 const LINKED_TASKS = 5;
 
+/** Telegram refuses a message longer than this (characters). */
+export const TELEGRAM_TEXT_MAX = 4096;
+
+/**
+A phone's body, in UTF-8 bytes: an FCM data message carries 4 KB in all, title, keys and the
+pool id included, and the poll queue stores the same text.
+*/
+export const PHONE_BODY_MAX_BYTES = 2048;
+
+const ELLIPSIS = "…";
+
+/** The characters of a text as a reader sees them (an emoji with its modifiers is one). */
+const charactersOf = (text: string): readonly string[] =>
+  Array.from(new Intl.Segmenter().segment(text), (part) => part.segment);
+
+/** The text cut to fit, by whole characters, ending in "…" when anything was cut. */
+const fitted = (text: string, isFitting: (candidate: string) => boolean): string => {
+  if (isFitting(text)) {
+    return text;
+  }
+  const characters = charactersOf(text);
+  const cut = (kept: number): string =>
+    `${characters.slice(0, kept).join("").trimEnd()}${ELLIPSIS}`;
+  // The most characters that fit with the ellipsis: binary search, `low` always fits.
+  let low = 0;
+  let high = characters.length - 1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (isFitting(cut(middle))) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return cut(low);
+};
+
+const encoder = new TextEncoder();
+
 const zonedOf = (settings: Pick<Settings, "language" | "timezone">, now: string): Zoned => ({
   language: settings.language,
   now,
@@ -99,7 +138,7 @@ export const telegramMessage = (
       : [];
   return {
     buttons: [...answerButtons(notification, zoned.language), ...links],
-    text: bodyOf(notification, zoned),
+    text: fitted(bodyOf(notification, zoned), (text) => text.length <= TELEGRAM_TEXT_MAX),
   };
 };
 
@@ -111,11 +150,12 @@ export const phoneContent = (
 ): { readonly title: string; readonly body: string } => {
   const zoned = zonedOf(settings, now);
   const body = bodyOf(notification, zoned);
+  const shown =
+    notification.kind === "deadline_digest"
+      ? body.split("\n").slice(1).join("\n")
+      : body.replace(/^\S+\s/u, "");
   return {
-    body:
-      notification.kind === "deadline_digest"
-        ? body.split("\n").slice(1).join("\n")
-        : body.replace(/^\S+\s/u, ""),
+    body: fitted(shown, (text) => encoder.encode(text).length <= PHONE_BODY_MAX_BYTES),
     title: t(zoned.language, `notify.title.${notification.kind}`),
   };
 };

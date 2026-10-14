@@ -35,8 +35,10 @@ export const subscriptionsOf = async (
 };
 
 /**
-Registers how a session's device is pushed to (its one method). An endpoint known under another
-session (the phone signed in again) moves here, so one device is never pushed to twice.
+Registers how a session's device is pushed to (its one method), in one batch: two registrations
+at once leave one (the session is unique). An endpoint known under another session moves here,
+whoever's it was: the phone signed in again, or signed in to another account, and a phone shows
+the notifications of the account it is signed in to only. One device is never pushed to twice.
 */
 export const subscribe = async (
   binding: D1Database,
@@ -49,23 +51,23 @@ export const subscribe = async (
   },
 ): Promise<void> => {
   const db = d1(binding);
-  await db
-    .delete(pushSubscriptions)
-    .where(
-      and(
-        eq(pushSubscriptions.transport, input.transport),
-        eq(pushSubscriptions.endpoint, input.endpoint),
-      ),
-    );
-  await unsubscribe(binding, input.sessionId);
-  await db.insert(pushSubscriptions).values({
-    createdAt: new Date(input.now),
-    endpoint: input.endpoint,
-    id: ulid(input.now),
-    sessionId: input.sessionId,
-    transport: input.transport,
-    userId: input.userId,
-  });
+  const sameEndpoint = and(
+    eq(pushSubscriptions.transport, input.transport),
+    eq(pushSubscriptions.endpoint, input.endpoint),
+  );
+  const sameSession = eq(pushSubscriptions.sessionId, input.sessionId);
+  await db.batch([
+    db.delete(pushSubscriptions).where(sameEndpoint),
+    db.delete(pushSubscriptions).where(sameSession),
+    db.insert(pushSubscriptions).values({
+      createdAt: new Date(input.now),
+      endpoint: input.endpoint,
+      id: ulid(input.now),
+      sessionId: input.sessionId,
+      transport: input.transport,
+      userId: input.userId,
+    }),
+  ]);
 };
 
 /** Stops pushing to a session's device (it gets the live socket only, while open). */
