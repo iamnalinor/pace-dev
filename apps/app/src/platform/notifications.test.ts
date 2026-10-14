@@ -126,6 +126,16 @@ describe("pollNow", () => {
   });
 });
 
+const SEMINAR_BODY = "📅 Seminar, 10:00–11:00. Attend?";
+
+/** A shown "event starting" as Android hands it back with a button tap. */
+const seminarContent = {
+  body: SEMINAR_BODY,
+  categoryIdentifier: "event_start",
+  data: { kind: "event_start", notificationId: "n-2", url: "/notifications" },
+  title: "Starting now",
+};
+
 describe("the push task", () => {
   it("takes a notification away on a dismiss push", async () => {
     await handlePushTask({ data: { notificationId: "n-1", type: "dismiss" } }, null);
@@ -148,6 +158,40 @@ describe("the push task", () => {
       body: { from: "app", resolution: "attended" },
       path: "/api/notifications/n-2/resolve",
     });
+  });
+
+  it("keeps the notification, saying the answer did not go through, so it can be tapped again", async () => {
+    await setupNotificationCategories("en");
+    const { api } = apiWith({
+      "POST /api/notifications/n-2/resolve": () =>
+        Response.json({ code: "server/error", message: "Down" }, { status: 503 }),
+    });
+    const tapped = {
+      actionIdentifier: "attended",
+      notification: { request: { content: seminarContent } },
+    };
+    await handlePushTask(tapped, api);
+    expect(fake.state.dismissed).toEqual([]);
+    const shownAgain = {
+      content: { ...seminarContent, body: `That did not go through. Try again.\n${SEMINAR_BODY}` },
+      identifier: "n-2",
+    };
+    expect(fake.state.scheduled).toEqual([expect.objectContaining(shownAgain)]);
+    // Refused again, from the notification shown again: the line is not added twice.
+    await handlePushTask(
+      { ...tapped, notification: { request: { content: shownAgain.content } } },
+      api,
+    );
+    expect(fake.state.scheduled.at(-1)).toEqual(expect.objectContaining(shownAgain));
+  });
+
+  it("keeps the notification when the phone is signed out", async () => {
+    await handlePushTask(
+      { actionIdentifier: "skipped", notification: { request: { content: seminarContent } } },
+      null,
+    );
+    expect(fake.state.dismissed).toEqual([]);
+    expect(fake.state.scheduled.map((item) => item.identifier)).toEqual(["n-2"]);
   });
 
   it("ignores a default tap and an unknown button", async () => {
