@@ -20,7 +20,9 @@ against `wrangler dev`). Clients discover the rest: the first unauthenticated ca
 `401` whose `WWW-Authenticate` names the protected resource metadata
 (`/.well-known/oauth-protected-resource/mcp`), which names the authorization server
 (`/.well-known/oauth-authorization-server`), which names `/authorize`, `/oauth/token` and
-`/oauth/register`.
+`/oauth/register`. A token whose user no longer exists (a deleted account, a data reset that
+gave everyone new ids) gets the same `401` with `error="invalid_token"`, so the client
+connects again instead of reaching a store that belongs to nobody.
 
 | Client | How |
 |---|---|

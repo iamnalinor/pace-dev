@@ -173,7 +173,7 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 
 | Call | Request | Response | Rules |
 |---|---|---|---|
-| `POST /api/sync/push` | `{ events: Event[] }` (≤ 500) | `{ accepted: id[], rejected: { id, reason }[], seq }` | each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
+| `POST /api/sync/push` | `{ events: Event[] (≤ 500), storeId }` | `{ accepted: id[], rejected: { id, reason }[], seq }` | a `storeId` that is not the store's current one refuses the whole batch with `409 store/changed`; each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
 | `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
 | `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
 
@@ -187,9 +187,16 @@ is created and again whenever it is wiped (account deletion, an epoch change). T
 answers it (so does `GET /api/me`). The client keeps it next to its cursor: the first pull
 of an empty cursor adopts it; a different one means the server's data was reset, so the
 client drops its local log, outbox and cursor, keeps the new id and pulls from 0. A run
-pulls before it pushes, so an outbox meant for a store that no longer exists never lands
-in the fresh one; it pulls again after a push for what the server derived from it. Signing
-out (a 401 on `/api/me` included) drops the local log, outbox, cursor and id as well.
+pulls before it pushes, and the push names the store that pull confirmed (the server
+refuses a push for any other with `409 store/changed`, which the client treats as a reset),
+so an outbox meant for a store that no longer exists never lands in the fresh one; it pulls
+again after a push for what the server derived from it. A run resets at most once: a second
+change in the same run stops it and the next run retries. What was written on the old copy
+while a reset was under way goes with it. Signing out (a 401 on `/api/me` included) drops
+the local log, outbox, cursor and id as well.
+
+A reset also forgets the store's Telegram chat; the store then sends to the user's private
+chat, whose id is their Telegram id (looked up in D1 by the store's name, the user id).
 
 The transport validates only the envelope (`SyncEventSchema`); the per-type payload is
 checked by the Durable Object. `seq` is a server-assigned integer, so a client that

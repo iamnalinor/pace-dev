@@ -18,8 +18,20 @@ export const SyncEventSchema = z.object({
 
 export type SyncEvent = z.output<typeof SyncEventSchema>;
 
+/**
+The identity of the user's store on the server, made anew whenever the store is wiped. A
+client keeps the id its local log came from; a different one means the server's data was
+reset, so the local copy and its outbox belong to nothing any more and are dropped.
+*/
+export const StoreIdSchema = z.string().min(1).max(64);
+
+/** The error code (HTTP 409) of a push for a store that is not the server's current one. */
+export const STORE_CHANGED = "store/changed";
+
 export const SyncPushBodySchema = z.object({
   events: z.array(SyncEventSchema).max(500),
+  /** The store the client's last pull confirmed: a push for any other store is refused whole. */
+  storeId: StoreIdSchema,
 });
 
 const RejectedEventSchema = z.object({ id: z.string(), reason: z.string() });
@@ -36,13 +48,6 @@ export const SyncPullQuerySchema = z.object({
   since: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
-
-/**
-The identity of the user's store on the server, made anew whenever the store is wiped. A
-client keeps the id its local log came from; a different one means the server's data was
-reset, so the local copy and its outbox belong to nothing any more and are dropped.
-*/
-export const StoreIdSchema = z.string().min(1).max(64);
 
 export const SyncPullOutputSchema = z.object({
   events: z.array(SyncEventSchema),

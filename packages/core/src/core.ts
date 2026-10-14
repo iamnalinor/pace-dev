@@ -48,6 +48,7 @@ export {
   requestedScopes,
 } from "./api/schemas/oauth.ts";
 export {
+  STORE_CHANGED,
   StoreIdSchema,
   type SyncEvent,
   SyncEventSchema,

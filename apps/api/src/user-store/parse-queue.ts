@@ -19,7 +19,7 @@ import { type Cooldowns, type ParseProvider, runParse } from "../shared/llm/llm.
 import { buildParsePrompt } from "../shared/llm/prompt.ts";
 import { parseProviders } from "../shared/llm/providers.ts";
 import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
-import { chatOf, telegramOf } from "./notifier.ts";
+import { telegramOf } from "./notifier.ts";
 
 /** A text to read once the assistant is back: kept in the store until then. */
 export type QueuedParse = {
@@ -164,6 +164,8 @@ type DrainStore = {
     meta: { readonly deviceId: string; readonly now: string; readonly source: "system" },
   ) => Promise<Result<unknown, unknown>>;
   readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
+  /** The user's Telegram chat (see `chatFor`); none means nothing is told. */
+  readonly chatId: () => Promise<string | undefined>;
 };
 
 export type DrainDeps = {
@@ -186,7 +188,7 @@ const stateOf = async (deps: DrainDeps): Promise<CoreState> => {
 
 /** Tells the person in Telegram what became of a text read later; quiet without a bot. */
 const tell = async (deps: DrainDeps, isDone: boolean, text: string): Promise<void> => {
-  const chatId = await chatOf(deps.storage);
+  const chatId = await deps.store.chatId();
   const telegram = telegramOf(deps.env);
   if (chatId === undefined || telegram === null) {
     return;

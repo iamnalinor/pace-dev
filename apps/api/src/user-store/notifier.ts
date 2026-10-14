@@ -5,6 +5,9 @@ import {
   nextAlarmAt,
   type NotifyDecision,
   type NotifyMemory,
+  notifyPlan,
+  type PlannedNotification,
+  snooze,
 } from "@pace/core";
 
 import { loadConfig } from "../shared/config.ts";
@@ -13,6 +16,7 @@ import {
   type TelegramTarget,
   wasTelegramMessageSent,
 } from "../shared/telegram-api.ts";
+import { telegramIdOf } from "../shared/user-lookup.ts";
 import { notificationText } from "./notify-text.ts";
 
 /** Storage keys of the notifier: the user's chat with the bot and what was already sent. */
@@ -31,6 +35,27 @@ export type NotifyRun = {
 export const chatOf = async (storage: DurableObjectStorage): Promise<string | undefined> =>
   await storage.get<string>(CHAT_KEY);
 
+/**
+Where Telegram messages go: the chat the bot stored, else the user's private chat, whose id
+is the user's Telegram id (a wipe forgets the stored one). A chat found this way is stored
+again, so D1 is asked once; a store with no user behind it has no chat.
+*/
+export const chatFor = async (
+  storage: DurableObjectStorage,
+  db: D1Database,
+  userId: string | undefined,
+): Promise<string | undefined> => {
+  const stored = await chatOf(storage);
+  if (stored !== undefined || userId === undefined) {
+    return stored;
+  }
+  const telegramId = await telegramIdOf(db, userId);
+  if (telegramId !== undefined) {
+    await storage.put(CHAT_KEY, telegramId);
+  }
+  return telegramId;
+};
+
 export const setChat = async (storage: DurableObjectStorage, chatId: string): Promise<void> => {
   if ((await chatOf(storage)) !== chatId) {
     await storage.put(CHAT_KEY, chatId);
@@ -47,15 +72,29 @@ export const saveMemory = async (
   await storage.put(MEMORY_KEY, memory);
 };
 
+/** Silences a task's alerts until `until`. */
+export const snoozeTask = async (
+  storage: DurableObjectStorage,
+  taskId: string,
+  until: string,
+): Promise<void> => {
+  await saveMemory(storage, snooze(await memoryOf(storage), taskId, until));
+};
+
+/** What the phone should schedule locally for the next day, as of `now`. */
+export const planFor = async (
+  storage: DurableObjectStorage,
+  state: CoreState,
+  now: string,
+): Promise<readonly PlannedNotification[]> =>
+  notifyPlan(state, { deviceTz: SERVER_TZ, now }, await memoryOf(storage));
+
 /** Moves the alarm earlier when the state now calls for an earlier evaluation. */
 export const rearm = async (
   storage: DurableObjectStorage,
   state: CoreState,
   now: string,
 ): Promise<void> => {
-  if ((await chatOf(storage)) === undefined) {
-    return;
-  }
   const next = nextAlarmAt(state, { deviceTz: SERVER_TZ, now }, await memoryOf(storage));
   const existing = await storage.getAlarm();
   if (next !== null && (existing === null || Date.parse(next) < existing)) {

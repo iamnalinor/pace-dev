@@ -64,12 +64,17 @@ describe("endpoints", () => {
       source: "app",
       type: "task.created",
     };
-    expect(endpoints.sync.push.body.parse({ events: [event] })).toEqual({ events: [event] });
+    const storeId = "store-a";
+    expect(endpoints.sync.push.body.parse({ events: [event], storeId })).toEqual({
+      events: [event],
+      storeId,
+    });
+    expect(() => endpoints.sync.push.body.parse({ events: [event] })).toThrow();
     expect(() =>
-      endpoints.sync.push.body.parse({ events: [{ ...event, precision: "fuzzy" }] }),
+      endpoints.sync.push.body.parse({ events: [{ ...event, precision: "fuzzy" }], storeId }),
     ).toThrow();
     expect(() =>
-      endpoints.sync.push.body.parse({ events: [{ ...event, occurredAt: "today" }] }),
+      endpoints.sync.push.body.parse({ events: [{ ...event, occurredAt: "today" }], storeId }),
     ).toThrow();
   });
 });

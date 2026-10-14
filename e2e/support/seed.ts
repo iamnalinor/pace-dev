@@ -296,6 +296,24 @@ const events = (now: number, ids: LivedIn & { readonly workId: string }): readon
   ];
 };
 
+/**
+`POST /api/sync/push` as a client sends it: a pull first confirms the store, and the push
+names it (the server refuses a push for any other store).
+*/
+export const pushAsClient = async (
+  token: string,
+  events: readonly unknown[],
+): Promise<Response> => {
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const pulled = await fetch(`${API_URL}/api/sync/pull?limit=1`, { headers });
+  const { storeId } = (await pulled.json()) as { readonly storeId: string };
+  return await fetch(`${API_URL}/api/sync/push`, {
+    body: JSON.stringify({ events, storeId }),
+    headers,
+    method: "POST",
+  });
+};
+
 /** Pushes the lived-in log for the account behind `token`; every event must be accepted. */
 export const seedLivedIn = async (token: string): Promise<LivedIn> => {
   const now = Date.now();
@@ -317,11 +335,7 @@ export const seedLivedIn = async (token: string): Promise<LivedIn> => {
     source: "web",
     type: event.type,
   }));
-  const response = await fetch(`${API_URL}/api/sync/push`, {
-    body: JSON.stringify({ events: envelopes }),
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    method: "POST",
-  });
+  const response = await pushAsClient(token, envelopes);
   expect(response.ok).toBe(true);
   const result = (await response.json()) as { rejected: readonly unknown[] };
   expect(result.rejected).toEqual([]);

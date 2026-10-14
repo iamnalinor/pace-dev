@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { newId } from "@pace/core";
 
-import { api, json, loginAsDev } from "./helpers.ts";
+import { api, loginAsDev, pushEvents } from "./helpers.ts";
 
 /** A complete task.created event written on the phone. */
 const event = () => ({
@@ -57,7 +57,7 @@ describe("live sync channel", () => {
       throw new Error("no socket");
     }
     const waiting = nextMessage(socket);
-    await json("/api/sync/push", { body: { events: [event()] }, token });
+    await pushEvents(token, [event()]);
     expect(JSON.parse((await waiting) ?? "null")).toEqual({ seq: 1, type: "changed" });
     socket.close();
   });
@@ -69,7 +69,7 @@ describe("live sync channel", () => {
       throw new Error("no socket");
     }
     const waiting = nextMessage(socket);
-    await json("/api/sync/push", { body: { events: [event()] }, token });
+    await pushEvents(token, [event()]);
     expect(await waiting).toBeNull();
     socket.close();
   });

@@ -2,7 +2,8 @@ import type { Page } from "@playwright/test";
 
 import { addTask } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
-import { API_URL, createDevSession, README_TELEGRAM_ID, resetAccount } from "./support/login.ts";
+import { createDevSession, README_TELEGRAM_ID, resetAccount } from "./support/login.ts";
+import { pushAsClient } from "./support/seed.ts";
 
 /**
 The README's screenshots, with a week of believable data. Off by default; run with
@@ -81,11 +82,7 @@ const seed = async (token: string): Promise<void> => {
     source: "web",
     type: "activity.logged",
   }));
-  const response = await fetch(`${API_URL}/api/sync/push`, {
-    body: JSON.stringify({ events }),
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    method: "POST",
-  });
+  const response = await pushAsClient(token, events);
   expect(response.ok).toBe(true);
 };
 

@@ -8,7 +8,7 @@ import type { UserStore } from "../src/user-store/user-store.ts";
 
 import { coreValidator } from "../src/user-store/event-log.ts";
 import { STORE_EPOCH } from "../src/user-store/store-identity.ts";
-import { call, json, loginAsDev } from "./helpers.ts";
+import { call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
 
 type PushResult = { accepted: string[]; rejected: { id: string; reason: string }[]; seq: number };
 type PullResult = {
@@ -32,7 +32,7 @@ const event = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const push = async (token: string, events: unknown[]): Promise<PushResult> =>
-  await json<PushResult>("/api/sync/push", { body: { events }, token });
+  await pushEvents<PushResult>(token, events);
 
 const pull = async (token: string, query = ""): Promise<PullResult> =>
   await json<PullResult>(`/api/sync/pull${query}`, { token });
@@ -89,7 +89,7 @@ describe("sync push/pull", () => {
   it("rejects a malformed batch as a whole with 422 (contract violation)", async () => {
     const token = await loginAsDev("1001");
     const response = await call("/api/sync/push", {
-      body: { events: [event(), event({ precision: "fuzzy" })] },
+      body: { events: [event(), event({ precision: "fuzzy" })], storeId: await storeIdOf(token) },
       token,
     });
     expect(response.status).toBe(422);
@@ -110,6 +110,25 @@ describe("sync push/pull", () => {
     expect(pushed.rejected[1]?.reason).toMatch(/payload\.title/);
     const pulled = await pull(token, `?since=${pushed.seq - 1}`);
     expect(pulled.events.map((item) => item.id)).toEqual([good.id]);
+  });
+
+  it("refuses a push that names no store", async () => {
+    const token = await loginAsDev("1001");
+    const response = await call("/api/sync/push", { body: { events: [event()] }, token });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "validation" });
+  });
+
+  it("refuses a whole push meant for another store with 409 store/changed", async () => {
+    const token = await loginAsDev("1001");
+    const before = await pull(token);
+    const response = await call("/api/sync/push", {
+      body: { events: [event(), event()], storeId: "an-older-store" },
+      token,
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "store/changed" });
+    expect(await pull(token, `?since=${before.seq}`)).toMatchObject({ events: [] });
   });
 
   it("has no observations route any more", async () => {

@@ -73,6 +73,24 @@ describe("the notifier in the user store", () => {
     });
   });
 
+  it("falls back to the user's own chat (the Telegram id) once a wipe forgot the stored one", async () => {
+    const token = await loginAsDev("1001");
+    const { id } = await json<{ id: string }>("/api/me", { token });
+    const stub = env.USER_STORE.get(env.USER_STORE.idFromName(id));
+    await runInDurableObject(stub, async (instance: UserStore, state) => {
+      await instance.notifyTo("1001", AFTER_TWO);
+      await instance.wipe();
+      expect(await state.storage.get("notify:chat")).toBeUndefined();
+      await instance.append([setup(), report("2026-10-07T07:00:00.000Z")], { now: AFTER_TWO });
+      // The alarm is armed for the fallback chat as well.
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      const telegram = recorder();
+      const run = await instance.runNotifications(AFTER_TWO, telegram.target);
+      expect(run.sent).toBe(1);
+      expect(telegram.sent[0]).toMatchObject({ chat_id: "1001" });
+    });
+  });
+
   it("sends the digest, logs every decision and arms the next alarm", async () => {
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
       await instance.append([setup(), report("2026-10-07T07:00:00.000Z")], { now: AFTER_TWO });

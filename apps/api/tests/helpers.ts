@@ -34,6 +34,17 @@ export const readJson = async <T>(response: Response): Promise<T> =>
 export const json = async <T = unknown>(path: string, options: RequestOptions = {}): Promise<T> =>
   await readJson<T>(await call(path, options));
 
+/** The store id a client confirms with a pull before it pushes. */
+export const storeIdOf = async (token: string): Promise<string> =>
+  (await json<{ storeId: string }>("/api/sync/pull?limit=1", { token })).storeId;
+
+/** `POST /api/sync/push` as a client sends it: with the store id its last pull confirmed. */
+export const pushEvents = async <T = unknown>(
+  token: string,
+  events: readonly unknown[],
+): Promise<T> =>
+  await json<T>("/api/sync/push", { body: { events, storeId: await storeIdOf(token) }, token });
+
 /** Signs in through the dev endpoint (ENVIRONMENT is "test" in vitest.config.ts). */
 export const loginAsDev = async (telegramId: string): Promise<string> => {
   const response = await call("/api/auth/dev", { body: { telegramId } });

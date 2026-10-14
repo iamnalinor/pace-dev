@@ -8,7 +8,7 @@ import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
 import { echoParse, fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev, readJson } from "./helpers.ts";
+import { json, loginAsDev, readJson, storeIdOf } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -278,6 +278,7 @@ describe("notification buttons", () => {
     const now = new Date().toISOString();
     await json("/api/sync/push", {
       body: {
+        storeId: await storeIdOf(token),
         events: [
           {
             deviceId: "dev-1",

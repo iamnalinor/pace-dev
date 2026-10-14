@@ -7,7 +7,7 @@ import { type EventInput, newId } from "@pace/core";
 import type { UserStore } from "../src/user-store/user-store.ts";
 
 import * as schema from "../src/user-store/schema.ts";
-import { json, loginAsDev } from "./helpers.ts";
+import { json, loginAsDev, storeIdOf } from "./helpers.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 
@@ -214,6 +214,7 @@ describe("derive", () => {
     const presetId = `hw.${newId().toLowerCase()}`;
     const pushed = await json<{ accepted: string[] }>("/api/sync/push", {
       body: {
+        storeId: await storeIdOf(token),
         events: [
           envelope("preset.created", {
             definition: {

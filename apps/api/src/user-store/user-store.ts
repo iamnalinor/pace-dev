@@ -3,14 +3,14 @@ import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlit
 import {
   type CalendarEvent,
   type CoreState,
+  err,
   type Event,
   type EventInput,
-  notifyPlan,
   ok,
   parseEvent,
   type PlannedNotification,
   type Result,
-  snooze,
+  STORE_CHANGED,
   type UsageRow,
 } from "@pace/core";
 
@@ -58,18 +58,6 @@ import {
 import { openStore, resetStore, storeIdOf } from "./store-identity.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
-
-export type AppendOptions = {
-  readonly now: string;
-  /** Only for in-process callers (tests); RPC callers get the core event schema. */
-  readonly validateEvent?: eventLog.EventValidator;
-};
-
-export type AppendResult = {
-  readonly accepted: readonly string[];
-  readonly rejected: eventLog.ScreenedBatch["rejected"];
-  readonly seq: number;
-};
 
 /** System events are the server's own: this is their device. */
 const SERVER_DEVICE_ID = "server";
@@ -139,8 +127,11 @@ export class UserStore extends LiveStore {
     return state;
   }
 
+  /** Alarms only matter once there is a chat to send to. */
   async #rearm(now: string): Promise<void> {
-    await notifier.rearm(this.ctx.storage, await this.#state(), now);
+    if ((await this.chatId()) !== undefined) {
+      await notifier.rearm(this.ctx.storage, await this.#state(), now);
+    }
   }
 
   async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
@@ -176,7 +167,10 @@ export class UserStore extends LiveStore {
   `rejected` and the rest of the batch still goes in. The system events the new state
   calls for (instances, automatic outcomes) are derived right after.
   */
-  async append(raw: readonly unknown[], options: AppendOptions): Promise<AppendResult> {
+  async append(
+    raw: readonly unknown[],
+    options: eventLog.AppendOptions,
+  ): Promise<eventLog.AppendResult> {
     const { accepted, events, rejected } = eventLog.screenBatch(raw, {
       now: options.now,
       validateEvent: options.validateEvent ?? eventLog.coreValidator,
@@ -185,6 +179,21 @@ export class UserStore extends LiveStore {
     await this.derive(options.now);
     await this.#rearm(options.now);
     return { accepted, rejected, seq: await log.latestSeq(this.db) };
+  }
+
+  /**
+  A client's sync push: `append`, but only into the store the client's last pull confirmed.
+  A batch meant for another store (one wiped since) is refused whole, in the same call that
+  would write it, so an old outbox never lands in a fresh store.
+  */
+  async push(
+    storeId: string,
+    raw: readonly unknown[],
+    options: eventLog.AppendOptions,
+  ): Promise<Result<eventLog.AppendResult, typeof STORE_CHANGED>> {
+    return storeId === (await storeIdOf(this.ctx.storage))
+      ? ok(await this.append(raw, options))
+      : err(STORE_CHANGED);
   }
 
   /**
@@ -333,22 +342,19 @@ export class UserStore extends LiveStore {
 
   /** Silences a task's alerts until `until`. */
   async snoozeTask(taskId: string, until: string, now: string): Promise<void> {
-    await notifier.saveMemory(
-      this.ctx.storage,
-      snooze(await notifier.memoryOf(this.ctx.storage), taskId, until),
-    );
+    await notifier.snoozeTask(this.ctx.storage, taskId, until);
     await this.#rearm(now);
   }
 
   /** What the phone should schedule locally for the next day. */
   async notifyPlan(now: string): Promise<readonly PlannedNotification[]> {
     await this.derive(now);
-    const state = await this.#state();
-    return notifyPlan(
-      state,
-      { deviceTz: notifier.SERVER_TZ, now },
-      await notifier.memoryOf(this.ctx.storage),
-    );
+    return await notifier.planFor(this.ctx.storage, await this.#state(), now);
+  }
+
+  /** The user's Telegram chat (see `chatFor`); the store's name is the user id. */
+  async chatId(): Promise<string | undefined> {
+    return await notifier.chatFor(this.ctx.storage, this.env.DB, this.ctx.id.name);
   }
 
   /** One pass of the notifier (see `runNotifier`); nothing happens until the chat is known. */
@@ -356,7 +362,7 @@ export class UserStore extends LiveStore {
     now: string,
     telegram: null | TelegramTarget,
   ): Promise<notifier.NotifyRun> {
-    const chatId = await notifier.chatOf(this.ctx.storage);
+    const chatId = await this.chatId();
     if (chatId === undefined) {
       return { decisions: 0, nextAt: null, sent: 0 };
     }

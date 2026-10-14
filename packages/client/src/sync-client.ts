@@ -1,6 +1,15 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { endpoints, err, type Event, ok, parseEvent, type Result } from "@pace/core";
+import {
+  type EndpointOutput,
+  endpoints,
+  err,
+  type Event,
+  ok,
+  parseEvent,
+  type Result,
+  STORE_CHANGED,
+} from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 import type { AppStateHandle } from "./state.ts";
@@ -49,20 +58,80 @@ const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] 
 const describe = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-const pushOutbox = async (
+/**
+Drops the local copy because the server's store changed: the log, its outbox and the cursor
+go, the new id (when known) is kept, and the state is rebuilt empty. What was written while
+this happened goes with it, deliberately: it was written on a copy that no longer exists.
+*/
+type Reset = (storeId: null | string) => Promise<void>;
+
+/** One run's reset: a second change within the same run stops it, and the next run retries. */
+const createReset = (store: EventStore, state: AppStateHandle): Reset => {
+  let isUsed = false;
+  return async (storeId) => {
+    if (isUsed) {
+      throw new ApiError(409, STORE_CHANGED, STORE_CHANGED);
+    }
+    isUsed = true;
+    await store.clear();
+    if (storeId !== null) {
+      await store.setStoreId(storeId);
+    }
+    await state.rematerialize();
+  };
+};
+
+const isStoreChanged = (error: unknown): boolean =>
+  error instanceof ApiError && error.code === STORE_CHANGED;
+
+type Pushed = {
+  readonly pushed: number;
+  readonly rejected: readonly string[];
+  /** The server refused the outbox for a store it no longer has: the copy was dropped. */
+  readonly isReset: boolean;
+};
+
+/** What one sync run works with: the transport, the local copy and its one reset. */
+type Run = {
+  readonly api: ApiClient;
+  readonly reset: Reset;
+  readonly state: AppStateHandle;
+  readonly store: EventStore;
+};
+
+/** One batch into the store `storeId`; the server's "that store is gone" comes back as a value. */
+const pushBatch = async (
   api: ApiClient,
-  store: EventStore,
-): Promise<{ readonly pushed: number; readonly rejected: readonly string[] }> => {
+  events: readonly Event[],
+  storeId: string,
+): Promise<EndpointOutput<typeof endpoints.sync.push> | typeof STORE_CHANGED> => {
+  try {
+    return await api.call(endpoints.sync.push, { body: { events: [...events], storeId } });
+  } catch (error) {
+    if (isStoreChanged(error)) {
+      return STORE_CHANGED;
+    }
+    throw error;
+  }
+};
+
+/** Pushes the outbox into the store the pull confirmed, and only into that one. */
+const pushOutbox = async ({ api, reset, store }: Run): Promise<Pushed> => {
   let pushed = 0;
   const rejected: string[] = [];
-  const batches = chunk(await store.listPending(), PUSH_BATCH);
+  const storeId = await store.getStoreId();
+  const batches = storeId === null ? [] : chunk(await store.listPending(), PUSH_BATCH);
   for (const batch of batches) {
-    const result = await api.call(endpoints.sync.push, { body: { events: [...batch] } });
+    const result = await pushBatch(api, batch, storeId ?? "");
+    if (result === STORE_CHANGED) {
+      await reset(null);
+      return { isReset: true, pushed, rejected };
+    }
     await store.markSynced(result.accepted);
     pushed += result.accepted.length;
     rejected.push(...result.rejected.map((item) => `${item.id} (${item.reason})`));
   }
-  return { pushed, rejected };
+  return { isReset: false, pushed, rejected };
 };
 
 const validEvents = (items: readonly unknown[]): readonly Event[] =>
@@ -74,12 +143,11 @@ const validEvents = (items: readonly unknown[]): readonly Event[] =>
 /**
 Whether a page comes from the server store the local log belongs to. The first pull of an
 empty cursor adopts the store's id. A different id (or a log pulled before ids existed)
-means the server's data was reset: the local log, its outbox and the cursor belong to
-nothing any more, so they are dropped and the state is rebuilt empty under the new id.
+means the server's data was reset: the local copy is dropped (see `Reset`).
 */
 const isSameStore = async (
   store: EventStore,
-  state: AppStateHandle,
+  reset: Reset,
   page: { readonly since: number; readonly storeId: string },
 ): Promise<boolean> => {
   const known = await store.getStoreId();
@@ -90,17 +158,11 @@ const isSameStore = async (
     await store.setStoreId(page.storeId);
     return true;
   }
-  await store.clear();
-  await store.setStoreId(page.storeId);
-  await state.rematerialize();
+  await reset(page.storeId);
   return false;
 };
 
-const pullSince = async (
-  api: ApiClient,
-  store: EventStore,
-  state: AppStateHandle,
-): Promise<number> => {
+const pullSince = async ({ api, reset, state, store }: Run): Promise<number> => {
   let pulled = 0;
   let isMore = true;
   while (isMore) {
@@ -108,7 +170,7 @@ const pullSince = async (
     const page = await api.call(endpoints.sync.pull, {
       query: { limit: PULL_LIMIT, since: String(since) },
     });
-    if (!(await isSameStore(store, state, { since, storeId: page.storeId }))) {
+    if (!(await isSameStore(store, reset, { since, storeId: page.storeId }))) {
       // Dropped: start again from the fresh store's first event.
       pulled = 0;
       continue;
@@ -137,12 +199,16 @@ const runSync = async (
   status.setState({ syncing: true });
   try {
     await state.ready;
+    const run: Run = { api, reset: createReset(store, state), state, store };
     // The pull goes first: it confirms the store id, so an outbox meant for a store that
-    // was reset since is dropped instead of landing in the fresh one.
-    const before = await pullSince(api, store, state);
-    const { pushed, rejected } = await pushOutbox(api, store);
-    // What the server derived from the pushed events comes back at once.
-    const pulled = before + (pushed > 0 ? await pullSince(api, store, state) : 0);
+    // was reset since is dropped instead of landing in the fresh one (the push names the
+    // store too, for a reset between the two).
+    const before = await pullSince(run);
+    const { isReset, pushed, rejected } = await pushOutbox(run);
+    // What the server derived from the pushed events comes back at once; after a refused
+    // push the fresh store's log is pulled from the start.
+    const after = isReset || pushed > 0 ? await pullSince(run) : 0;
+    const pulled = (isReset ? 0 : before) + after;
     status.setState({
       lastError: rejected.length === 0 ? null : `push rejected: ${rejected.join(", ")}`,
       lastSyncAt: now(),

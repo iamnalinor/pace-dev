@@ -1,12 +1,21 @@
 import type { Context, Hono } from "hono";
 
-import { endpoints, ok } from "@pace/core";
+import { endpoints, err, ok, type STORE_CHANGED } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 
 import { requireUser } from "../shared/current-user.ts";
-import { mount } from "../shared/mount.ts";
+import { mount, type Problem } from "../shared/mount.ts";
 import { socketUser, tokenFromProtocols } from "../shared/socket-auth.ts";
+
+/** Why a push was refused, as the client sees it (one entry per error code). */
+const PUSH_PROBLEMS: Readonly<Record<typeof STORE_CHANGED, Problem>> = {
+  "store/changed": {
+    code: "store/changed",
+    message: "The store was reset since the last pull; pull again before pushing",
+    status: 409,
+  },
+};
 
 /** The signed-in user's Durable Object: its id is the user id. */
 const userStore = (c: Context<AppEnv>) =>
@@ -37,8 +46,14 @@ const mountLiveRoute = (app: Hono<AppEnv>): void => {
 
 export const mountSyncRoutes = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.sync.push, async ({ c, body }) => {
-    const result = await userStore(c).append(body.events, { now: new Date().toISOString() });
-    return ok({ accepted: [...result.accepted], rejected: [...result.rejected], seq: result.seq });
+    const result = await userStore(c).push(body.storeId, body.events, {
+      now: new Date().toISOString(),
+    });
+    if (!result.ok) {
+      return err(PUSH_PROBLEMS[result.error]);
+    }
+    const { accepted, rejected, seq } = result.value;
+    return ok({ accepted: [...accepted], rejected: [...rejected], seq });
   });
 
   mount(app, endpoints.sync.pull, async ({ c, query }) => {
