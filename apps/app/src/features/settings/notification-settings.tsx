@@ -48,7 +48,7 @@ export const NotificationChannels = () => {
             {t(`notify.kind.${kind}`)}
           </Text>
           {NOTIFICATION_CHANNELS.map((channel) => (
-            <View className="w-14 items-center" key={channel}>
+            <View className="w-14 items-center" key={channel} role="cell">
               <PaceSwitch
                 isOn={isChannelOn(settings, kind, channel)}
                 label={t("notify.switch", {

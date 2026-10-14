@@ -13,6 +13,21 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+type Rendered = NonNullable<typeof screen.root>;
+
+/** The role of the nearest element above `node` that has one. */
+const roleAbove = (node: Rendered): unknown => {
+  const { parent } = node;
+  if (parent === null) {
+    return null;
+  }
+  const role: unknown =
+    typeof parent.type === "string"
+      ? (parent.props["role"] ?? parent.props["accessibilityRole"])
+      : undefined;
+  return role ?? roleAbove(parent);
+};
+
 const fakeNotifications = Notifications as unknown as {
   state: { granted: boolean; pushToken: null | string };
 };
@@ -87,6 +102,10 @@ describe("SettingsScreen", () => {
   it("switches one kind of notification on one channel, the others as they were", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
+    // A table's rows hold cells: each switch sits in one (axe aria-required-children on the web).
+    const switches = screen.getAllByRole("switch", { name: /^Sign-ins in |^Deadline digest in / });
+    expect(switches).toHaveLength(6);
+    expect(new Set(switches.map((item) => roleAbove(item)))).toEqual(new Set(["cell"]));
     const digestOnWeb = screen.getByLabelText(
       en("notify.switch", {
         channel: en("notify.channel.web"),

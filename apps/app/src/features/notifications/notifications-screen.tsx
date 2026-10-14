@@ -183,7 +183,11 @@ const Item = ({
 }) => {
   const t = useT();
   return (
-    <View className="gap-1.5 border-t border-line px-5 py-3" testID={`notification-${item.id}`}>
+    <View
+      className="gap-1.5 border-t border-line px-5 py-3"
+      role="listitem"
+      testID={`notification-${item.id}`}
+    >
       <View className="flex-row items-start gap-3">
         <View className="min-w-0 flex-1">
           <Body item={item} zoned={zoned} />
@@ -198,7 +202,7 @@ const Item = ({
         .map((line, index) => (
           // Lines repeat (two devices, one minute): their place keeps them apart.
           // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-          <Text className="font-sans text-[11px] text-faint" key={index}>
+          <Text className="font-sans text-[11px] text-muted" key={index}>
             {line}
           </Text>
         ))}
@@ -250,19 +254,33 @@ export const NotificationsScreen = () => {
       {status === "ready" && model.items.length === 0 ? (
         <EmptyState>{t("notifications.empty")}</EmptyState>
       ) : null}
-      {model.days.map((day) => (
-        <View key={day.day} role="list">
-          <Text
-            accessibilityRole="header"
-            className="px-5 pb-1.5 pt-4 font-sans text-[11px] uppercase tracking-[0.06em] text-muted"
-          >
-            {formatRelativeDay(day.day, viewer.now, { language: viewer.language, tz: zoned.zone })}
-          </Text>
-          {day.items.map((item) => (
-            <Item deliveries={deliveries[item.id] ?? []} item={item} key={item.id} zoned={zoned} />
-          ))}
-        </View>
-      ))}
+      {model.days.map((day) => {
+        const label = formatRelativeDay(day.day, viewer.now, {
+          language: viewer.language,
+          tz: zoned.zone,
+        });
+        // The day's heading, then its list: a list holds list items only.
+        return (
+          <View key={day.day}>
+            <Text
+              accessibilityRole="header"
+              className="px-5 pb-1.5 pt-4 font-sans text-[11px] uppercase tracking-[0.06em] text-muted"
+            >
+              {label}
+            </Text>
+            <View aria-label={label} role="list">
+              {day.items.map((item) => (
+                <Item
+                  deliveries={deliveries[item.id] ?? []}
+                  item={item}
+                  key={item.id}
+                  zoned={zoned}
+                />
+              ))}
+            </View>
+          </View>
+        );
+      })}
     </PushedScreen>
   );
 };
