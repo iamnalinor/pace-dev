@@ -2,6 +2,7 @@ import {
   accountTz,
   type ActivityCategory,
   addDaysIn,
+  type CalendarEvent,
   CATEGORY_COLORS,
   type CoreState,
   formatInZone,
@@ -14,7 +15,7 @@ import {
 /** Where something sits in a day's column: minutes from the column's first hour, and its length. */
 export type Placement = { readonly top: number; readonly height: number };
 
-/** The hours a week column shows by default; earlier time widens it. */
+/** The hours a week column shows by default (07–24); earlier time widens it, night hours show all. */
 const DEFAULT_FROM_HOUR = 7;
 const HOURS_PER_DAY = 24;
 
@@ -47,7 +48,7 @@ export type WeekModel = {
   /** `null` for the current week. */
   readonly next: null | string;
   readonly days: readonly WeekDay[];
-  /** The first hour the columns show (7 unless something started earlier). */
+  /** The first hour the columns show (7 unless something started earlier; 0 with night hours). */
   readonly fromHour: number;
 };
 
@@ -150,7 +151,7 @@ export const weekModel = (
     return { date, segments: [...day.segments, ...day.alongside] };
   });
   const earliest = Math.min(
-    DEFAULT_FROM_HOUR,
+    state.settings.nightHours ? 0 : DEFAULT_FROM_HOUR,
     ...lived.flatMap((day) => day.segments.map((segment) => hourOf(segment.startAt, zone))),
   );
   const today = formatInZone(ctx.now, zone, "yyyy-MM-dd");
@@ -187,4 +188,39 @@ export const weekModel = (
     weekStart,
     zone,
   };
+};
+
+/**
+The grid's first hour: the model's, or earlier for the week's first calendar event (which the
+model does not know: the screen fetches the calendar).
+*/
+export const gridFromHour = (week: WeekModel, calendar: readonly CalendarEvent[]): number =>
+  Math.min(
+    week.fromHour,
+    ...calendar
+      .filter((event) => event.startAt >= week.weekStart && event.startAt < week.weekEnd)
+      .map((event) => hourOf(event.startAt, week.zone)),
+  );
+
+/**
+How tall an hour of the grid is: the measured height shared between the hours, so the whole
+day fits; never under `floorPx`, and only when even that does not fit does the grid scroll.
+Before the height is measured (0) it is the floor, unscrolled.
+*/
+export const fitHourPx = ({
+  available,
+  floorPx,
+  hours,
+}: {
+  readonly available: number;
+  readonly floorPx: number;
+  readonly hours: number;
+}): { readonly hourPx: number; readonly scrolls: boolean } => {
+  if (available <= 0 || hours <= 0) {
+    return { hourPx: floorPx, scrolls: false };
+  }
+  const shared = Math.floor(available / hours);
+  return shared >= floorPx
+    ? { hourPx: shared, scrolls: false }
+    : { hourPx: floorPx, scrolls: true };
 };

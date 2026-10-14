@@ -24,10 +24,11 @@ const A = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
 const B = "01ARZ3NDEKTSV4RRFFQ69G5FAB";
 
 describe("DEFAULT_SETTINGS", () => {
-  it("is English, zone-less, with the spec's digest windows and quiet hours", () => {
+  it("is English, zone-less, with the spec's digest windows and quiet hours, nights hidden", () => {
     expect(DEFAULT_SETTINGS).toEqual({
       digestWindows: ["09:00", "14:00", "21:00"],
       language: "en",
+      nightHours: false,
       quietHours: { from: "23:00", to: "08:00" },
       timezone: null,
     });
@@ -47,6 +48,7 @@ describe("settingsReducer", () => {
     expect(materialize(events, settingsReducer, DEFAULT_SETTINGS)).toEqual({
       digestWindows: ["10:00"],
       language: "ru",
+      nightHours: false,
       quietHours: { from: "23:00", to: "08:00" },
       timezone: "Europe/Moscow",
     });
@@ -58,6 +60,16 @@ describe("settingsReducer", () => {
       from: "22:00",
       to: "07:00",
     });
+  });
+
+  it("turns the calendar's night hours on and back off", () => {
+    const on = [updated(A, 1, { nightHours: true })];
+    expect(materialize(on, settingsReducer, DEFAULT_SETTINGS).nightHours).toBe(true);
+    const off = [...on, updated(B, 2, { nightHours: false })];
+    expect(materialize(off, settingsReducer, DEFAULT_SETTINGS).nightHours).toBe(false);
+    // A patch about something else keeps the choice.
+    const other = [...on, updated(B, 2, { language: "ru" })];
+    expect(materialize(other, settingsReducer, DEFAULT_SETTINGS).nightHours).toBe(true);
   });
 
   it("ignores other events", () => {

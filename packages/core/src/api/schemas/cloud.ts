@@ -6,6 +6,9 @@ export const RangeQuerySchema = z.object({
   to: z.iso.datetime(),
 });
 
+/** How long the calendar's free-text fields may be: the phone cuts them to these. */
+export const CALENDAR_LIMITS = { location: 500, name: 200, notes: 2000, url: 2000 } as const;
+
 /** One occurrence of a calendar event, as a phone read it (own or accepted only). */
 export const CalendarEventSchema = z.strictObject({
   id: z.string().min(1).max(200),
@@ -14,6 +17,17 @@ export const CalendarEventSchema = z.strictObject({
   endAt: z.iso.datetime(),
   /** Same for every occurrence of a repeating event; `null` for a one-off. */
   series: z.string().max(300).nullable(),
+  // What else the phone's calendar tells, for the event's details; each one only when it is
+  // there (older phones send none of them).
+  location: z.string().max(CALENDAR_LIMITS.location).optional(),
+  /** The description, cut by the phone to the limit. */
+  notes: z.string().max(CALENDAR_LIMITS.notes).optional(),
+  /** The event's own link (a video call, a page); only http(s) ones are ever opened. */
+  url: z.string().max(CALENDAR_LIMITS.url).optional(),
+  calendarName: z.string().max(CALENDAR_LIMITS.name).optional(),
+  organizer: z.string().max(CALENDAR_LIMITS.name).optional(),
+  /** How many people were invited, the person included. */
+  attendeeCount: z.number().int().nonnegative().max(100_000).optional(),
 });
 
 export type CalendarEvent = z.output<typeof CalendarEventSchema>;

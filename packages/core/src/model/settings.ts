@@ -8,6 +8,8 @@ export type Settings = {
   /** Digest times as `HH:MM` on the account's zone. */
   readonly digestWindows: readonly string[];
   readonly quietHours: { readonly from: string; readonly to: string };
+  /** The Calendar shows the whole day, 00–24, instead of starting at seven in the morning. */
+  readonly nightHours: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -15,4 +17,5 @@ export const DEFAULT_SETTINGS: Settings = {
   timezone: null,
   digestWindows: ["09:00", "14:00", "21:00"],
   quietHours: { from: "23:00", to: "08:00" },
+  nightHours: false,
 };

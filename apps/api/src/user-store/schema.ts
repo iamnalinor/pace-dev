@@ -27,6 +27,13 @@ export const calendarEvents = sqliteTable(
     endAt: text().notNull(),
     title: text().notNull(),
     series: text(),
+    // The event's details, each `null` when the phone did not tell it.
+    location: text(),
+    notes: text(),
+    url: text(),
+    calendarName: text(),
+    organizer: text(),
+    attendeeCount: integer(),
   },
   (table) => [
     primaryKey({ columns: [table.deviceId, table.eventId, table.startAt] }),

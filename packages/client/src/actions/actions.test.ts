@@ -693,9 +693,11 @@ describe("settings", () => {
     unwrap(await world.actions.setTimezone("UTC"));
     unwrap(await world.actions.setDigestWindows(["08:00", "20:00"]));
     unwrap(await world.actions.setQuietHours({ from: "22:00", to: "07:00" }));
+    unwrap(await world.actions.setNightHours(true));
     expect(world.state.store.getState().settings).toEqual({
       digestWindows: ["08:00", "20:00"],
       language: "ru",
+      nightHours: true,
       quietHours: { from: "22:00", to: "07:00" },
       timezone: "UTC",
     });

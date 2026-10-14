@@ -39,6 +39,38 @@ describe("the calendar copy", () => {
     expect(await titles(token)).toEqual([]);
     expect((await call(`/api/calendar?${RANGE}`)).status).toBe(401);
   });
+
+  it("keeps what the phone tells about an event: place, notes, link, calendar and people", async () => {
+    const token = await loginAsDev("1002");
+    const details = {
+      attendeeCount: 12,
+      calendarName: "University",
+      location: "Room 214, Main building",
+      notes: "Bring the problem set.\nhttps://example.org/sheet",
+      organizer: "Prof. Ivanova",
+      url: "https://meet.google.com/abc-defg-hij",
+    };
+    await sync(token, "phone-a", [
+      { ...event("e1", 6, "Алгебра"), ...details },
+      event("e2", 7, "Матанализ"),
+    ]);
+    const { events } = await json<{ events: unknown[] }>(`/api/calendar?${RANGE}`, { token });
+    // An event the phone said nothing more about comes back as it went (an older phone).
+    expect(events).toEqual([
+      { ...event("e1", 6, "Алгебра"), ...details },
+      event("e2", 7, "Матанализ"),
+    ]);
+    const tooLong = await call("/api/calendar/sync", {
+      body: {
+        deviceId: "phone-a",
+        events: [{ ...event("e3", 8, "Английский"), notes: "x".repeat(2001) }],
+        from: "2026-10-05T00:00:00.000Z",
+        to: "2026-10-12T00:00:00.000Z",
+      },
+      token,
+    });
+    expect(tooLong.status).toBe(422);
+  });
 });
 
 /** The laptop's one VS Code session, seen until `endAt`. */

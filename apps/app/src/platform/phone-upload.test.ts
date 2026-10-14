@@ -1,10 +1,10 @@
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
-import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
 
 import { setCalendarSync } from "./phone-memory.ts";
 import { uploadPhoneData } from "./phone-upload.ts";
@@ -82,6 +82,58 @@ describe("what the phone sends to Pace", () => {
     expect(sent.at(-1)?.body["sessions"]).toEqual([
       { app: "Chrome", endAt: "2026-10-06T10:30:00.000Z", startAt: "2026-10-06T09:40:00.000Z" },
     ]);
+  });
+
+  it("sends what the calendar tells about an event: place, notes, link, calendar and people", async () => {
+    calendar.state.events = [
+      {
+        allDay: false,
+        attendees: [
+          { email: "ivanova@uni.example", name: "Prof. Ivanova", status: "accepted" },
+          { email: FAKE_OWNER, status: "accepted" },
+          { email: "petrov@uni.example", status: "tentative" },
+        ],
+        endDate: "2026-10-07T11:30:00.000Z",
+        id: "ev-2",
+        location: "  Room 214  ",
+        notes: `Bring the sheet.\n${"x".repeat(2100)}`,
+        organizerEmail: "ivanova@uni.example",
+        startDate: "2026-10-07T10:00:00.000Z",
+        title: "Algebra",
+        url: "https://meet.google.com/abc-defg-hij",
+      },
+      // One's own event with nothing more to tell: only what it always had.
+      {
+        allDay: false,
+        endDate: "2026-10-08T11:30:00.000Z",
+        id: "ev-3",
+        location: "",
+        notes: "",
+        recurrenceRule: null,
+        startDate: "2026-10-08T10:00:00.000Z",
+        title: "Gym",
+      },
+    ];
+    const sent: Sent[] = [];
+    await uploadPhoneData((await world(sent)).api, "2026-10-06T10:00:00.000Z");
+    const [algebra, gym] = sent[0]?.body["events"] as Record<string, unknown>[];
+    expect(algebra).toMatchObject({
+      attendeeCount: 3,
+      calendarName: "University",
+      location: "Room 214",
+      organizer: "Prof. Ivanova",
+      url: "https://meet.google.com/abc-defg-hij",
+    });
+    expect(String(algebra?.["notes"])).toHaveLength(2000);
+    expect(String(algebra?.["notes"])).toMatch(/^Bring the sheet\./u);
+    expect(gym).toEqual({
+      calendarName: "University",
+      endAt: "2026-10-08T11:30:00.000Z",
+      id: "ev-3",
+      series: null,
+      startAt: "2026-10-08T10:00:00.000Z",
+      title: "Gym",
+    });
   });
 
   it("keeps the calendar on the phone once sending it is turned off", async () => {

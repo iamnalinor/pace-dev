@@ -38,12 +38,18 @@ export const replaceCalendar = async (
     await db
       .insert(calendarEvents)
       .values({
+        attendeeCount: event.attendeeCount ?? null,
+        calendarName: event.calendarName ?? null,
         deviceId,
         endAt: event.endAt,
         eventId: event.id,
+        location: event.location ?? null,
+        notes: event.notes ?? null,
+        organizer: event.organizer ?? null,
         series: event.series,
         startAt: event.startAt,
         title: event.title,
+        url: event.url ?? null,
       })
       .onConflictDoNothing();
   }
@@ -78,8 +84,23 @@ export const listCalendar = async (
       series: row.series,
       startAt: row.startAt,
       title: row.title,
+      ...detailsOf(row),
     }));
 };
+
+type DetailKey = "attendeeCount" | "calendarName" | "location" | "notes" | "organizer" | "url";
+
+/** The details a row has, each left out when the phone did not tell it (`null` in the table). */
+const detailsOf = (
+  row: typeof schema.calendarEvents.$inferSelect,
+): Partial<Pick<CalendarEvent, DetailKey>> => ({
+  ...(row.location !== null && { location: row.location }),
+  ...(row.notes !== null && { notes: row.notes }),
+  ...(row.url !== null && { url: row.url }),
+  ...(row.calendarName !== null && { calendarName: row.calendarName }),
+  ...(row.organizer !== null && { organizer: row.organizer }),
+  ...(row.attendeeCount !== null && { attendeeCount: row.attendeeCount }),
+});
 
 export const clearCalendar = async (db: Db, deviceId: string): Promise<void> => {
   await db.delete(schema.calendarEvents).where(eq(schema.calendarEvents.deviceId, deviceId));

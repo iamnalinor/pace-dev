@@ -183,6 +183,7 @@ export const SettingsUpdatedPayload = z.object({
   timezone: TimeZoneSchema.optional(),
   digestWindows: z.array(ClockSchema).optional(),
   quietHours: z.object({ from: ClockSchema, to: ClockSchema }).optional(),
+  nightHours: z.boolean().optional(),
 });
 
 /** What an activity is about: one of a fixed set, so totals and defaults can group it. */

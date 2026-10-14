@@ -231,6 +231,8 @@ export {
   typeTime,
 } from "./view-models/time-forms.ts";
 export {
+  fitHourPx,
+  gridFromHour,
   type Lane,
   lanesOf,
   placeIn,
