@@ -58,7 +58,7 @@ const walk = (
     : err("preset/unknown-parent");
 };
 
-/** A child key replaces the parent's; `fields` and `notify` merge key by key. */
+/** A child key replaces the parent's; `fields` merge key by key. */
 const merge = (base: ResolvedPreset, delta: PresetDefinition): ResolvedPreset => ({
   defaultImportance: delta.defaultImportance ?? base.defaultImportance,
   deadlinePolicy: delta.deadlinePolicy ?? base.deadlinePolicy,
@@ -67,7 +67,6 @@ const merge = (base: ResolvedPreset, delta: PresetDefinition): ResolvedPreset =>
   // `null` is a value here (it removes the inherited schedule), so `??` would be wrong.
   recurrence: delta.recurrence === undefined ? base.recurrence : delta.recurrence,
   fields: { ...base.fields, ...delta.fields },
-  notify: { ...base.notify, ...delta.notify },
   defaultEstimateMinutes: delta.defaultEstimateMinutes ?? base.defaultEstimateMinutes,
   color: delta.color ?? base.color,
 });

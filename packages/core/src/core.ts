@@ -141,7 +141,6 @@ export { taskReducer } from "./materialize/task-reducer.ts";
 export {
   type DeadlinePolicy,
   type Importance,
-  type NotifyParams,
   type Preset,
   type PresetDefinition,
   type PresetFields,

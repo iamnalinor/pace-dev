@@ -3,12 +3,6 @@ import { describe, expect, it } from "vitest";
 import { BASE_PRESET_IDS, BASE_PRESETS, isBuiltInPreset } from "./base-presets.ts";
 import { PresetDefinitionSchema } from "./preset-schema.ts";
 
-const DEFAULT_NOTIFY = {
-  criticalHours: 24,
-  criticalProgress: 0.5,
-  inProgressIdleDays: 5,
-};
-
 const NO_FIELDS = { description: false, startAt: false, submitVia: false, link: false };
 
 const byText = (a: string, b: string): number => a.localeCompare(b);
@@ -45,7 +39,6 @@ describe("BASE_PRESETS", () => {
       defaultEstimateMinutes: 60,
       defaultImportance: "normal",
       fields: { ...NO_FIELDS, description: true },
-      notify: { ...DEFAULT_NOTIFY, criticalHours: 12 },
       progressMode: "subtasks",
       recurrence: null,
       submission: "per_subtask",
@@ -59,7 +52,6 @@ describe("BASE_PRESETS", () => {
       defaultEstimateMinutes: 120,
       defaultImportance: "normal",
       fields: { ...NO_FIELDS, description: true, startAt: true, link: true },
-      notify: DEFAULT_NOTIFY,
       progressMode: "slider",
       recurrence: null,
       submission: "whole",
@@ -73,7 +65,6 @@ describe("BASE_PRESETS", () => {
       defaultEstimateMinutes: 30,
       defaultImportance: "normal",
       fields: NO_FIELDS,
-      notify: DEFAULT_NOTIFY,
       progressMode: "subtasks",
       recurrence: null,
       submission: "whole",
@@ -87,7 +78,6 @@ describe("BASE_PRESETS", () => {
       defaultEstimateMinutes: 15,
       defaultImportance: "nice_to_have",
       fields: { ...NO_FIELDS, startAt: true },
-      notify: DEFAULT_NOTIFY,
       progressMode: "none",
       recurrence: null,
       submission: "whole",
@@ -101,7 +91,6 @@ describe("BASE_PRESETS", () => {
       defaultEstimateMinutes: 15,
       defaultImportance: "nice_to_have",
       fields: NO_FIELDS,
-      notify: DEFAULT_NOTIFY,
       progressMode: "none",
       recurrence: null,
       submission: "whole",

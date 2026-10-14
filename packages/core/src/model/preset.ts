@@ -49,15 +49,6 @@ export type PresetFields = {
   readonly submitVia: boolean;
 };
 
-export type NotifyParams = {
-  /** "Critical": less than this many hours to the deadline … */
-  readonly criticalHours: number;
-  /** … with progress below this share (0–1). */
-  readonly criticalProgress: number;
-  /** An in-progress task untouched longer than this is "stuck". */
-  readonly inProgressIdleDays: number;
-};
-
 /** What a preset stores: only the keys it changes relative to its parent. */
 export type PresetDefinition = {
   readonly defaultImportance?: Importance;
@@ -67,7 +58,6 @@ export type PresetDefinition = {
   /** `null` removes an inherited recurrence. */
   readonly recurrence?: null | Recurrence;
   readonly fields?: Partial<PresetFields>;
-  readonly notify?: Partial<NotifyParams>;
   readonly defaultEstimateMinutes?: number;
   readonly color?: ProjectColorName;
 };
@@ -80,7 +70,6 @@ export type ResolvedPreset = {
   readonly progressMode: ProgressMode;
   readonly recurrence: null | Recurrence;
   readonly fields: PresetFields;
-  readonly notify: NotifyParams;
   readonly defaultEstimateMinutes: number;
   readonly color: ProjectColorName;
 };

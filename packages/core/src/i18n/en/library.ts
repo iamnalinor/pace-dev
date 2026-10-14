@@ -100,7 +100,6 @@ export const enLibrary = {
   "presets.section.work": "Work",
   "presets.section.schedule": "Schedule",
   "presets.section.fields": "Task fields",
-  "presets.section.notify": "Notifications",
   "presets.field.defaultImportance": "Default importance",
   "presets.field.deadlinePolicy": "Deadline",
   "presets.field.submission": "Submission",
@@ -126,7 +125,4 @@ export const enLibrary = {
   "presets.taskField.link": "Link",
   "presets.taskField.startAt": "Start date",
   "presets.taskField.submitVia": "Submit via",
-  "presets.notify.criticalHours": "Warn when the deadline is closer than (hours)",
-  "presets.notify.criticalProgress": "…and less than this is done (0–1)",
-  "presets.notify.inProgressIdleDays": "Remind about a started task untouched for (days)",
 } as const;

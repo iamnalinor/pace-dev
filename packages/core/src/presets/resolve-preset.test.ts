@@ -42,12 +42,11 @@ const recurrence = {
 
 const RESOLVED_KEYS = Object.keys(BASE_PRESETS.hw.definition).toSorted(byText);
 
-/** A resolved preset has every key, every field flag and every notify threshold. */
+/** A resolved preset has every key and every field flag. */
 const isComplete = (value: ResolvedPreset): boolean =>
   PresetDefinitionSchema.safeParse(value).success &&
   Object.keys(value).toSorted(byText).join(",") === RESOLVED_KEYS.join(",") &&
-  Object.keys(value.fields).length === 4 &&
-  Object.keys(value.notify).length === 3;
+  Object.keys(value.fields).length === 4;
 
 const input = (patch: Partial<PresetInput>): PresetInput => ({
   definition: {},
@@ -101,23 +100,23 @@ describe("resolvePreset", () => {
     });
   });
 
-  it("merges fields and notify key by key across the chain", () => {
+  it("merges fields key by key across the chain", () => {
     const state = stateWith(
-      user("w.a", "work", { fields: { link: false }, notify: { inProgressIdleDays: 3 } }),
-      user("w.b", "w.a", { fields: { submitVia: true }, notify: { criticalHours: 48 } }),
+      user("w.a", "work", { fields: { link: false } }),
+      user("w.b", "w.a", { fields: { submitVia: true } }),
     );
-    const result = resolvePreset(state, "w.b", { notify: { criticalProgress: 0.2 } });
+    const result = resolvePreset(state, "w.b", { fields: { description: false } });
     expect(result).toMatchObject({
       ok: true,
-      value: {
-        fields: { description: true, startAt: true, submitVia: true, link: false },
-        notify: {
-          criticalHours: 48,
-          criticalProgress: 0.2,
-          inProgressIdleDays: 3,
-        },
-      },
+      value: { fields: { description: false, startAt: true, submitVia: true, link: false } },
     });
+  });
+
+  it("drops the legacy notification thresholds of a preset stored with them", () => {
+    const legacy = { fields: { link: false }, notify: { criticalHours: 48 } };
+    const state = stateWith(user("w.a", "work", legacy));
+    const result = resolvePreset(state, "w.a");
+    expect(result.ok && "notify" in result.value).toBe(false);
   });
 
   it("lets a child remove an inherited recurrence with null", () => {
@@ -190,7 +189,6 @@ describe("resolvePreset", () => {
         defaultEstimateMinutes: fc.nat({ max: 600 }),
         defaultImportance: fc.constantFrom("asap", "nice_to_have"),
         fields: fc.record({ link: fc.boolean() }, { requiredKeys: [] }),
-        notify: fc.record({ criticalHours: fc.nat({ max: 72 }) }, { requiredKeys: [] }),
         recurrence: fc.constantFrom(null, recurrence),
       },
       { requiredKeys: [] },

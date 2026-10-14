@@ -33,31 +33,31 @@ describe("toggleOverride", () => {
 });
 
 describe("toggleSubOverride", () => {
-  it("overrides one field or notify key at a time and removes the group when empty", () => {
-    const one = toggleSubOverride({}, { group: "notify", key: "criticalHours" }, hw);
-    expect(one).toEqual({ notify: { criticalHours: 12 } });
+  it("overrides one field at a time and removes the group when empty", () => {
+    const one = toggleSubOverride({}, { group: "fields", key: "description" }, hw);
+    expect(one).toEqual({ fields: { description: true } });
     const two = setSub(
       toggleSubOverride(one, { group: "fields", key: "link" }, hw),
       { group: "fields", key: "link" },
       true,
     );
-    expect(two).toEqual({ fields: { link: true }, notify: { criticalHours: 12 } });
-    expect(toggleSubOverride(two, { group: "notify", key: "criticalHours" }, hw)).toEqual({
-      fields: { link: true },
-    });
+    expect(two).toEqual({ fields: { description: true, link: true } });
+    const three = toggleSubOverride(two, { group: "fields", key: "description" }, hw);
+    expect(three).toEqual({ fields: { link: true } });
+    expect(toggleSubOverride(three, { group: "fields", key: "link" }, hw)).toEqual({});
   });
 });
 
 describe("definitionIssues", () => {
-  it("names the keys the schema rejects, down to the notify and field keys", () => {
+  it("names the keys the schema rejects, down to the field keys", () => {
     expect(definitionIssues({ defaultEstimateMinutes: 30 })).toEqual(new Set());
     expect(
       definitionIssues({
         defaultEstimateMinutes: -5,
         deadlinePolicy: { finalAt: null, finalTz: null, kind: "resubmission", softDays: 1.5 },
-        notify: { criticalProgress: 2 },
+        fields: { link: "yes" as unknown as boolean },
       }),
-    ).toEqual(new Set(["defaultEstimateMinutes", "deadlinePolicy", "notify.criticalProgress"]));
+    ).toEqual(new Set(["defaultEstimateMinutes", "deadlinePolicy", "fields.link"]));
   });
 });
 
