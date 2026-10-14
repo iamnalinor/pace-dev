@@ -11,8 +11,11 @@ import { useRunAction } from "./use-run-action.ts";
 export type CheckTask = {
   /** A task submitted problem by problem: the check opens its submit sheet (which, when). */
   readonly opensSheet: (row: NowRow) => boolean;
-  /** The sheet for such a task; anything else is closed as done (History undoes it). */
-  readonly check: (row: NowRow) => void;
+  /**
+  The sheet for such a task; anything else is closed as done (History undoes it). Resolves to
+  whether it went through: a refused close says why, and the row has to come back.
+  */
+  readonly check: (row: NowRow) => Promise<boolean>;
 };
 
 /** The row's check: close as done, or the submit sheet of a task sent problem by problem. */
@@ -34,12 +37,12 @@ export const useCheckTask = (): CheckTask => {
     [state],
   );
   const check = useCallback(
-    (row: NowRow) => {
+    async (row: NowRow): Promise<boolean> => {
       if (opensSheet(row)) {
         openTask(row.id, { close: true });
-        return;
+        return true;
       }
-      void run(actions.closeTask({ outcome: "done", taskId: row.id }));
+      return await run(actions.closeTask({ outcome: "done", taskId: row.id }));
     },
     [actions, openTask, opensSheet, run],
   );

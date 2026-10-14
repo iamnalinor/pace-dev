@@ -12,6 +12,15 @@ import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
 import { useCheckTask } from "./use-check-task.ts";
 
+/** The ids that `isKept` approves; the same set when nothing is dropped, so no render follows. */
+const keeping = (
+  ids: ReadonlySet<string>,
+  isKept: (id: string) => boolean,
+): ReadonlySet<string> => {
+  const kept = [...ids].filter((id) => isKept(id));
+  return kept.length === ids.size ? ids : new Set(kept);
+};
+
 /** A list of task rows: tap to open, the check to close. */
 export const TaskRows = ({
   checked = false,
@@ -29,46 +38,64 @@ export const TaskRows = ({
   const { check, opensSheet } = useCheckTask();
   // Rows turning to dust after their check; each closes once its dust has gone.
   const [dissolving, setDissolving] = useState<ReadonlySet<string>>(() => new Set());
-  // Rows that turned to dust leave without the fade: it would bring them back for a moment.
-  const [dissolved] = useState(() => new Set<string>());
-  const settle = (row: NowRow): void => {
-    dissolved.add(row.id);
-    check(row);
-    setDissolving((current) => new Set([...current].filter((id) => id !== row.id)));
+  // Rows whose dust has gone: they leave the list at once, so the rows below move up as the
+  // dust ends, not after the close has been written. A refused close brings the row back.
+  const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
+  // Once the store has dropped a row, forget it: closed again later (undone, then checked
+  // again), it dissolves anew. Adjusted while rendering, not in an effect, to skip a stale frame.
+  const present = rows.map((row) => row.id).join("\n");
+  const [seen, setSeen] = useState(present);
+  if (seen !== present) {
+    const ids = new Set(rows.map((row) => row.id));
+    setSeen(present);
+    setDissolving((current) => keeping(current, (id) => ids.has(id)));
+    setGone((current) => keeping(current, (id) => ids.has(id)));
+  }
+  const settle = async (row: NowRow): Promise<void> => {
+    setGone((current) => new Set([...current, row.id]));
+    if (await check(row)) {
+      return;
+    }
+
+    setGone((current) => keeping(current, (id) => id !== row.id));
+    setDissolving((current) => keeping(current, (id) => id !== row.id));
   };
   return (
     <View aria-label={label} className="px-2" role="list">
-      {rows.map((row) => (
-        <Animated.View
-          entering={ROW_ENTER}
-          key={row.id}
-          {...(!dissolved.has(row.id) && { exiting: ROW_EXIT })}
-          layout={ROW_LAYOUT}
-          role="listitem"
-        >
-          <TaskRow
-            checked={checked}
-            isDissolving={dissolving.has(row.id)}
-            onDissolved={() => {
-              settle(row);
-            }}
-            onOpen={() => {
-              openTask(row.id);
-            }}
-            row={row}
-            withTag={withTag}
-            {...(!checked && {
-              onCheck: () => {
-                if (opensSheet(row)) {
-                  check(row);
-                } else {
-                  setDissolving((current) => new Set([...current, row.id]));
-                }
-              },
-            })}
-          />
-        </Animated.View>
-      ))}
+      {rows
+        .filter((row) => !gone.has(row.id))
+        .map((row) => (
+          <Animated.View
+            entering={ROW_ENTER}
+            key={row.id}
+            // The dust is the exit of a checked row; the fade would only bring it back for a moment.
+            {...(!dissolving.has(row.id) && { exiting: ROW_EXIT })}
+            layout={ROW_LAYOUT}
+            role="listitem"
+          >
+            <TaskRow
+              checked={checked}
+              isDissolving={dissolving.has(row.id)}
+              onDissolved={() => {
+                void settle(row);
+              }}
+              onOpen={() => {
+                openTask(row.id);
+              }}
+              row={row}
+              withTag={withTag}
+              {...(!checked && {
+                onCheck: () => {
+                  if (opensSheet(row)) {
+                    void check(row);
+                  } else {
+                    setDissolving((current) => new Set([...current, row.id]));
+                  }
+                },
+              })}
+            />
+          </Animated.View>
+        ))}
     </View>
   );
 };

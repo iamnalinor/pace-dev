@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
@@ -8,6 +8,7 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { addMinutesIso } from "@pace/core";
 import { HW_ID, NOW } from "@pace/core/testing";
 
@@ -101,6 +102,54 @@ describe("NowBoard", () => {
     await runtime.actions.undoLast();
     await waitFor(() => {
       expect(screen.getByText("Reply to course curator")).toBeOnTheScreen();
+    });
+  });
+
+  describe("a checked task whose close is still being written", () => {
+    const TITLE = "Reply to course curator";
+    const CHECK = { name: `Mark ${TITLE} done` };
+
+    /** Checks the row, lets the dust run out, and holds the close until the test settles it. */
+    const checkAndHold = async () => {
+      jest.useFakeTimers();
+      const runtime = await createTestRuntime();
+      const close = Promise.withResolvers<Awaited<ReturnType<typeof runtime.actions.closeTask>>>();
+      const closeTask = jest.spyOn(runtime.actions, "closeTask").mockReturnValue(close.promise);
+      await renderScreen(<NowBoard />, runtime);
+      await fireEvent.press(screen.getByRole("checkbox", CHECK));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+      });
+      return { close, closeTask };
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("stays gone while the close is pending: the dust does not hand it back", async () => {
+      const { close, closeTask } = await checkAndHold();
+      expect(closeTask).toHaveBeenCalledTimes(1);
+      // The store has not dropped the row yet, but it must not show again, checked or not.
+      expect(screen.queryByText(TITLE)).toBeNull();
+      expect(screen.queryByRole("checkbox", CHECK)).toBeNull();
+      await act(async () => {
+        close.resolve({ ok: true, value: [] });
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      expect(screen.queryByText(TITLE)).toBeNull();
+    });
+
+    it("comes back, unchecked, when the close is refused", async () => {
+      const { close } = await checkAndHold();
+      expect(screen.queryByText(TITLE)).toBeNull();
+      await act(async () => {
+        close.resolve({ ok: false, error: "action/invalid-input" });
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      expect(screen.getByRole("checkbox", CHECK)).not.toBeChecked();
+      expect(screen.getByText(TITLE)).toBeOnTheScreen();
+      expect(screen.getByText(en("actionError.action/invalid-input"))).toBeOnTheScreen();
     });
   });
 
