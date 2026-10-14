@@ -12,8 +12,19 @@ const QUOTE_INSIDE = String.raw`'\''`;
 /** A value for a POSIX shell, in single quotes. */
 const shellQuote = (value: string): string => `'${value.split("'").join(QUOTE_INSIDE)}'`;
 
-/** A value for PowerShell, in single quotes (a quote inside is doubled). */
-const powerShellQuote = (value: string): string => `'${value.replaceAll("'", "''")}'`;
+/**
+A value for PowerShell, in single quotes. PowerShell ends such a string at the typographic
+quotes ‘ ’ ‚ ‛ as well (a phone keyboard types ’ in "Ilya’s PC"), so each of the four is
+doubled, which keeps it literal.
+*/
+const powerShellQuote = (value: string): string =>
+  `'${value.replaceAll(/['‘’‚‛]/gu, (quote) => quote + quote)}'`;
+
+/**
+Windows PowerShell 5 passes an argument to a program without escaping a double quote inside,
+which splits it there; the computer's name does without them.
+*/
+const withoutDoubleQuotes = (value: string): string => value.replaceAll('"', "");
 
 /**
 The PowerShell line for Windows. Python comes from `py` or `python`, tried by running them,
@@ -50,7 +61,7 @@ export const agentCommand = ({
 }): string => {
   const download = `${webOrigin}/pace_agent.py`;
   if (os === "windows") {
-    const install = `install --token ${powerShellQuote(device.token)} --api ${apiBase} --name ${powerShellQuote(device.name)}`;
+    const install = `install --token ${powerShellQuote(device.token)} --api ${apiBase} --name ${powerShellQuote(withoutDoubleQuotes(device.name))}`;
     return windowsCommand(download, install);
   }
   const install = `install --token ${shellQuote(device.token)} --api ${apiBase} --name ${shellQuote(device.name)}`;

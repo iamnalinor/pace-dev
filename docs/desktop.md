@@ -20,7 +20,8 @@ document names, keystrokes or screenshots.
   and start and takes the later end, so the running session grows with each send.
 - Offline, sessions wait in `buffer.json` next to the settings and go with the next send; after
   a failure it waits 5, 10, 20, 40, then 60 minutes between tries. Sessions older than a week
-  are dropped.
+  are dropped. A finished session is written to the buffer at once (whole, then renamed into
+  place); a damaged buffer is kept as `buffer.json.bad` and the agent starts afresh.
 
 Nothing is judged: Pace only shows where the time went.
 
@@ -30,8 +31,9 @@ Nothing is judged: Pace only shows where the time went.
 computer's system (the web app preselects the one it runs on) and follow its steps.
 
 The token is shown once and may only upload usage (`usage:write`): it cannot read or change
-anything else, and whatever it sends is filed under its own computer. Lost it? Disconnect the
-computer and add it again.
+anything else, and whatever it sends is filed under its own computer. It sits inside the pasted
+line, so it also stays in that terminal's history (and in `config.json`); *Disconnect* in
+Settings → Devices revokes it at once. Lost it? Disconnect the computer and add it again.
 
 ### Windows
 
@@ -85,9 +87,13 @@ sudo pacman -S xdotool xprintidle       # Arch
 ```
 
 Then paste the same `curl … && python3 ~/.pace_agent.py install …` line as on macOS. `install`
-saves the settings to `~/.config/pace/config.json` (with the session's `DISPLAY` and
-`XAUTHORITY`, since a user service may start before the desktop), writes the systemd user
-service `~/.config/systemd/user/pace-agent.service`, enables and starts it.
+saves the settings to `~/.config/pace/config.json` (with the session's `DISPLAY`, since a user
+service may start before the desktop), writes the systemd user service
+`~/.config/systemd/user/pace-agent.service`, enables and starts it. The X cookie (`XAUTHORITY`)
+is not saved: some display managers put it in a new temporary file at each login. The agent reads
+it from the user manager (`systemctl --user show-environment`) at start and whenever `xdotool`
+fails; most desktops hand it over on login, and on one that does not, add
+`systemctl --user import-environment DISPLAY XAUTHORITY` to the desktop's autostart.
 
 Probes: `xdotool getactivewindow getwindowpid` → `/proc/<pid>/comm`, or the window's `WM_CLASS`
 (`xprop`) when the window does not say its process; idle time from `xprintidle`.
@@ -125,7 +131,11 @@ the running agent's buffer, so it is safe next to it. A second plain `run` exits
   error. "HTTP Error 401" means the token was revoked: disconnect the computer and add it again.
 - **Linux: "Missing xdotool, xprintidle".** Install them (above) and run `install` again.
 - **Linux: "No graphical session here".** Run `install` from a terminal on the desktop, not over
-  SSH: it records the display the service uses. `systemctl --user status pace-agent` and
+  SSH: it records the display the service uses.
+- **Linux: every sample says `xdotool: … Can't open display` or `Authorization required`.** The
+  service lacks the desktop's X cookie: run
+  `systemctl --user import-environment DISPLAY XAUTHORITY` in a terminal on the desktop (add it to
+  the desktop's autostart to keep it). `systemctl --user status pace-agent` and
   `journalctl --user -u pace-agent` show the service's output.
 - **Linux: "Unsupported desktop (GNOME on Wayland)".** See Wayland above.
 - **macOS:** `launchctl print gui/$UID/app.pace.agent` and `agent.log` in

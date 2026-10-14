@@ -67,8 +67,13 @@ SERVICE = "pace-agent.service"
 TASK_XML = "pace-agent-task.xml"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
-# The graphical session's variables a systemd user service may start without.
-SESSION_ENV = ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP")
+# The graphical session's variables a systemd user service may start without. `install` keeps
+# the stable ones as a fallback; XAUTHORITY is not kept, since some display managers put the X
+# cookie in a fresh temporary file at each login: it is read from the user manager instead.
+SAVED_ENV = ("DISPLAY", "WAYLAND_DISPLAY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP")
+SESSION_ENV = (*SAVED_ENV, "XAUTHORITY")
+# How often a failing X probe may ask the user manager for the desktop's variables again.
+REFRESH_ENV_SECONDS = 60
 
 LINUX_PACKAGES = (
     "sudo apt install xdotool xprintidle (Debian, Ubuntu, Mint) · "
@@ -110,7 +115,7 @@ class Tracker:
     def sample(self, now: float, app: Optional[str], idle: float) -> str:
         """Takes one sample and says what it made of it (for `run --logs`)."""
         current = self.current
-        if current is not None and now - current.end > JOIN_GAP_SECONDS:
+        if current is not None and now - current.end >= JOIN_GAP_SECONDS:
             self._finish()
             current = None
         if app is None:
@@ -178,29 +183,51 @@ class Outbox:
         self.failures = 0
         self.next_at = 0.0
         if path is not None and path.exists():
-            try:
-                saved = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                saved = {}
-            self.pending = list(saved.get("pending", []))
-            self.last_sent_at = saved.get("lastSentAt")
-            self.last_error = saved.get("lastError")
+            self._load(path)
+
+    def _load(self, path: Path) -> None:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return
+        try:
+            saved = json.loads(text)
+        except ValueError:
+            saved = None
+        if not is_buffer(saved):
+            # Cut off by a power loss or edited by hand: kept aside for a look, started afresh.
+            path.with_name(path.name + ".bad").write_text(text, encoding="utf-8")
+            return
+        self.pending = list(saved["pending"])
+        self.last_sent_at = saved.get("lastSentAt")
+        self.last_error = saved.get("lastError")
 
     def add(self, sessions: list[Session]) -> None:
-        self.pending.extend(session_json(session) for session in sessions)
+        """Keeps finished sessions, on disk at once: a power cut during a backoff loses none."""
+        if sessions:
+            self.pending.extend(session_json(session) for session in sessions)
+            self.save()
 
     def save(self) -> None:
+        """Writes a whole new file and renames it into place, so a crash never leaves half of one."""
         if self.path is None:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         state = {"lastError": self.last_error, "lastSentAt": self.last_sent_at, "pending": self.pending}
-        self.path.write_text(json.dumps(state), encoding="utf-8")
+        temporary = self.path.with_name(self.path.name + ".tmp")
+        temporary.write_text(json.dumps(state), encoding="utf-8")
+        os.replace(temporary, self.path)
 
     def flush(self, now: float, running: Optional[Session], deliver: Callable[[list[dict]], None]) -> bool:
         """Sends what waits and the running session (cut at its last sample); False if it failed."""
         oldest = iso(now - KEEP_SECONDS)
         self.pending = [session for session in self.pending if session["endAt"] >= oldest]
         sessions = self.pending + ([session_json(running)] if running is not None else [])
+        if not sessions:
+            # Nothing to send is not a send: the last send stays what it was.
+            self.failures = 0
+            self.next_at = now + SEND_EVERY_SECONDS
+            return True
         try:
             while sessions:
                 deliver(sessions[:BATCH])
@@ -219,6 +246,16 @@ class Outbox:
         self.next_at = now + SEND_EVERY_SECONDS
         self.save()
         return True
+
+
+def is_buffer(saved: object) -> bool:
+    """A buffer file as `Outbox.save` writes it: sessions with an app, a start and an end."""
+    if not isinstance(saved, dict) or not isinstance(saved.get("pending"), list):
+        return False
+    return all(
+        isinstance(session, dict) and all(isinstance(session.get(key), str) for key in ("app", "startAt", "endAt"))
+        for session in saved["pending"]
+    )
 
 
 def post_sessions(config: Mapping) -> Callable[[list[dict]], None]:
@@ -268,7 +305,8 @@ class Agent:
         try:
             app, idle = self.front_app(), self.idle_seconds()
             decision = self.tracker.sample(now, app, idle)
-        except ProbeError as error:
+        except (ProbeError, OSError, ValueError) as error:
+            # A probe that broke (a missing tool, a denied process, odd output) is no app in front.
             decision = self.tracker.sample(now, None, 0) + f" ({error})"
         if self.logs:
             self.log(f"{clock(now)}  {decision}")
@@ -298,7 +336,9 @@ class Agent:
 def run_command(args: list[str]) -> str:
     """A probe's command output; a missing program or a failure is a ProbeError."""
     try:
-        done = subprocess.run(args, capture_output=True, check=True, text=True, timeout=5)
+        done = subprocess.run(
+            args, capture_output=True, check=True, encoding="utf-8", errors="replace", text=True, timeout=5
+        )
     except FileNotFoundError as error:
         raise ProbeError(f"{args[0]}: not found") from error
     except (OSError, subprocess.SubprocessError) as error:
@@ -370,10 +410,37 @@ def process_name(pid: str) -> Optional[str]:
         return None
 
 
+def refresh_session_env(environ: dict, read: Callable[[], str]) -> None:
+    """Takes the desktop's variables from `systemctl --user show-environment` (`read`)."""
+    try:
+        output = read()
+    except ProbeError:
+        return
+    for line in output.splitlines():
+        name, _, value = line.partition("=")
+        if name in SESSION_ENV and value:
+            environ[name] = value
+
+
+_last_refresh = [float("-inf")]
+
+
+def refresh_desktop_env() -> None:
+    """At most once a minute: the desktop may have logged in again with another X cookie."""
+    if time.monotonic() - _last_refresh[0] < REFRESH_ENV_SECONDS:
+        return
+    _last_refresh[0] = time.monotonic()
+    refresh_session_env(os.environ, lambda: run_command(["systemctl", "--user", "show-environment"]))  # type: ignore[arg-type]
+
+
 def linux_front_app() -> Optional[str]:
     if is_wayland(os.environ):
         return process_name(run_command(["kdotool", "getactivewindow", "getwindowpid"]))
-    window = run_command(["xdotool", "getactivewindow"]).strip()
+    try:
+        window = run_command(["xdotool", "getactivewindow"]).strip()
+    except ProbeError:
+        refresh_desktop_env()
+        raise
     if not window:
         return None
     try:
@@ -438,6 +505,9 @@ def windows_front_app() -> Optional[str]:
 
     user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32  # type: ignore[attr-defined]
     user32.GetForegroundWindow.restype = wintypes.HWND
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel32.OpenProcess.restype = wintypes.HANDLE
     kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     kernel32.QueryFullProcessImageNameW.argtypes = [
@@ -455,7 +525,8 @@ def windows_front_app() -> Optional[str]:
     if not process:
         raise ProbeError(f"OpenProcess failed for process {pid.value}")
     try:
-        size = wintypes.DWORD(1024)
+        # Long paths (\\?\ prefixed) reach 32767 characters.
+        size = wintypes.DWORD(32768)
         buffer = ctypes.create_unicode_buffer(size.value)
         if not kernel32.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(size)):
             raise ProbeError(f"QueryFullProcessImageNameW failed for process {pid.value}")
@@ -477,7 +548,10 @@ def windows_idle_seconds() -> float:
 
     info = LastInputInfo()
     info.cbSize = ctypes.sizeof(info)
-    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):  # type: ignore[attr-defined]
+    user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    user32.GetLastInputInfo.argtypes = [ctypes.POINTER(LastInputInfo)]
+    user32.GetLastInputInfo.restype = wintypes.BOOL
+    if not user32.GetLastInputInfo(ctypes.byref(info)):
         raise ProbeError("GetLastInputInfo failed")
     kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
     kernel32.GetTickCount64.restype = ctypes.c_ulonglong
@@ -543,12 +617,19 @@ class Plan:
     remove: list[Path] = field(default_factory=list)
 
 
+def systemd_quote(value: str) -> str:
+    """A word of ExecStart: in double quotes, with `\\` and `"` escaped and `%` and `$` doubled,
+    which systemd would otherwise expand as specifiers and variables."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    return f'"{escaped}"'
+
+
 def systemd_unit(python: str, script: Path) -> str:
     return (
         "[Unit]\n"
         "Description=Pace agent: which app is in front, sent to Pace\n\n"
         "[Service]\n"
-        f'ExecStart="{python}" "{script}" run\n'
+        f"ExecStart={systemd_quote(python)} {systemd_quote(str(script))} run\n"
         "Restart=on-failure\n"
         "RestartSec=30\n\n"
         "[Install]\n"
@@ -574,19 +655,20 @@ def task_xml(pythonw: str, script: Path, user: str) -> str:
     """
     A Task Scheduler task at logon, without elevation. Unlike `schtasks /SC ONLOGON`, it also
     starts and keeps running on battery and is never stopped after the default three days.
+    Without a known user name the UserId elements are left out: the task is then the
+    registering user's own.
     """
+    user_id = f"\n      <UserId>{escape(user)}</UserId>" if user else ""
     return f"""<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo><Description>Pace agent: which app is in front, sent to Pace</Description></RegistrationInfo>
   <Triggers>
     <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>{escape(user)}</UserId>
+      <Enabled>true</Enabled>{user_id}
     </LogonTrigger>
   </Triggers>
   <Principals>
-    <Principal id="Author">
-      <UserId>{escape(user)}</UserId>
+    <Principal id="Author">{user_id}
       <LogonType>InteractiveToken</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
@@ -678,6 +760,18 @@ def _run_quietly(command: list[str]) -> int:
         return 127
 
 
+def windows_user(environ: Mapping[str, str]) -> str:
+    """DOMAIN\\user for the logon task; `whoami` when the variables are missing, else empty."""
+    if environ.get("USERNAME"):
+        return "\\".join(part for part in (environ.get("USERDOMAIN"), environ["USERNAME"]) if part)
+    if SYSTEM != "Windows":
+        return ""
+    try:
+        return run_command(["whoami"]).strip()
+    except ProbeError:
+        return ""
+
+
 @dataclass
 class Env:
     """The computer the commands act on; the tests swap it for a temporary one."""
@@ -693,11 +787,7 @@ class Env:
     python: str = sys.executable
     script: Path = field(default_factory=lambda: Path(__file__).resolve())
     uid: int = field(default_factory=lambda: os.getuid() if hasattr(os, "getuid") else 0)
-    user: str = field(
-        default_factory=lambda: "\\".join(
-            part for part in (os.environ.get("USERDOMAIN"), os.environ.get("USERNAME")) if part
-        )
-    )
+    user: str = field(default_factory=lambda: windows_user(os.environ))
 
     @property
     def dir(self) -> Path:
@@ -766,7 +856,7 @@ def install(args: argparse.Namespace, env: Env) -> int:
     }
     if env.system not in ("Windows", "Darwin"):
         # A user service may start before the desktop: it takes the display from here.
-        config["env"] = {name: env.environ[name] for name in SESSION_ENV if name in env.environ}
+        config["env"] = {name: env.environ[name] for name in SAVED_ENV if name in env.environ}
     env.dir.mkdir(parents=True, exist_ok=True)
     path = env.dir / "config.json"
     path.write_text(json.dumps(config, indent=2), encoding="utf-8")
@@ -782,8 +872,13 @@ def install(args: argparse.Namespace, env: Env) -> int:
         if env.system != "Windows":
             return 1
         env.say("Task Scheduler refused: it starts from the Run key of your account instead.")
-        windows_run_key(env, remove=False)
-        subprocess.Popen([str(PureWindowsPath(env.python).with_name("pythonw.exe")), str(env.script), "run"])
+        try:
+            windows_run_key(env, remove=False)
+            subprocess.Popen([str(PureWindowsPath(env.python).with_name("pythonw.exe")), str(env.script), "run"])
+        except OSError as error:
+            env.say(f"Could not set it to start with the computer either ({error}).")
+            env.say(f'Start it by hand after each login: "{env.python}" "{env.script}" run')
+            return 1
     env.say("Installed: it starts with the computer and sends app names and times every 5 minutes.")
     env.say(f"To see what it sends: {logs_command(env)}")
     return 0
@@ -822,7 +917,7 @@ def uninstall(env: Env) -> int:
             pass
     if env.system not in ("Windows", "Darwin"):
         env.run(["systemctl", "--user", "daemon-reload"])
-    env.say("Removed. Disconnect this computer in Pace → Settings → Devices too.")
+    env.say("Removed. Disconnect this computer in Pace too (Settings, Devices).")
     return 0
 
 
@@ -853,6 +948,8 @@ def run(logs: bool, env: Env) -> int:
         return 2
     for name, value in config.get("env", {}).items():
         os.environ.setdefault(name, value)
+    if env.system not in ("Windows", "Darwin"):
+        refresh_desktop_env()
     problem = problem_of(env.system, os.environ, env.which)
     if problem is not None:
         env.say(problem)
@@ -895,8 +992,18 @@ def run(logs: bool, env: Env) -> int:
     return 0
 
 
+def safe_console(stream: Optional[IO[str]]) -> None:
+    """A Windows console (cp1252) cannot show every app's name: unknown letters become "?"."""
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="replace")
+
+
 def main(argv: list[str], env: Optional[Env] = None) -> int:
-    env = env or Env()
+    if env is None:
+        safe_console(sys.stdout)
+        safe_console(sys.stderr)
+        env = Env()
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     setup = commands.add_parser("install", help="save the settings and start with the computer")

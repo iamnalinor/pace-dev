@@ -44,7 +44,7 @@ export const enDevices = {
     "GNOME on Wayland does not let other programs see which window is in front, so the agent cannot work there: choose “GNOME on Xorg” at the login screen. KDE Plasma on Wayland works once kdotool is installed.",
   "devices.checkList": "Within 5 minutes its line in the list shows when it last sent data.",
   "devices.tokenOnce":
-    "The token is in the command and is shown only now. Lost it? Disconnect the computer and add it again.",
+    "The token is in the command and is shown only now. It also stays in that terminal's history: it can only upload app usage, and Disconnect revokes it. Lost it? Disconnect the computer and add it again.",
   "devices.copy": "Copy the command",
   "devices.copied": "Copied",
   "devices.share": "Send the command",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import plistlib
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -91,6 +92,47 @@ class TrackerTest(unittest.TestCase):
         self.assertEqual(tracker.running(), agent.Session("code", at("10:00:00"), at("10:01:25")))
 
 
+class BoundaryTest(unittest.TestCase):
+    """The minute limits, pinned on both sides: a gap, the idle time and a session's length."""
+
+    def session_across_gap(self, gap: int) -> list[agent.Session]:
+        tracker = agent.Tracker()
+        samples(tracker, "10:00:00", 120, "code")  # the last sample at 10:01:55
+        # After the gap, two more minutes of samples every 5 s.
+        for offset in range(0, 120, agent.SAMPLE_EVERY_SECONDS):
+            tracker.sample(at("10:01:55") + gap + offset, "code", 1)
+        tracker.close()
+        return tracker.take_finished()
+
+    def test_a_gap_under_a_minute_joins_and_a_minute_splits(self):
+        self.assertEqual(len(self.session_across_gap(59)), 1)
+        self.assertEqual(len(self.session_across_gap(60)), 2)
+        self.assertEqual(len(self.session_across_gap(61)), 2)
+
+    def test_idle_under_a_minute_is_active_and_a_minute_is_away(self):
+        tracker = agent.Tracker()
+        samples(tracker, "10:00:00", 120, "code")
+        self.assertIn("active", tracker.sample(at("10:02:00"), "code", 59))
+        self.assertEqual(tracker.running().end, at("10:02:00"))
+        self.assertIn("away", tracker.sample(at("10:02:05"), "code", 60))
+        self.assertIsNone(tracker.running())
+        self.assertEqual(tracker.take_finished(), [agent.Session("code", at("10:00:00"), at("10:01:05"))])
+
+    def session_of(self, seconds: int) -> list[agent.Session]:
+        tracker = agent.Tracker()
+        tracker.sample(at("10:00:00"), "code", 1)
+        for offset in range(5, seconds, 5):
+            tracker.sample(at("10:00:00") + offset, "code", 1)
+        tracker.sample(at("10:00:00") + seconds, "code", 1)
+        tracker.close()
+        return tracker.take_finished()
+
+    def test_a_session_counts_from_a_minute(self):
+        self.assertEqual(self.session_of(59), [])
+        self.assertEqual(len(self.session_of(60)), 1)
+        self.assertEqual(len(self.session_of(61)), 1)
+
+
 class BodyTest(unittest.TestCase):
     def test_sends_app_names_and_times_under_the_device(self):
         config = {"deviceId": "d1", "deviceName": "laptop"}
@@ -166,10 +208,29 @@ class OutboxTest(unittest.TestCase):
         outbox.flush(at("10:30:00"), None, self.deliver)
         self.assertEqual([len(batch) for batch in self.sent], [500, 500, 200])
 
-    def test_sends_nothing_when_there_is_nothing(self):
-        outbox = agent.Outbox(None)
+    def test_sends_nothing_when_there_is_nothing_and_that_is_no_send(self):
+        outbox = agent.Outbox(self.path)
         self.assertTrue(outbox.flush(at("10:05:00"), None, self.deliver))
         self.assertEqual(self.sent, [])
+        self.assertIsNone(outbox.last_sent_at)
+        self.assertEqual(outbox.next_at, at("10:10:00"))
+
+    def test_keeps_finished_sessions_on_disk_at_once(self):
+        # A power cut during the backoff must not lose what was already finished.
+        agent.Outbox(self.path).add([agent.Session("code", at("10:00:00"), at("10:02:00"))])
+        self.assertEqual(len(agent.Outbox(self.path).pending), 1)
+        # Written whole and renamed into place: no temporary file is left behind.
+        self.assertEqual([p.name for p in self.dir.iterdir()], ["buffer.json"])
+
+    def test_sets_a_broken_buffer_aside_and_starts_empty(self):
+        for broken in ('{"pending": [{"app": "co', "[]", '{"pending": "x"}', '{"pending": [1, {"app": "a"}]}'):
+            with self.subTest(broken=broken):
+                self.path.write_text(broken)
+                outbox = agent.Outbox(self.path)
+                self.assertEqual(outbox.pending, [])
+                self.assertEqual((self.dir / "buffer.json.bad").read_text(), broken)
+                outbox.add([agent.Session("code", at("10:00:00"), at("10:02:00"))])
+                self.assertEqual(len(agent.Outbox(self.path).pending), 1)
 
 
 class AgentTest(unittest.TestCase):
@@ -221,6 +282,25 @@ class AgentTest(unittest.TestCase):
         runner.step(at("10:00:00"))
         self.assertIn("xdotool: not found", lines[0])
 
+    def test_any_probe_failure_keeps_the_loop_going(self):
+        for error in (OSError("access denied"), UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")):
+
+            def broken(error: Exception = error) -> str | None:
+                raise error
+
+            lines: list[str] = []
+            runner = agent.Agent(
+                {"deviceId": "d1", "deviceName": "laptop"},
+                agent.Outbox(None),
+                front_app=broken,
+                idle_seconds=lambda: 0.0,
+                deliver=lambda sessions: None,
+                log=lines.append,
+                logs=True,
+            )
+            runner.step(at("10:00:00"))
+            self.assertIn("no app in front", lines[0])
+
     def test_stop_sends_what_it_has(self):
         sent: list[list[dict]] = []
         runner = self.make(["code"] * 20, logs=False, deliver=sent.append)
@@ -256,6 +336,43 @@ class ProbesTest(unittest.TestCase):
     def test_windows_idle_survives_the_tick_counter_wrapping(self):
         self.assertEqual(agent.idle_from_ticks(2**32 + 1000, 2**32 - 4000), 5.0)
         self.assertEqual(agent.idle_from_ticks(10_000, 4_000), 6.0)
+
+
+class RunCommandTest(unittest.TestCase):
+    def test_reads_output_that_is_not_utf8(self):
+        output = agent.run_command([sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'caf\\xe9')"])
+        self.assertEqual(output, "caf\ufffd")
+
+    def test_a_missing_program_is_a_probe_error(self):
+        with self.assertRaises(agent.ProbeError):
+            agent.run_command(["pace-no-such-program"])
+
+
+class SessionEnvTest(unittest.TestCase):
+    def test_reads_the_desktop_variables_from_the_user_manager(self):
+        output = "HOME=/home/me\nDISPLAY=:1\nXAUTHORITY=/tmp/xauth_AbCd\nLANG=en_US.UTF-8\n"
+        environ = {"DISPLAY": ":0", "XAUTHORITY": "/tmp/xauth_old"}
+        agent.refresh_session_env(environ, lambda: output)
+        self.assertEqual(environ, {"DISPLAY": ":1", "XAUTHORITY": "/tmp/xauth_AbCd"})
+
+    def test_keeps_what_it_has_when_the_manager_says_nothing(self):
+        environ = {"DISPLAY": ":0"}
+
+        def fails() -> str:
+            raise agent.ProbeError("systemctl: not found")
+
+        agent.refresh_session_env(environ, fails)
+        self.assertEqual(environ, {"DISPLAY": ":0"})
+
+
+class ConsoleTest(unittest.TestCase):
+    def test_prints_any_app_name_on_a_windows_console(self):
+        raw = io.BytesIO()
+        stream = io.TextIOWrapper(raw, encoding="cp1252")
+        agent.safe_console(stream)
+        print("微信 → Пейс", file=stream)
+        stream.flush()
+        self.assertEqual(raw.getvalue(), b"?? ? ????\n")
 
 
 class LinuxProblemTest(unittest.TestCase):
@@ -313,6 +430,10 @@ class AutostartTest(unittest.TestCase):
             ],
         )
 
+    def test_linux_unit_escapes_what_systemd_would_expand(self):
+        unit = agent.systemd_unit("/opt/py 3/python3", Path('/home/me/100%/$HOME/a"b\\c.py'))
+        self.assertIn(r'ExecStart="/opt/py 3/python3" "/home/me/100%%/$$HOME/a\"b\\c.py" run', unit)
+
     def test_macos_loads_a_launch_agent_that_stays_alive(self):
         plan = agent.autostart_plan(
             "Darwin",
@@ -356,6 +477,7 @@ class AutostartTest(unittest.TestCase):
         self.assertIn("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>", xml)
         self.assertIn(r"<Command>C:\Python312\pythonw.exe</Command>", xml)
         self.assertIn(rf'<Arguments>"{config / "pace_agent.py"}" run</Arguments>', xml)
+
         self.assertEqual(
             plan.commands,
             [
@@ -365,6 +487,11 @@ class AutostartTest(unittest.TestCase):
             ],
         )
         self.assertEqual(plan.optional, {1})
+
+    def test_windows_task_without_a_known_user_runs_as_whoever_registers_it(self):
+        xml = agent.task_xml(r"C:\Python312\pythonw.exe", Path(r"C:\Pace\pace_agent.py"), "")
+        self.assertNotIn("<UserId>", xml)
+        self.assertIn("<LogonTrigger>", xml)
 
     def test_windows_escapes_the_task_xml(self):
         xml = agent.task_xml(r"C:\P&Q\pythonw.exe", Path(r"C:\Users\a<b\pace_agent.py"), "DESK\\a<b")
@@ -392,7 +519,7 @@ class CommandsTest(unittest.TestCase):
             system="Linux",
             config=self.dir / "pace",
             home=self.dir,
-            environ={"DISPLAY": ":0", "XDG_SESSION_TYPE": "x11"},
+            environ={"DISPLAY": ":0", "XDG_SESSION_TYPE": "x11", "XAUTHORITY": "/tmp/xauth_x"},
             which=lambda tool: f"/usr/bin/{tool}",
             run=lambda command: self.ran.append(command) or 0,
             out=self.out,
@@ -408,6 +535,8 @@ class CommandsTest(unittest.TestCase):
         self.assertEqual(config["token"], "tok")
         self.assertEqual(config["deviceName"], "Mint")
         self.assertEqual(config["env"]["DISPLAY"], ":0")
+        # A display manager may put the X cookie in a fresh temporary file at each login.
+        self.assertNotIn("XAUTHORITY", config["env"])
         self.assertEqual((self.dir / "pace" / "config.json").stat().st_mode & 0o777, 0o600)
         self.assertIn(["systemctl", "--user", "restart", "pace-agent.service"], self.ran)
         self.assertIn("run --logs", self.out.getvalue())

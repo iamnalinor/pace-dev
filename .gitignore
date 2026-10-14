@@ -51,7 +51,7 @@ expo-env.d.ts
 *.jks
 !apps/app/keystores/debug.keystore
 
-# Python bytecode (the desktop bridge)
+# Python bytecode (the desktop agent)
 __pycache__/
 
 # Parallel agents' git worktrees

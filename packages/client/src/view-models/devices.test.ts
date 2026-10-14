@@ -28,6 +28,25 @@ describe("the command that connects a computer", () => {
     expect(command).not.toContain("\n");
   });
 
+  it("keeps a name with typographic quotes inside PowerShell's single quotes", () => {
+    // PowerShell ends a single-quoted string at ‘ ’ ‚ ‛ too; doubled, each stays literal.
+    const command = agentCommand({
+      ...setup,
+      device: { name: "Ilya’s ‘big’ ‚PC‛ 'x'", token: "tok_123" },
+      os: "windows",
+    });
+    expect(command).toContain("--name 'Ilya’’s ‘‘big’’ ‚‚PC‛‛ ''x'''");
+  });
+
+  it("drops double quotes from the name on Windows: PowerShell 5 would split the argument there", () => {
+    const command = agentCommand({
+      ...setup,
+      device: { name: 'The "big" PC', token: "tok_123" },
+      os: "windows",
+    });
+    expect(command).toContain("--name 'The big PC'");
+  });
+
   it("shows how to watch what the agent sends on each system", () => {
     expect(agentLogsCommand("linux")).toBe("python3 ~/.pace_agent.py run --logs");
     expect(agentLogsCommand("macos")).toBe("python3 ~/.pace_agent.py run --logs");

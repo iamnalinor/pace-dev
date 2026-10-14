@@ -18,7 +18,8 @@ test("adds a computer, which then reports its apps and shows on Calendar", async
   await page.getByRole("button", { name: "Добавить компьютер" }).click();
   await page.getByRole("textbox", { name: "Название" }).fill("Linux Mint");
   await page.getByRole("button", { name: "Создать токен" }).click();
-  // Chromium on Linux: the Linux steps come preselected.
+  // Picked explicitly: what comes preselected depends on the browser's platform.
+  await page.getByRole("radio", { name: "Linux" }).click();
   await expect(page.getByRole("radio", { name: "Linux" })).toBeChecked();
   const command = page.getByText(/^curl .*pace_agent\.py install /u);
   await expect(command).toBeVisible();

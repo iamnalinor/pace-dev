@@ -1,6 +1,6 @@
 /**
 The web build: Expo's static export of the app into `apps/app/dist/` (the files of `public/`
-are copied along) with the desktop bridge script, then a Workbox service worker that precaches it. The worker waits instead of taking
+are copied along) with Pace's desktop agent script, then a Workbox service worker that precaches it. The worker waits instead of taking
 over, so the page can offer "Reload" when a new version is ready (`src/platform/sw.web.tsx`).
 */
 import path from "node:path";
@@ -41,7 +41,7 @@ const { count, size, warnings } = await generateSW({
   globIgnores: [".well-known/**", "_headers", "**/*.map"],
   maximumFileSizeToCacheInBytes: MAX_PRECACHE_BYTES,
   navigateFallback: "/index.html",
-  navigateFallbackDenylist: [/^\/api/u, /^\/oauth/u, /^\/\.well-known/u],
+  navigateFallbackDenylist: [/^\/api/u, /^\/oauth/u, /^\/\.well-known/u, /\.py$/u],
   swDest: path.join(OUT, "sw.js"),
 });
 for (const warning of warnings) {
