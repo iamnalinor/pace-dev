@@ -257,6 +257,7 @@ export {
   minutesBetween,
   startOfDayIn,
   startOfWeekIn,
+  wallClockInstant,
   type ZonedInstant,
   zonesDiffer,
 } from "./time.ts";

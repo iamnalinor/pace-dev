@@ -88,6 +88,7 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
   const { payload, occurredAt } = event;
   return {
     id: payload.taskId,
+    createdEventId: event.id,
     title: payload.title,
     presetId: payload.presetId,
     projectId: payload.projectId ?? null,

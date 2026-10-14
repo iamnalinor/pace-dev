@@ -38,13 +38,7 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
-import {
-  ActivityParseRequestSchema,
-  ActivityParseResponseSchema,
-  LlmStatusSchema,
-  ParseRequestSchema,
-  ParseResponseSchema,
-} from "./schemas/parse.ts";
+import { LlmStatusSchema, ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
   SyncPullOutputSchema,
   SyncPullQuerySchema,
@@ -133,21 +127,16 @@ export const endpoints = {
     }),
   },
   parse: {
-    /** Free text read by the LLM into a task, or changes to one; nothing is saved. */
+    /**
+    Free text read into proposals: new tasks and activities, edits and deletes of existing ones,
+    for the person to accept; nothing is saved.
+    */
     run: endpoint({
       auth: true,
       body: ParseRequestSchema,
       method: "POST",
       output: ParseResponseSchema,
       path: "/api/parse",
-    }),
-    /** A note of what the person is doing, read into a label, a category and a length. */
-    activity: endpoint({
-      auth: true,
-      body: ActivityParseRequestSchema,
-      method: "POST",
-      output: ActivityParseResponseSchema,
-      path: "/api/parse/activity",
     }),
     /** Whether a model can answer now (none configured counts as never). */
     status: endpoint({

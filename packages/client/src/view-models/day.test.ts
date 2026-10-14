@@ -33,6 +33,7 @@ const activity = ({
   isAlongside,
   isLogged: endAt !== null,
   label,
+  originEventId: `e-${id}`,
   startAt,
   stillAt: null,
   taskId: null,

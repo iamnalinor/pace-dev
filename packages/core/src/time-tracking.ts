@@ -68,5 +68,5 @@ export {
   timeline,
   type Timeline,
 } from "./tracking/timeline.ts";
-export { typedActivity, type TypedActivity } from "./tracking/typed.ts";
+export { typedActivity, type TypedActivity, typedSpan, type TypedSpan } from "./tracking/typed.ts";
 export { type SatRow, whereSat } from "./tracking/where-sat.ts";

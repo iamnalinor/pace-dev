@@ -103,34 +103,43 @@ export const instanceBodies = (
   ...startedBodies(task, now),
   ...subtasksAddedBodies(task.id, input.subtasks, () => newId()),
   ...detailBodies(input, task),
-  {
-    type: "task.source.attached",
-    payload: {
-      taskId: task.id,
-      sourceText: input.text.trim(),
-      ...(input.link !== null && { sourceUrl: input.link }),
-    },
-  } as const,
+  // A form filled in by hand has no message to keep.
+  ...(input.text.trim() === ""
+    ? []
+    : [
+        {
+          type: "task.source.attached",
+          payload: {
+            taskId: task.id,
+            sourceText: input.text.trim(),
+            ...(input.link !== null && { sourceUrl: input.link }),
+          },
+        } as const,
+      ]),
 ];
+
+/** The project of this name, or a new one made by the events returned with its id. */
+export const namedProjectBodies = (
+  state: CoreState,
+  name: string,
+  newId: Ids,
+): { readonly projectId: string; readonly bodies: readonly EventBody[] } => {
+  const existing = findProjectByName(state.projects, name);
+  if (existing !== undefined) {
+    return { bodies: [], projectId: existing.id };
+  }
+  const projectId = newId();
+  return { bodies: [{ type: "project.created", payload: { name, projectId } }], projectId };
+};
 
 const projectBodies = (
   input: QuickInput,
   state: CoreState,
   newId: Ids,
-): { readonly projectId: null | string; readonly bodies: readonly EventBody[] } => {
-  if (input.projectId !== null || input.projectName === null) {
-    return { bodies: [], projectId: input.projectId };
-  }
-  const existing = findProjectByName(state.projects, input.projectName);
-  if (existing !== undefined) {
-    return { bodies: [], projectId: existing.id };
-  }
-  const projectId = newId();
-  return {
-    bodies: [{ type: "project.created", payload: { name: input.projectName, projectId } }],
-    projectId,
-  };
-};
+): { readonly projectId: null | string; readonly bodies: readonly EventBody[] } =>
+  input.projectId !== null || input.projectName === null
+    ? { bodies: [], projectId: input.projectId }
+    : namedProjectBodies(state, input.projectName, newId);
 
 /**
 What saving a composer reading writes, outside any client (the bot, the server): the
@@ -170,7 +179,7 @@ export const quickInputBodies = (
           label: subtask.label,
           ...(subtask.number !== null && { number: subtask.number }),
         })),
-        sourceText: input.text,
+        ...(input.text.trim() !== "" && { sourceText: input.text }),
         fields: input.link === null ? {} : { link: input.link },
       },
     },

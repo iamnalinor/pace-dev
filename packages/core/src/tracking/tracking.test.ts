@@ -32,6 +32,23 @@ describe("the time reducer", () => {
     expect(time.activities["a2"]).toMatchObject({ category: "food", endAt: T("13:10") });
   });
 
+  it("remembers the event that made each activity, which a delete revokes", () => {
+    const started = start("09:00", { activityId: "a1", label: "Work" });
+    const logged = act("10:00", {
+      payload: {
+        activityId: "l1",
+        category: "rest",
+        endAt: T("08:00"),
+        label: "Nap",
+        startAt: T("07:30"),
+      },
+      type: "activity.logged",
+    });
+    const time = timeOf([started, logged]);
+    expect(time.activities["a1"]?.originEventId).toBe(started.id);
+    expect(time.activities["l1"]?.originEventId).toBe(logged.id);
+  });
+
   it("runs an activity alongside the main one: neither closes the other", () => {
     const time = timeOf([
       start("09:00", { activityId: "a1", label: "Work" }),

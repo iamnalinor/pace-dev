@@ -103,6 +103,10 @@ describe("taskReducer: artboard scenarios", () => {
     expect(task === undefined ? -1 : progressOf(task, "slider")).toBeCloseTo(0.4, 10);
   });
 
+  it("remembers the event that created it, which a delete revokes", () => {
+    expect(hw([hwCreated(1)]).createdEventId).toBe(hwCreated(1).id);
+  });
+
   it("starts a fresh task not started, untouched and without optional data", () => {
     const task = hw([hwCreated()]);
     expect(task).toMatchObject({

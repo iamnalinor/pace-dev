@@ -46,6 +46,8 @@ export type TaskFields = {
 
 export type Task = {
   readonly id: string;
+  /** The `task.created` this task came from: deleting the task revokes it. */
+  readonly createdEventId: string;
   readonly title: string;
   readonly presetId: string;
   readonly projectId: null | string;
