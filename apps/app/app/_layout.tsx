@@ -21,6 +21,7 @@ import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { Sidebar } from "#app/ui/sidebar.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
+import { TooltipHost } from "#app/ui/tooltip.tsx";
 
 /** On a wide window the sidebar stays beside every signed-in screen, pushed ones included. */
 const useHasSidebar = (): boolean => {
@@ -100,7 +101,9 @@ export default function RootLayout() {
           <PaceProvider>
             <ShareIntentProvider>
               <ToastProvider>
-                <Navigator />
+                <TooltipHost>
+                  <Navigator />
+                </TooltipHost>
               </ToastProvider>
             </ShareIntentProvider>
           </PaceProvider>
