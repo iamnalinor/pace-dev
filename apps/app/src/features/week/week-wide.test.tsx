@@ -41,21 +41,33 @@ describe("WeekScreen on a wide window", () => {
     await renderScreen(<WeekScreen />, runtime);
     expect(screen.getByText("Pick an event or a block to see its details")).toBeOnTheScreen();
     const event = await screen.findByRole("button", { name: "From the calendar: Seminar" });
-    expect(event).not.toBeSelected();
+    expect(event).not.toHaveProp("aria-current", "true");
     await fireEvent.press(event);
     expect(await screen.findByText("Room 214")).toBeOnTheScreen();
     expect(screen.getByText("University")).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: "From the calendar: Seminar" })).toBeSelected();
+    expect(screen.getByRole("button", { name: "From the calendar: Seminar" })).toHaveProp(
+      "aria-current",
+      "true",
+    );
     // A block next: the pane follows, and the mark moves with it.
     await fireEvent.press(screen.getByRole("button", { name: /^Lecture notes, / }));
     expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
     expect(screen.queryByText("Room 214")).toBeNull();
-    expect(screen.getByRole("button", { name: /^Lecture notes, / })).toBeSelected();
-    expect(screen.getByRole("button", { name: "From the calendar: Seminar" })).not.toBeSelected();
+    expect(screen.getByRole("button", { name: /^Lecture notes, / })).toHaveProp(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "From the calendar: Seminar" })).not.toHaveProp(
+      "aria-current",
+      "true",
+    );
     // Closing the pane leaves nothing picked.
     await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText("Pick an event or a block to see its details")).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: /^Lecture notes, / })).not.toBeSelected();
+    expect(screen.getByRole("button", { name: /^Lecture notes, / })).not.toHaveProp(
+      "aria-current",
+      "true",
+    );
   });
 
   it("lets go of the pick when the week changes, either way", async () => {
@@ -83,6 +95,6 @@ describe("WeekScreen on a wide window", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
     await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
     expect(hint()).toBeOnTheScreen();
-    expect(block()).not.toBeSelected();
+    expect(block()).not.toHaveProp("aria-current", "true");
   });
 });

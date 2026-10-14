@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
-import { ulid } from "./support/seed.ts";
+import { pushAsClient, ulid } from "./support/seed.ts";
 
 type Size = {
   readonly name: string;
@@ -21,7 +21,10 @@ const SIZES: readonly Size[] = [
     details: (page) => page.locator("body"),
     height: 844,
     leaveDetails: async (page) => {
-      await page.getByRole("button", { name: "Close" }).first().click();
+      await page
+        .getByRole("button", { name: "Close" })
+        .first()
+        .click({ position: { x: 5, y: 5 } });
     },
     name: "phone",
     // A phone keeps Week behind More.
@@ -97,22 +100,22 @@ const seedWeek = async (token: string): Promise<{ readonly wednesday: number }> 
     source: "web",
     type: "activity.logged",
   });
-  await post(token, "/api/sync/push", {
-    events: [
-      {
-        deviceId: "e2e-seed",
-        id: ulid(wednesday - DAY),
-        occurredAt: new Date(wednesday - DAY).toISOString(),
-        payload: { language: "en", timezone: "UTC" },
-        precision: "exact",
-        recordedAt: new Date().toISOString(),
-        source: "web",
-        type: "settings.updated",
-      },
-      block(9, 10, "Lecture notes"),
-      block(12, 13, "Problem set"),
-    ],
-  });
+  const pushed = await pushAsClient(token, [
+    {
+      deviceId: "e2e-seed",
+      id: ulid(wednesday - DAY),
+      occurredAt: new Date(wednesday - DAY).toISOString(),
+      payload: { language: "en", timezone: "UTC" },
+      precision: "exact",
+      recordedAt: new Date().toISOString(),
+      source: "web",
+      type: "settings.updated",
+    },
+    block(9, 10, "Lecture notes"),
+    block(12, 13, "Problem set"),
+  ]);
+  expect(pushed.ok).toBe(true);
+  expect(((await pushed.json()) as { rejected: readonly unknown[] }).rejected).toEqual([]);
   await post(token, "/api/calendar/sync", {
     deviceId: "e2e-phone",
     events: [
@@ -166,7 +169,7 @@ for (const size of SIZES) {
       await expect(details.getByRole("button", { name: "Join the call" })).toBeVisible();
       await expect(details.getByText("12 people invited")).toBeVisible();
       await expect(details.getByRole("link", { name: "https://example.org/slides" })).toBeVisible();
-      await expect(seminar).toHaveAttribute("aria-selected", "true");
+      await expect(seminar).toHaveAttribute("aria-current", "true");
       await shoot(page, `week-event-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
       await size.leaveDetails(page);
@@ -213,7 +216,10 @@ for (const size of SIZES) {
       await expectNoA11yViolations(page);
       await gap.click();
       await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("10:00");
-      await page.getByRole("button", { name: "Close" }).first().click();
+      await page
+        .getByRole("button", { name: "Close" })
+        .first()
+        .click({ position: { x: 5, y: 5 } });
       await back.click();
       await expect(back).toHaveCount(0);
     });

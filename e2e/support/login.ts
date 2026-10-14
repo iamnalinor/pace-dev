@@ -1,6 +1,7 @@
 import { type Page, test } from "@playwright/test";
 
-export const API_URL = "http://localhost:8787";
+/** The Worker under test; `E2E_API_URL` points a run at one started elsewhere (with `E2E_BASE_URL`). */
+export const API_URL = process.env["E2E_API_URL"] ?? "http://localhost:8787";
 /** The id the UI login test types (the dev form's default). */
 export const DEV_TELEGRAM_ID = "1919230638";
 /** The account the README screenshots are seeded on. */

@@ -169,7 +169,7 @@ const ItemBox = ({
           : `${label}, ${clockTime(stretch.startAt, zone)}–${clockTime(stretch.endAt, zone)}`
       }
       accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}
+      aria-current={isSelected ? "true" : undefined}
       className={cx("absolute overflow-hidden rounded-md px-1", look.box)}
       onPress={() => {
         onPick(picked);
