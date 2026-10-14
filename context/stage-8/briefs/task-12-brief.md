@@ -35,3 +35,11 @@ composer shows each card kind and applies it; Day bar shows the start/log card a
 e2e (fake LLM): composer → an update proposal applied changes the task; Day bar "7:30 - 8:30 - ходил в военкомат" → logged
 span appears in the Day list. `bun lint`, `bun test:unit`, `bun test:app` green; touched e2e specs pass. Screenshots (desktop +
 phone, light + dark) of each card kind into /tmp/claude-0/-home-user-pace-dev/cb223545-7465-5720-b7e6-b3fd375d3413/scratchpad/task12/.
+
+## Owner's framing (2026-10-14, overrides the wording above)
+«давай об предложениях мыслить как о том что ассистент и так хотел сделать но мы просто апруваем его действие».
+These are not suggestions: they are the actions the assistant is about to take, held for one approval. Copy speaks
+in that voice — "The assistant will create «X»", "…will move «X» to Friday", "…will delete «X»", "…will log 7:30–8:30
+Военкомат" — with [Approve] (Enter) and [Cancel]; nothing says "suggested" or "proposal". In code, rename the
+domain term `proposal` → `action` (pending assistant action) across core, API, client, app and bot in Task 12
+(one sweep, no aliases left behind); Task 13 uses the new names.

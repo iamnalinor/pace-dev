@@ -25,3 +25,11 @@ Telegram's 64-byte limit.
 API int (bot tests with stubbed Telegram fetch, fake LLM): confident task create → one message with Accept; low confidence →
 the classify picker; picking Activity → activity proposals; Accept on an update/delete applies the events (check the store);
 Cancel; unavailable fallback. Remove tests of the old intents. `bun lint`, `bun test:api` (and unit) green.
+
+## Owner's framing (2026-10-14, overrides the wording above)
+«давай об предложениях мыслить как о том что ассистент и так хотел сделать но мы просто апруваем его действие».
+These are not suggestions: they are the actions the assistant is about to take, held for one approval. Copy speaks
+in that voice — "The assistant will create «X»", "…will move «X» to Friday", "…will delete «X»", "…will log 7:30–8:30
+Военкомат" — with [Approve] (Enter) and [Cancel]; nothing says "suggested" or "proposal". In code, rename the
+domain term `proposal` → `action` (pending assistant action) across core, API, client, app and bot in Task 12
+(one sweep, no aliases left behind); Task 13 uses the new names.
