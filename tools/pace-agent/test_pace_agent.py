@@ -215,12 +215,30 @@ class OutboxTest(unittest.TestCase):
         self.assertIsNone(outbox.last_sent_at)
         self.assertEqual(outbox.next_at, at("10:10:00"))
 
-    def test_keeps_finished_sessions_on_disk_at_once(self):
-        # A power cut during the backoff must not lose what was already finished.
+    def test_add_writes_the_buffer_at_once(self):
+        # The agent adds each session the moment it finishes (see AgentTest), so this is what
+        # keeps it through a power cut before the next send.
         agent.Outbox(self.path).add([agent.Session("code", at("10:00:00"), at("10:02:00"))])
         self.assertEqual(len(agent.Outbox(self.path).pending), 1)
         # Written whole and renamed into place: no temporary file is left behind.
         self.assertEqual([p.name for p in self.dir.iterdir()], ["buffer.json"])
+
+    def test_a_failed_write_keeps_the_sessions_in_memory_and_says_why(self):
+        blocker = self.dir / "not-a-folder"
+        blocker.write_text("")
+        outbox = agent.Outbox(blocker / "buffer.json")
+        outbox.add([agent.Session("code", at("10:00:00"), at("10:02:00"))])
+        self.assertEqual(len(outbox.pending), 1)
+        self.assertIsNotNone(outbox.unsaved)
+        blocker.unlink()
+        outbox.save()
+        self.assertIsNone(outbox.unsaved)
+        self.assertEqual(len(agent.Outbox(blocker / "buffer.json").pending), 1)
+
+    def test_a_broken_buffer_that_cannot_be_set_aside_still_starts_empty(self):
+        self.path.write_text("[]")
+        (self.dir / "buffer.json.bad").mkdir()
+        self.assertEqual(agent.Outbox(self.path).pending, [])
 
     def test_sets_a_broken_buffer_aside_and_starts_empty(self):
         for broken in ('{"pending": [{"app": "co', "[]", '{"pending": "x"}', '{"pending": [1, {"app": "a"}]}'):
@@ -301,6 +319,50 @@ class AgentTest(unittest.TestCase):
             runner.step(at("10:00:00"))
             self.assertIn("no app in front", lines[0])
 
+    def test_a_finished_session_is_on_disk_before_any_send_is_due(self):
+        path = Path(tempfile.mkdtemp()) / "buffer.json"
+        apps = iter(["code"] * 24 + [None] * 20)
+        runner = agent.Agent(
+            {"deviceId": "d1", "deviceName": "laptop"},
+            agent.Outbox(path),
+            front_app=lambda: next(apps),
+            idle_seconds=lambda: 2.0,
+            deliver=lambda sessions: self.fail("no send is due"),
+            log=lambda line: None,
+            logs=False,
+        )
+        runner.outbox.next_at = at("11:00:00")
+        now = at("10:00:00")
+        for _ in range(44):  # two minutes of code, then nothing in front for 100 s
+            runner.step(now)
+            now += agent.SAMPLE_EVERY_SECONDS
+        saved = json.loads(path.read_text())["pending"]
+        self.assertEqual([session["app"] for session in saved], ["code"])
+
+    def test_a_buffer_that_cannot_be_written_is_said_once_and_retried(self):
+        blocker = Path(tempfile.mkdtemp()) / "not-a-folder"
+        blocker.write_text("")
+        lines: list[str] = []
+        apps = iter(["code"] * 24 + [None] * 40)
+        runner = agent.Agent(
+            {"deviceId": "d1", "deviceName": "laptop"},
+            agent.Outbox(blocker / "buffer.json"),
+            front_app=lambda: next(apps),
+            idle_seconds=lambda: 2.0,
+            deliver=lambda sessions: None,
+            log=lines.append,
+            logs=False,
+        )
+        runner.outbox.next_at = at("11:00:00")
+        now = at("10:00:00")
+        for _ in range(44):
+            runner.step(now)
+            now += agent.SAMPLE_EVERY_SECONDS
+        self.assertEqual(len([line for line in lines if "Could not save" in line]), 1)
+        blocker.unlink()
+        runner.step(now)
+        self.assertEqual(len(agent.Outbox(blocker / "buffer.json").pending), 1)
+
     def test_stop_sends_what_it_has(self):
         sent: list[list[dict]] = []
         runner = self.make(["code"] * 20, logs=False, deliver=sent.append)
@@ -352,8 +414,16 @@ class SessionEnvTest(unittest.TestCase):
     def test_reads_the_desktop_variables_from_the_user_manager(self):
         output = "HOME=/home/me\nDISPLAY=:1\nXAUTHORITY=/tmp/xauth_AbCd\nLANG=en_US.UTF-8\n"
         environ = {"DISPLAY": ":0", "XAUTHORITY": "/tmp/xauth_old"}
-        agent.refresh_session_env(environ, lambda: output)
+        # After a probe failed with the current values, the manager's replace them.
+        agent.refresh_session_env(environ, lambda: output, replace=True)
         self.assertEqual(environ, {"DISPLAY": ":1", "XAUTHORITY": "/tmp/xauth_AbCd"})
+
+    def test_at_start_only_fills_what_is_missing(self):
+        # A terminal's `run --logs` already has the right display: the manager's may be stale.
+        output = "DISPLAY=:1\nXAUTHORITY=/tmp/xauth_AbCd\n"
+        environ = {"DISPLAY": ":0"}
+        agent.refresh_session_env(environ, lambda: output, replace=False)
+        self.assertEqual(environ, {"DISPLAY": ":0", "XAUTHORITY": "/tmp/xauth_AbCd"})
 
     def test_keeps_what_it_has_when_the_manager_says_nothing(self):
         environ = {"DISPLAY": ":0"}
@@ -361,7 +431,7 @@ class SessionEnvTest(unittest.TestCase):
         def fails() -> str:
             raise agent.ProbeError("systemctl: not found")
 
-        agent.refresh_session_env(environ, fails)
+        agent.refresh_session_env(environ, fails, replace=True)
         self.assertEqual(environ, {"DISPLAY": ":0"})
 
 

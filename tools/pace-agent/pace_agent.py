@@ -182,6 +182,8 @@ class Outbox:
         self.last_error: Optional[str] = None
         self.failures = 0
         self.next_at = 0.0
+        # Why the last save failed (a full disk, a lost permission), until one succeeds.
+        self.unsaved: Optional[str] = None
         if path is not None and path.exists():
             self._load(path)
 
@@ -196,7 +198,10 @@ class Outbox:
             saved = None
         if not is_buffer(saved):
             # Cut off by a power loss or edited by hand: kept aside for a look, started afresh.
-            path.with_name(path.name + ".bad").write_text(text, encoding="utf-8")
+            try:
+                path.with_name(path.name + ".bad").write_text(text, encoding="utf-8")
+            except OSError:
+                pass
             return
         self.pending = list(saved["pending"])
         self.last_sent_at = saved.get("lastSentAt")
@@ -209,14 +214,23 @@ class Outbox:
             self.save()
 
     def save(self) -> None:
-        """Writes a whole new file and renames it into place, so a crash never leaves half of one."""
+        """
+        Writes a whole new file and renames it into place, so a crash never leaves half of one.
+        A failed write keeps everything in memory and notes why in `unsaved`; the agent tries
+        again on its next sample.
+        """
         if self.path is None:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         state = {"lastError": self.last_error, "lastSentAt": self.last_sent_at, "pending": self.pending}
         temporary = self.path.with_name(self.path.name + ".tmp")
-        temporary.write_text(json.dumps(state), encoding="utf-8")
-        os.replace(temporary, self.path)
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(json.dumps(state), encoding="utf-8")
+            os.replace(temporary, self.path)
+        except OSError as error:
+            self.unsaved = str(error)
+            return
+        self.unsaved = None
 
     def flush(self, now: float, running: Optional[Session], deliver: Callable[[list[dict]], None]) -> bool:
         """Sends what waits and the running session (cut at its last sample); False if it failed."""
@@ -296,6 +310,7 @@ class Agent:
         self.logs = logs
         self.deliver = self._print if logs else deliver
         self.tracker = Tracker()
+        self.unsaved_said = False
 
     def _print(self, sessions: list[dict]) -> None:
         self.log(f"Would send to {self.config.get('api', '(not installed)')}/api/usage/sessions:")
@@ -310,8 +325,22 @@ class Agent:
             decision = self.tracker.sample(now, None, 0) + f" ({error})"
         if self.logs:
             self.log(f"{clock(now)}  {decision}")
+        # On disk the moment it finishes: the next send may be an hour away during a backoff.
+        self.outbox.add(self.tracker.take_finished())
+        if self.outbox.unsaved is not None:
+            self.outbox.save()
+        self._say_unsaved()
         if now >= self.outbox.next_at:
             self.send(now)
+
+    def _say_unsaved(self) -> None:
+        """Says once that the buffer cannot be written, and once that it can again."""
+        if self.outbox.unsaved is not None and not self.unsaved_said:
+            self.log(f"Could not save the unsent sessions ({self.outbox.unsaved}); kept in memory, trying again")
+            self.unsaved_said = True
+        elif self.outbox.unsaved is None and self.unsaved_said:
+            self.log("Saved the unsent sessions again.")
+            self.unsaved_said = False
 
     def send(self, now: float) -> None:
         self.outbox.add(self.tracker.take_finished())
@@ -410,27 +439,38 @@ def process_name(pid: str) -> Optional[str]:
         return None
 
 
-def refresh_session_env(environ: dict, read: Callable[[], str]) -> None:
-    """Takes the desktop's variables from `systemctl --user show-environment` (`read`)."""
+def refresh_session_env(environ: dict, read: Callable[[], str], *, replace: bool) -> None:
+    """
+    Takes the desktop's variables from `systemctl --user show-environment` (`read`): only the
+    missing ones, or, with `replace` (a probe just failed with the current ones), all of them.
+    """
     try:
         output = read()
     except ProbeError:
         return
     for line in output.splitlines():
         name, _, value = line.partition("=")
-        if name in SESSION_ENV and value:
+        if name in SESSION_ENV and value and (replace or name not in environ):
             environ[name] = value
 
 
 _last_refresh = [float("-inf")]
 
 
-def refresh_desktop_env() -> None:
-    """At most once a minute: the desktop may have logged in again with another X cookie."""
-    if time.monotonic() - _last_refresh[0] < REFRESH_ENV_SECONDS:
-        return
-    _last_refresh[0] = time.monotonic()
-    refresh_session_env(os.environ, lambda: run_command(["systemctl", "--user", "show-environment"]))  # type: ignore[arg-type]
+def refresh_desktop_env(*, replace: bool) -> None:
+    """
+    At start, fills what is missing (a terminal's own values stay). After a failed probe, at most
+    once a minute, replaces them: the desktop may have logged in again with another X cookie.
+    """
+    if replace:
+        if time.monotonic() - _last_refresh[0] < REFRESH_ENV_SECONDS:
+            return
+        _last_refresh[0] = time.monotonic()
+    refresh_session_env(
+        os.environ,  # type: ignore[arg-type]
+        lambda: run_command(["systemctl", "--user", "show-environment"]),
+        replace=replace,
+    )
 
 
 def linux_front_app() -> Optional[str]:
@@ -439,7 +479,7 @@ def linux_front_app() -> Optional[str]:
     try:
         window = run_command(["xdotool", "getactivewindow"]).strip()
     except ProbeError:
-        refresh_desktop_env()
+        refresh_desktop_env(replace=True)
         raise
     if not window:
         return None
@@ -949,7 +989,7 @@ def run(logs: bool, env: Env) -> int:
     for name, value in config.get("env", {}).items():
         os.environ.setdefault(name, value)
     if env.system not in ("Windows", "Darwin"):
-        refresh_desktop_env()
+        refresh_desktop_env(replace=False)
     problem = problem_of(env.system, os.environ, env.which)
     if problem is not None:
         env.say(problem)
