@@ -21,7 +21,7 @@ import {
   isAnswer,
   notificationIdOf,
   pollNow,
-  type PushMethod,
+  pushStore,
   registerPush,
   setupNotificationCategories,
 } from "./platform/notifications.ts";
@@ -45,9 +45,6 @@ const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
   }
 };
 
-/** How this phone gets system notifications; the web has none (its feed is the bell). */
-const pushState: { method: PushMethod } = { method: "none" };
-
 /**
 The phone's side of the notification pool, on every start and return: the answer buttons,
 the push method (registered again: a token may have changed) and, when it polls, what waits.
@@ -59,8 +56,7 @@ const startPhonePush = async (runtime: PaceRuntime): Promise<void> => {
   try {
     await setupNotificationCategories(runtime.state.store.getState().settings.language);
     await startPushTask();
-    pushState.method = await registerPush(runtime.api);
-    if (pushState.method === "poll") {
+    if ((await registerPush(runtime.api)) === "poll") {
       await pollNow(runtime.api);
     }
   } catch {
@@ -99,7 +95,7 @@ const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
     return () => undefined;
   }
   const pollIfPolling = (): void => {
-    if (pushState.method === "poll") {
+    if (pushStore.getState().method === "poll") {
       void (async () => {
         try {
           await pollNow(runtime.api);

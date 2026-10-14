@@ -1,8 +1,8 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import { createStore } from "zustand/vanilla";
 
-import type { ApiClient } from "@pace/client";
-
+import { type ApiClient, ApiError } from "@pace/client";
 import {
   type Answer,
   ANSWERS,
@@ -20,6 +20,8 @@ const CHANNEL_ID = "notifications";
 export type PushMethod = "fcm" | "none" | "poll";
 
 const METHOD_KEY = "pace.push.method";
+/** The method picked in Settings; absent: automatic (Google's push when there is one). */
+const CHOICE_KEY = "pace.push.choice";
 const CURSOR_KEY = "pace.push.cursor";
 /** The language the buttons were set up in: a background answer that fails says so in it. */
 const LANGUAGE_KEY = "pace.notify.language";
@@ -41,10 +43,46 @@ const readKey = async (key: string): Promise<null | string> => {
   }
 };
 
+const PUSH_METHODS: readonly PushMethod[] = ["fcm", "poll", "none"];
+
+const asMethod = (stored: null | string): null | PushMethod =>
+  PUSH_METHODS.find((method) => method === stored) ?? null;
+
 /** The push method this phone registered last (`none` before it ever did). */
-export const pushMethodOf = async (): Promise<PushMethod> => {
-  const stored = await readKey(METHOD_KEY);
-  return stored === "fcm" || stored === "poll" ? stored : "none";
+export const pushMethodOf = async (): Promise<PushMethod> =>
+  asMethod(await readKey(METHOD_KEY)) ?? "none";
+
+export type PushState = {
+  /** What this phone registered last; `null` until it is known. */
+  readonly method: null | PushMethod;
+  /** The method picked in Settings; `null`: automatic. */
+  readonly choice: null | PushMethod;
+  /** `false` when it registered none because notifications are not allowed. */
+  readonly isAllowed: boolean;
+};
+
+/** This phone's push state, for Settings to follow as it changes (registered again, picked). */
+export const pushStore = createStore<PushState>(() => ({
+  choice: null,
+  isAllowed: true,
+  method: null,
+}));
+
+/** Reads what was stored into `pushStore` (Settings opened before this start registered). */
+export const loadPushState = async (): Promise<void> => {
+  const [method, choice] = [await readKey(METHOD_KEY), await readKey(CHOICE_KEY)];
+  pushStore.setState((state) => ({
+    choice: asMethod(choice),
+    method: state.method ?? asMethod(method),
+  }));
+};
+
+/** Picks how this phone shows notifications (`null`: automatic); `registerPush` honours it. */
+export const setPushChoice = async (choice: null | PushMethod): Promise<void> => {
+  await (choice === null
+    ? SecureStore.deleteItemAsync(CHOICE_KEY)
+    : SecureStore.setItemAsync(CHOICE_KEY, choice));
+  pushStore.setState({ choice });
 };
 
 /**
@@ -194,29 +232,54 @@ const fcmToken = async (): Promise<null | string> => {
   }
 };
 
+/** Registers one method; `false` when the server refuses it (409: not accepted right now). */
+const isRegistered = async (api: ApiClient, method: "fcm" | "poll"): Promise<boolean> => {
+  const token = method === "fcm" ? await fcmToken() : null;
+  if (method === "fcm" && token === null) {
+    return false;
+  }
+  try {
+    await api.call(endpoints.notifications.push, {
+      body: token === null ? { method: "poll" } : { endpoint: token, method: "fcm" },
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "push/method-unavailable") {
+      return false;
+    }
+    throw error;
+  }
+};
+
 /**
-Tells the server how this phone gets system notifications, exactly one way: Firebase when the
-server offers it and the phone has a Google token; else polling (its background check and the
-open app fetch them); `none` without the notification permission. Run on every start (a token
-may have changed) and when the server says its methods changed.
+Tells the server how this phone gets system notifications, exactly one way: the method picked
+in Settings (`pushStore`'s `choice`); automatic, Firebase when the server offers it and the
+phone has a Google token, else polling (the open app fetches them). The pick is left for the
+other only when it cannot be used (the server does not take it, no Google token), and kept for
+the next time. `none` when picked, or without the notification permission. Run on every start
+(a token may have changed), when the server says its methods changed and on a new pick.
 */
 export const registerPush = async (api: ApiClient): Promise<PushMethod> => {
+  const choice = asMethod(await readKey(CHOICE_KEY));
+  const isAllowed = await hasPermission();
   const choose = async (): Promise<PushMethod> => {
-    if (!(await hasPermission())) {
+    if (!isAllowed || choice === "none") {
       await api.call(endpoints.notifications.push, { body: { method: "none" } });
       return "none";
     }
     const { pushMethods } = await api.call(endpoints.notifications.pushMethods, {});
-    const token = pushMethods.includes("fcm") ? await fcmToken() : null;
-    if (typeof token === "string") {
-      await api.call(endpoints.notifications.push, { body: { endpoint: token, method: "fcm" } });
-      return "fcm";
+    const order = choice === "poll" ? (["poll", "fcm"] as const) : (["fcm", "poll"] as const);
+    for (const method of order) {
+      if (pushMethods.includes(method) && (await isRegistered(api, method))) {
+        return method;
+      }
     }
-    await api.call(endpoints.notifications.push, { body: { method: "poll" } });
-    return "poll";
+    await api.call(endpoints.notifications.push, { body: { method: "none" } });
+    return "none";
   };
   const method = await choose();
   await SecureStore.setItemAsync(METHOD_KEY, method);
+  pushStore.setState({ choice, isAllowed, method });
   return method;
 };
 

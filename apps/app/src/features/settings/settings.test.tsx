@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -11,6 +12,25 @@ const nightHours = () => screen.getByRole("switch", { name: en("settings.nightHo
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+const fakeNotifications = Notifications as unknown as {
+  state: { granted: boolean; pushToken: null | string };
+};
+
+/** A server offering Google's push and polling, recording what the phone registers. */
+const pushRoutes = () => {
+  const registered: unknown[] = [];
+  return {
+    registered,
+    routes: {
+      "GET /api/push/methods": () => ({ pushMethods: ["fcm", "poll"] }),
+      "PUT /api/push/subscription": ({ body }: { readonly body: unknown }) => {
+        registered.push(body);
+        return { method: (body as { method: string }).method };
+      },
+    },
+  };
+};
 
 describe("SettingsScreen", () => {
   it("saves digest times as they are typed, adds and removes one", async () => {
@@ -83,6 +103,30 @@ describe("SettingsScreen", () => {
       });
     });
     expect(digestOnWeb).toBeChecked();
+  });
+
+  it("picks how this phone shows notifications from what the server offers, and says which it uses", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const server = pushRoutes();
+    const runtime = await createTestRuntime({ routes: server.routes, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const option = (method: "fcm" | "none" | "poll") =>
+      screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
+    await waitFor(() => {
+      expect(option("fcm")).toBeOnTheScreen();
+    });
+    expect(option("poll")).toBeOnTheScreen();
+    await fireEvent.press(option("none"));
+    expect(await screen.findByText(en("settings.push.none"))).toBeOnTheScreen();
+    expect(server.registered.at(-1)).toEqual({ method: "none" });
+    expect(option("none")).toBeChecked();
+    await fireEvent.press(option("poll"));
+    expect(await screen.findByText(en("settings.push.poll"))).toBeOnTheScreen();
+    expect(server.registered.at(-1)).toEqual({ method: "poll" });
+    await fireEvent.press(option("fcm"));
+    expect(await screen.findByText(en("settings.push.fcm"))).toBeOnTheScreen();
+    expect(server.registered.at(-1)).toEqual({ endpoint: "fcm-token", method: "fcm" });
   });
 
   it("logs out and goes to the login card", async () => {

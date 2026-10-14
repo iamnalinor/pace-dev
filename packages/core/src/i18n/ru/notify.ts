@@ -49,10 +49,15 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notifications.method.fcm": "Google",
   "notifications.method.poll": "Pace",
   "settings.notifications": "Уведомления",
+  "settings.push.hint": "Как этот телефон их показывает",
+  "settings.push.option.fcm": "Google",
+  "settings.push.option.poll": "Проверка Pace",
+  "settings.push.option.none": "Выкл.",
   "settings.push.fcm": "На этот телефон они приходят через пуш-сервис Google.",
-  "settings.push.poll":
-    "На этот телефон они приходят при регулярной проверке, примерно раз в 15 минут, и сразу, пока Pace открыт.",
-  "settings.push.none":
+  "settings.push.poll": "На этом телефоне они появляются, пока Pace открыт: тогда он их проверяет.",
+  "settings.push.none": "Этот телефон их не показывает; в колокольчике они все есть.",
+  "settings.push.denied":
     "Этот телефон их не показывает: уведомления не разрешены (Настройки → Разрешения).",
+  "settings.push.unavailable": "{method} сейчас недоступен.",
   "settings.notifications.hint": "Куда приходит каждый вид уведомлений.",
 };
