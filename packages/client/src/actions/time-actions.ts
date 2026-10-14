@@ -50,7 +50,7 @@ export type CalendarStart = {
 
 export type TimeActions = EditActions & {
   /**
-  A choice of a time-bar button ("sport:60", "chores:ready"): starts it in the account's
+  A choice of a time-bar button ("rest:walk", "chores:ready"): starts it in the account's
   language, or stops it if it is the main activity running (alongside, it always starts).
   */
   readonly startChoice: (choiceId: string, options?: StartOptions) => ActionResult;
@@ -63,7 +63,7 @@ export type TimeActions = EditActions & {
   readonly startTyped: (text: string, options?: StartOptions) => ActionResult;
   readonly startActivity: (input: ActivityInput, when?: When) => ActionResult;
   /** Time on a task: its title as the label, its estimate as the Expect. */
-  readonly focusTask: (taskId: string) => ActionResult;
+  readonly focusTask: (taskId: string, options?: StartOptions) => ActionResult;
   /** Stops the main activity, or the one named (an activity run alongside). */
   readonly stopActivity: (when?: StopWhen) => ActionResult;
   /**
@@ -156,7 +156,7 @@ const startChoice = async (
     buttonId: choiceId,
     category: found.choice.category,
     expectMinutes: found.choice.expectMinutes,
-    label: t(language, found.choice.labelKey ?? found.button.labelKey),
+    label: t(language, found.choice.labelKey),
   });
 };
 
@@ -241,12 +241,13 @@ const refineActivity = async (
 export const timeActions = (deps: ActionDeps): TimeActions => ({
   ...editActions(deps),
   refineActivity: async (activityId, reading) => await refineActivity(deps, activityId, reading),
-  focusTask: async (taskId) => {
+  focusTask: async (taskId, options = {}) => {
     const task = taskById(deps.state.store.getState().tasks, taskId);
     if (task === undefined) {
       return err("task/unknown");
     }
     const started = await startActivity(deps, {
+      alongside: options.alongside,
       category: "task",
       expectMinutes: task.estimateMinutes,
       label: task.title,

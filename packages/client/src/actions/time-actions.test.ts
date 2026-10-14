@@ -42,7 +42,7 @@ const isAttendedNow = async ([startSeconds, lengthSeconds, runningFor]: readonly
 describe("time actions", () => {
   it("switches with one tap and stops with a second tap on the running choice", async () => {
     const world = await setupActions();
-    unwrap(await world.actions.startChoice("sport:60"));
+    unwrap(await world.actions.startChoice("rest:workout"));
     world.setNow(later(50));
     unwrap(await world.actions.startChoice("chores:eating"));
     const bar = timeBarModel(world.state.store.getState(), ctx(later(80)));
@@ -63,7 +63,7 @@ describe("time actions", () => {
     const rowOf = (entry: (typeof day.entries)[number]) =>
       entry.kind === "activity" ? [[entry.row.label, entry.row.minutes]] : [];
     expect(day.entries.flatMap((entry) => rowOf(entry))).toEqual([
-      ["Sport", 50],
+      ["Workout", 50],
       ["Eating", 40],
     ]);
   });
@@ -176,6 +176,19 @@ describe("time actions", () => {
     const after = timeBarModel(world.state.store.getState(), ctx(later(21)));
     expect(after.running).toMatchObject({ label: "Commute" });
     expect(after.alongside).toEqual([]);
+  });
+
+  it("focuses a task alongside what runs, from the Task picker's switch", async () => {
+    const world = await setupActions();
+    const taskId =
+      Object.values(world.state.store.getState().tasks.byId).find(
+        (task) => task.title === "Algebra HW 6",
+      )?.id ?? "";
+    unwrap(await world.actions.startChoice("chores:commute"));
+    unwrap(await world.actions.focusTask(taskId, { alongside: true }));
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(1)));
+    expect(bar.running).toMatchObject({ label: "Commute" });
+    expect(bar.alongside).toEqual([expect.objectContaining({ label: "Algebra HW 6", taskId })]);
   });
 
   it("starts what was typed at once, a length in it as the Expect", async () => {

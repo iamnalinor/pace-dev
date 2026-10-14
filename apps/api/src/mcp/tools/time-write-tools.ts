@@ -48,7 +48,7 @@ const buttonOf = (scope: Scope, buttonId: string | undefined): ButtonPick | unde
         category: found.choice.category,
         expectMinutes: found.choice.expectMinutes,
         id: found.choice.id,
-        label: t(scope.state.settings.language, found.choice.labelKey ?? found.button.labelKey),
+        label: t(scope.state.settings.language, found.choice.labelKey),
       };
 };
 

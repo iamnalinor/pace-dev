@@ -216,6 +216,7 @@ export {
   type MessageText,
   PACE_STATUS_TEXT,
   type RunningView,
+  taskChoices,
   type TimeBarModel,
   timeBarModel,
   type TimeButtonView,

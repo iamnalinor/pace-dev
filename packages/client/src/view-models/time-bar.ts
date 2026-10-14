@@ -15,10 +15,12 @@ import {
   type TimeButton,
 } from "@pace/core";
 
-/** One thing a button starts: its name (none: the button's own) and how long it usually takes. */
+import type { NowRow } from "./now.ts";
+
+/** One thing a button starts: its name and how long it usually takes. */
 export type ChoiceView = {
   readonly id: string;
-  readonly labelKey: MessageKey | null;
+  readonly labelKey: MessageKey;
   readonly expectMinutes: number;
   /** It is the main activity running now. */
   readonly isRunning: boolean;
@@ -85,8 +87,25 @@ const runningView = (active: Activity, now: string): RunningView => {
 };
 
 /**
-The time bar at the bottom of Now: the four buttons, always in their places, and what is running
-(the main activity and whatever runs alongside it).
+Whether the button's own activity is the main one: the choice it started, the calendar's
+event, or for Task the time on a task that Focus started (no button of its own).
+*/
+const isButtonRunning = (
+  button: TimeButton,
+  main: Activity | null,
+  choices: readonly ChoiceView[],
+): boolean => {
+  if (main === null) {
+    return false;
+  }
+  return button.kind === "task"
+    ? main.taskId !== null && main.buttonId === null
+    : main.buttonId === button.id || choices.some((choice) => choice.isRunning);
+};
+
+/**
+The time bar at the bottom of Day: the four buttons, always in their places, and what is
+running (the main activity and whatever runs alongside it).
 */
 export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext): TimeBarModel => {
   const running = runningActivities(state.time, ctx.now);
@@ -108,13 +127,33 @@ export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext):
         choices,
         color: CATEGORY_COLORS[button.category],
         id: button.id,
-        isRunning: mainButton === button.id || choices.some((choice) => choice.isRunning),
+        isRunning: isButtonRunning(button, main, choices),
         kind: button.kind,
         labelKey: button.labelKey,
       };
     }),
     running: main === null ? null : runningView(main, ctx.now),
   };
+};
+
+/** A title or a query as compared: lower case, ё read as е. */
+const searchable = (text: string): string => text.toLocaleLowerCase().replaceAll("ё", "е");
+
+/**
+The Task button's picker: Now's open tasks in Now's order (those that start later last),
+narrowed to the titles that hold every word typed, in any case and order.
+*/
+export const taskChoices = <Row extends Pick<NowRow, "id" | "title">>(
+  board: { readonly rows: readonly Row[]; readonly future: readonly Row[] },
+  query: string,
+): readonly Row[] => {
+  const words = searchable(query)
+    .split(/\s+/u)
+    .filter((word) => word !== "");
+  return [...board.rows, ...board.future].filter((row) => {
+    const title = searchable(row.title);
+    return words.every((word) => title.includes(word));
+  });
 };
 
 /** A message in the account language, still to be translated by the UI. */

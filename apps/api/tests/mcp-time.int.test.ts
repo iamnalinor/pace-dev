@@ -46,7 +46,7 @@ describe("MCP time tools", () => {
       ]),
     );
 
-    await ok(token, "start_activity", { at: minutesAgo(90), buttonId: "sport:60" });
+    await ok(token, "start_activity", { at: minutesAgo(90), buttonId: "rest:workout" });
     const { activityId: music } = await ok(token, "start_activity", {
       alongside: true,
       at: minutesAgo(40),
@@ -66,7 +66,7 @@ describe("MCP time tools", () => {
       segment.minutes,
     ]);
     expect(labels).toEqual([
-      ["Sport", 60],
+      ["Workout", 60],
       ["Lunch", 30],
     ]);
     expect(day["alongside"]).toEqual([expect.objectContaining({ label: "Music", minutes: 20 })]);

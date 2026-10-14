@@ -12,12 +12,6 @@ import { NOW } from "@pace/core/testing";
 
 import { TimeBar } from "./time-bar.tsx";
 
-/** A finger on a button: the touch ends (the tooltip's cue), then the press runs. */
-const tap = async (button: ReturnType<typeof screen.getByRole>): Promise<void> => {
-  await fireEvent(button, "touchEnd");
-  await fireEvent.press(button);
-};
-
 const calendar = Calendar as unknown as FakeCalendar;
 
 const activities = (runtime: PaceRuntime) =>
@@ -27,6 +21,34 @@ const activities = (runtime: PaceRuntime) =>
 
 const running = (runtime: PaceRuntime): readonly string[] =>
   activities(runtime).map((activity) => activity.label);
+
+const BUTTONS = ["Calendar", "Task", "Chores", "Rest"];
+
+/** The bar's four buttons, by their accessible names, in the order they stand. */
+const barButtons = (): readonly string[] =>
+  within(screen.getByLabelText("Time"))
+    .getAllByRole("button")
+    .map((button): string => String(button.props["accessibilityLabel"]))
+    .filter((label) => BUTTONS.some((name) => label.startsWith(name)));
+
+/** The lists named so: a list is no accessibility element of its own, so it is found by its name. */
+const listsNamed = (name: string) =>
+  screen.queryAllByLabelText(name).filter((element) => element.props["role"] === "list");
+
+/** The picker a button opened: its list of choices, named after the button. */
+const picker = async (name: string) =>
+  await waitFor(() => {
+    const [list] = listsNamed(name);
+    if (list === undefined) {
+      throw new Error(`no picker named ${name}`);
+    }
+    return list;
+  });
+
+const choicesIn = async (name: string): Promise<readonly string[]> =>
+  within(await picker(name))
+    .getAllByRole("button")
+    .map((button): string => String(button.props["accessibilityLabel"]));
 
 beforeEach(() => {
   calendar.state.status = "undetermined";
@@ -51,52 +73,115 @@ const CSS_READ = {
 };
 
 describe("TimeBar", () => {
-  it("has four buttons in fixed places; Rest starts on a tap and stops on the next", async () => {
+  it("has Calendar, Task, Chores and Rest in this order, with no «⋯» and no switches", async () => {
+    await renderScreen(<TimeBar />, await createTestRuntime());
+    expect(barButtons()).toEqual(BUTTONS);
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("button", { name: /More about/u })).toBeNull();
+  });
+
+  it("opens Rest's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    const time = screen.getByLabelText("Time");
-    expect(
-      within(time)
-        .getAllByRole("switch")
-        .map((button): unknown => button.props["accessibilityLabel"]),
-    ).toEqual(["Calendar", "Rest", "Sport", "Chores"]);
-    await fireEvent.press(screen.getByRole("switch", { name: "Rest" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
+    expect(await choicesIn("Rest")).toEqual([
+      "Short break",
+      "Rest",
+      "Walk",
+      "Workout",
+      "Nap",
+      "Sleep",
+    ]);
+    // Nothing starts on the tap itself, and nothing runs, so there is nothing to stop.
+    expect(running(runtime)).toEqual([]);
+    expect(screen.queryByRole("button", { name: en("time.stop") })).toBeNull();
+    await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Workout" }));
     await waitFor(() => {
-      expect(running(runtime)).toEqual(["Rest"]);
+      expect(activities(runtime)).toEqual([
+        expect.objectContaining({ category: "sport", expectMinutes: 60, label: "Workout" }),
+      ]);
     });
-    expect(screen.getByRole("switch", { checked: true, name: "Rest" })).toBeOnTheScreen();
-    expect(screen.getByText("of ~30m")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("switch", { name: "Rest" }));
+    expect(listsNamed("Rest")).toEqual([]);
+
+    const on = screen.getByRole("button", { name: en("time.buttonRunning", { label: "Rest" }) });
+    await fireEvent.press(on);
+    await fireEvent.press(await screen.findByRole("button", { name: en("time.stop") }));
     await waitFor(() => {
       expect(running(runtime)).toEqual([]);
     });
+    expect(listsNamed("Rest")).toEqual([]);
   });
 
-  it("picks a chore from the list, and switches to it from what was running", async () => {
+  it("picks a chore from Chores' picker, which has no nap any more", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("switch", { name: "Rest" }));
-    await fireEvent.press(screen.getByRole("switch", { name: "Chores" }));
-    await fireEvent.press(await screen.findByRole("button", { name: "Getting ready" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Chores" }));
+    const chores = await choicesIn("Chores");
+    expect(chores).toContain("Getting ready");
+    expect(chores).not.toContain("Nap");
+    await fireEvent.press(screen.getByRole("button", { name: "Getting ready" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Getting ready"]);
     });
   });
 
-  it("runs a sport session alongside what is running, from a long press", async () => {
+  it("lists open tasks in Task's picker, narrows them as typed, and starts Focus on the one picked", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("switch", { name: "Rest" }));
-    await fireEvent(screen.getByRole("switch", { name: "Sport" }), "longPress");
+    await fireEvent.press(screen.getByRole("button", { name: "Task" }));
+    const all = await choicesIn("Task");
+    expect(all).toContain("Algebra HW 6");
+    expect(all).toContain("Calculus HW 6");
+    await fireEvent.changeText(screen.getByLabelText(en("time.taskSearch")), "calc 6");
+    await waitFor(async () => {
+      expect(await choicesIn("Task")).toEqual(["Calculus HW 6"]);
+    });
+    await fireEvent.press(screen.getByRole("button", { name: "Calculus HW 6" }));
+    await waitFor(() => {
+      expect(activities(runtime)).toEqual([
+        expect.objectContaining({ category: "task", label: "Calculus HW 6" }),
+      ]);
+    });
+    expect(
+      screen.getByRole("button", { name: en("time.buttonRunning", { label: "Task" }) }),
+    ).toBeOnTheScreen();
+  });
+
+  it("says so when no open task matches what is typed", async () => {
+    await renderScreen(<TimeBar />, await createTestRuntime());
+    await fireEvent.press(screen.getByRole("button", { name: "Task" }));
+    await fireEvent.changeText(await screen.findByLabelText(en("time.taskSearch")), "zzzz");
+    expect(await screen.findByText(en("time.taskNoMatch"))).toBeOnTheScreen();
+  });
+
+  it("runs a workout alongside what is running, from the switch in the picker's header", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: "Chores" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Commute" }));
+    await waitFor(() => {
+      expect(running(runtime)).toEqual(["Commute"]);
+    });
+    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
     await fireEvent(await screen.findByLabelText("Alongside what is running"), "valueChange", true);
-    await fireEvent.press(screen.getByRole("button", { name: "1h" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Workout" }));
     await waitFor(() => {
-      expect(running(runtime).toSorted((a, b) => a.localeCompare(b))).toEqual(["Rest", "Sport"]);
+      expect(running(runtime).toSorted((a, b) => a.localeCompare(b))).toEqual([
+        "Commute",
+        "Workout",
+      ]);
     });
-    await fireEvent.press(await screen.findByRole("button", { name: "Stop: Sport" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Stop: Workout" }));
     await waitFor(() => {
-      expect(running(runtime)).toEqual(["Rest"]);
+      expect(running(runtime)).toEqual(["Commute"]);
     });
+  });
+
+  it("offers no alongside switch when nothing else runs", async () => {
+    await renderScreen(<TimeBar />, await createTestRuntime());
+    await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
+    await picker("Rest");
+    expect(screen.queryByLabelText("Alongside what is running")).toBeNull();
   });
 
   it("starts what is typed at once with its length, then takes the assistant's name for it", async () => {
@@ -142,36 +227,27 @@ describe("TimeBar", () => {
     expect(screen.getByText("ЦСС")).toBeOnTheScreen();
   });
 
-  it("is greyed without calendar access, and a tap says why at once, beside the button", async () => {
+  it("is greyed without calendar access; a tap opens its picker, which says why and leads to the permissions", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    const button = screen.getByRole("switch", { name: "Calendar" });
+    const button = screen.getByRole("button", { name: "Calendar" });
     await waitFor(() => {
-      expect(button.props["accessibilityHint"]).toBe("No access to the calendar");
+      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.noAccess"));
     });
-    await tap(button);
-    // The tooltip, not a toast: there at once, with nothing to wait for.
-    expect(screen.getByText("No access to the calendar")).toBeOnTheScreen();
-    expect(screen.queryByRole("alert")).toBeNull();
+    await fireEvent(button, "touchEnd");
+    await fireEvent.press(button);
+    expect(await screen.findByText(en("phone.calendarAsk"))).toBeOnTheScreen();
+    // The sheet explains it: no bubble left behind over the dim.
+    expect(screen.queryByText(en("time.calendar.noAccess"))).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: en("permissions.title") }));
+    expect(router.push).toHaveBeenCalledWith("/permissions");
     expect(running(runtime)).toEqual([]);
   });
 
-  it("offers the permissions from its menu on the phone without calendar access", async () => {
-    await renderScreen(<TimeBar />, await createTestRuntime());
-    await waitFor(() => {
-      expect(screen.getByRole("switch", { name: "Calendar" }).props["accessibilityHint"]).toBe(
-        en("time.calendar.noAccess"),
-      );
-    });
-    await fireEvent.press(screen.getByRole("button", { name: "More about Calendar" }));
-    await fireEvent.press(await screen.findByRole("button", { name: en("permissions.title") }));
-    expect(router.push).toHaveBeenCalledWith("/permissions");
-  });
-
-  it("reads the calendar again on a tap: access granted since then counts at once", async () => {
+  it("reads the calendar again on a tap: access granted since then lists today's events", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    const button = screen.getByRole("switch", { name: "Calendar" });
+    const button = screen.getByRole("button", { name: "Calendar" });
     await waitFor(() => {
       expect(button.props["accessibilityHint"]).toBe(en("time.calendar.noAccess"));
     });
@@ -186,12 +262,13 @@ describe("TimeBar", () => {
       },
     ];
     await fireEvent.press(button);
+    await fireEvent.press(await screen.findByRole("button", { name: "Seminar" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Seminar"]);
     });
   });
 
-  it("is greyed with nothing in the calendar within 15 minutes of now", async () => {
+  it("is greyed with nothing in the calendar within 15 minutes of now, and its picker still lists the day", async () => {
     calendar.state.status = "granted";
     calendar.state.events = [
       {
@@ -202,58 +279,16 @@ describe("TimeBar", () => {
         title: "Later",
       },
     ];
-    const runtime = await createTestRuntime();
-    await renderScreen(<TimeBar />, runtime);
-    const button = screen.getByRole("switch", { name: "Calendar" });
+    await renderScreen(<TimeBar />, await createTestRuntime());
+    const button = screen.getByRole("button", { name: "Calendar" });
     await waitFor(() => {
-      expect(button.props["accessibilityHint"]).toBe("No calendar events around now");
-    });
-    await tap(button);
-    expect(screen.getByText("No calendar events around now")).toBeOnTheScreen();
-  });
-
-  it("starts the event that begins within 15 minutes", async () => {
-    calendar.state.status = "granted";
-    calendar.state.events = [
-      {
-        allDay: false,
-        endDate: addMinutesIso(NOW, 70),
-        id: "ev-soon",
-        startDate: addMinutesIso(NOW, 10),
-        title: "Standup",
-      },
-    ];
-    const runtime = await createTestRuntime();
-    await renderScreen(<TimeBar />, runtime);
-    const button = screen.getByRole("switch", { name: "Calendar" });
-    await waitFor(() => {
-      expect(button.props["accessibilityHint"]).toBe(en("time.buttonHint"));
+      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.nothingNear"));
     });
     await fireEvent.press(button);
-    await waitFor(() => {
-      expect(running(runtime)).toEqual(["Standup"]);
-    });
+    expect(await choicesIn(en("time.calendarToday"))).toEqual(["Later"]);
   });
 
-  it("offers a meeting without an event from its menu when the calendar has nothing on", async () => {
-    calendar.state.status = "granted";
-    calendar.state.events = [];
-    const runtime = await createTestRuntime();
-    await renderScreen(<TimeBar />, runtime);
-    await fireEvent.press(screen.getByRole("button", { name: "More about Calendar" }));
-    await fireEvent.press(
-      await screen.findByRole("button", { name: en("time.calendarStartUntitled") }),
-    );
-    await waitFor(() => {
-      expect(running(runtime)).toEqual([en("time.calendarUntitled")]);
-    });
-    // Its own activity runs: on, not greyed, and a tap stops it like any running button.
-    expect(screen.getByRole("switch", { name: "Calendar" }).props["accessibilityHint"]).toBe(
-      en("time.buttonHint"),
-    );
-  });
-
-  it("starts the calendar's event going on now, from its start", async () => {
+  it("opens the picker even with one event near now: the event starts from its start when picked", async () => {
     calendar.state.status = "granted";
     calendar.state.events = [
       {
@@ -266,11 +301,13 @@ describe("TimeBar", () => {
     ];
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
-    const button = screen.getByRole("switch", { name: "Calendar" });
+    const button = screen.getByRole("button", { name: "Calendar" });
     await waitFor(() => {
       expect(button.props["accessibilityHint"]).toBe(en("time.buttonHint"));
     });
     await fireEvent.press(button);
+    expect(running(runtime)).toEqual([]);
+    await fireEvent.press(await screen.findByRole("button", { name: "Алгебра, семинар" }));
     await waitFor(() => {
       expect(activities(runtime)).toEqual([
         expect.objectContaining({
@@ -279,6 +316,30 @@ describe("TimeBar", () => {
           startAt: addMinutesIso(NOW, -50),
         }),
       ]);
+    });
+  });
+
+  it("starts a meeting without an event from Calendar's picker when the calendar has nothing on", async () => {
+    calendar.state.status = "granted";
+    calendar.state.events = [];
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: "Calendar" }));
+    await fireEvent.press(
+      await screen.findByRole("button", { name: en("time.calendarStartUntitled") }),
+    );
+    await waitFor(() => {
+      expect(running(runtime)).toEqual([en("time.calendarUntitled")]);
+    });
+    // Its own activity runs: on, not greyed, and its picker offers Stop first.
+    const on = screen.getByRole("button", {
+      name: en("time.buttonRunning", { label: "Calendar" }),
+    });
+    expect(on.props["accessibilityHint"]).toBe(en("time.buttonHint"));
+    await fireEvent.press(on);
+    await fireEvent.press(await screen.findByRole("button", { name: en("time.stop") }));
+    await waitFor(() => {
+      expect(running(runtime)).toEqual([]);
     });
   });
 

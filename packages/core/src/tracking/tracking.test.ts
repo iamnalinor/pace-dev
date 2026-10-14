@@ -2,7 +2,7 @@ import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { ActivityCategorySchema } from "../events/payloads.ts";
-import { TIME_BUTTONS, timeButton } from "./buttons.ts";
+import { choiceById, TIME_BUTTONS, timeButton } from "./buttons.ts";
 import { defaultsFor, paceStatus, remindAt } from "./expect.ts";
 import { runningActivities, runningActivity, timeline } from "./timeline.ts";
 import { act, start, T, timeOf } from "./tracking.fake.ts";
@@ -91,27 +91,53 @@ describe("categories and buttons", () => {
     expect(ActivityCategorySchema.parse("food")).toBe("food");
   });
 
-  it("has four fixed buttons: calendar, rest (30 min), sport and chores with choices", () => {
-    expect(TIME_BUTTONS.map((button) => button.id)).toEqual([
-      "calendar",
-      "rest",
-      "sport",
-      "chores",
+  it("has four buttons in this order: Calendar, Task, Chores and Rest", () => {
+    expect(TIME_BUTTONS.map((button) => [button.id, button.kind])).toEqual([
+      ["calendar", "calendar"],
+      ["task", "task"],
+      ["chores", "choices"],
+      ["rest", "choices"],
     ]);
-    const rest = timeButton("rest");
-    expect(rest.choices).toEqual([
-      expect.objectContaining({ category: "rest", expectMinutes: 30 }),
-    ]);
-    expect(timeButton("sport").choices.map((choice) => choice.expectMinutes)).toEqual([
-      30, 60, 120, 180,
-    ]);
+    expect(timeButton("calendar").choices).toEqual([]);
+    expect(timeButton("task").choices).toEqual([]);
+  });
+
+  it("lists the chores, each with its usual length, and no nap among them", () => {
     const chores = timeButton("chores").choices;
     expect(chores.map((choice) => choice.id)).toContain("chores:ready");
     expect(chores.find((choice) => choice.id === "chores:commute")).toMatchObject({
       category: "commute",
       expectMinutes: 45,
     });
-    expect(timeButton("calendar").choices).toEqual([]);
+    expect(chores.map((choice) => choice.labelKey)).not.toContain("time.choice.nap");
+  });
+
+  it("rests six ways: a short break, rest, a walk, a workout, a nap and sleep", () => {
+    expect(
+      timeButton("rest").choices.map((choice) => [
+        choice.id,
+        choice.labelKey,
+        choice.category,
+        choice.expectMinutes,
+      ]),
+    ).toEqual([
+      ["rest:break", "time.choice.break", "rest", 15],
+      // The id Rest had as a single button: logs and the assistant's callers keep it.
+      ["rest", "time.choice.rest", "rest", 30],
+      ["rest:walk", "time.choice.walk", "rest", 30],
+      ["rest:workout", "time.choice.workout", "sport", 60],
+      ["rest:nap", "time.choice.nap", "sleep", 30],
+      ["rest:sleep", "time.choice.sleep", "sleep", 480],
+    ]);
+  });
+
+  it("finds a choice and its button by the choice's id; a retired one is gone", () => {
+    expect(choiceById("rest:workout")).toMatchObject({
+      button: { id: "rest" },
+      choice: { category: "sport", expectMinutes: 60 },
+    });
+    expect(choiceById("sport:60")).toBeNull();
+    expect(choiceById("chores:nap")).toBeNull();
   });
 });
 

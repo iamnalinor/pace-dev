@@ -100,6 +100,7 @@ export const Sheet = ({
   closeLabel,
   footer,
   formLabel,
+  header,
   onClose,
   subtitle,
   title,
@@ -111,6 +112,8 @@ export const Sheet = ({
   readonly footer?: ReactNode;
   /** The sheet is a form (its fields and the footer's buttons), named this. */
   readonly formLabel?: string;
+  /** Stays under the title, above the scrolling body: a picker's Stop, its switch, its search. */
+  readonly header?: ReactNode;
   readonly onClose: () => void;
   readonly subtitle?: string;
   readonly title: string;
@@ -156,6 +159,7 @@ export const Sheet = ({
                 subtitle={subtitle}
                 title={title}
               />
+              {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
               {/* The body shrinks and clips inside the frame, under a hairline: scrolled content
             meets an edge instead of seeming to run into the title. */}
               <ScrollView
