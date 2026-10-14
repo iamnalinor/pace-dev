@@ -1,60 +1,142 @@
 # App usage from a computer
 
 Pace shows where the time of each block went ("where I sat"): the apps in front on every device
-during it. The phone sends its own; a computer sends through
-[ActivityWatch](https://activitywatch.net) and a small bridge,
-`tools/pace-aw-bridge/pace_aw_bridge.py` (Python 3, standard library only).
+during it. The phone sends its own; a computer runs Pace's own agent,
+`tools/pace-agent/pace_agent.py`: one Python file (3.9 or newer, standard library only) for
+Windows, macOS and Linux. Nothing else to install: no tracker app, no browser extension.
 
-Only **app names and times** leave the computer: never window titles, URLs or contents. The time
-counts only while someone is at the computer (ActivityWatch's AFK watcher). Nothing is judged:
-Pace only shows where the time went.
+## What it collects
+
+Every 5 seconds it asks the system two things: the **name of the application in front** and
+**how long ago the last key press or mouse move was**. That is all. Never window titles, URLs,
+document names, keystrokes or screenshots.
+
+- A sample counts while someone is at the computer: the last input under 60 s ago. When it is
+  older, the session ends at that last input.
+- Samples of the same app join into a session; a gap under a minute (a busy or briefly sleeping
+  computer) joins too. Sessions under a minute are dropped (a glance while switching).
+- Every 5 minutes it sends the finished sessions and the running one (cut at its last sample) to
+  `POST /api/usage/sessions` with the computer's token. The server keeps one row per device, app
+  and start and takes the later end, so the running session grows with each send.
+- Offline, sessions wait in `buffer.json` next to the settings and go with the next send; after
+  a failure it waits 5, 10, 20, 40, then 60 minutes between tries. Sessions older than a week
+  are dropped.
+
+Nothing is judged: Pace only shows where the time went.
 
 ## Connect a computer
 
-1. **Settings → Devices → Add a computer**. Give it a name and press *Create the token*.
-2. Install ActivityWatch on that computer and start it; turn on *Start on login* in its tray
-   menu. On Linux Mint, Ubuntu or any X11 desktop the bundled watchers work as they are. On
-   Wayland (GNOME, KDE) use [awatcher](https://github.com/2e3s/awatcher) instead of
-   `aw-watcher-window`.
-3. Paste the command Pace shows into a terminal there. It:
-   - downloads the bridge to `~/.local/share/pace/pace_aw_bridge.py` (served by the web app);
-   - saves the server, the device's token and id to `~/.config/pace/aw-bridge.json` (mode 600);
-   - writes a systemd user service and timer (`~/.config/systemd/user/pace-aw-bridge.*`) that
-     sends every 5 minutes, enables it, and sends once.
-4. The computer appears in **Settings → Devices** with its last data within 5 minutes.
+**Settings → Devices → Add a computer**. Give it a name and press *Create the token*. Pick the
+computer's system (the web app preselects the one it runs on) and follow its steps.
 
 The token is shown once and may only upload usage (`usage:write`): it cannot read or change
-anything else, and whatever it sends is filed under its own computer. Lost it? Disconnect the computer and add it again.
+anything else, and whatever it sends is filed under its own computer. Lost it? Disconnect the
+computer and add it again.
 
-### macOS and Windows
+### Windows
 
-Run the same `python3 … install …` command. Without systemd it saves the settings and sends
-once; schedule `python3 ~/.local/share/pace/pace_aw_bridge.py run` every 5 minutes yourself
-(launchd on macOS, Task Scheduler on Windows).
+Open PowerShell (Start → "PowerShell") and paste the line Pace shows. It:
+
+1. looks for Python (`py`, then `python`, each run once: a bare Windows has a `python` that only
+   opens the Microsoft Store), and without one installs it:
+   `winget install -e --id Python.Python.3.12` (winget may ask to allow it);
+2. downloads `pace_agent.py` from the web app to `%APPDATA%\Pace`;
+3. runs `pace_agent.py install --token … --api … --name …`, which saves the settings to
+   `%APPDATA%\Pace\config.json` and registers the Task Scheduler task **Pace agent**: at logon,
+   without elevation (`LeastPrivilege`), running `pythonw.exe pace_agent.py run` (no window), then
+   starts it.
+
+The task is created from an XML file (`pace-agent-task.xml`) rather than `schtasks /SC ONLOGON`,
+because a task made that way does not start on battery and is stopped after three days. If
+Task Scheduler refuses (some managed computers), the agent starts from the `Run` key of the
+account (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) instead.
+
+Probes: `GetForegroundWindow` → `GetWindowThreadProcessId` → `QueryFullProcessImageNameW`; the
+name is the program's *FileDescription* ("Firefox", "Visual Studio Code"), else the `.exe` name.
+Idle time: `GetLastInputInfo` against `GetTickCount64`.
+
+### macOS
+
+Open Terminal (⌘ Space → "Terminal") and paste:
+
+```sh
+curl -fsSL https://<web app>/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --token '…' --api https://<api> --name '…'
+```
+
+`python3` comes with the Command Line Tools: on a fresh Mac the first `python3` offers to
+install them; agree, then paste the line again. `install` saves the settings to
+`~/Library/Application Support/Pace/config.json` and loads the LaunchAgent
+`~/Library/LaunchAgents/app.pace.agent.plist` (`RunAtLoad`, `KeepAlive`, its output in
+`agent.log` next to the settings) with `launchctl bootstrap gui/$UID`.
+
+Probes: `lsappinfo info -only name $(lsappinfo front)` for the app in front and
+`ioreg -c IOHIDSystem` (`HIDIdleTime`) for idle time. Neither needs the Accessibility or Screen
+Recording permission.
+
+### Linux
+
+On an X11 (Xorg) desktop — Linux Mint, Ubuntu on Xorg, Xfce, MATE, KDE on X11 — install the two
+small tools first:
+
+```sh
+sudo apt install xdotool xprintidle     # Debian, Ubuntu, Mint
+sudo dnf install xdotool xprintidle     # Fedora
+sudo pacman -S xdotool xprintidle       # Arch
+```
+
+Then paste the same `curl … && python3 ~/.pace_agent.py install …` line as on macOS. `install`
+saves the settings to `~/.config/pace/config.json` (with the session's `DISPLAY` and
+`XAUTHORITY`, since a user service may start before the desktop), writes the systemd user
+service `~/.config/systemd/user/pace-agent.service`, enables and starts it.
+
+Probes: `xdotool getactivewindow getwindowpid` → `/proc/<pid>/comm`, or the window's `WM_CLASS`
+(`xprop`) when the window does not say its process; idle time from `xprintidle`.
+
+**Wayland.** KDE Plasma on Wayland works with [kdotool](https://github.com/jinliu/kdotool)
+installed (`kdotool getactivewindow getwindowpid`; idle time from
+`org.freedesktop.ScreenSaver.GetSessionIdleTime` over D-Bus). **GNOME on Wayland is not
+supported**: it does not let other programs see which window is in front. `install` says
+"Unsupported desktop (GNOME on Wayland)" and stops; choose "GNOME on Xorg" at the login screen
+(the gear under the password field) and run it again.
 
 ## Commands
 
 ```sh
-python3 pace_aw_bridge.py run --dry-run   # print what would be sent, send nothing
-python3 pace_aw_bridge.py run             # send what ActivityWatch recorded since the last run
-python3 pace_aw_bridge.py uninstall       # stop the timer, forget the settings
-systemctl --user status pace-aw-bridge.timer
-journalctl --user -u pace-aw-bridge       # the runs' output
+python3 ~/.pace_agent.py run --logs   # each sample and what it would send; sends nothing (Ctrl+C stops)
+python3 ~/.pace_agent.py status       # the settings, the last send, what waits to be sent, the last error
+python3 ~/.pace_agent.py run          # what the autostart runs
+python3 ~/.pace_agent.py uninstall    # remove the autostart and the settings
 ```
 
-`PACE_AW_URL` points the bridge at another ActivityWatch server (default
-`http://localhost:5600`); `PACE_AW_CONFIG` at another settings file.
+On Windows: `py "$env:APPDATA\Pace\pace_agent.py" …` (or `python` for the Microsoft Store's
+Python). `install` prints the exact `run --logs` line for its own Python.
 
-## How it works
+`run --logs` shows a line per sample (`10:41:05  firefox, idle 2 s: active since 10:39:50`) and,
+every 5 minutes and on Ctrl+C, the JSON body it would send. It keeps nothing and does not touch
+the running agent's buffer, so it is safe next to it. A second plain `run` exits at once
+("Already running"): it would send every session twice.
 
-- Each run reads the window and AFK buckets of this host from ActivityWatch's REST API, from the
-  last run's cursor (a day back the first time) to now.
-- Window events are cut to the stretches someone was active; pieces of the same app less than a
-  minute apart are joined; sessions under a minute are dropped.
-- `POST /api/usage/sessions` stores one row per device, app and start, keeping the later end, so
-  the last session (maybe still open) is sent again next time, grown.
-- The phone sends the same way from the app (on start and on return), named after the phone.
+`uninstall` removes the task, LaunchAgent or service, and `config.json`, `buffer.json` and
+`agent.log`; disconnect the computer in **Settings → Devices** too, which revokes its token.
+
+## Troubleshooting
+
+- **Nothing in Settings → Devices after 5 minutes.** `status` shows the last send and the last
+  error. "HTTP Error 401" means the token was revoked: disconnect the computer and add it again.
+- **Linux: "Missing xdotool, xprintidle".** Install them (above) and run `install` again.
+- **Linux: "No graphical session here".** Run `install` from a terminal on the desktop, not over
+  SSH: it records the display the service uses. `systemctl --user status pace-agent` and
+  `journalctl --user -u pace-agent` show the service's output.
+- **Linux: "Unsupported desktop (GNOME on Wayland)".** See Wayland above.
+- **macOS:** `launchctl print gui/$UID/app.pace.agent` and `agent.log` in
+  `~/Library/Application Support/Pace`.
+- **Windows:** Task Scheduler → *Pace agent* → History; `status` shows the last error.
+- **An app shows under an odd name** (`python3`, `java`): that is the program's own name, the
+  only thing the agent reads. Pace shows it as sent.
 
 ## Tests
 
-`python3 -m unittest discover -s tools/pace-aw-bridge` (part of `bun test:unit`).
+`python3 -m unittest discover -s tools/pace-agent` (part of `bun test:unit`): sessions joining,
+the idle cut, short sessions dropped, the buffer on a failed send and its flush, the body,
+`--logs`, the settings folder per system, and the generated LaunchAgent, systemd unit and Task
+Scheduler task. The probes are stubbed; the time is passed in.

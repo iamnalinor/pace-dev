@@ -277,8 +277,9 @@ next release installs over it, and main after a squash merge installs over the b
 
 The phone sends its calendar (own and accepted events; *Settings → Devices → Send this phone's
 calendar*, off deletes the copy) and the apps it had in front, names and times only. A computer
-sends its apps through ActivityWatch and a small bridge: *Settings → Devices → Add a computer*
-gives one install command (see [docs/desktop.md](docs/desktop.md)). Day and Week show where the
+runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
+*Settings → Devices → Add a computer* gives one install line per system (see
+[docs/desktop.md](docs/desktop.md)). Day and Week show where the
 time of each block went; MCP has `get_calendar`, `get_usage` and `get_week`.
 
 ## Phone data on the device

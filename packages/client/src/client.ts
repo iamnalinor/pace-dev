@@ -112,7 +112,14 @@ export {
   trackedDates,
 } from "./view-models/day.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
-export { bridgeCommand } from "./view-models/devices.ts";
+export {
+  agentCommand,
+  agentLogsCommand,
+  COMPUTER_OSES,
+  type ComputerOs,
+  computerOsOf,
+  LINUX_PACKAGES,
+} from "./view-models/devices.ts";
 export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
 export {
   type HistoryEntry,

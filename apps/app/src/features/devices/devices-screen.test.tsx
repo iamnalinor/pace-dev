@@ -1,5 +1,6 @@
 import { fireEvent, screen, within } from "@testing-library/react-native";
 
+import { API_BASE_URL, WEB_ORIGIN } from "#app/platform/api-base.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
@@ -38,7 +39,7 @@ describe("Settings → Devices", () => {
     expect(await screen.findByText("Nothing sends app usage yet.")).toBeOnTheScreen();
   });
 
-  it("adds a computer: a token inside one install command", async () => {
+  it("adds a computer: an install line per system, with the token and the web app's origin", async () => {
     const runtime = await createTestRuntime({
       routes: {
         "GET /api/devices": () => ({ devices: [] }),
@@ -53,11 +54,44 @@ describe("Settings → Devices", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Add a computer" }));
     await fireEvent.changeText(screen.getByLabelText("Name"), "Work laptop");
     await fireEvent.press(screen.getByRole("button", { name: "Create the token" }));
+
+    // Not on a computer here, so Windows comes first: PowerShell, Python if missing, the agent.
+    const picker = await screen.findByLabelText("The computer's system");
+    expect(within(picker).getByRole("radio", { name: "Windows" })).toBeChecked();
+    expect(screen.getByText(/open PowerShell/u)).toBeOnTheScreen();
+    const windowsLine = screen.getByText(/winget install -e --id Python\.Python\.3\.12/u);
+    expect(windowsLine).toHaveTextContent(
+      `Invoke-WebRequest -UseBasicParsing ${WEB_ORIGIN}/pace_agent.py`,
+      { exact: false },
+    );
+    expect(windowsLine).toHaveTextContent(
+      `install --token 'tok_secret' --api ${API_BASE_URL} --name 'Work laptop'`,
+      { exact: false },
+    );
     expect(
-      await screen.findByText(
-        /python3 ~\/\.local\/share\/pace\/pace_aw_bridge\.py install .*--token tok_secret --device-id 01NEW --name 'Work laptop'/u,
+      screen.getByText(String.raw`py "$env:APPDATA\Pace\pace_agent.py" run --logs`),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(/ActivityWatch/u)).toBeNull();
+
+    // Linux: the packages first, then curl and python3.
+    await fireEvent.press(within(picker).getByRole("radio", { name: "Linux" }));
+    expect(within(picker).getByRole("radio", { name: "Linux" })).toBeChecked();
+    expect(screen.getByText(/sudo apt install xdotool xprintidle/u)).toBeOnTheScreen();
+    expect(screen.getByText(/GNOME on Wayland/u)).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        `curl -fsSL ${WEB_ORIGIN}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --token 'tok_secret' --api ${API_BASE_URL} --name 'Work laptop'`,
       ),
     ).toBeOnTheScreen();
+    expect(screen.queryByText(/winget/u)).toBeNull();
+
+    // macOS: the same line, in Terminal, without the Linux packages.
+    await fireEvent.press(within(picker).getByRole("radio", { name: "macOS" }));
+    expect(screen.getByText(/open Terminal/u)).toBeOnTheScreen();
+    expect(screen.getByText(/^curl -fsSL .*--token 'tok_secret'/u)).toBeOnTheScreen();
+    expect(screen.queryByText(/xprintidle/u)).toBeNull();
+    expect(screen.getByText("python3 ~/.pace_agent.py run --logs")).toBeOnTheScreen();
+    expect(screen.getByText(/never window titles or URLs/u)).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Send the command" })).toBeOnTheScreen();
   });
 });

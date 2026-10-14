@@ -27,10 +27,10 @@ if (exported.exitCode !== 0) {
   process.exit(exported.exitCode);
 }
 
-// The desktop bridge is served next to the app, so Settings → Devices can give one command.
+// Pace's desktop agent is served next to the app, so Settings → Devices can give one command.
 await Bun.write(
-  path.join(OUT, "pace_aw_bridge.py"),
-  Bun.file(path.join(import.meta.dir, "../tools/pace-aw-bridge/pace_aw_bridge.py")),
+  path.join(OUT, "pace_agent.py"),
+  Bun.file(path.join(import.meta.dir, "../tools/pace-agent/pace_agent.py")),
 );
 
 const { count, size, warnings } = await generateSW({
