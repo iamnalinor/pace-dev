@@ -9,6 +9,8 @@ import {
 } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { useIsWide } from "./layout.ts";
+
 export type ToastInput = {
   readonly message: string;
   readonly action?: { readonly label: string; readonly onPress: () => void };
@@ -20,6 +22,26 @@ type ToastHandle = { readonly show: (toast: ToastInput) => void };
 
 const ToastContext = createContext<null | ToastHandle>(null);
 
+/** A screen with a footer (the time bar) tells the toast how tall it is, so it floats above. */
+const FooterHeightContext = createContext<(height: number) => void>(() => undefined);
+
+/**
+Keeps the toast above this screen's footer while the screen is the one in front. A screen under
+a pushed one or a tab left behind stays mounted, and must not lift the toast of the next one.
+*/
+export const useLiftToastAbove = (footerHeight: number, isActive: boolean): void => {
+  const setFooterHeight = use(FooterHeightContext);
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+    setFooterHeight(footerHeight);
+    return () => {
+      setFooterHeight(0);
+    };
+  }, [footerHeight, isActive, setFooterHeight]);
+};
+
 /**
 Long enough to read a refusal or reach for its offer (about 60 ms a character, at least five
 seconds), short enough not to cover a row for long (ten at most).
@@ -27,11 +49,37 @@ seconds), short enough not to cover a row for long (ten at most).
 const visibleMs = (message: string): number =>
   Math.min(10_000, Math.max(5000, message.length * 60));
 
-const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toast: Shown }) => (
+/** What clears a phone's tab bar and leaves a little air above it. */
+const BASE_BOTTOM = 96;
+/** The phone's tab bar on its own, for a toast that has to clear a screen's footer as well. */
+const TAB_BAR_HEIGHT = 72;
+/** Air between the footer and the toast. */
+const FOOTER_GAP = 12;
+
+/** How far above the bottom edge the toast floats: clear of the tab bar and of any footer. */
+const bottomAbove = (footerHeight: number, isWide: boolean): number => {
+  if (footerHeight === 0) {
+    return BASE_BOTTOM;
+  }
+  // A wide window has no tab bar under the footer.
+  return (isWide ? 0 : TAB_BAR_HEIGHT) + footerHeight + FOOTER_GAP;
+};
+
+const ToastBar = ({
+  bottom,
+  onDone,
+  toast,
+}: {
+  readonly bottom: number;
+  readonly onDone: () => void;
+  readonly toast: Shown;
+}) => (
   <View
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
-    className="absolute inset-x-4 bottom-24 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg"
+    className="absolute inset-x-4 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg"
+    style={{ bottom }}
+    testID="toast"
   >
     {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
     <Pressable className="flex-1" onPress={onDone}>
@@ -60,6 +108,8 @@ const ToastBar = ({ onDone, toast }: { readonly onDone: () => void; readonly toa
 /** One toast at a time at the bottom of the screen; a new one replaces the current one. */
 export const ToastProvider = ({ children }: { readonly children: ReactNode }) => {
   const [toast, setToast] = useState<null | Shown>(null);
+  const [footerHeight, setFooterHeight] = useState(0);
+  const isWide = useIsWide();
   const hide = useCallback(() => {
     setToast(null);
   }, []);
@@ -82,10 +132,19 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   );
   return (
     <ToastContext value={handle}>
-      <View className="flex-1">
-        {children}
-        {toast === null ? null : <ToastBar key={toast.id} onDone={hide} toast={toast} />}
-      </View>
+      <FooterHeightContext value={setFooterHeight}>
+        <View className="flex-1">
+          {children}
+          {toast === null ? null : (
+            <ToastBar
+              bottom={bottomAbove(footerHeight, isWide)}
+              key={toast.id}
+              onDone={hide}
+              toast={toast}
+            />
+          )}
+        </View>
+      </FooterHeightContext>
     </ToastContext>
   );
 };

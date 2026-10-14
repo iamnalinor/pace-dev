@@ -122,3 +122,23 @@ for (const width of [1440, 1920]) {
     await shoot(page, `projects-${String(width)}`, (shot) => info.outputPath(shot));
   });
 }
+
+for (const size of SIZES) {
+  test(`a toast floats above the time bar, not over its buttons (${size.name})`, async ({
+    page,
+  }) => {
+    await loginViaApi(page);
+    await page.setViewportSize({ height: size.height, width: size.width });
+    await page.goto("/");
+    const bar = timeBar(page);
+    // A tap on the greyed Calendar button says in a toast what it is and why not now.
+    await bar.getByRole("switch", { name: "Calendar" }).click();
+    const toast = page.getByRole("alert");
+    await expect(toast).toBeVisible();
+    const toastBox = await toast.boundingBox();
+    const barBox = await bar.boundingBox();
+    expect(toastBox).not.toBeNull();
+    expect(barBox).not.toBeNull();
+    expect((toastBox?.y ?? 0) + (toastBox?.height ?? 0)).toBeLessThanOrEqual(barBox?.y ?? 0);
+  });
+}

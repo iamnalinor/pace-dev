@@ -1,6 +1,9 @@
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useIsScreenActive } from "./screen-active.ts";
+import { useLiftToastAbove } from "./toast.tsx";
 
 /**
 A full screen on the app background below the status bar. `header` stays put; the body
@@ -21,6 +24,9 @@ export const Screen = ({
   const insets = useSafeAreaInsets();
   const scrollerRef = useRef<ScrollView>(null);
   const scrolledToRef = useRef<number | undefined>(undefined);
+  // A toast floats above the footer (the time bar) instead of covering its buttons.
+  const [footerHeight, setFooterHeight] = useState(0);
+  useLiftToastAbove(footer === undefined ? 0 : footerHeight, useIsScreenActive());
   return (
     <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       <View className="w-full max-w-[880px] flex-1 self-center">
@@ -41,7 +47,16 @@ export const Screen = ({
         >
           {children}
         </ScrollView>
-        {footer}
+        {footer === undefined ? null : (
+          <View
+            onLayout={(event) => {
+              setFooterHeight(event.nativeEvent.layout.height);
+            }}
+            testID="screen-footer"
+          >
+            {footer}
+          </View>
+        )}
       </View>
     </View>
   );
