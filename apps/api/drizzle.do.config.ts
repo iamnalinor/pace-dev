@@ -1,6 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 
-/** Per-user tables (events, observations, projections, decisions) live in a Durable Object. */
+/** Per-user tables (events, projections, decisions, the phone data) live in a Durable Object. */
 export default defineConfig({
   casing: "snake_case",
   dialect: "sqlite",

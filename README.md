@@ -48,7 +48,7 @@ apps/app (Expo: Android ──┐                         ┌─ Telegram (webho
   Worker pace-web)        │                        │
 packages/core ◄───────────┘                        ├─ D1 "pace": users, sessions, login_nonces
   events + payload schemas, sort, materialize,     ├─ Durable Object UserStore (SQLite, one per user):
-  settings reducer, i18n (en/ru), design tokens,   │    events, observations, decisions, meta
+  settings reducer, i18n (en/ru), design tokens,   │    events, decisions, phone data, meta
   zod API contract (endpoints)                     └─ KV OAUTH_KV (MCP OAuth clients, grants, tokens)
 ```
 
@@ -87,7 +87,7 @@ apps/
     src/app.ts          createApp(): CORS, config, error shape, route mounting
     src/auth/           Telegram widget HMAC, whitelist, sessions, nonces, routes
     src/bot/            grammY bot (login deep link) + webhook route
-    src/sync/           push / pull / observations
+    src/sync/           push / pull / live
     src/user-store/     Durable Object (drizzle on SQLite), event-log validation
     src/shared/         config (zod over env), mount() for contract endpoints, D1 schema
     drizzle/d1, drizzle/do   committed migrations (D1 and Durable Object)

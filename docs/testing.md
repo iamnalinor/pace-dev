@@ -55,7 +55,7 @@ wrong bot, stale); whitelist; nonce lifecycle (pending → ready once, expiry, d
 bind); sessions (token never stored, revoke, hourly touch); dev login 404 in production;
 webhook secret check, login deep link, "Not allowed", expired link; sync push/pull
 ordering, idempotent re-push, paging, `recordedAt` clamping, partial rejection, user
-isolation; observations idempotency.
+isolation; the store id (stable, new after a wipe, an old epoch emptied on start).
 
 ## App tests (jest-expo)
 

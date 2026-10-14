@@ -17,7 +17,7 @@ const MAX_SIMULATION_MS = 31 * 24 * 60 * 60 * 1000;
 export const describeSchema = defineTool({
   annotations: READ,
   description:
-    "Lists the tables query_sql can read (events: the immutable log with JSON payloads; tasks, subtasks, projects, presets: projections of the current state; decisions: why reminders were or were not sent; observations) with their CREATE statements. Times are ISO 8601 UTC text.",
+    "Lists the tables query_sql can read (events: the immutable log with JSON payloads; tasks, subtasks, projects, presets: projections of the current state; decisions: why reminders were or were not sent; calendar_events, usage_sessions: the phone's calendar and app sessions) with their CREATE statements. Times are ISO 8601 UTC text.",
   handler: async (_args, ctx) => {
     const tables = await ctx.store.describeSchema();
     return success(

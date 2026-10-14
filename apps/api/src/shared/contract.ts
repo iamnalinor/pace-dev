@@ -11,7 +11,7 @@ import type {
   UsageRow,
 } from "@pace/core";
 
-export type { Observation, SyncEvent } from "@pace/core";
+export type { SyncEvent } from "@pace/core";
 
 /**
 A JSON value as read back from storage. Deliberately not recursive: the Durable Object

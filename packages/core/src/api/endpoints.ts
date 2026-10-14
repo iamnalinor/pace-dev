@@ -6,10 +6,10 @@ import {
   AuthSessionSchema,
   DevLoginSchema,
   LogoutSchema,
+  MeSchema,
   NonceCreatedSchema,
   NoncePollSchema,
   TelegramLoginSchema,
-  UserSchema,
 } from "./schemas/auth.ts";
 import {
   CalendarOutputSchema,
@@ -46,8 +46,6 @@ import {
   ParseResponseSchema,
 } from "./schemas/parse.ts";
 import {
-  SyncObservationsBodySchema,
-  SyncObservationsOutputSchema,
   SyncPullOutputSchema,
   SyncPullQuerySchema,
   SyncPushBodySchema,
@@ -65,7 +63,7 @@ export const endpoints = {
   me: endpoint({
     auth: true,
     method: "GET",
-    output: UserSchema,
+    output: MeSchema,
     path: "/api/me",
   }),
   /** Deletes the account: its event log, sessions, OAuth grants and the user itself. */
@@ -132,13 +130,6 @@ export const endpoints = {
       output: SyncPullOutputSchema,
       path: "/api/sync/pull",
       query: SyncPullQuerySchema,
-    }),
-    observations: endpoint({
-      auth: true,
-      body: SyncObservationsBodySchema,
-      method: "POST",
-      output: SyncObservationsOutputSchema,
-      path: "/api/sync/observations",
     }),
   },
   parse: {

@@ -1,14 +1,22 @@
-import { runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { err, newId } from "@pace/core";
 
+import type { UserStore } from "../src/user-store/user-store.ts";
+
 import { coreValidator } from "../src/user-store/event-log.ts";
+import { STORE_EPOCH } from "../src/user-store/store-identity.ts";
 import { call, json, loginAsDev } from "./helpers.ts";
 
 type PushResult = { accepted: string[]; rejected: { id: string; reason: string }[]; seq: number };
-type PullResult = { events: { id: string; recordedAt: string }[]; seq: number; more: boolean };
+type PullResult = {
+  events: { id: string; recordedAt: string }[];
+  seq: number;
+  more: boolean;
+  storeId: string;
+};
 
 /** A complete task.created event (defaults spelled out, so what comes back equals what went in). */
 const event = (overrides: Record<string, unknown> = {}) => ({
@@ -67,7 +75,7 @@ describe("sync push/pull", () => {
     expect(page2).toMatchObject({ more: false, seq });
 
     const empty = await pull(token, `?since=${seq}`);
-    expect(empty).toEqual({ events: [], more: false, seq });
+    expect(empty).toEqual({ events: [], more: false, seq, storeId: page1.storeId });
   });
 
   it("clamps a recordedAt from the future to the server clock", async () => {
@@ -104,6 +112,12 @@ describe("sync push/pull", () => {
     expect(pulled.events.map((item) => item.id)).toEqual([good.id]);
   });
 
+  it("has no observations route any more", async () => {
+    const token = await loginAsDev("1001");
+    const response = await call("/api/sync/observations", { body: { observations: [] }, token });
+    expect(response.status).toBe(404);
+  });
+
   it("keeps users apart: one never sees the other's events", async () => {
     const [alice, bob] = [await loginAsDev("1001"), await loginAsDev("1002")];
     const mine = event();
@@ -137,24 +151,72 @@ describe("UserStore.append validation seam", () => {
   });
 });
 
-describe("sync observations", () => {
-  it("stores observations once per kind+key", async () => {
-    const token = await loginAsDev("1002");
-    const observation = {
-      at: "2026-10-06T08:00:00.000Z",
-      key: `usage:${crypto.randomUUID()}`,
-      kind: "usage_stats",
-      payload: { minutes: 12 },
-    };
-    const first = await json("/api/sync/observations", {
-      body: { observations: [observation, { ...observation, kind: "calendar_events" }] },
-      token,
+/** A store of its own, reached directly (no user, no login). */
+const freshStub = () => env.USER_STORE.get(env.USER_STORE.idFromName(`epoch-${newId()}`));
+
+describe("the store id", () => {
+  it("comes with every pull and stays the same while the store lives", async () => {
+    const token = await loginAsDev("1001");
+    const first = await pull(token);
+    await push(token, [event()]);
+    const second = await pull(token, `?since=${first.seq}`);
+    expect(first.storeId).toMatch(/^[\w-]{22}$/u);
+    expect(second.storeId).toBe(first.storeId);
+    expect((await pull(await loginAsDev("1002"))).storeId).not.toBe(first.storeId);
+  });
+
+  it("comes with /api/me as well", async () => {
+    const token = await loginAsDev("1001");
+    const me = await json<{ id: string; storeId: string }>("/api/me", { token });
+    expect(me.storeId).toMatch(/^[\w-]{22}$/u);
+    expect(me.storeId).toBe((await pull(token)).storeId);
+  });
+
+  it("changes when the store is wiped", async () => {
+    const stub = freshStub();
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([event()], { now: "2026-10-06T10:00:00.000Z" });
+      const before = await instance.list(0, 10);
+      await instance.wipe();
+      const after = await instance.list(0, 10);
+      expect(before.events).toHaveLength(1);
+      expect(after.events).toEqual([]);
+      expect(after.storeId).not.toBe(before.storeId);
     });
-    expect(first).toEqual({ accepted: 2 });
-    const again = await json("/api/sync/observations", {
-      body: { observations: [observation] },
-      token,
+  });
+
+  it("survives a restart of the same epoch with its data", async () => {
+    const stub = freshStub();
+    const before = await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([event()], { now: "2026-10-06T10:00:00.000Z" });
+      return await instance.list(0, 10);
     });
-    expect(again).toEqual({ accepted: 0 });
+    await evictDurableObject(stub);
+    const after = await stub.list(0, 10);
+    expect(after.events).toHaveLength(1);
+    expect(after.storeId).toBe(before.storeId);
+  });
+
+  it.each([
+    ["an older epoch", 1],
+    ["no epoch at all (a store from before epochs)", undefined],
+  ])("empties a store with %s when it starts, alarm included", async (_name, epoch) => {
+    const stub = freshStub();
+    const before = await runInDurableObject(stub, async (instance: UserStore, state) => {
+      await instance.append([event()], { now: "2026-10-06T10:00:00.000Z" });
+      await (epoch === undefined
+        ? state.storage.delete("epoch")
+        : state.storage.put("epoch", epoch));
+      await state.storage.setAlarm(Date.now() + 3_600_000);
+      return await instance.list(0, 10);
+    });
+    await evictDurableObject(stub);
+    const after = await stub.list(0, 10);
+    expect(after).toMatchObject({ events: [], seq: 0 });
+    expect(after.storeId).not.toBe(before.storeId);
+    await runInDurableObject(stub, async (_instance: UserStore, state) => {
+      expect(await state.storage.getAlarm()).toBeNull();
+      expect(await state.storage.get("epoch")).toBe(STORE_EPOCH);
+    });
   });
 });

@@ -19,7 +19,10 @@ export type SyncSummary = { readonly pulled: number; readonly pushed: number };
 
 export type SyncClient = {
   readonly status: StoreApi<SyncStatus>;
-  /** Push the outbox, then pull since the cursor. Concurrent calls share one run. */
+  /**
+  Pull since the cursor (confirming the server store's id), push the outbox, then pull what
+  the push made. Concurrent calls share one run.
+  */
   readonly syncNow: () => Promise<Result<SyncSummary, string>>;
   /** Runs now, then every `intervalMs`; failures retry with exponential backoff (1s..60s). */
   readonly start: (options: { readonly intervalMs: number }) => void;
@@ -68,6 +71,31 @@ const validEvents = (items: readonly unknown[]): readonly Event[] =>
     return parsed.ok ? [parsed.value] : [];
   });
 
+/**
+Whether a page comes from the server store the local log belongs to. The first pull of an
+empty cursor adopts the store's id. A different id (or a log pulled before ids existed)
+means the server's data was reset: the local log, its outbox and the cursor belong to
+nothing any more, so they are dropped and the state is rebuilt empty under the new id.
+*/
+const isSameStore = async (
+  store: EventStore,
+  state: AppStateHandle,
+  page: { readonly since: number; readonly storeId: string },
+): Promise<boolean> => {
+  const known = await store.getStoreId();
+  if (known === page.storeId) {
+    return true;
+  }
+  if (known === null && page.since === 0) {
+    await store.setStoreId(page.storeId);
+    return true;
+  }
+  await store.clear();
+  await store.setStoreId(page.storeId);
+  await state.rematerialize();
+  return false;
+};
+
 const pullSince = async (
   api: ApiClient,
   store: EventStore,
@@ -76,8 +104,15 @@ const pullSince = async (
   let pulled = 0;
   let isMore = true;
   while (isMore) {
-    const since = String(await store.getCursor());
-    const page = await api.call(endpoints.sync.pull, { query: { limit: PULL_LIMIT, since } });
+    const since = await store.getCursor();
+    const page = await api.call(endpoints.sync.pull, {
+      query: { limit: PULL_LIMIT, since: String(since) },
+    });
+    if (!(await isSameStore(store, state, { since, storeId: page.storeId }))) {
+      // Dropped: start again from the fresh store's first event.
+      pulled = 0;
+      continue;
+    }
     const events = validEvents(page.events);
     await state.ingest(events);
     await store.setCursor(page.seq);
@@ -102,8 +137,12 @@ const runSync = async (
   status.setState({ syncing: true });
   try {
     await state.ready;
+    // The pull goes first: it confirms the store id, so an outbox meant for a store that
+    // was reset since is dropped instead of landing in the fresh one.
+    const before = await pullSince(api, store, state);
     const { pushed, rejected } = await pushOutbox(api, store);
-    const pulled = await pullSince(api, store, state);
+    // What the server derived from the pushed events comes back at once.
+    const pulled = before + (pushed > 0 ? await pullSince(api, store, state) : 0);
     status.setState({
       lastError: rejected.length === 0 ? null : `push rejected: ${rejected.join(", ")}`,
       lastSyncAt: now(),

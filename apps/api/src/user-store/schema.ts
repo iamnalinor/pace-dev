@@ -17,19 +17,6 @@ export const events = sqliteTable(
   (table) => [index("events_occurred_idx").on(table.occurredAt)],
 );
 
-/** High-volume phone observations (usage, calendar) — facts, not decisions; never events. */
-export const observations = sqliteTable(
-  "observations",
-  {
-    seq: integer().primaryKey({ autoIncrement: true }),
-    kind: text().notNull(),
-    key: text().notNull(),
-    at: text().notNull(),
-    payload: text().notNull(),
-  },
-  (table) => [index("observations_kind_key_idx").on(table.kind, table.key)],
-);
-
 /** A phone's calendar copy: one row per occurrence, replaced range by range by that phone. */
 export const calendarEvents = sqliteTable(
   "calendar_events",

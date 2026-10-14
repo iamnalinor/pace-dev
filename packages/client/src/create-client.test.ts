@@ -7,6 +7,7 @@ import { createPaceClient, type PaceClient } from "./create-client.ts";
 import {
   createFakeFetch,
   emptySyncRoutes,
+  fakeMe,
   type FakeRoute,
   fakeUser,
   problem,
@@ -21,7 +22,7 @@ const setup = async (
   if (storedToken !== undefined) {
     await session.set(storedToken);
   }
-  const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeUser, ...routes });
+  const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe, ...routes });
   const client = createPaceClient({
     baseUrl: "https://api.test",
     deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -54,7 +55,11 @@ describe("createPaceClient", () => {
       ok: true,
       value: { pulled: 0, pushed: 1 },
     });
-    expect(api.pathsCalled("/api/sync")).toEqual(["/api/sync/push", "/api/sync/pull"]);
+    expect(api.pathsCalled("/api/sync")).toEqual([
+      "/api/sync/pull",
+      "/api/sync/push",
+      "/api/sync/pull",
+    ]);
     expect(client.state.store.getState().settings.language).toBe("ru");
   });
 

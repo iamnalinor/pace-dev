@@ -6,7 +6,7 @@ import { useNewTaskRequest } from "#app/shared/new-task-request.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { fakeUser } from "@pace/client/testing";
+import { fakeMe } from "@pace/client/testing";
 
 import { Sidebar } from "./sidebar.tsx";
 
@@ -76,7 +76,7 @@ describe("Sidebar", () => {
 
   it("falls back to the first word of the full name for a session that predates the first name", async () => {
     const runtime = await createTestRuntime({
-      routes: { "GET /api/me": () => ({ ...fakeUser, firstName: null, name: "Ann Lee" }) },
+      routes: { "GET /api/me": () => ({ ...fakeMe, firstName: null, name: "Ann Lee" }) },
       world: "empty",
     });
     await runtime.auth.me();

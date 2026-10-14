@@ -43,12 +43,12 @@ export const mountSyncRoutes = (app: Hono<AppEnv>): void => {
 
   mount(app, endpoints.sync.pull, async ({ c, query }) => {
     const result = await userStore(c).list(query.since, query.limit);
-    return ok({ events: [...result.events], more: result.more, seq: result.seq });
-  });
-
-  mount(app, endpoints.sync.observations, async ({ c, body }) => {
-    const accepted = await userStore(c).appendObservations(body.observations);
-    return ok({ accepted });
+    return ok({
+      events: [...result.events],
+      more: result.more,
+      seq: result.seq,
+      storeId: result.storeId,
+    });
   });
 
   mountLiveRoute(app);

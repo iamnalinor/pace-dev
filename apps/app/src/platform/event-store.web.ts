@@ -7,6 +7,7 @@ import { createMemoryEventStore, type EventStore } from "@pace/client";
 const DB_NAME = "pace";
 const DB_VERSION = 1;
 const CURSOR_KEY = "cursor";
+const STORE_ID_KEY = "storeId";
 
 type PaceDb = DBSchema & {
   readonly events: {
@@ -18,7 +19,7 @@ type PaceDb = DBSchema & {
   readonly pending: { readonly key: string; readonly value: { readonly id: string } };
   readonly meta: {
     readonly key: string;
-    readonly value: { readonly key: string; readonly value: number };
+    readonly value: { readonly key: string; readonly value: number | string };
   };
 };
 
@@ -87,7 +88,11 @@ const idbBackend = (db: Db): EventStore => ({
   },
   getCursor: async () => {
     const row = await db.get("meta", CURSOR_KEY);
-    return row?.value ?? 0;
+    return typeof row?.value === "number" ? row.value : 0;
+  },
+  getStoreId: async () => {
+    const row = await db.get("meta", STORE_ID_KEY);
+    return typeof row?.value === "string" ? row.value : null;
   },
   listAll: async () => await db.getAllFromIndex("events", "byOccurredAt"),
   listPending: async () => await listPending(db),
@@ -96,6 +101,9 @@ const idbBackend = (db: Db): EventStore => ({
   },
   setCursor: async (seq) => {
     await db.put("meta", { key: CURSOR_KEY, value: seq });
+  },
+  setStoreId: async (storeId) => {
+    await db.put("meta", { key: STORE_ID_KEY, value: storeId });
   },
 });
 
@@ -111,7 +119,7 @@ const openBackend = async (): Promise<EventStore> => {
   }
 };
 
-/** The local event log in IndexedDB (database `pace`): events, the outbox and the sync cursor. */
+/** The local event log in IndexedDB (database `pace`): events, the outbox, the cursor and the store id. */
 export const createEventStore = (): EventStore => {
   let backendPromise: Promise<EventStore> | undefined;
   const call = async <T>(run: (store: EventStore) => Promise<T>): Promise<T> => {
@@ -131,6 +139,7 @@ export const createEventStore = (): EventStore => {
       });
     },
     getCursor: async () => await call(async (store) => await store.getCursor()),
+    getStoreId: async () => await call(async (store) => await store.getStoreId()),
     listAll: async () => await call(async (store) => await store.listAll()),
     listPending: async () => await call(async (store) => await store.listPending()),
     markSynced: async (ids) => {
@@ -141,6 +150,11 @@ export const createEventStore = (): EventStore => {
     setCursor: async (seq) => {
       await call(async (store) => {
         await store.setCursor(seq);
+      });
+    },
+    setStoreId: async (storeId) => {
+      await call(async (store) => {
+        await store.setStoreId(storeId);
       });
     },
   };

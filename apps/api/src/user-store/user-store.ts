@@ -1,5 +1,4 @@
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 
 import {
   type CalendarEvent,
@@ -25,7 +24,6 @@ import type {
   DryRunResult,
   EventPage,
   JsonValue,
-  Observation,
   ReadResult,
   Simulation,
   SimulationArgs,
@@ -37,7 +35,6 @@ import type {
 import type { Cooldowns } from "../shared/llm/llm.ts";
 import type { TelegramTarget } from "../shared/telegram-api.ts";
 
-import migrations from "../../drizzle/do/migrations.js";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import * as cloud from "./cloud-data.ts";
 import { insertDecisions, listDecisions } from "./decision-log.ts";
@@ -58,6 +55,7 @@ import {
   toRpcState,
   touchedBy,
 } from "./state.ts";
+import { openStore, resetStore, storeIdOf } from "./store-identity.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -81,9 +79,10 @@ const toStored = (event: Event): StoredEvent => event;
 
 /**
 One instance per user (id = user id): the event log, the materialized state, the SQL
-projections, decisions and alarms. Migrations run before the first request touches
-storage. The state is cached in memory with the log sequence it was built at and
-rebuilt when the cache is stale or a batch cannot be applied in order.
+projections, decisions and alarms. Before the first request touches storage, a store from
+another epoch is emptied (see `STORE_EPOCH`) and migrations run. The state is cached in
+memory with the log sequence it was built at and rebuilt when the cache is stale or a batch
+cannot be applied in order.
 */
 export class UserStore extends LiveStore {
   #cache: Materialized | undefined;
@@ -95,7 +94,7 @@ export class UserStore extends LiveStore {
     this.db = drizzle(ctx.storage, { casing: "snake_case", schema });
     // eslint-disable-next-line sonarjs/no-async-constructor -- blockConcurrencyWhile is the documented way to migrate before the first request
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+      await openStore(this.db, ctx.storage);
     });
   }
 
@@ -153,13 +152,17 @@ export class UserStore extends LiveStore {
   }
   /**
   Deletes the account's data: the event log, every projection, reminders and the alarm.
-  The empty store migrates again, so it serves the next login of the same person from scratch.
+  The empty store migrates again under a new store id, so it serves the next login of the
+  same person from scratch and a device still holding the old copy drops it.
   */
   async wipe(): Promise<void> {
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
     this.#cache = undefined;
-    await migrate(this.db, migrations);
+    await resetStore(this.db, this.ctx.storage);
+  }
+
+  /** The store's id (see `storeIdOf`): it changes only when the store is wiped. */
+  async storeId(): Promise<string> {
+    return await storeIdOf(this.ctx.storage);
   }
 
   /** Smoke check used by tests: the schema is in place. */
@@ -184,19 +187,20 @@ export class UserStore extends LiveStore {
     return { accepted, rejected, seq: await log.latestSeq(this.db) };
   }
 
-  /** Events after `since` in sequence order; `seq` is the cursor for the next call. */
-  async list(since: number, limit: number): Promise<EventPage> {
-    return await log.listPage(this.db, since, limit);
+  /**
+  Events after `since` in sequence order; `seq` is the cursor for the next call. The store id
+  comes in the same call, so a page and the id it belongs to can never come from two stores.
+  */
+  async list(since: number, limit: number): Promise<EventPage & { readonly storeId: string }> {
+    return {
+      ...(await log.listPage(this.db, since, limit)),
+      storeId: await storeIdOf(this.ctx.storage),
+    };
   }
 
   /** One event by id, corrections included; `undefined` when the log has no such id. */
   async find(id: string): Promise<StoredEvent | undefined> {
     return await log.findEvent(this.db, id);
-  }
-
-  /** Append-only facts from the phone; a `kind+key` pair is stored once. Returns how many were new. */
-  async appendObservations(observations: readonly Observation[]): Promise<number> {
-    return await log.insertObservations(this.db, observations);
   }
 
   /** The materialized state as of `now`, with the system events due by then derived first. */

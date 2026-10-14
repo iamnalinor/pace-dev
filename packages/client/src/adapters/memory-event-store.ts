@@ -8,6 +8,7 @@ export const createMemoryEventStore = (): EventStore => {
   const events = new Map<string, Event>();
   const pending = new Set<string>();
   let cursor = 0;
+  let storeId: null | string = null;
   return {
     append: async (incoming) => {
       for (const event of incoming) {
@@ -23,8 +24,10 @@ export const createMemoryEventStore = (): EventStore => {
       events.clear();
       pending.clear();
       cursor = 0;
+      storeId = null;
     },
     getCursor: async () => cursor,
+    getStoreId: async () => storeId,
     listAll: async () => events.values().toArray(),
     listPending: async () =>
       events
@@ -38,6 +41,9 @@ export const createMemoryEventStore = (): EventStore => {
     },
     setCursor: async (seq) => {
       cursor = seq;
+    },
+    setStoreId: async (id) => {
+      storeId = id;
     },
   };
 };

@@ -9,6 +9,7 @@ import { requireUser } from "../shared/current-user.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
 import { loginPayload } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
+import { userStoreOf } from "../shared/user-store-of.ts";
 import { readBearer } from "./auth-middleware.ts";
 import { mountDeviceRoutes } from "./device-routes.ts";
 import { consumeNonce, createNonce } from "./nonce.ts";
@@ -130,7 +131,9 @@ export const mountAuthRoutes = (app: Hono<AppEnv>): void => {
     }
     return ok({ ok: true as const });
   });
-  mount(app, endpoints.me, ({ c }) => ok(requireUser(c)));
+  mount(app, endpoints.me, async ({ c }) =>
+    ok({ ...requireUser(c), storeId: await userStoreOf(c).storeId() }),
+  );
   mount(app, endpoints.auth.dev, devLogin);
   mountDeviceRoutes(app);
 };

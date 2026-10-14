@@ -1,5 +1,5 @@
 import { type Clock, createMemoryEventStore, createMemorySessionStore } from "@pace/client";
-import { createFakeFetch, emptySyncRoutes, type FakeRoute, fakeUser } from "@pace/client/testing";
+import { createFakeFetch, emptySyncRoutes, fakeMe, type FakeRoute } from "@pace/client/testing";
 import { artboardEvents, MOSCOW, NOW } from "@pace/core/testing";
 
 import { createRuntime, type PaceRuntime } from "../runtime.ts";
@@ -24,7 +24,7 @@ export const frozenClock = ({ deviceTz = MOSCOW, now = NOW }: TestWorld = {}): C
 export const createTestRuntime = async (options: TestWorld = {}): Promise<PaceRuntime> => {
   const api = createFakeFetch({
     ...emptySyncRoutes,
-    "GET /api/me": () => fakeUser,
+    "GET /api/me": () => fakeMe,
     ...options.routes,
   });
   const runtime = await createRuntime({

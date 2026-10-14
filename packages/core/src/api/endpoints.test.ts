@@ -29,7 +29,6 @@ describe("endpoints", () => {
     expect(endpoints.me.auth).toBe(true);
     expect(endpoints.sync.push.auth).toBe(true);
     expect(endpoints.sync.pull.auth).toBe(true);
-    expect(endpoints.sync.observations.auth).toBe(true);
   });
 
   it("accepts the Telegram Login Widget payload with optional fields", () => {

@@ -2,8 +2,15 @@ import { act, render, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
 import { AppState, Text } from "react-native";
 
-import { createMemoryEventStore, createMemorySessionStore } from "@pace/client";
-import { createFakeFetch, emptySyncRoutes, fakeUser } from "@pace/client/testing";
+import { createMemoryEventStore, createMemorySessionStore, type EventStore } from "@pace/client";
+import {
+  createFakeFetch,
+  emptySyncRoutes,
+  fakeMe,
+  type FakeRoute,
+  fakeUser,
+  problem,
+} from "@pace/client/testing";
 import { addMinutesIso } from "@pace/core";
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
@@ -22,25 +29,30 @@ const Probe = () => {
   );
 };
 
-const setup = async (): Promise<{
+const setup = async (
+  routes: Readonly<Record<string, FakeRoute>> = {},
+): Promise<{
   readonly api: ReturnType<typeof createFakeFetch>;
+  readonly eventStore: EventStore;
   readonly runtime: PaceRuntime;
 }> => {
   const api = createFakeFetch({
     ...emptySyncRoutes,
-    "GET /api/me": () => fakeUser,
+    "GET /api/me": () => fakeMe,
     "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
     "POST /api/auth/logout": () => ({ ok: true }),
+    ...routes,
   });
+  const eventStore = createMemoryEventStore();
   const runtime = await createRuntime({
     baseUrl: "https://api.test",
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    eventStore: createMemoryEventStore(),
+    eventStore,
     fetch: api.fetch,
     session: createMemorySessionStore(),
   });
   await runtime.state.ready;
-  return { api, runtime };
+  return { api, eventStore, runtime };
 };
 
 // eslint-disable-next-line @typescript-eslint/unbound-method -- inspecting the jest mock, never calling it
@@ -183,6 +195,40 @@ describe("PaceProvider", () => {
       expect(screen.getByTestId("title")).toHaveTextContent("Now");
     });
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+  });
+
+  it("drops the local log, outbox, cursor and store id when a 401 signs the device out", async () => {
+    const { eventStore, runtime } = await setup({
+      "GET /api/me": () => problem(401, "auth/unauthorized"),
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    });
+    await act(async () => {
+      runtime.sync.stop();
+      await runtime.state.dispatch({
+        occurredAt: "2026-10-06T10:00:00.000Z",
+        payload: { language: "ru" },
+        type: "settings.updated",
+      });
+    });
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("title")).toHaveTextContent("Now");
+    });
+    await expect(eventStore.listAll()).resolves.toEqual([]);
+    await expect(eventStore.listPending()).resolves.toEqual([]);
+    await expect(eventStore.getCursor()).resolves.toBe(0);
+    await expect(eventStore.getStoreId()).resolves.toBeNull();
   });
 });
 

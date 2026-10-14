@@ -111,9 +111,9 @@ Reducers are `(state, event) => state` and pure. `settings-reducer.ts` is the fi
 (`settings.updated` patches `language`, `timezone`, `digestWindows`, `quietHours` on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
-High-volume phone facts (app usage, calendar entries, sleep candidates) are **not**
-events. They are *observations* (`kind`, `key`, `at`, `payload`), stored once per
-`kind+key`; only derived decisions become events.
+High-volume phone facts (the calendar copy, app usage) are **not** events. They have
+their own tables in the Durable Object (`calendar_events`, `usage_sessions`), replaced or
+added per device through the cloud routes; only derived decisions become events.
 
 ## API contract
 
@@ -174,14 +174,22 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 | Call | Request | Response | Rules |
 |---|---|---|---|
 | `POST /api/sync/push` | `{ events: Event[] }` (≤ 500) | `{ accepted: id[], rejected: { id, reason }[], seq }` | each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
-| `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again |
-| `POST /api/sync/observations` | `{ observations }` (≤ 1000) | `{ accepted: n }` | append-only, idempotent by `kind+key` |
+| `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
 | `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
 
 The client sends a local change within 0.8 s of writing it (and what is unsent when the tab
 is hidden or the app goes to the background), pulls on every `changed` and on every
 reconnect of the live socket (back after 1 s, 2 s, … 60 s), and polls as a safety net: every
 5 minutes while the socket is up, every 30 s while it is down.
+
+**The store id.** Every user store has a random `storeId` (16 bytes, base64url), made when it
+is created and again whenever it is wiped (account deletion, an epoch change). The pull
+answers it (so does `GET /api/me`). The client keeps it next to its cursor: the first pull
+of an empty cursor adopts it; a different one means the server's data was reset, so the
+client drops its local log, outbox and cursor, keeps the new id and pulls from 0. A run
+pulls before it pushes, so an outbox meant for a store that no longer exists never lands
+in the fresh one; it pulls again after a push for what the server derived from it. Signing
+out (a 401 on `/api/me` included) drops the local log, outbox, cursor and id as well.
 
 The transport validates only the envelope (`SyncEventSchema`); the per-type payload is
 checked by the Durable Object. `seq` is a server-assigned integer, so a client that
@@ -194,11 +202,15 @@ materialization rule above decides whether an incremental apply is enough.
 instance per user (`USER_STORE.idFromName(user.id)`). Storage is the DO's SQLite through
 drizzle (`drizzle-orm/durable-sqlite`); migrations (`drizzle/do`, bundled as
 `migrations.js`) run in the constructor inside `blockConcurrencyWhile`, so no request
-sees a half-migrated store. Tables (`user-store/schema.ts`): `events` (`seq` primary key,
-`id` unique, indexed by `occurredAt`), `observations`, `decisions` (every automatic
-decision with its inputs, for "why?"), `meta` (cursors, budgets) and the projections
-`tasks`, `subtasks`, `projects`, `presets` (the materialized state as SQL rows for SQL
-readers; never the source of truth).
+sees a half-migrated store. Before they run, a store whose stored epoch is not
+`STORE_EPOCH` (`user-store/store-identity.ts`; a store from before epochs has none) is
+emptied: `deleteAll` (SQL tables and keys) and its alarm. Raising the epoch drops every
+user's data at once, so a breaking change never needs a data migration (and the DO
+migrations could be squashed into one `0000`). Tables (`user-store/schema.ts`): `events`
+(`seq` primary key, `id` unique, indexed by `occurredAt`), `calendar_events`,
+`usage_sessions`, `decisions` (every automatic decision with its inputs, for "why?"),
+`meta` (cursors, budgets) and the projections `tasks`, `subtasks`, `projects`, `presets`
+(the materialized state as SQL rows for SQL readers; never the source of truth).
 
 The object keeps core's `CoreState` materialized in memory (`user-store/state.ts`), tagged
 with the log `seq` it was built at; a cache behind the log is rebuilt. A batch that is in
@@ -212,7 +224,7 @@ append (a client's sync push, an `apply`) and before every read and every `apply
 (`user-store/derive-steps.ts`), with deterministic ids, so they are idempotent
 against clients that derived the same events.
 
-Methods: `append` and `list` (sync), `appendObservations`, `find(id)`, `read(now)`,
+Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,
 `apply(inputs, { source, deviceId, now })` (derives, then validates the batch in order with
 core's `validateEventInput`, the first refusal stops it and none of it is written; stamps
 ids, `recordedAt` and the device; returns the stored events and the new state), `dryRun`

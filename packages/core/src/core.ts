@@ -14,6 +14,8 @@ export {
   AuthSessionSchema,
   DevLoginSchema,
   LogoutSchema,
+  type Me,
+  MeSchema,
   NonceCreatedSchema,
   NoncePollSchema,
   type TelegramLogin,
@@ -46,12 +48,9 @@ export {
   requestedScopes,
 } from "./api/schemas/oauth.ts";
 export {
-  type Observation,
-  ObservationSchema,
+  StoreIdSchema,
   type SyncEvent,
   SyncEventSchema,
-  SyncObservationsBodySchema,
-  SyncObservationsOutputSchema,
   SyncPullOutputSchema,
   SyncPullQuerySchema,
   SyncPushBodySchema,

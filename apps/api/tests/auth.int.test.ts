@@ -34,7 +34,10 @@ describe("dev login", () => {
       telegramId: "1001",
       username: null,
     });
-    expect(await json("/api/me", { token: session.token })).toEqual(session.user);
+    expect(await json("/api/me", { token: session.token })).toEqual({
+      ...session.user,
+      storeId: expect.any(String) as string,
+    });
   });
 
   it("refuses ids outside the whitelist", async () => {
@@ -63,7 +66,6 @@ describe("bearer sessions", () => {
     endpoints.auth.logout,
     endpoints.sync.push,
     endpoints.sync.pull,
-    endpoints.sync.observations,
   ];
 
   it.each(protectedEndpoints)("$method $path is 401 without a bearer", async (endpoint) => {

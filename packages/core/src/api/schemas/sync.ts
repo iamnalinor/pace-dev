@@ -37,27 +37,17 @@ export const SyncPullQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
 
+/**
+The identity of the user's store on the server, made anew whenever the store is wiped. A
+client keeps the id its local log came from; a different one means the server's data was
+reset, so the local copy and its outbox belong to nothing any more and are dropped.
+*/
+export const StoreIdSchema = z.string().min(1).max(64);
+
 export const SyncPullOutputSchema = z.object({
   events: z.array(SyncEventSchema),
   /** Cursor for the next pull: the sequence number of the last event returned. */
   seq: z.number().int().nonnegative(),
   more: z.boolean(),
-});
-
-export const ObservationSchema = z.object({
-  kind: z.string().min(1).max(64),
-  key: z.string().min(1).max(256),
-  at: z.iso.datetime({ offset: true }),
-  payload: z.unknown(),
-});
-
-export type Observation = z.output<typeof ObservationSchema>;
-
-export const SyncObservationsBodySchema = z.object({
-  observations: z.array(ObservationSchema).max(1000),
-});
-
-export const SyncObservationsOutputSchema = z.object({
-  /** Observations newly stored (duplicates by kind+key are skipped). */
-  accepted: z.number().int().nonnegative(),
+  storeId: StoreIdSchema,
 });
