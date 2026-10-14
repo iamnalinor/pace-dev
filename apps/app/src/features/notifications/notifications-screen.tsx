@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 
 import type { DeliveryEntry } from "@pace/client";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
@@ -142,17 +142,35 @@ const Answers = ({ item }: { readonly item: PoolNotification }) => {
   );
 };
 
+/** How it went out: to a device through its push method, or the Telegram copy. */
 const deliveryText = (entry: DeliveryEntry, t: ReturnType<typeof useT>, zone: string): string => {
+  const time = clockTime(entry.at, zone);
+  if (entry.method === "telegram" && entry.result !== "queued") {
+    return t(`notifications.delivery.telegram.${entry.result}`, { time });
+  }
   const method =
     entry.method === "fcm" || entry.method === "poll"
       ? t(`notifications.method.${entry.method}`)
       : entry.method;
-  return t(`notifications.delivery.${entry.result}`, {
-    device: entry.device,
-    method,
-    time: clockTime(entry.at, zone),
-  });
+  return t(`notifications.delivery.${entry.result}`, { device: entry.device, method, time });
 };
+
+/** Each delivery's line, and a second one once it was taken back. */
+const deliveryLines = (
+  entry: DeliveryEntry,
+  t: ReturnType<typeof useT>,
+  zone: string,
+): readonly string[] => [
+  deliveryText(entry, t, zone),
+  ...(entry.dismissedAt === null
+    ? []
+    : [
+        t("notifications.delivery.dismissed", {
+          device: entry.device,
+          time: clockTime(entry.dismissedAt, zone),
+        }),
+      ]),
+];
 
 const Item = ({
   deliveries,
@@ -175,14 +193,15 @@ const Item = ({
         </Text>
       </View>
       <Answers item={item} />
-      {deliveries.map((entry) => (
-        <Text
-          className="font-sans text-[11px] text-faint"
-          key={`${entry.device}${entry.at}${entry.result}`}
-        >
-          {deliveryText(entry, t, zoned.zone)}
-        </Text>
-      ))}
+      {deliveries
+        .flatMap((entry) => deliveryLines(entry, t, zoned.zone))
+        .map((line, index) => (
+          // Lines repeat (two devices, one minute): their place keeps them apart.
+          // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
+          <Text className="font-sans text-[11px] text-faint" key={index}>
+            {line}
+          </Text>
+        ))}
     </View>
   );
 };
@@ -196,9 +215,9 @@ export const NotificationsScreen = () => {
   const t = useT();
   const router = useRouter();
   const viewer = useViewer();
-  const { clock } = usePace();
-  const { deliveries, feed, model, status } = useFeed();
-  const zoned: Zoned = { language: viewer.language, now: viewer.now, zone: clock.deviceTz };
+  const { deliveries, feed, model, status, zone } = useFeed();
+  // The zone the feed grouped its days in: the times under each day are in it too.
+  const zoned: Zoned = { language: viewer.language, now: viewer.now, zone };
   useEffect(() => {
     void feed.refresh();
   }, [feed]);

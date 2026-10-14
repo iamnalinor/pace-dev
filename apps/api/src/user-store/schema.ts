@@ -116,14 +116,14 @@ export const notificationDeliveries = sqliteTable(
     sessionId: text().notNull(),
     /** The device as its session is named ("android", later the phone's name). */
     device: text().notNull(),
-    /** The push method (`fcm`, `poll`). */
+    /** The push method (`fcm`, `poll`), or `telegram` for the Telegram copy. */
     method: text().notNull(),
-    /** Where it went (the FCM token; the session for polling). */
+    /** Where it went (the FCM token; the session for polling; the Telegram chat). */
     endpoint: text().notNull(),
     attemptedAt: text().notNull(),
-    /** `sent` | `failed`. */
+    /** `queued` | `sent` | `failed`. */
     result: text().notNull(),
-    /** Why it failed (`gone`, `auth`, `failed`). */
+    /** Why it failed (`gone`, `unavailable`, `failed`). */
     reason: text(),
     /** When the copy was taken back from the device. */
     dismissedAt: text(),
