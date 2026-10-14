@@ -47,10 +47,15 @@ export const enNotify = {
   "notifications.method.fcm": "Google",
   "notifications.method.poll": "Pace",
   "settings.notifications": "Notifications",
+  "settings.push.hint": "How this phone shows them",
+  "settings.push.option.fcm": "Google",
+  "settings.push.option.poll": "Pace checks",
+  "settings.push.option.none": "Off",
   "settings.push.fcm": "On this phone they come through Google's push service.",
-  "settings.push.poll":
-    "On this phone they come with its regular check, about every 15 minutes, and at once while Pace is open.",
-  "settings.push.none":
+  "settings.push.poll": "On this phone they show while Pace is open: it checks for them then.",
+  "settings.push.none": "This phone shows none; the bell still has them all.",
+  "settings.push.denied":
     "This phone shows none: notifications are not allowed (Settings → Permissions).",
+  "settings.push.unavailable": "{method} is not available right now.",
   "settings.notifications.hint": "Where each kind of notification goes.",
 } as const;

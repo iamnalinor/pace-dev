@@ -9,7 +9,9 @@ import { createFakeFetch } from "@pace/client/testing";
 import {
   pollNow,
   pushMethodOf,
+  pushStore,
   registerPush,
+  setPushChoice,
   setupNotificationCategories,
 } from "./notifications.ts";
 import { handlePushTask } from "./push-task.ts";
@@ -37,15 +39,20 @@ const apiWith = (routes: Parameters<typeof createFakeFetch>[0]) => {
   };
 };
 
-const registering = (pushMethods: readonly string[]) =>
+/** A server offering `pushMethods`; it refuses (409) the ones in `refusing` all the same. */
+const registering = (pushMethods: readonly string[], refusing: readonly string[] = []) =>
   apiWith({
     "GET /api/push/methods": () => ({ pushMethods }),
-    "PUT /api/push/subscription": ({ body }) => ({
-      method: (body as { method: string }).method,
-    }),
+    "PUT /api/push/subscription": ({ body }) => {
+      const { method } = body as { method: string };
+      return refusing.includes(method)
+        ? Response.json({ code: "push/method-unavailable", message: "No" }, { status: 409 })
+        : { method };
+    },
   });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await setPushChoice(null);
   fake.state.granted = true;
   fake.state.pushToken = null;
   fake.state.scheduled = [];
@@ -68,6 +75,41 @@ describe("registerPush", () => {
     const serverWithout = registering(["poll"]);
     expect(await registerPush(serverWithout.api)).toBe("poll");
     expect(serverWithout.fetcher.calls.at(-1)?.body).toEqual({ method: "poll" });
+  });
+
+  it("keeps the method chosen in Settings: polling on a phone that has Google's push", async () => {
+    fake.state.pushToken = "fcm-token";
+    await setPushChoice("poll");
+    const { api, fetcher } = registering(["fcm", "poll"]);
+    expect(await registerPush(api)).toBe("poll");
+    expect(fetcher.calls.at(-1)?.body).toEqual({ method: "poll" });
+    expect(pushStore.getState()).toMatchObject({ choice: "poll", method: "poll" });
+  });
+
+  it("registers none when chosen, without asking which methods the server has", async () => {
+    fake.state.pushToken = "fcm-token";
+    await setPushChoice("none");
+    const { api, fetcher } = registering(["fcm", "poll"]);
+    expect(await registerPush(api)).toBe("none");
+    expect(fetcher.pathsCalled("/api/push/methods")).toEqual([]);
+    expect(fetcher.calls.at(-1)?.body).toEqual({ method: "none" });
+  });
+
+  it("falls back from the chosen method only when the server does not take it", async () => {
+    fake.state.pushToken = "fcm-token";
+    await setPushChoice("fcm");
+    const notOffered = registering(["poll"]);
+    expect(await registerPush(notOffered.api)).toBe("poll");
+    const refused = registering(["fcm", "poll"], ["fcm"]);
+    expect(await registerPush(refused.api)).toBe("poll");
+    expect(refused.fetcher.calls.map((call) => call.body)).toEqual([
+      undefined,
+      { endpoint: "fcm-token", method: "fcm" },
+      { method: "poll" },
+    ]);
+    // The choice stays: Google is used again once the server takes it.
+    expect(pushStore.getState()).toMatchObject({ choice: "fcm", method: "poll" });
+    expect(await registerPush(registering(["fcm", "poll"]).api)).toBe("fcm");
   });
 
   it("registers none without the notification permission", async () => {
