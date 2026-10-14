@@ -193,7 +193,7 @@ the workflow do it.
 |---|---|---|
 | `ci.yml` | pull requests and pushes to `main` (not for docs-only changes), manual | one checks job (lint with a clean tree afterwards, `bun audit`, unit, app, api), then e2e once it passes; manual runs also build the arm64 **release APK** as an artifact (R8 and all, unpublished; the step summary shows its size) |
 | `deploy.yml` | after a green CI on `main`, or manual | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
-| `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk` |
+| `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk`, sends the APK to the owner in Telegram when `TELEGRAM_RELEASE_CHAT_ID` is set |
 | `mutation.yml` | manual | Stryker on core and web |
 | `llm-regression.yml` | manual | `bun test:llm` with real providers (stage 2) |
 
@@ -207,8 +207,9 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider; several keys may be given (comma or newline separated): a key that hits its rate limit rests while the next one answers |
-| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; several keys rotate the same way |
+| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider; one or more keys separated by commas (or one per line): a key that hits its rate limit rests while the next one answers |
+| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; one or more keys separated by commas (or one per line), rotated the same way |
+| `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
 
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
@@ -218,7 +219,10 @@ Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_U
 
 ## Android release
 
-Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA updates.
+Releases are APKs (arm64-v8a, about 25 MB) on GitHub Releases, not the Play Store, and there are no OTA updates.
+Set the repository variable `TELEGRAM_RELEASE_CHAT_ID` to your Telegram user id to get each
+release's APK from the bot (open the bot once first); a bot may send files up to 50 MB, and the
+release job fails the Telegram step if the APK ever grows past that.
 `apps/app/app-version.ts` derives `version` and `versionCode` from the tag (`v1.2.3` →
 `1.2.3`, `10203000`). A build between releases sits on the last tag (`git describe`):
 `1.2.3-dev.7+cfd5334` (7 commits since), and its code adds the hours from the tag's commit to

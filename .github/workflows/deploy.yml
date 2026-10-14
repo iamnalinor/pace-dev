@@ -95,12 +95,14 @@ jobs:
         working-directory: apps/api
         run: if [ -n "$WEBHOOK_SECRET" ]; then printf '%s' "$WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
 
+      # Several keys may be given, separated by commas, newlines or spaces: every run of
+      # separators becomes one comma and the ends are trimmed. The Worker splits them again.
       - name: Secret GROQ_API_KEY
         working-directory: apps/api
         env:
           VALUE: ${{ secrets.GROQ_API_KEY }}
         run: |
-          VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+          VALUE="$(printf '%s' "$VALUE" | tr -s '[:space:],' ',' | sed 's/^,//; s/,$//')"
           if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GROQ_API_KEY; fi
 
       - name: Secret GEMINI_API_KEY
@@ -108,7 +110,7 @@ jobs:
         env:
           VALUE: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+          VALUE="$(printf '%s' "$VALUE" | tr -s '[:space:],' ',' | sed 's/^,//; s/,$//')"
           if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GEMINI_API_KEY; fi
 
       # BOT_INFO is the JSON of getMe, stored at deploy time so the bot never calls Telegram

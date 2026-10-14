@@ -133,6 +133,7 @@ jobs:
           } > release/notes.md
 
       - uses: softprops/action-gh-release@v3
+        id: release
         with:
           tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
@@ -141,3 +142,33 @@ jobs:
           body_path: release/notes.md
           files: release/pace-${{ env.TAG }}.apk
           fail_on_unmatched_files: true
+
+      # The bot sends the APK to the owner's private chat; set the repository variable
+      # TELEGRAM_RELEASE_CHAT_ID (the owner's Telegram user id, who must have opened the bot
+      # once) to turn it on. The Bot API accepts files up to 50 MB, so fail loudly beyond it.
+      # The token and the other values go through env:, never into the command text.
+      - name: Send the APK to Telegram
+        if: ${{ vars.TELEGRAM_RELEASE_CHAT_ID != '' }}
+        env:
+          RAW_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ vars.TELEGRAM_RELEASE_CHAT_ID }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+        run: |
+          TELEGRAM_BOT_TOKEN="$(printf '%s' "$RAW_TOKEN" | tr -d '[:space:]')"
+          if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "TELEGRAM_RELEASE_CHAT_ID is set but the TELEGRAM_BOT_TOKEN secret is empty"
+            exit 1
+          fi
+          echo "::add-mask::$TELEGRAM_BOT_TOKEN"
+          APK="release/pace-${TAG}.apk"
+          SIZE="$(stat -c %s "$APK")"
+          LIMIT=$((50 * 1024 * 1024))
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "The APK is $SIZE bytes, over the 50 MB (52428800 bytes) a bot may send: not sending it to Telegram"
+            exit 1
+          fi
+          curl -sS --fail-with-body \
+            -F chat_id="$CHAT_ID" \
+            -F document=@"$APK" \
+            -F caption="Pace ${TAG} — ${RELEASE_URL}" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
