@@ -364,8 +364,13 @@ describe("still doing X?", () => {
       await instance.resolveNotification(id, "still", { couriers, now, origin: "telegram" });
       const { state } = await instance.read(now);
       expect(state.time.activities["a-commute"]).toMatchObject({ stillAt: now });
-      // Answered in Telegram: the bot edits the message there, nothing is deleted.
+      // Answered in Telegram: the bot edits the message there, nothing is deleted, and the
+      // feed does not claim it was taken back from Telegram.
       expect(telegram.calls.map((entry) => entry.method)).toEqual(["sendMessage"]);
+      const page = await instance.listNotifications({ limit: 5 });
+      expect(page.deliveries[id]).toEqual([
+        expect.objectContaining({ dismissedAt: null, method: "telegram", result: "sent" }),
+      ]);
 
       // The next ask, at twice as far again, then a stop from the phone. Taking it back runs
       // with the Worker's own Telegram (the test one, behind the global fetch).
@@ -691,7 +696,7 @@ describe("Firebase push", () => {
   it("drops a token FCM no longer knows, and pushes nothing for a kind off on the app", async () => {
     const pushToken = `fcm-${crypto.randomUUID()}`;
     const { stub, userId } = await phoneWithToken(pushToken);
-    const fcm = await fcmRecorder({ send: 404 });
+    const fcm = await fcmRecorder({ send: { errorCode: "UNREGISTERED", status: 404 } });
     await runInDurableObject(stub, async (instance: UserStore) => {
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
       await instance.append([commute], { now: COMMUTE_START });
@@ -740,6 +745,23 @@ describe("Firebase push", () => {
         const page = await instance.listNotifications({ limit: 5 });
         expect(Object.values(page.deliveries).flat()).toEqual([
           expect.objectContaining({ reason: "gone", result: "failed" }),
+        ]);
+      });
+    }
+  });
+
+  it("keeps the device on a 404 that does not say the token is unregistered", async () => {
+    // A 404 is also a project or URL FCM does not know: about the server, not this phone.
+    for (const notFound of [404, { errorCode: "NOT_FOUND", status: 404 }] as const) {
+      const { stub, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+      const fcm = await fcmRecorder({ send: notFound });
+      await runInDurableObject(stub, async (instance: UserStore) => {
+        await instance.append([commute], { now: COMMUTE_START });
+        await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
+        expect(await subscriptionsOf(env.DB, userId, Date.now())).toHaveLength(1);
+        const page = await instance.listNotifications({ limit: 5 });
+        expect(Object.values(page.deliveries).flat()).toEqual([
+          expect.objectContaining({ reason: "failed", result: "failed" }),
         ]);
       });
     }
@@ -807,6 +829,31 @@ describe("Firebase push", () => {
       expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now + 61 * 60_000)).toEqual([
         "fcm",
         "poll",
+      ]);
+    });
+  });
+
+  it("logs a device it cannot reach once per notification, however often the pass is repeated", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      // FCM not set up on this server: the phone on it cannot be reached.
+      const couriers = couriersOf(telegramRecorder().target, null);
+      const signIn = {
+        kind: "login" as const,
+        payload: {
+          country: "Germany",
+          ip: SIGN_IN_IP,
+          kind: "web",
+          name: "Chrome",
+          sessionId: "s",
+        },
+      };
+      const login = added(await instance.notify(signIn, CROSSED, couriers));
+      added(await instance.notify(signIn, CROSSED, couriers));
+      added(await instance.notify(signIn, "2026-10-07T08:05:00.000Z", couriers));
+      const page = await instance.listNotifications({ limit: 5 });
+      expect(page.deliveries[login.id]?.filter((entry) => entry.method === "fcm")).toEqual([
+        expect.objectContaining({ reason: "unavailable", result: "failed" }),
       ]);
     });
   });

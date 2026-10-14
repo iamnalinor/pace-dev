@@ -32,7 +32,13 @@ import {
   type TelegramTarget,
   wasTelegramMessageDeleted,
 } from "../shared/telegram-api.ts";
-import { logAttempt, takeBackDeliveries, wasDelivered } from "./delivery-rows.ts";
+import {
+  logAttempt,
+  takeBackDeliveries,
+  UNAVAILABLE,
+  wasDelivered,
+  wasLoggedUnavailable,
+} from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
 import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
@@ -148,9 +154,30 @@ const afterSend = async (
 };
 
 /**
-One device by its push method, logged; nothing when it got this one already. A method not set
-up on this server, or found broken, sends nothing: the log says it was unavailable.
+A device whose method is not set up on this server, or found broken: nothing is sent, and the log
+says it was unavailable, once per notification and method (a pass repeated meanwhile adds none).
 */
+const logUnavailable = async (
+  deps: PoolDeps,
+  notificationId: string,
+  subscription: PushSubscription,
+): Promise<void> => {
+  const { device, endpoint, sessionId, transport: method } = subscription;
+  if (await wasLoggedUnavailable(deps.db, notificationId, { method, sessionId })) {
+    return;
+  }
+  const attempt = {
+    device,
+    endpoint,
+    method,
+    reason: UNAVAILABLE,
+    result: "failed" as const,
+    sessionId,
+  };
+  await logAttempt(deps.db, { attempt, notificationId, now: deps.now });
+};
+
+/** One device by its push method, logged; nothing when it got this one already. */
 const pushToDevice = async (
   deps: PoolDeps,
   message: PushMessage,
@@ -161,18 +188,11 @@ const pushToDevice = async (
   if (await wasDelivered(deps.db, notification.id, subscription.sessionId)) {
     return;
   }
-  const address = { endpoint: subscription.endpoint, sessionId: subscription.sessionId };
   if (transport === null || (await isBroken(deps.binding, transport, Date.now()))) {
-    const attempt = {
-      ...address,
-      device: subscription.device,
-      method: subscription.transport,
-      reason: "unavailable",
-      result: "failed" as const,
-    };
-    await logAttempt(deps.db, { attempt, notificationId: notification.id, now: deps.now });
+    await logUnavailable(deps, notification.id, subscription);
     return;
   }
+  const address = { endpoint: subscription.endpoint, sessionId: subscription.sessionId };
   const outcome = await transport.send(address, message);
   const isOk = outcome === "sent" || outcome === "queued";
   const attempt = {
@@ -224,20 +244,22 @@ export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Pr
   broadcast(deps.ctx, { notification, type: "notification" });
 };
 
-/** Deletes the Telegram copy, unless the answer came from Telegram (the bot edits it there). */
-const deleteTelegramCopy = async (
+/**
+Deletes the Telegram copy, unless the answer came from Telegram (the bot edits it there and the
+message stays). Whether the copy is gone: only then does the log mark it taken back.
+*/
+const wasTelegramCopyDeleted = async (
   deps: PoolDeps,
   telegram: StoredNotification["telegram"],
   origin: AnswerOrigin,
-): Promise<void> => {
+): Promise<boolean> => {
   const { chatId, messageId, state } = telegram;
   const target = deps.couriers.telegram;
-  if (origin === "telegram" || state !== "sent" || target === null) {
-    return;
-  }
-  if (chatId !== null && messageId !== null) {
-    await wasTelegramMessageDeleted(target, chatId, messageId);
-  }
+  return origin === "telegram" || state !== "sent" || target === null
+    ? false
+    : chatId !== null &&
+        messageId !== null &&
+        (await wasTelegramMessageDeleted(target, chatId, messageId));
 };
 
 /**
@@ -251,8 +273,11 @@ export const withdraw = async (
   { origin, resolution }: { readonly origin: AnswerOrigin; readonly resolution: Resolution },
 ): Promise<void> => {
   const { notification, telegram } = stored;
-  await deleteTelegramCopy(deps, telegram, origin);
-  const copies = await takeBackDeliveries(deps.db, notification.id, deps.now);
+  const isTelegramGone = await wasTelegramCopyDeleted(deps, telegram, origin);
+  const copies = await takeBackDeliveries(deps.db, notification.id, {
+    isTelegramGone,
+    now: deps.now,
+  });
   for (const copy of copies) {
     await transportFor(deps.couriers.push, copy.method)?.dismiss(copy, notification.id);
   }

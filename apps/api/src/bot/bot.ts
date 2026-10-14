@@ -129,6 +129,11 @@ export const createBot = (deps: BotDeps): Bot => {
     bot.on("callback_query:data", async (ctx) => {
       const { data } = ctx.callbackQuery;
       const reply = await assistant.choose(String(ctx.from.id), data);
+      if (reply.isRefused === true) {
+        // Refused: the message keeps its buttons to try again; the reason shows as an alert.
+        await ctx.answerCallbackQuery({ show_alert: true, text: reply.text });
+        return;
+      }
       await ctx.answerCallbackQuery();
       // A notification keeps its text (the buttons go away); a preview is replaced by the result.
       const original = ctx.callbackQuery.message?.text;

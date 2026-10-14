@@ -38,11 +38,9 @@ const notificationAnswer = async (turn: Turn, answer: Answer, id: string): Promi
     now: turn.now,
     origin: "telegram",
   });
-  return plain(
-    result.ok
-      ? t(language, `notify.resolved.${result.value.resolution ?? "read"}`)
-      : t(language, "bot.failed", { reason: result.error.code }),
-  );
+  return result.ok
+    ? plain(t(language, `notify.resolved.${result.value.resolution ?? "read"}`))
+    : { ...plain(t(language, "bot.failed", { reason: result.error.code })), isRefused: true };
 };
 
 /** The top of Now as a short numbered list. */

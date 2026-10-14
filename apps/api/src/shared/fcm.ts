@@ -216,8 +216,8 @@ What a refused send means. The body decides first: a token another project issue
 (`SENDER_ID_MISMATCH`, a 403), one FCM no longer knows (`UNREGISTERED`) or a malformed token
 (`INVALID_ARGUMENT` naming `message.token`) is this device gone; any other `INVALID_ARGUMENT` is
 the message, tried again another time. Then the status: 401 is the access token (`stale`: mint a
-fresh one and retry once), 403 the project refusing the account (FCM broken for everyone), 404
-a token gone.
+fresh one and retry once), 403 the project refusing the account (FCM broken for everyone). A 404
+without `UNREGISTERED` is a project or address FCM does not know, not this device: a failure.
 */
 const refusalOf = async (response: Response): Promise<"stale" | Exclude<FcmOutcome, "sent">> => {
   const { codes, details } = await errorOf(response);
@@ -232,9 +232,6 @@ const refusalOf = async (response: Response): Promise<"stale" | Exclude<FcmOutco
     }
     case 403: {
       return "auth";
-    }
-    case 404: {
-      return "unregistered";
     }
     default: {
       return "failed";

@@ -88,11 +88,12 @@ describe("live sync channel", () => {
   });
 
   it("closes in answer with a code a socket may send, whatever the device's close said", () => {
-    // 1005 (no code), 1006 (dropped) and 1015 (TLS) are only ever received; sending one throws.
-    for (const received of [1005, 1006, 1015]) {
+    // 1005 (no code), 1006 (dropped) and 1015 (TLS) are only ever received; 1004 and 1015–2999
+    // are reserved, past 4999 is no code at all: sending any of them throws.
+    for (const received of [0, 999, 1004, 1005, 1006, 1015, 1016, 2999, 5000]) {
       expect(replyCloseCode(received)).toBe(1000);
     }
-    for (const sent of [1000, 1001, 1011, 4001]) {
+    for (const sent of [1000, 1001, 1002, 1003, 1007, 1011, 1014, 3000, 4001, 4999]) {
       expect(replyCloseCode(sent)).toBe(sent);
     }
   });

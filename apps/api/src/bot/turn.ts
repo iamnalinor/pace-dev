@@ -5,8 +5,11 @@ import type { OutgoingMessage } from "../shared/telegram-api.ts";
 
 import { clockIn } from "../shared/clock.ts";
 
-/** A reply with its inline keyboard. */
-export type BotReply = OutgoingMessage;
+/**
+A reply with its inline keyboard. `isRefused`: a button's answer that did not go through; the
+message it came from stays as it was, buttons and all, to be tapped again.
+*/
+export type BotReply = OutgoingMessage & { readonly isRefused?: true };
 
 /** One bot update being handled: the user's store, their state and the instant. */
 export type Turn = {

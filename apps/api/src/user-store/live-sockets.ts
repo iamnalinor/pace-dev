@@ -58,12 +58,19 @@ export const broadcast = (ctx: DurableObjectState, message: object): void => {
   }
 };
 
-/** Codes a socket only ever receives (none given, dropped, TLS failed): sending one throws. */
-const RECEIVE_ONLY: ReadonlySet<number> = new Set([1005, 1006, 1015]);
+/**
+Whether a socket may close with this code (RFC 6455 §7.4): 1000–1003 and 1007–1014 of the
+protocol's, and 3000–4999 for libraries and apps. The rest are only ever received (1005 none
+given, 1006 dropped, 1015 TLS failed) or reserved: sending one throws.
+*/
+const isSendable = (code: number): boolean =>
+  (code >= 1000 && code <= 1003) ||
+  (code >= 1007 && code <= 1014) ||
+  (code >= 3000 && code <= 4999);
 
 /** The code to close with in answer to a device's close: its own, unless that may not be sent. */
 export const replyCloseCode = (received: number): number =>
-  RECEIVE_ONLY.has(received) ? 1000 : received;
+  isSendable(received) ? received : 1000;
 
 /**
 The live channel's half of a user's store: it accepts live clients (the Worker has checked the

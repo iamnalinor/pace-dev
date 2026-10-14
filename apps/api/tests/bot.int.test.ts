@@ -348,4 +348,15 @@ describe("notification buttons", () => {
     await webhook(callbackUpdate(`na:${announced?.id ?? ""}`));
     expect(sent[1]?.body["text"]).toBe("preview\n\n✓ Attending");
   });
+
+  it("keeps the message and its buttons when the answer is refused, and says why", async () => {
+    await loginAsDev("1002");
+    await webhook(callbackUpdate("na:no-such-notification"));
+    // Not edited: the buttons stay to be tapped again; the refusal shows as an alert.
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery"]);
+    expect(sent[0]?.body).toMatchObject({
+      show_alert: true,
+      text: "That did not work: notification/not-found",
+    });
+  });
 });

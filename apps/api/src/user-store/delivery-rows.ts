@@ -1,6 +1,6 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { and, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, ne, type SQL } from "drizzle-orm";
 
 import type { PollEntry } from "../shared/push/poll-transport.ts";
 
@@ -35,11 +35,14 @@ export type DeliveryEntry = {
 
 const { notificationDeliveries } = schema;
 
-/** Whether the device already got this notification (a retried alarm sends nothing twice). */
-export const wasDelivered = async (
+/** The reason logged for a device whose push method is not set up here, or found broken. */
+export const UNAVAILABLE = "unavailable";
+
+/** Whether the log has an attempt for this notification and device that also matches `also`. */
+const isLogged = async (
   db: Db,
-  notificationId: string,
-  sessionId: string,
+  { notificationId, sessionId }: { readonly notificationId: string; readonly sessionId: string },
+  also: readonly SQL[],
 ): Promise<boolean> => {
   const found = await db
     .select({ id: notificationDeliveries.id })
@@ -48,11 +51,35 @@ export const wasDelivered = async (
       and(
         eq(notificationDeliveries.notificationId, notificationId),
         eq(notificationDeliveries.sessionId, sessionId),
-        inArray(notificationDeliveries.result, ["queued", "sent"]),
+        ...also,
       ),
     );
   return found.length > 0;
 };
+
+/** Whether the device already got this notification (a retried alarm sends nothing twice). */
+export const wasDelivered = async (
+  db: Db,
+  notificationId: string,
+  sessionId: string,
+): Promise<boolean> =>
+  await isLogged(db, { notificationId, sessionId }, [
+    inArray(notificationDeliveries.result, ["queued", "sent"]),
+  ]);
+
+/**
+Whether the device's attempt was logged already as unreachable by this method: a pass repeated
+while the method is down logs it once, not once per pass.
+*/
+export const wasLoggedUnavailable = async (
+  db: Db,
+  notificationId: string,
+  { method, sessionId }: { readonly sessionId: string; readonly method: string },
+): Promise<boolean> =>
+  await isLogged(db, { notificationId, sessionId }, [
+    eq(notificationDeliveries.method, method),
+    eq(notificationDeliveries.reason, UNAVAILABLE),
+  ]);
 
 export const logAttempt = async (
   db: Db,
@@ -65,11 +92,14 @@ export const logAttempt = async (
   await db.insert(notificationDeliveries).values({ ...attempt, attemptedAt: now, notificationId });
 };
 
-/** The copies of a notification still on devices, each marked taken back once. */
+/**
+The copies of a notification still on devices, each marked taken back once. The Telegram copy is
+marked only when it was deleted (`isTelegramGone`): one answered in Telegram stays there, edited.
+*/
 export const takeBackDeliveries = async (
   db: Db,
   notificationId: string,
-  now: string,
+  { isTelegramGone, now }: { readonly isTelegramGone: boolean; readonly now: string },
 ): Promise<readonly Pick<DeliveryAttempt, "endpoint" | "method" | "sessionId">[]> =>
   await db
     .update(notificationDeliveries)
@@ -79,6 +109,7 @@ export const takeBackDeliveries = async (
         eq(notificationDeliveries.notificationId, notificationId),
         inArray(notificationDeliveries.result, ["queued", "sent"]),
         isNull(notificationDeliveries.dismissedAt),
+        isTelegramGone ? undefined : ne(notificationDeliveries.method, "telegram"),
       ),
     )
     .returning({
