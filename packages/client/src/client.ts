@@ -196,7 +196,13 @@ export {
   projectsViewModel,
 } from "./view-models/projects.ts";
 export { type DueRelative, relativeDay } from "./view-models/relative-day.ts";
-export { type ReviewRow, type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
+export {
+  reviewDecisions,
+  type ReviewRow,
+  type ReviewViewModel,
+  reviewViewModel,
+  waitingCount,
+} from "./view-models/review.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,
