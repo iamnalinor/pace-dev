@@ -94,7 +94,7 @@ const noEventsKey = (calendar: CalendarToday | null): MessageKey => {
 
 /**
 Nothing in the calendar: why, and the way on anyway — a meeting without an event (named later
-on Day), and on the web where the calendar comes from.
+on Day), on the web where the calendar comes from, on a phone without access its permissions.
 */
 const NoEvents = ({ calendar, close, options, start }: ListProps) => {
   const t = useT();
@@ -127,6 +127,17 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
           }}
         />
       )}
+      {/* The phone without calendar access: the way to grant it (the button's tooltip only says why). */}
+      {IS_PHONE && calendar?.access !== "granted" ? (
+        <ChoiceRow
+          aside={null}
+          label={t("permissions.title")}
+          onPress={() => {
+            close();
+            router.push("/permissions");
+          }}
+        />
+      ) : null}
     </View>
   );
 };

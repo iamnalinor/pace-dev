@@ -23,6 +23,15 @@ const shoot = async (
   });
 };
 
+/** How far above `below` the bottom of `above` ends (negative when they overlap). */
+const gapAbove = async (above: Locator, below: Locator): Promise<number> => {
+  const [top, bottom] = await Promise.all([above.boundingBox(), below.boundingBox()]);
+  if (top === null || bottom === null) {
+    throw new Error("both boxes must be on the screen");
+  }
+  return bottom.y - (top.y + top.height);
+};
+
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
 for (const size of SIZES) {
@@ -131,8 +140,10 @@ for (const size of SIZES) {
     await page.setViewportSize({ height: size.height, width: size.width });
     await page.goto("/");
     const bar = timeBar(page);
-    // A tap on the greyed Calendar button says in a toast what it is and why not now.
-    await bar.getByRole("switch", { name: "Calendar" }).click();
+    // Deleting a task says so in a toast (with Undo), back on Now.
+    await addTask(page, `Toast ${size.name}`);
+    await page.getByRole("list", { name: "Tasks" }).getByText(`Toast ${size.name}`).click();
+    await page.getByRole("button", { name: "Delete the task" }).click();
     const toast = page.getByRole("alert");
     await expect(toast).toBeVisible();
     const toastBox = await toast.boundingBox();
@@ -142,3 +153,22 @@ for (const size of SIZES) {
     expect((toastBox?.y ?? 0) + (toastBox?.height ?? 0)).toBeLessThanOrEqual(barBox?.y ?? 0);
   });
 }
+
+test("the greyed Calendar button says why the moment the pointer is over it", async ({ page }) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await page.goto("/");
+  const calendar = timeBar(page).getByRole("switch", { name: "Calendar" });
+  await expect(calendar).toHaveAttribute("aria-describedby", /.+/u);
+  await calendar.hover();
+  const tooltip = page.getByRole("tooltip");
+  // No toast and no delay: the bubble is there at once, right above the button.
+  await expect(tooltip).toBeVisible({ timeout: 300 });
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const gap = await gapAbove(tooltip, calendar);
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThan(16);
+  await expectNoA11yViolations(page);
+  await page.mouse.move(0, 0);
+  await expect(tooltip).toBeHidden();
+});

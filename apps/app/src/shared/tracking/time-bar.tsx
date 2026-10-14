@@ -19,6 +19,7 @@ import { inkClass, OUTLINE } from "#app/ui/color.tsx";
 import { contextMenuProps } from "#app/ui/context-menu.ts";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
@@ -109,7 +110,7 @@ const TypedStart = ({
 
 type ButtonProps = {
   readonly button: TimeButtonView;
-  /** Greyed: a tap only explains why it cannot start anything now (the Calendar button). */
+  /** Greyed: why it cannot start anything now (the Calendar button), shown in its tooltip. */
   readonly unavailable?: string | undefined;
   readonly onTap: (button: TimeButtonView) => void;
   readonly onMore: (button: TimeButtonView) => void;
@@ -131,43 +132,46 @@ const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
   };
   return (
     <View className="relative flex-1">
-      <Pressable
-        accessibilityActions={[{ label: t("time.more", { label }), name: "longpress" }]}
-        accessibilityHint={unavailable ?? t("time.buttonHint")}
-        accessibilityLabel={label}
-        accessibilityRole="switch"
-        aria-checked={button.isRunning}
-        className={cx(
-          "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
-          button.isRunning ? "border-accentQuiet bg-accentQuiet" : "bg-surface",
-          !button.isRunning &&
-            (unavailable === undefined ? OUTLINE[button.color] : "border-dashed border-line"),
-        )}
-        delayLongPress={450}
-        onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === "longpress") {
-            more();
-          }
-        }}
-        onLongPress={more}
-        onPress={() => {
-          onTap(button);
-        }}
-        {...contextMenuProps(more)}
-      >
-        <Icon color={iconColor} size={18} />
-        <Text
+      {/* Greyed, it says why the moment the pointer is over it, or at once on a tap. */}
+      <Tooltip label={unavailable}>
+        <Pressable
+          accessibilityActions={[{ label: t("time.more", { label }), name: "longpress" }]}
+          accessibilityHint={unavailable ?? t("time.buttonHint")}
+          accessibilityLabel={label}
+          accessibilityRole="switch"
+          aria-checked={button.isRunning}
           className={cx(
-            "text-center font-sans text-[12px] leading-[14px]",
-            button.isRunning && "font-medium text-accentQuietFg",
+            "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
+            button.isRunning ? "border-accentQuiet bg-accentQuiet" : "bg-surface",
             !button.isRunning &&
-              (unavailable === undefined ? inkClass(button.color) : "text-muted"),
+              (unavailable === undefined ? OUTLINE[button.color] : "border-dashed border-line"),
           )}
-          numberOfLines={1}
+          delayLongPress={450}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === "longpress") {
+              more();
+            }
+          }}
+          onLongPress={more}
+          onPress={() => {
+            onTap(button);
+          }}
+          {...contextMenuProps(more)}
         >
-          {label}
-        </Text>
-      </Pressable>
+          <Icon color={iconColor} size={18} />
+          <Text
+            className={cx(
+              "text-center font-sans text-[12px] leading-[14px]",
+              button.isRunning && "font-medium text-accentQuietFg",
+              !button.isRunning &&
+                (unavailable === undefined ? inkClass(button.color) : "text-muted"),
+            )}
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
+        </Pressable>
+      </Tooltip>
       <Pressable
         accessibilityLabel={t("time.more", { label })}
         accessibilityRole="button"

@@ -5,11 +5,18 @@ import type { PaceRuntime } from "#app/runtime.ts";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 
 import { en, renderScreen } from "#app/test/render.tsx";
+import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
 import { TimeBar } from "./time-bar.tsx";
+
+/** A finger on a button: the touch ends (the tooltip's cue), then the press runs. */
+const tap = async (button: ReturnType<typeof screen.getByRole>): Promise<void> => {
+  await fireEvent(button, "touchEnd");
+  await fireEvent.press(button);
+};
 
 const calendar = Calendar as unknown as FakeCalendar;
 
@@ -126,18 +133,30 @@ describe("TimeBar", () => {
     expect(screen.getByText("ЦСС")).toBeOnTheScreen();
   });
 
-  it("is greyed without calendar access, and a tap says what it is and why not now", async () => {
+  it("is greyed without calendar access, and a tap says why at once, beside the button", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);
     const button = screen.getByRole("switch", { name: "Calendar" });
     await waitFor(() => {
-      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.noAccess"));
+      expect(button.props["accessibilityHint"]).toBe("No access to the calendar");
     });
-    await fireEvent.press(button);
-    expect(
-      await screen.findByText(`${en("time.calendar.what")} ${en("time.calendar.noAccess")}`),
-    ).toBeOnTheScreen();
+    await tap(button);
+    // The tooltip, not a toast: there at once, with nothing to wait for.
+    expect(screen.getByText("No access to the calendar")).toBeOnTheScreen();
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(running(runtime)).toEqual([]);
+  });
+
+  it("offers the permissions from its menu on the phone without calendar access", async () => {
+    await renderScreen(<TimeBar />, await createTestRuntime());
+    await waitFor(() => {
+      expect(screen.getByRole("switch", { name: "Calendar" }).props["accessibilityHint"]).toBe(
+        en("time.calendar.noAccess"),
+      );
+    });
+    await fireEvent.press(screen.getByRole("button", { name: "More about Calendar" }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("permissions.title") }));
+    expect(router.push).toHaveBeenCalledWith("/permissions");
   });
 
   it("reads the calendar again on a tap: access granted since then counts at once", async () => {
@@ -178,12 +197,10 @@ describe("TimeBar", () => {
     await renderScreen(<TimeBar />, runtime);
     const button = screen.getByRole("switch", { name: "Calendar" });
     await waitFor(() => {
-      expect(button.props["accessibilityHint"]).toBe(en("time.calendar.nothingNear"));
+      expect(button.props["accessibilityHint"]).toBe("No calendar events around now");
     });
-    await fireEvent.press(button);
-    expect(
-      await screen.findByText(`${en("time.calendar.what")} ${en("time.calendar.nothingNear")}`),
-    ).toBeOnTheScreen();
+    await tap(button);
+    expect(screen.getByText("No calendar events around now")).toBeOnTheScreen();
   });
 
   it("starts the event that begins within 15 minutes", async () => {

@@ -39,10 +39,9 @@ export const enTime = {
   "time.more": "More about {label}",
   "time.alongside": "Alongside what is running",
   "time.alongsideTag": "alongside",
-  "time.calendar.what": "Calendar starts the meeting on now or within 15 minutes.",
-  "time.calendar.loading": "The calendar is still loading.",
-  "time.calendar.noAccess": "Pace has no calendar access yet.",
-  "time.calendar.nothingNear": "Nothing is on within 15 minutes.",
+  "time.calendar.loading": "The calendar is still loading",
+  "time.calendar.noAccess": "No access to the calendar",
+  "time.calendar.nothingNear": "No calendar events around now",
   "time.calendarNone": "Nothing on in your calendar right now.",
   "time.calendarNoneWeb":
     "Nothing on today in the calendar your phone sends (Pace on Android, with the calendar on in Settings → Devices).",

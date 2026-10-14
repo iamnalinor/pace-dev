@@ -41,10 +41,9 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "time.more": "Подробнее: {label}",
   "time.alongside": "Параллельно с текущим",
   "time.alongsideTag": "параллельно",
-  "time.calendar.what": "«Календарь» запускает встречу, идущую сейчас или в пределах 15 минут.",
-  "time.calendar.loading": "Календарь ещё загружается.",
-  "time.calendar.noAccess": "У Pace пока нет доступа к календарю.",
-  "time.calendar.nothingNear": "В пределах 15 минут встреч нет.",
+  "time.calendar.loading": "Календарь ещё загружается",
+  "time.calendar.noAccess": "Нет доступа к календарю",
+  "time.calendar.nothingNear": "В календаре рядом нет событий",
   "time.calendarNone": "Сейчас в календаре ничего нет.",
   "time.calendarNoneWeb":
     "Сегодня в календаре с телефона ничего нет (Pace на Android, календарь включён в Настройках → Устройства).",
