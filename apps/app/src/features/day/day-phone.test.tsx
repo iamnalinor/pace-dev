@@ -10,6 +10,9 @@ import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
 
 import { DayScreen } from "./day-screen.tsx";
 
+/** A clock time of the test day (6 October) as a UTC instant. */
+const utcAt = (clock: string): string => `2026-10-06T${clock}.000Z`;
+
 const utc = (iso: string): number => Date.parse(`2026-10-${iso}:00.000Z`);
 
 /** A night in Moscow (UTC+3): screen off 23:50, a glance at 03:10, up at 07:40, Telegram at noon. */
@@ -126,6 +129,54 @@ describe("Day with the phone's data", () => {
     expect(
       await within(screen.getByLabelText("From your calendar")).findByText("logged"),
     ).toBeOnTheScreen();
+  });
+
+  // The activity begins at the event's start once that has passed, else now (12:00 UTC).
+  it.each([
+    { begins: "11:50:00", from: "11:50:00", name: "has been on for 10 minutes", to: "12:50:00" },
+    { begins: "11:59:59", from: "11:59:59", name: "started a second ago", to: "12:50:00" },
+    { begins: "12:00:00", from: "12:00:01", name: "starts in a second", to: "12:50:00" },
+    { begins: "12:00:00", from: "12:02:00", name: "starts in 2 minutes", to: "12:50:00" },
+    { begins: "12:00:00", from: "12:15:00", name: "starts in 15 minutes", to: "13:00:00" },
+  ])(
+    "attends an event that $name: it is tracked, never refused as the future",
+    async ({ begins, from, to }) => {
+      calendar.state.events = [
+        {
+          allDay: false,
+          endDate: utcAt(to),
+          id: "ev-soon",
+          startDate: utcAt(from),
+          title: "Colloquium",
+        },
+      ];
+      const runtime = await createTestRuntime();
+      await renderScreen(<DayScreen />, runtime);
+      const list = await screen.findByLabelText("From your calendar");
+      await fireEvent.press(within(list).getByRole("button", { name: "Attended" }));
+      await waitFor(() => {
+        expect(
+          activities(runtime).find((activity) => activity.label === "Colloquium"),
+        ).toMatchObject({ endAt: null, startAt: utcAt(begins) });
+      });
+      expect(screen.queryByText("That time is in the future.")).toBeNull();
+    },
+  );
+
+  it("does not offer Attended for an event hours away, only Skip", async () => {
+    calendar.state.events = [
+      {
+        allDay: false,
+        endDate: "2026-10-06T16:00:00.000Z",
+        id: "ev-later",
+        startDate: "2026-10-06T15:00:00.000Z",
+        title: "Evening lecture",
+      },
+    ];
+    await renderScreen(<DayScreen />, await createTestRuntime());
+    const list = await screen.findByLabelText("From your calendar");
+    expect(within(list).queryByRole("button", { name: "Attended" })).toBeNull();
+    expect(within(list).getByRole("button", { name: "Skip" })).toBeOnTheScreen();
   });
 
   it("waves a wrong sleep guess and a calendar event away for good", async () => {

@@ -8,6 +8,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { openUsageAccessSettings } from "#app/platform/phone-data.ts";
 import { calendarKey, sleepKey } from "#app/platform/phone-memory.ts";
+import { isAttendableNow } from "#app/shared/tracking/calendar-today.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -150,7 +151,8 @@ export const UsageAccessHint = () => {
 };
 
 /**
-One event: its time and title, then Attended (it becomes a block) / Skip, or "logged" once it
+One event: its time and title, then Attended (it becomes a block, or starts now if the event
+has not begun) / Skip, or "logged" once it
 is on the day. A repeating event's toast offers "Every time" for the whole series.
 */
 const CalendarRow = ({
@@ -168,6 +170,7 @@ const CalendarRow = ({
   const { actions } = usePace();
   const run = useRunAction();
   const toast = useToast();
+  const { now } = useViewer();
   const { series } = event;
   const everyTime = (rule: "attended" | "skip") =>
     series === null
@@ -191,27 +194,24 @@ const CalendarRow = ({
         <Text className="font-sans text-[12px] text-muted">{t("phone.logged")}</Text>
       ) : (
         <View className="flex-row">
-          <Button
-            onPress={() => {
-              phone.answered(calendarKey(event));
-              const action = everyTime("attended");
-              // A recurring event offers to remember the answer for the whole series.
-              void run(
-                actions.logPast({
-                  category: "other",
-                  endAt: event.endAt,
-                  label: event.title,
-                  startAt: event.startAt,
-                }),
-                action === undefined
-                  ? undefined
-                  : { action, success: t("phone.attendedDone", { title: event.title }) },
-              );
-            }}
-            variant="ghost"
-          >
-            {t("day.attended")}
-          </Button>
+          {isAttendableNow(event, now) && (
+            <Button
+              onPress={() => {
+                phone.answered(calendarKey(event));
+                const action = everyTime("attended");
+                // A recurring event offers to remember the answer for the whole series.
+                void run(
+                  actions.startCalendar(event),
+                  action === undefined
+                    ? undefined
+                    : { action, success: t("phone.attendedDone", { title: event.title }) },
+                );
+              }}
+              variant="ghost"
+            >
+              {t("day.attended")}
+            </Button>
+          )}
           <Button
             onPress={() => {
               phone.dismiss(calendarKey(event));

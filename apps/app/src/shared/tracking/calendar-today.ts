@@ -57,6 +57,13 @@ export const promptedEvent = (
 /** How far from now an event can be and still be linked from the Calendar button. */
 const NEAR_MINUTES = 15;
 
+/**
+Whether "Attend" makes sense for the event now: it started, or starts within fifteen minutes
+(attending it before its start begins the activity now). An event hours away is only skipped.
+*/
+export const isAttendableNow = (event: Pick<PhoneCalendarEvent, "startAt">, now: string): boolean =>
+  addMinutesIso(event.startAt, -NEAR_MINUTES) <= now;
+
 export type CalendarButtonState =
   | { readonly kind: "loading" }
   | { readonly kind: "noAccess" }

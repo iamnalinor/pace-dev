@@ -1,6 +1,6 @@
 import { addMinutesIso } from "@pace/core";
 
-import { calendarButtonState, promptedEvent } from "./calendar-today.ts";
+import { calendarButtonState, isAttendableNow, promptedEvent } from "./calendar-today.ts";
 
 const NOW = "2026-10-06T09:55:00.000Z";
 
@@ -73,5 +73,15 @@ describe("what the Calendar button can do now", () => {
     const later = event("later", 16);
     const long = { ...event("long", -200), endAt: addMinutesIso(NOW, -16) };
     expect(calendarButtonState(today([later, long]), NOW)).toEqual({ kind: "nothingNear" });
+  });
+});
+
+describe("when an event can be attended", () => {
+  it.each([-10, -0.02, 0, 0.02, 2, 15])("is so for an event starting in %s minutes", (startIn) => {
+    expect(isAttendableNow(event("e", startIn), NOW)).toBe(true);
+  });
+
+  it.each([15.02, 16, 120])("is not for an event starting in %s minutes", (startIn) => {
+    expect(isAttendableNow(event("e", startIn), NOW)).toBe(false);
   });
 });

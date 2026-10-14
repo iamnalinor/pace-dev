@@ -203,6 +203,26 @@ describe("time actions", () => {
     expect(open.map((activity) => activity.label)).toEqual(["Seminar"]);
   });
 
+  it.each([
+    ["10 minutes ago", -10 * 60_000],
+    ["1 second ago", -1000],
+    ["right now", 0],
+    ["in 1 second", 1000],
+    ["in 2 minutes", 2 * 60_000],
+    ["in 15 minutes", 15 * 60_000],
+  ])("attends an event starting %s: never before its start, never in the future", async (_, ms) => {
+    const world = await setupActions();
+    const startAt = new Date(Date.parse(NOW) + ms).toISOString();
+    const endAt = new Date(Date.parse(startAt) + 60 * 60_000).toISOString();
+    unwrap(await world.actions.startCalendar({ endAt, startAt, title: "Colloquium" }));
+    const running = timeBarModel(world.state.store.getState(), ctx(NOW)).running;
+    // Started: at the event's start once that has passed, else now.
+    expect(running).toMatchObject({ label: "Colloquium", startAt: ms < 0 ? startAt : NOW });
+    // Expected to last until the event's end, wherever it began.
+    const expected = Math.round((Date.parse(endAt) - Date.parse(running?.startAt ?? NOW)) / 60_000);
+    expect(running?.expectMinutes).toBe(expected);
+  });
+
   it("logs a calendar event already over as a closed block and leaves what runs alone", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startChoice("rest"));

@@ -108,5 +108,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | Toast over the time bar | 6 | pending (stage 8 sweep) | e2e overlay sweep |
 | 2026-10-14 | Moved routes lost the sign-in guard | 7 | yes | central RouteGate, signed-out deep-link tests |
 | 2026-10-14 | Onboarding loop in the central guard | 8 | pending (stage 8 sweep) | transition test |
-| 2026-10-14 | Attend refuses an event that starts soon | 9 | pending (stage 8 sweep) | time-offset tests |
+| 2026-10-14 | Attend refuses an event that starts soon | 9 | yes: root cause was Day's "Attended" button, which logged the whole event with `logPast` (its end is ahead for any event not over, so `retro/future`; an event that was on already failed too). It now goes through `startCalendar` like Now's offer, the Calendar button and the picker, and is shown only from 15 minutes before the start (`isAttendableNow`). `startCalendar` already started at `min(start, now)`; other `logPast` callers (sleep, "always attended" series) only take instants already over | time-offset tests (−10 min, −1 s, 0, +1 s, +2 min, +15 min) at client and Day level, `isAttendableNow` boundary test |
 | 2026-10-14 | Add a computer does nothing on phones | 10 | pending (stage 8 sweep) | press test at phone layout |
