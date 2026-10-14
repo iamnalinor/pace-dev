@@ -1,6 +1,6 @@
 import {
   type ActivityCategory,
-  type ActivityReading,
+  categoryOfLabel,
   choiceById,
   defaultsFor,
   err,
@@ -17,6 +17,13 @@ import { editActions, type EditActions, logPast } from "./activity-edits.ts";
 import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
 export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
+
+/** What the assistant reads from a note of what the person is doing ("Пошёл в ЦСС, 20 мин"). */
+export type ActivityReading = {
+  readonly label: string;
+  readonly category: ActivityCategory;
+  readonly expectMinutes: null | number;
+};
 
 export type ActivityInput = {
   readonly label: string;
@@ -209,14 +216,10 @@ const startTyped = async (
   options: StartOptions = {},
 ): ActionResult => {
   const typed = typedActivity(text);
-  const key = typed.label.toLowerCase();
-  const before = Object.values(timeOf(deps).activities)
-    .filter((activity) => activity.label.trim().toLowerCase() === key)
-    .toSorted((a, b) => b.startAt.localeCompare(a.startAt))[0];
   // No length typed: the one learned for this label applies.
   return await startActivity(deps, {
     alongside: options.alongside,
-    category: before?.category ?? "other",
+    category: categoryOfLabel(timeOf(deps), typed.label),
     label: typed.label,
     ...(typed.expectMinutes !== null && { expectMinutes: typed.expectMinutes }),
   });

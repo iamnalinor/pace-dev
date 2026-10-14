@@ -99,27 +99,35 @@ describe("createPaceClient", () => {
   });
 });
 
+/** The assistant's answer from the activity field. */
+const activityAnswer = (proposals: readonly object[]) => ({
+  confidence: 1,
+  domain: "activity",
+  proposals,
+  provider: "fake",
+  status: "parsed",
+});
+
 describe("client.assistant", () => {
+  const task = {
+    description: null,
+    dueAt: null,
+    dueTz: null,
+    estimateMinutes: 90,
+    importance: null,
+    link: null,
+    presetId: "personal",
+    projectId: null,
+    projectName: null,
+    sourceText: "разобрать почту, полтора часа",
+    subtasks: [],
+    title: "разобрать почту",
+  };
   const parsed = {
-    doubtful: [],
-    isClean: true,
+    confidence: 1,
+    domain: "task",
+    proposals: [{ kind: "task.create", summary: "New task: разобрать почту", task }],
     provider: "fake",
-    result: {
-      category: null,
-      description: null,
-      dueDate: null,
-      dueTime: null,
-      estimateMinutes: 90,
-      evidence: [{ field: "estimateMinutes", quote: "полтора часа" }],
-      importance: null,
-      intent: "create_task",
-      outcome: null,
-      project: null,
-      questions: [],
-      subtasks: [],
-      task: null,
-      title: "разобрать почту",
-    },
     status: "parsed",
   };
 
@@ -135,10 +143,53 @@ describe("client.assistant", () => {
   it("passes on when the assistant is out of requests, and a failure as failed", async () => {
     const retryAt = "2026-10-06T12:05:00.000Z";
     const { client } = await setup({
-      "POST /api/parse": () => ({ retryAt, status: "unavailable" }),
+      "POST /api/parse": () => ({
+        confidence: 1,
+        domain: "task",
+        proposals: [],
+        retryAt,
+        status: "unavailable",
+      }),
     });
     expect(await client.assistant.read("что-то")).toEqual({ retryAt, status: "unavailable" });
     const broken = await setup({ "POST /api/parse": () => problem(500, "internal") });
     expect(await broken.client.assistant.read("что-то")).toEqual({ status: "failed" });
+  });
+
+  it("reads an activity note from the activity field, and nothing from another proposal", async () => {
+    const bodies: unknown[] = [];
+    const start = {
+      category: "commute",
+      expectMinutes: 20,
+      kind: "activity.start",
+      label: "ЦСС",
+      summary: "Start: ЦСС",
+    };
+    const { client } = await setup({
+      "POST /api/parse": (request) => {
+        bodies.push(request.body);
+        return activityAnswer([start]);
+      },
+    });
+    expect(await client.assistant.readActivity("Пошел в ЦСС, 20мин")).toEqual({
+      category: "commute",
+      expectMinutes: 20,
+      label: "ЦСС",
+    });
+    expect(bodies).toEqual([{ domain: "activity", text: "Пошел в ЦСС, 20мин" }]);
+    const logged = await setup({
+      "POST /api/parse": () =>
+        activityAnswer([
+          {
+            category: "other",
+            end: "2026-10-06T08:30:00.000Z",
+            kind: "activity.log",
+            label: "x",
+            start: "2026-10-06T07:30:00.000Z",
+            summary: "Log",
+          },
+        ]),
+    });
+    expect(await logged.client.assistant.readActivity("7:30-8:30 x")).toBeNull();
   });
 });

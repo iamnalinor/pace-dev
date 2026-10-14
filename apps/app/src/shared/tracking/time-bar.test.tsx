@@ -33,6 +33,23 @@ beforeEach(() => {
   calendar.state.events = [];
 });
 
+/** The assistant's reading of "Пошел в ЦСС, 20мин" from the activity field. */
+const CSS_READ = {
+  confidence: 1,
+  domain: "activity",
+  proposals: [
+    {
+      category: "sport",
+      expectMinutes: 20,
+      kind: "activity.start",
+      label: "ЦСС",
+      summary: "Start: ЦСС",
+    },
+  ],
+  provider: "fake",
+  status: "parsed",
+};
+
 describe("TimeBar", () => {
   it("has four buttons in fixed places; Rest starts on a tap and stops on the next", async () => {
     const runtime = await createTestRuntime();
@@ -85,11 +102,7 @@ describe("TimeBar", () => {
   it("starts what is typed at once with its length, then takes the assistant's name for it", async () => {
     const runtime = await createTestRuntime({
       routes: {
-        "POST /api/parse/activity": () => ({
-          provider: "fake",
-          reading: { category: "sport", expectMinutes: 20, label: "ЦСС" },
-          status: "parsed",
-        }),
+        "POST /api/parse": () => CSS_READ,
       },
     });
     await renderScreen(<TimeBar />, runtime);
@@ -108,7 +121,7 @@ describe("TimeBar", () => {
     const answer: { resolve: (value: unknown) => void } = { resolve: () => undefined };
     const runtime = await createTestRuntime({
       routes: {
-        "POST /api/parse/activity": async () =>
+        "POST /api/parse": async () =>
           await new Promise((resolve) => {
             answer.resolve = resolve;
           }),
@@ -122,11 +135,7 @@ describe("TimeBar", () => {
     expect(
       await screen.findByLabelText(en("time.draft", { label: "Пошел в ЦСС" })),
     ).toBeOnTheScreen();
-    answer.resolve({
-      provider: "fake",
-      reading: { category: "sport", expectMinutes: 20, label: "ЦСС" },
-      status: "parsed",
-    });
+    answer.resolve(CSS_READ);
     await waitFor(() => {
       expect(screen.queryByLabelText(en("time.draft", { label: "Пошел в ЦСС" }))).toBeNull();
     });

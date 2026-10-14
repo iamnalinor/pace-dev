@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
+import type { ParseField, TaskDraft } from "@pace/core";
 
 import { requestNewTask } from "#app/shared/new-task-request.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -38,28 +39,47 @@ const enterInTitle = async (): Promise<void> => {
   await fireEvent(title(), "submitEditing");
 };
 
-const PARSED = {
-  doubtful: ["estimateMinutes"],
-  isClean: false,
+/** The assistant's answer: one new task, its fields filled in. */
+const parsed = (
+  task: Partial<TaskDraft> & Pick<TaskDraft, "sourceText" | "title">,
+  doubtful: readonly ParseField[] = [],
+) => ({
+  confidence: 1,
+  domain: "task",
+  proposals: [
+    {
+      ...(doubtful.length > 0 && { doubtful }),
+      kind: "task.create",
+      summary: `New task: ${task.title}`,
+      task: {
+        description: null,
+        dueAt: null,
+        dueTz: null,
+        estimateMinutes: null,
+        importance: null,
+        link: null,
+        presetId: "personal",
+        projectId: null,
+        projectName: null,
+        subtasks: [],
+        ...task,
+      },
+    },
+  ],
   provider: "fake",
-  result: {
-    category: "work",
-    description: null,
-    dueDate: null,
-    dueTime: null,
+  status: "parsed",
+});
+
+const PARSED = parsed(
+  {
     estimateMinutes: 90,
-    evidence: [],
     importance: "asap",
-    intent: "create_task",
-    outcome: null,
-    project: null,
-    questions: [],
-    subtasks: [],
-    task: null,
+    presetId: "work",
+    sourceText: "срочно почта",
     title: "разобрать почту",
   },
-  status: "parsed",
-};
+  ["estimateMinutes"],
+);
 
 const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: string) =>
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
@@ -266,28 +286,11 @@ describe("Composer", () => {
   it("parses a pasted homework at once and writes nothing until Create", async () => {
     const homework =
       "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (определитель)";
-    const reading = {
-      doubtful: [],
-      isClean: true,
-      provider: "fake",
-      result: {
-        category: null,
-        description: null,
-        dueDate: null,
-        dueTime: null,
-        estimateMinutes: null,
-        evidence: [],
-        importance: null,
-        intent: "create_task",
-        outcome: null,
-        project: null,
-        questions: [],
-        subtasks: ["290", "292", "293", "365"].map((label) => ({ label, number: Number(label) })),
-        task: null,
-        title: "ДЗ по алгебре: № 290–365",
-      },
-      status: "parsed",
-    };
+    const reading = parsed({
+      sourceText: homework,
+      subtasks: ["290", "292", "293", "365"].map((label) => ({ label, number: Number(label) })),
+      title: "ДЗ по алгебре: № 290–365",
+    });
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => reading } });
     await renderComposer(runtime);
     await fireEvent.changeText(line(), homework);
