@@ -26,6 +26,7 @@ import { type InboxViewModel, inboxViewModel } from "./view-models/inbox.ts";
 import { type InsightsModel, insightsModel } from "./view-models/insights.ts";
 import { type NowViewModel, nowViewModel } from "./view-models/now.ts";
 import { type ProjectViewModel, projectViewModel } from "./view-models/project.ts";
+import { type ProjectListRow, projectsViewModel } from "./view-models/projects.ts";
 import { type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 import { type TaskViewModel, taskViewModel } from "./view-models/task.ts";
 import { type TimeBarModel, timeBarModel } from "./view-models/time-bar.ts";
@@ -52,6 +53,8 @@ export type AppHooks = {
   readonly useClock: () => QueryContext;
   readonly useNow: (options?: NowListOptions) => NowViewModel;
   readonly useTaskView: (taskId: string) => Result<TaskViewModel, "task/unknown" | PresetError>;
+  /** The projects list: every active project with its open tasks. */
+  readonly useProjects: () => readonly ProjectListRow[];
   readonly useProjectView: (projectId: string) => Result<ProjectViewModel, "project/unknown">;
   readonly useInbox: () => InboxViewModel;
   readonly useReview: () => ReviewViewModel;
@@ -118,6 +121,7 @@ export const createAppHooks = (state: AppStateHandle, clock: Clock = systemClock
     useLanguage: () => useStore(state.store, (current) => current.settings.language),
     useNow: (options) =>
       useView((current, ctx) => nowViewModel(current, ctx, options), options?.projectId ?? ""),
+    useProjects: () => useView(projectsViewModel),
     useProjectView: (projectId) =>
       useView((current, ctx) => projectViewModel(current, projectId, ctx), projectId),
     useReview: () => useView(reviewViewModel),

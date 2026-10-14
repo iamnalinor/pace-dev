@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -39,11 +39,36 @@ describe("InboxScreen — decisions", () => {
   });
 });
 
+const row = (name: string) => screen.getByRole("link", { name });
+
 describe("ProjectsScreen and ProjectScreen", () => {
   it("lists the projects and opens one", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
     await fireEvent.press(screen.getByRole("link", { name: "Algebra" }));
     expect(router.push).toHaveBeenCalledWith(`/project/${ALGEBRA_ID}`);
+  });
+
+  it("says how many tasks are open in each project, whatever Now's chips show", async () => {
+    await renderScreen(<ProjectsScreen />, await createTestRuntime());
+    expect(within(row("Algebra")).getByText("2 tasks")).toBeOnTheScreen();
+    expect(within(row("Work")).getByText("3 tasks")).toBeOnTheScreen();
+  });
+
+  it("says one task, and none", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.createProject({ color: "blue", name: "Garden" });
+    await runtime.actions.createProject({ color: "teal", name: "Attic" });
+    const garden = Object.values(runtime.state.store.getState().projects.byId).find(
+      (project) => project.name === "Garden",
+    );
+    await runtime.actions.createTask({
+      presetId: "personal",
+      projectId: garden?.id,
+      title: "Weed",
+    });
+    await renderScreen(<ProjectsScreen />, runtime);
+    expect(within(row("Garden")).getByText("1 task")).toBeOnTheScreen();
+    expect(within(row("Attic")).getByText("No open tasks")).toBeOnTheScreen();
   });
 
   it("shows a project's figures and open tasks", async () => {

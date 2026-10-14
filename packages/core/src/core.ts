@@ -212,7 +212,7 @@ export {
   taskPreset,
   validatePresetInput,
 } from "./presets/resolve-preset.ts";
-export { importanceOf, presetOf } from "./queries/classify.ts";
+export { importanceOf, isInboxTask, presetOf } from "./queries/classify.ts";
 export { accountTz, type QueryContext } from "./queries/context.ts";
 export { type InboxItem, inboxList, UNSORTED_TOO_LONG_MINUTES } from "./queries/inbox.ts";
 export { compareNowItems, hasLaterStart, nowItem } from "./queries/now-item.ts";

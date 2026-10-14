@@ -11,6 +11,7 @@ import { EmptyState } from "#app/ui/empty-state.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { openTasksLabel } from "@pace/client";
 
 /** "+ New project": a name and a color, created on the spot. */
 const NewProject = () => {
@@ -57,13 +58,8 @@ export const ProjectsScreen = () => {
   const t = useT();
   const router = useRouter();
   const { hooks } = usePace();
-  const projects = hooks.useAppState((state) => state.projects);
-  const now = hooks.useNow();
-  const active = Object.values(projects.byId)
-    .filter((project) => !project.archived)
-    .toSorted((a, b) => a.name.localeCompare(b.name));
-  const openCount = (projectId: string): number =>
-    now.projects.find((chip) => chip.id === projectId)?.open ?? 0;
+  const language = hooks.useLanguage();
+  const active = hooks.useProjects();
   return (
     <Screen header={<ScreenHeader title={t("nav.projects")} />}>
       <View className="px-4">
@@ -88,7 +84,7 @@ export const ProjectsScreen = () => {
               {project.name}
             </Text>
             <Text className="font-sans text-[13px] tabular-nums text-fg2">
-              {openCount(project.id)}
+              {openTasksLabel(language, project.open)}
             </Text>
           </Pressable>
         ))}

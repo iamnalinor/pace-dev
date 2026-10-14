@@ -179,6 +179,11 @@ export {
   type ProjectViewModel,
   projectViewModel,
 } from "./view-models/project.ts";
+export {
+  openTasksLabel,
+  type ProjectListRow,
+  projectsViewModel,
+} from "./view-models/projects.ts";
 export { type DueRelative, relativeDay } from "./view-models/relative-day.ts";
 export { type ReviewRow, type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
 export {
