@@ -19,10 +19,25 @@ const model = (text: string, edits: ComposerEdits = {}) =>
 describe("composerModel", () => {
   it("is empty and personal before anything is typed", () => {
     expect(model("")).toMatchObject({
-      isEmpty: true,
+      canAdd: false,
       preset: { id: "personal" },
       importance: "normal",
       target: { kind: "new" },
+    });
+  });
+
+  it("can be added once the line or the form's title says something", () => {
+    expect(model(" ".repeat(3)).canAdd).toBe(false);
+    expect(model("read the paper").canAdd).toBe(true);
+    // The form's Title typed by hand over an empty line.
+    expect(model("", { title: "read the paper" }).canAdd).toBe(true);
+    expect(model("read the paper", { title: "  " }).canAdd).toBe(false);
+  });
+
+  it("can add problems to this week's homework without a title of its own", () => {
+    expect(model("дз по алгебре 8", { title: "" })).toMatchObject({
+      canAdd: true,
+      target: { kind: "instance", taskId: HW_ID },
     });
   });
 

@@ -74,3 +74,21 @@ test("a pasted message opens the form and is written only on Create", async ({ p
   await form.getByRole("button", { name: /^Create/u }).click();
   await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toBeVisible();
 });
+
+test("a title typed into the empty form is added on Enter", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const line = page.getByRole("textbox", { name: "New task" });
+  await expect(line).toBeVisible();
+  // N puts the cursor in the line; the chevron unfolds the form around the still empty line.
+  await page.keyboard.press("n");
+  await expect(line).toBeFocused();
+  await page.getByRole("button", { name: "Fill in the form yourself" }).click();
+  const form = page.getByRole("form", { name: "Check before adding" });
+  const title = form.getByRole("textbox", { exact: true, name: "Title" });
+  await expect(title).toBeFocused();
+  await page.keyboard.type("Pay the rent");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("list", { name: "Tasks" }).getByText("Pay the rent")).toBeVisible();
+  await expect(page.getByText("Type something first.")).toHaveCount(0);
+});

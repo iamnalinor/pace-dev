@@ -98,8 +98,7 @@ const useComposerFlow = (initialText: string) => {
   };
   const add = async (): Promise<void> => {
     // A title cleared in the form is not filled back from the line behind the user's back.
-    const isUntitled = model.target.kind === "new" && model.title.trim() === "";
-    if (isUntitled || isAddingRef.current) {
+    if (!model.canAdd || isAddingRef.current) {
       return;
     }
     isAddingRef.current = true;
@@ -179,11 +178,11 @@ const LineBlock = ({
   readonly status: ReactNode;
 }) => {
   const t = useT();
-  const { ai, model, text } = flow;
+  const { ai, text } = flow;
   return (
     <>
       <QuickLine flow={flow} isFocused={isFocused} onFocusChange={onFocusChange} />
-      {model.isEmpty ? null : (
+      {text.trim() === "" ? null : (
         <>
           {KEYBOARD === null ? null : (
             <Text className="px-2 font-sans text-[12px] text-muted">{t("composer.quickHint")}</Text>

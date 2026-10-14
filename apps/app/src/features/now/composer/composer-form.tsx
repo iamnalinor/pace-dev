@@ -217,7 +217,6 @@ export const ComposerForm = ({
   readonly onCollapse: () => void;
 }) => {
   const t = useT();
-  const isInstance = model.target.kind === "instance";
   return (
     <HotkeyLayer>
       <View accessibilityLabel={t("composer.formTitle")} className="gap-3.5 p-2" role="form">
@@ -227,7 +226,7 @@ export const ComposerForm = ({
               ? t("composer.addTo", { title: model.target.title })
               : t("form.create")
           }
-          canAdd={model.title.trim() !== "" || isInstance}
+          canAdd={model.canAdd}
           onAdd={onAdd}
           onCollapse={onCollapse}
         />

@@ -114,6 +114,31 @@ describe("Composer", () => {
     });
   });
 
+  it("adds a title typed into the form over an empty line", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<Composer />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
+    // Nothing to create yet.
+    expect(screen.getByRole("button", { name: en("form.create") })).toBeDisabled();
+    await fireEvent.changeText(title(), "pay the rent");
+    await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
+    await waitFor(() => {
+      expect(created(runtime, "pay the rent")).toBeDefined();
+    });
+    expect(screen.queryByText(en("actionError.action/empty-text"))).toBeNull();
+  });
+
+  it("adds it on Enter in the title as well", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<Composer />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.expand") }));
+    await fireEvent.changeText(title(), "pay the rent");
+    await enterInTitle();
+    await waitFor(() => {
+      expect(created(runtime, "pay the rent")).toBeDefined();
+    });
+  });
+
   it("collapses back to the line, which keeps the text", async () => {
     await renderScreen(<Composer />, await createTestRuntime());
     await fireEvent.changeText(line(), "renew the passport");

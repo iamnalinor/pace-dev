@@ -100,7 +100,7 @@ const newTaskForm = (
     readonly readByAssistant: boolean;
   },
 ): CreateTaskForm => ({
-  title: model.title === "" ? model.text.trim() : model.title,
+  title: model.title,
   presetId: model.preset.id,
   projectId: model.project?.id,
   projectName: model.project === null ? (model.newProjectName ?? undefined) : undefined,
@@ -116,7 +116,7 @@ const newTaskForm = (
 
 export const composerActions = (deps: ActionDeps): ComposerActions => ({
   createFromComposer: async (model, extras = {}) => {
-    if (model.isEmpty) {
+    if (!model.canAdd) {
       return err("action/empty-text");
     }
     const subtasks = subtaskForms(model, extras);

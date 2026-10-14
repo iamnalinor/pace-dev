@@ -2,8 +2,6 @@ import { ChevronDown } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Pressable, TextInput, type TextInputKeyPressEvent, View } from "react-native";
 
-import type { ComposerModel } from "@pace/client";
-
 import { useT } from "#app/app-state.tsx";
 import { lineEnterProps } from "#app/platform/enter-key.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -14,7 +12,6 @@ import { KEYBOARD, useHotkey } from "#app/ui/use-hotkey.tsx";
 /** What the line needs from the composer's flow. */
 type LineFlow = {
   readonly text: string;
-  readonly model: Pick<ComposerModel, "isEmpty">;
   readonly isLineFocused: boolean;
   readonly type: (next: string) => void;
   readonly enter: () => void;
@@ -100,6 +97,7 @@ export const QuickLine = ({
   const t = useT();
   const { palette } = useTheme();
   const inputRef = useRef<TextInput>(null);
+  const isEmpty = flow.text.trim() === "";
   // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
   const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
   useHotkey(HOTKEYS.newTask, () => {
@@ -126,11 +124,11 @@ export const QuickLine = ({
         }}
         {...lineEnterProps({
           onEnter: () => {
-            if (!flow.model.isEmpty) {
+            if (!isEmpty) {
               flow.enter();
             }
           },
-          onKeyPress: onEnter(flow.model.isEmpty, {
+          onKeyPress: onEnter(isEmpty, {
             enter: flow.enter,
             toInbox: () => void flow.toInbox(),
           }),
