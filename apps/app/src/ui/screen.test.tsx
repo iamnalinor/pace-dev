@@ -49,7 +49,44 @@ const Leaves = () => {
   );
 };
 
+/** Now's list beside a task pane, each with its footer; "Close the pane" drops the pane. */
+const SideBySide = () => {
+  const [hasPane, setHasPane] = useState(true);
+  return (
+    <>
+      <Screen footer={<Text>Time bar</Text>}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setHasPane(false);
+          }}
+        >
+          <Text>Close the pane</Text>
+        </Pressable>
+        <Shows message="Deleted" />
+      </Screen>
+      {hasPane ? (
+        <Screen footer={<Text>Done</Text>}>
+          <Text>Task</Text>
+        </Screen>
+      ) : null}
+    </>
+  );
+};
+
 describe("a toast on a screen with a footer", () => {
+  it("stays above the list's footer when the pane beside it (with its own) closes", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<SideBySide />, runtime);
+    for (const footer of screen.getAllByTestId("screen-footer")) {
+      await fireEvent(footer, "layout", {
+        nativeEvent: { layout: { height: FOOTER_HEIGHT, width: 390, x: 0, y: 0 } },
+      });
+    }
+    await fireEvent.press(screen.getByRole("button", { name: "Close the pane" }));
+    expect(bottomOfToast()).toBe(72 + FOOTER_HEIGHT + 12);
+  });
+
   it("sits above the footer and the phone's tab bar, not over the footer's buttons", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(

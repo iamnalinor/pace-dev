@@ -11,6 +11,7 @@ Nothing in the code reads this folder; delete it whenever it stops being useful.
 | [feedback-2.md](feedback-2.md) | The user's second feedback document (2026-10-10), verbatim as text with the screenshots described, plus the scenario coverage table written while planning stage 6. |
 | [feedback-3.md](feedback-3.md) | The user's third feedback document (2026-10-11), verbatim as text with the screenshots described. |
 | [feedback-4.md](feedback-4.md) | The user's fourth feedback document (2026-10-13), verbatim as text with the screenshots described, plus the extra screenshot sent after it. |
+| [bug-lessons.md](bug-lessons.md) | Every bug with why the tests missed it, its class, the sweep and the guard added; the standing rules per class (owner's request, 2026-10-14). |
 | [user-messages.md](user-messages.md) | The user's requests and decisions during the build, in order: verbatim where the chat kept them, from session summaries where it was compacted. |
 
 State at the time of writing (2026-10-08): stages 0–4 merged and deployed; releases up to

@@ -8,7 +8,8 @@
       "!**/drizzle/**/migrations.js",
       "!**/worker-configuration.d.ts",
       "!apps/app/android",
-      "!apps/app/.expo"
+      "!apps/app/.expo",
+      "!!**/.claude/worktrees"
     ]
   },
   "formatter": {

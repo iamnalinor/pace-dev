@@ -4,6 +4,7 @@ import {
   use,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
 } from "react";
@@ -22,24 +23,42 @@ type ToastHandle = { readonly show: (toast: ToastInput) => void };
 
 const ToastContext = createContext<null | ToastHandle>(null);
 
-/** A screen with a footer (the time bar) tells the toast how tall it is, so it floats above. */
-const FooterHeightContext = createContext<(height: number) => void>(() => undefined);
+/**
+A screen with a footer (the time bar) tells the toast how tall it is, so it floats above; null
+takes it back. Each screen speaks for itself: on a wide window Now's list and the task pane
+beside it both have one.
+*/
+type SetFooter = (screenId: string, height: null | number) => void;
+
+const FooterHeightContext = createContext<SetFooter>(() => undefined);
 
 /**
 Keeps the toast above this screen's footer while the screen is the one in front. A screen under
 a pushed one or a tab left behind stays mounted, and must not lift the toast of the next one.
 */
 export const useLiftToastAbove = (footerHeight: number, isActive: boolean): void => {
-  const setFooterHeight = use(FooterHeightContext);
+  const setFooter = use(FooterHeightContext);
+  const screenId = useId();
   useEffect(() => {
     if (!isActive) {
       return;
     }
-    setFooterHeight(footerHeight);
+    setFooter(screenId, footerHeight);
     return () => {
-      setFooterHeight(0);
+      setFooter(screenId, null);
     };
-  }, [footerHeight, isActive, setFooterHeight]);
+  }, [footerHeight, isActive, screenId, setFooter]);
+};
+
+/** The footers of the screens in view, by screen: the toast clears the tallest. */
+const useFooters = () => {
+  const [footers, setFooters] = useState<Readonly<Record<string, number>>>({});
+  const setFooter = useCallback<SetFooter>((screenId, height) => {
+    setFooters(({ [screenId]: _gone, ...others }) =>
+      height === null ? others : { ...others, [screenId]: height },
+    );
+  }, []);
+  return { footerHeight: Math.max(0, ...Object.values(footers)), setFooter };
 };
 
 /**
@@ -108,7 +127,7 @@ const ToastBar = ({
 /** One toast at a time at the bottom of the screen; a new one replaces the current one. */
 export const ToastProvider = ({ children }: { readonly children: ReactNode }) => {
   const [toast, setToast] = useState<null | Shown>(null);
-  const [footerHeight, setFooterHeight] = useState(0);
+  const { footerHeight, setFooter } = useFooters();
   const isWide = useIsWide();
   const hide = useCallback(() => {
     setToast(null);
@@ -132,7 +151,7 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   );
   return (
     <ToastContext value={handle}>
-      <FooterHeightContext value={setFooterHeight}>
+      <FooterHeightContext value={setFooter}>
         <View className="flex-1">
           {children}
           {toast === null ? null : (

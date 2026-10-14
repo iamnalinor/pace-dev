@@ -233,3 +233,9 @@ Answers while planning:
 Then the extra screenshot (the composer form in the dark theme with a toast over the time bar):
 
 > еще такой фидбек. что ему здесь не нравится? и опять же почему мы такое не ловим на этапе QA
+
+Later in the stage 8 session:
+
+> запиши в контекст после каждого найденного бага делать вывод почему существующими тестами мы его не отловили и как в целом нужно улучшать свой подход к тестам чтобы отлавливать такие классы ошибок. сейчас это тоже примени. однотипные баги не хочется каждый раз скидывать
+
+Taken as: `context/bug-lessons.md` (why missed, the class, a sweep for siblings, the guard) and a rule in `CLAUDE.md`; applied at once to this round's bugs with a sweep task.
