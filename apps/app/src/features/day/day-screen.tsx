@@ -114,12 +114,14 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
 
 /**
 The block's task, a link on its own line under the row, lined up with the block's words: inside
-the row's button it would be a control within a control, which screen readers skip.
+the row's button it would be a control within a control, which screen readers skip. Its words
+come from the view-model ("Open task" under a block already named after the task).
 */
 const TaskLine = ({ row }: { readonly row: DayRowProps["row"] }) => {
+  const t = useT();
   const openTask = useOpenTask();
-  const { taskId, taskTitle } = row;
-  if (taskId === null || taskTitle === null) {
+  const link = row.taskLink;
+  if (link === null) {
     return null;
   }
   return (
@@ -129,10 +131,10 @@ const TaskLine = ({ row }: { readonly row: DayRowProps["row"] }) => {
         className="min-h-6 shrink py-1 font-sans text-[12px] text-fg2 underline"
         numberOfLines={1}
         onPress={() => {
-          openTask(taskId);
+          openTask(link.id);
         }}
       >
-        {taskTitle}
+        {"title" in link.text ? link.text.title : t(link.text.key)}
       </Text>
     </View>
   );

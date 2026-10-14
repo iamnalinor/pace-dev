@@ -146,11 +146,25 @@ describe("DayScreen", () => {
       { category: "task", label: "Algebra HW 6", taskId },
       { at: addMinutesIso(NOW, -40) },
     );
+    // Another block on it, named otherwise.
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -90),
+      label: "Reading for it",
+      startAt: addMinutesIso(NOW, -120),
+    });
+    const reading = Object.values(runtime.state.store.getState().time.activities).find(
+      (activity) => activity.label === "Reading for it",
+    );
+    await runtime.actions.relabelActivity(reading?.id ?? "", { taskId });
     await renderScreen(<DayScreen />, runtime);
     // A link inside a button is a nested control: screen readers skip it, axe refuses it.
     expect(controlsInsideControls()).toEqual([]);
-    await fireEvent.press(screen.getByRole("link", { name: "Algebra HW 6" }));
+    // The block named after the task says Open task, not its title a second time.
+    await fireEvent.press(screen.getByRole("link", { name: "Open task" }));
     expect(router.push).toHaveBeenCalledWith(`/task/${taskId}`);
+    // The other one names the task it was for.
+    expect(screen.getByRole("link", { name: "Algebra HW 6" })).toBeOnTheScreen();
   });
 
   it("lists blocks and gaps as one timeline: a gap is a quiet row with its hours and Log", async () => {
