@@ -9,9 +9,9 @@ import { useOnboarded } from "#app/features/permissions/use-onboarded.ts";
 /** Screens without the app's navigation or a session: signing in and the first-run walk-through. */
 export const BARE_PATHS = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
 
-/** Whether a path is one of the screens that need no session. */
+/** Whether a path is one of the screens that need no session (a whole segment: not "/authors"). */
 export const isBarePath = (path: string): boolean =>
-  BARE_PATHS.some((bare) => path.startsWith(bare));
+  BARE_PATHS.some((bare) => path === bare || path.startsWith(`${bare}/`));
 
 /**
 The one guard of every signed-in screen, whichever navigator it sits in (the tabs or a stack

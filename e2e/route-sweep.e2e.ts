@@ -16,7 +16,11 @@ route list is read from `apps/app/app`, so a new screen is swept without anyone 
 
 const APP_DIR = path.resolve(import.meta.dirname, "../apps/app/app");
 
-/** Screens that are not meant to have the sidebar: signing in (and its way back) and the walk-through. */
+/**
+Screens that are not meant to have the sidebar: signing in (and its way back) and the walk-through.
+A copy of `BARE_PATHS` in apps/app/src/auth/route-gate.tsx (e2e may not import from the app); keep
+the two lists the same.
+*/
 const BARE = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
 
 const routeFiles = (dir: string): readonly string[] =>
@@ -30,7 +34,7 @@ const SIDEBAR_FAULT = ["shown on a bare screen", "missing"] as const;
 
 /** On a desktop every screen but signing in and the walk-through keeps the sidebar. */
 const isSidebarScreen = (size: string, url: string): boolean =>
-  size === "desktop" && BARE.every((bare) => !url.startsWith(bare));
+  size === "desktop" && BARE.every((bare) => url !== bare && !url.startsWith(`${bare}/`));
 
 /** A route file as the URLs that open it on the seeded account (none for layouts and hooks). */
 const urlsOf = (file: string, seeded: LivedIn): readonly string[] => {
