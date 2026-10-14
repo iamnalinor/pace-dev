@@ -9,6 +9,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
+import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
@@ -258,7 +259,10 @@ const Totals = ({ day }: { readonly day: DayModel }) => {
   );
 };
 
-/** One day of the time ledger: totals per category, the timeline with its gaps, edits. */
+/**
+One day of the time ledger: totals per category, the timeline with its gaps, edits. Today it
+has the time bar at its foot, where the thumb rests; another day is only looked back on.
+*/
 export const DayScreen = () => {
   const t = useT();
   const { hooks } = usePace();
@@ -277,7 +281,7 @@ export const DayScreen = () => {
     />
   );
   return (
-    <Screen header={header}>
+    <Screen {...(day.isToday && { footer: <TimeBar /> })} header={header}>
       <Totals day={day} />
       {phone.hasUsageAccess ? <SleepCard phone={phone} zone={day.zone} /> : null}
       {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}

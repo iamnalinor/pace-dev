@@ -46,6 +46,7 @@ export const enTime = {
   "time.taskNone": "No open tasks.",
   "time.taskNoMatch": "No open task matches.",
   "time.openDay": "Open Day",
+  "time.running": "Running now",
   "time.alongside": "Alongside what is running",
   "time.alongsideTag": "alongside",
   "time.calendar.loading": "The calendar is still loading",

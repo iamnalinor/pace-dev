@@ -46,6 +46,16 @@ const seminarSoon = (): void => {
   ];
 };
 
+/** A world where a walk (Rest's choice) has run for `minutes`. */
+const walkSince = async (minutes: number) => {
+  const runtime = await createTestRuntime();
+  await runtime.actions.startActivity(
+    { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
+    { at: addMinutesIso(NOW, -minutes) },
+  );
+  return runtime;
+};
+
 const checks = (): readonly string[] =>
   screen
     .getAllByRole("checkbox", { name: /^Mark .* done$/ })
@@ -78,7 +88,8 @@ describe("NowBoard", () => {
     expect(screen.getAllByText("Nice-to-have").length).toBeGreaterThan(0);
     expect(screen.getByText("Due Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
     expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+    // The time bar is on Day now.
+    expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
   });
 
   it("opens a task from its row, and has no Inbox counter of its own (that is in the navigation)", async () => {
@@ -308,6 +319,48 @@ describe("NowBoard", () => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
+  });
+
+  describe("what runs, in one compact row (the time bar lives on Day)", () => {
+    it("has no row and no time bar while nothing runs", async () => {
+      await renderScreen(<Board />, await createTestRuntime());
+      expect(screen.queryByLabelText(en("time.running"))).toBeNull();
+      expect(screen.queryByLabelText(en("time.bar"))).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Stop/u })).toBeNull();
+    });
+
+    it("shows the category, the label and the time it has run; Stop stops it and the row goes", async () => {
+      const runtime = await walkSince(25);
+      await renderScreen(<Board />, runtime);
+      const row = screen.getByLabelText(en("time.running"));
+      expect(within(row).getByText("Rest")).toBeOnTheScreen();
+      expect(within(row).getByText("Walk")).toBeOnTheScreen();
+      expect(within(row).getByText("25m")).toBeOnTheScreen();
+      await fireEvent.press(within(row).getByRole("button", { name: "Stop: Walk" }));
+      await waitFor(() => {
+        expect(screen.queryByLabelText(en("time.running"))).toBeNull();
+      });
+      expect(
+        Object.values(runtime.state.store.getState().time.activities).filter(
+          (activity) => activity.endAt === null,
+        ),
+      ).toEqual([]);
+    });
+
+    it("opens Day on a tap on the row", async () => {
+      await renderScreen(<Board />, await walkSince(5));
+      const row = screen.getByRole("link", { name: /Walk/u });
+      expect(row.props["accessibilityHint"]).toBe(en("time.openDay"));
+      await fireEvent.press(row);
+      expect(router.push).toHaveBeenCalledWith("/day");
+    });
+
+    it("keeps the task rows in their own box under it, so its arrival cannot move them", async () => {
+      await renderScreen(<Board />, await walkSince(5));
+      expect(screen.getByLabelText(en("time.running"))).toBeOnTheScreen();
+      expect(checks().length).toBeGreaterThan(0);
+      expect(rowsInFlattenableBoxes()).toEqual([]);
+    });
   });
 
   it("shows the empty state on a fresh account", async () => {

@@ -5,7 +5,6 @@ import type { NowRow } from "@pace/client";
 import { usePace, useT } from "#app/app-state.tsx";
 import { Composer } from "#app/features/now/composer/composer.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
-import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
 import { ZoneBanner } from "#app/shared/zone-banner.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { Screen } from "#app/ui/screen.tsx";
@@ -13,11 +12,13 @@ import { Screen } from "#app/ui/screen.tsx";
 import { CalendarPrompt } from "./calendar-prompt.tsx";
 import { NowHeader } from "./now-header.tsx";
 import { ProjectChips } from "./project-chips.tsx";
+import { RunningNow } from "./running-now.tsx";
 
 /**
 The Main artboard: open tasks by deadline, the nearest first; the composer on top (shared text
-lands there), the tasks that start later folded under "In future", and the time bar where the
-thumb rests. The composer's state comes from the `ComposerProvider` around Now.
+lands there), what runs now in a compact row under it, and the tasks that start later folded
+under "In future". The time bar itself is on Day. The composer's state comes from the
+`ComposerProvider` around Now.
 */
 export const NowBoard = ({
   isComposerFocused = false,
@@ -35,9 +36,10 @@ export const NowBoard = ({
   const future = board.future.filter((row) => isInProject(row));
   const isEmpty = rows.length === 0 && future.length === 0;
   return (
-    <Screen footer={<TimeBar />} header={<NowHeader />}>
+    <Screen header={<NowHeader />}>
       {/* On /add (a share) the cursor is in the composer. */}
       <Composer isFocused={isComposerFocused} />
+      <RunningNow />
       <ZoneBanner />
       <CalendarPrompt />
       <ProjectChips chips={board.projects} onSelect={setProjectId} selected={selected} />

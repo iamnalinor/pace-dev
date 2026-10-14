@@ -48,6 +48,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "time.taskNone": "Открытых задач нет.",
   "time.taskNoMatch": "Ни одна открытая задача не подходит.",
   "time.openDay": "Открыть день",
+  "time.running": "Сейчас идёт",
   "time.alongside": "Параллельно с текущим",
   "time.alongsideTag": "параллельно",
   "time.calendar.loading": "Календарь ещё загружается",
