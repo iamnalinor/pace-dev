@@ -33,3 +33,9 @@ in that voice — "The assistant will create «X»", "…will move «X» to Frid
 Военкомат" — with [Approve] (Enter) and [Cancel]; nothing says "suggested" or "proposal". In code, rename the
 domain term `proposal` → `action` (pending assistant action) across core, API, client, app and bot in Task 12
 (one sweep, no aliases left behind); Task 13 uses the new names.
+
+## Follow-up on pending actions (owner, 2026-10-14)
+While an approval message is pending, any text the person sends (or a reply to that message) is a follow-up: the bot
+asks again with the thread (Task 12's `thread` on `/api/parse`: original text, actions shown, follow-ups), edits the
+approval message to the revised actions and keeps [Approve] [Cancel]. A new unrelated message after Cancel or Approve
+starts fresh. If several approvals are pending, a reply targets its message; plain text targets the latest one.

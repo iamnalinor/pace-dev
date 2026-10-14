@@ -43,3 +43,15 @@ in that voice — "The assistant will create «X»", "…will move «X» to Frid
 Военкомат" — with [Approve] (Enter) and [Cancel]; nothing says "suggested" or "proposal". In code, rename the
 domain term `proposal` → `action` (pending assistant action) across core, API, client, app and bot in Task 12
 (one sweep, no aliases left behind); Task 13 uses the new names.
+
+## Follow-up on pending actions (owner, 2026-10-14)
+«и мы можем дать follow-up, который улетает вместе с тем что он уже предложил и нашим изначальным запросом».
+Under the pending actions there is a one-line field "Correct the assistant…" (EN/RU). Sending it asks again with the
+whole thread: the original text, the actions shown so far, and every follow-up in order. The new answer replaces
+the cards (nothing applied in between). Contract (core `endpoint()`, API, client): `/api/parse` takes an optional
+`thread: [{ text, actions }]` of earlier turns (strict input, bounded: at most 5 turns, text limits as today); the
+prompt shows the thread before the new text and asks for the full revised set of actions, not a diff. The rules
+fallback (no assistant) ignores the thread and reads only the latest text. Fake LLM handles a thread
+deterministically; LLM regression fixtures gain follow-up cases ("не на пятницу, а на субботу", "и ещё добавь
+подзадачу", "нет, не удаляй"). Tests: contract, prompt contents, app flow (two follow-ups then Approve applies only the
+final set; Cancel clears the thread), Decision log records the turns. Task 13 reuses this for the bot.
