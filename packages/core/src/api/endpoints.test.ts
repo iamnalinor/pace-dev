@@ -5,6 +5,17 @@ import { describe, expect, it } from "vitest";
 import { endpointList, endpoints } from "./endpoints.ts";
 
 /** Every object schema reachable from `schema` that refuses keys it does not know. */
+/** Containers that hold schemas but that `loosen` does not walk into. */
+const UNWALKED: ReadonlySet<string> = new Set([
+  "catch",
+  "intersection",
+  "lazy",
+  "map",
+  "record",
+  "set",
+  "tuple",
+]);
+
 const strictObjectsIn = (schema: z.ZodType, path: string): readonly string[] => {
   const def = schema._zod.def as unknown as Record<string, unknown> & { readonly type: string };
   const inner = (key: string): readonly string[] => {
@@ -35,7 +46,10 @@ const strictObjectsIn = (schema: z.ZodType, path: string): readonly string[] => 
       return [...inner("in"), ...inner("out")];
     }
     default: {
-      return inner("innerType");
+      // A container `loosen` does not walk would hide a strict object from both: fail loudly.
+      return UNWALKED.has(def.type)
+        ? [`${path} (${def.type}: not walked by loosen)`]
+        : inner("innerType");
     }
   }
 };
