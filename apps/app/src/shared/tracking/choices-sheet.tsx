@@ -18,8 +18,11 @@ import type { CalendarToday } from "./calendar-today.ts";
 import { CalendarChoices } from "./calendar-choices.tsx";
 import { ChoiceItem, ChoiceList, type ListProps, Nothing } from "./choice-row.tsx";
 
-/** A button's own choices (the chores, the ways to rest), each with its usual length. */
-const ButtonChoices = ({ button, options, start }: ListProps) => {
+/**
+A button's own choices (the chores, the ways to rest), each with its usual length. The one
+running already is checked, and picking it only closes the picker: Stop has its own row.
+*/
+const ButtonChoices = ({ button, close, options, start }: ListProps) => {
   const t = useT();
   const { language } = useViewer();
   const { actions } = usePace();
@@ -32,6 +35,10 @@ const ButtonChoices = ({ button, options, start }: ListProps) => {
           key={choice.id}
           label={t(choice.labelKey)}
           onPress={() => {
+            if (choice.isRunning) {
+              close();
+              return;
+            }
             start(actions.startChoice(choice.id, options));
           }}
         />
@@ -47,14 +54,14 @@ task's own Focus button does. The task in focus already is checked and only clos
 const TaskChoices = ({
   button,
   close,
+  focused,
   options,
   query,
   start,
-}: ListProps & { readonly query: string }) => {
+}: ListProps & { readonly query: string; readonly focused: null | string }) => {
   const t = useT();
   const { actions, hooks } = usePace();
   const board = hooks.useNow();
-  const focused = hooks.useTimeBar().running?.taskId ?? null;
   const rows = taskChoices(board, query);
   if (rows.length === 0) {
     const isEmpty = board.rows.length === 0 && board.future.length === 0;
@@ -112,7 +119,10 @@ const TaskSearch = ({
   );
 };
 
-/** The running button's way out, first in its picker: Stop is one tap away. */
+/**
+The running button's way out, first in its picker: Stop is one tap away. Filled, centred and
+without an outline, it reads as an action, not as one more thing to start.
+*/
 const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
   const t = useT();
   const { palette } = useTheme();
@@ -120,7 +130,7 @@ const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
     <Pressable
       accessibilityLabel={t("time.stop")}
       accessibilityRole="button"
-      className="min-h-12 flex-row items-center gap-2 rounded-lg border border-line bg-bg px-3.5 active:opacity-70"
+      className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg bg-track px-3.5 active:opacity-70"
       onPress={onStop}
     >
       <Square color={palette.fg} size={14} />
@@ -129,15 +139,42 @@ const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
   );
 };
 
+/** What the picker shows of the bar: its button, whether "alongside" applies, the task in focus. */
+type Shown = {
+  readonly button: TimeButtonView;
+  readonly canGoAlongside: boolean;
+  readonly focused: null | string;
+};
+
+/**
+The bar as the picker shows it: live, until a pick is being written. From then on it stays as
+it was when tapped, so the pick's own effect (Stop, a check) never flashes in before the picker
+closes; a refused pick lets go of it again.
+*/
+const useShownWhileWriting = (live: Shown, onClose: () => void) => {
+  const run = useRunAction();
+  const [frozen, setFrozen] = useState<null | Shown>(null);
+  const start = (result: ActionResult): void => {
+    setFrozen(live);
+    void (async () => {
+      if (await run(result)) {
+        onClose();
+        return;
+      }
+      setFrozen(null);
+    })();
+  };
+  return { shown: frozen ?? live, start };
+};
+
 /**
 Behind every button of the time bar: what it can start. Its header holds Stop when the button's
 own activity runs, the "alongside" switch when something else runs, and Task's search.
 */
 export const ChoicesSheet = ({
-  button,
   calendar,
-  canGoAlongside,
   onClose,
+  ...live
 }: {
   readonly button: TimeButtonView;
   readonly calendar: CalendarToday | null;
@@ -145,17 +182,14 @@ export const ChoicesSheet = ({
   readonly onClose: () => void;
 }) => {
   const t = useT();
-  const { actions } = usePace();
-  const run = useRunAction();
+  const { actions, hooks } = usePace();
   const [isAlongside, setIsAlongside] = useState(false);
   const [query, setQuery] = useState("");
-  const start = (result: ActionResult): void => {
-    void (async () => {
-      if (await run(result)) {
-        onClose();
-      }
-    })();
-  };
+  const { shown, start } = useShownWhileWriting(
+    { ...live, focused: hooks.useTimeBar().focusedTaskId },
+    onClose,
+  );
+  const { button, canGoAlongside } = shown;
   const props: ListProps = {
     button,
     calendar,
@@ -188,7 +222,9 @@ export const ChoicesSheet = ({
       visible
     >
       {button.kind === "calendar" ? <CalendarChoices {...props} /> : null}
-      {button.kind === "task" ? <TaskChoices {...props} query={query} /> : null}
+      {button.kind === "task" ? (
+        <TaskChoices {...props} focused={shown.focused} query={query} />
+      ) : null}
       {button.kind === "choices" ? <ButtonChoices {...props} /> : null}
     </Sheet>
   );

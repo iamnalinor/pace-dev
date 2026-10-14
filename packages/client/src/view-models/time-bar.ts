@@ -60,7 +60,17 @@ export type TimeBarModel = {
   readonly running: null | RunningView;
   /** What runs alongside it. */
   readonly alongside: readonly RunningView[];
+  /**
+  The task in focus: the main activity's task when Focus started it (no button of its own). The
+  Task button, its picker's check and the task's own Focus button all read this one answer; a
+  button's choice that also names a task belongs to that button.
+  */
+  readonly focusedTaskId: null | string;
 };
+
+/** The task the main activity is Focus on, or null (see `TimeBarModel.focusedTaskId`). */
+const focusedTaskOf = (main: Activity | null): null | string =>
+  main !== null && main.buttonId === null ? main.taskId : null;
 
 const MS_PER_MINUTE = 60_000;
 
@@ -99,7 +109,7 @@ const isButtonRunning = (
     return false;
   }
   return button.kind === "task"
-    ? main.taskId !== null && main.buttonId === null
+    ? focusedTaskOf(main) !== null
     : main.buttonId === button.id || choices.some((choice) => choice.isRunning);
 };
 
@@ -132,6 +142,7 @@ export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext):
         labelKey: button.labelKey,
       };
     }),
+    focusedTaskId: focusedTaskOf(main),
     running: main === null ? null : runningView(main, ctx.now),
   };
 };

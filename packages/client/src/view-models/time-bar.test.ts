@@ -41,6 +41,28 @@ describe("timeBarModel", () => {
     expect(runningButtons(world)).toEqual([]);
   });
 
+  it("names the task in focus once, for the Task button, its picker and the task's Focus", async () => {
+    const world = await setupActions();
+    const { tasks } = world.state.store.getState();
+    const taskId = Object.values(tasks.byId).find((task) => task.title === "Algebra HW 6")?.id;
+    const bar = () => timeBarModel(world.state.store.getState(), ctx);
+    expect(bar().focusedTaskId).toBeNull();
+    unwrap(await world.actions.focusTask(taskId ?? ""));
+    expect(bar().focusedTaskId).toBe(taskId);
+    // A button's choice that also names a task (the assistant can start one so) belongs to the
+    // button: Rest is on, Task is not, and no task reads as in focus anywhere.
+    unwrap(
+      await world.actions.startActivity({
+        buttonId: "rest:walk",
+        category: "rest",
+        label: "Walk",
+        taskId,
+      }),
+    );
+    expect(bar().focusedTaskId).toBeNull();
+    expect(runningButtons(world)).toEqual(["rest"]);
+  });
+
   it("marks the running choice in Rest's list", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startChoice("rest:nap"));

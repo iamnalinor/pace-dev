@@ -1,9 +1,9 @@
 import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import type { TimeButtonView } from "@pace/client";
-import type { Event } from "@pace/core";
+import type { Event, MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -106,14 +106,28 @@ type ButtonProps = {
   readonly onTap: (button: TimeButtonView) => void;
 };
 
-/** How a button looks: on (its activity runs), greyed (cannot start now) or resting in its color. */
-const buttonLook = (button: TimeButtonView, isGreyed: boolean) => {
+/**
+How a button looks, and what its hint says a tap does: on (its activity runs: the picker opens
+on Stop), greyed (cannot start now) or resting in its color.
+*/
+const buttonLook = (
+  button: TimeButtonView,
+  isGreyed: boolean,
+): { readonly box: string; readonly ink: string; readonly hintKey: MessageKey } => {
   if (button.isRunning) {
-    return { box: "border-accentQuiet bg-accentQuiet", ink: "font-medium text-accentQuietFg" };
+    return {
+      box: "border-accentQuiet bg-accentQuiet",
+      hintKey: "time.buttonRunningHint",
+      ink: "font-medium text-accentQuietFg",
+    };
   }
   return isGreyed
-    ? { box: "border-dashed border-line bg-surface", ink: "text-muted" }
-    : { box: `bg-surface ${OUTLINE[button.color]}`, ink: inkClass(button.color) };
+    ? { box: "border-dashed border-line bg-surface", hintKey: "time.buttonHint", ink: "text-muted" }
+    : {
+        box: `bg-surface ${OUTLINE[button.color]}`,
+        hintKey: "time.buttonHint",
+        ink: inkClass(button.color),
+      };
 };
 
 /**
@@ -132,7 +146,7 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
       {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
       <Tooltip label={unavailable} showsOnTap={false}>
         <Pressable
-          accessibilityHint={unavailable ?? t("time.buttonHint")}
+          accessibilityHint={unavailable ?? t(look.hintKey)}
           accessibilityLabel={button.isRunning ? t("time.buttonRunning", { label }) : label}
           accessibilityRole="button"
           className={cx(
@@ -160,6 +174,30 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
 type Opened = { readonly id: TimeButtonView["id"]; readonly calendar: CalendarToday | null };
 
 /**
+Which picker is open. Calendar's opens once today's calendar is read; only the picker asked for
+last opens, so a read that answers late (another button tapped meanwhile, or the picker
+closed) opens nothing over what is there.
+*/
+const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
+  const [opened, setOpened] = useState<null | Opened>(null);
+  const askedRef = useRef<null | TimeButtonView["id"]>(null);
+  return {
+    close: (): void => {
+      askedRef.current = null;
+      setOpened(null);
+    },
+    open: async (button: TimeButtonView): Promise<void> => {
+      askedRef.current = button.id;
+      const today = button.kind === "calendar" ? await readCalendar() : null;
+      if (askedRef.current === button.id) {
+        setOpened({ calendar: today, id: button.id });
+      }
+    },
+    opened,
+  };
+};
+
+/**
 The time bar at the foot of Day (today): what runs (and what runs alongside), "What are you
 doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
 what it can start.
@@ -168,14 +206,10 @@ export const TimeBar = () => {
   const t = useT();
   const { hooks } = usePace();
   const { alongside, buttons, running } = hooks.useTimeBar();
-  const [opened, setOpened] = useState<null | Opened>(null);
   // The typed activities the assistant is still reading (two can be in flight).
   const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
   const calendar = useCalendarButton();
-  const open = async (button: TimeButtonView): Promise<void> => {
-    const today = button.kind === "calendar" ? await calendar.forPicker() : null;
-    setOpened({ calendar: today, id: button.id });
-  };
+  const { close, open, opened } = usePicker(calendar.forPicker);
   const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
   return (
     <View
@@ -212,9 +246,7 @@ export const TimeBar = () => {
           button={openedButton}
           calendar={opened.calendar}
           canGoAlongside={running !== null && !openedButton.isRunning}
-          onClose={() => {
-            setOpened(null);
-          }}
+          onClose={close}
         />
       )}
     </View>

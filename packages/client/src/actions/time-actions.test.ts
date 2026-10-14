@@ -40,7 +40,7 @@ const isAttendedNow = async ([startSeconds, lengthSeconds, runningFor]: readonly
 };
 
 describe("time actions", () => {
-  it("switches with one tap and stops with a second tap on the running choice", async () => {
+  it("switches with one pick; the running choice picked again keeps running (Stop stops it)", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startChoice("rest:workout"));
     world.setNow(later(50));
@@ -54,8 +54,13 @@ describe("time actions", () => {
     });
     expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("chores");
 
+    world.setNow(later(85));
+    // Picked again: nothing new, the same block runs on.
+    expect(unwrap(await world.actions.startChoice("chores:eating"))).toEqual([]);
+    const again = timeBarModel(world.state.store.getState(), ctx(later(86)));
+    expect(again.running).toMatchObject({ label: "Eating", minutes: 36 });
     world.setNow(later(90));
-    unwrap(await world.actions.startChoice("chores:eating"));
+    unwrap(await world.actions.stopActivity());
     const after = world.state.store.getState();
     const at = ctx(later(95));
     expect(timeBarModel(after, at).running).toBeNull();

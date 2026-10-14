@@ -51,7 +51,7 @@ export type CalendarStart = {
 export type TimeActions = EditActions & {
   /**
   A choice of a time-bar button ("rest:walk", "chores:ready"): starts it in the account's
-  language, or stops it if it is the main activity running (alongside, it always starts).
+  language; the main activity running already is left as it is (alongside, it always starts).
   */
   readonly startChoice: (choiceId: string, options?: StartOptions) => ActionResult;
   /** "From calendar": the event's title, from its start if it is on already, until its end. */
@@ -147,8 +147,9 @@ const startChoice = async (
     return err("action/nothing-to-do");
   }
   const isRunning = runningActivity(timeOf(deps), deps.clock.now())?.buttonId === choiceId;
+  // Picked again while it runs: it runs on (Stop has its own row in the picker).
   if (isRunning && options.alongside !== true) {
-    return await stopActivity(deps);
+    return ok([]);
   }
   const { language } = deps.state.store.getState().settings;
   return await startActivity(deps, {

@@ -4,6 +4,7 @@ import * as Calendar from "expo-calendar";
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 
+import * as phoneCalendar from "#app/platform/phone-calendar.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -50,6 +51,20 @@ const choicesIn = async (name: string): Promise<readonly string[]> =>
   within(await picker(name))
     .getAllByRole("button")
     .map((button): string => String(button.props["accessibilityLabel"]));
+
+/** A promise the test settles when it wants to. */
+const deferred = <T,>() => {
+  const settle: { resolve: (value: T) => void } = { resolve: () => undefined };
+  const promise = new Promise<T>((resolve) => {
+    settle.resolve = resolve;
+  });
+  return {
+    promise,
+    resolve: (value: T) => {
+      settle.resolve(value);
+    },
+  };
+};
 
 beforeEach(() => {
   calendar.state.status = "undetermined";
@@ -176,6 +191,113 @@ describe("TimeBar", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Stop: Workout" }));
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Commute"]);
+    });
+  });
+
+  it.each([
+    { button: "Chores", choice: "Getting ready" },
+    { button: "Rest", choice: "Walk" },
+    { button: "Task", choice: "Algebra HW 6" },
+  ])(
+    "only closes $button's picker when the choice running already is picked again",
+    async ({ button, choice }) => {
+      const runtime = await createTestRuntime();
+      await renderScreen(<TimeBar />, runtime);
+      await fireEvent.press(screen.getByRole("button", { name: button }));
+      await fireEvent.press(within(await picker(button)).getByRole("button", { name: choice }));
+      const on = en("time.buttonRunning", { label: button });
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: on })).toBeOnTheScreen();
+      });
+      const before = activities(runtime);
+      const events = runtime.state.store.getState().log.length;
+      const starts = [
+        jest.spyOn(runtime.actions, "startChoice"),
+        jest.spyOn(runtime.actions, "focusTask"),
+      ];
+      await fireEvent.press(screen.getByRole("button", { name: on }));
+      await fireEvent.press(within(await picker(button)).getByRole("button", { name: choice }));
+      await waitFor(() => {
+        expect(listsNamed(button)).toEqual([]);
+      });
+      // Nothing asked of the actions, nothing written: the same block runs on.
+      for (const start of starts) {
+        expect(start).not.toHaveBeenCalled();
+      }
+      expect(activities(runtime)).toEqual(before);
+      expect(runtime.state.store.getState().log).toHaveLength(events);
+    },
+  );
+
+  describe("while an answer is pending (class 3)", () => {
+    it("opens only the picker asked for last: a calendar read that answers late opens nothing", async () => {
+      await renderScreen(<TimeBar />, await createTestRuntime());
+      const button = screen.getByRole("button", { name: "Calendar" });
+      await waitFor(() => {
+        expect(button.props["accessibilityHint"]).toBe(en("time.calendar.noAccess"));
+      });
+      // Greyed, a tap reads the calendar again: that read hangs until the test answers it.
+      const read = deferred<"granted">();
+      jest.spyOn(phoneCalendar, "calendarAccess").mockReturnValueOnce(read.promise);
+      await fireEvent.press(button);
+      await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
+      await picker("Rest");
+      calendar.state.status = "granted";
+      read.resolve("granted");
+      // The late answer has landed once the button reads it (access, nothing near)...
+      await waitFor(() => {
+        expect(button.props["accessibilityHint"]).toBe(en("time.calendar.nothingNear"));
+      });
+      // ...and the Rest picker stays: Calendar's late answer opens nothing over it.
+      expect(listsNamed("Rest")).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: en("time.calendarStartUntitled") })).toBeNull();
+      expect(
+        screen.getAllByRole("header").map((header): unknown => header.props["children"]),
+      ).toEqual(["Rest"]);
+    });
+
+    it("keeps the picker as it was while a pick is written: no Stop flashes in before it closes", async () => {
+      const runtime = await createTestRuntime();
+      await renderScreen(<TimeBar />, runtime);
+      const release = deferred<undefined>();
+      const original = runtime.actions.startChoice;
+      jest.spyOn(runtime.actions, "startChoice").mockImplementation(async (...args) => {
+        const result = await original(...args);
+        await release.promise;
+        return result;
+      });
+      await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
+      await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Walk" }));
+      // Written: the bar shows it on, but the picker, still closing, is the one that was tapped.
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: en("time.buttonRunning", { label: "Rest" }) }),
+        ).toBeOnTheScreen();
+      });
+      expect(listsNamed("Rest")).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: en("time.stop") })).toBeNull();
+      release.resolve(undefined);
+      await waitFor(() => {
+        expect(listsNamed("Rest")).toEqual([]);
+      });
+    });
+
+    it("lets go of the picker as it was when the pick is refused", async () => {
+      const runtime = await createTestRuntime();
+      await renderScreen(<TimeBar />, runtime);
+      jest
+        .spyOn(runtime.actions, "startChoice")
+        .mockResolvedValue({ error: "action/nothing-to-do", ok: false });
+      await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
+      await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Walk" }));
+      // Refused: the picker stays open for another pick, and the next one goes through.
+      expect(await screen.findByText(en("actionError.action/nothing-to-do"))).toBeOnTheScreen();
+      expect(listsNamed("Rest")).toHaveLength(1);
+      jest.restoreAllMocks();
+      await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Nap" }));
+      await waitFor(() => {
+        expect(running(runtime)).toEqual(["Nap"]);
+      });
     });
   });
 
@@ -337,7 +459,7 @@ describe("TimeBar", () => {
     const on = screen.getByRole("button", {
       name: en("time.buttonRunning", { label: "Calendar" }),
     });
-    expect(on.props["accessibilityHint"]).toBe(en("time.buttonHint"));
+    expect(on.props["accessibilityHint"]).toBe(en("time.buttonRunningHint"));
     await fireEvent.press(on);
     await fireEvent.press(await screen.findByRole("button", { name: en("time.stop") }));
     await waitFor(() => {

@@ -48,6 +48,21 @@ describe("TaskScreen — homework", () => {
     });
   });
 
+  it("reads a button's choice that names the task as that button's, not as Focus", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    // The assistant can start a choice on a task: a walk to think the homework over.
+    await runtime.actions.startActivity({
+      buttonId: "rest:walk",
+      category: "rest",
+      label: "Walk",
+      taskId: HW_ID,
+    });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    // The same answer as the time bar's Task button (off) and its picker (no check).
+    expect(screen.getByRole("button", { name: "Focus" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Focusing" })).toBeNull();
+  });
+
   it("toggles a subtask solved and back", async () => {
     const runtime = await hwScreen();
     const subtask = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
