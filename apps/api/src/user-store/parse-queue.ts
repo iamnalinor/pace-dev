@@ -4,9 +4,10 @@ import {
   type EventBody,
   type EventInput,
   newId,
-  planProposal,
+  planProposals,
   type Proposal,
   type ProposalKind,
+  type RequestDomain,
   type Result,
   t,
 } from "@pace/core";
@@ -27,7 +28,7 @@ export type QueuedParse = {
   readonly text: string;
   readonly channel: "api" | "bot";
   /** The field it was typed into; a text kept before fields existed is a task's. */
-  readonly domain?: "activity" | "auto" | "task" | undefined;
+  readonly domain?: RequestDomain | undefined;
   readonly enqueuedAt: string;
   /** Not before this instant; `null` = at the next chance. */
   readonly retryAt: null | string;
@@ -131,28 +132,25 @@ const toInbox = (item: QueuedParse, now: string): Exclude<Drained, { kind: "wait
 });
 
 /** Every proposal planned, or `null` when one is not for writing unseen or cannot be planned. */
+/**
+Every proposal planned in order, the text kept as the source of a task it adds to; `null`
+when one is not for writing unseen or cannot be planned.
+*/
 const planAll = (
   proposals: readonly Proposal[],
-  world: { readonly state: CoreState; readonly now: string },
+  world: { readonly state: CoreState; readonly now: string; readonly text: string },
 ): null | readonly EventInput[] => {
   if (proposals.length === 0 || proposals.some((proposal) => !AUTO_APPLIED.has(proposal.kind))) {
     return null;
   }
-  const ctx = {
+  const planned = planProposals(world.state, proposals, {
     deviceTz: world.state.settings.timezone ?? "UTC",
     newId: () => newId(),
     now: world.now,
-    source: "system" as const,
-  };
-  const inputs: EventInput[] = [];
-  for (const proposal of proposals) {
-    const planned = planProposal(world.state, proposal, ctx);
-    if (!planned.ok) {
-      return null;
-    }
-    inputs.push(...planned.value);
-  }
-  return inputs;
+    source: "system",
+    sourceText: world.text,
+  });
+  return planned.ok ? planned.value : null;
 };
 
 /**
@@ -191,7 +189,7 @@ export const drainOne = async (
       limited,
     };
   }
-  const inputs = planAll(answer.value.proposals, { now, state });
+  const inputs = planAll(answer.value.proposals, { now, state, text: item.text });
   return {
     drained: inputs === null ? toInbox(item, now) : { inputs, item, kind: "done" },
     limited,

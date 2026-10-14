@@ -6,19 +6,29 @@ import {
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { type EventInput, newId, type ParseResponse, type Proposal } from "@pace/core";
+import {
+  endpoints,
+  type EventInput,
+  newId,
+  type ParseResponse,
+  type Proposal,
+  type RequestDomain,
+} from "@pace/core";
 
 import { createApp } from "../src/app.ts";
 import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
 import { json, loginAsDev, readJson } from "./helpers.ts";
 
-type Domain = "activity" | "auto" | "task";
+/**
+Every answer is read through the endpoint's own output schema, as the client reads it: the
+server must never send what its contract refuses.
+*/
+const asAnswered = (answer: unknown): ParseResponse => endpoints.parse.run.output.parse(answer);
 
-const parse = async (token: string, text: string, domain?: Domain): Promise<ParseResponse> =>
-  await json<ParseResponse>("/api/parse", {
-    body: { text, ...(domain !== undefined && { domain }) },
-    token,
-  });
+const parse = async (token: string, text: string, domain?: RequestDomain): Promise<ParseResponse> =>
+  asAnswered(
+    await json("/api/parse", { body: { text, ...(domain !== undefined && { domain }) }, token }),
+  );
 
 /** The only proposal of a parsed answer. */
 const only = (answer: ParseResponse): Proposal => {
@@ -113,10 +123,25 @@ const callLimited = async (
   return response;
 };
 
-const parseLimited = async (token: string, body: object): Promise<ParseResponse> =>
-  await readJson<ParseResponse>(
-    await callLimited(token, "/api/parse", { body: JSON.stringify(body), method: "POST" }),
+const parseLimited = async (token: string, body: object): Promise<ParseResponse> => {
+  const init = { body: JSON.stringify(body), method: "POST" };
+  return asAnswered(await readJson(await callLimited(token, "/api/parse", init)));
+};
+
+type Pulled = { events: { type: string; payload: Record<string, unknown> }[] };
+
+/** The events with this title in their payload, as the store has them now. */
+const titled = async (token: string, title: string) =>
+  (await json<Pulled>("/api/sync/pull", { token })).events.filter(
+    (event) => event.payload["title"] === title,
   );
+
+/** Lifts the remembered rate limit and lets the store read what waits, a minute on. */
+const drainLater = async (token: string): Promise<void> => {
+  const stub = await storeOf(token);
+  await stub.noteLlmLimits({ fake: "2000-01-01T00:00:00.000Z" }, new Date().toISOString());
+  await stub.drainParses(new Date(Date.now() + 60_000).toISOString());
+};
 
 describe("POST /api/parse: tasks", () => {
   it("reads a message into a new task, sure of the field it came from, and writes nothing", async () => {
@@ -253,6 +278,8 @@ describe("POST /api/parse: no model", () => {
     const token = await loginAsDev("1002");
     const queued = await parseLimited(token, { defer: true, text: "позвонить в банк" });
     expect(queued).toMatchObject({ proposals: [], status: "queued" });
+    // Queued is not written: nothing of it exists until the store reads it.
+    expect(await titled(token, "позвонить в банк")).toEqual([]);
     // The limit is remembered: the status says the assistant is out until then.
     const status = await readJson<{ available: boolean; retryAt: null | string }>(
       await callLimited(token, "/api/llm/status"),
@@ -285,6 +312,22 @@ describe("POST /api/parse: no model", () => {
     expect(again.events.filter((event) => event.payload.title === "позвонить в банк")).toHaveLength(
       1,
     );
+  });
+
+  it("adds problems to a task read later, the message kept as the task's source", async () => {
+    const token = await loginAsDev("1002");
+    const { taskId } = await seed(token, "Geometry sheet", "Gym");
+    const text = "add to Geometry sheet: 7, 8";
+    expect(await parseLimited(token, { defer: true, text })).toMatchObject({ status: "queued" });
+    await drainLater(token);
+    const { state } = await (await storeOf(token)).read(new Date().toISOString());
+    expect(state.tasks.byId[taskId]?.subtasks.map((subtask) => subtask.label)).toEqual([
+      "photo",
+      "form",
+      "7",
+      "8",
+    ]);
+    expect(state.tasks.byId[taskId]?.sources.map((source) => source.text)).toContain(text);
   });
 
   it("puts a deferred delete in the Inbox instead of deleting unseen", async () => {

@@ -9,6 +9,7 @@ import {
   PROPOSAL_KINDS,
   type ProposalContext,
   type QueryContext,
+  type RequestDomain,
   resolvePreset,
 } from "@pace/core";
 
@@ -18,11 +19,8 @@ export const PROMPT_TOKEN_BUDGET = 3000;
 /** A rough count (4 characters a token) that is safe for budgeting. */
 export const approxTokens = (text: string): number => Math.ceil(text.length / 4);
 
-/** What the message was typed into; `auto` leaves it to the model (the bot's one field). */
-export type PromptDomain = "activity" | "auto" | "task";
-
 /** The line of the prompt that says which field the message came from (the fake model reads it). */
-export const DOMAIN_LINES: Readonly<Record<PromptDomain, string>> = {
+export const DOMAIN_LINES: Readonly<Record<RequestDomain, string>> = {
   activity: "Domain: activity (typed into the time tracker). Answer domain activity, confidence 1.",
   auto: "Domain: decide. Answer domain task (something to do) or activity (time spent: done or going on), and confidence 0..1 for how sure you are.",
   task: "Domain: task (typed into the task list). Answer domain task, confidence 1.",
@@ -39,6 +37,7 @@ Rules:
 - Homework: every problem number is one subtask (label = the number as written, e.g. "290", "5а"); a task described in words is one subtask with those words.
 - category: for a task an id from Categories, for an activity one of ${ACTIVITY_CATEGORIES.join(", ")}; null when unsure.
 - project: a name from the list, or a new name only when the message names one. importance only when the message says it.
+- link: a web address the message gives, verbatim.
 - task.update: only the fields that change; clear lists what to empty; subtasks to add, subtaskRefs (label or number) to remove, renames. task.markSubtasks: subtaskRefs solved. task.close: outcome.
 - activity.log: time already spent, with start and end. activity.start: going on now (start only when it began earlier; expectMinutes when a length is said). activity.update: start, end, label or category. label: 2–4 words in the message's language. Times are "YYYY-MM-DD HH:MM" on the clock below.
 - Never invent numbers, dates or times. For dueDate, dueTime, estimateMinutes, expectMinutes, start and end add an evidence entry quoting the exact words they come from.
@@ -103,7 +102,7 @@ export const buildParsePrompt = (
     readonly state: CoreState;
     readonly ctx: QueryContext;
     readonly language: Language;
-    readonly domain: PromptDomain;
+    readonly domain: RequestDomain;
     readonly context: ProposalContext;
   },
 ): ParsePrompt => {

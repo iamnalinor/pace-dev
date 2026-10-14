@@ -1,10 +1,15 @@
 import type { Context, Hono } from "hono";
 
-import { type CoreState, endpoints, ok, type ParseResponse } from "@pace/core";
+import {
+  type CoreState,
+  endpoints,
+  ok,
+  type ParseRequestBody,
+  type ParseResponse,
+} from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
-import type { PromptDomain } from "../shared/llm/prompt.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
@@ -22,17 +27,10 @@ they can. `GET /api/llm/status`: can the assistant read now?
 const storeOf = (c: Context<AppEnv>) =>
   c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
 
-type Request = {
-  readonly text: string;
-  readonly domain: PromptDomain;
-  readonly defer?: boolean | undefined;
-  readonly draft?: boolean | undefined;
-};
-
 /** No model can answer: logged, the rules' reading, and kept for later when the caller asked to defer. */
 const unavailable = async (
   store: ReturnType<typeof storeOf>,
-  request: Request,
+  request: ParseRequestBody,
   world: { readonly state: CoreState; readonly now: string; readonly retryAt: null | string },
 ): Promise<ParseResponse> => {
   const { now, retryAt } = world;

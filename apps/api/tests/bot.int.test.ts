@@ -265,6 +265,22 @@ describe("the bot as an assistant", () => {
     expect(await pulledEvent(token, "task.closed")).toMatchObject({ payload: { outcome: "done" } });
   });
 
+  it("adds problems to a task from the chat, the message kept as the task's source", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("geometry sheet three"));
+    await webhook(callbackUpdate(buttonData("Accept")));
+    sent.length = 0;
+    const text = "add to geometry sheet three: 4, 5";
+    await webhook(textUpdate(text));
+    await webhook(callbackUpdate(buttonData("Accept")));
+    expect(await pulledEvent(token, "task.subtasks.added")).toMatchObject({
+      payload: { subtasks: [{ label: "4" }, { label: "5" }] },
+    });
+    expect(await pulledEvent(token, "task.source.attached")).toMatchObject({
+      payload: { sourceText: text },
+    });
+  });
+
   it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {
     const token = await loginAsDev("1002");
     await webhook(textUpdate("подумать об отпуске"));

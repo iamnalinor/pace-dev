@@ -114,6 +114,20 @@ The classes so far are below. Each has its standing rule, and new code is writte
   screen with such rows; a card that arrives above a list gets an e2e geometry check at phone width (card
   and first row do not intersect), and the QA round on Android opens screens whose cards load late.
 
+### 12. A producer's output never checked against its own contract
+- **Bug.** `/api/parse` could answer with an activity label longer than 80 characters, a summary
+  longer than 500, an expected length past a day, or a new task with over 100 subtasks. The schema
+  the client parses the answer with refuses all of these, so the whole answer was lost. The client
+  also refused answers with extra keys, so any key a newer server added would break an older app
+  (stage 8, Task 11 review).
+- **Missed because.** The API tests read answers with `json<T>()`, a cast that checks nothing.
+  Fixtures used short, tidy texts. Nothing fed the producers long or odd input.
+- **Rule.** Whatever a server sends goes through the endpoint's own `output` schema in its tests.
+  A fast-check property feeds the producers (rules, model conversion, summaries, planners) random
+  long texts and answers, and asserts the output still fits the schema. Limits live in one place
+  (`proposals/limits.ts`), read by both the schema and the producers. Response schemas are loose
+  (`z.object`); only request input is strict.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -131,3 +145,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | Add a computer does nothing on phones | 10 | pending (stage 8 sweep) | press test at phone layout |
 | 2026-10-14 | Now's calendar card drawn over the task rows on Android | 11 (5) | yes: the only lists whose rows carry a layout transition are Now's/Projects' `TaskRows` and Day's timeline (`Entries`); both now sit in `RowList`. The sheet's entering animations have no layout transition and are absolutely placed | `rowsInFlattenableBoxes()` app tests on Now (card shown) and Day (blocks and calendar shown); e2e at 390px: the card's box ends above the first row, then Attend starts the event |
 | 2026-10-14 | "That time is in the future." over Now's calendar card (owner, Android, 13:47 Moscow, an event 12:15–15:20) | 9 | yes: not reproducible on Now's path. A Now-level test in Europe/Moscow with expo-calendar's Android event shape (offsets −92 min … +9 min, with and without something running) and a client fast-check property (start ±6 h by the second, any length, any running activity) all start the event; `startCalendar` cannot return `retro/future` (its only refusal path, `logPast`, runs for an event already over). Every `retro/future` producer in v0.9.0 was swept: `logPast` (Day's "Attended" over the whole event, the activity sheet, sleep), `adjustActivity`, task events dated ahead; none is reachable from Now. In v0.9.0 Day's "Attended" refused exactly this event, and a toast is app-wide for 5–10 s; with the rows drawn over the card (above), a tap on the visible "Attend" would land on the task row drawn over it (rows come later in drawing and hit-test order), not on Attend. The previous fix's sweep had checked UTC offsets only, on hand-made ISO fixtures. Follow-up found and fixed: after attending ahead of its start, Day kept offering Attended/Skip (`isCalendarLogged` saw a block ending at now before the event's start) and a second tap restarted the activity | Moscow + Android-shape test on Now, client fast-check property, phone-calendar shape test, Day test "then reads logged", `startCalendar` keeps an attended event running (second tap), `isStartedFor` test |
+| 2026-10-14 | Adding problems to a task through the assistant no longer kept the message as the task's source | 2 | yes: the bot and the deferred queue both plan through `planProposals`, with the text as `sourceText`; add and mark both keep it | the deleted `addToTask` test was the only guard: core plan test, bot integration test, deferred-queue integration test |
+| 2026-10-14 | `/api/parse` could send answers its own contract refuses (labels, summaries, lengths, subtask counts), and the client refused unknown keys | 12 (new) | yes: producers clamp to `PROPOSAL_LIMITS`, summaries name at most 5 items and then "+N", response schemas are loose | every `/api/parse` answer in `parse.int.test.ts` goes through `endpoints.parse.run.output`; fast-check properties over the rules, the model conversion with summaries, and `planActivity` against `parseEvent`; a client test with extra keys |

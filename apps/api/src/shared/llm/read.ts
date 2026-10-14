@@ -11,13 +11,14 @@ import {
   proposalsFromModel,
   type QueryContext,
   type Rejected,
+  type RequestDomain,
   type Result,
   RULES_CONFIDENCE,
   withSummary,
 } from "@pace/core";
 
 import { type Cooldowns, type LlmError, type ParseProvider, runParse } from "./llm.ts";
-import { buildParsePrompt, type PromptDomain } from "./prompt.ts";
+import { buildParsePrompt } from "./prompt.ts";
 
 /** What a message is about and what to do with it, each proposal with its summary. */
 export type Reading = {
@@ -60,7 +61,7 @@ export const readMessage = async (
   providers: readonly ParseProvider[],
   text: string,
   options: World & {
-    readonly domain: PromptDomain;
+    readonly domain: RequestDomain;
     readonly cooldowns: Cooldowns;
     readonly clock?: () => number;
   },
@@ -111,7 +112,7 @@ export const readMessage = async (
 The rules' reading when no model can answer: a new task, or the activity a typed span says.
 Asked to decide, the rules guess, never sure enough to skip asking.
 */
-export const readByRules = (text: string, domain: PromptDomain, world: World): Reading => {
+export const readByRules = (text: string, domain: RequestDomain, world: World): Reading => {
   const ctx = ctxOf(world);
   const read = domain === "auto" ? domainByRules(text, { ctx, state: world.state }) : domain;
   const summary = summaryWorld(world);

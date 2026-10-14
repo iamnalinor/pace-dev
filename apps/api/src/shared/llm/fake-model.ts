@@ -6,12 +6,14 @@ import {
   type ModelAction,
   type ModelOutput,
   type ParseDomain,
+  REQUEST_DOMAINS,
+  type RequestDomain,
   typedActivity,
   typedSpan,
   wallClockInstant,
 } from "@pace/core";
 
-import { DOMAIN_LINES, type PromptDomain } from "./prompt.ts";
+import { DOMAIN_LINES } from "./prompt.ts";
 
 /** What a scripted model does with a message: answer it, or be rate limited. */
 export type FakeReply = ModelOutput | { readonly rateLimitedFor: number };
@@ -79,10 +81,8 @@ export const fakeParseModel = (
 };
 
 /** The field the prompt says the message came from. */
-const domainOfPrompt = (system: string): PromptDomain =>
-  (Object.keys(DOMAIN_LINES) as PromptDomain[]).find((domain) =>
-    system.includes(DOMAIN_LINES[domain]),
-  ) ?? "task";
+const domainOfPrompt = (system: string): RequestDomain =>
+  REQUEST_DOMAINS.find((domain) => system.includes(DOMAIN_LINES[domain])) ?? "task";
 
 type Listed = { readonly alias: string; readonly title: string };
 
@@ -264,7 +264,7 @@ const SURE = 0.95;
 const UNSURE = 0.6;
 
 /** A command's answer: sure of the domain its kind belongs to when asked to decide. */
-const commandAnswer = (command: ModelAction | null, domain: PromptDomain): ModelOutput => {
+const commandAnswer = (command: ModelAction | null, domain: RequestDomain): ModelOutput => {
   const actions = command === null ? [] : [command];
   if (domain !== "auto") {
     return answer(domain, 1, actions);

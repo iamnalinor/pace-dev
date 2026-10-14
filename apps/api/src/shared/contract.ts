@@ -4,6 +4,7 @@ import type {
   EventInput,
   NotifyMessage,
   PresetDefinition,
+  RequestDomain,
   Result,
   RetroError,
   SyncEvent,
@@ -154,7 +155,7 @@ export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
     item: {
       readonly channel: "api" | "bot";
       /** The field it was typed into; a text kept before fields existed is a task's. */
-      readonly domain?: "activity" | "auto" | "task" | undefined;
+      readonly domain?: RequestDomain | undefined;
       readonly retryAt: null | string;
       readonly text: string;
     },
