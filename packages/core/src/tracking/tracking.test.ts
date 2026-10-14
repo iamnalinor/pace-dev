@@ -47,7 +47,7 @@ describe("the time reducer", () => {
     ]);
   });
 
-  it("adjusts and relabels, and ignores the retired button events", () => {
+  it("adjusts and relabels", () => {
     const time = timeOf([
       start("09:00", { activityId: "a1", label: "Work" }),
       act("10:00", {
@@ -57,16 +57,6 @@ describe("the time reducer", () => {
       act("10:01", {
         payload: { activityId: "a1", category: "study", label: "Algebra" },
         type: "activity.labelled",
-      }),
-      act("10:02", {
-        payload: {
-          buttonId: "btn:read",
-          category: "study",
-          color: "violet",
-          label: "Read",
-          order: 0,
-        },
-        type: "activity.button.set",
       }),
     ]);
     expect(time.activities["a1"]).toMatchObject({

@@ -258,18 +258,6 @@ export const ActivityLabelledPayload = z.object({
   /** Retired with the messenger penalty: still parsed in old events, never read. */
   messengersOnPurpose: z.boolean().optional(),
 });
-/** Retired (the time bar's buttons are fixed now): still parsed in old events, never read. */
-export const ActivityButtonSetPayload = z.object({
-  buttonId: z.string().min(1),
-  ...activityFields,
-  color: ProjectColorSchema,
-  expectMinutes: minutes.nullable().optional(),
-  limitMinutes: minutes.nullable().optional(),
-  order: z.number().int().nonnegative(),
-  shouldAskDetails: z.boolean().optional(),
-});
-/** Retired with the editable buttons: still parsed in old events, never read. */
-export const ActivityButtonRemovedPayload = z.object({ buttonId: z.string().min(1) });
 
 export const FocusStartedPayload = z.object(taskRef);
 export const FocusEndedPayload = z.object(taskRef);

@@ -36,8 +36,6 @@ export const EVENT_LABEL_KEYS: Readonly<Record<EventType, MessageKey>> = {
   "activity.logged": "event.activity.logged",
   "activity.adjusted": "event.activity.adjusted",
   "activity.labelled": "event.activity.labelled",
-  "activity.button.set": "event.activity.button.set",
-  "activity.button.removed": "event.activity.button.removed",
   "event.amended": "event.event.amended",
   "event.revoked": "event.event.revoked",
 };

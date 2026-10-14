@@ -4,8 +4,6 @@ import { isUlid } from "../ids.ts";
 import { err, ok, type Result } from "../result.ts";
 import {
   ActivityAdjustedPayload,
-  ActivityButtonRemovedPayload,
-  ActivityButtonSetPayload,
   ActivityLabelledPayload,
   ActivityLoggedPayload,
   ActivityStartedPayload,
@@ -71,8 +69,6 @@ export const EVENT_TYPES = [
   "activity.logged",
   "activity.adjusted",
   "activity.labelled",
-  "activity.button.set",
-  "activity.button.removed",
   "event.amended",
   "event.revoked",
 ] as const;
@@ -134,8 +130,6 @@ export const EventSchema = z.discriminatedUnion("type", [
   event("activity.logged", ActivityLoggedPayload),
   event("activity.adjusted", ActivityAdjustedPayload),
   event("activity.labelled", ActivityLabelledPayload),
-  event("activity.button.set", ActivityButtonSetPayload),
-  event("activity.button.removed", ActivityButtonRemovedPayload),
   event("event.amended", EventAmendedPayload),
   event("event.revoked", EventRevokedPayload),
 ]);

@@ -53,8 +53,6 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "event.activity.logged": "Активность записана",
   "event.activity.adjusted": "Время активности изменено",
   "event.activity.labelled": "Активность переименована",
-  "event.activity.button.set": "Кнопка активности изменена",
-  "event.activity.button.removed": "Кнопка активности удалена",
   "event.event.amended": "Исправление: изменено",
   "event.event.revoked": "Исправление: отозвано",
   "projects.new": "Новый проект",

@@ -57,8 +57,6 @@ const SEEDED_TYPES = [
   "activity.logged",
   "activity.adjusted",
   "activity.labelled",
-  "activity.button.set",
-  "activity.button.removed",
   "event.amended",
   "event.revoked",
 ] as const;
@@ -295,18 +293,6 @@ const events = (now: number, ids: LivedIn & { readonly workId: string }): readon
       },
       type: "activity.started",
     },
-    {
-      at: now - 3 * DAY,
-      payload: {
-        buttonId: "btn:seeded",
-        category: "rest",
-        color: "green",
-        label: "Отдых",
-        order: 9,
-      },
-      type: "activity.button.set",
-    },
-    { at: now - 3 * DAY + 1, payload: { buttonId: "btn:seeded" }, type: "activity.button.removed" },
   ];
 };
 

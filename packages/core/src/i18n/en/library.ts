@@ -51,8 +51,6 @@ export const enLibrary = {
   "event.activity.logged": "Activity logged",
   "event.activity.adjusted": "Activity times changed",
   "event.activity.labelled": "Activity renamed",
-  "event.activity.button.set": "Activity button changed",
-  "event.activity.button.removed": "Activity button removed",
   "event.event.amended": "Correction: amended",
   "event.event.revoked": "Correction: revoked",
   "projects.new": "New project",

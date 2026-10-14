@@ -50,6 +50,14 @@ describe("parseEvent", () => {
     expect(errorOf(result)).toContain("type");
   });
 
+  it.each(["activity.button.set", "activity.button.removed"])(
+    "no longer knows the retired %s",
+    (type) => {
+      const result = parseEvent({ ...envelope, payload: { buttonId: "btn:read" }, type });
+      expect(errorOf(result)).toContain("type");
+    },
+  );
+
   it("rejects an id that is neither a ULID nor a deterministic system id", () => {
     expect(parseEvent({ ...created, id: "not-an-id" }).ok).toBe(false);
     expect(parseEvent({ ...created, id: "hw:preset-work:2026-W41" }).ok).toBe(true);
@@ -228,7 +236,7 @@ describe("EVENT_TYPES", () => {
   });
 
   it("covers every stage-1 type from the plan, the stage-3 activity types and problem removal", () => {
-    expect(EVENT_TYPES).toHaveLength(34);
+    expect(EVENT_TYPES).toHaveLength(32);
     expect(EVENT_TYPES).toContain("task.subtask.removed");
     expect(EVENT_TYPES.filter((type) => type.startsWith("activity."))).toEqual([
       "activity.started",
@@ -236,8 +244,6 @@ describe("EVENT_TYPES", () => {
       "activity.logged",
       "activity.adjusted",
       "activity.labelled",
-      "activity.button.set",
-      "activity.button.removed",
     ]);
   });
 });

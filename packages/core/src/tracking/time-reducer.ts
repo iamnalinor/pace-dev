@@ -113,9 +113,6 @@ const HANDLERS: Handlers = {
       taskId: taskId === undefined ? activity.taskId : taskId,
     }));
   },
-  // The bar's buttons are fixed now: the old edits stay in the log and change nothing.
-  "activity.button.set": (state) => state,
-  "activity.button.removed": (state) => state,
 };
 
 const isActivityEvent = (event: Event): event is ActivityEvent =>
