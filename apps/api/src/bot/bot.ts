@@ -12,6 +12,7 @@ import { readLoginPayload, returnUrl } from "../shared/login-link.ts";
 export type BotUser = {
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: string;
   readonly username: null | string;
 };
 
@@ -49,6 +50,7 @@ export const REPLIES = {
 const toBotUser = (from: NonNullable<Context["from"]>): BotUser => ({
   telegramId: String(from.id),
   name: [from.first_name, from.last_name].filter(Boolean).join(" "),
+  firstName: from.first_name,
   username: from.username ?? null,
 });
 

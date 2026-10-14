@@ -133,6 +133,13 @@ describe("POST /telegram/webhook", () => {
     expect(ready).toMatchObject({ status: "ready", user: { name: "Ada", telegramId: "1001" } });
   });
 
+  it("keeps the person's Telegram first name, which /api/me then serves", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce", { method: "POST" });
+    await webhook(startUpdate(1001, `/start login_${nonce}`));
+    const ready = await json<{ token: string }>(`/api/auth/nonce/${nonce}`);
+    expect(await json("/api/me", { token: ready.token })).toMatchObject({ firstName: "Ada" });
+  });
+
   it("sends a login started in the browser back to the website", async () => {
     const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=web", {
       method: "POST",

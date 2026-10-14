@@ -46,6 +46,7 @@ describe("verifyTelegramLogin", () => {
     expect(result).toEqual({
       ok: true,
       value: {
+        firstName: "Ada",
         name: "Ada Lovelace",
         photoUrl: "https://t.me/i/userpic/320/ada.jpg",
         telegramId: "1001",
@@ -63,7 +64,7 @@ describe("verifyTelegramLogin", () => {
     );
     expect(result).toEqual({
       ok: true,
-      value: { name: "Ada", photoUrl: null, telegramId: "1001", username: null },
+      value: { firstName: "Ada", name: "Ada", photoUrl: null, telegramId: "1001", username: null },
     });
   });
 

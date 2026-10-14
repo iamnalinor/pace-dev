@@ -74,6 +74,7 @@ export const settingsEvent = (
 });
 
 export const fakeUser: User = {
+  firstName: "Ann",
   id: "u1",
   name: "Ann",
   photoUrl: null,

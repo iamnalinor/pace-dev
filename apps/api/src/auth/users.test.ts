@@ -11,11 +11,12 @@ describe("upsertTelegramUser", () => {
     const db = d1(env.DB);
     const first = await upsertTelegramUser(
       db,
-      { name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
+      { firstName: "Ada", name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
       NOW,
     );
     expect(first.id).toMatch(/^[0-9A-Z]{26}$/);
     expect(first).toMatchObject({
+      firstName: "Ada",
       name: "Ada",
       photoUrl: null,
       telegramId: "1001",
@@ -24,11 +25,18 @@ describe("upsertTelegramUser", () => {
 
     const second = await upsertTelegramUser(
       db,
-      { name: "Ada L.", photoUrl: "https://t.me/p.jpg", telegramId: "1001", username: null },
+      {
+        firstName: "Adele",
+        name: "Ada L.",
+        photoUrl: "https://t.me/p.jpg",
+        telegramId: "1001",
+        username: null,
+      },
       NOW + 1,
     );
     expect(second.id).toBe(first.id);
     expect(second).toMatchObject({
+      firstName: "Adele",
       name: "Ada L.",
       photoUrl: "https://t.me/p.jpg",
       username: null,
@@ -40,12 +48,18 @@ describe("upsertTelegramUser", () => {
     const db = d1(env.DB);
     await upsertTelegramUser(
       db,
-      { name: "Ada", photoUrl: "https://t.me/p.jpg", telegramId: "1002", username: "ada" },
+      {
+        firstName: "Ada",
+        name: "Ada",
+        photoUrl: "https://t.me/p.jpg",
+        telegramId: "1002",
+        username: "ada",
+      },
       NOW,
     );
     const user = await upsertTelegramUser(
       db,
-      { name: "Ada", photoUrl: undefined, telegramId: "1002", username: "ada" },
+      { firstName: "Ada", name: "Ada", photoUrl: undefined, telegramId: "1002", username: "ada" },
       NOW,
     );
     expect(user.photoUrl).toBe("https://t.me/p.jpg");

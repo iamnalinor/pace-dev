@@ -82,6 +82,7 @@ export const findSession = async (
         id: users.id,
         telegramId: users.telegramId,
         name: users.name,
+        firstName: users.firstName,
         username: users.username,
         photoUrl: users.photoUrl,
       },

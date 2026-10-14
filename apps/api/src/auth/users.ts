@@ -9,6 +9,8 @@ export type User = {
   readonly id: string;
   readonly telegramId: string;
   readonly name: string;
+  /** Telegram's first name alone (the owner's name in the app); null when none is known. */
+  readonly firstName: null | string;
   readonly username: null | string;
   readonly photoUrl: null | string;
 };
@@ -16,6 +18,7 @@ export type User = {
 export type TelegramProfile = {
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: null | string;
   readonly username: null | string;
   /** `undefined` when the login source has no photo (bot), which keeps the stored one. */
   readonly photoUrl: null | string | undefined;
@@ -25,11 +28,12 @@ const toUser = (row: typeof users.$inferSelect): User => ({
   id: row.id,
   telegramId: row.telegramId,
   name: row.name,
+  firstName: row.firstName,
   username: row.username,
   photoUrl: row.photoUrl,
 });
 
-/** Creates the user on first login, refreshes name/username/photo afterwards; the id never changes. */
+/** Creates the user on first login, refreshes name/first name/username/photo afterwards; the id never changes. */
 export const upsertTelegramUser = async (
   db: Db,
   profile: TelegramProfile,
@@ -42,12 +46,18 @@ export const upsertTelegramUser = async (
       id: ulid(now),
       telegramId: profile.telegramId,
       name: profile.name,
+      firstName: profile.firstName,
       username: profile.username,
       photoUrl: profile.photoUrl ?? null,
       createdAt: new Date(now),
     })
     .onConflictDoUpdate({
-      set: { name: profile.name, username: profile.username, ...photo },
+      set: {
+        name: profile.name,
+        firstName: profile.firstName,
+        username: profile.username,
+        ...photo,
+      },
       target: users.telegramId,
     })
     .returning();

@@ -18,6 +18,8 @@ export const UserSchema = z.object({
   id: z.string(),
   telegramId: z.string(),
   name: z.string(),
+  /** Telegram's first name, shown as the owner's name; null until a login has carried one. */
+  firstName: z.string().nullable(),
   username: z.string().nullable(),
   photoUrl: z.string().nullable(),
 });

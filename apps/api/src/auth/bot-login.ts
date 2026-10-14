@@ -7,6 +7,7 @@ import { upsertTelegramUser } from "./users.ts";
 export type BotLoginUser = {
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: string;
   readonly username: null | string;
 };
 
@@ -21,6 +22,7 @@ export const bindBotLogin =
       db,
       {
         name: botUser.name,
+        firstName: botUser.firstName,
         photoUrl: undefined,
         telegramId: botUser.telegramId,
         username: botUser.username,

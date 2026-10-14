@@ -106,6 +106,7 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
   }
   const profile: TelegramProfile = {
     name: `Dev ${body.telegramId}`,
+    firstName: null,
     photoUrl: null,
     telegramId: body.telegramId,
     username: null,

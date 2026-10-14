@@ -4,6 +4,7 @@ export type CurrentUser = {
   readonly id: string;
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: null | string;
   readonly username: null | string;
   readonly photoUrl: null | string;
 };

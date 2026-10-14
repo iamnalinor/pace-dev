@@ -28,7 +28,12 @@ describe("dev login", () => {
     const response = await call("/api/auth/dev", { body: { telegramId: "1001" } });
     expect(response.status).toBe(200);
     const session = await readJson<{ token: string; user: { telegramId: string } }>(response);
-    expect(session.user).toMatchObject({ telegramId: "1001", username: null, photoUrl: null });
+    expect(session.user).toMatchObject({
+      firstName: null,
+      photoUrl: null,
+      telegramId: "1001",
+      username: null,
+    });
     expect(await json("/api/me", { token: session.token })).toEqual(session.user);
   });
 
@@ -97,6 +102,20 @@ describe("Telegram Login Widget", () => {
     expect((await call("/api/me", { token: session.token })).status).toBe(200);
   });
 
+  it("serves the first name from the widget payload on /api/me, not the full name", async () => {
+    const body = await widgetPayload({
+      auth_date: nowSeconds(),
+      first_name: "Albert",
+      id: 1001,
+      last_name: "Einstein",
+    });
+    const session = await readJson<{ token: string }>(await call("/api/auth/telegram", { body }));
+    expect(await json("/api/me", { token: session.token })).toMatchObject({
+      firstName: "Albert",
+      name: "Albert Einstein",
+    });
+  });
+
   it("rejects a bad hash with 401", async () => {
     const body = {
       ...(await widgetPayload({ auth_date: nowSeconds(), first_name: "A", id: 1001 })),
@@ -142,7 +161,7 @@ describe("login nonce", () => {
     const { nonce } = await json<{ nonce: string }>("/api/auth/nonce", { method: "POST" });
     const user = await upsertTelegramUser(
       d1(env.DB),
-      { name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
+      { firstName: "Ada", name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
       Date.now(),
     );
     await bindNonce(d1(env.DB), { nonce, now: Date.now(), userId: user.id });
