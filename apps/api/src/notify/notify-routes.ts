@@ -32,7 +32,7 @@ const resolveProblem = (code: ResolveErrorCode): Problem => ({ code, ...RESOLVE_
 /** How this device gets system notifications: the methods, its registration, its poll. */
 const mountPushRoutes = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.notifications.pushMethods, async ({ c }) =>
-    ok({ pushMethods: [...(await acceptedMethods(c.env.DB, pushConfigOf(c.env)))] }),
+    ok({ pushMethods: [...(await acceptedMethods(c.env.DB, pushConfigOf(c.env), Date.now()))] }),
   );
 
   mount(app, endpoints.notifications.push, async ({ body, c }) => {
@@ -42,7 +42,7 @@ const mountPushRoutes = (app: Hono<AppEnv>): void => {
     if (body.method === "none") {
       return ok({ method: "none" as const });
     }
-    const accepted = await acceptedMethods(c.env.DB, pushConfigOf(c.env));
+    const accepted = await acceptedMethods(c.env.DB, pushConfigOf(c.env), Date.now());
     if (!accepted.includes(body.method)) {
       return err({
         code: "push/method-unavailable",

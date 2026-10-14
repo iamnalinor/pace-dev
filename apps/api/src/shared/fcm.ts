@@ -169,40 +169,125 @@ const accessToken = async (
   return { token: body.access_token };
 };
 
+const FieldViolationSchema = z.object({ field: z.string().optional() });
+
+const ErrorDetailSchema = z.object({
+  errorCode: z.string().optional(),
+  fieldViolations: z.array(FieldViolationSchema).optional(),
+});
+
+/** What FCM's error body says: its `FcmError` code and the request fields it names. */
+const FcmErrorSchema = z.object({
+  error: z.object({
+    status: z.string().optional(),
+    details: z.array(ErrorDetailSchema).optional(),
+  }),
+});
+
+type ErrorDetail = z.output<typeof ErrorDetailSchema>;
+
+/** Codes that are about this one device's token: the device is gone, not FCM. */
+const DEVICE_GONE: ReadonlySet<string> = new Set(["SENDER_ID_MISMATCH", "UNREGISTERED"]);
+
+/** The error's codes and details; nothing when the body is not FCM's error. */
+const errorOf = async (
+  response: Response,
+): Promise<{ readonly codes: ReadonlySet<string>; readonly details: readonly ErrorDetail[] }> => {
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Not JSON: the status alone decides.
+  }
+  const parsed = FcmErrorSchema.safeParse(body);
+  if (!parsed.success) {
+    return { codes: new Set(), details: [] };
+  }
+  const { details = [], status } = parsed.data.error;
+  const codes = details.flatMap((detail) => detail.errorCode ?? []);
+  return { codes: new Set(status === undefined ? codes : [status, ...codes]), details };
+};
+
+const isAboutToken = (detail: ErrorDetail): boolean =>
+  (detail.fieldViolations ?? []).some((violation) => violation.field === "message.token");
+
 /**
-Sends one data message through FCM HTTP v1, high priority so Android wakes the app for it.
+What a refused send means. The body decides first: a token another project issued
+(`SENDER_ID_MISMATCH`, a 403), one FCM no longer knows (`UNREGISTERED`) or a malformed token
+(`INVALID_ARGUMENT` naming `message.token`) is this device gone; any other `INVALID_ARGUMENT` is
+the message, tried again another time. Then the status: 401 is the access token (`stale`: mint a
+fresh one and retry once), 403 the project refusing the account (FCM broken for everyone), 404
+a token gone.
+*/
+const refusalOf = async (response: Response): Promise<"stale" | Exclude<FcmOutcome, "sent">> => {
+  const { codes, details } = await errorOf(response);
+  const isTokenRefused =
+    codes.has("INVALID_ARGUMENT") && details.some((detail) => isAboutToken(detail));
+  if (isTokenRefused || !codes.isDisjointFrom(DEVICE_GONE)) {
+    return "unregistered";
+  }
+  switch (response.status) {
+    case 401: {
+      return "stale";
+    }
+    case 403: {
+      return "auth";
+    }
+    case 404: {
+      return "unregistered";
+    }
+    default: {
+      return "failed";
+    }
+  }
+};
+
+const postMessage = async (
+  target: FcmTarget,
+  message: FcmMessage,
+  nowMs: number,
+): Promise<"stale" | FcmOutcome> => {
+  const access = await accessToken(target, nowMs);
+  if (typeof access === "string") {
+    return access;
+  }
+  const response = await target.fetch(
+    `https://fcm.googleapis.com/v1/projects/${target.account.project_id}/messages:send`,
+    {
+      body: JSON.stringify({
+        message: {
+          android: { collapse_key: message.collapseKey, priority: "high" },
+          data: message.data,
+          token: message.token,
+        },
+      }),
+      headers: { Authorization: `Bearer ${access.token}`, "Content-Type": "application/json" },
+      method: "POST",
+    },
+  );
+  if (response.ok) {
+    return "sent";
+  }
+  const refusal = await refusalOf(response);
+  if (refusal === "stale" || refusal === "auth") {
+    accessTokens.delete(target.fingerprint);
+  }
+  return refusal;
+};
+
+/**
+Sends one data message through FCM HTTP v1, high priority so Android wakes the app for it. An
+access token FCM no longer takes is replaced once; refused again, the credentials are (`auth`).
 A failure never throws: the other channels carry on.
 */
 export const sendFcm = async (target: FcmTarget, message: FcmMessage): Promise<FcmOutcome> => {
   try {
-    const access = await accessToken(target, Date.now());
-    if (typeof access === "string") {
-      return access;
+    const first = await postMessage(target, message, Date.now());
+    if (first !== "stale") {
+      return first;
     }
-    const response = await target.fetch(
-      `https://fcm.googleapis.com/v1/projects/${target.account.project_id}/messages:send`,
-      {
-        body: JSON.stringify({
-          message: {
-            android: { collapse_key: message.collapseKey, priority: "high" },
-            data: message.data,
-            token: message.token,
-          },
-        }),
-        headers: { Authorization: `Bearer ${access.token}`, "Content-Type": "application/json" },
-        method: "POST",
-      },
-    );
-    if (response.ok) {
-      return "sent";
-    }
-    if (response.status === 401 || response.status === 403) {
-      // The project refuses this account (FCM API off, permission removed): broken for all.
-      accessTokens.delete(target.fingerprint);
-      return "auth";
-    }
-    // A token the app no longer has (uninstalled, rotated) answers 404 UNREGISTERED.
-    return response.status === 404 ? "unregistered" : "failed";
+    const retried = await postMessage(target, message, Date.now());
+    return retried === "stale" ? "auth" : retried;
   } catch {
     return "failed";
   }

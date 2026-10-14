@@ -148,6 +148,19 @@ The classes so far are below. Each has its standing rule, and new code is writte
   (`packages/core/src/api/tolerant.ts`). A socket message is an answer too: it is read through
   `loosen`. `loosen` and the sweep walk records as well.
 
+### 14. An outside service's refusal read by its status alone, with a lasting consequence
+- **Bug.** Any 401 or 403 from FCM marked push broken for every user until the key changed. FCM
+  answers 403 `SENDER_ID_MISMATCH` for one phone's token issued by another Firebase project, and
+  401 for an access token it stopped taking: one odd device, or one stale token, would have
+  switched push off for everyone, for good (stage 8, Task 8 review).
+- **Missed because.** The test double answered bare statuses with empty bodies, so the code
+  could only ever look at the status; nobody read the provider's error codes.
+- **Rule.** Classify a provider's refusal by its documented error body first (FCM's `FcmError`
+  `errorCode` and the field it names), the status only after that. A refusal about one item (a
+  device's token) acts on that item; a stale credential is refreshed and retried once before
+  anything is concluded. A state that turns something off for everyone expires and is checked
+  again (`BROKEN_FOR_MS`). Test doubles answer with the provider's real error bodies.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -172,4 +185,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | Day's row hairlines missing on the web (class names on a reanimated view are dropped there; found in screenshots before shipping) | 5 | yes (no other `Animated.View` carries a class name) | e2e reads the computed border of every Day row |
 | 2026-10-14 | Strict output schemas: a field added to an answer breaks older clients | 13 | yes: `endpoint()` loosens every output; the cloud, notify and LLM status answers are also plain `z.object`, the calendar event split by direction; requests stay strict | output strictness sweep in `endpoints.test.ts`, extra-key parse test |
 | 2026-10-14 | The notification answers (list, poll, live notices, push methods) were read with strict payloads and closed enums: a key, kind, resolution, push method or delivery result a newer server adds would have made an older app drop the whole feed | 13 | yes: every notification output goes through `endpoint()`'s `loosen` (records included now); the lists a server can grow (items, poll entries, delivery logs, push methods) drop unknown entries, an unknown resolution reads as `read`, the live notice is loosened. Left for their owners, listed in the Task 8 fix report: closed enums in other answers (cloud's device `kind`, sync's event `precision`/`source`) | `knownValues`/`knownValue`/`knownOrNull` tests, the sweep walks records, a client test reading a newer server's pool, the notify API tests read every answer through `endpoints.notifications.*.output` (`answerOf`) |
+| 2026-10-14 | FCM's 401/403 marked push broken for everyone, forever: one device's `SENDER_ID_MISMATCH`, or an access token FCM stopped taking, was enough | 14 (new) | yes: FCM is the only place in the Worker that reads a provider's status (Telegram's and the LLMs' failures stay per message); the token endpoint's 400/401 is OAuth's `invalid_grant` and its mark now expires too | API tests with FCM's real error bodies: `SENDER_ID_MISMATCH`, `UNREGISTERED`, `INVALID_ARGUMENT` on `message.token` drop only the device; on `message.data` keep it; 401 then 200 sends with a fresh token; 401 twice marks broken, accepted again after an hour |
 | 2026-10-14 | Week's picked block marked with `accessibilityState.selected`: jest saw it, the web build did not (react-native-web emits no `aria-selected` on a button, and axe refuses it there) | 10 | yes (the only other `accessibilityState` is the time bar's `disabled`, left to its owner to check) | e2e asserts `aria-current` on the picked item and runs axe with it picked |

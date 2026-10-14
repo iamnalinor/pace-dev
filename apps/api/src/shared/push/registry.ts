@@ -42,26 +42,39 @@ export const transportFor = (config: PushConfig, method: string): null | PushTra
   isMethod(method) ? FACTORIES[method](config) : null;
 
 /**
-The methods this server accepts now: configured, and not found broken with the credentials it
-has (new credentials clear that).
+How long a method found broken stays off. Then it is offered and tried again: a refusal that
+passes (Google's outage, a permission put back) does not keep push off until a redeploy, and one
+that does not marks it broken again on the next send.
+*/
+export const BROKEN_FOR_MS = 60 * 60_000;
+
+type BrokenRow = typeof brokenPushMethods.$inferSelect;
+
+/** Whether the row marks this transport's credentials broken at `now` (the mark not expired). */
+const isMarkedBy = (row: BrokenRow, transport: PushTransport, now: number): boolean =>
+  row.method === transport.method &&
+  row.fingerprint === transport.fingerprint &&
+  now - row.brokenAt.getTime() < BROKEN_FOR_MS;
+
+/**
+The methods this server accepts at `now`: configured, and not found broken with the credentials
+it has within the last `BROKEN_FOR_MS` (new credentials clear that at once).
 */
 export const acceptedMethods = async (
   binding: D1Database,
   config: PushConfig,
+  now: number,
 ): Promise<readonly PushMethod[]> => {
   const broken = await d1(binding).select().from(brokenPushMethods);
   return PUSH_METHODS.filter((method) => {
     const transport = FACTORIES[method](config);
-    return (
-      transport !== null &&
-      broken.every((row) => !(row.method === method && row.fingerprint === transport.fingerprint))
-    );
+    return transport !== null && broken.every((row) => !isMarkedBy(row, transport, now));
   });
 };
 
 /**
 Marks a method broken for everyone: its credentials were refused (not one device's bad token).
-It stops being offered and used until the credentials change.
+It stops being offered and used until the credentials change, or for `BROKEN_FOR_MS`.
 */
 export const markBroken = async (
   binding: D1Database,
@@ -81,11 +94,15 @@ export const markBroken = async (
     .onConflictDoUpdate({ set: row, target: brokenPushMethods.method });
 };
 
-/** Whether `method` is broken with the credentials the transport has now. */
-export const isBroken = async (binding: D1Database, transport: PushTransport): Promise<boolean> => {
+/** Whether `method` is broken at `now` with the credentials the transport has. */
+export const isBroken = async (
+  binding: D1Database,
+  transport: PushTransport,
+  now: number,
+): Promise<boolean> => {
   const [row] = await d1(binding)
     .select()
     .from(brokenPushMethods)
     .where(eq(brokenPushMethods.method, transport.method));
-  return row?.fingerprint === transport.fingerprint;
+  return row !== undefined && isMarkedBy(row, transport, now);
 };

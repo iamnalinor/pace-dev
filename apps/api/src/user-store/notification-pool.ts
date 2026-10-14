@@ -129,7 +129,8 @@ const afterSend = async (
   if (outcome === "gone") {
     await dropSubscription(deps.binding, subscription.id);
   } else if (outcome === "unavailable") {
-    await markBroken(deps.binding, transport, { now, reason: "credentials refused" });
+    // On the wall clock, not the pass's instant: the mark is shared by everyone, and expires.
+    await markBroken(deps.binding, transport, { now: Date.now(), reason: "credentials refused" });
     broadcast(deps.ctx, { type: "push-methods-changed" });
   } else {
     await noteSend(deps.binding, subscription.id, { isOk: outcome !== "failed", now });
@@ -146,7 +147,7 @@ const pushToDevice = async (
   const { notification } = message;
   if (
     transport === null ||
-    (await isBroken(deps.binding, transport)) ||
+    (await isBroken(deps.binding, transport, Date.now())) ||
     (await wasDelivered(deps.db, notification.id, subscription.sessionId))
   ) {
     return;

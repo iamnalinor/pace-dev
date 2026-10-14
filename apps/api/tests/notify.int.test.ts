@@ -455,8 +455,54 @@ const testServiceAccount = async (): Promise<string> => {
 
 type FcmCall = { readonly url: string; readonly body: string; readonly auth: null | string };
 
-/** Google's OAuth and FCM, answering as told: `token` for the token call, `send` for sends. */
-const fcmRecorder = async (answers: { readonly token?: number; readonly send?: number } = {}) => {
+/** How FCM answers one send: a status, with FCM's error code and the field it names. */
+type FcmAnswer =
+  | number
+  | { readonly status: number; readonly errorCode: string; readonly field?: string };
+
+/** FCM's error body as HTTP v1 sends it (`google.rpc.Status` with an `FcmError` detail). */
+const fcmErrorBody = (answer: Exclude<FcmAnswer, number>) => ({
+  error: {
+    code: answer.status,
+    details: [
+      {
+        "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+        errorCode: answer.errorCode,
+      },
+      ...(answer.field === undefined
+        ? []
+        : [
+            {
+              "@type": "type.googleapis.com/google.rpc.BadRequest",
+              fieldViolations: [{ description: "Invalid value", field: answer.field }],
+            },
+          ]),
+    ],
+    message: "Request contains an invalid argument.",
+    status: answer.errorCode,
+  },
+});
+
+const fcmResponse = (answer: FcmAnswer): Response => {
+  if (typeof answer !== "number") {
+    return Response.json(fcmErrorBody(answer), { status: answer.status });
+  }
+  return Response.json(answer === 200 ? { name: "projects/pace-test/messages/1" } : {}, {
+    status: answer,
+  });
+};
+
+/**
+Google's OAuth and FCM, answering as told: `token` for the token call; `send` for sends, one
+answer per send in turn (the last one repeats).
+*/
+const fcmRecorder = async (
+  answers: { readonly token?: number; readonly send?: FcmAnswer | readonly FcmAnswer[] } = {},
+) => {
+  const sendAnswers: readonly FcmAnswer[] = Array.isArray(answers.send)
+    ? answers.send
+    : [answers.send ?? 200];
+  let sent = 0;
   const calls: FcmCall[] = [];
   const { fcmTargetOf } = await import("../src/shared/fcm.ts");
   const target = fcmTargetOf(
@@ -473,10 +519,9 @@ const fcmRecorder = async (answers: { readonly token?: number; readonly send?: n
           ? Response.json({ access_token: "ya29.test", expires_in: 3600 })
           : Response.json({ error: "invalid_grant" }, { status });
       }
-      const status = answers.send ?? 200;
-      return Response.json(status === 200 ? { name: "projects/pace-test/messages/1" } : {}, {
-        status,
-      });
+      const answer = sendAnswers[Math.min(sent, sendAnswers.length - 1)] ?? 200;
+      sent += 1;
+      return fcmResponse(answer);
     },
   );
   const sends = () =>
@@ -607,15 +652,91 @@ describe("Firebase push", () => {
     });
   });
 
+  it("drops a device whose token is another project's or not a token, FCM staying on for all", async () => {
+    const refusals: readonly FcmAnswer[] = [
+      { errorCode: "SENDER_ID_MISMATCH", status: 403 },
+      { errorCode: "INVALID_ARGUMENT", field: "message.token", status: 400 },
+      { errorCode: "UNREGISTERED", status: 404 },
+    ];
+    for (const refusal of refusals) {
+      const { stub, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+      const fcm = await fcmRecorder({ send: refusal });
+      await runInDurableObject(stub, async (instance: UserStore) => {
+        await instance.append([commute], { now: COMMUTE_START });
+        await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
+        expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([]);
+        expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toEqual([
+          "fcm",
+          "poll",
+        ]);
+        const page = await instance.listNotifications({ limit: 5 });
+        expect(Object.values(page.deliveries).flat()).toEqual([
+          expect.objectContaining({ reason: "gone", result: "failed" }),
+        ]);
+      });
+    }
+  });
+
+  it("keeps the device when FCM refuses the message itself, not its token", async () => {
+    const { stub, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder({
+      send: { errorCode: "INVALID_ARGUMENT", field: "message.data", status: 400 },
+    });
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([commute], { now: COMMUTE_START });
+      await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
+      expect(await subscriptionsOf(env.DB, userId, Date.now())).toHaveLength(1);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toContain("fcm");
+    });
+  });
+
+  it("mints a fresh access token once when FCM says the one it had is no good", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder({ send: [{ errorCode: "UNAUTHENTICATED", status: 401 }, 200] });
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([commute], { now: COMMUTE_START });
+      await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
+      expect(fcm.calls.filter((entry) => entry.url.includes("oauth2"))).toHaveLength(2);
+      expect(fcm.sends()).toHaveLength(2);
+      const page = await instance.listNotifications({ limit: 5 });
+      expect(Object.values(page.deliveries).flat()).toEqual([
+        expect.objectContaining({ reason: null, result: "sent" }),
+      ]);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toContain("fcm");
+    });
+  });
+
+  it("marks FCM unavailable when a fresh token is refused too, and tries it again an hour later", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder({ send: { errorCode: "UNAUTHENTICATED", status: 401 } });
+    const now = Date.now();
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([commute], { now: COMMUTE_START });
+      await instance.runNotifications(CROSSED, couriersOf(telegramRecorder().target, fcm.target));
+      expect(fcm.sends()).toHaveLength(2);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now)).toEqual(["poll"]);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now + 59 * 60_000)).toEqual([
+        "poll",
+      ]);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now + 61 * 60_000)).toEqual([
+        "fcm",
+        "poll",
+      ]);
+    });
+  });
+
   it("marks FCM unavailable for everyone when Google refuses the server's credentials", async () => {
     const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
     const fcm = await fcmRecorder({ token: 400 });
     await runInDurableObject(stub, async (instance: UserStore) => {
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
       await instance.append([commute], { now: COMMUTE_START });
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target })).toEqual(["fcm", "poll"]);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toEqual([
+        "fcm",
+        "poll",
+      ]);
       await instance.runNotifications(CROSSED, couriers);
-      expect(await acceptedMethods(env.DB, { fcm: fcm.target })).toEqual(["poll"]);
+      expect(await acceptedMethods(env.DB, { fcm: fcm.target }, Date.now())).toEqual(["poll"]);
       const page = await instance.listNotifications({ limit: 5 });
       expect(Object.values(page.deliveries).flat()).toEqual([
         expect.objectContaining({ reason: "unavailable", result: "failed" }),
