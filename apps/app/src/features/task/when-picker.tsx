@@ -42,9 +42,9 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
       <Text className="font-sans text-[12px] text-muted">
         {t("edit.inZone", { zone: deviceTz })}
       </Text>
-      {form.at === null ? (
+      {form.at === null || form.problem !== null ? (
         <Text accessibilityLiveRegion="polite" className="font-sans text-[12px] text-warn">
-          {t("close.timeInvalid")}
+          {t(form.problem === null ? "close.timeInvalid" : `actionError.${form.problem}`)}
         </Text>
       ) : null}
     </View>

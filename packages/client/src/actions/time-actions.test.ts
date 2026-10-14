@@ -380,6 +380,23 @@ describe("time actions", () => {
     expect(seminar).toMatchObject({ endAt: later(60), startAt: later(-30) });
   });
 
+  it("starts whatever the time bar's field lets ▶ start: any text that is not blank", async () => {
+    // Bug class 1: ▶ is enabled for `text.trim() !== ""`; the action must take every such text.
+    const typed = fc
+      .string({ maxLength: 200, unit: "grapheme" })
+      .filter((text) => text.trim() !== "");
+    await fc.assert(
+      fc.asyncProperty(typed, async (text) => {
+        const world = await setupActions([]);
+        return (await world.actions.startTyped(text)).ok;
+      }),
+      { numRuns: 100 },
+    );
+    // Spaces round a word, as a field hands them.
+    const world = await setupActions([]);
+    expect((await world.actions.startTyped("  reading ")).ok).toBe(true);
+  });
+
   it("keeps a typed activity within the limits: 80 characters, a day at most", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startTyped(`${"чтение ".repeat(20)}30 ч`));

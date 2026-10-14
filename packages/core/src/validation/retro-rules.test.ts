@@ -19,7 +19,7 @@ import { INITIAL_TASKS_STATE } from "../model/task.ts";
 import { exampleCoursePresetEvents } from "../presets/example-presets.ts";
 import { INITIAL_PRESETS_STATE, presetReducer } from "../presets/preset-reducer.ts";
 import { addMinutesIso } from "../time.ts";
-import { FUTURE_TOLERANCE_MINUTES, validateEventInput } from "./retro-rules.ts";
+import { FUTURE_TOLERANCE_MINUTES, taskInstantProblem, validateEventInput } from "./retro-rules.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
 const T = (hour: number): string => `2026-10-06T${String(hour).padStart(2, "0")}:00:00.000Z`;
@@ -194,5 +194,19 @@ describe("validateEventInput: subtasks and submissions", () => {
     expect(errorOf(submitted(20, AT, {}), fresh)).toBe("retro/nothing-to-submit");
     expect(errorOf(submitted(21, AT, {}))).toBe("ok");
     expect(errorOf(submitted(22, AT, { closes: true, taskId: TRK_ID }))).toBe("ok");
+  });
+});
+
+describe("taskInstantProblem", () => {
+  const made = { createdAt: "2026-10-06T10:00:00.000Z" };
+  const now = "2026-10-06T12:00:00.000Z";
+
+  it("says what validateEventInput would: ahead of now (past the drift), before the task, or fine", () => {
+    expect(taskInstantProblem(made, addMinutesIso(now, FUTURE_TOLERANCE_MINUTES), now)).toBeNull();
+    expect(taskInstantProblem(made, addMinutesIso(now, FUTURE_TOLERANCE_MINUTES + 1), now)).toBe(
+      "retro/future",
+    );
+    expect(taskInstantProblem(made, made.createdAt, now)).toBeNull();
+    expect(taskInstantProblem(made, "2026-10-06T09:59:00.000Z", now)).toBe("retro/before-created");
   });
 });

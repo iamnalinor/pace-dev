@@ -130,13 +130,12 @@ describe("taskViewModel", () => {
       submittedAt: "2026-10-05T13:00:00.000Z",
     });
     expect(hw.primaryAction).toEqual({ kind: "submit", subtaskIds: ["s3", "s4"] });
+    // Due tonight: "at the deadline" is ahead, which the close would refuse, so it is not offered.
     expect(hw.quickTimes.map((entry) => entry.key)).toEqual([
       "now",
       "hour-ago",
       "yesterday-evening",
-      "at-deadline",
     ]);
-    expect(hw.quickTimes.at(-1)?.at).toBe(HW_DUE);
     expect(hw.stats.workLeftMinutes).toBe(103);
     expect(hw.progress).toMatchObject({ mode: "subtasks", slider: null });
     expect(hw.tags).toEqual([

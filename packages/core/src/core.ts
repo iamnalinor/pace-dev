@@ -275,6 +275,7 @@ export {
 export {
   FUTURE_TOLERANCE_MINUTES,
   type RetroError,
+  taskInstantProblem,
   validateEventInput,
   type ValidationState,
 } from "./validation/retro-rules.ts";

@@ -1,4 +1,10 @@
-import { addMinutesIso, type QueryContext, startOfDayIn, type Task } from "@pace/core";
+import {
+  addMinutesIso,
+  type QueryContext,
+  startOfDayIn,
+  type Task,
+  taskInstantProblem,
+} from "@pace/core";
 
 /** Where the client reads the time from; tests pass a frozen one. */
 export type Clock = {
@@ -31,12 +37,13 @@ const EVENING_BEFORE_MIDNIGHT_MINUTES = 3 * 60;
 /**
 The retro pills of the close sheet. Yesterday 21:00 is counted back from today's start in
 the device zone, so a summer-time change earlier that day cannot shift it; "end of last
-focus" joins with stage 3.
+focus" joins with stage 3. For a task, only the instants the close takes (`taskInstantProblem`:
+not before it was made, not ahead of now): "now" always is.
 */
 export const quickTimes = (clock: Clock, task: null | Task): readonly QuickTime[] => {
   const now = clock.now();
   const deadline = task?.dueAt ?? null;
-  return [
+  const pills: readonly QuickTime[] = [
     { at: now, key: "now" },
     { at: addMinutesIso(now, -60), key: "hour-ago" },
     {
@@ -45,4 +52,7 @@ export const quickTimes = (clock: Clock, task: null | Task): readonly QuickTime[
     },
     ...(deadline === null ? [] : [{ at: deadline, key: "at-deadline" as const }]),
   ];
+  return task === null
+    ? pills
+    : pills.filter((pill) => pill.key === "now" || taskInstantProblem(task, pill.at, now) === null);
 };

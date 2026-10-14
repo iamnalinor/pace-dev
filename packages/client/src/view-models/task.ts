@@ -77,6 +77,8 @@ const taskLink = (
 export type TaskViewModel = {
   readonly id: string;
   readonly title: string;
+  /** When the task was made: nothing about it can be dated before (`taskInstantProblem`). */
+  readonly createdAt: string;
   readonly description: null | string;
   /**
   The task's link: set explicitly, else the first web address in the source text or the
@@ -209,6 +211,7 @@ export const taskViewModel = (
     value: {
       id: task.id,
       title: task.title,
+      createdAt: task.createdAt,
       description: task.description,
       link: taskLink(task.fields.link, task.sourceText, task.description),
       submitVia: task.fields.submitVia,

@@ -35,9 +35,11 @@ describe("CloseSheet — submitting subtasks", () => {
     expect(
       screen.getByText(en("close.subtitleSolved", { title: "Algebra HW 6" })),
     ).toBeOnTheScreen();
-    for (const key of ["now", "hour-ago", "yesterday-evening", "at-deadline"] as const) {
+    for (const key of ["now", "hour-ago", "yesterday-evening"] as const) {
       expect(screen.getByRole("radio", { name: en(`quickTime.${key}`) })).toBeOnTheScreen();
     }
+    // Due tonight: closing "at the deadline" would be refused as the future, so it is not offered.
+    expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
     expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
     expect(preview("open")).toHaveTextContent("5, 6, 7a Bonus", { exact: false });
     expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50", { exact: false });
@@ -76,6 +78,22 @@ describe("CloseSheet — submitting subtasks", () => {
     expect(screen.getByRole("button", { name: en("close.submit") })).toBeDisabled();
     await fireEvent.changeText(time, "10:15");
     expect(preview("recorded")).toHaveTextContent("12:50 · happened 10:15", { exact: false });
+  });
+
+  it("says why a typed time cannot be taken, before Submit is pressed: ahead of now, before the task", async () => {
+    // The sheet and the write read one rule: Submit is never enabled for a time it would refuse.
+    await openSubmit();
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
+    const submit = () => screen.getByRole("button", { name: en("close.submit") });
+    await fireEvent.changeText(screen.getByLabelText(en("close.time")), "20:00");
+    expect(screen.getByText(en("actionError.retro/future"))).toBeOnTheScreen();
+    expect(submit()).toBeDisabled();
+    await fireEvent.changeText(screen.getByLabelText(en("close.date")), "2026-10-04");
+    expect(screen.getByText(en("actionError.retro/before-created"))).toBeOnTheScreen();
+    expect(submit()).toBeDisabled();
+    await fireEvent.changeText(screen.getByLabelText(en("close.date")), "2026-10-06");
+    expect(screen.queryByText(en("actionError.retro/before-created"))).toBeNull();
+    expect(submit()).toBeEnabled();
   });
 
   it("closes the task as skipped with a reason instead", async () => {
