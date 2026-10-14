@@ -41,6 +41,14 @@ describe("loosen", () => {
     expect(() => loose.parse({ items: three })).toThrow();
   });
 
+  it("loosens the values of a record keyed by id", () => {
+    const ById = z.strictObject({ byId: z.record(z.string(), z.array(Nested)) });
+    const answer = { byId: { a: [{ extra: "x", n: 1 }] } };
+    expect(() => ById.parse(answer)).toThrow();
+    expect(loosen(ById).parse(answer)).toEqual({ byId: { a: [{ n: 1 }] } });
+    expect(() => loosen(ById).parse({ byId: { a: [{ n: 9 }] } })).toThrow();
+  });
+
   it("leaves the schema it was given strict", () => {
     loosen(Answer);
     expect(() => Answer.parse({ extra: 1, items: [] })).toThrow();

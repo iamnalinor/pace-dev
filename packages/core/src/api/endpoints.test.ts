@@ -11,7 +11,6 @@ const UNWALKED: ReadonlySet<string> = new Set([
   "intersection",
   "lazy",
   "map",
-  "record",
   "set",
   "tuple",
 ]);
@@ -36,6 +35,9 @@ const strictObjectsIn = (schema: z.ZodType, path: string): readonly string[] => 
     }
     case "array": {
       return strictObjectsIn(def["element"] as z.ZodType, `${path}[]`);
+    }
+    case "record": {
+      return strictObjectsIn(def["valueType"] as z.ZodType, `${path}{}`);
     }
     case "union": {
       return (def["options"] as readonly z.ZodType[]).flatMap((option) =>

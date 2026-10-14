@@ -140,6 +140,13 @@ The classes so far are below. Each has its standing rule, and new code is writte
   `packages/core/src/api/loose.ts`: every object at any depth, all other checks kept), so a schema
   may stay strict where it also checks an input. `endpoints.test.ts` walks every endpoint's output
   and fails on any strict object at any depth.
+- **Also open: what a newer server can add a value to.** Unknown keys are not the only way in: a new
+  kind of notification, a new resolution, push method or delivery result fails a closed enum or a
+  discriminated union just as hard, and one such entry lost the whole list. A list of things a
+  server can grow is read with `knownValues` (unknown entries dropped, the rest kept), a single
+  value with `knownValue` (a stand-in for an unknown one) or `knownOrNull`
+  (`packages/core/src/api/tolerant.ts`). A socket message is an answer too: it is read through
+  `loosen`. `loosen` and the sweep walk records as well.
 
 ## Log
 
@@ -164,4 +171,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | A past calendar event with a title over 80 characters could not be logged (`logPast` trimmed but did not cut, the payload refuses > 80) | 12 | yes: `logPast` and the Day sheet's rename cut through `activityLabel`, the one helper `startActivity` and `isCalendarRun` use | client test: a 100+ character title logs, stored as `activityLabel(title)` |
 | 2026-10-14 | Day's row hairlines missing on the web (class names on a reanimated view are dropped there; found in screenshots before shipping) | 5 | yes (no other `Animated.View` carries a class name) | e2e reads the computed border of every Day row |
 | 2026-10-14 | Strict output schemas: a field added to an answer breaks older clients | 13 | yes: `endpoint()` loosens every output; the cloud, notify and LLM status answers are also plain `z.object`, the calendar event split by direction; requests stay strict | output strictness sweep in `endpoints.test.ts`, extra-key parse test |
+| 2026-10-14 | The notification answers (list, poll, live notices, push methods) were read with strict payloads and closed enums: a key, kind, resolution, push method or delivery result a newer server adds would have made an older app drop the whole feed | 13 | yes: every notification output goes through `endpoint()`'s `loosen` (records included now); the lists a server can grow (items, poll entries, delivery logs, push methods) drop unknown entries, an unknown resolution reads as `read`, the live notice is loosened. Left for their owners, listed in the Task 8 fix report: closed enums in other answers (cloud's device `kind`, sync's event `precision`/`source`) | `knownValues`/`knownValue`/`knownOrNull` tests, the sweep walks records, a client test reading a newer server's pool, the notify API tests read every answer through `endpoints.notifications.*.output` (`answerOf`) |
 | 2026-10-14 | Week's picked block marked with `accessibilityState.selected`: jest saw it, the web build did not (react-native-web emits no `aria-selected` on a button, and axe refuses it there) | 10 | yes (the only other `accessibilityState` is the time bar's `disabled`, left to its owner to check) | e2e asserts `aria-current` on the picked item and runs axe with it picked |

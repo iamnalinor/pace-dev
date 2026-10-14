@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { NotificationKind } from "../model/notification-channels.ts";
 
+import { loosen } from "../api/loose.ts";
+import { knownValue } from "../api/tolerant.ts";
 import { InstantSchema } from "../events/payloads.ts";
 
 /**
@@ -104,10 +106,14 @@ const common = {
   createdAt: InstantSchema,
   readAt: InstantSchema.nullable(),
   resolvedAt: InstantSchema.nullable(),
-  resolution: z.enum(RESOLUTIONS).nullable(),
+  /** A resolution a newer server added reads as `read`: settled, with nothing to act on. */
+  resolution: knownValue(RESOLUTIONS, "read").nullable(),
 };
 
-/** A notification of the pool as the API lists it. */
+/**
+A notification of the pool as the API lists it. Payloads are written strict (the server checks
+what it adds against them); a client reads them loosened (`loosen`, `knownValues`).
+*/
 export const NotificationSchema = z.discriminatedUnion("kind", [
   z.object({ ...common, kind: z.literal("login"), payload: LoginPayloadSchema }),
   z.object({ ...common, kind: z.literal("deadline_digest"), payload: DeadlineDigestPayloadSchema }),
@@ -121,17 +127,26 @@ export const NotificationSchema = z.discriminatedUnion("kind", [
 
 export type PoolNotification = z.output<typeof NotificationSchema>;
 
+const DismissNoticeSchema = z.object({
+  type: z.literal("dismiss"),
+  id: z.string(),
+  resolution: knownValue(RESOLUTIONS, "read"),
+});
+
+const LiveNotices = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("notification"), notification: NotificationSchema }),
+  DismissNoticeSchema,
+  z.object({ type: z.literal("read") }),
+  z.object({ type: z.literal("push-methods-changed") }),
+]);
+
 /**
 What the live socket says about the pool to every open client: a notification new, one resolved,
 some read, the push methods changed. An open app whose push method is `poll` fetches its queue at
 once on a new or resolved one, so it shows the notification without waiting for the next check.
+Read loosened, as an answer is: a newer server's extra keys are dropped.
 */
-export const LiveNoticeSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("notification"), notification: NotificationSchema }),
-  z.object({ type: z.literal("dismiss"), id: z.string(), resolution: z.enum(RESOLUTIONS) }),
-  z.object({ type: z.literal("read") }),
-  z.object({ type: z.literal("push-methods-changed") }),
-]);
+export const LiveNoticeSchema = loosen(LiveNotices);
 
 export type LiveNotice = z.output<typeof LiveNoticeSchema>;
 

@@ -24,6 +24,9 @@ const loosenAny = (schema: z.ZodType): z.ZodType => {
     case "array": {
       return schema.clone({ ...def, element: child("element") } as never);
     }
+    case "record": {
+      return schema.clone({ ...def, valueType: child("valueType") } as never);
+    }
     case "union": {
       return schema.clone({ ...def, options: loosenAll(def["options"] as z.ZodType[]) } as never);
     }
