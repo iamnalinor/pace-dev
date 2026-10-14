@@ -72,6 +72,24 @@ the test suites).
 > happened vs what should happen, and a screenshot path; owner requests not met (with
 > evidence); a few lines of what works well. Write it as you go; stop the servers at the end.
 
+## Every form, every way in
+
+A form tested from one entry path hides what the others do (bug class 2 in
+[`context/bug-lessons.md`](../context/bug-lessons.md)). Each round opens every form every way below
+and submits from each; a new way in gets a row and a test that submits from it.
+
+| Form | Ways in | Where a test submits from it |
+|---|---|---|
+| Composer (Now) | typed line + Enter; Send; + over a typed line; + over an empty line; New task request (N, the sidebar); pasted text; a share (`/add`); the assistant's reading (parsed, rules when it is down, queued); To Inbox | `composer.test.tsx`, `now-screen.test.tsx`, `e2e/composer.e2e.ts` |
+| Task edit sheet | the task screen's Edit; the wide pane's Edit | `task-screen.test.tsx` |
+| Close / submit sheet | the row's check on Now; the task screen's Done / Submit; "Close as…" (Cancelled · Skipped); a pill; a typed date and time | `close-sheet.test.tsx`, `close-times.test.ts` |
+| Day's activity sheet | a block (edit); a gap's Log; Log past; a time ahead of now or into the next block | `activity-sheet.test.tsx`, `day-screen.test.tsx` |
+| Time bar | each button's picker (Calendar, Task, Chores, Rest); the typed field + Enter or ▶; Alongside; a re-pick of what runs; Stop | `time-bar.test.tsx`, `e2e/time.e2e.ts` |
+| Calendar event | Now's offer (Attend, Skip); Day's row (Attended, Skip, Every time); the Calendar picker; the feed; Telegram; a phone notification's button | `now-screen.test.tsx`, `day-phone.test.tsx`, `notify.int.test.ts`, `bot.int.test.ts`, `notifications.test.ts` (the phone buttons) |
+| Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
+| Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
+| Add a computer (Devices) | the Devices screen at phone and desktop width; each OS | `devices-screen.test.tsx`, `e2e/devices.e2e.ts` |
+
 ## Limits
 
 - The LLM is the fake provider: parsing findings need a check against the real model.

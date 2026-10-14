@@ -221,6 +221,22 @@ describe("Composer", () => {
     });
   });
 
+  it("creates a task from a share: the shared text in the line, the form opened by hand", async () => {
+    // An entry path of its own (bug class 2): /add hands the shared text in, nothing typed.
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime, "Read https://example.com/article");
+    expect(line()).toHaveDisplayValue("Read https://example.com/article");
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    expect(screen.getByRole("button", { name: en("form.create") })).toBeEnabled();
+    await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
+    await waitFor(() => {
+      // The address goes to the task's link, the words are its title.
+      expect(created(runtime, "Read")?.fields).toMatchObject({
+        link: "https://example.com/article",
+      });
+    });
+  });
+
   it("adds a title typed into the form over an empty line", async () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);

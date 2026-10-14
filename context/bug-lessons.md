@@ -199,7 +199,7 @@ New bugs go here with their class; a new class gets its own section above.
 
 | Date | Bug | Class | Swept? | Guard added |
 |---|---|---|---|---|
-| 2026-10-14 | Composer refuses a hand-typed title | 1, 2 | pending (stage 8 sweep) | `canAdd` property test, e2e N → title → Enter |
+| 2026-10-14 | Composer refuses a hand-typed title | 1, 2 | yes (stage 8 sweep): class 1 found the close sheet's pills and typed time (its own row below); class 2 listed every form's ways in (docs/qa.md, "Every form, every way in") and found one way with no test submitting from it, the share into the composer (`/add`): it works (the address becomes the task's link), now tested; the others each have a submitting test | `canAdd` property test, e2e N → title → Enter; the entry-path table in docs/qa.md; share → Create test |
 | 2026-10-14 | Dissolved task flashes back | 3 | pending (stage 8 sweep) | deferred-promise app test |
 | 2026-10-14 | Projects show 0 | 4 | pending (stage 8 sweep) | edge-fixture view-model test |
 | 2026-10-14 | Composer header clipped while unfolding | 5 | pending (stage 8 sweep) | e2e geometry check |
