@@ -77,6 +77,62 @@ describe("what the server answers", () => {
     expect(endpoints.calendar.list.output.parse(answer)).toEqual({ events: [calendarEvent] });
   });
 
+  it("reads a device of a kind a newer server added as a phone, keeping the list", () => {
+    const device = {
+      connectedAt: null,
+      id: "d-1",
+      lastActivityAt: null,
+      lastSeenAt: null,
+      name: "Watch",
+    };
+    const answer = {
+      devices: [
+        { ...device, kind: "watch" },
+        { ...device, kind: "computer" },
+      ],
+    };
+    expect(endpoints.devices.list.output.parse(answer).devices.map((d) => d.kind)).toEqual([
+      "phone",
+      "computer",
+    ]);
+  });
+
+  it("pulls events of a precision or source a newer server added, and drops an unreadable one", () => {
+    const event = {
+      deviceId: "dev-1",
+      id: "01JA0000000000000000000000",
+      occurredAt: "2026-10-06T10:00:00.000Z",
+      payload: {},
+      recordedAt: "2026-10-06T10:00:00.000Z",
+      type: "task.created",
+    };
+    const page = {
+      events: [
+        { ...event, precision: "estimated", source: "watch" },
+        { ...event, precision: "exact", source: "bot" },
+        { ...event, occurredAt: "not a time", precision: "exact", source: "app" },
+      ],
+      more: false,
+      seq: 3,
+      storeId: "s-1",
+    };
+    expect(
+      endpoints.sync.pull.output
+        .parse(page)
+        .events.map(({ precision, source }) => ({ precision, source })),
+    ).toEqual([
+      { precision: "approx", source: "system" },
+      { precision: "exact", source: "bot" },
+    ]);
+    // What a client sends stays strict.
+    expect(() =>
+      endpoints.sync.push.body.parse({
+        events: [{ ...event, precision: "estimated", source: "app" }],
+        storeId: "s-1",
+      }),
+    ).toThrow();
+  });
+
   it("still refuses a key it does not know in what a phone sends", () => {
     const sync = {
       deviceId: "phone",

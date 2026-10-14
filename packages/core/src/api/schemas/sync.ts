@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { PrecisionSchema, SourceSchema } from "../../events/event-schema.ts";
+import { knownValue, knownValues } from "../tolerant.ts";
+
 /**
 The structural event envelope exchanged by clients and the Worker. The payload is
 opaque here; its per-type shape is validated by the core event schema (wired into
@@ -11,9 +14,19 @@ export const SyncEventSchema = z.object({
   occurredAt: z.iso.datetime({ offset: true }),
   recordedAt: z.iso.datetime({ offset: true }),
   deviceId: z.string().min(1).max(64),
-  precision: z.enum(["exact", "approx"]),
-  source: z.enum(["app", "web", "bot", "mcp", "system"]),
+  precision: PrecisionSchema,
+  source: SourceSchema,
   payload: z.unknown(),
+});
+
+/**
+An event as a pull reads it: a precision or source a newer server added stands in as `approx` /
+`system` (the event itself still counts), and an entry this client cannot read at all is left out
+instead of refusing the page (the sync would stop there for good).
+*/
+const PulledEventSchema = SyncEventSchema.extend({
+  precision: knownValue(PrecisionSchema.options, "approx"),
+  source: knownValue(SourceSchema.options, "system"),
 });
 
 export type SyncEvent = z.output<typeof SyncEventSchema>;
@@ -50,7 +63,7 @@ export const SyncPullQuerySchema = z.object({
 });
 
 export const SyncPullOutputSchema = z.object({
-  events: z.array(SyncEventSchema),
+  events: knownValues(PulledEventSchema),
   /** Cursor for the next pull: the sequence number of the last event returned. */
   seq: z.number().int().nonnegative(),
   more: z.boolean(),

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { knownValue, knownValues } from "../tolerant.ts";
+
 // What a client sends is strict (a key the server does not know is refused); what the server
 // answers is not (a client parsing it drops keys a newer server added): adding a field to an
 // answer must never break an older client.
@@ -84,7 +86,8 @@ it sent; a computer's `connectedAt` and `lastSeenAt` come from its token.
 export const DeviceSchema = z.object({
   id: z.string(),
   name: z.string(),
-  kind: z.enum(["computer", "phone"]),
+  /** A kind a newer server added reads as a phone: shown, with nothing to disconnect. */
+  kind: knownValue(["computer", "phone"], "phone"),
   connectedAt: z.number().nullable(),
   lastSeenAt: z.number().nullable(),
   lastActivityAt: z.iso.datetime().nullable(),
@@ -92,7 +95,7 @@ export const DeviceSchema = z.object({
 
 export type Device = z.output<typeof DeviceSchema>;
 
-export const DevicesOutputSchema = z.object({ devices: z.array(DeviceSchema) });
+export const DevicesOutputSchema = z.object({ devices: knownValues(DeviceSchema) });
 
 export const DeviceCreateSchema = z.strictObject({ name: z.string().trim().min(1).max(80) });
 
