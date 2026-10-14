@@ -2,7 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
 
-import { newId } from "@pace/core";
+import { type CalendarEvent, newId } from "@pace/core";
 
 import type { FcmTarget } from "../src/shared/fcm.ts";
 import type { TelegramTarget } from "../src/shared/telegram-api.ts";
@@ -138,7 +138,10 @@ const SEMINAR = {
 
 const withCalendar = async (
   instance: UserStore,
-  options: { readonly ruledSeries?: readonly string[] } = {},
+  options: {
+    readonly ruledSeries?: readonly string[];
+    readonly events?: readonly CalendarEvent[];
+  } = {},
 ): Promise<void> => {
   await instance.append([setup()], { now: "2026-10-07T06:30:00.000Z" });
   await instance.notifyTo("1002", "2026-10-07T06:30:00.000Z");
@@ -232,6 +235,33 @@ describe("an event starting", () => {
       const { items } = await instance.listNotifications({ limit: 5 });
       expect(items[0]).toMatchObject({ resolution: "expired" });
       expect(telegram.calls.map((entry) => entry.method)).toEqual(["sendMessage", "deleteMessage"]);
+    });
+  });
+
+  it("is attended from a notification however long its title or the event", async () => {
+    // A 200-character title over a 30-hour event: the label is cut and the Expect capped, as the app does.
+    const marathon = {
+      ...SEMINAR,
+      endAt: "2026-10-08T13:00:00.000Z",
+      id: "ev-long",
+      series: null,
+      title: `Hackathon ${"x".repeat(190)}`,
+    };
+    await runInDurableObject(freshStore(), async (instance: UserStore) => {
+      await withCalendar(instance, { events: [marathon] });
+      const couriers = couriersOf(telegramRecorder().target);
+      const [announced] = (await instance.runNotifications(SEMINAR.startAt, couriers)).created;
+      const now = "2026-10-07T07:05:00.000Z";
+      const resolved = await instance.resolveNotification(announced?.id ?? "", "attended", {
+        couriers,
+        now,
+        origin: "telegram",
+      });
+      expect(resolved).toMatchObject({ ok: true, value: { resolution: "attended" } });
+      const { state } = await instance.read(now);
+      expect(Object.values(state.time.activities)).toEqual([
+        expect.objectContaining({ expectMinutes: 24 * 60, label: marathon.title.slice(0, 80) }),
+      ]);
     });
   });
 

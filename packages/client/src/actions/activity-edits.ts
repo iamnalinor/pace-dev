@@ -1,6 +1,5 @@
-import { type ActivityCategory, err, type Event, newId, ok } from "@pace/core";
+import { type ActivityCategory, activityLabel, err, type Event, newId, ok } from "@pace/core";
 
-import { activityLabel } from "./calendar-run.ts";
 import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
 
 /** What the Day sheet edits: an existing block (move and rename) or a new past one. */

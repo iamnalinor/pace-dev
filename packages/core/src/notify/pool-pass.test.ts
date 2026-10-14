@@ -7,6 +7,7 @@ import { coreReducer, type CoreState, INITIAL_CORE_STATE } from "../materialize/
 import { materializeAt } from "../materialize/materializer.ts";
 import { at } from "../materialize/task-fixture.fake.ts";
 import { addMinutesIso } from "../time.ts";
+import { activityLabel } from "../tracking/calendar-run.ts";
 import {
   INITIAL_POOL_MEMORY,
   type OpenNotification,
@@ -138,6 +139,32 @@ describe("an event starting", () => {
     });
     expect(pass(now, { calendar: [seminar], events: [attended] }).created).toEqual([]);
     expect(pass(seminar.endAt, { calendar: [seminar] }).created).toEqual([]);
+  });
+
+  it("counts as attended the way the app does: from fifteen minutes early, by the stored label", () => {
+    const early = at(5, addMinutesIso(seminar.startAt, -12), {
+      type: "activity.started",
+      payload: { activityId: "a-early", category: "other", label: "Seminar" },
+    });
+    expect(pass(seminar.startAt, { calendar: [seminar], events: [early] }).created).toEqual([]);
+    const long: PoolCalendarEvent = {
+      ...seminar,
+      series: null,
+      title: `Seminar ${"x".repeat(120)}`,
+    };
+    const attended = at(6, addMinutesIso(long.startAt, 2), {
+      type: "activity.started",
+      payload: { activityId: "a-long", category: "other", label: activityLabel(long.title) },
+    });
+    const open: OpenNotification = {
+      id: "n-long",
+      kind: "event_start",
+      payload: { end: long.endAt, eventKey: "k", start: long.startAt, title: long.title },
+    };
+    const during = addMinutesIso(long.startAt, 5);
+    expect(pass(during, { events: [attended], open: [open] }).settled).toEqual([
+      { id: "n-long", resolution: "attended" },
+    ]);
   });
 
   it("is held back (and not asked later) during the quiet hours", () => {

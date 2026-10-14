@@ -1,13 +1,13 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
+import { activityLabel } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
 import { dayModel } from "../view-models/day.ts";
 import { insightsModel } from "../view-models/insights.ts";
 import { nowViewModel } from "../view-models/now.ts";
 import { timeBarModel } from "../view-models/time-bar.ts";
-import { activityLabel } from "./calendar-run.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
 const later = (minutes: number): string =>

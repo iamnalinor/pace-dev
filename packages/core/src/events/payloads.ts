@@ -223,11 +223,10 @@ export const ActivityCategorySchema = z
   .enum([...ACTIVITY_CATEGORIES, "errands"])
   .transform((category) => (category === "errands" ? "chores" : category));
 
-const minutes = z
-  .number()
-  .int()
-  .positive()
-  .max(24 * 60);
+/** An activity's Expect is a day at most. */
+export const ACTIVITY_EXPECT_MAX = 24 * 60;
+
+const minutes = z.number().int().positive().max(ACTIVITY_EXPECT_MAX);
 
 /** An activity's name is at most this long. */
 export const ACTIVITY_LABEL_MAX = 80;

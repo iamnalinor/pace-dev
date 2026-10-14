@@ -2,7 +2,7 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import {
   type ActivityOverrunPayload,
-  calendarStart,
+  calendarAttend,
   type CoreState,
   type EventInput,
   type EventStartPayload,
@@ -238,36 +238,17 @@ const at = (
 
 type AnswerContext = { readonly state: CoreState; readonly now: string };
 
-/** Attend: the event tracked the way Now's offer does (`calendarStart`). */
+/** Attend: the event tracked the way Now's offer does (`calendarAttend`: label and Expect fitted). */
 const attendInputs = (
   { end, start, title }: EventStartPayload,
   { now, state }: AnswerContext,
 ): readonly EventInput[] => {
-  const plan = calendarStart(state.time, { endAt: end, startAt: start, title }, { now });
-  const activityId = newId();
-  return [
-    plan.kind === "log"
-      ? at(plan.endAt, {
-          payload: {
-            activityId,
-            category: "other",
-            endAt: plan.endAt,
-            label: title,
-            startAt: plan.startAt,
-          },
-          type: "activity.logged",
-        })
-      : at(plan.startAt, {
-          payload: {
-            activityId,
-            buttonId: "calendar",
-            category: "other",
-            label: title,
-            ...(plan.expectMinutes !== null && { expectMinutes: plan.expectMinutes }),
-          },
-          type: "activity.started",
-        }),
-  ];
+  const write = calendarAttend(
+    state.time,
+    { endAt: end, startAt: start, title },
+    { activityId: newId(), now },
+  );
+  return [at(write.occurredAt, write.body)];
 };
 
 /** "Yes, still" moves the next ask on; Stop stops it; nothing once the activity is not running. */

@@ -1,11 +1,5 @@
 /** Public surface of @pace/client: the local-first store, actions, view-models, sync, auth and their ports. */
 export { type Actions, type ActionsOptions, createActions } from "./actions/actions.ts";
-export {
-  activityLabel,
-  CALENDAR_LEAD_MINUTES,
-  type CalendarOccurrence,
-  isCalendarRun,
-} from "./actions/calendar-run.ts";
 export type { ComposerExtras } from "./actions/composer-actions.ts";
 export type { ActionError, ActionResult, When } from "./actions/deps.ts";
 export {
@@ -245,3 +239,10 @@ export {
   type WeekModel,
   weekModel,
 } from "./view-models/week.ts";
+// The one answer to "attended already?" lives in core; the app reads it from here too.
+export {
+  activityLabel,
+  CALENDAR_LEAD_MINUTES,
+  type CalendarOccurrence,
+  isCalendarRun,
+} from "@pace/core";

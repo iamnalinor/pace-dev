@@ -2,6 +2,7 @@ import type { CoreState } from "../materialize/core-state.ts";
 import type { Activity } from "../tracking/model.ts";
 
 import { addMinutesIso } from "../time.ts";
+import { isCalendarRun } from "../tracking/calendar-run.ts";
 import { remindAt } from "../tracking/expect.ts";
 import { runningActivity } from "../tracking/timeline.ts";
 import { deadlineDigest, digestSlotAt, reportedKey } from "./deadline-digest.ts";
@@ -72,22 +73,14 @@ export type PoolPass = {
   readonly nextAt: null | string;
 };
 
-/** An event is offered this long before its start (Now's offer); tracking from then attends it. */
-const OFFER_MINUTES = 10;
 /** Handled calendar keys are kept this long after their start. */
 const KEEP_EVENT_MINUTES = 2 * 24 * 60;
 
-/** Something under the event's title tracked from its offer on: it was attended. */
-export const isEventTracked = (
+/** One of the event's own runs is on the ledger (`isCalendarRun`, as the app decides it). */
+const isAttended = (
   event: Pick<PoolCalendarEvent, "endAt" | "startAt" | "title">,
   activities: readonly Pick<Activity, "label" | "startAt">[],
-): boolean =>
-  activities.some(
-    (activity) =>
-      activity.label === event.title &&
-      activity.startAt >= addMinutesIso(event.startAt, -OFFER_MINUTES) &&
-      activity.startAt < event.endAt,
-  );
+): boolean => activities.some((activity) => isCalendarRun(event, activity));
 
 type Inputs = PoolInputs & { readonly activities: readonly Activity[] };
 
@@ -100,7 +93,7 @@ const pendingEvents = (inputs: Inputs): readonly PoolCalendarEvent[] => {
       event.endAt > inputs.now &&
       !handled.has(calendarEventKey(event)) &&
       (event.series === null || !ruled.has(event.series)) &&
-      !isEventTracked(event, inputs.activities),
+      !isAttended(event, inputs.activities),
   );
 };
 
@@ -189,7 +182,7 @@ const overrunStep = (inputs: Inputs, isQuiet: boolean) => {
 /** An event's announcement settles once the event is attended (anywhere) or over. */
 const eventSettlement = (payload: EventStartPayload, inputs: Inputs): null | Resolution => {
   const event = { endAt: payload.end, startAt: payload.start, title: payload.title };
-  if (isEventTracked(event, inputs.activities)) {
+  if (isAttended(event, inputs.activities)) {
     return "attended";
   }
   return inputs.now >= event.endAt ? "expired" : null;
