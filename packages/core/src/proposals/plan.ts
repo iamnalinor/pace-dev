@@ -62,6 +62,8 @@ const planFrom = (
 /**
 Every proposal of an answer, planned in order over what the ones before write (two new tasks
 naming the same new project make it once); the first that cannot be planned refuses the batch.
+The state is folded with the reducer, which does not apply revocations: a later proposal still
+sees what an earlier one deletes (harmless, the materializer drops writes to a revoked task).
 */
 export const planProposals = (
   state: CoreState,

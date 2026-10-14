@@ -131,7 +131,6 @@ const toInbox = (item: QueuedParse, now: string): Exclude<Drained, { kind: "wait
   kind: "inbox",
 });
 
-/** Every proposal planned, or `null` when one is not for writing unseen or cannot be planned. */
 /**
 Every proposal planned in order, the text kept as the source of a task it adds to; `null`
 when one is not for writing unseen or cannot be planned.
