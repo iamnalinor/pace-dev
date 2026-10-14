@@ -211,3 +211,25 @@ Taken as: the owner's own courses are never written into the code; the shipped p
 The third feedback document («pace замечания 3», text in `feedback-3.md`), with:
 
 > реализуй что тут написано. думай продуктово пж
+
+## 2026-10-13, stage 8 session
+
+The fourth feedback document («pace замечания 4», text in `feedback-4.md`). It came with no
+request text beyond the file.
+
+Answers while planning:
+
+- Desktop activity: «Own agent» (our own small Python agent; no ActivityWatch).
+- Notification kinds: «Two + keep the timers» (Login and Deadline Digest in the shared pool;
+  Android keeps the "still doing this?" and calendar-start local timers).
+- Notifications in the browser: «Feed in the app» (no Web Push).
+- Tabs:
+
+> Tasks -> Now обратно, Activity -> Day Activity. дальше calendar inbox more
+
+  clarified as «Now·Day·Calendar·Inbox·More» (Now and Day keep their names; Week becomes
+  Calendar).
+
+Then the extra screenshot (the composer form in the dark theme with a toast over the time bar):
+
+> еще такой фидбек. что ему здесь не нравится? и опять же почему мы такое не ловим на этапе QA
