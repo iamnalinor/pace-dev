@@ -92,3 +92,58 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await expect(page.getByRole("list", { name: "Tasks" }).getByText("Pay the rent")).toBeVisible();
   await expect(page.getByText("Type something first.")).toHaveCount(0);
 });
+
+/**
+Samples, frame by frame, where the form sits inside the card's clipping box while the card
+unfolds: the browser must not scroll the box to reveal the focused title, which would slide
+the header (and the top of Create) out of the card and back.
+*/
+const sampleUnfolding = async (page: Page): Promise<readonly { top: number; scroll: number }[]> =>
+  await page.evaluate(
+    async () =>
+      await new Promise<readonly { top: number; scroll: number }[]>((resolve) => {
+        const samples: { top: number; scroll: number }[] = [];
+        let end = Infinity;
+        const frame = (now: number): void => {
+          const form = globalThis.document.querySelector('[role="form"]');
+          // The nearest ancestor that clips: the box whose height grows.
+          let clip = form?.parentElement ?? null;
+          while (clip !== null && globalThis.getComputedStyle(clip).overflow !== "hidden") {
+            clip = clip.parentElement;
+          }
+          if (form !== null && clip !== null) {
+            end = Math.min(end, now + 600);
+            samples.push({
+              scroll: clip.scrollTop,
+              top: form.getBoundingClientRect().top - clip.getBoundingClientRect().top,
+            });
+          }
+          if (now < end) {
+            globalThis.requestAnimationFrame(frame);
+          } else {
+            resolve(samples);
+          }
+        };
+        globalThis.requestAnimationFrame(frame);
+      }),
+  );
+
+for (const [width, height, size] of [
+  [390, 844, "phone"],
+  [1440, 900, "desktop"],
+] as const) {
+  test(`the form unfolds without sliding out of the card (${size})`, async ({ page }) => {
+    await loginViaApi(page);
+    await page.setViewportSize({ height, width });
+    await page.goto("/");
+    const line = page.getByRole("textbox", { name: "New task" });
+    await line.pressSequentially("Pay the rent");
+    const sampling = sampleUnfolding(page);
+    await page.getByRole("button", { name: "Fill in the form yourself" }).click();
+    const samples = await sampling;
+    // The card grew over several frames, and the form stayed inside it throughout.
+    expect(samples.length).toBeGreaterThan(5);
+    expect(Math.min(...samples.map((sample) => sample.top))).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...samples.map((sample) => sample.scroll))).toBe(0);
+  });
+}

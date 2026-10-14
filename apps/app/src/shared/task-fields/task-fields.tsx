@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { type TextInput, View } from "react-native";
 
 import type { ComposerOption } from "@pace/client";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
+import { focusField } from "#app/platform/focus-field.ts";
 import { Chip } from "#app/ui/chip.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { type Importance, IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
@@ -201,16 +202,23 @@ export const TaskFields = ({
   readonly isTitleFocused?: boolean;
 }) => {
   const t = useT();
+  const titleRef = useRef<TextInput>(null);
+  // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in.
+  useEffect(() => {
+    if (isTitleFocused) {
+      focusField(titleRef.current);
+    }
+  }, [isTitleFocused]);
   return (
     <View className="gap-3.5">
       <TextField
-        autoFocus={isTitleFocused}
         error={values.title.trim() === "" ? t("edit.titleRequired") : null}
         label={t("edit.taskTitle")}
         onChangeText={(title) => {
           onChange({ title });
         }}
         onSubmitEditing={onSubmit}
+        ref={titleRef}
         returnKeyType={onSubmit === undefined ? "default" : "done"}
         submitBehavior={onSubmit === undefined ? "blurAndSubmit" : "submit"}
         value={values.title}
