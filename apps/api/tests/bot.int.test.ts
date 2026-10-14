@@ -2,13 +2,11 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { newId } from "@pace/core";
-
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
 import { echoReply, fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev, readJson, storeIdOf } from "./helpers.ts";
+import { json, loginAsDev, readJson } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -303,38 +301,51 @@ describe("notification buttons", () => {
     sent.length = 0;
   });
 
-  it("snoozes a task's alerts and closes it from the chat, keeping the notification text", async () => {
+  it("attends an event from the chat: the activity starts and the message keeps its text", async () => {
     const token = await loginAsDev("1002");
-    const taskId = `t-${crypto.randomUUID()}`;
-    const now = new Date().toISOString();
-    await json("/api/sync/push", {
+    const { id: userId } = await json<{ id: string }>("/api/me", { token });
+    const now = Date.now();
+    const title = `Seminar ${crypto.randomUUID().slice(0, 6)}`;
+    await json("/api/calendar/sync", {
       body: {
-        storeId: await storeIdOf(token),
+        deviceId: "phone-1",
         events: [
           {
-            deviceId: "dev-1",
-            id: newId(),
-            occurredAt: now,
-            payload: { presetId: "personal", subtasks: [], taskId, title: "Renew the passport" },
-            precision: "exact",
-            recordedAt: now,
-            source: "app",
-            type: "task.created",
+            endAt: new Date(now + 60 * 60_000).toISOString(),
+            id: "ev-1",
+            series: null,
+            startAt: new Date(now - 2 * 60_000).toISOString(),
+            title,
           },
         ],
+        from: new Date(now - 24 * 3_600_000).toISOString(),
+        to: new Date(now + 24 * 3_600_000).toISOString(),
       },
       token,
     });
-
-    await webhook(callbackUpdate(`z:${taskId}`));
-    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
-    expect(sent[1]?.body["text"]).toMatch(/^preview\n\nSnoozed until \d\d:\d\d\.$/u);
-
-    sent.length = 0;
-    await webhook(callbackUpdate(`d:${taskId}`));
-    expect(sent[1]?.body["text"]).toBe("preview\n\nMarked done ✓");
-    expect(await pulledEvent(token, "task.closed")).toMatchObject({
-      payload: { outcome: "done", taskId },
+    const store = env.USER_STORE.get(env.USER_STORE.idFromName(userId));
+    await store.runNotifications(new Date().toISOString());
+    const { items } = await json<{ items: { id: string; kind: string }[] }>("/api/notifications", {
+      token,
     });
+    const announced = items.find((item) => item.kind === "event_start");
+    expect(announced).toBeDefined();
+
+    await webhook(callbackUpdate(`na:${announced?.id ?? ""}`));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    expect(sent[1]?.body["text"]).toBe("preview\n\n✓ Attending");
+    expect(await pulledEvent(token, "activity.started")).toMatchObject({
+      payload: { buttonId: "calendar", label: title },
+    });
+    const after = await json<{ items: { id: string; resolution: null | string }[] }>(
+      "/api/notifications",
+      { token },
+    );
+    expect(after.items.find((item) => item.id === announced?.id)?.resolution).toBe("attended");
+
+    // A second tap changes nothing.
+    sent.length = 0;
+    await webhook(callbackUpdate(`na:${announced?.id ?? ""}`));
+    expect(sent[1]?.body["text"]).toBe("preview\n\n✓ Attending");
   });
 });

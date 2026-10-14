@@ -15,7 +15,6 @@ const isSingleton = (moduleName) =>
 // Phone-only Expo modules: the web build gets these stand-ins (src/platform/web).
 const WEB = path.join(__dirname, "src/platform/web");
 const WEB_SHIMS = {
-  "expo-background-task": path.join(WEB, "phone-only.ts"),
   "expo-calendar": path.join(WEB, "phone-only.ts"),
   "expo-notifications": path.join(WEB, "phone-only.ts"),
   "expo-secure-store": path.join(WEB, "secure-store.ts"),

@@ -12,8 +12,8 @@ import { isBarePath, RouteGate } from "#app/auth/route-gate.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
-// Defines the background phone check before Android may run it.
-import "#app/platform/phone-background.ts";
+// Defines the push task (and the foreground handler) before Android may run it.
+import "#app/platform/push-task.ts";
 import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
@@ -67,6 +67,7 @@ const Navigator = () => {
             <Stack.Screen name="history" />
             <Stack.Screen name="permissions" />
             <Stack.Screen name="devices" />
+            <Stack.Screen name="notifications" />
             <Stack.Screen
               name="onboarding"
               options={{ animation: "fade", gestureEnabled: false }}

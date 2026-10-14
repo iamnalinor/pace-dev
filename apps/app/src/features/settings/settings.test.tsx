@@ -64,6 +64,27 @@ describe("SettingsScreen", () => {
     });
   });
 
+  it("switches one kind of notification on one channel, the others as they were", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const digestOnWeb = screen.getByLabelText(
+      en("notify.switch", {
+        channel: en("notify.channel.web"),
+        kind: en("notify.kind.deadline_digest"),
+      }),
+    );
+    expect(digestOnWeb).not.toBeChecked();
+    await fireEvent(digestOnWeb, "valueChange", true);
+    await waitFor(() => {
+      expect(runtime.state.store.getState().settings.notificationChannels.deadline_digest).toEqual({
+        app: false,
+        telegram: true,
+        web: true,
+      });
+    });
+    expect(digestOnWeb).toBeChecked();
+  });
+
   it("logs out and goes to the login card", async () => {
     await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.logout") }));

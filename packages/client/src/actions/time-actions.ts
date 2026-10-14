@@ -1,5 +1,6 @@
 import {
   type ActivityCategory,
+  calendarStart,
   categoryOfLabel,
   choiceById,
   defaultsFor,
@@ -178,32 +179,25 @@ const startCalendar = async (
   if (isRunning) {
     return ok([]);
   }
-  if (Date.parse(event.endAt) <= Date.parse(now)) {
+  const plan = calendarStart(timeOf(deps), event, { alongside: options.alongside, now });
+  if (plan.kind === "log") {
     return await logPast(deps, {
       category: "other",
-      endAt: event.endAt,
+      endAt: plan.endAt,
       label: event.title,
-      startAt: event.startAt,
+      startAt: plan.startAt,
     });
   }
-  // A main activity begun since the event started keeps its time: the event takes over from it.
-  const since =
-    options.alongside === true ? null : (runningActivity(timeOf(deps), now)?.startAt ?? null);
-  const begun = Math.min(Date.parse(event.startAt), Date.parse(now));
-  const startAt = new Date(
-    since === null ? begun : Math.max(begun, Date.parse(since)),
-  ).toISOString();
-  const minutes = Math.round((Date.parse(event.endAt) - Date.parse(startAt)) / 60_000);
   return await startActivity(
     deps,
     {
       alongside: options.alongside,
       buttonId: "calendar",
       category: "other",
-      expectMinutes: minutes > 0 ? minutes : null,
+      expectMinutes: plan.expectMinutes,
       label: event.title,
     },
-    { at: startAt },
+    { at: plan.startAt },
   );
 };
 

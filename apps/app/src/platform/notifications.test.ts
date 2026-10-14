@@ -1,98 +1,164 @@
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 
-import { createApiClient, createAppState, createMemoryEventStore } from "@pace/client";
+import type { createFakeNotifications } from "#app/testing/notifications.fake.ts";
+
+import { createApiClient } from "@pace/client";
 import { createFakeFetch } from "@pace/client/testing";
 
-import { syncActivityTimers, syncLocalNotifications } from "./notifications.ts";
+import {
+  pollNow,
+  pushMethodOf,
+  registerPush,
+  setupNotificationCategories,
+} from "./notifications.ts";
+import { handlePushTask } from "./push-task.ts";
 
-jest.mock("expo-notifications", () => ({
-  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
-  SchedulableTriggerInputTypes: { DATE: "date" },
-  cancelScheduledNotificationAsync: jest.fn(async () => undefined),
-  getAllScheduledNotificationsAsync: jest.fn(async () => [
-    { identifier: "pace:digest:2026-10-06T11:00:00.000Z" },
-    { identifier: "someone-else" },
-  ]),
-  getPermissionsAsync: jest.fn(async () => ({ canAskAgain: true, granted: true })),
-  requestPermissionsAsync: jest.fn(async () => ({ canAskAgain: true, granted: true })),
-  scheduleNotificationAsync: jest.fn(async () => "id"),
-  setNotificationChannelAsync: jest.fn(async () => null),
-}));
+const fake = Notifications as unknown as ReturnType<typeof createFakeNotifications>;
 
-const plan = { items: [{ at: "2026-10-06T18:00:00.000Z", kind: "digest" }] };
+// eslint-disable-next-line sonarjs/no-hardcoded-ip -- the address a sign-in notice shows
+const SIGN_IN_IP = "1.2.3.4";
 
-const client = async (routes: Parameters<typeof createFakeFetch>[0]) => {
-  const fake = createFakeFetch(routes);
-  const state = createAppState({
-    deviceId: "d",
-    now: () => "2026-10-06T12:00:00.000Z",
-    source: "app",
-    store: createMemoryEventStore(),
-  });
-  await state.ready;
+const login = {
+  createdAt: "2026-10-07T09:00:00.000Z",
+  id: "n-login",
+  kind: "login",
+  payload: { country: "Germany", ip: SIGN_IN_IP, kind: "web", name: "Chrome", sessionId: "s" },
+  readAt: null,
+  resolution: null,
+  resolvedAt: null,
+};
+
+const apiWith = (routes: Parameters<typeof createFakeFetch>[0]) => {
+  const fetcher = createFakeFetch(routes);
   return {
-    api: createApiClient({ baseUrl: "https://api.test", fetch: fake.fetch, token: () => "t" }),
-    state,
+    api: createApiClient({ baseUrl: "https://api.test", fetch: fetcher.fetch, token: () => "t" }),
+    fetcher,
   };
 };
 
-describe("syncLocalNotifications", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+const registering = (pushMethods: readonly string[]) =>
+  apiWith({
+    "GET /api/push/methods": () => ({ pushMethods }),
+    "PUT /api/push/subscription": ({ body }) => ({
+      method: (body as { method: string }).method,
+    }),
   });
 
-  it("replaces stale reminders and schedules the plan", async () => {
-    await syncLocalNotifications(await client({ "GET /api/notify/plan": () => plan }));
-    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
-    expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
-      "pace:digest:2026-10-06T11:00:00.000Z",
-    );
-    expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledTimes(1);
-    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
-      content: { body: "Time for a look at Now.", title: "Pace" },
-      identifier: "pace:digest:2026-10-06T18:00:00.000Z",
-      trigger: { channelId: "reminders", date: new Date("2026-10-06T18:00:00.000Z"), type: "date" },
-    });
+beforeEach(() => {
+  fake.state.granted = true;
+  fake.state.pushToken = null;
+  fake.state.scheduled = [];
+  fake.state.dismissed = [];
+});
+
+describe("registerPush", () => {
+  it("registers Google's push when the server offers it and the phone has a token", async () => {
+    fake.state.pushToken = "fcm-token";
+    const { api, fetcher } = registering(["fcm", "poll"]);
+    expect(await registerPush(api)).toBe("fcm");
+    expect(fetcher.calls.at(-1)?.body).toEqual({ endpoint: "fcm-token", method: "fcm" });
+    expect(await pushMethodOf()).toBe("fcm");
   });
 
-  it("never asks: without the permission nothing is scheduled", async () => {
-    jest
-      .mocked(Notifications.getPermissionsAsync)
-      .mockResolvedValueOnce({ canAskAgain: true, granted: false } as never);
-    await syncLocalNotifications(await client({ "GET /api/notify/plan": () => plan }));
-    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
-    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  it("polls without Google services, and when the server stopped offering Google", async () => {
+    const withoutGoogle = registering(["fcm", "poll"]);
+    expect(await registerPush(withoutGoogle.api)).toBe("poll");
+    fake.state.pushToken = "fcm-token";
+    const serverWithout = registering(["poll"]);
+    expect(await registerPush(serverWithout.api)).toBe("poll");
+    expect(serverWithout.fetcher.calls.at(-1)?.body).toEqual({ method: "poll" });
   });
 
-  it("leaves the scheduled reminders alone when offline", async () => {
-    await syncLocalNotifications(await client({}));
-    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
-    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  it("registers none without the notification permission", async () => {
+    fake.state.granted = false;
+    const { api, fetcher } = registering(["fcm", "poll"]);
+    expect(await registerPush(api)).toBe("none");
+    expect(fetcher.pathsCalled("/api/push/methods")).toEqual([]);
   });
 });
 
-describe("syncActivityTimers", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+describe("the answer buttons", () => {
+  it("are categories of the answerable kinds, answering without opening the app", async () => {
+    await setupNotificationCategories("en");
+    expect(fake.state.categories.get("event_start")).toEqual([
+      { buttonTitle: "Attend", identifier: "attended", options: { opensAppToForeground: false } },
+      { buttonTitle: "Skip", identifier: "skipped", options: { opensAppToForeground: false } },
+    ]);
+    expect(
+      fake.state.categories.get("activity_overrun")?.map((action) => action.identifier),
+    ).toEqual(["still", "stopped"]);
+  });
+});
+
+describe("pollNow", () => {
+  it("shows what waits under the pool id, takes back dismissals and acknowledges by cursor", async () => {
+    await SecureStore.deleteItemAsync("pace.push.cursor");
+    const { api, fetcher } = apiWith({
+      "GET /api/push/poll": () => ({
+        cursor: 7,
+        entries: [
+          {
+            body: "Signed in: Chrome",
+            notification: login,
+            notificationId: "n-login",
+            title: "New sign-in",
+            type: "show",
+          },
+          { notificationId: "n-old", type: "dismiss" },
+        ],
+      }),
+    });
+    expect(await pollNow(api)).toBe(2);
+    expect(fake.state.scheduled).toEqual([
+      expect.objectContaining({
+        content: expect.objectContaining({
+          body: "Signed in: Chrome",
+          title: "New sign-in",
+        }) as unknown,
+        identifier: "n-login",
+      }),
+    ]);
+    expect(fake.state.dismissed).toEqual(["n-old"]);
+    await pollNow(api);
+    expect(fetcher.calls.at(-1)?.path).toBe("/api/push/poll");
+    expect(fetcher.calls.map((call) => call.path)).toHaveLength(2);
+  });
+});
+
+describe("the push task", () => {
+  it("takes a notification away on a dismiss push", async () => {
+    await handlePushTask({ data: { notificationId: "n-1", type: "dismiss" } }, null);
+    expect(fake.state.dismissed).toEqual(["n-1"]);
   });
 
-  it("asks at twice the running activity's Expect and leaves the plan's reminders alone", async () => {
-    const { state } = await client({});
-    const clock = { deviceTz: "Europe/Moscow", now: () => "2026-10-06T12:00:00.000Z" };
-    const started = await state.dispatch({
-      occurredAt: "2026-10-06T12:00:00.000Z",
-      payload: { activityId: "a1", category: "commute", expectMinutes: 45, label: "Commute" },
-      precision: "exact",
-      source: "app",
-      type: "activity.started",
+  it("answers an answer button through the resolve endpoint, the notification gone", async () => {
+    const { api, fetcher } = apiWith({
+      "POST /api/notifications/n-2/resolve": () => ({ notification: { ...login, id: "n-2" } }),
     });
-    expect(started.ok).toBe(true);
-    await syncActivityTimers({ clock, state });
-    expect(Notifications.cancelScheduledNotificationAsync).not.toHaveBeenCalled();
-    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith({
-      content: { body: "Still doing Commute?", title: "Pace" },
-      identifier: "pace:activity:a1:long@2026-10-06T13:30:00.000Z",
-      trigger: { channelId: "timers", date: new Date("2026-10-06T13:30:00.000Z"), type: "date" },
+    await handlePushTask(
+      {
+        actionIdentifier: "attended",
+        notification: { request: { content: { data: { notificationId: "n-2" } } } },
+      },
+      api,
+    );
+    expect(fake.state.dismissed).toEqual(["n-2"]);
+    expect(fetcher.calls.at(-1)).toMatchObject({
+      body: { from: "app", resolution: "attended" },
+      path: "/api/notifications/n-2/resolve",
     });
+  });
+
+  it("ignores a default tap and an unknown button", async () => {
+    const { api, fetcher } = apiWith({});
+    await handlePushTask(
+      {
+        actionIdentifier: "expo.modules.notifications.actions.DEFAULT",
+        notification: { request: { content: { data: { notificationId: "n-3" } } } },
+      },
+      api,
+    );
+    expect(fetcher.calls).toEqual([]);
   });
 });

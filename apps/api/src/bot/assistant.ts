@@ -1,10 +1,10 @@
-import { addMinutesIso, nextDigestAt, nowList, t } from "@pace/core";
+import { type Answer, nowList, t } from "@pace/core";
 
 import type { ParseProvider } from "../shared/llm/llm.ts";
 
-import { type BotStoreApi, NOTIFY_ACTIONS } from "../shared/contract.ts";
+import { type BotStoreApi, POOL_ACTIONS } from "../shared/contract.ts";
 import { choosePreview, preview } from "./preview.ts";
-import { applyBodies, type BotReply, plain, timeOf, type Turn, zoneOf } from "./turn.ts";
+import { type BotReply, plain, type Turn, zoneOf } from "./turn.ts";
 
 export type { BotReply } from "./turn.ts";
 
@@ -22,32 +22,27 @@ export type Assistant = {
   readonly choose: (telegramId: string, data: string) => Promise<BotReply>;
 };
 
-/** A snooze without any digest window ahead lasts this long. */
-const SNOOZE_FALLBACK_MINUTES = 3 * 60;
 const NOW_ROWS = 5;
 
-const NOTIFY_ACTION_CODES: readonly string[] = Object.values(NOTIFY_ACTIONS);
+/** The answer a notification button's code stands for; `undefined` for any other button. */
+export const answerOfCode = (code: string): Answer | undefined =>
+  (Object.entries(POOL_ACTIONS) as [Answer, string][]).find(([, value]) => value === code)?.[0];
 
-/** A notification button: snooze the task's alerts until the next digest, or close it from the chat. */
-const notificationAction = async (
-  turn: Turn,
-  action: string,
-  taskId: string,
-): Promise<BotReply> => {
-  const { now, state } = turn;
-  const { language } = state.settings;
-  if (action === NOTIFY_ACTIONS.snooze) {
-    const until =
-      nextDigestAt(now, zoneOf(state), state.settings) ??
-      addMinutesIso(now, SNOOZE_FALLBACK_MINUTES);
-    await turn.store.snoozeTask(taskId, until, now);
-    return plain(t(language, "notify.snoozed", { time: timeOf(until, state) }));
-  }
-  const isDone = action === NOTIFY_ACTIONS.done;
-  const failure = await applyBodies(turn, [
-    { payload: { outcome: isDone ? "done" : "cancelled", taskId }, type: "task.closed" },
-  ]);
-  return plain(failure ?? t(language, isDone ? "notify.closedDone" : "notify.closedCancelled"));
+/**
+A notification button: the same answer as from the app or the web (the store writes it and
+takes the notification back elsewhere); the reply is what the message gains below its text.
+*/
+const notificationAnswer = async (turn: Turn, answer: Answer, id: string): Promise<BotReply> => {
+  const { language } = turn.state.settings;
+  const result = await turn.store.resolveNotification(id, answer, {
+    now: turn.now,
+    origin: "telegram",
+  });
+  return plain(
+    result.ok
+      ? t(language, `notify.resolved.${result.value.resolution ?? "read"}`)
+      : t(language, "bot.failed", { reason: result.error.code }),
+  );
 };
 
 /** The top of Now as a short numbered list. */
@@ -93,9 +88,10 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
     choose: async (telegramId, data) =>
       await withUser(telegramId, async (turn) => {
         const { action, id } = splitData(data);
-        return NOTIFY_ACTION_CODES.includes(action)
-          ? await notificationAction(turn, action, id)
-          : await choosePreview(turn, action, id);
+        const answer = answerOfCode(action);
+        return answer === undefined
+          ? await choosePreview(turn, action, id)
+          : await notificationAnswer(turn, answer, id);
       }),
     message: async (telegramId, text) =>
       await withUser(telegramId, async (turn) => await preview(turn, deps.providers, text)),

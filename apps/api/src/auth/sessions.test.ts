@@ -39,6 +39,7 @@ describe("sessions", () => {
     expect(await findSession(db, session.token, NOW + 89 * DAY)).toEqual({
       device: null,
       scope: null,
+      sessionId: session.id,
       user,
     });
     expect(await findSession(db, session.token, NOW + 90 * DAY + 1)).toBeNull();

@@ -113,6 +113,15 @@ describe("parseEvent", () => {
       parseEvent({ ...base, payload: { quietHours: { from: "23:00", to: "08:00" } } }).ok,
     ).toBe(true);
     expect(parseEvent({ ...base, payload: { timezone: "Nowhere/Land" } }).ok).toBe(false);
+    expect(
+      parseEvent({ ...base, payload: { notificationChannels: { login: { telegram: false } } } }).ok,
+    ).toBe(true);
+    expect(
+      parseEvent({ ...base, payload: { notificationChannels: { critical: { web: true } } } }).ok,
+    ).toBe(false);
+    expect(
+      parseEvent({ ...base, payload: { notificationChannels: { login: { email: true } } } }).ok,
+    ).toBe(false);
   });
 
   it("keeps preset definitions opaque", () => {

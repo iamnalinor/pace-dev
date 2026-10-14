@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { endpoint, type EndpointShape } from "./endpoint.ts";
+import { notificationEndpoints } from "./notification-endpoints.ts";
 import {
   AccountDeletedSchema,
   AuthSessionSchema,
@@ -25,9 +26,9 @@ import {
 } from "./schemas/cloud.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import {
+  CalendarSkipSchema,
   DecisionsOutputSchema,
   DecisionsQuerySchema,
-  NotifyPlanOutputSchema,
 } from "./schemas/notify.ts";
 import {
   OAuthClientInfoQuerySchema,
@@ -146,15 +147,7 @@ export const endpoints = {
       path: "/api/llm/status",
     }),
   },
-  notify: {
-    /** The next day's local reminders for the phone: digest windows and deadline crossings. */
-    plan: endpoint({
-      auth: true,
-      method: "GET",
-      output: NotifyPlanOutputSchema,
-      path: "/api/notify/plan",
-    }),
-  },
+  notifications: notificationEndpoints,
   decisions: {
     /** The decision log (notifications sent or held back, and why), newest first. */
     list: endpoint({
@@ -234,6 +227,14 @@ export const endpoints = {
       output: CalendarOutputSchema,
       path: "/api/calendar",
       query: RangeQuerySchema,
+    }),
+    /** Skips one occurrence everywhere: never announced, an announcement out is resolved. */
+    skip: endpoint({
+      auth: true,
+      body: CalendarSkipSchema,
+      method: "POST",
+      output: DoneSchema,
+      path: "/api/calendar/skip",
     }),
     /** Forgets one phone's calendar copy (it turned sending off). */
     clear: endpoint({

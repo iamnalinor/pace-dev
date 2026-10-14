@@ -46,6 +46,18 @@ export const announceChange = (
   }
 };
 
+/** Sends a message to every live client (a feed update: a notification new or resolved). */
+export const broadcast = (ctx: DurableObjectState, message: object): void => {
+  const text = JSON.stringify(message);
+  for (const socket of ctx.getWebSockets()) {
+    try {
+      socket.send(text);
+    } catch {
+      // A socket closing meanwhile: its client reloads the feed when it reconnects.
+    }
+  }
+};
+
 /**
 The live channel's half of a user's store: it accepts live clients (the Worker has checked the
 bearer), answers their keep-alive without waking (no duration billed) and closes cleanly.

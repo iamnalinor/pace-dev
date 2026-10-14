@@ -6,7 +6,20 @@ export type TelegramTransport = (input: string | URL, init?: RequestInit) => Pro
 
 export const telegramFetch: TelegramTransport = async (input, init) => await fetch(input, init);
 
-export type InlineButton = { readonly label: string; readonly data: string };
+/** A button that answers the bot (`data`) or opens a page (`url`). */
+export type InlineButton =
+  | { readonly label: string; readonly data: string }
+  | { readonly label: string; readonly url: string };
+
+/** A button as the Bot API takes it. */
+export const inlineKeyboardButton = (
+  button: InlineButton,
+):
+  | { readonly text: string; readonly callback_data: string }
+  | { readonly text: string; readonly url: string } =>
+  "url" in button
+    ? { text: button.label, url: button.url }
+    : { callback_data: button.data, text: button.label };
 
 /** A message with its inline keyboard (rows of buttons). */
 export type OutgoingMessage = {
@@ -20,34 +33,64 @@ export type TelegramTarget = {
   readonly fetch: TelegramTransport;
 };
 
+/** One Bot API call; the parsed answer, or `null` when it failed (network or Telegram). */
+const callTelegram = async (
+  target: TelegramTarget,
+  method: string,
+  body: Record<string, unknown>,
+): Promise<null | { readonly result?: unknown }> => {
+  try {
+    const response = await target.fetch(`${target.apiRoot}/bot${target.token}/${method}`, {
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    return response.ok ? await response.json<{ readonly result?: unknown }>() : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
-Sends `message` to `chatId`; resolves to whether Telegram accepted it. A network failure
-counts as "not accepted" rather than an error: one undelivered message must not stop the rest.
+Sends `message` to `chatId`; resolves to the id Telegram gave it, or `null` when it was not
+accepted. A network failure counts as "not accepted" rather than an error: one undelivered
+message must not stop the rest.
 */
-export const wasTelegramMessageSent = async (
+export const sendTelegramMessage = async (
   target: TelegramTarget,
   chatId: string,
   message: OutgoingMessage,
-): Promise<boolean> => {
-  const body = JSON.stringify({
+): Promise<null | number> => {
+  const answer = await callTelegram(target, "sendMessage", {
     chat_id: chatId,
     text: message.text,
     ...(message.buttons.length > 0 && {
       reply_markup: {
         inline_keyboard: message.buttons.map((row) =>
-          row.map((button) => ({ callback_data: button.data, text: button.label })),
+          row.map((button) => inlineKeyboardButton(button)),
         ),
       },
     }),
   });
-  try {
-    const response = await target.fetch(`${target.apiRoot}/bot${target.token}/sendMessage`, {
-      body,
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    return response.ok;
-  } catch {
-    return false;
+  if (answer === null) {
+    return null;
   }
+  const result = answer.result as undefined | { readonly message_id?: unknown };
+  return typeof result?.message_id === "number" ? result.message_id : 0;
 };
+
+/** Sends `message`; whether Telegram accepted it. */
+export const wasTelegramMessageSent = async (
+  target: TelegramTarget,
+  chatId: string,
+  message: OutgoingMessage,
+): Promise<boolean> => (await sendTelegramMessage(target, chatId, message)) !== null;
+
+/** Deletes a message the bot sent; whether Telegram accepted that. */
+export const wasTelegramMessageDeleted = async (
+  target: TelegramTarget,
+  chatId: string,
+  messageId: number,
+): Promise<boolean> =>
+  (await callTelegram(target, "deleteMessage", { chat_id: chatId, message_id: messageId })) !==
+  null;

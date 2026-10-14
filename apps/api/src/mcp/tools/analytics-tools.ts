@@ -67,7 +67,7 @@ export const querySql = defineTool({
 export const simulateTool = defineTool({
   annotations: READ,
   description:
-    "Replays the reminder rules over the log from `from` to `to` (at most 31 days): every digest, critical alert, stuck report and Limit alert the notifier would send, starting from a fresh memory. Writes nothing.",
+    'Replays the notification pool over the log from `from` to `to` (at most 31 days): every deadline digest and "still doing X?" ask the server would send, starting from a fresh memory (calendar events are not replayed). Writes nothing.',
   handler: async (args, ctx) => {
     const span = Date.parse(args.to) - Date.parse(args.from);
     if (span <= 0 || span > MAX_SIMULATION_MS) {

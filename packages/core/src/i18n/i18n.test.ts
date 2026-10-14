@@ -7,6 +7,7 @@ import {
   formatDuration,
   formatEyebrow,
   formatLate,
+  formatLeft,
   formatRelativeDay,
   formatSpan,
   formatWeekRange,
@@ -151,6 +152,15 @@ describe("plural", () => {
 
   it("falls back to other when a form is missing", () => {
     expect(plural("ru", 3, { one: "{count} день", other: "{count} дней" })).toBe("3 дней");
+  });
+});
+
+describe("formatLeft", () => {
+  it("shows days and hours from a day on, hours and minutes under it, nothing below zero", () => {
+    expect(formatLeft(30 * 60 + 10, "en")).toBe("1d 6h");
+    expect(formatLeft(48 * 60, "ru")).toBe("2 д");
+    expect(formatLeft(5 * 60 + 20, "en")).toBe("5h 20m");
+    expect(formatLeft(-5, "en")).toBe("0m");
   });
 });
 

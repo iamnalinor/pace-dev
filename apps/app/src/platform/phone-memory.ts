@@ -51,7 +51,6 @@ const notified = keyList("pace.phone.notified");
 
 export const dismissedKeys = dismissed.all;
 export const dismiss = dismissed.add;
-export const notifiedKeys = notified.all;
 export const markNotified = notified.add;
 
 /** "Every time" for a repeating calendar event: log it as attended, or never show it. */

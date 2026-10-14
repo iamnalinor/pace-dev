@@ -50,9 +50,11 @@ describe("the bot's preview", () => {
       [{ model: fakeParseModel(echoReply), name: "fake" }],
       "close task Reply to course curator",
     );
-    const accept = shown.buttons[0]?.find((button) => button.data.startsWith("a:"));
+    const accept = shown.buttons[0]?.find(
+      (button) => "data" in button && button.data.startsWith("a:"),
+    );
     expect(accept).toBeDefined();
-    const id = accept?.data.slice(2) ?? "";
+    const id = accept !== undefined && "data" in accept ? accept.data.slice(2) : "";
     expect(written).toEqual([]);
     await choosePreview(turn(LATER), PREVIEW_ACTIONS.accept, id);
     expect(written).toEqual([

@@ -27,6 +27,14 @@ export const cancelScheduledNotificationAsync = none;
 export const getAllScheduledNotificationsAsync = nothing;
 export const setNotificationChannelAsync = none;
 export const setNotificationHandler = (): void => undefined;
+export const setNotificationCategoryAsync = none;
+export const dismissNotificationAsync = none;
+export const getDevicePushTokenAsync = (): Promise<never> =>
+  Promise.reject(new Error("No push on the web"));
+export const addNotificationResponseReceivedListener = (): { readonly remove: () => void } => ({
+  remove: () => undefined,
+});
+export const BackgroundNotificationTaskResult = { Failed: 2, NewData: 0, NoData: 1 } as const;
 // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- the name expo-notifications exports
 export const useLastNotificationResponse = (): null => null;
 
@@ -37,15 +45,11 @@ export const requestCalendarPermissions = deny;
 export const getCalendars = nothing;
 export const listEvents = nothing;
 
-// expo-task-manager, expo-background-task
+// expo-task-manager
 export const defineTask = (): void => undefined;
 export const isTaskRegisteredAsync = async (): Promise<boolean> => {
   await Promise.resolve();
   return false;
 };
-export const BackgroundTaskResult = { Failed: 2, Success: 1 } as const;
-export const BackgroundTaskStatus = { Available: 2, Restricted: 1 } as const;
-export const getStatusAsync = (): Promise<number> =>
-  Promise.resolve(BackgroundTaskStatus.Restricted);
 export const registerTaskAsync = none;
 export const unregisterTaskAsync = none;

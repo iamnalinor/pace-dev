@@ -108,7 +108,7 @@ shows.
 | `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |
 | `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `calendar_events`, `usage_sessions`) with their CREATE statements | — |
 | `query_sql` | analytics | one read-only SQLite `SELECT` (or `WITH … SELECT`), at most 500 rows, run in a transaction that always rolls back; a second statement, `PRAGMA`, `ATTACH` or any write is refused (`sql/forbidden`, `sql/not-select`) | `sql` |
-| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and "still doing this?" they would send (`simulate/range` for a bad range) | `from`, `to` |
+| `simulate` | analytics | replays the notification pool over a past range (at most 31 days) from a fresh memory: every deadline digest and "still doing X?" it would send (calendar events are not replayed) (`simulate/range` for a bad range) | `from`, `to` |
 | `export_all` | analytics | the event log as NDJSON (one event per line, corrections included), a page at a time | `since?`, `limit?` (default 1000, max 5000) |
 
 ### Writes: `at`, `precision`, `dryRun`

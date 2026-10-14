@@ -59,9 +59,26 @@ export const plural = (language: Language, count: number, forms: PluralForms): s
   return interpolate(chosen(), { count });
 };
 
-const DURATION_UNITS: Readonly<Record<Language, { readonly h: string; readonly m: string }>> = {
-  en: { h: "h", m: "m" },
-  ru: { h: " ч", m: " м" },
+const DURATION_UNITS: Readonly<
+  Record<Language, { readonly d: string; readonly h: string; readonly m: string }>
+> = {
+  en: { d: "d", h: "h", m: "m" },
+  ru: { d: " д", h: " ч", m: " м" },
+};
+
+/**
+Time left until a deadline, coarse: `1d 6h` from a day on, `5h 20m` under it, `0m` once
+past. Whole days and hours only from a day on, where minutes are noise.
+*/
+export const formatLeft = (minutes: number, language: Language): string => {
+  const total = Math.max(0, Math.floor(minutes));
+  if (total < 24 * 60) {
+    return formatDuration(total, language);
+  }
+  const units = DURATION_UNITS[language];
+  const days = Math.floor(total / (24 * 60));
+  const hours = Math.floor((total % (24 * 60)) / 60);
+  return [`${days}${units.d}`, ...(hours > 0 ? [`${hours}${units.h}`] : [])].join(" ");
 };
 
 /** `90` → `1h 30m` / `1 ч 30 м`; `0` → `0m`. */

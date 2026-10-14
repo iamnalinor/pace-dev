@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_SETTINGS } from "../model/settings.ts";
-import { isQuietAt, lastDigestWindow, nextDigestAt } from "./schedule.ts";
+import { isQuietAt, lastDigestWindow, nextDigestAt, quietEndsAt } from "./schedule.ts";
 
 const MOSCOW = "Europe/Moscow";
 
@@ -43,5 +43,16 @@ describe("quiet hours", () => {
     expect(isQuietAt("2026-10-07T12:30:00.000Z", MOSCOW, nap)).toBe(false);
     const off = { ...DEFAULT_SETTINGS, quietHours: { from: "00:00", to: "00:00" } };
     expect(isQuietAt("2026-10-07T21:00:00.000Z", MOSCOW, off)).toBe(false);
+  });
+
+  it("ends the next morning for a night that wraps past midnight, and is nothing outside it", () => {
+    // 23:30 and 03:00 Moscow are quiet until 08:00 the next morning.
+    expect(quietEndsAt("2026-10-07T20:30:00.000Z", MOSCOW, DEFAULT_SETTINGS)).toBe(
+      "2026-10-08T05:00:00.000Z",
+    );
+    expect(quietEndsAt("2026-10-08T00:00:00.000Z", MOSCOW, DEFAULT_SETTINGS)).toBe(
+      "2026-10-08T05:00:00.000Z",
+    );
+    expect(quietEndsAt("2026-10-08T05:00:00.000Z", MOSCOW, DEFAULT_SETTINGS)).toBeNull();
   });
 });

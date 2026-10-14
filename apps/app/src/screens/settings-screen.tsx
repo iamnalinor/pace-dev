@@ -8,7 +8,12 @@ import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { DeleteAccount } from "#app/features/settings/delete-account.tsx";
 import { ExportRow } from "#app/features/settings/export-row.tsx";
-import { DigestWindows, QuietHours } from "#app/features/settings/notification-settings.tsx";
+import {
+  DigestWindows,
+  NotificationChannels,
+  PushStatus,
+  QuietHours,
+} from "#app/features/settings/notification-settings.tsx";
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
@@ -117,6 +122,10 @@ export const SettingsScreen = () => {
         <TimezoneRow />
       </Row>
       {IS_PHONE ? <PermissionsRow /> : null}
+      <Row label={t("settings.notifications")}>
+        <NotificationChannels />
+        <PushStatus />
+      </Row>
       <Row label={t("settings.digestWindows")}>
         <DigestWindows />
       </Row>

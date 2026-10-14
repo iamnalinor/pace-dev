@@ -15,11 +15,10 @@ import {
   taskOutcome,
 } from "@pace/core";
 
+import { taskUrl } from "../shared/web-links.ts";
 import { describeCode, type Rendered, type Scope, type ToolFailure } from "./tool-kit.ts";
 
 /** The shapes the tools answer with for tasks and projects, and the renderers behind them. */
-
-export const taskUrl = (webOrigin: string, taskId: string): string => `${webOrigin}/task/${taskId}`;
 
 export const projectUrl = (webOrigin: string, projectId: string): string =>
   `${webOrigin}/project/${projectId}`;

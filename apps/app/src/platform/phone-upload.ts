@@ -7,7 +7,7 @@ import { addMinutesIso, appSessions, endpoints } from "@pace/core";
 import { loadDeviceId } from "./device-id.ts";
 import { calendarAccess, calendarEvents } from "./phone-calendar.ts";
 import { appLabels, readPhoneEvents } from "./phone-data.ts";
-import { isCalendarSyncOn, setUsageCursor, usageCursor } from "./phone-memory.ts";
+import { isCalendarSyncOn, seriesRules, setUsageCursor, usageCursor } from "./phone-memory.ts";
 
 /** The calendar copy covers last week and the next two. */
 const CALENDAR_BACK_MINUTES = 7 * 24 * 60;
@@ -34,6 +34,7 @@ const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Pr
   const from = addMinutesIso(now, -CALENDAR_BACK_MINUTES);
   const to = addMinutesIso(now, CALENDAR_AHEAD_MINUTES);
   const events = await calendarEvents(from, to);
+  const rules = await seriesRules();
   await api.call(endpoints.calendar.sync, {
     body: {
       deviceId,
@@ -44,6 +45,8 @@ const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Pr
       })),
       from,
       to,
+      // Series answered "every time" here: the server never announces them as they start.
+      ruledSeries: rules.map((rule) => rule.series.slice(0, 300)).slice(0, 500),
     },
   });
 };

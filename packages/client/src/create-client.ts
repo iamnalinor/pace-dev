@@ -1,3 +1,5 @@
+import type { LiveNotice } from "@pace/core";
+
 import type { EventStore } from "./event-store.ts";
 import type { SessionStore } from "./session.ts";
 
@@ -7,6 +9,7 @@ import { type Assistant, createAssistant } from "./assistant.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { type Clock, systemClock } from "./clock.ts";
 import { createLiveChannel, type LiveChannel, type SocketLike } from "./live.ts";
+import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
 
@@ -21,6 +24,10 @@ export type PaceClient = {
   readonly sync: SyncClient;
   /** The server's "your log grew" line; started and stopped with the sync loop. */
   readonly live: LiveChannel;
+  /** The notification pool, kept current by the live line. */
+  readonly notifications: NotificationFeed;
+  /** Other live messages about the pool (a new notification to show, one to take back). */
+  readonly onNotice: (listener: (notice: LiveNotice) => void) => () => void;
 };
 
 export type PaceClientOptions = {
@@ -64,15 +71,50 @@ const stateAndSync = (
 /** The live channel next to the API: a server's "changed" asks the sync for a run. */
 const liveChannelOf = (
   options: PaceClientOptions,
-  wiring: { readonly onChange: () => void; readonly token: () => string | undefined },
+  wiring: {
+    readonly onChange: () => void;
+    readonly onMessage: (message: unknown) => void;
+    readonly token: () => string | undefined;
+  },
 ): LiveChannel =>
   createLiveChannel({
     baseUrl: options.baseUrl,
     ...(options.createSocket !== undefined && { createSocket: options.createSocket }),
     deviceId: options.deviceId,
     onChange: wiring.onChange,
+    onMessage: wiring.onMessage,
     token: wiring.token,
   });
+
+/** The live channel's other messages: the pool's notices go to the feed, then to the listeners. */
+const noticeRouter = (
+  feed: NotificationFeed,
+): {
+  readonly feed: NotificationFeed;
+  readonly onMessage: (message: unknown) => void;
+  readonly onNotice: PaceClient["onNotice"];
+} => {
+  const listeners = new Set<(notice: LiveNotice) => void>();
+  return {
+    feed,
+    onMessage: (message) => {
+      const notice = parseLiveNotice(message);
+      if (notice === null) {
+        return;
+      }
+      feed.receive(notice);
+      for (const listener of listeners) {
+        listener(notice);
+      }
+    },
+    onNotice: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+};
 
 /**
 Wires API client → auth → app state → sync → actions on the platform adapters: the one
@@ -94,7 +136,14 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   const auth = createAuth({ api, session: options.session });
   token = auth.token;
   const { state, sync } = stateAndSync(options, api, now);
-  const live = liveChannelOf(options, { onChange: sync.soon, token: auth.token });
+  const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
+  const live = liveChannelOf(options, {
+    onChange: () => {
+      sync.soon();
+    },
+    onMessage: notices.onMessage,
+    token: auth.token,
+  });
   const actions = createActions({ clock, source: options.source, state });
 
   void (async (): Promise<void> => {
@@ -105,5 +154,6 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   })();
 
   const assistant = createAssistant({ api });
-  return { actions, api, assistant, auth, clock, live, state, sync };
+  const { feed: notifications, onNotice } = notices;
+  return { actions, api, assistant, auth, clock, live, notifications, onNotice, state, sync };
 };

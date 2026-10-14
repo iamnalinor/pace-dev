@@ -28,6 +28,9 @@ const untouchedStore: UserStoreApi = {
   apply: async () => {
     throw new Error("store not expected");
   },
+  notify: async () => {
+    throw new Error("store not expected");
+  },
   calendar: async () => {
     throw new Error("store not expected");
   },

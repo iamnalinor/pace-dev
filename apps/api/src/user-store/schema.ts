@@ -73,6 +73,85 @@ export const decisions = sqliteTable(
   (table) => [index("decisions_task_idx").on(table.taskId), index("decisions_at_idx").on(table.at)],
 );
 
+/**
+The notification pool: one row per notification, shown by every channel its kind is on for
+(Telegram, the app, the web). Telegram's copy is tracked so a resolution elsewhere can delete it.
+*/
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    /** A ULID: ids sort by creation. */
+    id: text().primaryKey(),
+    kind: text().notNull(),
+    /** What it is about (`refOf`): an event's key, an activity's ask, a slot, a session. */
+    ref: text().notNull(),
+    createdAt: text().notNull(),
+    /** The kind's payload as JSON (zod schema per kind in core). */
+    payload: text().notNull(),
+    readAt: text(),
+    resolvedAt: text(),
+    resolution: text(),
+    /** `pending` | `sent` | `skipped` (channel off or no chat) | `failed`. */
+    telegramState: text().notNull(),
+    telegramChatId: text(),
+    telegramMessageId: integer(),
+    telegramSentAt: text(),
+  },
+  (table) => [
+    index("notifications_ref_idx").on(table.kind, table.ref),
+    index("notifications_open_idx").on(table.resolvedAt),
+  ],
+);
+
+/**
+The delivery log: every push attempt of a notification to a device (its session), by the
+device's push method, with the result. A device that got one (`sent`) is never sent it again,
+and a resolution takes back every copy sent; the feed shows it for debugging.
+*/
+export const notificationDeliveries = sqliteTable(
+  "notification_deliveries",
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    notificationId: text().notNull(),
+    sessionId: text().notNull(),
+    /** The device as its session is named ("android", later the phone's name). */
+    device: text().notNull(),
+    /** The push method (`fcm`, `poll`). */
+    method: text().notNull(),
+    /** Where it went (the FCM token; the session for polling). */
+    endpoint: text().notNull(),
+    attemptedAt: text().notNull(),
+    /** `sent` | `failed`. */
+    result: text().notNull(),
+    /** Why it failed (`gone`, `auth`, `failed`). */
+    reason: text(),
+    /** When the copy was taken back from the device. */
+    dismissedAt: text(),
+  },
+  (table) => [index("notification_deliveries_idx").on(table.notificationId, table.sessionId)],
+);
+
+/**
+What waits for a device whose push method is `poll`: notifications to show and ones to take
+back, fetched by its periodic background check (and by the open app). Fetched entries are
+acknowledged by the next fetch's cursor and dropped.
+*/
+export const pollOutbox = sqliteTable(
+  "poll_outbox",
+  {
+    seq: integer().primaryKey({ autoIncrement: true }),
+    sessionId: text().notNull(),
+    /** `show` | `dismiss`. */
+    type: text().notNull(),
+    notificationId: text().notNull(),
+    /** For `show`: the text in the account language. */
+    title: text(),
+    body: text(),
+    createdAt: text().notNull(),
+  },
+  (table) => [index("poll_outbox_session_idx").on(table.sessionId, table.seq)],
+);
+
 /** Small key/value state of the store (last digest time, budgets, cursors). */
 export const meta = sqliteTable("meta", {
   key: text().primaryKey(),

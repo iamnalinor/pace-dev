@@ -2,13 +2,11 @@ import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlit
 
 import {
   type CalendarEvent,
-  type CoreState,
   err,
   type Event,
   type EventInput,
   ok,
   parseEvent,
-  type PlannedNotification,
   type Result,
   STORE_CHANGED,
   type UsageRow,
@@ -33,17 +31,19 @@ import type {
   TableSchema,
 } from "../shared/contract.ts";
 import type { Cooldowns } from "../shared/llm/llm.ts";
-import type { TelegramTarget } from "../shared/telegram-api.ts";
 
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import * as cloud from "./cloud-data.ts";
 import { insertDecisions, listDecisions } from "./decision-log.ts";
 import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
-import { announceChange, LiveStore } from "./live-sockets.ts";
+import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
+import { saveRuledSeries } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
+import { NotificationPool } from "./pool-service.ts";
+import { PoolStore } from "./pool-store.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
 import {
@@ -72,14 +72,26 @@ another epoch is emptied (see `STORE_EPOCH`) and migrations run. The state is ca
 memory with the log sequence it was built at and rebuilt when the cache is stale or a batch
 cannot be applied in order.
 */
-export class UserStore extends LiveStore {
+export class UserStore extends PoolStore {
   #cache: Materialized | undefined;
+
+  readonly #pool: NotificationPool;
 
   readonly db: Db;
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { casing: "snake_case", schema });
+    this.#pool = new NotificationPool({
+      chatId: async () => await this.chatId(),
+      ctx,
+      current: async () => await this.#current(),
+      db: this.db,
+      derive: async (now) => await this.derive(now),
+      deviceId: SERVER_DEVICE_ID,
+      env,
+      insert: async (events) => await this.#insert(events),
+    });
     // eslint-disable-next-line sonarjs/no-async-constructor -- blockConcurrencyWhile is the documented way to migrate before the first request
     void ctx.blockConcurrencyWhile(async () => {
       await openStore(this.db, ctx.storage);
@@ -122,18 +134,6 @@ export class UserStore extends LiveStore {
     return inserted;
   }
 
-  async #state(): Promise<CoreState> {
-    const { state } = await this.#current();
-    return state;
-  }
-
-  /** Alarms only matter once there is a chat to send to. */
-  async #rearm(now: string): Promise<void> {
-    if ((await this.chatId()) !== undefined) {
-      await notifier.rearm(this.ctx.storage, await this.#state(), now);
-    }
-  }
-
   async #system(inputs: readonly EventInput[], now: string): Promise<readonly Event[]> {
     const events = inputs.flatMap((input) => {
       const parsed = parseEvent({ ...input, deviceId: SERVER_DEVICE_ID, recordedAt: now });
@@ -141,6 +141,10 @@ export class UserStore extends LiveStore {
     });
     return await this.#insert(events);
   }
+  protected override get pool(): NotificationPool {
+    return this.#pool;
+  }
+
   /**
   Deletes the account's data: the event log, every projection, reminders and the alarm.
   The empty store migrates again under a new store id, so it serves the next login of the
@@ -177,7 +181,7 @@ export class UserStore extends LiveStore {
     });
     await this.#insert(events);
     await this.derive(options.now);
-    await this.#rearm(options.now);
+    await this.#pool.afterWrite(options.now);
     return { accepted, rejected, seq: await log.latestSeq(this.db) };
   }
 
@@ -236,7 +240,7 @@ export class UserStore extends LiveStore {
     }
     const inserted = await this.#insert(prepared.value.events);
     await this.derive(meta.now);
-    await this.#rearm(meta.now);
+    await this.#pool.afterWrite(meta.now);
     const current = await this.#current();
     return ok({
       events: inserted.map((event) => toStored(event)),
@@ -272,11 +276,24 @@ export class UserStore extends LiveStore {
     return await log.takeMemo(this.ctx.storage, `memo:${key}`);
   }
 
-  /** A phone's calendar over a range, replacing what that phone sent for it before. */
+  /**
+  A phone's calendar over a range, replacing what that phone sent for it before, with the series
+  it answers "every time" for (never announced as they start).
+  */
   async syncCalendar(
-    upload: cloud.Range & { readonly deviceId: string; readonly events: readonly CalendarEvent[] },
+    upload: cloud.Range & {
+      readonly deviceId: string;
+      readonly events: readonly CalendarEvent[];
+      readonly ruledSeries?: readonly string[] | undefined;
+    },
+    now: string,
   ): Promise<number> {
-    return await cloud.replaceCalendar(this.db, upload);
+    const stored = await cloud.replaceCalendar(this.db, upload);
+    if (upload.ruledSeries !== undefined) {
+      await saveRuledSeries(this.ctx.storage, upload.ruledSeries);
+    }
+    await this.#pool.afterWrite(now);
+    return stored;
   }
 
   /** The calendar's events overlapping a range. */
@@ -337,19 +354,7 @@ export class UserStore extends LiveStore {
   /** Notifications go to this chat from now on (the bot and every bot login call it). */
   async notifyTo(chatId: string, now: string): Promise<void> {
     await notifier.setChat(this.ctx.storage, chatId);
-    await this.#rearm(now);
-  }
-
-  /** Silences a task's alerts until `until`. */
-  async snoozeTask(taskId: string, until: string, now: string): Promise<void> {
-    await notifier.snoozeTask(this.ctx.storage, taskId, until);
-    await this.#rearm(now);
-  }
-
-  /** What the phone should schedule locally for the next day. */
-  async notifyPlan(now: string): Promise<readonly PlannedNotification[]> {
-    await this.derive(now);
-    return await notifier.planFor(this.ctx.storage, await this.#state(), now);
+    await this.#pool.afterWrite(now);
   }
 
   /** The user's Telegram chat (see `chatFor`); the store's name is the user id. */
@@ -357,31 +362,9 @@ export class UserStore extends LiveStore {
     return await notifier.chatFor(this.ctx.storage, this.env.DB, this.ctx.id.name);
   }
 
-  /** One pass of the notifier (see `runNotifier`); nothing happens until the chat is known. */
-  async runNotifications(
-    now: string,
-    telegram: null | TelegramTarget,
-  ): Promise<notifier.NotifyRun> {
-    const chatId = await this.chatId();
-    if (chatId === undefined) {
-      return { decisions: 0, nextAt: null, sent: 0 };
-    }
-    await this.derive(now);
-    return await notifier.runNotifier({
-      chatId,
-      log: async (decisions) => {
-        await this.logDecisions(decisions, now);
-      },
-      now,
-      state: await this.#state(),
-      storage: this.ctx.storage,
-      telegram,
-    });
-  }
-
   override async alarm(): Promise<void> {
     const now = new Date().toISOString();
-    await this.runNotifications(now, notifier.telegramOf(this.env));
+    await this.runNotifications(now);
     await this.drainParses(now);
   }
 

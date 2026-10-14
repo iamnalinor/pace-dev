@@ -1,14 +1,14 @@
 import {
   coreReducer,
   err,
-  evaluateNotifications,
   type Event,
   INITIAL_CORE_STATE,
-  INITIAL_NOTIFY_MEMORY,
+  INITIAL_POOL_MEMORY,
   materializeAt,
-  type NotifyMemory,
-  type NotifyMessage,
+  type NewNotification,
   ok,
+  type PoolMemory,
+  poolPass,
   type Result,
 } from "@pace/core";
 
@@ -103,38 +103,28 @@ export const describeTables = (storage: DurableObjectStorage): readonly TableSch
 /** A simulation never steps more than this many times. */
 const MAX_STEPS = 500;
 
-const describeMessage = (message: NotifyMessage): Omit<SimulatedMessage, "at"> => {
+const describeMessage = (message: NewNotification): Omit<SimulatedMessage, "at"> => {
   switch (message.kind) {
-    case "critical": {
+    case "deadline_digest": {
       return {
-        kind: "critical",
-        taskId: message.taskId,
-        text: `${message.title}: critical`,
-      };
-    }
-    case "digest": {
-      return {
-        kind: "digest",
+        kind: message.kind,
         taskId: null,
-        text:
-          message.top.length === 0
-            ? "Digest: nothing on top"
-            : `Digest: ${message.top.map((row) => row.title).join(", ")}`,
+        text: `Deadlines: ${message.payload.tasks.map((task) => task.title).join(", ")}`,
       };
     }
-    case "long": {
+    case "activity_overrun": {
+      const { expectMinutes, label } = message.payload;
       return {
-        kind: "long",
+        kind: message.kind,
         taskId: null,
-        text: `${message.label}: still going at twice its ${String(message.expectMinutes)} min`,
+        text: `${label}: still going past its ${String(expectMinutes)} min`,
       };
     }
-    case "stuck": {
-      return {
-        kind: "stuck",
-        taskId: message.taskId,
-        text: `${message.title}: stuck (${String(message.days)} d)`,
-      };
+    case "event_start": {
+      return { kind: message.kind, taskId: null, text: `${message.payload.title} starts` };
+    }
+    case "login": {
+      return { kind: message.kind, taskId: null, text: `Sign-in: ${message.payload.name}` };
     }
   }
 };
@@ -143,27 +133,30 @@ const stateAt = (events: readonly Event[], at: string) =>
   materializeAt(events, at, { initial: INITIAL_CORE_STATE, reducer: coreReducer });
 
 /**
-Replays the notification rules over the log from `from` to `to`, evaluating at each instant
-the notifier would have woken up (from a fresh memory, so earlier sends are not known). Reads
-only.
+Replays the notification pool over the log from `from` to `to`: the deadline digests and the
+"still doing X?" asks, at each instant the server would have woken up (from a fresh memory, so
+earlier sends are not known; the calendar is not replayed). Reads only.
 */
 export const simulate = (events: readonly Event[], { from, to }: SimulationArgs): Simulation => {
   const messages: SimulatedMessage[] = [];
-  let memory: NotifyMemory = INITIAL_NOTIFY_MEMORY;
+  let memory: PoolMemory = INITIAL_POOL_MEMORY;
   let at: null | string = from;
   let steps = 0;
   while (at !== null && at <= to && steps < MAX_STEPS) {
-    const evaluation = evaluateNotifications(
-      stateAt(events, at),
-      { deviceTz: SERVER_TZ, now: at },
+    const state = stateAt(events, at);
+    const pass = poolPass({
+      calendar: [],
       memory,
-    );
+      now: at,
+      open: [],
+      ruledSeries: [],
+      state,
+      zone: state.settings.timezone ?? SERVER_TZ,
+    });
     const when: string = at;
-    messages.push(
-      ...evaluation.messages.map((message) => ({ at: when, ...describeMessage(message) })),
-    );
-    memory = evaluation.memory;
-    at = evaluation.nextAt;
+    messages.push(...pass.created.map((message) => ({ at: when, ...describeMessage(message) })));
+    memory = pass.memory;
+    at = pass.nextAt;
     steps += 1;
   }
   return { isCut: steps >= MAX_STEPS, messages };
