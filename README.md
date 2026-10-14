@@ -22,7 +22,7 @@ Still `v0.x`: the product is in daily use but not final.
 
 | Now (desktop) | Insights (desktop) |
 |---|---|
-| ![Now on a desktop: the composer, the task list and the time bar](docs/screenshots/now-desktop.png) | ![Insights: time by category, focus by hour, fragmentation, sleep and focus](docs/screenshots/insights-desktop.png) |
+| ![Now on a desktop: the composer, what is running and the task list](docs/screenshots/now-desktop.png) | ![Insights: time by category, focus by hour, fragmentation, sleep and focus](docs/screenshots/insights-desktop.png) |
 | **Day (desktop)** | **Now (phone, dark)** |
 | ![Day: the blocks of a day and the gaps between them](docs/screenshots/day-desktop.png) | ![Now on a phone in the dark theme](docs/screenshots/now-phone-dark.png) |
 
@@ -307,9 +307,13 @@ the native code and runs the JS logic against mocks).
 - **Calendar**: "From your calendar" lists the day's timed events from every visible
   calendar that are yours to attend: your own events and subscriptions, and invitations you
   accepted (declined, tentative and unanswered ones, and all-day events, are skipped). The
-  time bar's *Calendar* starts the event near now (starting, going on or just over within 15
-  minutes) under its title, from its start; with none, or no access, it is greyed and a tap
-  says why. *Attended* logs the event as a block, *Skip* hides it
+  time bar sits at the foot of Day (today). Every one of its buttons (*Calendar*, *Task*,
+  *Chores*, *Rest*) opens a picker, with *Stop* first when that button's activity runs.
+  *Calendar*'s picker lists today's events; one picked starts under its title, from its
+  start. When nothing is near now (starting, going on or just over within 15 minutes), or
+  without access, the button is greyed: its tooltip and its picker say why, and the picker
+  still offers a meeting without an event. Now shows what runs in one compact row with
+  *Stop*. *Attended* logs the event as a block, *Skip* hides it
   on this phone. For a repeating event, the toast offers *Every time*: the whole series is
   then logged when it ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.

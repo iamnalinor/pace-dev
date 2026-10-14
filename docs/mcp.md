@@ -97,7 +97,7 @@ shows.
 | `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
 | `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
 | `archive_preset` | write | archives a user preset; its tasks keep working (`preset/built-in` for built-ins) | `id` |
-| `list_activity_buttons` | time read | what the time bar's buttons start (Rest, Sport by length, Chores by name): each choice's id, its button, label in the account language, category and Expect minutes | — |
+| `list_activity_buttons` | time read | what the time bar's Chores and Rest start (Rest: a short break, rest, a walk, a workout, a nap, sleep; Calendar and Task start an event or a task, not a choice): each choice's id, its button, label in the account language, category and Expect minutes | — |
 | `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running, what ran alongside the main line | `date?` (YYYY-MM-DD, default today) |
 | `summary_time` | time read | minutes per category and per project (through the task) over a range, largest first | `from`, `to` |
 | `get_calendar` | time read | the calendar events the phone sends (own and accepted) overlapping a range | `from`, `to` |
