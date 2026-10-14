@@ -7,6 +7,7 @@ import { dayModel } from "../view-models/day.ts";
 import { insightsModel } from "../view-models/insights.ts";
 import { nowViewModel } from "../view-models/now.ts";
 import { timeBarModel } from "../view-models/time-bar.ts";
+import { activityLabel } from "./calendar-run.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
 const later = (minutes: number): string =>
@@ -143,6 +144,20 @@ describe("time actions", () => {
       error: "event/not-found",
       ok: false,
     });
+  });
+
+  it("logs a past block with a long title cut to the stored label length", async () => {
+    const world = await setupActions();
+    const title = `Seminar ${"x".repeat(100)}`;
+    const [event] = unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: later(-60),
+        label: title,
+        startAt: later(-120),
+      }),
+    );
+    expect(event?.type === "activity.logged" && event.payload.label).toBe(activityLabel(title));
   });
 
   it("runs an activity alongside: the main one keeps going, each stops on its own", async () => {

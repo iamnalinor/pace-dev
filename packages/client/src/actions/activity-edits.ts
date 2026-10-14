@@ -1,5 +1,6 @@
 import { type ActivityCategory, err, type Event, newId, ok } from "@pace/core";
 
+import { activityLabel } from "./calendar-run.ts";
 import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
 
 /** What the Day sheet edits: an existing block (move and rename) or a new past one. */
@@ -62,7 +63,7 @@ const isAhead = (deps: ActionDeps, at: string | undefined): boolean =>
   at !== undefined && Date.parse(at) > Date.parse(deps.clock.now());
 
 export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionResult => {
-  const label = activity.label.trim();
+  const label = activityLabel(activity.label);
   if (label === "" || Date.parse(activity.endAt) <= Date.parse(activity.startAt)) {
     return err("action/invalid-input");
   }
@@ -135,11 +136,12 @@ const saveEdit = async (
   if (!moved.ok) {
     return moved;
   }
-  const isRenamed = entry.label.trim() !== target.label || entry.category !== target.category;
+  const isRenamed =
+    activityLabel(entry.label) !== target.label || entry.category !== target.category;
   const renamed = isRenamed
     ? await edits.relabelActivity(target.activityId, {
         category: entry.category,
-        label: entry.label.trim(),
+        label: activityLabel(entry.label),
       })
     : ok([]);
   return renamed.ok ? ok([...moved.value, ...renamed.value]) : renamed;
