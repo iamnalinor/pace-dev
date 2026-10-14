@@ -1,8 +1,10 @@
 import type { ExpoConfig } from "expo/config";
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 import { appVersion } from "./app-version.ts";
+import { firebaseProjectOf } from "./firebase-project.ts";
 
 // Expo types `process.env` loosely (EXPO_PUBLIC_* are injected at bundle time): narrow it here.
 const envString = (name: string): string | undefined => {
@@ -42,6 +44,19 @@ const { version, versionCode } = appVersion({
 
 /** The Firebase config file, when the build has one (see release.yml). */
 const GOOGLE_SERVICES_FILE = envString("GOOGLE_SERVICES_FILE");
+
+/** The Firebase project that file is for: the app compares it with the server's. */
+const firebaseProject = (() => {
+  if (GOOGLE_SERVICES_FILE === undefined) {
+    return null;
+  }
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- the build's own Firebase file, named by release.yml
+    return firebaseProjectOf(JSON.parse(readFileSync(GOOGLE_SERVICES_FILE, "utf8")) as unknown);
+  } catch {
+    return null;
+  }
+})();
 
 const config: ExpoConfig = {
   name: "Pace",
@@ -164,6 +179,8 @@ const config: ExpoConfig = {
     botUsername: envString("EXPO_PUBLIC_TELEGRAM_BOT") ?? "PaceTaskTrackerBot",
     // A build made for e2e shows the dev login form (only the test Worker accepts it).
     isDevLogin: envString("EXPO_PUBLIC_DEV_LOGIN") === "1",
+    // FCM works only with a server sending with this same project (`src/platform/notifications.ts`).
+    firebaseProject,
   },
 };
 

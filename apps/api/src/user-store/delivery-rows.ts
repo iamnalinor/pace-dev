@@ -2,6 +2,7 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import { and, eq, inArray, isNull, lte, ne, type SQL } from "drizzle-orm";
 
+import type { PushSubscription } from "../shared/push-subscriptions.ts";
 import type { PollEntry } from "../shared/push/poll-transport.ts";
 
 import * as schema from "./schema.ts";
@@ -36,7 +37,7 @@ export type DeliveryEntry = {
 const { notificationDeliveries } = schema;
 
 /** The reason logged for a device whose push method is not set up here, or found broken. */
-export const UNAVAILABLE = "unavailable";
+const UNAVAILABLE = "unavailable";
 
 /** Whether the log has an attempt for this notification and device that also matches `also`. */
 const isLogged = async (
@@ -67,11 +68,8 @@ export const wasDelivered = async (
     inArray(notificationDeliveries.result, ["queued", "sent"]),
   ]);
 
-/**
-Whether the device's attempt was logged already as unreachable by this method: a pass repeated
-while the method is down logs it once, not once per pass.
-*/
-export const wasLoggedUnavailable = async (
+/** Whether the device's attempt was logged already as unreachable by this method. */
+const wasLoggedUnavailable = async (
   db: Db,
   notificationId: string,
   { method, sessionId }: { readonly sessionId: string; readonly method: string },
@@ -90,6 +88,37 @@ export const logAttempt = async (
   }: { readonly notificationId: string; readonly attempt: DeliveryAttempt; readonly now: string },
 ): Promise<void> => {
   await db.insert(notificationDeliveries).values({ ...attempt, attemptedAt: now, notificationId });
+};
+
+/**
+A device whose method is not set up on this server, or found broken: nothing was sent, and the log
+says it was unavailable, once per notification and method (a pass repeated meanwhile adds none).
+*/
+export const logUnavailable = async (
+  db: Db,
+  {
+    notificationId,
+    now,
+    subscription,
+  }: {
+    readonly notificationId: string;
+    readonly subscription: Omit<PushSubscription, "id">;
+    readonly now: string;
+  },
+): Promise<void> => {
+  const { device, endpoint, sessionId, transport: method } = subscription;
+  if (await wasLoggedUnavailable(db, notificationId, { method, sessionId })) {
+    return;
+  }
+  const attempt = {
+    device,
+    endpoint,
+    method,
+    reason: UNAVAILABLE,
+    result: "failed" as const,
+    sessionId,
+  };
+  await logAttempt(db, { attempt, notificationId, now });
 };
 
 /**

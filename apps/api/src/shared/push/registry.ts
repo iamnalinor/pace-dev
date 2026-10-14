@@ -4,6 +4,7 @@ import { brokenPushMethods } from "../db/d1-schema.ts";
 import { d1 } from "../db/d1.ts";
 import { type FcmTarget, fcmTargetOf } from "../fcm.ts";
 import { createLogger } from "../logger.ts";
+import { isFcmTokenRefused } from "../push-subscriptions.ts";
 import { fcmTransport } from "./fcm-transport.ts";
 import { type PollQueue, pollTransport } from "./poll-transport.ts";
 import { PUSH_METHODS, type PushMethod, type PushTransport } from "./transport.ts";
@@ -70,6 +71,50 @@ export const acceptedMethods = async (
     const transport = FACTORIES[method](config);
     return transport !== null && broken.every((row) => !isMarkedBy(row, transport, now));
   });
+};
+
+/** The Firebase project the server sends with; `null` without Firebase. */
+export const fcmProjectOf = (config: PushConfig): null | string =>
+  config.fcm?.account.project_id ?? null;
+
+/** The methods-check answer: what the server takes now, and the Firebase project it sends with. */
+export const pushMethodsOf = async (
+  binding: D1Database,
+  config: PushConfig,
+  now: number,
+): Promise<{ readonly pushMethods: PushMethod[]; readonly fcmProject: null | string }> => ({
+  fcmProject: fcmProjectOf(config),
+  pushMethods: [...(await acceptedMethods(binding, config, now))],
+});
+
+/**
+Whether a device may register this way: the method is taken now, and for FCM the app's Firebase
+project is the server's (when the app says it; an older app does not) and its token was never
+refused as another project's while the server sent with this one. Refused, the app polls.
+*/
+export const isRegistrable = async (
+  binding: D1Database,
+  config: PushConfig,
+  request: {
+    readonly method: PushMethod;
+    readonly endpoint: string;
+    readonly projectId?: string | undefined;
+    readonly now: number;
+  },
+): Promise<boolean> => {
+  const accepted = await acceptedMethods(binding, config, request.now);
+  if (!accepted.includes(request.method)) {
+    return false;
+  }
+  const project = fcmProjectOf(config);
+  if (project === null || request.method !== "fcm") {
+    return true;
+  }
+  const isOwnProject = request.projectId === undefined || request.projectId === project;
+  return (
+    isOwnProject &&
+    !(await isFcmTokenRefused(binding, { projectId: project, token: request.endpoint }))
+  );
 };
 
 /**

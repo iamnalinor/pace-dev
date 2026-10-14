@@ -366,6 +366,13 @@ phones switch to polling on their next start or at once while open. Each item's 
    as the GitHub secret `FIREBASE_SERVICE_ACCOUNT`; the deploy workflow puts it into the Worker.
 5. Release a new APK and deploy. Without either secret everything works and phones poll.
 
+Both secrets must come from the **same** Firebase project: FCM refuses every push to a token
+another project issued (`SENDER_ID_MISMATCH`). The APK knows the project it was built with and
+`GET /api/push/methods` says the server's (`fcmProject`); when they differ (a self-hosted server
+with its own project, say) the phone polls and Settings says why. A phone that got a token
+refused anyway (an older APK) is moved to polling by the server, and its token is not taken for
+FCM again while the server sends with that project.
+
 ## Telegram bot setup
 
 1. In [@BotFather](https://t.me/BotFather): `/newbot` → note the username and the token.

@@ -24,15 +24,21 @@ export const knownValues = <T extends z.ZodType>(
   );
 };
 
-/** The value when this client knows it, `null` when it does not (or there is none). */
+/**
+The value when this client knows it, `null` when it does not, or there is none: an older server
+that does not send the key at all reads as `null` too.
+*/
 export const knownOrNull = <T extends z.ZodType>(
   schema: T,
-): Reading<z.ZodUnknown, null | z.output<T>> => {
+): Reading<z.ZodOptional<z.ZodUnknown>, null | z.output<T>> => {
   const known = loosen(schema);
-  return z.unknown().transform((value): null | z.output<T> => {
-    const parsed = known.safeParse(value);
-    return parsed.success ? parsed.data : null;
-  });
+  return z
+    .unknown()
+    .optional()
+    .transform((value): null | z.output<T> => {
+      const parsed = known.safeParse(value);
+      return parsed.success ? parsed.data : null;
+    });
 };
 
 /** One of `values`; a value a newer server added reads as `fallback`. */

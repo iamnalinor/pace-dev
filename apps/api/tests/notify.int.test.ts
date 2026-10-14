@@ -10,7 +10,7 @@ import type { Couriers } from "../src/user-store/notification-pool.ts";
 import type { UserStore } from "../src/user-store/user-store.ts";
 
 import { subscribe, subscriptionsOf } from "../src/shared/push-subscriptions.ts";
-import { acceptedMethods } from "../src/shared/push/registry.ts";
+import { acceptedMethods, isRegistrable, pushMethodsOf } from "../src/shared/push/registry.ts";
 import { answerOf, call, json, loginAsDev } from "./helpers.ts";
 
 const MOSCOW = "Europe/Moscow";
@@ -627,11 +627,12 @@ describe("Firebase push", () => {
 
   it("lists only polling and refuses FCM registration without the secret", async () => {
     expect(await answerOf(endpoints.notifications.pushMethods, "/api/push/methods")).toEqual({
+      fcmProject: null,
       pushMethods: ["poll"],
     });
     const token = await loginAsDev("1002");
     const refused = await call("/api/push/subscription", {
-      body: { endpoint: "fcm-token", method: "fcm" },
+      body: { endpoint: "fcm-token", method: "fcm", projectId: "pace-test" },
       method: "PUT",
       token,
     });
@@ -725,9 +726,8 @@ describe("Firebase push", () => {
     });
   });
 
-  it("drops a device whose token is another project's or not a token, FCM staying on for all", async () => {
+  it("drops a device whose token is no token or unregistered, FCM staying on for all", async () => {
     const refusals: readonly FcmAnswer[] = [
-      { errorCode: "SENDER_ID_MISMATCH", status: 403 },
       { errorCode: "INVALID_ARGUMENT", field: "message.token", status: 400 },
       { errorCode: "UNREGISTERED", status: 404 },
     ];
@@ -748,6 +748,93 @@ describe("Firebase push", () => {
         ]);
       });
     }
+  });
+
+  it("moves a phone whose token another Firebase project issued to polling, and keeps it there", async () => {
+    // An APK built with one project's google-services.json, a server sending with another's: every
+    // send is SENDER_ID_MISMATCH. Dropping the phone made it register FCM again: no notification, ever.
+    const pushToken = `fcm-${crypto.randomUUID()}`;
+    const { sessionId, stub, userId } = await phoneWithToken(pushToken);
+    const fcm = await fcmRecorder({ send: { errorCode: "SENDER_ID_MISMATCH", status: 403 } });
+    const config = { fcm: fcm.target };
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      const couriers = couriersOf(telegramRecorder().target, fcm.target);
+      await instance.append([commute], { now: COMMUTE_START });
+      const run = await instance.runNotifications(CROSSED, couriers);
+      const id = run.created[0]?.id ?? "";
+      expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([
+        expect.objectContaining({ endpoint: sessionId, transport: "poll" }),
+      ]);
+      // Not lost: the same notification waits for the phone's poll, and the log says why.
+      const page = await instance.listNotifications({ limit: 5 });
+      expect(page.deliveries[id]).toEqual([
+        expect.objectContaining({ method: "fcm", reason: "incompatible", result: "failed" }),
+        expect.objectContaining({ method: "poll", result: "queued" }),
+      ]);
+      const polled = await instance.pollFor(sessionId, { after: 0, now: CROSSED });
+      expect(polled.entries).toEqual([
+        expect.objectContaining({ notificationId: id, type: "show" }),
+      ]);
+      // FCM stays on for everyone else; this phone's token is not taken for FCM again.
+      expect(await acceptedMethods(env.DB, config, Date.now())).toEqual(["fcm", "poll"]);
+      expect(
+        await isRegistrable(env.DB, config, {
+          endpoint: pushToken,
+          method: "fcm",
+          now: Date.now(),
+        }),
+      ).toBe(false);
+      expect(
+        await isRegistrable(env.DB, config, {
+          endpoint: "fcm-other",
+          method: "fcm",
+          now: Date.now(),
+        }),
+      ).toBe(true);
+      // The next notification goes by polling only.
+      const sends = fcm.sends().length;
+      const signIn = {
+        kind: "login" as const,
+        payload: {
+          country: "Germany",
+          ip: SIGN_IN_IP,
+          kind: "web",
+          name: "Chrome",
+          sessionId: "s",
+        },
+      };
+      const login = added(await instance.notify(signIn, CROSSED, couriers));
+      expect(fcm.sends()).toHaveLength(sends);
+      const logged = (await instance.listNotifications({ limit: 5 })).deliveries[login.id] ?? [];
+      expect(logged.filter((entry) => entry.method !== "telegram")).toEqual([
+        expect.objectContaining({ method: "poll", result: "queued" }),
+      ]);
+    });
+  });
+
+  it("says which Firebase project it sends with, and refuses a phone of another project", async () => {
+    const fcm = await fcmRecorder();
+    const config = { fcm: fcm.target };
+    expect(await pushMethodsOf(env.DB, config, Date.now())).toEqual({
+      fcmProject: "pace-test",
+      pushMethods: ["fcm", "poll"],
+    });
+    expect(await pushMethodsOf(env.DB, { fcm: null }, Date.now())).toEqual({
+      fcmProject: null,
+      pushMethods: ["poll"],
+    });
+    const token = {
+      endpoint: `fcm-${crypto.randomUUID()}`,
+      method: "fcm" as const,
+      now: Date.now(),
+    };
+    expect(await isRegistrable(env.DB, config, { ...token, projectId: "pace-test" })).toBe(true);
+    expect(await isRegistrable(env.DB, config, { ...token, projectId: "someone-else" })).toBe(
+      false,
+    );
+    // An app that does not say its project (an older one) is taken, as before.
+    expect(await isRegistrable(env.DB, config, token)).toBe(true);
+    expect(await isRegistrable(env.DB, { fcm: null }, token)).toBe(false);
   });
 
   it("keeps the device on a 404 that does not say the token is unregistered", async () => {

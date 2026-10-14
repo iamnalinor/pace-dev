@@ -61,6 +61,7 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "settings.push.none": "Этот телефон их не показывает; в колокольчике они все есть.",
   "settings.push.denied":
     "Этот телефон их не показывает: уведомления не разрешены (Настройки → Разрешения).",
+  "settings.push.otherProject": "Google недоступен: у этого сервера другой проект Firebase.",
   "settings.push.unavailable": "{method} сейчас недоступен.",
   "settings.notifications.hint": "Куда приходит каждый вид уведомлений.",
 };

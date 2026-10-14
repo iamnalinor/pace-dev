@@ -22,23 +22,24 @@ import type * as schema from "./schema.ts";
 
 import {
   dropSubscription,
+  moveToPolling,
   noteSend,
   type PushSubscription,
   subscriptionsOf,
 } from "../shared/push-subscriptions.ts";
-import { isBroken, markBroken, type PushConfig, transportFor } from "../shared/push/registry.ts";
+import {
+  fcmProjectOf,
+  isBroken,
+  markBroken,
+  type PushConfig,
+  transportFor,
+} from "../shared/push/registry.ts";
 import {
   sendTelegramMessage,
   type TelegramTarget,
   wasTelegramMessageDeleted,
 } from "../shared/telegram-api.ts";
-import {
-  logAttempt,
-  takeBackDeliveries,
-  UNAVAILABLE,
-  wasDelivered,
-  wasLoggedUnavailable,
-} from "./delivery-rows.ts";
+import { logAttempt, logUnavailable, takeBackDeliveries, wasDelivered } from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
 import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
@@ -128,7 +129,11 @@ const sendToTelegram = async (deps: PoolDeps, stored: StoredNotification): Promi
   await logAttempt(deps.db, { attempt, notificationId: notification.id, now: deps.now });
 };
 
-/** After a push: a dead device address goes; refused credentials break the method for all. */
+/**
+After a push: a dead device address goes; refused credentials break the method for all; a device
+FCM can never reach from this server polls from now on (an open app is told to register again,
+and gets polling). The subscription to push through instead, if any.
+*/
 const afterSend = async (
   deps: PoolDeps,
   {
@@ -140,41 +145,39 @@ const afterSend = async (
     readonly subscription: PushSubscription;
     readonly transport: PushTransport;
   },
-): Promise<void> => {
-  const now = Date.parse(deps.now);
-  if (outcome === "gone") {
-    await dropSubscription(deps.binding, subscription.id);
-  } else if (outcome === "unavailable") {
-    // On the wall clock, not the pass's instant: the mark is shared by everyone, and expires.
-    await markBroken(deps.binding, transport, { now: Date.now(), reason: "credentials refused" });
-    broadcast(deps.ctx, { type: "push-methods-changed" });
-  } else {
-    await noteSend(deps.binding, subscription.id, { isOk: outcome !== "failed", now });
+): Promise<null | PushSubscription> => {
+  const { binding, ctx } = deps;
+  switch (outcome) {
+    case "gone": {
+      await dropSubscription(binding, subscription.id);
+      return null;
+    }
+    case "unavailable": {
+      // On the wall clock, not the pass's instant: the mark is shared by everyone, and expires.
+      await markBroken(binding, transport, { now: Date.now(), reason: "credentials refused" });
+      broadcast(ctx, { type: "push-methods-changed" });
+      return null;
+    }
+    case "incompatible": {
+      const projectId = fcmProjectOf(deps.couriers.push) ?? "";
+      const userId = deps.userId ?? "";
+      const polling = await moveToPolling(binding, {
+        now: Date.now(),
+        projectId,
+        subscription,
+        userId,
+      });
+      broadcast(ctx, { type: "push-methods-changed" });
+      return polling;
+    }
+    case "failed":
+    case "queued":
+    case "sent": {
+      const isOk = outcome !== "failed";
+      await noteSend(binding, subscription.id, { isOk, now: Date.parse(deps.now) });
+      return null;
+    }
   }
-};
-
-/**
-A device whose method is not set up on this server, or found broken: nothing is sent, and the log
-says it was unavailable, once per notification and method (a pass repeated meanwhile adds none).
-*/
-const logUnavailable = async (
-  deps: PoolDeps,
-  notificationId: string,
-  subscription: PushSubscription,
-): Promise<void> => {
-  const { device, endpoint, sessionId, transport: method } = subscription;
-  if (await wasLoggedUnavailable(deps.db, notificationId, { method, sessionId })) {
-    return;
-  }
-  const attempt = {
-    device,
-    endpoint,
-    method,
-    reason: UNAVAILABLE,
-    result: "failed" as const,
-    sessionId,
-  };
-  await logAttempt(deps.db, { attempt, notificationId, now: deps.now });
 };
 
 /** One device by its push method, logged; nothing when it got this one already. */
@@ -189,7 +192,7 @@ const pushToDevice = async (
     return;
   }
   if (transport === null || (await isBroken(deps.binding, transport, Date.now()))) {
-    await logUnavailable(deps, notification.id, subscription);
+    await logUnavailable(deps.db, { notificationId: notification.id, now: deps.now, subscription });
     return;
   }
   const address = { endpoint: subscription.endpoint, sessionId: subscription.sessionId };
@@ -203,7 +206,11 @@ const pushToDevice = async (
     result: isOk ? outcome : ("failed" as const),
   };
   await logAttempt(deps.db, { attempt, notificationId: notification.id, now: deps.now });
-  await afterSend(deps, { outcome, subscription, transport });
+  const instead = await afterSend(deps, { outcome, subscription, transport });
+  if (instead !== null) {
+    // Not lost: this one goes the way the device gets them from now on.
+    await pushToDevice(deps, message, instead);
+  }
 };
 
 /**
@@ -211,7 +218,8 @@ Pushes to each device by its one push method (once per device: a retried alarm s
 twice), logging every attempt. A dead device address drops its subscription until the app
 registers again on its next start; credentials the method's provider refuses mark the method
 broken for everyone, and open clients are told to choose again. There is never a fallback to
-another method, so nothing arrives twice.
+another method, so nothing arrives twice; only a device FCM can never reach from this server
+(another Firebase project's token) is moved to polling, and gets this one that way.
 */
 const pushToDevices = async (deps: PoolDeps, notification: PoolNotification): Promise<void> => {
   if (deps.userId === undefined || !isChannelOn(deps.settings, notification.kind, "app")) {

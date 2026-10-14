@@ -24,9 +24,10 @@ export type DeviceAddress = { readonly sessionId: string; readonly endpoint: str
 `sent`; `queued`: waiting for the device to fetch it; `gone`: this device's address is dead (its
 subscription is dropped; the app registers again on its next start); `unavailable`: the
 server's own credentials for the method were refused, so the method is broken for every
-device; `failed`: not this time.
+device; `incompatible`: this device can never be reached this way from this server (its FCM
+token is another Firebase project's), so it polls instead; `failed`: not this time.
 */
-export type SendOutcome = "failed" | "gone" | "queued" | "sent" | "unavailable";
+export type SendOutcome = "failed" | "gone" | "incompatible" | "queued" | "sent" | "unavailable";
 
 /**
 A way to put a notification on a device and take it back. The device shows it under the pool

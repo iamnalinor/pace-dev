@@ -32,6 +32,12 @@ describe("knownOrNull", () => {
     expect(knownOrNull(Item).parse({ kind: "z" })).toBeNull();
     expect(knownOrNull(Item).parse(null)).toBeNull();
   });
+
+  it("is `null` for a key an older server does not send at all", () => {
+    // A field added to an answer is read as one an older server leaves out.
+    const answer = z.object({ added: knownOrNull(z.string()) });
+    expect(answer.parse({})).toEqual({ added: null });
+  });
 });
 
 describe("knownValue", () => {

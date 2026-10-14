@@ -8,7 +8,7 @@ import type { ResolveErrorCode } from "../shared/contract.ts";
 import { requireUser } from "../shared/current-user.ts";
 import { mount, type Problem } from "../shared/mount.ts";
 import { subscribe, unsubscribe } from "../shared/push-subscriptions.ts";
-import { acceptedMethods, pushConfigOf } from "../shared/push/registry.ts";
+import { isRegistrable, pushConfigOf, pushMethodsOf } from "../shared/push/registry.ts";
 import { userStoreOf } from "../shared/user-store-of.ts";
 
 /** Each refusal of an answer as HTTP: every code has its entry (the type makes it exhaustive). */
@@ -32,7 +32,7 @@ const resolveProblem = (code: ResolveErrorCode): Problem => ({ code, ...RESOLVE_
 /** How this device gets system notifications: the methods, its registration, its poll. */
 const mountPushRoutes = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.notifications.pushMethods, async ({ c }) =>
-    ok({ pushMethods: [...(await acceptedMethods(c.env.DB, pushConfigOf(c.env), Date.now()))] }),
+    ok(await pushMethodsOf(c.env.DB, pushConfigOf(c.env), Date.now())),
   );
 
   mount(app, endpoints.notifications.push, async ({ body, c }) => {
@@ -42,8 +42,9 @@ const mountPushRoutes = (app: Hono<AppEnv>): void => {
     if (body.method === "none") {
       return ok({ method: "none" as const });
     }
-    const accepted = await acceptedMethods(c.env.DB, pushConfigOf(c.env), Date.now());
-    if (!accepted.includes(body.method)) {
+    // An FCM token of another Firebase project than the server's is refused too: it polls instead.
+    const request = body.method === "fcm" ? body : { endpoint: sessionId, method: body.method };
+    if (!(await isRegistrable(c.env.DB, pushConfigOf(c.env), { ...request, now: Date.now() }))) {
       return err({
         code: "push/method-unavailable",
         message: "This server does not push that way now",

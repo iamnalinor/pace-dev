@@ -6,6 +6,7 @@ import type { createFakeNotifications } from "#app/testing/notifications.fake.ts
 import { createApiClient } from "@pace/client";
 import { createFakeFetch } from "@pace/client/testing";
 
+import * as firebaseProject from "./firebase-project.ts";
 import {
   pollNow,
   pushMethodOf,
@@ -39,10 +40,20 @@ const apiWith = (routes: Parameters<typeof createFakeFetch>[0]) => {
   };
 };
 
-/** A server offering `pushMethods`; it refuses (409) the ones in `refusing` all the same. */
-const registering = (pushMethods: readonly string[], refusing: readonly string[] = []) =>
+/**
+A server offering `pushMethods`; it refuses (409) the ones in `refusing` all the same. It names
+the Firebase project it sends with when given one (`null`: none; absent: an older server).
+*/
+const registering = (
+  pushMethods: readonly string[],
+  refusing: readonly string[] = [],
+  fcmProject?: null | string,
+) =>
   apiWith({
-    "GET /api/push/methods": () => ({ pushMethods }),
+    "GET /api/push/methods": () => ({
+      pushMethods,
+      ...(fcmProject !== undefined && { fcmProject }),
+    }),
     "PUT /api/push/subscription": ({ body }) => {
       const { method } = body as { method: string };
       return refusing.includes(method)
@@ -117,6 +128,49 @@ describe("registerPush", () => {
     const { api, fetcher } = registering(["fcm", "poll"]);
     expect(await registerPush(api)).toBe("none");
     expect(fetcher.pathsCalled("/api/push/methods")).toEqual([]);
+  });
+});
+
+describe("registerPush and the Firebase project", () => {
+  beforeEach(() => {
+    fake.state.pushToken = "fcm-token";
+    jest.spyOn(firebaseProject, "appFirebaseProject").mockReturnValue("pace-app");
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("registers Google's push with this build's project when the server sends with the same one", async () => {
+    const { api, fetcher } = registering(["fcm", "poll"], [], "pace-app");
+    expect(await registerPush(api)).toBe("fcm");
+    expect(fetcher.calls.at(-1)?.body).toEqual({
+      endpoint: "fcm-token",
+      method: "fcm",
+      projectId: "pace-app",
+    });
+    expect(pushStore.getState()).toMatchObject({
+      isFcmOtherProject: false,
+      offered: ["fcm", "poll"],
+    });
+  });
+
+  it("polls when the server sends with another Firebase project, even when Google's push is picked", async () => {
+    // Its pushes would all be refused as SENDER_ID_MISMATCH: nothing would ever arrive.
+    await setPushChoice("fcm");
+    const { api, fetcher } = registering(["fcm", "poll"], [], "pace-selfhosted");
+    expect(await registerPush(api)).toBe("poll");
+    expect(fetcher.calls.map((call) => call.body)).toEqual([undefined, { method: "poll" }]);
+    expect(pushStore.getState()).toMatchObject({ isFcmOtherProject: true, offered: ["poll"] });
+  });
+
+  it("stays on polling start after start once the server refuses its token as another project's", async () => {
+    // An older server that does not say its project, or a build that does not know its own.
+    jest.spyOn(firebaseProject, "appFirebaseProject").mockReturnValue(null);
+    const server = registering(["fcm", "poll"], ["fcm"], null);
+    expect(await registerPush(server.api)).toBe("poll");
+    expect(await registerPush(server.api)).toBe("poll");
+    expect(await pushMethodOf()).toBe("poll");
   });
 });
 

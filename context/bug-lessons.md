@@ -176,6 +176,23 @@ The classes so far are below. Each has its standing rule, and new code is writte
   anything is concluded. A state that turns something off for everyone expires and is checked
   again (`BROKEN_FOR_MS`). Test doubles answer with the provider's real error bodies.
 
+### 16. Each side checks it has the thing, nobody checks that both have the same one
+- **Bug.** The app chose Google's push whenever the server offered FCM and the phone had a Google
+  token. An APK built with one Firebase project's `google-services.json` and a server holding
+  another project's service account (a self-hosted server) get `SENDER_ID_MISMATCH` on every
+  send: the server dropped the phone as gone, the app registered FCM again on its next start, and
+  no notification ever arrived, silently (stage 8, the owner).
+- **Missed because.** Each side was tested alone: the app against a server that "offers fcm",
+  the server against tokens that were all its own project's or plainly dead. No test paired two
+  identities, and the refusal that means "never with this server" was read as "gone".
+- **Rule.** When two parts must be configured from the same source (a Firebase project, a bot, a
+  key pair, an origin), the handshake names the identity, and each side compares it before it
+  relies on the other (`fcmProject` in `GET /api/push/methods`, `projectId` in the FCM
+  registration). A provider's refusal of the pairing is its own outcome (`incompatible`), never
+  "gone": the device moves to what works (polling) at once, and the server remembers the pairing
+  (`fcm_refused_tokens`) so a retry cannot start a silent loop. Test the whole path: refused →
+  fallback → the next start stays on the fallback.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -215,3 +232,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | The live socket answered a device's close with the device's own code: a dropped connection (1006) made it close with a code no socket may send, an uncaught error in the Worker per dropped tab | 12 | yes: the only `close(` in the Worker | `replyCloseCode` test: 1005, 1006 and 1015 answer 1000, sendable codes are echoed |
 | 2026-10-14 | Week's picked block marked with `accessibilityState.selected`: jest saw it, the web build did not (react-native-web emits no `aria-selected` on a button, and axe refuses it there) | 10 | yes (the only other `accessibilityState` is the time bar's `disabled`, left to its owner to check) | e2e asserts `aria-current` on the picked item and runs axe with it picked |
 | 2026-10-14 | Day's block row held its task as a link inside the row's button: unreachable for a screen reader, `nested-interactive` and a 15 px target on the web | 14 (new) | yes: Day's task link is a line of its own under the row (24 px target); a one-off sweep of `controlsInsideControls()` over Now (something running), Day (a block on a task), Week, the task screen, Inbox, History, Insights, Projects and More found no other | `controlsInsideControls()` on Day (block on a task), Now (running row) and the time bar's Task picker; the time e2e runs axe on Day after Focus from the Task picker |
+| 2026-10-14 | FCM offered on both sides but from different Firebase projects: every send `SENDER_ID_MISMATCH`, the phone dropped as gone, FCM registered again, no notification ever (owner) | 16 (new) | yes: the only other two-sided identity is the web login widget's bot (`EXPO_PUBLIC_TELEGRAM_BOT`) against the Worker's bot token; a mismatch there refuses the sign-in visibly (a bad signature), nothing loops silently. Found on the way: `knownOrNull` refused an answer whose key an older server does not send (class 13: an added answer field must read as absent, not fail) | API test: mismatch → the phone polls, the notification is queued for it, its token is refused for FCM, the next notification goes by polling only; `isRegistrable` with the app's project; app tests: another project → poll even when Google is picked, the same project registers with `projectId`, a refused token stays on polling start after start; Settings says why; `knownOrNull` missing-key test |

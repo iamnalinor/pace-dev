@@ -59,6 +59,8 @@ export const enNotify = {
   "settings.push.none": "This phone shows none; the bell still has them all.",
   "settings.push.denied":
     "This phone shows none: notifications are not allowed (Settings → Permissions).",
+  "settings.push.otherProject":
+    "Google: not available, this server uses a different Firebase project.",
   "settings.push.unavailable": "{method} is not available right now.",
   "settings.notifications.hint": "Where each kind of notification goes.",
 } as const;

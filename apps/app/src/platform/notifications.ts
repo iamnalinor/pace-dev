@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { createStore } from "zustand/vanilla";
 
+import { appFirebaseProject } from "#app/platform/firebase-project.ts";
 import { type ApiClient, ApiError } from "@pace/client";
 import {
   type Answer,
@@ -59,8 +60,13 @@ export type PushState = {
   readonly choice: null | PushMethod;
   /** `false` when it registered none because notifications are not allowed. */
   readonly isAllowed: boolean;
-  /** The methods the server took when last asked; `null` until it answered once. */
+  /**
+  The methods of those the server took when last asked that this phone can use; `null` until it
+  answered once.
+  */
   readonly offered: null | readonly ("fcm" | "poll")[];
+  /** The server sends with another Firebase project than this build's: Google's push cannot work. */
+  readonly isFcmOtherProject: boolean;
 };
 
 /**
@@ -70,15 +76,34 @@ server's methods changed).
 export const pushStore = createStore<PushState>(() => ({
   choice: null,
   isAllowed: true,
+  isFcmOtherProject: false,
   method: null,
   offered: null,
 }));
 
+type MethodsAnswer = {
+  readonly pushMethods: readonly ("fcm" | "poll")[];
+  readonly fcmProject: null | string;
+};
+
+/**
+The methods this phone can use of those the server takes, into `pushStore`. Google's push only
+when the server sends with this build's Firebase project: FCM refuses every push to a token of
+another project, so nothing would ever arrive (when either side does not say, it is tried, and the
+server refuses the token after its first refused push).
+*/
+const usableMethods = ({ fcmProject, pushMethods }: MethodsAnswer): readonly ("fcm" | "poll")[] => {
+  const own = appFirebaseProject();
+  const isFcmOtherProject = own !== null && fcmProject !== null && own !== fcmProject;
+  const offered = pushMethods.filter((method) => method !== "fcm" || !isFcmOtherProject);
+  pushStore.setState({ isFcmOtherProject, offered });
+  return offered;
+};
+
 /** Asks the server which methods it takes now, into `pushStore`; offline, what it said last stays. */
 export const loadOfferedMethods = async (api: ApiClient): Promise<void> => {
   try {
-    const { pushMethods } = await api.call(endpoints.notifications.pushMethods, {});
-    pushStore.setState({ offered: pushMethods });
+    usableMethods(await api.call(endpoints.notifications.pushMethods, {}));
   } catch {
     // Offline: the methods it offered last (or the one in use) are still shown.
   }
@@ -255,8 +280,12 @@ const isRegistered = async (api: ApiClient, method: "fcm" | "poll"): Promise<boo
     return false;
   }
   try {
+    const projectId = appFirebaseProject();
     await api.call(endpoints.notifications.push, {
-      body: token === null ? { method: "poll" } : { endpoint: token, method: "fcm" },
+      body:
+        token === null
+          ? { method: "poll" }
+          : { endpoint: token, method: "fcm", ...(projectId !== null && { projectId }) },
     });
     return true;
   } catch (error) {
@@ -283,8 +312,7 @@ export const registerPush = async (api: ApiClient): Promise<PushMethod> => {
       await api.call(endpoints.notifications.push, { body: { method: "none" } });
       return "none";
     }
-    const { pushMethods } = await api.call(endpoints.notifications.pushMethods, {});
-    pushStore.setState({ offered: pushMethods });
+    const pushMethods = usableMethods(await api.call(endpoints.notifications.pushMethods, {}));
     const order = choice === "poll" ? (["poll", "fcm"] as const) : (["fcm", "poll"] as const);
     for (const method of order) {
       if (pushMethods.includes(method) && (await isRegistered(api, method))) {

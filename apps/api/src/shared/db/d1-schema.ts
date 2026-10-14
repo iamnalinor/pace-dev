@@ -43,6 +43,18 @@ export const brokenPushMethods = sqliteTable("broken_push_methods", {
 });
 
 /**
+FCM tokens a send was refused for as another Firebase project's (`SENDER_ID_MISMATCH`): the app
+was built with one project's config, the server sends with another's. Such a token is not taken
+for FCM again while the server sends with that project (its device polls); global, not per user.
+*/
+export const fcmRefusedTokens = sqliteTable("fcm_refused_tokens", {
+  token: text().primaryKey(),
+  /** The project the server sent with when it was refused. */
+  projectId: text().notNull(),
+  refusedAt: integer({ mode: "timestamp_ms" }).notNull(),
+});
+
+/**
 How a signed-in device gets system notifications: its one push method (an FCM token, or its
 polling); without a row it has none. Tied to the session, so signing out
 or deleting the account drops it; the same endpoint belongs to one session at a time.

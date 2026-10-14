@@ -35,7 +35,11 @@ export type FcmMessage = {
 `sent`; `unregistered`: this device's token is gone (the app fetches a new one); `auth`: the
 server's own credentials were refused (FCM is broken for everyone); `failed`: try another time.
 */
-export type FcmOutcome = "auth" | "failed" | "sent" | "unregistered";
+/**
+`mismatch`: the token is another Firebase project's than the one the server sends with (the app
+was built with another project's config): this device can never get FCM from this server.
+*/
+export type FcmOutcome = "auth" | "failed" | "mismatch" | "sent" | "unregistered";
 
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 /** Google's access tokens last an hour; one is reused while it has this long left. */
@@ -186,9 +190,6 @@ const FcmErrorSchema = z.object({
 
 type ErrorDetail = z.output<typeof ErrorDetailSchema>;
 
-/** Codes that are about this one device's token: the device is gone, not FCM. */
-const DEVICE_GONE: ReadonlySet<string> = new Set(["SENDER_ID_MISMATCH", "UNREGISTERED"]);
-
 /** The error's codes and details; nothing when the body is not FCM's error. */
 const errorOf = async (
   response: Response,
@@ -213,9 +214,10 @@ const isAboutToken = (detail: ErrorDetail): boolean =>
 
 /**
 What a refused send means. The body decides first: a token another project issued
-(`SENDER_ID_MISMATCH`, a 403), one FCM no longer knows (`UNREGISTERED`) or a malformed token
-(`INVALID_ARGUMENT` naming `message.token`) is this device gone; any other `INVALID_ARGUMENT` is
-the message, tried again another time. Then the status: 401 is the access token (`stale`: mint a
+(`SENDER_ID_MISMATCH`, a 403) is this device's FCM never working with this server (it polls);
+one FCM no longer knows (`UNREGISTERED`) or a malformed token (`INVALID_ARGUMENT` naming
+`message.token`) is this device gone; any other `INVALID_ARGUMENT` is the message, tried again
+another time. Then the status: 401 is the access token (`stale`: mint a
 fresh one and retry once), 403 the project refusing the account (FCM broken for everyone). A 404
 without `UNREGISTERED` is a project or address FCM does not know, not this device: a failure.
 */
@@ -223,7 +225,10 @@ const refusalOf = async (response: Response): Promise<"stale" | Exclude<FcmOutco
   const { codes, details } = await errorOf(response);
   const isTokenRefused =
     codes.has("INVALID_ARGUMENT") && details.some((detail) => isAboutToken(detail));
-  if (isTokenRefused || !codes.isDisjointFrom(DEVICE_GONE)) {
+  if (codes.has("SENDER_ID_MISMATCH")) {
+    return "mismatch";
+  }
+  if (isTokenRefused || codes.has("UNREGISTERED")) {
     return "unregistered";
   }
   switch (response.status) {

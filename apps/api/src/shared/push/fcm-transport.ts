@@ -43,6 +43,9 @@ export const fcmTransport = (target: FcmTarget): PushTransport => ({
       case "unregistered": {
         return "gone";
       }
+      case "mismatch": {
+        return "incompatible";
+      }
       case "auth": {
         return "unavailable";
       }

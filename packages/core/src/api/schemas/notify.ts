@@ -68,7 +68,12 @@ How this session's device gets system notifications, exactly one way: Firebase C
 with its token, `poll` (its periodic background check fetches them), or not at all (`none`).
 */
 export const PushSubscriptionSchema = z.discriminatedUnion("method", [
-  z.strictObject({ method: z.literal("fcm"), endpoint: z.string().min(1).max(4096) }),
+  z.strictObject({
+    method: z.literal("fcm"),
+    endpoint: z.string().min(1).max(4096),
+    /** The Firebase project the app was built with: one the server does not send with is refused. */
+    projectId: z.string().min(1).max(200).optional(),
+  }),
   z.strictObject({ method: z.literal("poll") }),
   z.strictObject({ method: z.literal("none") }),
 ]);
@@ -84,6 +89,11 @@ always. A device registers with one of them, or none.
 export const PushMethodsSchema = z.object({
   /** A method this client cannot use (a newer server's) is not offered. */
   pushMethods: knownValues(z.enum(["fcm", "poll"])),
+  /**
+  The Firebase project the server sends with (`null` without Firebase, or from an older server):
+  a phone built with another project's config cannot get its pushes, so it polls instead.
+  */
+  fcmProject: knownOrNull(z.string().min(1)),
 });
 
 /** What a polling device fetches: everything after the cursor of its last fetch. */

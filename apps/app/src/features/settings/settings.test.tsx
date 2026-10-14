@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
 
+import * as firebaseProject from "#app/platform/firebase-project.ts";
 import { pushStore, registerPush, setPushChoice } from "#app/platform/notifications.ts";
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -197,6 +198,28 @@ describe("SettingsScreen", () => {
     });
     expect(google()).toBeOnTheScreen();
     expect(await screen.findByText(en("settings.push.fcm"))).toBeOnTheScreen();
+  });
+
+  it("says Google's push cannot work when the server sends with another Firebase project", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    jest.spyOn(firebaseProject, "appFirebaseProject").mockReturnValue("pace-app");
+    const runtime = await createTestRuntime({
+      routes: {
+        ...pushRoutes().routes,
+        "GET /api/push/methods": () => ({
+          fcmProject: "pace-selfhosted",
+          pushMethods: ["fcm", "poll"],
+        }),
+      },
+      world: "empty",
+    });
+    await setPushChoice(null);
+    await renderScreen(<SettingsScreen />, runtime);
+    expect(await screen.findByText(en("settings.push.otherProject"))).toBeOnTheScreen();
+    expect(screen.queryByRole("radio", { name: en("settings.push.option.fcm") })).toBeNull();
+    expect(screen.getByRole("radio", { name: en("settings.push.option.poll") })).toBeOnTheScreen();
+    jest.restoreAllMocks();
   });
 
   it("keeps the picked method shown and selected while offline", async () => {

@@ -148,6 +148,9 @@ export const PushStatus = () => {
     <View className="gap-2">
       <Text className="font-sans text-[13px] text-muted">{t("settings.push.hint")}</Text>
       <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
+      {state.isFcmOtherProject ? (
+        <Text className="font-sans text-[13px] text-muted">{t("settings.push.otherProject")}</Text>
+      ) : null}
       {state.method === null
         ? null
         : pushLine({ ...state, method: state.method }, t).map((line) => (

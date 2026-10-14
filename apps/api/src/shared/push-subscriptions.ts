@@ -1,7 +1,7 @@
 import { and, eq, gt, sql } from "drizzle-orm";
 import { ulid } from "ulidx";
 
-import { pushSubscriptions, sessions } from "./db/d1-schema.ts";
+import { fcmRefusedTokens, pushSubscriptions, sessions } from "./db/d1-schema.ts";
 import { d1 } from "./db/d1.ts";
 
 /** A device's way to be pushed to: its session, the transport and where that transport sends. */
@@ -94,4 +94,59 @@ export const noteSend = async (
         : { failures: sql`${pushSubscriptions.failures} + 1` },
     )
     .where(eq(pushSubscriptions.id, id));
+};
+
+/**
+Notes an FCM token refused as another Firebase project's (the server sends with `projectId`): it
+is not taken for FCM again while the server sends with that project.
+*/
+const refuseFcmToken = async (
+  binding: D1Database,
+  {
+    now,
+    projectId,
+    token,
+  }: { readonly token: string; readonly projectId: string; readonly now: number },
+): Promise<void> => {
+  const row = { projectId, refusedAt: new Date(now), token };
+  await d1(binding)
+    .insert(fcmRefusedTokens)
+    .values(row)
+    .onConflictDoUpdate({ set: row, target: fcmRefusedTokens.token });
+};
+
+/**
+A device whose FCM token is another Firebase project's than the one the server sends with: its
+token is noted as refused (not taken for FCM again) and it polls from now on. Its new subscription.
+*/
+export const moveToPolling = async (
+  binding: D1Database,
+  {
+    now,
+    projectId,
+    subscription,
+    userId,
+  }: {
+    readonly subscription: PushSubscription;
+    readonly projectId: string;
+    readonly userId: string;
+    readonly now: number;
+  },
+): Promise<PushSubscription> => {
+  const { endpoint: token, sessionId } = subscription;
+  await refuseFcmToken(binding, { now, projectId, token });
+  await subscribe(binding, { endpoint: sessionId, now, sessionId, transport: "poll", userId });
+  return { ...subscription, endpoint: sessionId, transport: "poll" };
+};
+
+/** Whether FCM refused this token as another project's while the server sent with `projectId`. */
+export const isFcmTokenRefused = async (
+  binding: D1Database,
+  { projectId, token }: { readonly token: string; readonly projectId: string },
+): Promise<boolean> => {
+  const found = await d1(binding)
+    .select({ token: fcmRefusedTokens.token })
+    .from(fcmRefusedTokens)
+    .where(and(eq(fcmRefusedTokens.token, token), eq(fcmRefusedTokens.projectId, projectId)));
+  return found.length > 0;
 };
