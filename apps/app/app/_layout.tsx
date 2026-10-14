@@ -44,32 +44,36 @@ const Navigator = () => {
   useNotificationLinks();
   useCrashNotice();
   return (
-    <View className="flex-1 flex-row bg-bg">
-      <CrashContext />
-      {hasSidebar ? <Sidebar /> : null}
-      <View className="flex-1">
-        <Stack
-          screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
-          screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="login" options={{ animation: "fade" }} />
-          <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
-          <Stack.Screen name="task/[id]" />
-          <Stack.Screen name="project/[id]" />
-          <Stack.Screen name="projects" />
-          <Stack.Screen name="insights" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="review" />
-          <Stack.Screen name="history" />
-          <Stack.Screen name="permissions" />
-          <Stack.Screen name="devices" />
-          <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
-        </Stack>
+    <UpdateBanner>
+      <View className="flex-1 flex-row bg-bg">
+        <CrashContext />
+        {hasSidebar ? <Sidebar /> : null}
+        <View className="flex-1">
+          <Stack
+            screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
+            screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="login" options={{ animation: "fade" }} />
+            <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
+            <Stack.Screen name="task/[id]" />
+            <Stack.Screen name="project/[id]" />
+            <Stack.Screen name="projects" />
+            <Stack.Screen name="insights" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="review" />
+            <Stack.Screen name="history" />
+            <Stack.Screen name="permissions" />
+            <Stack.Screen name="devices" />
+            <Stack.Screen
+              name="onboarding"
+              options={{ animation: "fade", gestureEnabled: false }}
+            />
+          </Stack>
+        </View>
+        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       </View>
-      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      <UpdateBanner />
-    </View>
+    </UpdateBanner>
   );
 };
 

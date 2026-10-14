@@ -1,2 +1,4 @@
+import type { ReactNode } from "react";
+
 /** The phone updates through new APKs: only the web build has a service worker (`.web.tsx`). */
-export const UpdateBanner = () => null;
+export const UpdateBanner = ({ children }: { readonly children: ReactNode }) => children;
