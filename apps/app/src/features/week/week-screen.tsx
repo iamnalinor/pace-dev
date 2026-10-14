@@ -75,7 +75,7 @@ const WeekNav = ({
   <View className="flex-row items-center gap-1">
     <NightHoursToggle />
     <BackToToday
-      isAway={week.next !== null}
+      isAway={!week.isCurrent}
       onPress={() => {
         onWeek(null);
       }}

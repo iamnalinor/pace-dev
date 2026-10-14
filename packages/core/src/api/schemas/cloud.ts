@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// What a client sends is strict (a key the server does not know is refused); what the server
+// answers is not (a client parsing it drops keys a newer server added): adding a field to an
+// answer must never break an older client.
+
 /** A stretch of time to read: what overlaps [from, to). */
 export const RangeQuerySchema = z.object({
   from: z.iso.datetime(),
@@ -10,7 +14,7 @@ export const RangeQuerySchema = z.object({
 export const CALENDAR_LIMITS = { location: 500, name: 200, notes: 2000, url: 2000 } as const;
 
 /** One occurrence of a calendar event, as a phone read it (own or accepted only). */
-export const CalendarEventSchema = z.strictObject({
+const CALENDAR_EVENT = {
   id: z.string().min(1).max(200),
   title: z.string().trim().min(1).max(200),
   startAt: z.iso.datetime(),
@@ -28,7 +32,10 @@ export const CalendarEventSchema = z.strictObject({
   organizer: z.string().max(CALENDAR_LIMITS.name).optional(),
   /** How many people were invited, the person included. */
   attendeeCount: z.number().int().nonnegative().max(100_000).optional(),
-});
+};
+
+/** An event as a phone sends it. */
+export const CalendarEventSchema = z.strictObject(CALENDAR_EVENT);
 
 export type CalendarEvent = z.output<typeof CalendarEventSchema>;
 
@@ -40,7 +47,7 @@ export const CalendarSyncSchema = z.strictObject({
   events: z.array(CalendarEventSchema).max(2000),
 });
 
-export const CalendarOutputSchema = z.strictObject({ events: z.array(CalendarEventSchema) });
+export const CalendarOutputSchema = z.object({ events: z.array(z.object(CALENDAR_EVENT)) });
 
 /** An app in front on a device: its name and when (never what was in it). */
 export const UsageSessionSchema = z.strictObject({
@@ -55,7 +62,7 @@ export const UsageUploadSchema = z.strictObject({
   sessions: z.array(UsageSessionSchema).max(1000),
 });
 
-export const UsageRowSchema = z.strictObject({
+export const UsageRowSchema = z.object({
   ...UsageSessionSchema.shape,
   deviceId: z.string(),
   deviceName: z.string(),
@@ -63,16 +70,16 @@ export const UsageRowSchema = z.strictObject({
 
 export type UsageRow = z.output<typeof UsageRowSchema>;
 
-export const UsageOutputSchema = z.strictObject({ sessions: z.array(UsageRowSchema) });
+export const UsageOutputSchema = z.object({ sessions: z.array(UsageRowSchema) });
 
-export const StoredSchema = z.strictObject({ stored: z.number().int().nonnegative() });
+export const StoredSchema = z.object({ stored: z.number().int().nonnegative() });
 
 /**
 A device that sends its app usage: a computer connected with its own token (it may only
 upload), or a phone signed in to the app. `lastActivityAt` is the end of the newest session
 it sent; a computer's `connectedAt` and `lastSeenAt` come from its token.
 */
-export const DeviceSchema = z.strictObject({
+export const DeviceSchema = z.object({
   id: z.string(),
   name: z.string(),
   kind: z.enum(["computer", "phone"]),
@@ -83,15 +90,15 @@ export const DeviceSchema = z.strictObject({
 
 export type Device = z.output<typeof DeviceSchema>;
 
-export const DevicesOutputSchema = z.strictObject({ devices: z.array(DeviceSchema) });
+export const DevicesOutputSchema = z.object({ devices: z.array(DeviceSchema) });
 
 export const DeviceCreateSchema = z.strictObject({ name: z.string().trim().min(1).max(80) });
 
 /** The new device and its token, shown once. */
-export const DeviceCreatedSchema = z.strictObject({
+export const DeviceCreatedSchema = z.object({
   id: z.string(),
   name: z.string(),
   token: z.string(),
 });
 
-export const DoneSchema = z.strictObject({ ok: z.literal(true) });
+export const DoneSchema = z.object({ ok: z.literal(true) });

@@ -2,8 +2,8 @@ import { z } from "zod";
 
 /** One local notification the phone schedules (mirrors `notifyPlan` in core). */
 export const PlannedNotificationSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("digest"), at: z.iso.datetime() }),
-  z.strictObject({
+  z.object({ kind: z.literal("digest"), at: z.iso.datetime() }),
+  z.object({
     kind: z.literal("deadline"),
     at: z.iso.datetime(),
     taskId: z.string(),

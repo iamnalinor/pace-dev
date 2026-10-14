@@ -57,4 +57,32 @@ describe("WeekScreen on a wide window", () => {
     expect(screen.getByText("Pick an event or a block to see its details")).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: /^Lecture notes, / })).not.toBeSelected();
   });
+
+  it("lets go of the pick when the week changes, either way", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -180),
+      label: "Lecture notes",
+      startAt: addMinutesIso(NOW, -240),
+    });
+    await renderScreen(<WeekScreen />, runtime);
+    const hint = () => screen.queryByText("Pick an event or a block to see its details");
+    const block = () => screen.getByRole("button", { name: /^Lecture notes, / });
+    await fireEvent.press(block());
+    expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
+    expect(
+      await screen.findByText("Pick an event or a block to see its details"),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText("Study · 1h")).toBeNull();
+    // Picked again, then Back to today: the pane empties again, and nothing stays marked.
+    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
+    await fireEvent.press(block());
+    expect(hint()).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Previous week" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
+    expect(hint()).toBeOnTheScreen();
+    expect(block()).not.toBeSelected();
+  });
 });

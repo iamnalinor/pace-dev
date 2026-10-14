@@ -1,5 +1,4 @@
-import { type ReactNode, useRef } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import type { CalendarEvent, Language, UsageRow } from "@pace/core";
 
@@ -17,6 +16,8 @@ import {
   type WeekDay,
   type WeekModel,
 } from "@pace/client";
+
+import { SidewaysDays } from "./sideways-days.tsx";
 
 /** What a tap on the grid opens: a tracked block, or a calendar event. */
 export type Picked =
@@ -305,32 +306,5 @@ export const WeekGrid = (props: GridProps) => {
         </SidewaysDays>
       )}
     </View>
-  );
-};
-
-/** The phone's days: scrolled sideways so that today (with the day before) is in sight. */
-const SidewaysDays = ({
-  children,
-  minColumnPx,
-  week,
-}: {
-  readonly children: ReactNode;
-  readonly minColumnPx: number;
-  readonly week: WeekModel;
-}) => {
-  const scrollerRef = useRef<ScrollView>(null);
-  const today = week.days.findIndex((day) => day.isToday);
-  return (
-    <ScrollView
-      contentContainerClassName="min-w-full flex-row"
-      horizontal
-      onContentSizeChange={() => {
-        // Another week has no today: it opens at its Monday, wherever the last one was left.
-        scrollerRef.current?.scrollTo({ animated: false, x: Math.max(0, today - 1) * minColumnPx });
-      }}
-      ref={scrollerRef}
-    >
-      {children}
-    </ScrollView>
   );
 };

@@ -1,6 +1,82 @@
+import type { z } from "zod";
+
 import { describe, expect, it } from "vitest";
 
 import { endpointList, endpoints } from "./endpoints.ts";
+
+/** Every object schema reachable from `schema` that refuses keys it does not know. */
+const strictObjectsIn = (schema: z.ZodType, path: string): readonly string[] => {
+  const def = schema._zod.def as unknown as Record<string, unknown> & { readonly type: string };
+  const inner = (key: string): readonly string[] => {
+    const child = def[key] as undefined | z.ZodType;
+    return child === undefined ? [] : strictObjectsIn(child, path);
+  };
+  switch (def.type) {
+    case "object": {
+      const catchall = def["catchall"] as undefined | z.ZodType;
+      const own = catchall?._zod.def.type === "never" ? [path] : [];
+      const shape = def["shape"] as Readonly<Record<string, z.ZodType>>;
+      return [
+        ...own,
+        ...Object.entries(shape).flatMap(([key, child]) =>
+          strictObjectsIn(child, `${path}.${key}`),
+        ),
+      ];
+    }
+    case "array": {
+      return strictObjectsIn(def["element"] as z.ZodType, `${path}[]`);
+    }
+    case "union": {
+      return (def["options"] as readonly z.ZodType[]).flatMap((option) =>
+        strictObjectsIn(option, path),
+      );
+    }
+    case "pipe": {
+      return [...inner("in"), ...inner("out")];
+    }
+    default: {
+      return inner("innerType");
+    }
+  }
+};
+
+const calendarEvent = {
+  endAt: "2026-10-06T11:30:00.000Z",
+  id: "ev-1",
+  series: null,
+  startAt: "2026-10-06T10:00:00.000Z",
+  title: "Seminar",
+};
+
+describe("what the server answers", () => {
+  it("never refuses a key a newer server adds: no output schema is strict, at any depth", () => {
+    const strict = endpointList.flatMap((definition) =>
+      strictObjectsIn(definition.output, `${definition.method} ${definition.path}`),
+    );
+    expect(strict).toEqual([]);
+  });
+
+  it("parses a calendar answer with keys it does not know, dropping them", () => {
+    const answer = { events: [{ ...calendarEvent, colour: "#ff0000" }], nextCursor: "abc" };
+    expect(endpoints.calendar.list.output.parse(answer)).toEqual({ events: [calendarEvent] });
+  });
+
+  it("still refuses a key it does not know in what a phone sends", () => {
+    const sync = {
+      deviceId: "phone",
+      events: [calendarEvent],
+      from: "2026-10-05T00:00:00.000Z",
+      to: "2026-10-12T00:00:00.000Z",
+    };
+    expect(endpoints.calendar.sync.body.parse(sync)).toEqual(sync);
+    expect(() =>
+      endpoints.calendar.sync.body.parse({
+        ...sync,
+        events: [{ ...calendarEvent, colour: "red" }],
+      }),
+    ).toThrow();
+  });
+});
 
 describe("endpoints", () => {
   it("declares every path under /api with a unique method+path", () => {

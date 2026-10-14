@@ -89,7 +89,9 @@ const Fact = ({
 };
 
 const FACT_TEXT = "font-sans text-[14px] leading-5 text-fg";
+/** A link in the quiet accent's text color, as the notes' links: one color only, no clash. */
 const LINK_TEXT = "text-accentQuietText underline";
+const LOCATION_TEXT = `font-sans text-[14px] leading-5 ${LINK_TEXT}`;
 
 /** The notes' first lines, their web addresses tappable. */
 const Notes = ({ notes }: { readonly notes: NonNullable<EventDetails["notes"]> }) => {
@@ -136,7 +138,7 @@ const EventFacts = ({ details }: { readonly details: EventDetails }) => {
           <Text
             accessibilityHint={t("calendar.openMaps")}
             accessibilityRole="link"
-            className={`${FACT_TEXT} ${LINK_TEXT}`}
+            className={LOCATION_TEXT}
             onPress={() => {
               open(location.mapsUrl);
             }}

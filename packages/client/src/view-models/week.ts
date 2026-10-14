@@ -47,6 +47,8 @@ export type WeekModel = {
   readonly previous: string;
   /** `null` for the current week. */
   readonly next: null | string;
+  /** The week shown is this week: no "Back to today" to offer. */
+  readonly isCurrent: boolean;
   readonly days: readonly WeekDay[];
   /** The first hour the columns show (7 unless something started earlier; 0 with night hours). */
   readonly fromHour: number;
@@ -182,6 +184,7 @@ export const weekModel = (
       isToday: formatInZone(date, zone, "yyyy-MM-dd") === today,
     })),
     fromHour: Math.max(0, Math.min(earliest, HOURS_PER_DAY - 1)),
+    isCurrent: weekStart === thisWeek,
     next: weekStart >= thisWeek ? null : addDaysIn(weekStart, 7, zone),
     previous: addDaysIn(weekStart, -7, zone),
     weekEnd: addDaysIn(weekStart, 7, zone),

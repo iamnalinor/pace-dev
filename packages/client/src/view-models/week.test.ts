@@ -74,6 +74,26 @@ describe("Week's hour range", () => {
   });
 });
 
+describe("whether the week shown is this one", () => {
+  it("is this week (from any day in it) and not the one before", () => {
+    const week = weekModel(world({}), null, ctx());
+    expect(week.isCurrent).toBe(true);
+    // Thursday of this week, asked for by date, is still this week.
+    expect(weekModel(world({}), "2026-10-08T09:00:00.000Z", ctx()).isCurrent).toBe(true);
+    expect(weekModel(world({}), week.previous, ctx()).isCurrent).toBe(false);
+  });
+
+  it("turns at Monday's midnight in the account zone, not in UTC", () => {
+    // Monday 12 October 00:00 in Moscow is Sunday 21:00 UTC.
+    const monday = "2026-10-11T21:00:00.000Z";
+    const justBefore = "2026-10-11T20:59:59.999Z";
+    const lastWeek = "2026-10-05T12:00:00.000Z";
+    expect(weekModel(world({}), lastWeek, ctx(justBefore)).isCurrent).toBe(true);
+    expect(weekModel(world({}), lastWeek, ctx(monday)).isCurrent).toBe(false);
+    expect(weekModel(world({}), null, ctx(monday)).isCurrent).toBe(true);
+  });
+});
+
 describe("fitHourPx", () => {
   it("shares the measured height between the hours, so the grid fits without scrolling", () => {
     expect(fitHourPx({ available: 680, floorPx: 18, hours: 17 })).toEqual({

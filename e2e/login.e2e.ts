@@ -91,7 +91,7 @@ test("/oauth/authorize exists as the API's redirect target", async ({ page }) =>
   await expect(page.getByRole("alert")).toContainText("not a valid connection request");
 });
 
-test("a desktop's sidebar keeps the owner's order, Calendar after Day", async ({ page }) => {
+test("a desktop's sidebar keeps the owner's order, Week after Day", async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 });
   await loginViaApi(page);
   await page.goto("/");

@@ -128,6 +128,16 @@ The classes so far are below. Each has its standing rule, and new code is writte
   (`proposals/limits.ts`), read by both the schema and the producers. Response schemas are loose
   (`z.object`); only request input is strict.
 
+### 13. A contract strict in the direction that must stay open
+- **Bug.** The calendar answer was a strict schema shared with what the phone sends: adding the
+  event's details to the answer would have made every older client refuse it (stage 8, found in
+  review).
+- **Missed because.** Client and server always shipped together in the tests; no test parsed an answer
+  from a newer server.
+- **Rule.** What a client sends is strict; what a server answers is not (unknown keys are dropped).
+  A schema shared by both directions is split. `endpoints.test.ts` walks every endpoint's output
+  and fails on any strict object at any depth.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -150,3 +160,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | Attend after a run of the same title left open (yesterday's lecture, or the one just before back to back) silently did nothing, while Now kept offering it | 1 | yes: "is this occurrence attended already?" was answered in three places with three rules (`startCalendar`'s no-op by title against any open run, Now's `isTracked` from 10 minutes before, Day's `isStartedFor` from 15 and with the raw title, so a title over 80 characters never matched). One predicate now, `isCalendarRun` in @pace/client (label as stored by `activityLabel`, begun from `CALENDAR_LEAD_MINUTES` before the start until the end), read by all three; the 10 and 15 minute windows are one constant (Now now offers an event 15 minutes ahead, like Day and the Calendar button); Day's overlap check compares `activityLabel(title)` too | client tests: a stale open run from yesterday, back-to-back same-title events, a title over 80 characters; `isCalendarRun` unit tests; Day "reads logged" with a long title; Now prompt still offered over a stale run |
 | 2026-10-14 | A past calendar event with a title over 80 characters could not be logged (`logPast` trimmed but did not cut, the payload refuses > 80) | 12 | yes: `logPast` and the Day sheet's rename cut through `activityLabel`, the one helper `startActivity` and `isCalendarRun` use | client test: a 100+ character title logs, stored as `activityLabel(title)` |
 | 2026-10-14 | Day's row hairlines missing on the web (class names on a reanimated view are dropped there; found in screenshots before shipping) | 5 | yes (no other `Animated.View` carries a class name) | e2e reads the computed border of every Day row |
+| 2026-10-14 | Strict output schemas: a field added to an answer breaks older clients | 13 | yes: every output in `endpoints.ts` (cloud, notify, parse incl. the nested parse result, LLM status, devices); requests stay strict | output strictness sweep in `endpoints.test.ts`, extra-key parse test |
