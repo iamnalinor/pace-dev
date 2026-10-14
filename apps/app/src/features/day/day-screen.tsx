@@ -88,7 +88,7 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
         <Text
           className={cx(
             "font-sans text-[13px] tabular-nums",
-            row.isRunning ? "text-accentText" : "text-fg",
+            row.isRunning ? "text-accentQuietText" : "text-fg",
           )}
         >
           {formatDuration(row.minutes, language)}

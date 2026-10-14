@@ -2,7 +2,7 @@ import { Switch, Text, View } from "react-native";
 
 import { useTheme } from "./theme-provider.tsx";
 
-/** The native switch in Pace's colors: off, a light knob on a grey track; on, a white knob on the indigo accent. */
+/** The native switch in Pace's colors: off, a light knob on a grey track; on, a white knob on the quiet indigo accent. */
 export const PaceSwitch = ({
   isOn,
   label,
@@ -14,13 +14,13 @@ export const PaceSwitch = ({
 }) => {
   const { palette } = useTheme();
   // react-native-web colors the knob of an "on" switch with its own teal unless told otherwise.
-  const webKnob = { activeThumbColor: palette.accentFg };
+  const webKnob = { activeThumbColor: palette.accentQuietFg };
   return (
     <Switch
       accessibilityLabel={label}
       onValueChange={onChange}
-      thumbColor={isOn ? palette.accentFg : palette.surface}
-      trackColor={{ false: palette.muted, true: palette.accent }}
+      thumbColor={isOn ? palette.accentQuietFg : palette.surface}
+      trackColor={{ false: palette.muted, true: palette.accentQuiet }}
       value={isOn}
       {...webKnob}
     />

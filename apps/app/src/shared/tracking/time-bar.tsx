@@ -116,7 +116,7 @@ type ButtonProps = {
 };
 
 /**
-A big button in its fixed place: icon over name, its color's outline, filled with the accent while it runs.
+A big button in its fixed place: icon over name, its color's outline, filled with the quiet accent while it runs (a state, not an action).
 A long press, a right click or "⋯" opens what it can start and "alongside".
 */
 const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
@@ -125,7 +125,7 @@ const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
   const label = t(button.labelKey);
   const Icon = ICONS[button.id];
   const restingColor = unavailable === undefined ? palette.fg2 : palette.muted;
-  const iconColor = button.isRunning ? palette.accentFg : restingColor;
+  const iconColor = button.isRunning ? palette.accentQuietFg : restingColor;
   const more = (): void => {
     onMore(button);
   };
@@ -139,7 +139,7 @@ const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
         aria-checked={button.isRunning}
         className={cx(
           "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
-          button.isRunning ? "border-accent bg-accent" : "bg-surface",
+          button.isRunning ? "border-accentQuiet bg-accentQuiet" : "bg-surface",
           !button.isRunning &&
             (unavailable === undefined ? OUTLINE[button.color] : "border-dashed border-line"),
         )}
@@ -159,7 +159,7 @@ const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
         <Text
           className={cx(
             "text-center font-sans text-[12px] leading-[14px]",
-            button.isRunning && "font-medium text-accentFg",
+            button.isRunning && "font-medium text-accentQuietFg",
             !button.isRunning &&
               (unavailable === undefined ? inkClass(button.color) : "text-muted"),
           )}

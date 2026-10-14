@@ -223,11 +223,11 @@ export const Composer = ({
   const [isLineInFocus, setIsLineInFocus] = useState(false);
   return (
     // One card that changes shape: its height follows the line or the form, and the focused
-    // line rings it in the accent.
+    // line rings it in the quiet accent.
     <View
       className={cx(
         "mx-4 mb-3 rounded-xl border bg-surface p-2",
-        isLineInFocus && flow.form === null ? "border-accent" : "border-line",
+        isLineInFocus && flow.form === null ? "border-accentQuiet" : "border-line",
       )}
     >
       <AnimatedHeight>

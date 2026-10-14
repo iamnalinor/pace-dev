@@ -27,10 +27,10 @@ const dayLabel = (date: string, language: Language): string =>
     weekday: "long",
   }).format(new Date(`${date}T00:00:00Z`));
 
-/** The picked day on the accent, the month's days in ink, the neighbours' faint. */
+/** The picked day on the quiet accent, the month's days in ink, the neighbours' faint. */
 const ink = (cell: CalendarDay, isSelected: boolean): string => {
   if (isSelected) {
-    return "font-semibold text-accentFg";
+    return "font-semibold text-accentQuietFg";
   }
   return cell.isInMonth ? "text-fg" : "text-faint";
 };
@@ -63,7 +63,7 @@ const DayCell = ({
     aria-selected={isSelected}
     className={cx(
       "h-10 flex-1 items-center justify-center rounded-lg active:opacity-70",
-      isSelected && "bg-accent",
+      isSelected && "bg-accentQuiet",
       !isSelected && isToday && "border-2 border-fg",
       isDisabled && "opacity-30",
     )}
@@ -79,7 +79,7 @@ const DayCell = ({
       <View
         className={cx(
           "absolute bottom-1 h-1 w-1 rounded-full",
-          isSelected ? "bg-accentFg" : "bg-accentText",
+          isSelected ? "bg-accentQuietFg" : "bg-accentQuietText",
         )}
       />
     ) : null}
@@ -88,7 +88,7 @@ const DayCell = ({
 
 /**
 A themed month view: the month's title with previous / next, Monday-first weeks, today
-outlined, the picked day filled in the accent and days with something on them dotted.
+outlined, the picked day filled in the quiet accent and days with something on them dotted.
 */
 export const Calendar = ({
   labels,

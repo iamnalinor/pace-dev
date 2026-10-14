@@ -40,10 +40,10 @@ export const ScopeList = ({
             <View
               className={cx(
                 "h-[18px] w-[18px] items-center justify-center rounded border-[1.5px]",
-                isChecked ? "border-accent bg-accent" : "border-muted",
+                isChecked ? "border-accentQuiet bg-accentQuiet" : "border-muted",
               )}
             >
-              {isChecked ? <Check color={palette.accentFg} size={12} strokeWidth={3} /> : null}
+              {isChecked ? <Check color={palette.accentQuietFg} size={12} strokeWidth={3} /> : null}
             </View>
             <Text className="flex-1 font-sans text-[14px] text-fg">{t(SCOPE_KEYS[scope])}</Text>
           </Pressable>

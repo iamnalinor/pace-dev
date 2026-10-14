@@ -5,7 +5,7 @@ const PERCENT = 100;
 const share = (fraction: number): `${number}%` =>
   `${Math.min(Math.max(fraction, 0), 1) * PERCENT}%`;
 
-/** The 3px bar of a task row: progress in the foreground colour, the marker in the accent. */
+/** The 3px bar of a task row: progress in the foreground colour, the marker in the quiet accent. */
 export const ProgressBar = ({
   label,
   marker,
@@ -27,7 +27,7 @@ export const ProgressBar = ({
     <View className="h-[3px] rounded-sm bg-fg" style={{ width: share(value) }} />
     {marker === null ? null : (
       <View
-        className="absolute -top-[3px] h-[9px] w-0.5 rounded-[1px] bg-accentText"
+        className="absolute -top-[3px] h-[9px] w-0.5 rounded-[1px] bg-accentQuietText"
         style={{ left: share(marker) }}
       />
     )}

@@ -44,7 +44,7 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         // On /add (New task, a share) Now is the screen, with the cursor in the composer.
         const current = state.routes[state.index]?.name;
         const isFocused = state.index === index || (route.name === "index" && current === "add");
-        const activeColor = isFocused ? palette.accentText : palette.muted;
+        const activeColor = isFocused ? palette.accentQuietText : palette.muted;
         const title = descriptors[route.key]?.options.title ?? route.name;
         const onPress = (): void => {
           const event = navigation.emit({
@@ -69,7 +69,7 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
             <Text
               className={cx(
                 "font-sans text-[11px]",
-                isFocused ? "font-medium text-accentText" : "text-muted",
+                isFocused ? "font-medium text-accentQuietText" : "text-muted",
               )}
               numberOfLines={1}
             >

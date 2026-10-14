@@ -4,7 +4,8 @@ import path from "node:path";
 
 /**
 Brand assets (design board "08 · Step"). The mark is two chevrons and a dot; the favicon is
-the chevrons on an indigo tile (the app's accent). This script is the single source for every logo SVG in
+the dark chevrons on a lime tile (the app's accent for important actions; the quiet indigo
+stays out of the brand). This script is the single source for every logo SVG in
 assets/logo and for the committed PNG icons of the web app and the Expo app. Rerun with
 `bun scripts/generate-icons.ts` after changing the mark; the output is deterministic.
 */
@@ -16,11 +17,12 @@ const XMLNS = 'xmlns="http://www.w3.org/2000/svg"';
 const STROKE = 'fill="none" stroke-linecap="round" stroke-linejoin="round"';
 
 // The first chevron is the quiet one, yet it must read on the dark tile (3:1, not 1.7:1).
-const DARK: Palette = { accent: "#91a7ff", fg: "#ececee", track: "#6a6a74" };
-const LIGHT: Palette = { accent: "#3b5bdb", fg: "#17181c", track: "#b9bcc6" };
+const DARK: Palette = { accent: "#d4ff3a", fg: "#ececee", track: "#6a6a74" };
+// On a light ground the lime would vanish, so the chevron takes the dark olive of accentText.
+const LIGHT: Palette = { accent: "#4d6b00", fg: "#17181c", track: "#b9bcc6" };
 const WHITE: Palette = { accent: "#ffffff", fg: "#ffffff", track: "#ffffff" };
 const DARK_BG = "#0b0b0c";
-const INDIGO = "#4263eb";
+const LIME = "#d4ff3a";
 
 /**
 The mark's drawing in its 120x120 coordinate space (no <svg> wrapper). Its ink spans x 10–114,
@@ -62,7 +64,7 @@ const wordmarkSvg = (): string =>
 const faviconSvg = (): string =>
   svg(
     120,
-    `<rect width="120" height="120" rx="30" fill="${INDIGO}"/>\n  ${faviconShapes({ accent: "#ffffff", fg: "#ffffff", track: "rgba(255,255,255,.45)" })}`,
+    `<rect width="120" height="120" rx="30" fill="${LIME}"/>\n  ${faviconShapes({ accent: DARK_BG, fg: DARK_BG, track: "rgba(0,0,0,.3)" })}`,
   );
 
 /** A 1024x1024 canvas with `shapes` (drawn in a 120 unit box) centred at `fraction` of the width. */

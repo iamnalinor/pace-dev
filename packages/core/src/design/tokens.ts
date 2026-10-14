@@ -3,6 +3,9 @@ import tokensJson from "./tokens.json";
 export type PaletteName =
   | "accent"
   | "accentFg"
+  | "accentQuiet"
+  | "accentQuietFg"
+  | "accentQuietText"
   | "accentText"
   | "bg"
   | "faint"
