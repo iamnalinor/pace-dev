@@ -14,6 +14,7 @@ import {
 } from "@pace/core";
 
 import { editActions, type EditActions, logPast } from "./activity-edits.ts";
+import { activityLabel, isCalendarRun } from "./calendar-run.ts";
 import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
 export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
@@ -80,11 +81,6 @@ export type StopWhen = When & { readonly activityId?: string | undefined };
 
 /** An activity's Expect is a day at most (what the events accept). */
 const MAX_MINUTES = 24 * 60;
-/** A label is at most this long (what the events accept). */
-const MAX_LABEL = 80;
-
-/** A label as an activity stores it: trimmed, at most `MAX_LABEL` characters. */
-const labelOf = (text: string): string => text.trim().slice(0, MAX_LABEL).trim();
 
 /** Whole positive minutes up to a day, or nothing. */
 const positive = (minutes: null | number | undefined): number | undefined =>
@@ -99,7 +95,7 @@ const startActivity = async (
   input: Parameters<TimeActions["startActivity"]>[0],
   when: When = {},
 ): ActionResult => {
-  const label = labelOf(input.label);
+  const label = activityLabel(input.label);
   if (label === "") {
     return err("action/empty-text");
   }
@@ -167,7 +163,8 @@ const startChoice = async (
 /**
 The calendar's event, begun at its start when that has passed, expected to last until its end;
 one already over is logged as the block it was, and what runs now keeps running. Attended
-again while it runs (a second tap, Now and Day both offering it), it keeps running as it is.
+again while its own run is open (`isCalendarRun`: a second tap, Now and Day both offering it),
+that run keeps going as it is.
 */
 const startCalendar = async (
   deps: ActionDeps,
@@ -175,8 +172,8 @@ const startCalendar = async (
   options: StartOptions = {},
 ): ActionResult => {
   const now = deps.clock.now();
-  const isRunning = runningActivities(timeOf(deps), now).some(
-    (activity) => activity.buttonId === "calendar" && activity.label === labelOf(event.title),
+  const isRunning = runningActivities(timeOf(deps), now).some((activity) =>
+    isCalendarRun(event, activity),
   );
   if (isRunning) {
     return ok([]);

@@ -184,6 +184,25 @@ describe("Day with the phone's data", () => {
     expect(rowsInFlattenableBoxes()).toEqual([]);
   });
 
+  it("reads logged after attending an event whose title is longer than an activity's label", async () => {
+    const title = `Mathematical analysis colloquium ${"with a very long name ".repeat(4)}`.trim();
+    calendar.state.events = [
+      {
+        allDay: false,
+        endDate: utcAt("12:50:00"),
+        id: "ev-long",
+        startDate: utcAt("12:05:00"),
+        title,
+      },
+    ];
+    const runtime = await createTestRuntime();
+    await renderScreen(<DayScreen />, runtime);
+    const list = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(list).getByRole("button", { name: "Attended" }));
+    expect(await within(list).findByText("logged")).toBeOnTheScreen();
+    expect(within(list).queryByRole("button", { name: "Attended" })).toBeNull();
+  });
+
   it("does not offer Attended for an event hours away, only Skip", async () => {
     calendar.state.events = [
       {

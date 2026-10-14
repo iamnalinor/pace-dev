@@ -2,19 +2,19 @@ import { useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 
 import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
-import type { DayEntry, DayRow } from "@pace/client";
 
 import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { openUsageAccessSettings } from "#app/platform/phone-data.ts";
 import { calendarKey, sleepKey } from "#app/platform/phone-memory.ts";
-import { isAttendableNow, isStartedFor } from "#app/shared/tracking/calendar-today.ts";
+import { isAttendableNow } from "#app/shared/tracking/calendar-today.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { inkClass, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useToast } from "#app/ui/toast.tsx";
+import { type DayEntry, type DayRow, isCalendarRun } from "@pace/client";
 import { CATEGORY_COLORS, formatDuration } from "@pace/core";
 
 import { type DayPhone, isCalendarLogged, type NamedApp } from "./use-day-phone.ts";
@@ -173,7 +173,7 @@ const CalendarRow = ({
   const { now } = useViewer();
   // Attended ahead of its start, it runs from the tap: not on the day's blocks yet, but answered.
   const isStarted = useAppState((state) =>
-    Object.values(state.time.activities).some((activity) => isStartedFor(event, activity)),
+    Object.values(state.time.activities).some((activity) => isCalendarRun(event, activity)),
   );
   const { series } = event;
   const everyTime = (rule: "attended" | "skip") =>

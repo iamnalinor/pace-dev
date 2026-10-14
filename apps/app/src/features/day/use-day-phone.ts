@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
 
-import type { DayModel } from "@pace/client";
-
 import {
   calendarAccess,
   type CalendarAccess,
@@ -21,6 +19,7 @@ import {
   setSeriesRule,
   sleepKey,
 } from "#app/platform/phone-memory.ts";
+import { activityLabel, type DayModel } from "@pace/client";
 import {
   addDaysIn,
   addMinutesIso,
@@ -110,7 +109,7 @@ export const isCalendarLogged = (
   entries.some(
     (entry) =>
       entry.kind === "activity" &&
-      entry.row.label === event.title &&
+      entry.row.label === activityLabel(event.title) &&
       entry.row.startAt < event.endAt &&
       entry.row.endAt > event.startAt,
   );

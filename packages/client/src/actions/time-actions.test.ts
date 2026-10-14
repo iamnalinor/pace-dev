@@ -264,6 +264,57 @@ describe("time actions", () => {
     expect(named).toHaveLength(1);
   });
 
+  it("a run of the same title left open since yesterday does not answer today's occurrence", async () => {
+    const world = await setupActions([]);
+    world.setNow(later(-24 * 60));
+    unwrap(
+      await world.actions.startCalendar({
+        endAt: later(-24 * 60 + 90),
+        startAt: later(-24 * 60),
+        title: "Colloquium",
+      }),
+    );
+    // Never stopped: still open a day later.
+    world.setNow(NOW);
+    unwrap(
+      await world.actions.startCalendar({
+        endAt: later(95),
+        startAt: later(5),
+        title: "Colloquium",
+      }),
+    );
+    const bar = timeBarModel(world.state.store.getState(), ctx(NOW));
+    expect(bar.running).toMatchObject({ label: "Colloquium", startAt: NOW });
+    const named = Object.values(world.state.store.getState().time.activities).filter(
+      (activity) => activity.label === "Colloquium",
+    );
+    expect(named).toHaveLength(2);
+  });
+
+  it("back-to-back events of one title get a run each", async () => {
+    const world = await setupActions([]);
+    world.setNow(later(-90));
+    unwrap(
+      await world.actions.startCalendar({ endAt: NOW, startAt: later(-90), title: "Lecture" }),
+    );
+    world.setNow(NOW);
+    unwrap(await world.actions.startCalendar({ endAt: later(90), startAt: NOW, title: "Lecture" }));
+    const runs = Object.values(world.state.store.getState().time.activities)
+      .filter((activity) => activity.label === "Lecture")
+      .map((activity) => activity.startAt)
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(runs).toEqual([later(-90), NOW]);
+  });
+
+  it("a title over 80 characters is still recognised as attended: a second tap keeps the run", async () => {
+    const world = await setupActions([]);
+    const event = { endAt: later(60), startAt: later(-5), title: `Lecture ${"x".repeat(100)}` };
+    unwrap(await world.actions.startCalendar(event));
+    world.setNow(later(1));
+    unwrap(await world.actions.startCalendar(event));
+    expect(Object.values(world.state.store.getState().time.activities)).toHaveLength(1);
+  });
+
   it("never refuses an event as the future, whatever its offset from now and what runs", async () => {
     // Instants as an Android phone hands them (UTC, ".SSSZ"), seconds around now on either side,
     // with or without something running since before: the attend path must always answer ok.

@@ -1,7 +1,7 @@
 import type { CalendarAccess, PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
-import type { ApiClient } from "@pace/client";
 
 import { calendarKey } from "#app/platform/phone-memory.ts";
+import { type ApiClient, CALENDAR_LEAD_MINUTES, isCalendarRun } from "@pace/client";
 import { type Activity, addMinutesIso } from "@pace/core";
 
 /** Where today's calendar is read from: the phone's own, or the copy it sends (on the web). */
@@ -17,25 +17,6 @@ export type CalendarToday = {
   readonly events: readonly PhoneCalendarEvent[];
 };
 
-/** How long before its start an event is offered on Now. */
-const AHEAD_MINUTES = 10;
-
-/** How far from now an event can be and still be linked from the Calendar button. */
-const NEAR_MINUTES = 15;
-
-/**
-An activity under the event's title begun for it: from fifteen minutes before its start (Attend
-ahead of the start begins it at once) until its end. Such a run answers the event even while it
-has not reached the event's own time yet.
-*/
-export const isStartedFor = (
-  event: Pick<PhoneCalendarEvent, "endAt" | "startAt" | "title">,
-  activity: { readonly label: string; readonly startAt: string },
-): boolean =>
-  activity.label === event.title &&
-  addMinutesIso(event.startAt, -NEAR_MINUTES) <= activity.startAt &&
-  activity.startAt < event.endAt;
-
 export type PromptMemory = {
   /** Occurrences waved away on this phone (`calendarKey`). */
   readonly dismissed: ReadonlySet<string>;
@@ -44,17 +25,12 @@ export type PromptMemory = {
   readonly activities: readonly Pick<Activity, "endAt" | "label" | "startAt">[];
 };
 
-/** Something under the event's title is tracked from its offer on: it was attended already. */
+/** One of its runs is on the ledger already (`isCalendarRun`): it was attended. */
 const isTracked = (event: PhoneCalendarEvent, activities: PromptMemory["activities"]): boolean =>
-  activities.some(
-    (activity) =>
-      activity.label === event.title &&
-      activity.startAt >= addMinutesIso(event.startAt, -AHEAD_MINUTES) &&
-      activity.startAt < event.endAt,
-  );
+  activities.some((activity) => isCalendarRun(event, activity));
 
 /**
-The event Now asks "Attend or skip?" about: starting within ten minutes or going on, not
+The event Now asks "Attend or skip?" about: starting within fifteen minutes or going on, not
 waved away, not answered for its whole series, not tracked yet; the earliest first.
 */
 export const promptedEvent = (
@@ -63,7 +39,9 @@ export const promptedEvent = (
   memory: PromptMemory,
 ): null | PhoneCalendarEvent =>
   events
-    .filter((event) => addMinutesIso(event.startAt, -AHEAD_MINUTES) <= now && now < event.endAt)
+    .filter(
+      (event) => addMinutesIso(event.startAt, -CALENDAR_LEAD_MINUTES) <= now && now < event.endAt,
+    )
     .filter((event) => !memory.dismissed.has(calendarKey(event)))
     .filter((event) => event.series === null || !memory.ruled.has(event.series))
     .filter((event) => !isTracked(event, memory.activities))
@@ -75,7 +53,7 @@ Whether "Attend" makes sense for the event now: it started, or starts within fif
 (attending it before its start begins the activity now). An event hours away is only skipped.
 */
 export const isAttendableNow = (event: Pick<PhoneCalendarEvent, "startAt">, now: string): boolean =>
-  addMinutesIso(event.startAt, -NEAR_MINUTES) <= now;
+  addMinutesIso(event.startAt, -CALENDAR_LEAD_MINUTES) <= now;
 
 export type CalendarButtonState =
   | { readonly kind: "loading" }
@@ -100,8 +78,8 @@ export const calendarButtonState = (
   const events = today.events
     .filter(
       (event) =>
-        addMinutesIso(event.startAt, -NEAR_MINUTES) <= now &&
-        now <= addMinutesIso(event.endAt, NEAR_MINUTES),
+        addMinutesIso(event.startAt, -CALENDAR_LEAD_MINUTES) <= now &&
+        now <= addMinutesIso(event.endAt, CALENDAR_LEAD_MINUTES),
     )
     .toSorted((a, b) => a.startAt.localeCompare(b.startAt));
   return events.length === 0 ? { kind: "nothingNear" } : { events, kind: "ready" };
