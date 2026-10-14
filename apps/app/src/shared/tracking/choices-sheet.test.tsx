@@ -16,7 +16,7 @@ const CALENDAR: TimeButtonView = {
   id: "calendar",
   isRunning: false,
   kind: "calendar",
-  labelKey: "nav.calendar",
+  labelKey: "time.button.calendar",
 };
 
 const sheet = (calendar: CalendarToday | null) => (

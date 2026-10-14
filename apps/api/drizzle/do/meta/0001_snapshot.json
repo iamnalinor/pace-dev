@@ -95,20 +95,14 @@
       "indexes": {
         "calendar_events_start_idx": {
           "name": "calendar_events_start_idx",
-          "columns": [
-            "start_at"
-          ],
+          "columns": ["start_at"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "calendar_events_device_id_event_id_start_at_pk": {
-          "columns": [
-            "device_id",
-            "event_id",
-            "start_at"
-          ],
+          "columns": ["device_id", "event_id", "start_at"],
           "name": "calendar_events_device_id_event_id_start_at_pk"
         }
       },
@@ -178,16 +172,12 @@
       "indexes": {
         "decisions_task_idx": {
           "name": "decisions_task_idx",
-          "columns": [
-            "task_id"
-          ],
+          "columns": ["task_id"],
           "isUnique": false
         },
         "decisions_at_idx": {
           "name": "decisions_at_idx",
-          "columns": [
-            "at"
-          ],
+          "columns": ["at"],
           "isUnique": false
         }
       },
@@ -266,16 +256,12 @@
       "indexes": {
         "events_id_unique": {
           "name": "events_id_unique",
-          "columns": [
-            "id"
-          ],
+          "columns": ["id"],
           "isUnique": true
         },
         "events_occurred_idx": {
           "name": "events_occurred_idx",
-          "columns": [
-            "occurred_at"
-          ],
+          "columns": ["occurred_at"],
           "isUnique": false
         }
       },
@@ -455,10 +441,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "subtasks_task_id_id_pk": {
-          "columns": [
-            "task_id",
-            "id"
-          ],
+          "columns": ["task_id", "id"],
           "name": "subtasks_task_id_id_pk"
         }
       },
@@ -584,23 +567,17 @@
       "indexes": {
         "tasks_project_idx": {
           "name": "tasks_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         },
         "tasks_status_idx": {
           "name": "tasks_status_idx",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "tasks_due_idx": {
           "name": "tasks_due_idx",
-          "columns": [
-            "due_at"
-          ],
+          "columns": ["due_at"],
           "isUnique": false
         }
       },
@@ -651,20 +628,14 @@
       "indexes": {
         "usage_sessions_start_idx": {
           "name": "usage_sessions_start_idx",
-          "columns": [
-            "start_at"
-          ],
+          "columns": ["start_at"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "usage_sessions_device_id_app_start_at_pk": {
-          "columns": [
-            "device_id",
-            "app",
-            "start_at"
-          ],
+          "columns": ["device_id", "app", "start_at"],
           "name": "usage_sessions_device_id_app_start_at_pk"
         }
       },
