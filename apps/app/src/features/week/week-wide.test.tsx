@@ -5,7 +5,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
-import { CalendarScreen } from "./calendar-screen.tsx";
+import { WeekScreen } from "./week-screen.tsx";
 
 // A computer's window: the grid with a details pane beside it.
 jest.mock("#app/ui/layout.ts", (): unknown => ({
@@ -13,7 +13,7 @@ jest.mock("#app/ui/layout.ts", (): unknown => ({
   useIsWide: () => true,
 }));
 
-describe("CalendarScreen on a wide window", () => {
+describe("WeekScreen on a wide window", () => {
   it("shows what was picked in the pane beside the grid, the picked one marked", async () => {
     const runtime = await createTestRuntime({
       routes: {
@@ -38,7 +38,7 @@ describe("CalendarScreen on a wide window", () => {
       label: "Lecture notes",
       startAt: addMinutesIso(NOW, -240),
     });
-    await renderScreen(<CalendarScreen />, runtime);
+    await renderScreen(<WeekScreen />, runtime);
     expect(screen.getByText("Pick an event or a block to see its details")).toBeOnTheScreen();
     const event = await screen.findByRole("button", { name: "From the calendar: Seminar" });
     expect(event).not.toBeSelected();

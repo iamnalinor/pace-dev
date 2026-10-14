@@ -6,7 +6,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
-import { CalendarScreen } from "./calendar-screen.tsx";
+import { WeekScreen } from "./week-screen.tsx";
 
 /** 12:30–14:00 in Moscow today, with everything a phone's calendar can tell about it. */
 const seminar: CalendarEvent = {
@@ -51,7 +51,7 @@ const world = async (events: readonly CalendarEvent[] = [seminar]) => {
 
 /** The grid's room as the layout measures it. */
 const measure = async (height: number): Promise<void> => {
-  await fireEvent(screen.getByTestId("calendar-body"), "layout", {
+  await fireEvent(screen.getByTestId("week-body"), "layout", {
     nativeEvent: { layout: { height, width: 390, x: 0, y: 0 } },
   });
 };
@@ -60,9 +60,9 @@ const measure = async (height: number): Promise<void> => {
 const hourHeight = (): unknown =>
   (screen.getByText("08").props as { style?: { height?: number } }).style?.height;
 
-describe("CalendarScreen", () => {
+describe("WeekScreen", () => {
   it("lays the week's tracked time and calendar on one grid; a block tells where its time went", async () => {
-    await renderScreen(<CalendarScreen />, await world());
+    await renderScreen(<WeekScreen />, await world());
     expect(
       await screen.findByRole("button", { name: "From the calendar: Seminar" }),
     ).toBeOnTheScreen();
@@ -73,7 +73,7 @@ describe("CalendarScreen", () => {
 
   it("opens an event's details in a sheet: calendar, place, call, notes and people", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
-    await renderScreen(<CalendarScreen />, await world());
+    await renderScreen(<WeekScreen />, await world());
     await fireEvent.press(
       await screen.findByRole("button", { name: "From the calendar: Seminar" }),
     );
@@ -101,7 +101,7 @@ describe("CalendarScreen", () => {
       startAt: seminar.startAt,
       title: "Call with Anna",
     };
-    await renderScreen(<CalendarScreen />, await world([bare]));
+    await renderScreen(<WeekScreen />, await world([bare]));
     await fireEvent.press(
       await screen.findByRole("button", { name: "From the calendar: Call with Anna" }),
     );
@@ -112,7 +112,7 @@ describe("CalendarScreen", () => {
   });
 
   it("offers Back to today only on another week, and it brings this week back", async () => {
-    await renderScreen(<CalendarScreen />, await world());
+    await renderScreen(<WeekScreen />, await world());
     const back = () => screen.queryByRole("button", { name: "Back to today" });
     expect(screen.getByText("Oct 5 – Oct 11")).toBeOnTheScreen();
     expect(back()).toBeNull();
@@ -124,23 +124,23 @@ describe("CalendarScreen", () => {
   });
 
   it("fits the day into the measured height, and scrolls only below the floor", async () => {
-    await renderScreen(<CalendarScreen />, await world());
+    await renderScreen(<WeekScreen />, await world());
     await measure(700);
     // 700 less the day names (28) and the bottom room (24), shared by the 17 hours 07–24.
     await waitFor(() => {
       expect(hourHeight()).toBe(38);
     });
-    expect(screen.getByTestId("calendar-scroller")).toHaveProp("scrollEnabled", false);
+    expect(screen.getByTestId("week-scroller")).toHaveProp("scrollEnabled", false);
     await measure(300);
     await waitFor(() => {
       expect(hourHeight()).toBe(18);
     });
-    expect(screen.getByTestId("calendar-scroller")).toHaveProp("scrollEnabled", true);
+    expect(screen.getByTestId("week-scroller")).toHaveProp("scrollEnabled", true);
   });
 
   it("shows the night hours when asked, from the header and in the settings", async () => {
     const runtime = await world();
-    await renderScreen(<CalendarScreen />, runtime);
+    await renderScreen(<WeekScreen />, runtime);
     await measure(700);
     const toggle = screen.getByRole("switch", { name: "Night hours" });
     expect(toggle).not.toBeChecked();
@@ -160,6 +160,6 @@ describe("CalendarScreen", () => {
     await waitFor(() => {
       expect(screen.queryByText("00")).toBeNull();
     });
-    expect(within(screen.getByTestId("calendar-body")).getByText("07")).toBeOnTheScreen();
+    expect(within(screen.getByTestId("week-body")).getByText("07")).toBeOnTheScreen();
   });
 });

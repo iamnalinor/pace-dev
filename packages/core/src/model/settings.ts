@@ -8,7 +8,7 @@ export type Settings = {
   /** Digest times as `HH:MM` on the account's zone. */
   readonly digestWindows: readonly string[];
   readonly quietHours: { readonly from: string; readonly to: string };
-  /** The Calendar shows the whole day, 00–24, instead of starting at seven in the morning. */
+  /** Week shows the whole day, 00–24, instead of starting at seven in the morning. */
   readonly nightHours: boolean;
 };
 

@@ -47,10 +47,10 @@ const DESTINATIONS: readonly Destination[] = [
   },
   { href: "/day", icon: Clock, label: "nav.day", owns: (path) => path === "/day" },
   {
-    href: "/calendar",
+    href: "/week",
     icon: CalendarRange,
-    label: "nav.calendar",
-    owns: (path) => path === "/calendar",
+    label: "nav.week",
+    owns: (path) => path === "/week",
   },
   {
     href: "/inbox",

@@ -5,7 +5,7 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-/** Settings' switch for the Calendar's night hours. */
+/** Settings' switch for Week's night hours. */
 const nightHours = () => screen.getByRole("switch", { name: en("settings.nightHours") });
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ describe("SettingsScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/presets");
   });
 
-  it("turns the Calendar's night hours on and off", async () => {
+  it("turns Week's night hours on and off", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     expect(nightHours()).not.toBeChecked();

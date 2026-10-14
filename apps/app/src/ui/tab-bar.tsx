@@ -1,7 +1,7 @@
 import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
-import { CalendarRange, Clock, Ellipsis, Inbox, type LucideIcon, Zap } from "lucide-react-native";
+import { Clock, Ellipsis, Inbox, type LucideIcon, Zap } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,12 +18,11 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 
 /**
 The tabs a phone shows, in order; New task is the composer on Now, not a tab of its own.
-Projects, Insights, History and Settings are behind More.
+Week, Projects, Insights, History and Settings are behind More.
 */
 const ICONS: Readonly<Record<string, LucideIcon>> = {
   index: Zap,
   day: Clock,
-  calendar: CalendarRange,
   inbox: Inbox,
   more: Ellipsis,
 };

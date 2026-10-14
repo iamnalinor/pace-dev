@@ -61,7 +61,7 @@ const PermissionsRow = () => {
   );
 };
 
-/** Theme (this device), language and the Calendar's night hours (the account). */
+/** Theme (this device), language and Week's night hours (the account). */
 const LookRows = () => {
   const t = useT();
   const theme = useTheme();
@@ -88,7 +88,7 @@ const LookRows = () => {
           value={settings.language}
         />
       </Row>
-      <Row label={t("nav.calendar")}>
+      <Row label={t("nav.week")}>
         <SwitchRow
           hint={t("settings.nightHours.hint")}
           isOn={settings.nightHours}

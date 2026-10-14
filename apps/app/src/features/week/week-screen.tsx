@@ -4,6 +4,7 @@ import { Pressable, ScrollView, View } from "react-native";
 
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackToToday } from "#app/shared/back-to-today.tsx";
+import { useBack } from "#app/shared/use-back.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -38,7 +39,7 @@ const NightHoursToggle = () => {
   const { actions } = usePace();
   const { nightHours } = useSettings();
   const { palette } = useTheme();
-  const label = t("calendar.nightHours");
+  const label = t("week.nightHours");
   return (
     <Tooltip label={label}>
       <Pressable
@@ -104,9 +105,9 @@ const FittedGrid = (props: GridArgs) => {
       onLayout={(event) => {
         setAvailable(event.nativeEvent.layout.height);
       }}
-      testID="calendar-body"
+      testID="week-body"
     >
-      <ScrollView scrollEnabled={scrolls} testID="calendar-scroller">
+      <ScrollView scrollEnabled={scrolls} testID="week-scroller">
         <WeekGrid {...props} hourPx={hourPx} minColumnPx={isWide ? 0 : PHONE_COLUMN_PX} />
       </ScrollView>
     </View>
@@ -114,7 +115,7 @@ const FittedGrid = (props: GridArgs) => {
 };
 
 /** The week's grid under its header: the dates, the moon, Back to today and the arrows. */
-const CalendarGrid = ({
+const WeekPage = ({
   onPick,
   onWeek,
   picked,
@@ -131,14 +132,17 @@ const CalendarGrid = ({
   const calendar = useCalendarRange(api, week.weekStart, week.weekEnd);
   const usage = useUsage(api, week.weekStart, week.weekEnd);
   const lastDay = addDaysIn(week.weekStart, 6, week.zone);
+  // A phone opens Week from More: the chevron goes back there; beside the sidebar there is none.
+  const back = useBack();
   return (
     <Screen
       fills
       header={
         <ScreenHeader
+          {...(back !== undefined && { backLabel: t("common.back"), onBack: back })}
           eyebrow={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
           right={<WeekNav onWeek={onWeek} week={week} />}
-          title={t("nav.calendar")}
+          title={t("nav.week")}
         />
       }
     >
@@ -160,7 +164,7 @@ The week as lived: Monday to Sunday on one hour grid that fits the screen, track
 in its color, the calendar's events outlined, a thin strip where some device was in use. A tap
 tells more: beside the grid on a wide window, in a sheet on a phone.
 */
-export const CalendarScreen = () => {
+export const WeekScreen = () => {
   const t = useT();
   const { hooks } = usePace();
   const isWide = useIsWide();
@@ -171,7 +175,7 @@ export const CalendarScreen = () => {
     setPicked(null);
   };
   const grid = (
-    <CalendarGrid
+    <WeekPage
       onPick={setPicked}
       onWeek={(next) => {
         setWeekOf(next);
@@ -187,7 +191,7 @@ export const CalendarScreen = () => {
       <SplitPane
         main={grid}
         side={<PickedPane onClose={close} picked={picked} week={week} />}
-        sideLabel={t("calendar.details")}
+        sideLabel={t("week.details")}
       />
     );
   }

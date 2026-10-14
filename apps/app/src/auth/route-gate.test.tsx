@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 describe("RouteGate", () => {
-  it.each(["/settings", "/projects", "/insights", "/history", "/calendar", "/task/abc"])(
+  it.each(["/settings", "/projects", "/insights", "/history", "/week", "/task/abc"])(
     "sends a signed-out deep link to %s to the login screen, showing nothing of it",
     async (path) => {
       await renderAt(path, await createTestRuntime({ world: "empty" }));

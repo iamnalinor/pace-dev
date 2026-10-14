@@ -11,12 +11,13 @@ beforeEach(() => {
 });
 
 describe("MoreScreen", () => {
-  it("lists Projects, Insights, History and Settings, each opening its page", async () => {
+  it("lists Week, Projects, Insights, History and Settings, each opening its page", async () => {
     await renderScreen(<MoreScreen />, await createTestRuntime({ world: "empty" }));
     const rows = screen
       .getAllByRole("link")
       .map((link) => link.props["accessibilityLabel"] as string);
     expect(rows).toEqual([
+      en("nav.week"),
       en("nav.projects"),
       en("nav.insights"),
       en("nav.history"),
@@ -30,6 +31,8 @@ describe("MoreScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/projects");
     await fireEvent.press(screen.getByRole("link", { name: en("nav.insights") }));
     expect(router.push).toHaveBeenCalledWith("/insights");
+    await fireEvent.press(screen.getByRole("link", { name: en("nav.week") }));
+    expect(router.push).toHaveBeenCalledWith("/week");
   });
 
   it("greets the owner by their Telegram first name at the top", async () => {

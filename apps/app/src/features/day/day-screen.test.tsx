@@ -69,6 +69,9 @@ describe("DayScreen", () => {
     await renderScreen(<DayScreen />, await createTestRuntime());
     const back = () => screen.queryByRole("button", { name: "Back to today" });
     expect(back()).toBeNull();
+    // The header is the arrows and the day picker alone: Week is reached from the navigation.
+    expect(screen.queryByRole("button", { name: "Week" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Calendar" })).toBeNull();
     expect(screen.getByRole("button", { name: "Next day" })).toBeDisabled();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {

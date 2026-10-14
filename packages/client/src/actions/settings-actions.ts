@@ -15,7 +15,7 @@ export type SettingsActions = {
   /** `HH:MM` on the account's zone. */
   readonly setDigestWindows: (digestWindows: readonly string[]) => ActionResult;
   readonly setQuietHours: (quietHours: QuietHours) => ActionResult;
-  /** The Calendar from midnight to midnight (on), or from seven (off). */
+  /** Week from midnight to midnight (on), or from seven (off). */
   readonly setNightHours: (isOn: boolean) => ActionResult;
 };
 

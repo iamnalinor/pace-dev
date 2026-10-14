@@ -39,12 +39,12 @@ describe("Sidebar", () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it("lists the destinations in the owner's order, Calendar after Day", async () => {
+  it("lists the destinations in the owner's order, Week after Day", async () => {
     await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
     expect(linkNames()).toEqual([
       en("nav.now"),
       en("nav.day"),
-      en("nav.calendar"),
+      en("nav.week"),
       en("nav.inbox"),
       en("nav.projects"),
       en("nav.insights"),

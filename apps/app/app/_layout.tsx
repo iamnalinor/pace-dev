@@ -60,6 +60,7 @@ const Navigator = () => {
             <Stack.Screen name="task/[id]" />
             <Stack.Screen name="project/[id]" />
             <Stack.Screen name="projects" />
+            <Stack.Screen name="week" />
             <Stack.Screen name="insights" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="review" />

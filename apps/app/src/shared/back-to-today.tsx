@@ -3,7 +3,7 @@ import { Pressable, Text } from "react-native";
 import { useT } from "#app/app-state.tsx";
 
 /**
-"Back to today", a quiet text button beside the ‹ › arrows of Day and the Calendar. It is there
+"Back to today", a quiet text button beside the ‹ › arrows of Day and Week. It is there
 only away from today (or this week): on the present it would have nothing to do. It sits before
 the arrows, so on a wide window, where they keep to the right edge, they never move.
 */
@@ -25,7 +25,7 @@ export const BackToToday = ({
       onPress={onPress}
     >
       <Text className="font-sans text-[13px] font-medium text-accentQuietText">
-        {t("calendar.backToToday")}
+        {t("common.backToToday")}
       </Text>
     </Pressable>
   );

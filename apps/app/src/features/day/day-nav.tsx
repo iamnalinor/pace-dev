@@ -1,5 +1,4 @@
-import { useRouter } from "expo-router";
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react-native";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
 
@@ -13,25 +12,9 @@ import { Sheet } from "#app/ui/sheet.tsx";
 import { type DayModel, trackedDates } from "@pace/client";
 import { formatInZone } from "@pace/core";
 
-/** The week this day sits in, on one grid. */
-const CalendarLink = () => {
-  const t = useT();
-  const router = useRouter();
-  return (
-    <IconButton
-      icon={CalendarRange}
-      label={t("calendar.open")}
-      onPress={() => {
-        router.push("/calendar");
-      }}
-      variant="plain"
-    />
-  );
-};
-
 /**
-[Calendar] [Back to today] [‹] [day] [›]: Back to today shows only away from today; the day
-button jumps to any past day, days with time on them dotted.
+[Back to today] [‹] [day] [›]: Back to today shows only away from today; the day button jumps
+to any past day, days with time on them dotted.
 */
 export const DayNav = ({
   day,
@@ -51,7 +34,6 @@ export const DayNav = ({
   const today = formatInZone(now, day.zone, "yyyy-MM-dd");
   return (
     <View className="flex-row items-center gap-1">
-      <CalendarLink />
       <BackToToday
         isAway={!day.isToday}
         onPress={() => {

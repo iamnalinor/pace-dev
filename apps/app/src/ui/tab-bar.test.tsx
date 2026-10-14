@@ -9,11 +9,10 @@ import { TabBar } from "./tab-bar.tsx";
 
 type Props = ComponentProps<typeof TabBar>;
 
-const ROUTES = ["index", "day", "calendar", "inbox", "more", "add"] as const;
+const ROUTES = ["index", "day", "inbox", "more", "add"] as const;
 
 const TITLES: Readonly<Record<(typeof ROUTES)[number], string>> = {
   add: en("nav.add"),
-  calendar: en("nav.calendar"),
   day: en("nav.day"),
   inbox: en("nav.inbox"),
   index: en("nav.now"),
@@ -33,14 +32,13 @@ const propsAt = (current: (typeof ROUTES)[number], navigate: jest.Mock): Props =
   }) as unknown as Props;
 
 describe("TabBar", () => {
-  it("shows Now, Day, Calendar, Inbox and More, the rest being behind More", async () => {
+  it("shows Now, Day, Inbox and More, the rest (Week first) being behind More", async () => {
     const navigate = jest.fn();
     await renderScreen(<TabBar {...propsAt("index", navigate)} />, await createTestRuntime());
     const tabs = screen.getAllByRole("tab").map((tab) => tab.props["accessibilityLabel"] as string);
     expect(tabs).toEqual([
       en("nav.now"),
       en("nav.day"),
-      en("nav.calendar"),
       en("nav.inboxWaiting", { count: 4 }),
       en("nav.more"),
     ]);

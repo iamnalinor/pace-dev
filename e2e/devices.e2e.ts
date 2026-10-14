@@ -56,11 +56,11 @@ test("adds a computer, which then reports its apps and shows on Calendar", async
     path: SHOT_DIR === undefined ? info.outputPath("devices.png") : `${SHOT_DIR}/devices.png`,
   });
 
-  await page.goto("/calendar");
-  await expect(page.getByRole("heading", { level: 1, name: "Календарь" })).toBeVisible();
+  await page.goto("/week");
+  await expect(page.getByRole("heading", { level: 1, name: "Неделя" })).toBeVisible();
   await expectNoA11yViolations(page);
   await page.screenshot({
     fullPage: true,
-    path: SHOT_DIR === undefined ? info.outputPath("calendar.png") : `${SHOT_DIR}/calendar.png`,
+    path: SHOT_DIR === undefined ? info.outputPath("week.png") : `${SHOT_DIR}/week.png`,
   });
 });

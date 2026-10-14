@@ -203,6 +203,8 @@ const BlockFacts = ({
         {[t(`category.${block.category}`), formatDuration(block.minutes, language)].join(" · ")}
       </Text>
       <WhereSatLine isIndented={false} rows={sat(block.startAt, block.endAt)} />
+      {/* Slot: "the apps used during this activity" (a follow-up, on Week and Day) goes here,
+      after where the block's time sat on the devices and before its task. */}
       {taskId === null ? null : (
         <Button
           onPress={() => {
@@ -263,9 +265,7 @@ export const PickedPane = ({
   if (picked === null) {
     return (
       <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-center font-sans text-[14px] text-muted">
-          {t("calendar.pickHint")}
-        </Text>
+        <Text className="text-center font-sans text-[14px] text-muted">{t("week.pickHint")}</Text>
       </View>
     );
   }

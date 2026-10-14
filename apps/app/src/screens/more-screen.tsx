@@ -1,5 +1,6 @@
 import { type Href, useRouter } from "expo-router";
 import {
+  CalendarRange,
   ChartColumn,
   ChevronRight,
   Folder,
@@ -22,8 +23,9 @@ type Row = {
   readonly label: MessageKey;
 };
 
-/** What a phone keeps behind More: the sidebar's other destinations. */
+/** What a phone keeps behind More: the sidebar's other destinations, Week first. */
 const ROWS: readonly Row[] = [
+  { href: "/week", icon: CalendarRange, label: "nav.week" },
   { href: "/projects", icon: Folder, label: "nav.projects" },
   { href: "/insights", icon: ChartColumn, label: "nav.insights" },
   { href: "/history", icon: History, label: "nav.history" },
@@ -65,7 +67,7 @@ const Owner = ({ name }: { readonly name: string }) => (
 );
 
 /**
-The phone's fifth tab: the owner's name at the top, then the rows that did not fit the tab bar.
+The phone's last tab: the owner's name at the top, then the rows that did not fit the tab bar.
 A wide window has them all in the sidebar and never shows this.
 */
 export const MoreScreen = () => {

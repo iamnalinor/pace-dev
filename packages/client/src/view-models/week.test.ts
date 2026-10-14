@@ -6,7 +6,7 @@ import { artboardState, ctx, MOSCOW } from "@pace/core/testing";
 
 import { fitHourPx, gridFromHour, lanesOf, placeIn, weekModel } from "./week.ts";
 
-/** The artboard world with the Calendar's night hours on or off, and these tracked stretches. */
+/** The artboard world with Week's night hours on or off, and these tracked stretches. */
 const world = ({
   nightHours = false,
   tracked = [],
@@ -50,7 +50,7 @@ const event = (startAt: string, endAt: string): CalendarEvent => ({
   title: "Seminar",
 });
 
-describe("the Calendar's hour range", () => {
+describe("Week's hour range", () => {
   it("is 07–24 by default, and 00–24 with night hours on", () => {
     expect(weekModel(world({}), null, ctx()).fromHour).toBe(7);
     expect(weekModel(world({ nightHours: true }), null, ctx()).fromHour).toBe(0);

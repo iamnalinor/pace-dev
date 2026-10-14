@@ -17,7 +17,7 @@ export const Screen = ({
 }: {
   readonly children: ReactNode;
   /**
-  The body takes the height left under the header as it is, without scrolling: the Calendar
+  The body takes the height left under the header as it is, without scrolling: Week
   fits its grid into it (and scrolls the grid itself only when it cannot).
   */
   readonly fills?: boolean;
