@@ -4,20 +4,20 @@ import {
   type EventBody,
   type EventInput,
   newId,
-  planParse,
-  quickInputBodies,
+  planProposal,
+  type Proposal,
+  type ProposalKind,
   type Result,
   t,
-  verifyParse,
 } from "@pace/core";
 
 import type { DecisionEntry } from "../shared/contract.ts";
+import type { Cooldowns, ParseProvider } from "../shared/llm/llm.ts";
 
 import { loadConfig } from "../shared/config.ts";
 import { inboxBody } from "../shared/inbox.ts";
-import { type Cooldowns, type ParseProvider, runParse } from "../shared/llm/llm.ts";
-import { buildParsePrompt } from "../shared/llm/prompt.ts";
 import { parseProviders } from "../shared/llm/providers.ts";
+import { readMessage } from "../shared/llm/read.ts";
 import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
 import { telegramOf } from "./notifier.ts";
 
@@ -26,6 +26,8 @@ export type QueuedParse = {
   readonly id: string;
   readonly text: string;
   readonly channel: "api" | "bot";
+  /** The field it was typed into; a text kept before fields existed is a task's. */
+  readonly domain?: "activity" | "auto" | "task" | undefined;
   readonly enqueuedAt: string;
   /** Not before this instant; `null` = at the next chance. */
   readonly retryAt: null | string;
@@ -102,14 +104,61 @@ export type Drained =
   | {
       readonly kind: "done" | "inbox";
       readonly item: QueuedParse;
-      readonly bodies: readonly EventBody[];
+      readonly inputs: readonly EventInput[];
     }
   | { readonly kind: "wait"; readonly item: QueuedParse };
 
 /**
+What a text read later writes without the person looking at it: what it wrote before the
+assistant could edit and delete (new tasks, problems added to one, solved, a task closed).
+An edit, a delete or an activity waits for the person in the Inbox instead.
+*/
+const AUTO_APPLIED: ReadonlySet<ProposalKind> = new Set([
+  "task.create",
+  "task.addSubtasks",
+  "task.markSubtasks",
+  "task.close",
+]);
+
+/** The events a drained text writes, recorded by the server at `now`. */
+const stampSystem = (bodies: readonly EventBody[], now: string): readonly EventInput[] =>
+  bodies.map((body) => ({ ...body, occurredAt: now, precision: "exact", source: "system" }));
+
+const toInbox = (item: QueuedParse, now: string): Exclude<Drained, { kind: "wait" }> => ({
+  inputs: stampSystem([inboxBody(item.text)], now),
+  item,
+  kind: "inbox",
+});
+
+/** Every proposal planned, or `null` when one is not for writing unseen or cannot be planned. */
+const planAll = (
+  proposals: readonly Proposal[],
+  world: { readonly state: CoreState; readonly now: string },
+): null | readonly EventInput[] => {
+  if (proposals.length === 0 || proposals.some((proposal) => !AUTO_APPLIED.has(proposal.kind))) {
+    return null;
+  }
+  const ctx = {
+    deviceTz: world.state.settings.timezone ?? "UTC",
+    newId: () => newId(),
+    now: world.now,
+    source: "system" as const,
+  };
+  const inputs: EventInput[] = [];
+  for (const proposal of proposals) {
+    const planned = planProposal(world.state, proposal, ctx);
+    if (!planned.ok) {
+      return null;
+    }
+    inputs.push(...planned.value);
+  }
+  return inputs;
+};
+
+/**
 Reads one queued text as the assistant would have at the time: the reading the person asked
-for is written (it can be undone from History); a text it cannot place, or one still unread a
-day later, goes to the Inbox instead.
+for is written (it can be undone from History); a text it cannot place, one that asks for an
+edit or a delete, or one still unread a day later, goes to the Inbox instead.
 */
 export const drainOne = async (
   item: QueuedParse,
@@ -121,16 +170,20 @@ export const drainOne = async (
   },
 ): Promise<{ readonly drained: Drained; readonly limited: Cooldowns }> => {
   const { cooldowns, now, providers, state } = world;
-  const ctx = { deviceTz: state.settings.timezone ?? "UTC", now };
-  const prompt = buildParsePrompt(item.text, { ctx, language: state.settings.language, state });
-  const answer = await runParse(providers, prompt, { cooldowns, now: () => Date.parse(now) });
+  const answer = await readMessage(providers, item.text, {
+    clock: () => Date.parse(now),
+    cooldowns,
+    domain: item.domain ?? "task",
+    now,
+    state,
+  });
   const limited = answer.ok ? answer.value.limited : answer.error.limited;
   if (!answer.ok) {
     const isStale = addMinutesIso(item.enqueuedAt, GIVE_UP_MINUTES) <= now;
     return {
       drained:
         isStale || answer.error.code === "llm/invalid-output"
-          ? { bodies: [inboxBody(item.text)], item, kind: "inbox" }
+          ? toInbox(item, now)
           : {
               item: { ...item, retryAt: answer.error.retryAt ?? addMinutesIso(now, RETRY_MINUTES) },
               kind: "wait",
@@ -138,22 +191,12 @@ export const drainOne = async (
       limited,
     };
   }
-  const projectNames = Object.values(state.projects.byId).map((project) => project.name);
-  const verified = verifyParse(answer.value.result, { projectNames, source: item.text });
-  const plan = planParse(verified, item.text, { ctx, state });
-  if (!plan.ok) {
-    return { drained: { bodies: [inboxBody(item.text)], item, kind: "inbox" }, limited };
-  }
-  const bodies =
-    plan.value.kind === "update"
-      ? plan.value.bodies
-      : quickInputBodies(plan.value.input, { now, state }, newId);
-  return { drained: { bodies, item, kind: "done" }, limited };
+  const inputs = planAll(answer.value.proposals, { now, state });
+  return {
+    drained: inputs === null ? toInbox(item, now) : { inputs, item, kind: "done" },
+    limited,
+  };
 };
-
-/** The events a drained text writes, recorded by the server at `now`. */
-export const stampSystem = (bodies: readonly EventBody[], now: string): readonly EventInput[] =>
-  bodies.map((body) => ({ ...body, occurredAt: now, precision: "exact", source: "system" }));
 
 /** The store a drain runs in: it reads, derives, writes as the server and logs. */
 type DrainStore = {
@@ -178,8 +221,8 @@ export type DrainDeps = {
 /** Texts read later are written by the server, as the person asked. */
 const SERVER = { deviceId: "server", source: "system" } as const;
 
-const write = async (deps: DrainDeps, bodies: readonly EventBody[]) =>
-  await deps.store.apply(stampSystem(bodies, deps.now), { ...SERVER, now: deps.now });
+const write = async (deps: DrainDeps, inputs: readonly EventInput[]) =>
+  await deps.store.apply(inputs, { ...SERVER, now: deps.now });
 
 const stateOf = async (deps: DrainDeps): Promise<CoreState> => {
   const { state } = await deps.store.read(deps.now);
@@ -214,10 +257,10 @@ const decisionOf = (item: QueuedParse, isDone: boolean): DecisionEntry => ({
 
 /** Writes what a drained text became; a reading that cannot be written falls back to the Inbox. */
 const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" }>) => {
-  const written = await write(deps, drained.bodies);
+  const written = await write(deps, drained.inputs);
   const isDone = drained.kind === "done" && written.ok;
   if (!isDone && drained.kind === "done") {
-    await write(deps, [inboxBody(drained.item.text)]);
+    await write(deps, toInbox(drained.item, deps.now).inputs);
   }
   await deps.store.logDecisions([decisionOf(drained.item, isDone)], deps.now);
   await tell(deps, isDone, drained.item.text);

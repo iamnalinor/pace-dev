@@ -7,7 +7,7 @@ import { newId } from "@pace/core";
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
-import { echoParse, fakeParseModel } from "../src/shared/llm/fake-model.ts";
+import { echoReply, fakeParseModel } from "../src/shared/llm/fake-model.ts";
 import { json, loginAsDev, readJson, storeIdOf } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
@@ -45,7 +45,7 @@ const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<R
     fetch: async () => {
       throw new Error("no network in tests");
     },
-    parseProviders: () => [{ model: fakeParseModel(echoParse), name: "fake" }],
+    parseProviders: () => [{ model: fakeParseModel(echoReply), name: "fake" }],
     telegramFetch,
   }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
@@ -248,6 +248,21 @@ describe("the bot as an assistant", () => {
     expect(sent[1]?.body).toMatchObject({
       text: "This preview has expired. Send the message again.",
     });
+  });
+
+  it("previews a change to an existing task by its summary and writes it on Accept", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("water the balcony plants"));
+    await webhook(callbackUpdate(buttonData("Accept")));
+    sent.length = 0;
+    await webhook(textUpdate("close task water the balcony plants"));
+    const text = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
+    expect(text).toBe("Close “water the balcony plants” as Done");
+    const accept = buttonData("Accept");
+    sent.length = 0;
+    await webhook(callbackUpdate(accept));
+    expect(sent[1]?.body).toMatchObject({ text: "Done ✓" });
+    expect(await pulledEvent(token, "task.closed")).toMatchObject({ payload: { outcome: "done" } });
   });
 
   it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {

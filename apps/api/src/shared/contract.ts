@@ -153,6 +153,8 @@ export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
   readonly enqueueParse: (
     item: {
       readonly channel: "api" | "bot";
+      /** The field it was typed into; a text kept before fields existed is a task's. */
+      readonly domain?: "activity" | "auto" | "task" | undefined;
       readonly retryAt: null | string;
       readonly text: string;
     },

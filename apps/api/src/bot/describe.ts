@@ -1,19 +1,20 @@
 import {
   type CoreState,
-  type EventBody,
   formatDuration,
   type Language,
   type MessageKey,
+  openInstanceOf,
   type ParseField,
-  type ParsePlan,
   presetById,
   projectById,
-  type QuickInput,
+  type Proposal,
+  resolvePreset,
   t,
+  type TaskDraft,
 } from "@pace/core";
 
-const dueText = (input: QuickInput, language: Language): null | string =>
-  input.dueAt === null || input.dueTz === null
+const dueText = (task: TaskDraft, language: Language): null | string =>
+  task.dueAt === null || task.dueTz === null
     ? null
     : new Intl.DateTimeFormat(language, {
         day: "numeric",
@@ -21,9 +22,9 @@ const dueText = (input: QuickInput, language: Language): null | string =>
         hourCycle: "h23",
         minute: "2-digit",
         month: "short",
-        timeZone: input.dueTz,
+        timeZone: task.dueTz,
         weekday: "short",
-      }).format(new Date(input.dueAt));
+      }).format(new Date(task.dueAt));
 
 type Line = {
   readonly field: null | ParseField;
@@ -31,86 +32,61 @@ type Line = {
   readonly value: null | string;
 };
 
-const createLines = (input: QuickInput, state: CoreState, language: Language): readonly Line[] => {
-  const preset = presetById(state.presets, input.presetId);
-  const project =
-    input.projectId === null ? undefined : projectById(state.projects, input.projectId);
+/** The importance the task gets: its own, else its category's default. */
+const importanceOf = (task: TaskDraft, state: CoreState) => {
+  const resolved = resolvePreset(state.presets, task.presetId);
+  return task.importance ?? (resolved.ok ? resolved.value.defaultImportance : null);
+};
+
+const createLines = (task: TaskDraft, state: CoreState, language: Language): readonly Line[] => {
+  const preset = presetById(state.presets, task.presetId);
+  const project = task.projectId === null ? undefined : projectById(state.projects, task.projectId);
+  const importance = importanceOf(task, state);
   const line = (field: Line["field"], key: MessageKey, value: Line["value"]): Line => ({
     field,
     label: t(language, key),
     value,
   });
   return [
-    line("title", "bot.field.title", input.title === "" ? input.text : input.title),
-    line("category", "bot.field.category", preset?.name ?? input.presetId),
-    line("project", "bot.field.project", project?.name ?? input.projectName),
-    line("dueDate", "bot.field.due", dueText(input, language)),
+    line("title", "bot.field.title", task.title),
+    line("category", "bot.field.category", preset?.name ?? task.presetId),
+    line("project", "bot.field.project", project?.name ?? task.projectName),
+    line("dueDate", "bot.field.due", dueText(task, language)),
     line(
       "estimateMinutes",
       "bot.field.estimate",
-      input.estimateMinutes === null ? null : formatDuration(input.estimateMinutes, language),
+      task.estimateMinutes === null ? null : formatDuration(task.estimateMinutes, language),
     ),
-    line(null, "bot.field.importance", t(language, `importance.${input.importance}`)),
+    line(
+      null,
+      "bot.field.importance",
+      importance === null ? null : t(language, `importance.${importance}`),
+    ),
     line(
       "subtasks",
       "bot.field.subtasks",
-      input.subtasks.length === 0
-        ? null
-        : input.subtasks.map((subtask) => subtask.label).join(", "),
+      task.subtasks.length === 0 ? null : task.subtasks.map((subtask) => subtask.label).join(", "),
     ),
   ];
 };
 
-const subtasksOf = (bodies: readonly EventBody[], state: CoreState, taskId: string): string => {
-  const task = state.tasks.byId[taskId];
-  const labelsOf = (body: EventBody): readonly string[] => {
-    if (body.type === "task.subtask.solved") {
-      const subtask = task?.subtasks.find((item) => item.id === body.payload.subtaskId);
-      return [subtask === undefined ? body.payload.subtaskId : subtask.label];
-    }
-    return body.type === "task.subtasks.added"
-      ? body.payload.subtasks.map((subtask) => subtask.label)
-      : [];
-  };
-  return bodies.flatMap((body) => labelsOf(body)).join(", ");
+type Extras = {
+  readonly state: CoreState;
+  readonly language: Language;
+  readonly now: string;
 };
 
-const updateText = (
-  plan: Extract<ParsePlan, { kind: "update" }>,
-  state: CoreState,
-  language: Language,
+/** A new task as its fields, doubtful ones marked; or the course week it is added to. */
+const describeCreate = (
+  proposal: Extract<Proposal, { kind: "task.create" }>,
+  { language, now, state }: Extras,
 ): string => {
-  const first = plan.bodies[0];
-  const subtasks = subtasksOf(plan.bodies, state, plan.taskId);
-  if (first?.type === "task.closed") {
-    return t(language, "bot.close", {
-      outcome: t(language, `outcome.${first.payload.outcome}`),
-      title: plan.title,
-    });
-  }
-  return t(language, first?.type === "task.subtask.solved" ? "bot.markSolved" : "bot.addSubtasks", {
-    subtasks,
-    title: plan.title,
-  });
-};
-
-/** The preview message: what will be written, doubtful fields marked, questions asked. */
-export const describePlan = (
-  plan: ParsePlan,
-  extras: {
-    readonly state: CoreState;
-    readonly language: Language;
-    readonly doubtful: readonly ParseField[];
-    readonly questions: readonly string[];
-    readonly instanceTitle: null | string;
-  },
-): string => {
-  const { doubtful, language, questions, state } = extras;
-  const asked = questions.map((question) => t(language, "bot.question", { question }));
-  if (plan.kind === "update") {
-    return [updateText(plan, state, language), ...asked].join("\n");
-  }
-  const lines = createLines(plan.input, state, language)
+  const doubtful = proposal.doubtful ?? [];
+  const { task } = proposal;
+  const due =
+    task.dueAt === null || task.dueTz === null ? null : { at: task.dueAt, tz: task.dueTz };
+  const instance = openInstanceOf(state, task.presetId, { due, now });
+  const lines = createLines(task, state, language)
     .filter((line) => line.value !== null)
     .map((line) => {
       const mark =
@@ -120,8 +96,24 @@ export const describePlan = (
       return `${line.label}: ${line.value ?? ""}${mark}`;
     });
   const header =
-    extras.instanceTitle === null
+    instance === undefined
       ? t(language, "bot.preview")
-      : t(language, "bot.addTo", { title: extras.instanceTitle });
-  return [header, ...lines, ...asked].join("\n");
+      : t(language, "bot.addTo", { title: instance.title });
+  return [header, ...lines].join("\n");
+};
+
+/**
+The preview message: a new task as its fields (doubtful ones marked), anything else by its
+summary, then the assistant's questions.
+*/
+export const describeProposals = (
+  proposals: readonly Proposal[],
+  extras: Extras & { readonly questions: readonly string[] },
+): string => {
+  const { language, questions } = extras;
+  const asked = questions.map((question) => t(language, "bot.question", { question }));
+  const described = proposals.map((proposal) =>
+    proposal.kind === "task.create" ? describeCreate(proposal, extras) : proposal.summary,
+  );
+  return [...described, ...asked].join("\n");
 };

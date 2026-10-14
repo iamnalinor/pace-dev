@@ -397,7 +397,7 @@ export class UserStore extends LiveStore {
 
   /** Keeps a text to read once the assistant is back (`retryAt`, or the next chance). */
   async enqueueParse(
-    item: Pick<parseQueue.QueuedParse, "channel" | "retryAt" | "text">,
+    item: Pick<parseQueue.QueuedParse, "channel" | "domain" | "retryAt" | "text">,
     now: string,
   ): Promise<void> {
     await parseQueue.enqueue(this.ctx.storage, { ...item, enqueuedAt: now });

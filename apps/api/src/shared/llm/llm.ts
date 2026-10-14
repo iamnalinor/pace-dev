@@ -2,7 +2,7 @@ import type { z } from "zod";
 
 import { generateText, type LanguageModel, Output } from "ai";
 
-import { err, ok, type ParseResult, ParseResultSchema, type Result } from "@pace/core";
+import { err, type ModelOutput, ModelOutputSchema, ok, type Result } from "@pace/core";
 
 import type { ParsePrompt } from "./prompt.ts";
 
@@ -31,7 +31,7 @@ export type Answer<T> = {
   readonly limited: Cooldowns;
 };
 
-export type ParseAnswer = Answer<ParseResult>;
+export type ParseAnswer = Answer<ModelOutput>;
 
 type RunOptions = { readonly cooldowns?: Cooldowns; readonly now?: () => number };
 
@@ -129,10 +129,10 @@ export const runStructured = async <T>(
   return await attempt(0, null);
 };
 
-/** The task parse: free text read into a task, or changes to one. */
+/** The parse: free text read into actions on tasks and activities. */
 export const runParse = async (
   providers: readonly ParseProvider[],
   prompt: ParsePrompt,
   options: RunOptions = {},
 ): Promise<Result<ParseAnswer, LlmError>> =>
-  await runStructured(providers, prompt, { ...options, schema: ParseResultSchema });
+  await runStructured(providers, prompt, { ...options, schema: ModelOutputSchema });

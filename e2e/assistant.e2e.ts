@@ -21,6 +21,6 @@ test("the assistant reads a line, the task is added, the decision is logged", as
 
   await page.goto("/decisions");
   await expect(page.getByRole("heading", { name: "Notification log" })).toBeVisible();
-  await expect(page.getByText("parse.create_task")).toBeVisible();
+  await expect(page.getByText("parse.task.create")).toBeVisible();
   await expectNoA11yViolations(page);
 });

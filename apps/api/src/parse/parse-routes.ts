@@ -1,66 +1,54 @@
 import type { Context, Hono } from "hono";
 
-import {
-  type ActivityParseResponse,
-  ActivityReadingSchema,
-  endpoints,
-  ok,
-  type ParseResponse,
-  verifyParse,
-} from "@pace/core";
+import { type CoreState, endpoints, ok, type ParseResponse } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
+import type { PromptDomain } from "../shared/llm/prompt.ts";
 
 import { requireUser } from "../shared/current-user.ts";
-import { buildActivityPrompt } from "../shared/llm/activity-prompt.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
-import { availability, type ParseProvider, runParse, runStructured } from "../shared/llm/llm.ts";
-import { buildParsePrompt } from "../shared/llm/prompt.ts";
+import { availability, type ParseProvider } from "../shared/llm/llm.ts";
+import { readByRules, readMessage } from "../shared/llm/read.ts";
 import { mount } from "../shared/mount.ts";
 
 /**
-`POST /api/parse`: the user's state (categories, projects, open tasks) frames the prompt;
-the answer is checked against the text before it goes back. Nothing is written, unless no
-model can answer and the caller asked to `defer`: then the text waits in the store and is
-read (and written) once one is back. `POST /api/parse/activity`: a note of what the person is
-doing read into a label, a category and a length (the app has started it already and relabels
-it). `GET /api/llm/status`: can the assistant read now?
+`POST /api/parse`: the user's state (categories, projects, open tasks, recent activities)
+frames the prompt; the answer comes back as proposals checked against the text. Nothing is
+written, unless no model can answer and the caller asked to `defer`: then the text waits in
+the store and is read (and written) once one is back. Without a model the rules propose what
+they can. `GET /api/llm/status`: can the assistant read now?
 */
 const storeOf = (c: Context<AppEnv>) =>
   c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
 
-/** No model can answer: logged, and kept for later when the caller asked to defer. */
-const unavailable = async (
-  store: ReturnType<typeof storeOf>,
-  { defer, text }: { readonly text: string; readonly defer?: boolean | undefined },
-  { now, retryAt }: { readonly now: string; readonly retryAt: null | string },
-): Promise<ParseResponse> => {
-  await store.logDecisions([parseDecision(text, "api", { retryAt, status: "unavailable" })], now);
-  if (defer !== true) {
-    return { retryAt, status: "unavailable" };
-  }
-  await store.enqueueParse({ channel: "api", retryAt, text }, now);
-  return { retryAt, status: "queued" };
+type Request = {
+  readonly text: string;
+  readonly domain: PromptDomain;
+  readonly defer?: boolean | undefined;
+  readonly draft?: boolean | undefined;
 };
 
-/** A note of what the person is doing, read by the first model that answers; nothing is written. */
-const readActivity = async (
+/** No model can answer: logged, the rules' reading, and kept for later when the caller asked to defer. */
+const unavailable = async (
   store: ReturnType<typeof storeOf>,
-  providers: readonly ParseProvider[],
-  text: string,
-): Promise<ActivityParseResponse> => {
-  const now = new Date().toISOString();
-  const { state } = await store.read(now);
-  const prompt = buildActivityPrompt(text, { language: state.settings.language, state });
-  const answer = await runStructured(providers, prompt, {
-    cooldowns: await store.llmCooldowns(now),
-    schema: ActivityReadingSchema,
-  });
-  await store.noteLlmLimits(answer.ok ? answer.value.limited : answer.error.limited, now);
-  return answer.ok
-    ? { provider: answer.value.provider, reading: answer.value.result, status: "parsed" }
-    : { retryAt: answer.error.retryAt, status: "unavailable" };
+  request: Request,
+  world: { readonly state: CoreState; readonly now: string; readonly retryAt: null | string },
+): Promise<ParseResponse> => {
+  const { now, retryAt } = world;
+  await store.logDecisions(
+    [parseDecision(request.text, "api", { retryAt, status: "unavailable" })],
+    now,
+  );
+  const rules = readByRules(request.text, request.domain, world);
+  if (request.defer !== true) {
+    return { ...rules, proposals: [...rules.proposals], retryAt, status: "unavailable" };
+  }
+  await store.enqueueParse(
+    { channel: "api", domain: request.domain, retryAt, text: request.text },
+    now,
+  );
+  return { ...rules, proposals: [], retryAt, status: "queued" };
 };
 
 export const mountParseRoutes = (
@@ -71,25 +59,26 @@ export const mountParseRoutes = (
     const now = new Date().toISOString();
     const store = storeOf(c);
     const { state } = await store.read(now);
-    const ctx = { deviceTz: state.settings.timezone ?? "UTC", now };
-    const prompt = buildParsePrompt(body.text, { ctx, language: state.settings.language, state });
-    const answer = await runParse(providersOf(c.get("config")), prompt, {
+    const read = await readMessage(providersOf(c.get("config")), body.text, {
       cooldowns: await store.llmCooldowns(now),
+      domain: body.domain,
+      now,
+      state,
     });
-    await store.noteLlmLimits(answer.ok ? answer.value.limited : answer.error.limited, now);
-    if (!answer.ok) {
-      return ok(await unavailable(store, body, { now, retryAt: answer.error.retryAt }));
+    await store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
+    if (!read.ok) {
+      return ok(await unavailable(store, body, { now, retryAt: read.error.retryAt, state }));
     }
-    const projectNames = Object.values(state.projects.byId).map((project) => project.name);
-    const verified = verifyParse(answer.value.result, { projectNames, source: body.text });
+    const { confidence, domain, output, proposals, provider, questions, rejected } = read.value;
     // Readings while typing come every pause: only the ones the person acts on are logged.
     if (body.draft !== true) {
       await store.logDecisions(
         [
           parseDecision(body.text, "api", {
-            doubtful: verified.doubtful,
-            provider: answer.value.provider,
-            result: verified.result,
+            output,
+            proposals,
+            provider,
+            rejected,
             status: "parsed",
           }),
         ],
@@ -97,17 +86,13 @@ export const mountParseRoutes = (
       );
     }
     return ok({
-      doubtful: [...verified.doubtful],
-      isClean: verified.isClean,
-      provider: answer.value.provider,
-      result: verified.result,
+      confidence,
+      domain,
+      proposals: [...proposals],
+      provider,
+      ...(questions.length > 0 && { questions: [...questions] }),
       status: "parsed" as const,
     });
-  });
-
-  mount(app, endpoints.parse.activity, async ({ body, c }) => {
-    const providers = providersOf(c.get("config"));
-    return ok(await readActivity(storeOf(c), providers, body.text));
   });
 
   mount(app, endpoints.parse.status, async ({ c }) => {

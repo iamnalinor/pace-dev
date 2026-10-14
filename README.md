@@ -386,15 +386,24 @@ AI SDK: **Groq** (`openai/gpt-oss-120b`, strict JSON schema) first, **Gemini**
 (`gemini-flash-latest`) when Groq is rate limited, and a **fake** provider
 (`LLM_PROVIDER=fake`) in tests and the e2e Worker. Keys come from the `GROQ_API_KEY` and
 `GEMINI_API_KEY` secrets; a provider without a key is skipped, and with none the assistant
-reports itself unavailable. The prompt (categories, projects, open tasks, now, zone) stays
-under 3k tokens, the free tier's per-minute budget.
+reports itself unavailable. The prompt (categories, projects, up to 40 open tasks and today's
+and yesterday's activities under short aliases such as `t3` and `a2`, never their ids, now,
+zone) stays under 3k tokens, the free tier's per-minute budget.
 
 The LLM never rewrites your text: the line is stored verbatim, every extracted string must
 be a literal quote of it, and numbers and dates need a quote as evidence — anything else
 comes back marked "check this". Where it is used:
 
-- `POST /api/parse` — the composer's **Read with AI** (web and app) fills the same chips
-  the rule-based reading does; questions show as one-tap answers.
+- `POST /api/parse` — `{ text, domain: "task" | "activity" | "auto" }` → proposals for the
+  person to accept: create, edit, delete or close a task (or add and mark its subtasks);
+  start, log, edit or delete an activity. Each comes with a summary written by code. The
+  model answers with aliases of the lists it was shown; code maps them back and checks
+  them: an alias outside the lists is dropped, a delete must quote the item's title, times
+  must name real minutes. With `auto` it also says whether the text is about a task or an
+  activity and how sure it is (below `CLASSIFY_CONFIDENT` = 0.8 the bot asks). Without a
+  model the rules propose a new task, or the activity a typed span names ("7:30 - 8:30 -
+  ходил в военкомат" is logged). The composer's **Read with AI** (web and app) fills the
+  same chips the rule-based reading does; questions show as one-tap answers.
 - The bot's previews (above).
 - `GET /api/decisions` and the **Decision log** page (Settings), plus the MCP tool
   `search_decisions`: every parse and every notification sent or held back, with the rule,
@@ -404,8 +413,9 @@ comes back marked "check this". Where it is used:
 `retry-after`) and skipped until then, so the next calls go straight to the one still
 answering; `GET /api/llm/status` says whether the assistant can read now and when it is back.
 With every provider out, the composer offers **Read it when it's back**: the line is kept in
-your Durable Object and read at that time, then written as read (History can undo it) or put in
-the Inbox if it cannot be placed or is still unread a day later. The bot does the same with any
+your Durable Object and read at that time, then written as read (History can undo it: new
+tasks, problems added or solved, a task closed) or put in the Inbox if it cannot be placed,
+asks for an edit or a delete, or is still unread a day later. The bot does the same with any
 message and writes back once it has read it.
 
 The Android app mirrors `GET /api/notify/plan` into local reminders (digest windows and

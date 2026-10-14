@@ -120,6 +120,9 @@ slow, so `mutation.yml` runs it weekly and on demand; reports land in `reports/`
 
 ## LLM regression (planned)
 
-Stage 2 adds `packages/core/src/parse/regression/` with cases and `run.ts`;
-`bun test:llm` will run them against Groq and Gemini and write `docs/llm.md`.
-`llm-regression.yml` already exists for it (weekly, with the provider secrets).
+The cases are in `packages/core/src/parse/regression/cases.fake.ts`: a message, the field it was
+typed into (`task`, `activity` or `auto`), the instant over the artboard world, and the
+proposals expected (kinds in order, fields of the first, the domain and how sure for `auto`).
+`cases.test.ts` keeps them well-formed in `bun test:unit`. The runner (`run.ts`) is still to
+come: `bun test:llm` will run them against Groq and Gemini and write `docs/llm.md`.
+`llm-regression.yml` already exists for it (on demand, with the provider secrets).
