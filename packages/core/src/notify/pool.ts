@@ -94,8 +94,15 @@ export const ANSWERS = {
   activity_overrun: ["still", "stopped"],
 } as const satisfies Record<NotificationKind, readonly Resolution[]>;
 
-/** The answer resolutions a person gives (not `read` or `expired`). */
-export type Answer = "attended" | "skipped" | "still" | "stopped";
+/** The answer resolutions a person gives (not `read` or `expired`): the ones of `ANSWERS`. */
+export type Answer = (typeof ANSWERS)[NotificationKind][number];
+
+/** Every answer some kind has, once each (the phone's buttons, what an answer may be). */
+export const ALL_ANSWERS: readonly Answer[] = [...new Set(Object.values(ANSWERS).flat())];
+
+/** Whether a value (a button's identifier, say) is one of the answers. */
+export const isAnswer = (value: string): value is Answer =>
+  (ALL_ANSWERS as readonly string[]).includes(value);
 
 /** Whether a person may settle a notification of `kind` this way. */
 export const canResolveAs = (kind: NotificationKind, resolution: Resolution): boolean =>

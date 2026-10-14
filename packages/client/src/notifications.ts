@@ -134,10 +134,10 @@ const resolveOf =
   };
 
 const skipEventOf =
-  ({ api }: FeedDeps, refresh: () => Promise<void>) =>
+  ({ api, source }: FeedDeps, refresh: () => Promise<void>) =>
   async (eventKey: string): Promise<boolean> => {
     try {
-      await api.call(endpoints.calendar.skip, { body: { eventKey } });
+      await api.call(endpoints.calendar.skip, { body: { eventKey, from: source } });
       void refresh();
       return true;
     } catch {

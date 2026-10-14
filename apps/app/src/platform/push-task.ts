@@ -2,13 +2,12 @@ import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 
 import { type ApiClient, createApiClient } from "@pace/client";
-import { endpoints } from "@pace/core";
+import { endpoints, isAnswer } from "@pace/core";
 
 import { API_BASE_URL } from "./api-base.ts";
 import {
   answerFromButton,
   dismissPoolNotification,
-  isAnswer,
   notificationIdOf,
   type ShownContent,
 } from "./notifications.ts";

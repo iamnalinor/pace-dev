@@ -116,7 +116,7 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.calendar.skip, async ({ body, c }) => {
     await userStoreOf(c).skipCalendarEvent(body.eventKey, {
       now: new Date().toISOString(),
-      origin: "app",
+      origin: body.from,
     });
     return ok({ ok: true as const });
   });

@@ -323,7 +323,9 @@ describe("NowBoard", () => {
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
     const eventKey = calendarEventKey({ startAt: addMinutesIso(NOW, 5), title: "Seminar" });
     await waitFor(() => {
-      expect(skip).toHaveBeenCalledWith(expect.objectContaining({ body: { eventKey } }));
+      expect(skip).toHaveBeenCalledWith(
+        expect.objectContaining({ body: { eventKey, from: "app" } }),
+      );
     });
   });
 

@@ -1,6 +1,7 @@
 import type { CoreState } from "../materialize/core-state.ts";
 import type { Activity } from "../tracking/model.ts";
 
+import { isOpen } from "../model/task.ts";
 import { addMinutesIso } from "../time.ts";
 import { isCalendarRun } from "../tracking/calendar-run.ts";
 import { remindAt } from "../tracking/expect.ts";
@@ -242,10 +243,11 @@ export const poolPass = (inputs: PoolInputs): PoolPass => {
     events: [...memory.events, ...events.handled].filter(
       (key) => key.slice(0, key.indexOf("@")) > addMinutesIso(now, -KEEP_EVENT_MINUTES),
     ),
-    // Only tasks still open at the deadline reported matter.
+    // Only tasks still open, at the deadline reported, matter: a closed one is never listed again.
     reported: [...memory.reported, ...digest.reported].filter((key) => {
       const [taskId = "", dueAt = ""] = key.split("@", 2);
-      return inputs.state.tasks.byId[taskId]?.dueAt === dueAt;
+      const task = inputs.state.tasks.byId[taskId];
+      return task !== undefined && isOpen(task) && task.dueAt === dueAt;
     }),
   };
   const stillOpen = inputs.open.filter((open) => settled.every((done) => done.id !== open.id));

@@ -6,6 +6,7 @@ import { useStore } from "zustand";
 import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
 
 import {
+  isAnswer,
   type Language,
   type MessageKey,
   type MessageParams,
@@ -18,7 +19,6 @@ import { IS_PHONE } from "./platform/device.ts";
 import {
   answerFromButton,
   dismissPoolNotification,
-  isAnswer,
   notificationIdOf,
   pollNow,
   pushStore,

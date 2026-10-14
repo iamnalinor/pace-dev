@@ -291,8 +291,3 @@ export const notificationIdOf = (data: unknown): null | string => {
       : null;
   return typeof id === "string" ? id : null;
 };
-
-const ANSWER_IDS: ReadonlySet<string> = new Set(["attended", "skipped", "still", "stopped"]);
-
-/** Whether an action identifier is one of the answer buttons. */
-export const isAnswer = (identifier: string): identifier is Answer => ANSWER_IDS.has(identifier);
