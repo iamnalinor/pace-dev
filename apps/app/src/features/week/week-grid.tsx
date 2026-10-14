@@ -325,9 +325,8 @@ const SidewaysDays = ({
       contentContainerClassName="min-w-full flex-row"
       horizontal
       onContentSizeChange={() => {
-        if (today > 0) {
-          scrollerRef.current?.scrollTo({ animated: false, x: (today - 1) * minColumnPx });
-        }
+        // Another week has no today: it opens at its Monday, wherever the last one was left.
+        scrollerRef.current?.scrollTo({ animated: false, x: Math.max(0, today - 1) * minColumnPx });
       }}
       ref={scrollerRef}
     >

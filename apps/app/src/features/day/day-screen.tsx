@@ -227,14 +227,11 @@ const Entries = ({
 }) => (
   <RowList className="px-5">
     {entries.map((entry, index) => (
-      <Animated.View
-        className={cx(index > 0 && "border-t border-line")}
-        entering={ROW_ENTER}
-        exiting={ROW_EXIT}
-        key={entry.key}
-        layout={ROW_LAYOUT}
-      >
-        <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
+      <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
+        {/* The hairline on a plain view: the web drops class names on animated ones. */}
+        <View className={cx(index > 0 && "border-t border-line")} testID="day-entry">
+          <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
+        </View>
       </Animated.View>
     ))}
   </RowList>

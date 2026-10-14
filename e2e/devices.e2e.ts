@@ -7,11 +7,9 @@ const SHOT_DIR = process.env["E2E_SHOT_DIR"];
 
 test.use({ viewport: { height: 900, width: 1440 } });
 
-test("adds a computer, which then reports its apps and shows on Calendar", async ({
-  page,
-}, info) => {
+test("adds a computer, which then reports its apps and shows on Week", async ({ page }, info) => {
   const { token } = await loginViaApi(page);
-  // A lived-in account (in Russian) so Calendar has something to show.
+  // A lived-in account (in Russian) so Week has something to show.
   await seedLivedIn(token);
   await page.goto("/devices");
   await expect(page.getByText("Пока ничего не присылает данные.")).toBeVisible();

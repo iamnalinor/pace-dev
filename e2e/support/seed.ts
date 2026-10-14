@@ -16,7 +16,7 @@ const DAY = 24 * HOUR;
 const ZONE = "Europe/Moscow";
 
 /** A ULID whose time part is `at`, so the seeded ids sort like real ones. */
-const ulid = (at: number): string => {
+export const ulid = (at: number): string => {
   const time = Array.from({ length: 10 }, (_, index) =>
     CROCKFORD.charAt(Math.floor(at / 32 ** (9 - index)) % 32),
   ).join("");
