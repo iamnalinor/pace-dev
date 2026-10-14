@@ -124,6 +124,36 @@ describe("createNotificationFeed", () => {
     expect(parseLiveNotice({ seq: 1, type: "changed" })).toBeNull();
   });
 
+  it("reads a newer server's pool: keys it adds dropped, kinds and results it adds left out", async () => {
+    const newer = seminar("attended");
+    const { feed } = feedWith({
+      "GET /api/notifications": () => ({
+        deliveries: {
+          e: [
+            { at: newer.createdAt, device: "Pixel", method: "fcm", reason: null, result: "sent" },
+            { at: newer.createdAt, device: "Pixel", method: "fcm", reason: null, result: "read" },
+          ],
+        },
+        items: [
+          { ...newer, payload: { ...newer.payload, colour: "red" }, priority: 2 },
+          { ...login("x", newer.createdAt), kind: "weather", payload: { rain: true } },
+          { ...digest("d", newer.createdAt), resolution: "snoozed", resolvedAt: newer.createdAt },
+        ],
+        more: false,
+        total: 3,
+      }),
+    });
+    await feed.refresh();
+    const { deliveries, items } = feed.store.getState();
+    expect(items).toEqual([
+      newer,
+      { ...digest("d", newer.createdAt), resolution: "read", resolvedAt: newer.createdAt },
+    ]);
+    expect(deliveries["e"]?.map((entry) => entry.result)).toEqual(["sent"]);
+    const notice = parseLiveNotice({ id: "e", resolution: "snoozed", type: "dismiss", by: "x" });
+    expect(notice).toEqual({ id: "e", resolution: "read", type: "dismiss" });
+  });
+
   it("answers through the resolve endpoint as the web, keeping the store in step", async () => {
     const { fake, feed } = feedWith({
       "GET /api/notifications": () => ({ deliveries: {}, items: [seminar(null)], more: false }),

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { NotificationSchema } from "../../notify/pool.ts";
+import { knownOrNull, knownValue, knownValues } from "../tolerant.ts";
 
 /** A page of the pool, newest first: `before` is the id the previous page ended at. */
 export const NotificationsQuerySchema = z.object({
@@ -21,10 +22,12 @@ const DeliveryEntrySchema = z.object({
   reason: z.string().nullable(),
 });
 
-const DeliveriesSchema = z.array(DeliveryEntrySchema);
+/** An entry with a result this client does not know is left out of the log. */
+const DeliveriesSchema = knownValues(DeliveryEntrySchema);
 
 export const NotificationsOutputSchema = z.object({
-  items: z.array(NotificationSchema),
+  /** A kind this client does not know yet (a newer server's) is left out, the rest shown. */
+  items: knownValues(NotificationSchema),
   /** Per notification id, its delivery log (push attempts to devices), for the item's detail. */
   deliveries: z.record(z.string(), DeliveriesSchema),
   more: z.boolean(),
@@ -61,7 +64,7 @@ export const PushSubscriptionSchema = z.discriminatedUnion("method", [
 ]);
 
 export const PushSubscriptionOutputSchema = z.object({
-  method: z.enum(["fcm", "poll", "none"]),
+  method: knownValue(["fcm", "poll", "none"], "none"),
 });
 
 /**
@@ -69,7 +72,8 @@ The push methods this server accepts now: `fcm` while Firebase is set up and wor
 always. A device registers with one of them, or none.
 */
 export const PushMethodsSchema = z.object({
-  pushMethods: z.array(z.enum(["fcm", "poll"])),
+  /** A method this client cannot use (a newer server's) is not offered. */
+  pushMethods: knownValues(z.enum(["fcm", "poll"])),
 });
 
 /** What a polling device fetches: everything after the cursor of its last fetch. */
@@ -86,8 +90,8 @@ const PollShowSchema = z.object({
   notificationId: z.string(),
   title: z.string(),
   body: z.string(),
-  /** As it stands now; `null` once gone. */
-  notification: NotificationSchema.nullable(),
+  /** As it stands now; `null` once gone (or of a kind this client does not know). */
+  notification: knownOrNull(NotificationSchema),
 });
 
 const PollDismissSchema = z.object({ type: z.literal("dismiss"), notificationId: z.string() });
@@ -95,7 +99,7 @@ const PollDismissSchema = z.object({ type: z.literal("dismiss"), notificationId:
 const PollEntrySchema = z.discriminatedUnion("type", [PollShowSchema, PollDismissSchema]);
 
 export const PollOutputSchema = z.object({
-  entries: z.array(PollEntrySchema),
+  entries: knownValues(PollEntrySchema),
   cursor: z.number().int(),
 });
 

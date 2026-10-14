@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import { exports } from "cloudflare:workers";
 
 export const api = exports.default;
@@ -33,6 +35,16 @@ export const readJson = async <T>(response: Response): Promise<T> =>
 
 export const json = async <T = unknown>(path: string, options: RequestOptions = {}): Promise<T> =>
   await readJson<T>(await call(path, options));
+
+/**
+An endpoint's answer as `@pace/client` reads it: through the endpoint's own output schema (loose,
+tolerant), so a test sees what a client sees and fails when the server answers off-contract.
+*/
+export const answerOf = async <T extends z.ZodType>(
+  definition: { readonly output: T },
+  path: string,
+  options: RequestOptions = {},
+): Promise<z.output<T>> => definition.output.parse(await json(path, options));
 
 /** The store id a client confirms with a pull before it pushes. */
 export const storeIdOf = async (token: string): Promise<string> =>

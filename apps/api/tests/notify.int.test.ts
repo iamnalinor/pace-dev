@@ -2,7 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
 
-import { type CalendarEvent, newId } from "@pace/core";
+import { type CalendarEvent, endpoints, newId } from "@pace/core";
 
 import type { FcmTarget } from "../src/shared/fcm.ts";
 import type { TelegramTarget } from "../src/shared/telegram-api.ts";
@@ -11,7 +11,7 @@ import type { UserStore } from "../src/user-store/user-store.ts";
 
 import { subscribe, subscriptionsOf } from "../src/shared/push-subscriptions.ts";
 import { acceptedMethods } from "../src/shared/push/registry.ts";
-import { call, json, loginAsDev } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev } from "./helpers.ts";
 
 const MOSCOW = "Europe/Moscow";
 // eslint-disable-next-line sonarjs/no-hardcoded-ip -- the address a sign-in notice shows
@@ -372,7 +372,7 @@ describe("the notifications API", () => {
   it("lists, marks read and answers for the signed-in user only", async () => {
     const token = await loginAsDev("1002");
     expect((await call("/api/notifications")).status).toBe(401);
-    const page = await json<{ items: unknown[]; more: boolean }>("/api/notifications?limit=5", {
+    const page = await answerOf(endpoints.notifications.list, "/api/notifications?limit=5", {
       token,
     });
     expect(page).toMatchObject({ more: false });
@@ -411,19 +411,20 @@ describe("the notifications API", () => {
       new Date().toISOString(),
     );
     await call("/api/notifications/read", { body: { ids: [login.id] }, token });
-    const listed = await json<{ items: { id: string; readAt: null | string }[] }>(
-      "/api/notifications",
-      { token },
-    );
+    const listed = await answerOf(endpoints.notifications.list, "/api/notifications", { token });
     expect(listed.items.find((item) => item.id === login.id)?.readAt).not.toBeNull();
     const wrong = await call(`/api/notifications/${login.id}/resolve`, {
       body: { resolution: "attended" },
       token,
     });
     expect(wrong.status).toBe(422);
-    const read = await json<{ notification: { resolution: string } }>(
+    const read = await answerOf(
+      endpoints.notifications.resolve,
       `/api/notifications/${login.id}/resolve`,
-      { body: { resolution: "read" }, token },
+      {
+        body: { resolution: "read" },
+        token,
+      },
     );
     expect(read.notification.resolution).toBe("read");
   });
@@ -511,7 +512,9 @@ const phoneWithToken = async (pushToken: string) => {
 
 describe("Firebase push", () => {
   it("lists only polling and refuses FCM registration without the secret", async () => {
-    expect(await json("/api/push/methods")).toEqual({ pushMethods: ["poll"] });
+    expect(await answerOf(endpoints.notifications.pushMethods, "/api/push/methods")).toEqual({
+      pushMethods: ["poll"],
+    });
     const token = await loginAsDev("1002");
     const refused = await call("/api/push/subscription", {
       body: { endpoint: "fcm-token", method: "fcm" },
@@ -521,7 +524,11 @@ describe("Firebase push", () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({ code: "push/method-unavailable" });
     expect(
-      await json("/api/push/subscription", { body: { method: "none" }, method: "PUT", token }),
+      await answerOf(endpoints.notifications.push, "/api/push/subscription", {
+        body: { method: "none" },
+        method: "PUT",
+        token,
+      }),
     ).toEqual({ method: "none" });
   });
 
@@ -617,17 +624,12 @@ describe("Firebase push", () => {
   });
 });
 
-type Polled = {
-  readonly entries: readonly { readonly type: string; readonly notificationId: string }[];
-  readonly cursor: number;
-};
-
 describe("polling", () => {
   it("queues what a polling device gets, hands it over once, then the dismissal", async () => {
     const phone = await loginAsDev("1002");
     const laptop = await loginAsDev("1002");
     expect(
-      await json("/api/push/subscription", {
+      await answerOf(endpoints.notifications.push, "/api/push/subscription", {
         body: { method: "poll" },
         method: "PUT",
         token: phone,
@@ -648,15 +650,14 @@ describe("polling", () => {
       },
       new Date().toISOString(),
     );
-    const before = await json<{ deliveries: Record<string, { method: string; result: string }[]> }>(
-      "/api/notifications",
-      { token: laptop },
-    );
+    const before = await answerOf(endpoints.notifications.list, "/api/notifications", {
+      token: laptop,
+    });
     expect(before.deliveries[login.id]).toEqual([
       expect.objectContaining({ method: "poll", result: "queued" }),
     ]);
 
-    const first = await json<Polled>("/api/push/poll", { token: phone });
+    const first = await answerOf(endpoints.notifications.poll, "/api/push/poll", { token: phone });
     expect(first.entries).toEqual([
       expect.objectContaining({
         body: "Signed in: Chrome · 1.2.3.4 · Germany",
@@ -666,24 +667,33 @@ describe("polling", () => {
         type: "show",
       }),
     ]);
-    expect((await json<Polled>("/api/push/poll", { token: laptop })).entries).toEqual([]);
-    const after = await json<{ deliveries: Record<string, { result: string }[]> }>(
-      "/api/notifications",
-      { token: laptop },
-    );
+    expect(
+      (await answerOf(endpoints.notifications.poll, "/api/push/poll", { token: laptop })).entries,
+    ).toEqual([]);
+    const after = await answerOf(endpoints.notifications.list, "/api/notifications", {
+      token: laptop,
+    });
     expect(after.deliveries[login.id]?.[0]?.result).toBe("sent");
 
     await call(`/api/notifications/${login.id}/resolve`, {
       body: { resolution: "read" },
       token: laptop,
     });
-    const second = await json<Polled>(`/api/push/poll?after=${String(first.cursor)}`, {
-      token: phone,
-    });
+    const second = await answerOf(
+      endpoints.notifications.poll,
+      `/api/push/poll?after=${String(first.cursor)}`,
+      {
+        token: phone,
+      },
+    );
     expect(second.entries).toEqual([{ notificationId: login.id, type: "dismiss" }]);
-    const third = await json<Polled>(`/api/push/poll?after=${String(second.cursor)}`, {
-      token: phone,
-    });
+    const third = await answerOf(
+      endpoints.notifications.poll,
+      `/api/push/poll?after=${String(second.cursor)}`,
+      {
+        token: phone,
+      },
+    );
     expect(third.entries).toEqual([]);
     expect((await call("/api/push/poll")).status).toBe(401);
   });
