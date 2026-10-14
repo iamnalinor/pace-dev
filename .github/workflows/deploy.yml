@@ -119,7 +119,17 @@ jobs:
         working-directory: apps/api
         env:
           VALUE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put FIREBASE_SERVICE_ACCOUNT; fi
+        run: |
+          if [ -z "$VALUE" ]; then
+            echo "No FIREBASE_SERVICE_ACCOUNT: push is off, phones poll"
+            exit 0
+          fi
+          # An unreadable key would leave push off without a word; fail here (never print it).
+          if ! printf '%s' "$VALUE" | jq -e '.project_id and .client_email and .private_key' >/dev/null 2>&1; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT is not a service account JSON key"
+            exit 1
+          fi
+          printf '%s' "$VALUE" | bunx wrangler secret put FIREBASE_SERVICE_ACCOUNT
 
       # BOT_INFO is the JSON of getMe, stored at deploy time so the bot never calls Telegram
       # on a cold start. Stored as a secret (same mechanism, not committed to wrangler.jsonc).
