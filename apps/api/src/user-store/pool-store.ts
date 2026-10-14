@@ -21,7 +21,7 @@ export abstract class PoolStore extends LiveStore {
     created: NewNotification,
     now: string,
     couriers?: Couriers,
-  ): Promise<PoolNotification> {
+  ): ReturnType<NotificationPool["notify"]> {
     return await this.pool.notify(created, now, couriers);
   }
 

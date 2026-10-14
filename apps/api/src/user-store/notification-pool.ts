@@ -207,11 +207,18 @@ const pushToDevices = async (deps: PoolDeps, notification: PoolNotification): Pr
 /**
 Delivers a notification just added to the pool: Telegram when its kind is on there and the chat
 is known, every open client's feed over the live socket (a phone without push shows it from
-there), and each phone's push method when the kind is on for the app.
+there), and each phone's push method when the kind is on for the app. Delivered again (a pass
+repeated after being cut short), it reaches only what it did not reach: Telegram once, each
+device once; one resolved meanwhile goes nowhere.
 */
 export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Promise<void> => {
   const { notification } = stored;
-  await sendToTelegram(deps, stored);
+  if (notification.resolvedAt !== null) {
+    return;
+  }
+  if (stored.telegram.state === "pending") {
+    await sendToTelegram(deps, stored);
+  }
   // Queued for polling devices before the open clients hear of it: an open app fetches at once.
   await pushToDevices(deps, notification);
   broadcast(deps.ctx, { notification, type: "notification" });

@@ -69,6 +69,14 @@ const telegramRecorder = () => {
   return { calls, sent: () => calls.filter((entry) => entry.method === "sendMessage"), target };
 };
 
+/** What `notify` added; a refusal fails the test. */
+const added = <T>(result: { readonly ok: false } | { readonly ok: true; readonly value: T }): T => {
+  if (!result.ok) {
+    throw new Error("the notification was refused");
+  }
+  return result.value;
+};
+
 const couriersOf = (telegram: TelegramTarget, fcm: FcmTarget | null = null): Couriers => ({
   push: { fcm },
   telegram,
@@ -409,18 +417,20 @@ describe("the notifications API", () => {
     const token = await loginAsDev("1002");
     const { id: userId } = await json<{ id: string }>("/api/me", { token });
     const store = env.USER_STORE.get(env.USER_STORE.idFromName(userId));
-    const login = await store.notify(
-      {
-        kind: "login",
-        payload: {
-          country: "Germany",
-          ip: SIGN_IN_IP,
-          kind: "web",
-          name: "Chrome on macOS",
-          sessionId: "s-1",
+    const login = added(
+      await store.notify(
+        {
+          kind: "login",
+          payload: {
+            country: "Germany",
+            ip: SIGN_IN_IP,
+            kind: "web",
+            name: "Chrome on macOS",
+            sessionId: "s-1",
+          },
         },
-      },
-      new Date().toISOString(),
+        new Date().toISOString(),
+      ),
     );
     await call("/api/notifications/read", { body: { ids: [login.id] }, token });
     const listed = await answerOf(endpoints.notifications.list, "/api/notifications", { token });
@@ -564,10 +574,52 @@ const phoneWithToken = async (pushToken: string) => {
     transport: "fcm",
     userId,
   });
-  return { stub: env.USER_STORE.get(env.USER_STORE.idFromName(userId)), token, userId };
+  return {
+    sessionId: session?.id ?? "",
+    stub: env.USER_STORE.get(env.USER_STORE.idFromName(userId)),
+    token,
+    userId,
+  };
 };
 
 describe("Firebase push", () => {
+  it("keeps one way to push per device, even when it registers twice at once", async () => {
+    const { sessionId, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const at = async (transport: string, endpoint: string) => {
+      await subscribe(env.DB, { endpoint, now: Date.now(), sessionId, transport, userId });
+    };
+    await Promise.allSettled([at("fcm", `fcm-${crypto.randomUUID()}`), at("poll", sessionId)]);
+    const rows = await env.DB.prepare(
+      "SELECT transport FROM push_subscriptions WHERE session_id = ?",
+    )
+      .bind(sessionId)
+      .all();
+    expect(rows.results).toHaveLength(1);
+    // The phone signed in to another account: its token pushes for that account only.
+    const token = `fcm-${crypto.randomUUID()}`;
+    await at("fcm", token);
+    const otherToken = await loginAsDev("1002");
+    const { id: otherId } = await json<{ id: string }>("/api/me", { token: otherToken });
+    const otherSession = await env.DB.prepare(
+      "SELECT id FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+    )
+      .bind(otherId)
+      .first<{ id: string }>();
+    await subscribe(env.DB, {
+      endpoint: token,
+      now: Date.now(),
+      sessionId: otherSession?.id ?? "",
+      transport: "fcm",
+      userId: otherId,
+    });
+    expect(await subscriptionsOf(env.DB, userId, Date.now())).toEqual([]);
+    expect(await subscriptionsOf(env.DB, otherId, Date.now())).toContainEqual(
+      expect.objectContaining({ endpoint: token, transport: "fcm" }),
+    );
+    // The other account's tests expect no phone of its own.
+    await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").bind(otherId).run();
+  });
+
   it("lists only polling and refuses FCM registration without the secret", async () => {
     expect(await answerOf(endpoints.notifications.pushMethods, "/api/push/methods")).toEqual({
       pushMethods: ["poll"],
@@ -732,20 +784,18 @@ describe("Firebase push", () => {
       expect(fcm.sends()).toHaveLength(2);
       expect(await acceptedMethods(env.DB, { fcm: fcm.target }, now)).toEqual(["poll"]);
       // While broken, a device on it is not pushed to, and the log says why.
-      const login = await instance.notify(
-        {
-          kind: "login",
-          payload: {
-            country: "Germany",
-            ip: SIGN_IN_IP,
-            kind: "web",
-            name: "Chrome",
-            sessionId: "s",
-          },
+      const couriers = couriersOf(telegramRecorder().target, fcm.target);
+      const signIn = {
+        kind: "login" as const,
+        payload: {
+          country: "Germany",
+          ip: SIGN_IN_IP,
+          kind: "web",
+          name: "Chrome",
+          sessionId: "s",
         },
-        CROSSED,
-        couriersOf(telegramRecorder().target, fcm.target),
-      );
+      };
+      const login = added(await instance.notify(signIn, CROSSED, couriers));
       expect(fcm.sends()).toHaveLength(2);
       const page = await instance.listNotifications({ limit: 5 });
       expect(page.deliveries[login.id]).toContainEqual(
@@ -794,18 +844,20 @@ describe("polling", () => {
     ).toEqual({ method: "poll" });
     const { id: userId } = await json<{ id: string }>("/api/me", { token: phone });
     const store = env.USER_STORE.get(env.USER_STORE.idFromName(userId));
-    const login = await store.notify(
-      {
-        kind: "login",
-        payload: {
-          country: "Germany",
-          ip: SIGN_IN_IP,
-          kind: "web",
-          name: "Chrome",
-          sessionId: "s-9",
+    const login = added(
+      await store.notify(
+        {
+          kind: "login",
+          payload: {
+            country: "Germany",
+            ip: SIGN_IN_IP,
+            kind: "web",
+            name: "Chrome",
+            sessionId: "s-9",
+          },
         },
-      },
-      new Date().toISOString(),
+        new Date().toISOString(),
+      ),
     );
     const before = await answerOf(endpoints.notifications.list, "/api/notifications", {
       token: laptop,
@@ -856,5 +908,104 @@ describe("polling", () => {
     );
     expect(third.entries).toEqual([]);
     expect((await call("/api/push/poll")).status).toBe(401);
+  });
+});
+
+describe("the pool's own bookkeeping", () => {
+  const longLogin = {
+    kind: "login" as const,
+    payload: {
+      country: "Germany",
+      ip: SIGN_IN_IP,
+      kind: "web",
+      name: "x".repeat(500),
+      sessionId: "s-long",
+    },
+  };
+
+  it("refuses a notification whose payload breaks its contract, storing and sending nothing", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore) => {
+      await instance.notifyTo("1002", CROSSED);
+      const telegram = telegramRecorder();
+      const refused = await instance.notify(longLogin, CROSSED, couriersOf(telegram.target));
+      expect(refused).toEqual({ error: { code: "notification/invalid" }, ok: false });
+      expect((await instance.listNotifications({ limit: 5 })).items).toEqual([]);
+      expect(telegram.sent()).toEqual([]);
+    });
+  });
+
+  it("adds one notification per subject, however often it is asked to", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore) => {
+      await instance.notifyTo("1002", CROSSED);
+      const telegram = telegramRecorder();
+      const login = { ...longLogin, payload: { ...longLogin.payload, name: "Chrome" } };
+      const first = await instance.notify(login, CROSSED, couriersOf(telegram.target));
+      const second = await instance.notify(login, CROSSED, couriersOf(telegram.target));
+      expect(first.ok && second.ok && first.value.id === second.value.id).toBe(true);
+      expect((await instance.listNotifications({ limit: 5 })).items).toHaveLength(1);
+      expect(telegram.sent()).toHaveLength(1);
+    });
+  });
+
+  it("fits a digest of many long tasks into one Telegram message and one push", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder();
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([setup({ notificationChannels: { deadline_digest: { app: true } } })], {
+        now: COMMUTE_START,
+      });
+      await instance.notifyTo("1001", COMMUTE_START);
+      const telegram = telegramRecorder();
+      const tasks = Array.from({ length: 60 }, (_, index) => ({
+        dueAt: "2026-10-08T07:00:00.000Z",
+        dueTz: null,
+        taskId: `t-${String(index)}`,
+        title: `Task ${String(index)} ${"ж".repeat(190)}`,
+      }));
+      const couriers = couriersOf(telegram.target, fcm.target);
+      const digest = { kind: "deadline_digest" as const, payload: { slot: CROSSED, tasks } };
+      added(await instance.notify(digest, CROSSED, couriers));
+      const text = String(telegram.sent()[0]?.body["text"]);
+      expect(text.length).toBeLessThanOrEqual(4096);
+      expect(text.endsWith("…")).toBe(true);
+      const [push] = fcm.sends();
+      const bytes = new TextEncoder().encode(JSON.stringify(push?.message.data)).length;
+      expect(bytes).toBeLessThanOrEqual(4096);
+    });
+  });
+
+  it("loses nothing and sends nothing twice when a pass is cut short", async () => {
+    const { sessionId, stub, userId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    await subscribe(env.DB, {
+      endpoint: sessionId,
+      now: Date.now(),
+      sessionId,
+      transport: "poll",
+      userId,
+    });
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      await instance.append([commute], { now: COMMUTE_START });
+      const queued: string[] = [];
+      const queue = { isDown: true };
+      const poll = {
+        enqueue: async (_session: string, entry: { readonly notificationId: string }) => {
+          await Promise.resolve();
+          if (queue.isDown) {
+            throw new Error("the queue's storage is down");
+          }
+          queued.push(entry.notificationId);
+        },
+      };
+      const couriers: Couriers = { push: { fcm: null, poll }, telegram: telegramRecorder().target };
+      await expect(instance.runNotifications(CROSSED, couriers)).rejects.toThrow("down");
+      queue.isDown = false;
+      const again = await instance.runNotifications(CROSSED, couriers);
+      const { items } = await instance.listNotifications({ limit: 5 });
+      expect(items).toHaveLength(1);
+      expect(again.created.map((created) => created.id)).toEqual([items[0]?.id]);
+      expect(queued).toEqual([items[0]?.id]);
+      expect((await instance.runNotifications(CROSSED, couriers)).created).toEqual([]);
+      expect(queued).toHaveLength(1);
+    });
   });
 });

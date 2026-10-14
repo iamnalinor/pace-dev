@@ -364,8 +364,18 @@ export class UserStore extends PoolStore {
 
   override async alarm(): Promise<void> {
     const now = new Date().toISOString();
-    await this.runNotifications(now);
+    // A failed pass of the pool does not hold the assistant's queue back; it fails the alarm
+    // afterwards, so the runtime tries it again.
+    let failure: Error | null = null;
+    try {
+      await this.runNotifications(now);
+    } catch (error) {
+      failure = error instanceof Error ? error : new Error(String(error));
+    }
     await this.drainParses(now);
+    if (failure !== null) {
+      throw failure;
+    }
   }
 
   /** The providers known to be rate limited at `now`, to skip until their time. */

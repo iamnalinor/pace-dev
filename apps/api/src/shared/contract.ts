@@ -104,10 +104,16 @@ export type UserStoreApi = {
   readonly simulate: (args: SimulationArgs) => Promise<Simulation>;
   /**
   Adds a notification to the pool and delivers it to every channel its kind is on for (the
-  sessions feature calls it with a sign-in).
+  sessions feature calls it with a sign-in); a payload its kind's schema refuses is not added.
   */
-  readonly notify: (created: NewNotification, now: string) => Promise<PoolNotification>;
+  readonly notify: (
+    created: NewNotification,
+    now: string,
+  ) => Promise<Result<PoolNotification, NotifyError>>;
 };
+
+/** Why a notification was not added: its payload breaks its kind's contract. */
+export type NotifyError = { readonly code: "notification/invalid" };
 
 export type EventPage = {
   readonly events: readonly StoredEvent[];

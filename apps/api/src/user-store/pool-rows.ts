@@ -3,13 +3,19 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 
 import {
+  err,
   newId,
   type NewNotification,
   NotificationSchema,
+  ok,
+  PAYLOAD_SCHEMAS,
   type PoolNotification,
   refOf,
   type Resolution,
+  type Result,
 } from "@pace/core";
+
+import type { NotifyError } from "../shared/contract.ts";
 
 import * as schema from "./schema.ts";
 
@@ -56,27 +62,44 @@ const toStored = (row: Row): StoredNotification[] => {
     : [];
 };
 
-/** Adds a notification to the pool, its Telegram copy still to be sent. */
+const bySubject = async (
+  db: Db,
+  created: NewNotification,
+): Promise<StoredNotification | undefined> => {
+  const ref = refOf(created);
+  const subject = and(eq(notifications.kind, created.kind), eq(notifications.ref, ref));
+  const found = await db.select().from(notifications).where(subject);
+  return found.flatMap((row) => toStored(row))[0];
+};
+
+/**
+Adds a notification to the pool, its Telegram copy still to be sent. One about the same subject
+(its kind and `refOf`) is returned as it stands instead: a pass repeated after being cut short
+adds nothing twice. A payload its kind's schema refuses is not stored (it could never be read
+back).
+*/
 export const insertNotification = async (
   db: Db,
   created: NewNotification,
   now: string,
-): Promise<StoredNotification> => {
-  const id = newId();
+): Promise<Result<StoredNotification, NotifyError>> => {
+  if (!PAYLOAD_SCHEMAS[created.kind].safeParse(created.payload).success) {
+    return err({ code: "notification/invalid" });
+  }
+  const existing = await bySubject(db, created);
+  if (existing !== undefined) {
+    return ok(existing);
+  }
   await db.insert(notifications).values({
     createdAt: now,
-    id,
+    id: newId(),
     kind: created.kind,
     payload: JSON.stringify(created.payload),
     ref: refOf(created),
     telegramState: "pending",
   });
-  const [row] = await db.select().from(notifications).where(eq(notifications.id, id));
-  const [stored] = row === undefined ? [] : toStored(row);
-  if (stored === undefined) {
-    throw new Error("a notification just written could not be read back");
-  }
-  return stored;
+  const stored = await bySubject(db, created);
+  return stored === undefined ? err({ code: "notification/invalid" }) : ok(stored);
 };
 
 export const findNotification = async (

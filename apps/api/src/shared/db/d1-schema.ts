@@ -68,6 +68,8 @@ export const pushSubscriptions = sqliteTable(
   },
   (table) => [
     uniqueIndex("push_subscriptions_endpoint_idx").on(table.transport, table.endpoint),
+    // One way to push per device: a session has at most one subscription.
+    uniqueIndex("push_subscriptions_session_idx").on(table.sessionId),
     index("push_subscriptions_user_idx").on(table.userId),
   ],
 );
