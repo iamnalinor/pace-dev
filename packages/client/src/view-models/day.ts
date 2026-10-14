@@ -1,6 +1,7 @@
 import {
   accountTz,
   type ActivityCategory,
+  activityLabel,
   addDaysIn,
   addMinutesIso,
   CATEGORY_COLORS,
@@ -17,8 +18,6 @@ import {
 } from "@pace/core";
 
 import type { ActivityTarget } from "../actions/time-actions.ts";
-
-import { activityLabel } from "../actions/calendar-run.ts";
 
 export type DayRow = {
   readonly activityId: string;
