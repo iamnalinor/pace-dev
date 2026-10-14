@@ -1,6 +1,11 @@
 import { addMinutesIso } from "@pace/core";
 
-import { calendarButtonState, isAttendableNow, promptedEvent } from "./calendar-today.ts";
+import {
+  calendarButtonState,
+  isAttendableNow,
+  isStartedFor,
+  promptedEvent,
+} from "./calendar-today.ts";
 
 const NOW = "2026-10-06T09:55:00.000Z";
 
@@ -83,5 +88,23 @@ describe("when an event can be attended", () => {
 
   it.each([15.02, 16, 120])("is not for an event starting in %s minutes", (startIn) => {
     expect(isAttendableNow(event("e", startIn), NOW)).toBe(false);
+  });
+});
+
+describe("an activity begun for an event", () => {
+  const lecture = event("lecture", 10);
+  const run = (startIn: number, label = lecture.title) => ({
+    label,
+    startAt: addMinutesIso(NOW, startIn),
+  });
+
+  it("is one under its title from fifteen minutes before its start until its end", () => {
+    // Attended ten minutes early it runs from the tap: answered, though not on the event's time yet.
+    expect(isStartedFor(lecture, run(0))).toBe(true);
+    expect(isStartedFor(lecture, run(-5))).toBe(true);
+    expect(isStartedFor(lecture, run(40))).toBe(true);
+    expect(isStartedFor(lecture, run(-6))).toBe(false);
+    expect(isStartedFor(lecture, run(100))).toBe(false);
+    expect(isStartedFor(lecture, run(0, "Something else"))).toBe(false);
   });
 });

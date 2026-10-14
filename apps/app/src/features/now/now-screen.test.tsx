@@ -8,6 +8,7 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { addMinutesIso } from "@pace/core";
 import { HW_ID, NOW } from "@pace/core/testing";
@@ -214,6 +215,87 @@ describe("NowBoard", () => {
     await waitFor(() => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
+  });
+
+  describe("Attend on an Android phone in Moscow (the owner's 13:47, a 12:15–15:20 colloquium)", () => {
+    /** 13:47 in Moscow (UTC+3): what the phone's clock read in the owner's screenshot. */
+    const AT = "2026-10-14T10:47:00.000Z";
+    const TITLE = "Коллоквиум по матанализу";
+
+    /** The event as expo-calendar's Android module hands it out: UTC strings with ".SSSZ". */
+    const androidEvent = (startOffsetMinutes: number, endOffsetMinutes: number): void => {
+      calendar.state.status = "granted";
+      calendar.state.events = [
+        {
+          allDay: false,
+          endDate: addMinutesIso(AT, endOffsetMinutes),
+          id: "ev-android",
+          recurrenceRule: null,
+          startDate: addMinutesIso(AT, startOffsetMinutes),
+          title: TITLE,
+        },
+      ];
+    };
+
+    it.each([
+      ["going on for 92 minutes (the owner's)", -92, 93],
+      ["started 10 minutes ago", -10, 80],
+      ["started a second ago", -1 / 60, 60],
+      ["starting in a second", 1 / 60, 60],
+      ["starting in 2 minutes", 2, 60],
+      ["starting in 9 minutes", 9, 60],
+    ])("%s: starts it, no refusal", async (_name, start, end) => {
+      androidEvent(start, end);
+      const runtime = await createTestRuntime({
+        deviceTz: "Europe/Moscow",
+        now: AT,
+        world: "empty",
+      });
+      await renderScreen(<Board />, runtime);
+      const card = await screen.findByLabelText("From your calendar");
+      expect(within(card).getByText(TITLE)).toBeOnTheScreen();
+      await fireEvent.press(within(card).getByRole("button", { name: "Attend" }));
+      await waitFor(() => {
+        expect(screen.queryByLabelText("From your calendar")).toBeNull();
+      });
+      expect(screen.queryByText(en("actionError.retro/future"))).toBeNull();
+      const [started] = Object.values(runtime.state.store.getState().time.activities);
+      expect(started?.label).toBe(TITLE);
+      // From its start once that has passed, else from the tap.
+      expect(started?.startAt).toBe(start < 0 ? addMinutesIso(AT, start) : AT);
+    });
+
+    it("with something running since 13:00: the event takes over from it, no refusal", async () => {
+      androidEvent(-92, 93);
+      const runtime = await createTestRuntime({
+        deviceTz: "Europe/Moscow",
+        now: AT,
+        world: "empty",
+      });
+      await runtime.actions.startTyped("Reading");
+      await runtime.actions.adjustActivity(
+        Object.values(runtime.state.store.getState().time.activities)[0]?.id ?? "",
+        { startAt: addMinutesIso(AT, -47) },
+      );
+      await renderScreen(<Board />, runtime);
+      const card = await screen.findByLabelText("From your calendar");
+      await fireEvent.press(within(card).getByRole("button", { name: "Attend" }));
+      await waitFor(() => {
+        expect(screen.queryByLabelText("From your calendar")).toBeNull();
+      });
+      expect(screen.queryByText(en("actionError.retro/future"))).toBeNull();
+    });
+  });
+
+  it("keeps the task rows in a box of their own, so the calendar card above cannot move them", async () => {
+    // On Android the renderer flattens a View that only lays out: the rows would become children
+    // of the scroll view, the card's arrival would move each row's own frame, and their layout
+    // transitions started (and on the owner's phone stuck) from where they were, over the card.
+    seminarSoon();
+    await renderScreen(<Board />, await createTestRuntime());
+    await screen.findByLabelText("From your calendar");
+    expect(checks().length).toBeGreaterThan(0);
+    expect(rowsInFlattenableBoxes()).toEqual([]);
   });
 
   it("hides a calendar event on Skip", async () => {

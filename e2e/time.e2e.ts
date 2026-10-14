@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { addTask } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { loginViaApi } from "./support/login.ts";
+import { API_URL, loginViaApi } from "./support/login.ts";
 
 const SIZES = [
   { height: 844, name: "phone", width: 390 },
@@ -171,4 +171,53 @@ test("the greyed Calendar button says why the moment the pointer is over it", as
   await expectNoA11yViolations(page);
   await page.mouse.move(0, 0);
   await expect(tooltip).toBeHidden();
+});
+
+test.describe("the calendar's Attend or skip on Now, phone (390px)", () => {
+  test.use({ viewport: { height: 844, width: 390 } });
+
+  test("sits above the task rows, never over them, and Attend starts an event going on", async ({
+    page,
+  }) => {
+    const { token } = await loginViaApi(page);
+    await page.goto("/");
+    await addTask(page, "Planes and lines homework");
+    await addTask(page, "Reformat the thesis");
+    // What the phone sends of its calendar: a colloquium on for an hour and a half already.
+    const now = Date.now();
+    const synced = await fetch(`${API_URL}/api/calendar/sync`, {
+      body: JSON.stringify({
+        deviceId: "e2e-phone",
+        events: [
+          {
+            endAt: new Date(now + 90 * 60_000).toISOString(),
+            id: "ev-colloquium",
+            series: null,
+            startAt: new Date(now - 92 * 60_000).toISOString(),
+            title: "Colloquium",
+          },
+        ],
+        from: new Date(now - 12 * 3_600_000).toISOString(),
+        to: new Date(now + 12 * 3_600_000).toISOString(),
+      }),
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(synced.status).toBe(200);
+    // The rows are drawn first, the card arrives after the calendar is read: the owner's order.
+    await page.reload();
+    const prompt = page.getByRole("region", { name: "From your calendar" });
+    await expect(prompt.getByText("Colloquium")).toBeVisible();
+    const firstRow = page.getByRole("list", { name: "Tasks" }).getByRole("listitem").first();
+    await expect(firstRow).toBeVisible();
+    await page.waitForFunction(() =>
+      document.getAnimations().every((animation) => animation.playState !== "running"),
+    );
+    expect(await gapAbove(prompt, firstRow)).toBeGreaterThanOrEqual(0);
+
+    await prompt.getByRole("button", { name: "Attend" }).click();
+    await expect(prompt).toBeHidden();
+    await expect(page.getByText("That time is in the future.")).toHaveCount(0);
+    await expect(timeBar(page).getByText("Colloquium")).toBeVisible();
+  });
 });

@@ -6,6 +6,7 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
 
 import { DayScreen } from "./day-screen.tsx";
@@ -139,7 +140,7 @@ describe("Day with the phone's data", () => {
     { begins: "12:00:00", from: "12:02:00", name: "starts in 2 minutes", to: "12:50:00" },
     { begins: "12:00:00", from: "12:15:00", name: "starts in 15 minutes", to: "13:00:00" },
   ])(
-    "attends an event that $name: it is tracked, never refused as the future",
+    "attends an event that $name: it is tracked, never refused as the future, then reads logged",
     async ({ begins, from, to }) => {
       calendar.state.events = [
         {
@@ -160,8 +161,28 @@ describe("Day with the phone's data", () => {
         ).toMatchObject({ endAt: null, startAt: utcAt(begins) });
       });
       expect(screen.queryByText("That time is in the future.")).toBeNull();
+      // Answered: the row reads "logged", so a second tap cannot start it over.
+      expect(await within(list).findByText("logged")).toBeOnTheScreen();
+      expect(within(list).queryByRole("button", { name: "Attended" })).toBeNull();
+      expect(within(list).queryByRole("button", { name: "Skip" })).toBeNull();
     },
   );
+
+  it("keeps the day's blocks in a box of their own, so the cards above cannot move them", async () => {
+    // The sleep card and the calendar arrive after the blocks: on Android a flattened box would
+    // hand their arrival to every block's own layout transition (see RowList).
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "other",
+      endAt: utcAt("10:00:00"),
+      label: "Reading",
+      startAt: utcAt("09:00:00"),
+    });
+    await renderScreen(<DayScreen />, runtime);
+    await screen.findByLabelText("From your calendar");
+    expect(await screen.findByText("Reading")).toBeOnTheScreen();
+    expect(rowsInFlattenableBoxes()).toEqual([]);
+  });
 
   it("does not offer Attended for an event hours away, only Skip", async () => {
     calendar.state.events = [

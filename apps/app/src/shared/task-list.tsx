@@ -6,6 +6,7 @@ import Animated from "react-native-reanimated";
 import type { NowRow } from "@pace/client";
 
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
+import { RowList } from "#app/ui/row-list.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import { useOpenTask } from "./task-opener.tsx";
@@ -61,7 +62,7 @@ export const TaskRows = ({
     setDissolving((current) => keeping(current, (id) => id !== row.id));
   };
   return (
-    <View aria-label={label} className="px-2" role="list">
+    <RowList aria-label={label} className="px-2" role="list">
       {rows
         .filter((row) => !gone.has(row.id))
         .map((row) => (
@@ -96,7 +97,7 @@ export const TaskRows = ({
             />
           </Animated.View>
         ))}
-    </View>
+    </RowList>
   );
 };
 

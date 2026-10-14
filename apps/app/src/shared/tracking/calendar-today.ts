@@ -20,6 +20,22 @@ export type CalendarToday = {
 /** How long before its start an event is offered on Now. */
 const AHEAD_MINUTES = 10;
 
+/** How far from now an event can be and still be linked from the Calendar button. */
+const NEAR_MINUTES = 15;
+
+/**
+An activity under the event's title begun for it: from fifteen minutes before its start (Attend
+ahead of the start begins it at once) until its end. Such a run answers the event even while it
+has not reached the event's own time yet.
+*/
+export const isStartedFor = (
+  event: Pick<PhoneCalendarEvent, "endAt" | "startAt" | "title">,
+  activity: { readonly label: string; readonly startAt: string },
+): boolean =>
+  activity.label === event.title &&
+  addMinutesIso(event.startAt, -NEAR_MINUTES) <= activity.startAt &&
+  activity.startAt < event.endAt;
+
 export type PromptMemory = {
   /** Occurrences waved away on this phone (`calendarKey`). */
   readonly dismissed: ReadonlySet<string>;
@@ -53,9 +69,6 @@ export const promptedEvent = (
     .filter((event) => !isTracked(event, memory.activities))
     .toSorted((a, b) => a.startAt.localeCompare(b.startAt))
     .at(0) ?? null;
-
-/** How far from now an event can be and still be linked from the Calendar button. */
-const NEAR_MINUTES = 15;
 
 /**
 Whether "Attend" makes sense for the event now: it started, or starts within fifteen minutes

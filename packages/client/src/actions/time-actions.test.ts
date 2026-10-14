@@ -1,3 +1,4 @@
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { NOW } from "@pace/core/testing";
@@ -11,6 +12,31 @@ import { setupActions, unwrap } from "./fixture.fake.ts";
 const later = (minutes: number): string =>
   new Date(Date.parse(NOW) + minutes * 60_000).toISOString();
 const ctx = (now: string) => ({ deviceTz: "Europe/Moscow", now });
+
+/**
+Attends an event `startSeconds` from now lasting `lengthSeconds`, with something running for
+`runningFor` seconds before (or nothing): whether it started, at now or before, unrefused.
+*/
+const isAttendedNow = async ([startSeconds, lengthSeconds, runningFor]: readonly [
+  number,
+  number,
+  null | number,
+]): Promise<boolean> => {
+  const world = await setupActions([]);
+  const now = Date.parse(NOW);
+  if (runningFor !== null) {
+    world.setNow(new Date(now - runningFor * 1000).toISOString());
+    unwrap(await world.actions.startTyped("Reading"));
+    world.setNow(NOW);
+  }
+  const startAt = new Date(now + startSeconds * 1000).toISOString();
+  const endAt = new Date(now + (startSeconds + lengthSeconds) * 1000).toISOString();
+  const result = await world.actions.startCalendar({ endAt, startAt, title: "Коллоквиум" });
+  const attended = Object.values(world.state.store.getState().time.activities).find(
+    (activity) => activity.label === "Коллоквиум",
+  );
+  return result.ok && attended !== undefined && Date.parse(attended.startAt) <= now;
+};
 
 describe("time actions", () => {
   it("switches with one tap and stops with a second tap on the running choice", async () => {
@@ -221,6 +247,34 @@ describe("time actions", () => {
     // Expected to last until the event's end, wherever it began.
     const expected = Math.round((Date.parse(endAt) - Date.parse(running?.startAt ?? NOW)) / 60_000);
     expect(running?.expectMinutes).toBe(expected);
+  });
+
+  it("attending the same event again keeps it running: a second tap does not start it over", async () => {
+    const world = await setupActions();
+    const event = { endAt: later(60), startAt: later(5), title: "Colloquium" };
+    unwrap(await world.actions.startCalendar(event));
+    const first = timeBarModel(world.state.store.getState(), ctx(NOW)).running?.activityId;
+    world.setNow(later(1));
+    unwrap(await world.actions.startCalendar(event));
+    const after = timeBarModel(world.state.store.getState(), ctx(later(1)));
+    expect(after.running).toMatchObject({ activityId: first, label: "Colloquium", startAt: NOW });
+    const named = Object.values(world.state.store.getState().time.activities).filter(
+      (activity) => activity.label === "Colloquium",
+    );
+    expect(named).toHaveLength(1);
+  });
+
+  it("never refuses an event as the future, whatever its offset from now and what runs", async () => {
+    // Instants as an Android phone hands them (UTC, ".SSSZ"), seconds around now on either side,
+    // with or without something running since before: the attend path must always answer ok.
+    const offsets = fc.tuple(
+      fc.integer({ max: 6 * 3600, min: -6 * 3600 }),
+      fc.integer({ max: 4 * 3600, min: 1 }),
+      fc.option(fc.integer({ max: 12 * 3600, min: 0 })),
+    );
+    await fc.assert(fc.asyncProperty(offsets, isAttendedNow), { numRuns: 150 });
+    // The owner's: on for 92 minutes, 93 to go, with something running for 47.
+    expect(await isAttendedNow([-92 * 60, 185 * 60, 47 * 60])).toBe(true);
   });
 
   it("logs a calendar event already over as a closed block and leaves what runs alone", async () => {

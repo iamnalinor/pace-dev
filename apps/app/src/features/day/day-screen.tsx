@@ -16,6 +16,7 @@ import { Button } from "#app/ui/button.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
+import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -164,13 +165,13 @@ const Entries = ({
   readonly sat: SatOf;
   readonly onOpen: (target: SheetTarget) => void;
 }) => (
-  <View className="px-5">
+  <RowList className="px-5">
     {entries.map((entry) => (
       <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
         <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
       </Animated.View>
     ))}
-  </View>
+  </RowList>
 );
 
 /** The day's tracked time and its split by category. */

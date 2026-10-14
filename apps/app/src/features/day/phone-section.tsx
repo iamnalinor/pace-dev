@@ -4,11 +4,11 @@ import { Text, View } from "react-native";
 import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
 import type { DayEntry, DayRow } from "@pace/client";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { openUsageAccessSettings } from "#app/platform/phone-data.ts";
 import { calendarKey, sleepKey } from "#app/platform/phone-memory.ts";
-import { isAttendableNow } from "#app/shared/tracking/calendar-today.ts";
+import { isAttendableNow, isStartedFor } from "#app/shared/tracking/calendar-today.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -171,6 +171,10 @@ const CalendarRow = ({
   const run = useRunAction();
   const toast = useToast();
   const { now } = useViewer();
+  // Attended ahead of its start, it runs from the tap: not on the day's blocks yet, but answered.
+  const isStarted = useAppState((state) =>
+    Object.values(state.time.activities).some((activity) => isStartedFor(event, activity)),
+  );
   const { series } = event;
   const everyTime = (rule: "attended" | "skip") =>
     series === null
@@ -190,7 +194,7 @@ const CalendarRow = ({
       <Text className="flex-1 font-sans text-[14px] text-fg" numberOfLines={2}>
         {event.title}
       </Text>
-      {isCalendarLogged(entries, event) ? (
+      {isStarted || isCalendarLogged(entries, event) ? (
         <Text className="font-sans text-[12px] text-muted">{t("phone.logged")}</Text>
       ) : (
         <View className="flex-row">

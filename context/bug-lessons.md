@@ -86,7 +86,11 @@ The classes so far are below. Each has its standing rule, and new code is writte
 - **Missed because.** Fixtures used events that had already started.
 - **Rule.** Anything taking an instant is tested around its boundaries: before, at and after the start;
   just before and after now; across midnight and a zone change. Prefer fast-check properties over offsets
-  relative to `now` instead of fixed timestamps.
+  relative to `now` instead of fixed timestamps. Run them in a zone other than UTC (the owner's is
+  Europe/Moscow, UTC+3) and feed them the input in the shape the platform really hands out (expo-calendar's
+  Android module: UTC strings `yyyy-MM-ddTHH:mm:ss.SSSZ`), not only hand-made ISO fixtures. When a report
+  names a screen, reproduce on that screen's own path before concluding where the refusal came from: a
+  toast is app-wide and outlives a tab switch.
 
 ### 10. A control that does nothing on one platform
 - **Bug.** "Add a computer" did nothing on phones (stage 8; the root cause is recorded with its fix).
@@ -94,6 +98,21 @@ The classes so far are below. Each has its standing rule, and new code is writte
   the phone layout.
 - **Rule.** Every control on a phone-layout screen has an app test that presses it and asserts a visible
   result. The QA heuristic "every control must change something" is checked at phone width too.
+
+### 11. The web build standing in for Android's layout
+- **Bug.** On Android, Now's calendar card ("Attend or skip?") was drawn over the first two task rows: the
+  rows stayed where they had been before the card arrived, while the list below them had moved down
+  (stage 8, the owner's screenshot on v0.9.0).
+- **Missed because.** React Native's renderer on Android flattens a View that only lays out (padding, an
+  `aria-label`, a `role`): the task list's box vanished, its rows became children of the scroll view, and
+  the card's arrival changed every row's own frame, which set off each row's Reanimated layout transition
+  (`ROW_LAYOUT`); on the phone they stuck at their start. The web never flattens, so the e2e suite (web
+  only) and jest (no layout) could not see it; nobody opened Now on Android with an event on.
+- **Rule.** Rows that slide with a layout transition sit in `RowList` (`apps/app/src/ui/row-list.tsx`), a
+  box kept a native view (`collapsable={false}`), so nothing outside the list can move a row's own frame.
+  The structural app test `rowsInFlattenableBoxes()` (apps/app/src/test/sliding-rows.ts) runs on every
+  screen with such rows; a card that arrives above a list gets an e2e geometry check at phone width (card
+  and first row do not intersect), and the QA round on Android opens screens whose cards load late.
 
 ## Log
 
@@ -110,3 +129,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-14 | Onboarding loop in the central guard | 8 | pending (stage 8 sweep) | transition test |
 | 2026-10-14 | Attend refuses an event that starts soon | 9 | yes: root cause was Day's "Attended" button, which logged the whole event with `logPast` (its end is ahead for any event not over, so `retro/future`; an event that was on already failed too). It now goes through `startCalendar` like Now's offer, the Calendar button and the picker, and is shown only from 15 minutes before the start (`isAttendableNow`). `startCalendar` already started at `min(start, now)`; other `logPast` callers (sleep, "always attended" series) only take instants already over | time-offset tests (−10 min, −1 s, 0, +1 s, +2 min, +15 min) at client and Day level, `isAttendableNow` boundary test |
 | 2026-10-14 | Add a computer does nothing on phones | 10 | pending (stage 8 sweep) | press test at phone layout |
+| 2026-10-14 | Now's calendar card drawn over the task rows on Android | 11 (5) | yes: the only lists whose rows carry a layout transition are Now's/Projects' `TaskRows` and Day's timeline (`Entries`); both now sit in `RowList`. The sheet's entering animations have no layout transition and are absolutely placed | `rowsInFlattenableBoxes()` app tests on Now (card shown) and Day (blocks and calendar shown); e2e at 390px: the card's box ends above the first row, then Attend starts the event |
+| 2026-10-14 | "That time is in the future." over Now's calendar card (owner, Android, 13:47 Moscow, an event 12:15–15:20) | 9 | yes: not reproducible on Now's path. A Now-level test in Europe/Moscow with expo-calendar's Android event shape (offsets −92 min … +9 min, with and without something running) and a client fast-check property (start ±6 h by the second, any length, any running activity) all start the event; `startCalendar` cannot return `retro/future` (its only refusal path, `logPast`, runs for an event already over). Every `retro/future` producer in v0.9.0 was swept: `logPast` (Day's "Attended" over the whole event, the activity sheet, sleep), `adjustActivity`, task events dated ahead; none is reachable from Now. In v0.9.0 Day's "Attended" refused exactly this event, and a toast is app-wide for 5–10 s; with the rows drawn over the card (above), a tap on the visible "Attend" would land on the task row drawn over it (rows come later in drawing and hit-test order), not on Attend. The previous fix's sweep had checked UTC offsets only, on hand-made ISO fixtures. Follow-up found and fixed: after attending ahead of its start, Day kept offering Attended/Skip (`isCalendarLogged` saw a block ending at now before the event's start) and a second tap restarted the activity | Moscow + Android-shape test on Now, client fast-check property, phone-calendar shape test, Day test "then reads logged", `startCalendar` keeps an attended event running (second tap), `isStartedFor` test |
