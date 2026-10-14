@@ -56,6 +56,13 @@ export const ChoiceRow = ({
   );
 };
 
+/** A choice as an item of a `ChoiceList` (a list holds list items, the row sits inside). */
+export const ChoiceItem = (props: Parameters<typeof ChoiceRow>[0]) => (
+  <View role="listitem">
+    <ChoiceRow {...props} />
+  </View>
+);
+
 /** A picker's choices as a list named after what they are, so each picker reads as its own. */
 export const ChoiceList = ({
   children,

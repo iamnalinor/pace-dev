@@ -157,7 +157,7 @@ export const CompactRunningRow = ({
       <Pressable
         accessibilityHint={t("time.openDay")}
         accessibilityRole="link"
-        className="min-h-11 flex-1 flex-row flex-wrap items-center gap-2 active:opacity-70"
+        className="min-h-11 flex-1 flex-row flex-wrap content-center items-center gap-2 active:opacity-70"
         onPress={onOpen}
       >
         <PulseDot className={PROJECT_FILL[running.color]} />

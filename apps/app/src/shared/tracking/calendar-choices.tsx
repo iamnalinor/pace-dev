@@ -10,7 +10,7 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
-import { ChoiceList, ChoiceRow, type ListProps, Nothing } from "./choice-row.tsx";
+import { ChoiceItem, ChoiceList, ChoiceRow, type ListProps, Nothing } from "./choice-row.tsx";
 
 /** Why there is nothing to pick: on the web the calendar is the copy the phone sends. */
 const noEventsKey = (calendar: CalendarToday | null): MessageKey => {
@@ -83,7 +83,7 @@ export const CalendarChoices = (props: ListProps) => {
   return (
     <ChoiceList label={t("time.calendarToday")}>
       {events.map((event) => (
-        <ChoiceRow
+        <ChoiceItem
           aside={`${clockTime(event.startAt, deviceTz)}–${clockTime(event.endAt, deviceTz)}`}
           key={event.id}
           label={event.title}

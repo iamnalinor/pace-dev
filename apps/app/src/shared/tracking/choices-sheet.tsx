@@ -16,7 +16,7 @@ import { formatDuration } from "@pace/core";
 import type { CalendarToday } from "./calendar-today.ts";
 
 import { CalendarChoices } from "./calendar-choices.tsx";
-import { ChoiceList, ChoiceRow, type ListProps, Nothing } from "./choice-row.tsx";
+import { ChoiceItem, ChoiceList, type ListProps, Nothing } from "./choice-row.tsx";
 
 /** A button's own choices (the chores, the ways to rest), each with its usual length. */
 const ButtonChoices = ({ button, options, start }: ListProps) => {
@@ -26,7 +26,7 @@ const ButtonChoices = ({ button, options, start }: ListProps) => {
   return (
     <ChoiceList label={t(button.labelKey)}>
       {button.choices.map((choice) => (
-        <ChoiceRow
+        <ChoiceItem
           aside={`~${formatDuration(choice.expectMinutes, language)}`}
           isRunning={choice.isRunning}
           key={choice.id}
@@ -63,7 +63,7 @@ const TaskChoices = ({
   return (
     <ChoiceList label={t(button.labelKey)}>
       {rows.map((row) => (
-        <ChoiceRow
+        <ChoiceItem
           aside={null}
           isRunning={row.id === focused}
           key={row.id}
@@ -77,7 +77,7 @@ const TaskChoices = ({
           }}
         >
           <MetaLine parts={[]} tag={row} />
-        </ChoiceRow>
+        </ChoiceItem>
       ))}
     </ChoiceList>
   );
