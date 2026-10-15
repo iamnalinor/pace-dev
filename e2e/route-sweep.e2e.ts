@@ -23,11 +23,10 @@ the two lists the same.
 */
 const BARE = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
 
-const routeFiles = (dir: string): readonly string[] =>
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- the app's own route folder, fixed above
-  readdirSync(dir, { recursive: true, withFileTypes: true })
+const routeFiles = (): readonly string[] =>
+  readdirSync(APP_DIR, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => `/${path.relative(dir, path.join(entry.parentPath, entry.name))}`);
+    .map((entry) => `/${path.relative(APP_DIR, path.join(entry.parentPath, entry.name))}`);
 
 /** What is wrong with the sidebar, by whether the screen should have it. */
 const SIDEBAR_FAULT = ["shown on a bare screen", "missing"] as const;
@@ -84,6 +83,53 @@ const collectErrors = async (page: Page, run: () => Promise<void>): Promise<read
   return errors;
 };
 
+/** Stand-ins for a dynamic route's id: signed out, nothing is read before the guard. */
+const SIGNED_OUT_IDS: LivedIn = {
+  algebraId: "01SIGNEDOUT00000000000000A",
+  doneTaskId: "01SIGNEDOUT00000000000000D",
+  openTaskId: "01SIGNEDOUT00000000000000O",
+};
+
+/** What is wrong with where a signed-out visit landed: anywhere but the login, for a guarded screen. */
+const landingFaults = (url: string, landed: string): readonly string[] => {
+  const isPublic =
+    url === "/no-such-page" || BARE.some((bare) => url === bare || url.startsWith(`${bare}/`));
+  return isPublic || landed === "/login" ? [] : [`${url}: landed on ${landed}`];
+};
+
+/** Opens `url` and waits until what it shows (or where it sent the page) stops changing. */
+const openSettled = async (page: Page, url: string): Promise<void> => {
+  await page.goto(url);
+  const settled = { previous: "" };
+  await expect
+    .poll(async () => {
+      const now = `${page.url()} ${(await page.locator("body").innerText()).trim()}`;
+      const isStable = now === settled.previous && now.length > page.url().length + 10;
+      settled.previous = now;
+      return isStable;
+    })
+    .toBe(true);
+};
+
+test("signed out, every screen but signing in lands on the login (bug class 7)", async ({
+  page,
+}) => {
+  // The guard sits in one place (RouteGate in the root layout); a route moved to another folder
+  // keeps it only if this holds for every route file, whatever navigator it lives in.
+  test.setTimeout(120_000);
+  const urls = routeFiles().flatMap((file) => urlsOf(file, SIGNED_OUT_IDS));
+  expect(urls.length).toBeGreaterThan(15);
+  const failures: string[] = [];
+  for (const url of urls) {
+    const errors = await collectErrors(page, async () => {
+      await openSettled(page, url);
+    });
+    const landed = new URL(page.url()).pathname;
+    failures.push(...landingFaults(url, landed), ...errors.map((error) => `${url}: ${error}`));
+  }
+  expect(failures).toEqual([]);
+});
+
 for (const size of SIZES) {
   test.describe(`route sweep, ${size.name}`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
@@ -92,7 +138,7 @@ for (const size of SIZES) {
       test.setTimeout(180_000);
       const { token } = await loginViaApi(page);
       const seeded = await seedLivedIn(token);
-      const urls = routeFiles(APP_DIR).flatMap((file) => urlsOf(file, seeded));
+      const urls = routeFiles().flatMap((file) => urlsOf(file, seeded));
       expect(urls.length).toBeGreaterThan(15);
       const failures: string[] = [];
       for (const url of urls) {
