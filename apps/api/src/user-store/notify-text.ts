@@ -1,115 +1,161 @@
 import {
-  type CoreState,
-  type Critical,
-  type Digest,
+  type Answer,
+  ANSWERS,
   formatDuration,
-  formatRelativeDay,
+  formatLeft,
   type Language,
-  type LongRun,
-  type NotifyMessage,
-  type Stuck,
+  minutesBetween,
+  type PoolNotification,
+  type Settings,
   t,
 } from "@pace/core";
 
-import type { OutgoingMessage } from "../shared/telegram-api.ts";
+import type { InlineButton, OutgoingMessage } from "../shared/telegram-api.ts";
 
-import { clockIn } from "../shared/clock.ts";
-import { NOTIFY_ACTIONS } from "../shared/contract.ts";
+import { clockIn, dayClockIn } from "../shared/clock.ts";
+import { POOL_ACTIONS } from "../shared/contract.ts";
+import { taskUrl } from "../shared/web-links.ts";
 
 type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
 
-const button = (language: Language, key: "cancelTask" | "markDone" | "snooze", data: string) => ({
-  data,
-  label: t(language, `notify.${key}`),
-});
+/** A digest lists every task, but only the first few get a button to open them. */
+const LINKED_TASKS = 5;
 
-const dueText = (dueAt: string, { language, now, zone }: Zoned): string =>
-  `${formatRelativeDay(dueAt, now, { language, tz: zone })} ${clockIn(dueAt, language, zone)}`;
+/** Telegram refuses a message longer than this (characters). */
+export const TELEGRAM_TEXT_MAX = 4096;
 
-const criticalText = (message: Critical, zoned: Zoned): OutgoingMessage => {
-  const { language } = zoned;
-  const text = t(language, "notify.criticalDeadline", {
-    progress: Math.round(message.progress * 100),
-    title: message.title,
-    when: dueText(message.dueAt, zoned),
-  });
-  return {
-    buttons: [
-      [
-        button(language, "snooze", `${NOTIFY_ACTIONS.snooze}:${message.taskId}`),
-        button(language, "markDone", `${NOTIFY_ACTIONS.done}:${message.taskId}`),
-      ],
-    ],
-    text,
-  };
-};
+/**
+A phone's body, in UTF-8 bytes: an FCM data message carries 4 KB in all, title, keys and the
+pool id included, and the poll queue stores the same text.
+*/
+export const PHONE_BODY_MAX_BYTES = 2048;
 
-const longText = (message: LongRun, { language, zone }: Zoned): OutgoingMessage => ({
-  buttons: [],
-  text: t(language, "notify.long", {
-    duration: formatDuration(message.expectMinutes, language),
-    label: message.label,
-    time: clockIn(message.startAt, language, zone),
-  }),
-});
+const ELLIPSIS = "…";
 
-const stuckText = (message: Stuck, { language }: Zoned): OutgoingMessage => ({
-  buttons: [
-    [
-      button(language, "snooze", `${NOTIFY_ACTIONS.snooze}:${message.taskId}`),
-      button(language, "cancelTask", `${NOTIFY_ACTIONS.cancel}:${message.taskId}`),
-    ],
-  ],
-  text: t(language, "notify.stuckIdle", {
-    days: message.days,
-    title: message.title,
-  }),
-});
+/** The characters of a text as a reader sees them (an emoji with its modifiers is one). */
+const charactersOf = (text: string): readonly string[] =>
+  Array.from(new Intl.Segmenter().segment(text), (part) => part.segment);
 
-const digestText = (digest: Digest, zoned: Zoned): OutgoingMessage => {
-  const { language, zone } = zoned;
-  const rows = digest.top.map((row) => {
-    const due = row.dueAt === null ? "" : ` · ${dueText(row.dueAt, zoned)}`;
-    const late = row.isLate ? ` · ${t(language, "notify.digestLate")}` : "";
-    return `• ${row.title}${due}${late}`;
-  });
-  const lines = [
-    t(language, "notify.digestTitle", { time: clockIn(digest.window, language, zone) }),
-    ...(rows.length === 0 ? [t(language, "bot.nowEmpty")] : rows),
-    ...(digest.more > 0 ? [t(language, "notify.digestMore", { count: digest.more })] : []),
-    ...(digest.reviewCount > 0
-      ? [t(language, "notify.digestReview", { count: digest.reviewCount })]
-      : []),
-    ...(digest.inboxCount > 0
-      ? [t(language, "notify.digestInbox", { count: digest.inboxCount })]
-      : []),
-  ];
-  return { buttons: [], text: lines.join("\n") };
-};
-
-/** A notification as the bot sends it, in the account language and zone. */
-export const notificationText = (
-  message: NotifyMessage,
-  state: Pick<CoreState, "settings">,
-  now: string,
-): OutgoingMessage => {
-  const zoned: Zoned = {
-    language: state.settings.language,
-    now,
-    zone: state.settings.timezone ?? "UTC",
-  };
-  switch (message.kind) {
-    case "critical": {
-      return criticalText(message, zoned);
-    }
-    case "digest": {
-      return digestText(message, zoned);
-    }
-    case "stuck": {
-      return stuckText(message, zoned);
-    }
-    case "long": {
-      return longText(message, zoned);
+/** The text cut to fit, by whole characters, ending in "…" when anything was cut. */
+const fitted = (text: string, isFitting: (candidate: string) => boolean): string => {
+  if (isFitting(text)) {
+    return text;
+  }
+  const characters = charactersOf(text);
+  const cut = (kept: number): string =>
+    `${characters.slice(0, kept).join("").trimEnd()}${ELLIPSIS}`;
+  // The most characters that fit with the ellipsis: binary search, `low` always fits.
+  let low = 0;
+  let high = characters.length - 1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (isFitting(cut(middle))) {
+      low = middle;
+    } else {
+      high = middle - 1;
     }
   }
+  return cut(low);
+};
+
+const encoder = new TextEncoder();
+
+const zonedOf = (settings: Pick<Settings, "language" | "timezone">, now: string): Zoned => ({
+  language: settings.language,
+  now,
+  zone: settings.timezone ?? "UTC",
+});
+
+/** The answer buttons of a notification, one row: `<code>:<id>` for the bot to handle. */
+const answerButtons = (
+  notification: PoolNotification,
+  language: Language,
+): readonly (readonly InlineButton[])[] => {
+  const answers: readonly Answer[] = ANSWERS[notification.kind];
+  return answers.length === 0
+    ? []
+    : [
+        answers.map((answer) => ({
+          data: `${POOL_ACTIONS[answer]}:${notification.id}`,
+          label: t(language, `notify.action.${answer}`),
+        })),
+      ];
+};
+
+/** The one-line body of a notification, the same in Telegram (after its emoji) and on a phone. */
+const bodyOf = (notification: PoolNotification, zoned: Zoned): string => {
+  const { language, zone } = zoned;
+  switch (notification.kind) {
+    case "login": {
+      const { city, country, ip, name } = notification.payload;
+      const place = [city, country].filter((part) => part !== undefined && part !== "").join(", ");
+      return t(language, "notify.login", { ip, name, place });
+    }
+    case "deadline_digest": {
+      return [
+        t(language, "notify.digestTitle"),
+        ...notification.payload.tasks.map(
+          (task) =>
+            `• ${t(language, "notify.digestRow", {
+              left: formatLeft(minutesBetween(zoned.now, task.dueAt), language),
+              title: task.title,
+              when: dayClockIn(task.dueAt, language, zone),
+            })}`,
+        ),
+      ].join("\n");
+    }
+    case "event_start": {
+      const { end, start, title } = notification.payload;
+      return t(language, "notify.eventStart", {
+        from: clockIn(start, language, zone),
+        title,
+        to: clockIn(end, language, zone),
+      });
+    }
+    case "activity_overrun": {
+      const { expectMinutes, label, startAt } = notification.payload;
+      return t(language, "notify.overrun", {
+        duration: formatDuration(expectMinutes, language),
+        label,
+        time: clockIn(startAt, language, zone),
+      });
+    }
+  }
+};
+
+/** A notification as the bot sends it, in the account language and zone, with its buttons. */
+export const telegramMessage = (
+  notification: PoolNotification,
+  settings: Pick<Settings, "language" | "timezone">,
+  { now, webOrigin }: { readonly now: string; readonly webOrigin: string },
+): OutgoingMessage => {
+  const zoned = zonedOf(settings, now);
+  const links: readonly (readonly InlineButton[])[] =
+    notification.kind === "deadline_digest"
+      ? notification.payload.tasks
+          .slice(0, LINKED_TASKS)
+          .map((task) => [{ label: task.title, url: taskUrl(webOrigin, task.taskId) }])
+      : [];
+  return {
+    buttons: [...answerButtons(notification, zoned.language), ...links],
+    text: fitted(bodyOf(notification, zoned), (text) => text.length <= TELEGRAM_TEXT_MAX),
+  };
+};
+
+/** A notification as a phone shows it: a title and a body without the chat's emoji. */
+export const phoneContent = (
+  notification: PoolNotification,
+  settings: Pick<Settings, "language" | "timezone">,
+  now: string,
+): { readonly title: string; readonly body: string } => {
+  const zoned = zonedOf(settings, now);
+  const body = bodyOf(notification, zoned);
+  const shown =
+    notification.kind === "deadline_digest"
+      ? body.split("\n").slice(1).join("\n")
+      : body.replace(/^\S+\s/u, "");
+  return {
+    body: fitted(shown, (text) => encoder.encode(text).length <= PHONE_BODY_MAX_BYTES),
+    title: t(zoned.language, `notify.title.${notification.kind}`),
+  };
 };

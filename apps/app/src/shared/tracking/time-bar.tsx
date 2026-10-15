@@ -1,36 +1,28 @@
-import {
-  CalendarDays,
-  Coffee,
-  Dumbbell,
-  Ellipsis,
-  House,
-  type LucideIcon,
-  Play,
-} from "lucide-react-native";
-import { useState } from "react";
+import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
+import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import type { TimeButtonView } from "@pace/client";
-import type { Event } from "@pace/core";
+import type { Event, MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { inkClass, OUTLINE } from "#app/ui/color.tsx";
-import { contextMenuProps } from "#app/ui/context-menu.ts";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
 import { ChoicesSheet } from "./choices-sheet.tsx";
 import { RunningRow } from "./running-row.tsx";
-import { type CalendarButton, useCalendarButton } from "./use-calendar-button.ts";
+import { useCalendarButton } from "./use-calendar-button.ts";
 
 const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
   calendar: CalendarDays,
   chores: House,
   rest: Coffee,
-  sport: Dumbbell,
+  task: Timer,
 };
 
 const startedId = (events: readonly Event[]): null | string => {
@@ -109,119 +101,116 @@ const TypedStart = ({
 
 type ButtonProps = {
   readonly button: TimeButtonView;
-  /** Greyed: a tap only explains why it cannot start anything now (the Calendar button). */
+  /** Greyed: why it cannot start anything now (the Calendar button), shown in its tooltip. */
   readonly unavailable?: string | undefined;
   readonly onTap: (button: TimeButtonView) => void;
-  readonly onMore: (button: TimeButtonView) => void;
 };
 
 /**
-A big button in its fixed place: icon over name, its color's outline, filled with the accent while it runs.
-A long press, a right click or "⋯" opens what it can start and "alongside".
+How a button looks, and what its hint says a tap does: on (its activity runs: the picker opens
+on Stop), greyed (cannot start now) or resting in its color.
 */
-const BarButton = ({ button, onMore, onTap, unavailable }: ButtonProps) => {
+const buttonLook = (
+  button: TimeButtonView,
+  isGreyed: boolean,
+): { readonly box: string; readonly ink: string; readonly hintKey: MessageKey } => {
+  if (button.isRunning) {
+    return {
+      box: "border-accentQuiet bg-accentQuiet",
+      hintKey: "time.buttonRunningHint",
+      ink: "font-medium text-accentQuietFg",
+    };
+  }
+  return isGreyed
+    ? { box: "border-dashed border-line bg-surface", hintKey: "time.buttonHint", ink: "text-muted" }
+    : {
+        box: `bg-surface ${OUTLINE[button.color]}`,
+        hintKey: "time.buttonHint",
+        ink: inkClass(button.color),
+      };
+};
+
+/**
+A big button in its fixed place: icon over name, its color's outline, filled with the quiet
+accent while its activity runs (a state, said in its name too). A tap always opens its picker.
+*/
+const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
   const t = useT();
   const { palette } = useTheme();
   const label = t(button.labelKey);
   const Icon = ICONS[button.id];
+  const look = buttonLook(button, unavailable !== undefined);
   const restingColor = unavailable === undefined ? palette.fg2 : palette.muted;
-  const iconColor = button.isRunning ? palette.accentFg : restingColor;
-  const more = (): void => {
-    onMore(button);
-  };
   return (
-    <View className="relative flex-1">
-      <Pressable
-        accessibilityActions={[{ label: t("time.more", { label }), name: "longpress" }]}
-        accessibilityHint={unavailable ?? t("time.buttonHint")}
-        accessibilityLabel={label}
-        accessibilityRole="switch"
-        aria-checked={button.isRunning}
-        className={cx(
-          "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
-          button.isRunning ? "border-accent bg-accent" : "bg-surface",
-          !button.isRunning &&
-            (unavailable === undefined ? OUTLINE[button.color] : "border-dashed border-line"),
-        )}
-        delayLongPress={450}
-        onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === "longpress") {
-            more();
-          }
-        }}
-        onLongPress={more}
-        onPress={() => {
-          onTap(button);
-        }}
-        {...contextMenuProps(more)}
-      >
-        <Icon color={iconColor} size={18} />
-        <Text
+    <View className="flex-1">
+      {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
+      <Tooltip label={unavailable} showsOnTap={false}>
+        <Pressable
+          accessibilityHint={unavailable ?? t(look.hintKey)}
+          accessibilityLabel={button.isRunning ? t("time.buttonRunning", { label }) : label}
+          accessibilityRole="button"
           className={cx(
-            "text-center font-sans text-[12px] leading-[14px]",
-            button.isRunning && "font-medium text-accentFg",
-            !button.isRunning &&
-              (unavailable === undefined ? inkClass(button.color) : "text-muted"),
+            "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
+            look.box,
           )}
-          numberOfLines={1}
+          onPress={() => {
+            onTap(button);
+          }}
         >
-          {label}
-        </Text>
-      </Pressable>
-      <Pressable
-        accessibilityLabel={t("time.more", { label })}
-        accessibilityRole="button"
-        className="absolute -right-1 -top-1 h-11 w-11 items-start justify-start rounded-md pl-4 pt-2 active:opacity-60"
-        hitSlop={6}
-        onPress={more}
-      >
-        <Ellipsis color={palette.muted} size={16} />
-      </Pressable>
+          <Icon color={button.isRunning ? palette.accentQuietFg : restingColor} size={18} />
+          <Text
+            className={cx("text-center font-sans text-[12px] leading-[14px]", look.ink)}
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
+        </Pressable>
+      </Tooltip>
     </View>
   );
 };
 
-type Opened = { readonly button: TimeButtonView; readonly calendar: CalendarToday | null };
+/** The picker open: which button's (its view is read live, so Stop shows the moment it runs). */
+type Opened = { readonly id: TimeButtonView["id"]; readonly calendar: CalendarToday | null };
 
-/** What a tap does: stop the running button, start the calendar's event or a single choice, or ask. */
-const useTap = (open: (opened: Opened) => void, calendar: CalendarButton) => {
-  const { actions } = usePace();
-  const run = useRunAction();
-  const tap = async (button: TimeButtonView): Promise<void> => {
-    const [only] = button.choices;
-    if (button.isRunning) {
-      await run(actions.stopActivity());
-    } else if (button.kind === "calendar") {
-      await calendar.tap(async () => {
-        open({ button, calendar: await calendar.forPicker() });
-      });
-    } else if (only !== undefined && button.choices.length === 1) {
-      await run(actions.startChoice(only.id));
-    } else {
-      open({ button, calendar: null });
-    }
+/**
+Which picker is open. Calendar's opens once today's calendar is read; only the picker asked for
+last opens, so a read that answers late (another button tapped meanwhile, or the picker
+closed) opens nothing over what is there.
+*/
+const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
+  const [opened, setOpened] = useState<null | Opened>(null);
+  const askedRef = useRef<null | TimeButtonView["id"]>(null);
+  return {
+    close: (): void => {
+      askedRef.current = null;
+      setOpened(null);
+    },
+    open: async (button: TimeButtonView): Promise<void> => {
+      askedRef.current = button.id;
+      const today = button.kind === "calendar" ? await readCalendar() : null;
+      if (askedRef.current === button.id) {
+        setOpened({ calendar: today, id: button.id });
+      }
+    },
+    opened,
   };
-  const more = (button: TimeButtonView): void => {
-    void (async () => {
-      open({ button, calendar: button.kind === "calendar" ? await calendar.forPicker() : null });
-    })();
-  };
-  return { more, tap };
 };
 
 /**
-The time bar under Now, where the thumb rests: what runs (and what runs alongside), "What are
-you doing?", and four buttons that never move: Calendar, Rest, Sport and Chores.
+The time bar at the foot of Day (today): what runs (and what runs alongside), "What are you
+doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
+what it can start.
 */
 export const TimeBar = () => {
   const t = useT();
   const { hooks } = usePace();
   const { alongside, buttons, running } = hooks.useTimeBar();
-  const [opened, setOpened] = useState<null | Opened>(null);
   // The typed activities the assistant is still reading (two can be in flight).
   const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
   const calendar = useCalendarButton();
-  const { more, tap } = useTap(setOpened, calendar);
+  const { close, open, opened } = usePicker(calendar.forPicker);
+  const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
   return (
     <View
       accessibilityLabel={t("time.bar")}
@@ -244,23 +233,20 @@ export const TimeBar = () => {
           <BarButton
             button={button}
             key={button.id}
-            onMore={more}
-            onTap={(pressed) => void tap(pressed)}
-            // Running its own activity, it is on (a tap stops it), whatever the calendar says.
+            onTap={(pressed) => void open(pressed)}
+            // Running its own activity, it is on, whatever the calendar says.
             unavailable={
               button.kind === "calendar" && !button.isRunning ? calendar.unavailable : undefined
             }
           />
         ))}
       </View>
-      {opened === null ? null : (
+      {opened === null || openedButton === null ? null : (
         <ChoicesSheet
-          button={opened.button}
+          button={openedButton}
           calendar={opened.calendar}
-          canGoAlongside={running !== null && !opened.button.isRunning}
-          onClose={() => {
-            setOpened(null);
-          }}
+          canGoAlongside={running !== null && !openedButton.isRunning}
+          onClose={close}
         />
       )}
     </View>

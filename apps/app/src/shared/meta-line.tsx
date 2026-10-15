@@ -22,7 +22,7 @@ const rowTagLabel = (tag: NowRow["tag"], language: Language): string =>
 
 /**
 A row's meta line: the project (else the category) and the importance as coloured tags, then
-`by end of day · 2 problems left` with lateness in orange.
+`by end of day · 2 subtasks left` with lateness in orange.
 */
 export const MetaLine = ({
   asOf,

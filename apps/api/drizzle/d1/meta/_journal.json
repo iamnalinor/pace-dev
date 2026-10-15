@@ -15,6 +15,34 @@
       "when": 1791636159323,
       "tag": "0001_tiresome_betty_brant",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791962029118,
+      "tag": "0002_stormy_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791969535720,
+      "tag": "0003_reset_all_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791997559745,
+      "tag": "0004_flimsy_tenebrous",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792013116320,
+      "tag": "0005_mysterious_steve_rogers",
+      "breakpoints": true
     }
   ]
 }

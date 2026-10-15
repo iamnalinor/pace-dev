@@ -1,9 +1,13 @@
 import {
   type ActivityCategory,
-  type ActivityReading,
+  activityExpect,
+  activityLabel,
+  calendarStart,
+  categoryOfLabel,
   choiceById,
   defaultsFor,
   err,
+  isCalendarRun,
   newId,
   ok,
   runningActivities,
@@ -17,6 +21,13 @@ import { editActions, type EditActions, logPast } from "./activity-edits.ts";
 import { type ActionDeps, type ActionResult, emit, stamp, type When } from "./deps.ts";
 
 export type { ActivityEntry, ActivityTarget, PastActivity } from "./activity-edits.ts";
+
+/** What the assistant reads from a note of what the person is doing ("Пошёл в ЦСС, 20 мин"). */
+export type ActivityReading = {
+  readonly label: string;
+  readonly category: ActivityCategory;
+  readonly expectMinutes: null | number;
+};
 
 export type ActivityInput = {
   readonly label: string;
@@ -42,8 +53,8 @@ export type CalendarStart = {
 
 export type TimeActions = EditActions & {
   /**
-  A choice of a time-bar button ("sport:60", "chores:ready"): starts it in the account's
-  language, or stops it if it is the main activity running (alongside, it always starts).
+  A choice of a time-bar button ("rest:walk", "chores:ready"): starts it in the account's
+  language; the main activity running already is left as it is (alongside, it always starts).
   */
   readonly startChoice: (choiceId: string, options?: StartOptions) => ActionResult;
   /** "From calendar": the event's title, from its start if it is on already, until its end. */
@@ -55,7 +66,7 @@ export type TimeActions = EditActions & {
   readonly startTyped: (text: string, options?: StartOptions) => ActionResult;
   readonly startActivity: (input: ActivityInput, when?: When) => ActionResult;
   /** Time on a task: its title as the label, its estimate as the Expect. */
-  readonly focusTask: (taskId: string) => ActionResult;
+  readonly focusTask: (taskId: string, options?: StartOptions) => ActionResult;
   /** Stops the main activity, or the one named (an activity run alongside). */
   readonly stopActivity: (when?: StopWhen) => ActionResult;
   /**
@@ -71,16 +82,9 @@ export type TimeActions = EditActions & {
 /** When to stop, and which activity: the main one unless named. */
 export type StopWhen = When & { readonly activityId?: string | undefined };
 
-/** An activity's Expect is a day at most (what the events accept). */
-const MAX_MINUTES = 24 * 60;
-/** A label is at most this long (what the events accept). */
-const MAX_LABEL = 80;
-
 /** Whole positive minutes up to a day, or nothing. */
 const positive = (minutes: null | number | undefined): number | undefined =>
-  minutes === null || minutes === undefined || minutes <= 0
-    ? undefined
-    : Math.min(MAX_MINUTES, Math.round(minutes));
+  activityExpect(minutes) ?? undefined;
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
 
@@ -89,7 +93,7 @@ const startActivity = async (
   input: Parameters<TimeActions["startActivity"]>[0],
   when: When = {},
 ): ActionResult => {
-  const label = input.label.trim().slice(0, MAX_LABEL).trim();
+  const label = activityLabel(input.label);
   if (label === "") {
     return err("action/empty-text");
   }
@@ -141,8 +145,9 @@ const startChoice = async (
     return err("action/nothing-to-do");
   }
   const isRunning = runningActivity(timeOf(deps), deps.clock.now())?.buttonId === choiceId;
+  // Picked again while it runs: it runs on (Stop has its own row in the picker).
   if (isRunning && options.alongside !== true) {
-    return await stopActivity(deps);
+    return ok([]);
   }
   const { language } = deps.state.store.getState().settings;
   return await startActivity(deps, {
@@ -150,13 +155,15 @@ const startChoice = async (
     buttonId: choiceId,
     category: found.choice.category,
     expectMinutes: found.choice.expectMinutes,
-    label: t(language, found.choice.labelKey ?? found.button.labelKey),
+    label: t(language, found.choice.labelKey),
   });
 };
 
 /**
 The calendar's event, begun at its start when that has passed, expected to last until its end;
-one already over is logged as the block it was, and what runs now keeps running.
+one already over is logged as the block it was, and what runs now keeps running. Attended
+again while its own run is open (`isCalendarRun`: a second tap, Now and Day both offering it),
+that run keeps going as it is.
 */
 const startCalendar = async (
   deps: ActionDeps,
@@ -164,32 +171,31 @@ const startCalendar = async (
   options: StartOptions = {},
 ): ActionResult => {
   const now = deps.clock.now();
-  if (Date.parse(event.endAt) <= Date.parse(now)) {
+  const isRunning = runningActivities(timeOf(deps), now).some((activity) =>
+    isCalendarRun(event, activity),
+  );
+  if (isRunning) {
+    return ok([]);
+  }
+  const plan = calendarStart(timeOf(deps), event, { alongside: options.alongside, now });
+  if (plan.kind === "log") {
     return await logPast(deps, {
       category: "other",
-      endAt: event.endAt,
+      endAt: plan.endAt,
       label: event.title,
-      startAt: event.startAt,
+      startAt: plan.startAt,
     });
   }
-  // A main activity begun since the event started keeps its time: the event takes over from it.
-  const since =
-    options.alongside === true ? null : (runningActivity(timeOf(deps), now)?.startAt ?? null);
-  const begun = Math.min(Date.parse(event.startAt), Date.parse(now));
-  const startAt = new Date(
-    since === null ? begun : Math.max(begun, Date.parse(since)),
-  ).toISOString();
-  const minutes = Math.round((Date.parse(event.endAt) - Date.parse(startAt)) / 60_000);
   return await startActivity(
     deps,
     {
       alongside: options.alongside,
       buttonId: "calendar",
       category: "other",
-      expectMinutes: minutes > 0 ? minutes : null,
+      expectMinutes: plan.expectMinutes,
       label: event.title,
     },
-    { at: startAt },
+    { at: plan.startAt },
   );
 };
 
@@ -199,14 +205,10 @@ const startTyped = async (
   options: StartOptions = {},
 ): ActionResult => {
   const typed = typedActivity(text);
-  const key = typed.label.toLowerCase();
-  const before = Object.values(timeOf(deps).activities)
-    .filter((activity) => activity.label.trim().toLowerCase() === key)
-    .toSorted((a, b) => b.startAt.localeCompare(a.startAt))[0];
   // No length typed: the one learned for this label applies.
   return await startActivity(deps, {
     alongside: options.alongside,
-    category: before?.category ?? "other",
+    category: categoryOfLabel(timeOf(deps), typed.label),
     label: typed.label,
     ...(typed.expectMinutes !== null && { expectMinutes: typed.expectMinutes }),
   });
@@ -231,12 +233,13 @@ const refineActivity = async (
 export const timeActions = (deps: ActionDeps): TimeActions => ({
   ...editActions(deps),
   refineActivity: async (activityId, reading) => await refineActivity(deps, activityId, reading),
-  focusTask: async (taskId) => {
+  focusTask: async (taskId, options = {}) => {
     const task = taskById(deps.state.store.getState().tasks, taskId);
     if (task === undefined) {
       return err("task/unknown");
     }
     const started = await startActivity(deps, {
+      alongside: options.alongside,
       category: "task",
       expectMinutes: task.estimateMinutes,
       label: task.title,

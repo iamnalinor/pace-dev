@@ -73,7 +73,13 @@ const identify = async (
   }
   if (input.devTelegramId !== undefined && config.environment !== "production") {
     const telegramId = input.devTelegramId;
-    return ok({ name: `Dev ${telegramId}`, photoUrl: null, telegramId, username: null });
+    return ok({
+      name: `Dev ${telegramId}`,
+      firstName: null,
+      photoUrl: null,
+      telegramId,
+      username: null,
+    });
   }
   return err(IDENTITY_REQUIRED);
 };

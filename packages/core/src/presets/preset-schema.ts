@@ -73,10 +73,14 @@ const FieldsSchema = z.preprocess(
   }),
 );
 
-const NotifySchema = z.strictObject({
+/**
+Legacy: notification thresholds no feature ever read (score alerts and the waiting status went
+in stage 6, the rest in stage 8). Accepted so old events parse, then dropped
+(`parsePresetDefinition`).
+*/
+const LegacyNotifySchema = z.strictObject({
   criticalHours: z.number().min(0).exactOptional(),
   criticalProgress: z.number().min(0).max(1).exactOptional(),
-  // Legacy (score alerts and the waiting status were removed in stage 6): accepted, ignored.
   criticalScore: z.number().min(0).exactOptional(),
   waitingDays: z.number().min(0).exactOptional(),
   inProgressIdleDays: z.number().min(0).exactOptional(),
@@ -96,18 +100,21 @@ export const PresetDefinitionSchema = z.strictObject({
   progressMode: z.enum(["none", "slider", "subtasks"]).exactOptional(),
   recurrence: RecurrenceSchema.nullable().exactOptional(),
   fields: FieldsSchema.exactOptional(),
-  notify: NotifySchema.exactOptional(),
+  notify: LegacyNotifySchema.exactOptional(),
   defaultEstimateMinutes: z.int().min(0).exactOptional(),
   color: ProjectColorSchema.exactOptional(),
 });
 
+/** A stored or entered definition, checked; the legacy notification thresholds are dropped. */
 export const parsePresetDefinition = (value: unknown): Result<PresetDefinition, string> => {
   const parsed = PresetDefinitionSchema.safeParse(value);
-  return parsed.success
-    ? ok(parsed.data)
-    : err(
-        parsed.error.issues
-          .map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`)
-          .join("; "),
-      );
+  if (parsed.success) {
+    const { notify: _legacy, ...definition } = parsed.data;
+    return ok(definition);
+  }
+  return err(
+    parsed.error.issues
+      .map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`)
+      .join("; "),
+  );
 };

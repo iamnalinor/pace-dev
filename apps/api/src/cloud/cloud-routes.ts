@@ -13,7 +13,7 @@ events) and the apps in front on each device (names and times, never contents).
 */
 const mountCalendar = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.calendar.sync, async ({ body, c }) =>
-    ok({ stored: await userStoreOf(c).syncCalendar(body) }),
+    ok({ stored: await userStoreOf(c).syncCalendar(body, new Date().toISOString()) }),
   );
   mount(app, endpoints.calendar.list, async ({ c, query }) =>
     ok({ events: [...(await userStoreOf(c).calendar(query))] }),

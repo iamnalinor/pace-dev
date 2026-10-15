@@ -1,10 +1,11 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** One row per person allowed in; `telegramId` is the identity, `id` is what everything else references. */
 export const users = sqliteTable("users", {
   id: text().primaryKey(),
   telegramId: text().notNull().unique(),
   name: text().notNull(),
+  firstName: text(),
   username: text(),
   photoUrl: text(),
   createdAt: integer({ mode: "timestamp_ms" }).notNull(),
@@ -27,6 +28,62 @@ export const sessions = sqliteTable(
     lastSeenAt: integer({ mode: "timestamp_ms" }).notNull(),
   },
   (table) => [index("sessions_user_idx").on(table.userId)],
+);
+
+/**
+A push method the server found broken on its own side (its credentials rejected), keyed by the
+credentials' fingerprint: new credentials are tried afresh. Global, not per user.
+*/
+export const brokenPushMethods = sqliteTable("broken_push_methods", {
+  method: text().primaryKey(),
+  /** Which credentials failed (the account and its key's id). */
+  fingerprint: text().notNull(),
+  brokenAt: integer({ mode: "timestamp_ms" }).notNull(),
+  reason: text().notNull(),
+});
+
+/**
+FCM tokens a send was refused for as another Firebase project's (`SENDER_ID_MISMATCH`): the app
+was built with one project's config, the server sends with another's. Such a token is not taken
+for FCM again while the server sends with that project (its device polls); global, not per user.
+*/
+export const fcmRefusedTokens = sqliteTable("fcm_refused_tokens", {
+  token: text().primaryKey(),
+  /** The project the server sent with when it was refused. */
+  projectId: text().notNull(),
+  refusedAt: integer({ mode: "timestamp_ms" }).notNull(),
+});
+
+/**
+How a signed-in device gets system notifications: its one push method (an FCM token, or its
+polling); without a row it has none. Tied to the session, so signing out
+or deleting the account drops it; the same endpoint belongs to one session at a time.
+*/
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: text().primaryKey(),
+    sessionId: text()
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `fcm` or `poll`: the transport module that sends to it. */
+    transport: text().notNull(),
+    /** The FCM registration token; the session id for polling. */
+    endpoint: text().notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
+    lastOkAt: integer({ mode: "timestamp_ms" }),
+    /** Failed sends since the last one that went through. */
+    failures: integer().notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex("push_subscriptions_endpoint_idx").on(table.transport, table.endpoint),
+    // One way to push per device: a session has at most one subscription.
+    uniqueIndex("push_subscriptions_session_idx").on(table.sessionId),
+    index("push_subscriptions_user_idx").on(table.userId),
+  ],
 );
 
 /** Android login: the app mints a nonce, the bot binds it to a user, the app exchanges it once. */

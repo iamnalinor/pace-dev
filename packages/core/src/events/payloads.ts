@@ -178,11 +178,28 @@ export const PresetUpdatedPayload = z.object({
 });
 export const PresetArchivedPayload = z.object({ id: z.string().min(1) });
 
+/** Switches of one kind's channels; only the ones named change. */
+const ChannelSwitchesPatch = z.strictObject({
+  telegram: z.boolean().optional(),
+  app: z.boolean().optional(),
+  web: z.boolean().optional(),
+});
+
 export const SettingsUpdatedPayload = z.object({
   language: z.enum(["en", "ru"]).optional(),
   timezone: TimeZoneSchema.optional(),
   digestWindows: z.array(ClockSchema).optional(),
   quietHours: z.object({ from: ClockSchema, to: ClockSchema }).optional(),
+  nightHours: z.boolean().optional(),
+  /** Per kind of notification (`NOTIFICATION_KINDS`), the channel switches that change. */
+  notificationChannels: z
+    .strictObject({
+      login: ChannelSwitchesPatch.optional(),
+      deadline_digest: ChannelSwitchesPatch.optional(),
+      event_start: ChannelSwitchesPatch.optional(),
+      activity_overrun: ChannelSwitchesPatch.optional(),
+    })
+    .optional(),
 });
 
 /** What an activity is about: one of a fixed set, so totals and defaults can group it. */
@@ -206,14 +223,16 @@ export const ActivityCategorySchema = z
   .enum([...ACTIVITY_CATEGORIES, "errands"])
   .transform((category) => (category === "errands" ? "chores" : category));
 
-const minutes = z
-  .number()
-  .int()
-  .positive()
-  .max(24 * 60);
+/** An activity's Expect is a day at most. */
+export const ACTIVITY_EXPECT_MAX = 24 * 60;
+
+const minutes = z.number().int().positive().max(ACTIVITY_EXPECT_MAX);
+
+/** An activity's name is at most this long. */
+export const ACTIVITY_LABEL_MAX = 80;
 
 const activityFields = {
-  label: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(ACTIVITY_LABEL_MAX),
   category: ActivityCategorySchema,
   taskId: z.string().min(1).optional(),
 };
@@ -258,18 +277,6 @@ export const ActivityLabelledPayload = z.object({
   /** Retired with the messenger penalty: still parsed in old events, never read. */
   messengersOnPurpose: z.boolean().optional(),
 });
-/** Retired (the time bar's buttons are fixed now): still parsed in old events, never read. */
-export const ActivityButtonSetPayload = z.object({
-  buttonId: z.string().min(1),
-  ...activityFields,
-  color: ProjectColorSchema,
-  expectMinutes: minutes.nullable().optional(),
-  limitMinutes: minutes.nullable().optional(),
-  order: z.number().int().nonnegative(),
-  shouldAskDetails: z.boolean().optional(),
-});
-/** Retired with the editable buttons: still parsed in old events, never read. */
-export const ActivityButtonRemovedPayload = z.object({ buttonId: z.string().min(1) });
 
 export const FocusStartedPayload = z.object(taskRef);
 export const FocusEndedPayload = z.object(taskRef);

@@ -52,6 +52,10 @@ export const ClosePreview = ({
   const timing = t(view.stats.dueAt === null ? "outcome.done" : deadlineTiming);
   const outcome = form.mode === "other" ? t(`close.${form.outcome}`) : timing;
   const happened = form.at === null ? "—" : clockTime(form.at, deviceTz);
+  const recorded = clockTime(now, deviceTz);
+  const isSameMinute =
+    form.at !== null &&
+    Math.floor(Date.parse(form.at) / 60_000) === Math.floor(Date.parse(now) / 60_000);
   return (
     <View className="gap-1.5 rounded-lg bg-bg p-3">
       <Line id="outcome" label={t("close.outcome")} value={outcome} />
@@ -62,7 +66,11 @@ export const ClosePreview = ({
         id="recorded"
         label={t("close.recorded")}
         mono
-        value={t("close.recordedAt", { happened, recorded: clockTime(now, deviceTz) })}
+        value={
+          isSameMinute
+            ? t("close.recordedOnly", { recorded })
+            : t("close.recordedAt", { happened, recorded })
+        }
       />
     </View>
   );

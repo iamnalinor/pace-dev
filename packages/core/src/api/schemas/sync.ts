@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { PrecisionSchema, SourceSchema } from "../../events/event-schema.ts";
+import { knownValue, knownValues } from "../tolerant.ts";
+
 /**
 The structural event envelope exchanged by clients and the Worker. The payload is
 opaque here; its per-type shape is validated by the core event schema (wired into
@@ -11,15 +14,37 @@ export const SyncEventSchema = z.object({
   occurredAt: z.iso.datetime({ offset: true }),
   recordedAt: z.iso.datetime({ offset: true }),
   deviceId: z.string().min(1).max(64),
-  precision: z.enum(["exact", "approx"]),
-  source: z.enum(["app", "web", "bot", "mcp", "system"]),
+  precision: PrecisionSchema,
+  source: SourceSchema,
   payload: z.unknown(),
+});
+
+/**
+An event as a pull reads it: a precision or source a newer server added stands in as `approx` /
+`system` (the event itself still counts), and an entry this client cannot read at all is left out
+instead of refusing the page (the sync would stop there for good).
+*/
+const PulledEventSchema = SyncEventSchema.extend({
+  precision: knownValue(PrecisionSchema.options, "approx"),
+  source: knownValue(SourceSchema.options, "system"),
 });
 
 export type SyncEvent = z.output<typeof SyncEventSchema>;
 
+/**
+The identity of the user's store on the server, made anew whenever the store is wiped. A
+client keeps the id its local log came from; a different one means the server's data was
+reset, so the local copy and its outbox belong to nothing any more and are dropped.
+*/
+export const StoreIdSchema = z.string().min(1).max(64);
+
+/** The error code (HTTP 409) of a push for a store that is not the server's current one. */
+export const STORE_CHANGED = "store/changed";
+
 export const SyncPushBodySchema = z.object({
   events: z.array(SyncEventSchema).max(500),
+  /** The store the client's last pull confirmed: a push for any other store is refused whole. */
+  storeId: StoreIdSchema,
 });
 
 const RejectedEventSchema = z.object({ id: z.string(), reason: z.string() });
@@ -38,26 +63,9 @@ export const SyncPullQuerySchema = z.object({
 });
 
 export const SyncPullOutputSchema = z.object({
-  events: z.array(SyncEventSchema),
+  events: knownValues(PulledEventSchema),
   /** Cursor for the next pull: the sequence number of the last event returned. */
   seq: z.number().int().nonnegative(),
   more: z.boolean(),
-});
-
-export const ObservationSchema = z.object({
-  kind: z.string().min(1).max(64),
-  key: z.string().min(1).max(256),
-  at: z.iso.datetime({ offset: true }),
-  payload: z.unknown(),
-});
-
-export type Observation = z.output<typeof ObservationSchema>;
-
-export const SyncObservationsBodySchema = z.object({
-  observations: z.array(ObservationSchema).max(1000),
-});
-
-export const SyncObservationsOutputSchema = z.object({
-  /** Observations newly stored (duplicates by kind+key are skipped). */
-  accepted: z.number().int().nonnegative(),
+  storeId: StoreIdSchema,
 });

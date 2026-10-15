@@ -43,7 +43,8 @@ the test suites).
 >
 > Cover: every screen at 1440×900 and 390×844, light and dark (`localStorage["pace.theme"]`),
 > Russian and English; the owner's scenarios in `context/feedback-*.md` and the plan's scenario
-> table; every form, sheet, picker and button; keyboard (Tab, Enter, Escape); empty, loading,
+> table; every form, sheet, picker and button; open every form by hand and from each other
+> entry path in the table below, then submit from each; keyboard (Tab, Enter, Escape); empty, loading,
 > error and offline states; console errors and failed requests on every screen; translation
 > gaps and raw keys; text overflow, contrast, tap targets; anything that contradicts itself.
 > Compare with what the owner asked for and list every request that is still not met.
@@ -66,11 +67,39 @@ the test suites).
 > - **Copy**: plain words that say what happened and what to do («A new version is ready ·
 >   Refresh»), never vague («We changed a few things»).
 > - **Color**: one calm accent for actions; no colour that shouts without a reason.
+> - **Forms keep their promise**: try every entry path (empty by hand, assistant, paste,
+>   New task/N, edit) and submit; anything an enabled button offers must be accepted by
+>   the action, since separate UI and action decisions can disagree.
+> - **Overlays in context**: check when every toast, tooltip and popup appears, where it
+>   lands and which controls it covers; late or misplaced feedback hides the next action.
+> - **Visual matrix**: inspect each changed screen at 390 px and 1280 px, in both themes
+>   with Russian text; wrapping and contrast can fail only in one combination.
+> - **Guest language and sideways content**: check signed-out pages with a Russian browser
+>   locale and verify the document language; on narrow screens, every sideways region needs
+>   a visible scroll cue and a keyboard focus target.
 >
 > Report (English): a summary with counts by severity; findings most severe first, each with an
 > id, severity (blocker/high/medium/low), screen + width + theme + language, exact steps, what
 > happened vs what should happen, and a screenshot path; owner requests not met (with
 > evidence); a few lines of what works well. Write it as you go; stop the servers at the end.
+
+## Every form, every way in
+
+A form tested from one entry path hides what the others do (bug class 2 in
+[`context/bug-lessons.md`](../context/bug-lessons.md)). Each round opens every form every way below
+and submits from each; a new way in gets a row and a test that submits from it.
+
+| Form | Ways in | Where a test submits from it |
+|---|---|---|
+| Composer (Now) | typed line + Enter; Send; + over a typed line; + over an empty line; New task request (N, the sidebar); pasted text; a share (`/add`); the assistant's reading (parsed, rules when it is down, queued); To Inbox | `composer.test.tsx`, `now-screen.test.tsx`, `e2e/composer.e2e.ts` |
+| Task edit sheet | the task screen's Edit; the wide pane's Edit | `task-screen.test.tsx` |
+| Close / submit sheet | the row's check on Now; the task screen's Done / Submit; "Close as…" (Cancelled · Skipped); a pill; a typed date and time | `close-sheet.test.tsx`, `close-times.test.ts` |
+| Day's activity sheet | a block (edit); a gap's Log; Log past; a time ahead of now or into the next block | `activity-sheet.test.tsx`, `day-screen.test.tsx` |
+| Time bar | each button's picker (Calendar, Task, Chores, Rest); the typed field + Enter or ▶; Alongside; a re-pick of what runs; Stop | `time-bar.test.tsx`, `e2e/time.e2e.ts` |
+| Calendar event | Now's offer (Attend, Skip); Day's row (Attended, Skip, Every time); the Calendar picker; the feed; Telegram; a phone notification's button | `now-screen.test.tsx`, `day-phone.test.tsx`, `notify.int.test.ts`, `bot.int.test.ts`, `notifications.test.ts` (the phone buttons) |
+| Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
+| Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
+| Add a computer (Devices) | the Devices screen at phone and desktop width; each OS | `devices-screen.test.tsx`, `e2e/devices.e2e.ts` |
 
 ## Limits
 

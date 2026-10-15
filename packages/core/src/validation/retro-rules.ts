@@ -40,6 +40,26 @@ const REJECTED_WHEN_CLOSED: ReadonlySet<TaskInput["type"]> = new Set([
 
 const isAfter = (iso: string, thanIso: string): boolean => Date.parse(iso) > Date.parse(thanIso);
 
+/** Ahead of now by more than a device clock drifts: refused as `retro/future`. */
+const isAheadOfNow = (at: string, now: string): boolean =>
+  isAfter(at, addMinutesIso(now, FUTURE_TOLERANCE_MINUTES));
+
+/**
+Why an event about this task may not happen at `at`, as `validateEventInput` decides it: ahead
+of now, or before the task was made; `null` when it may. What offers or takes instants for a
+task (the close sheet's pills and typed time) reads this, so it never offers one the write refuses.
+*/
+export const taskInstantProblem = (
+  task: Pick<Task, "createdAt">,
+  at: string,
+  now: string,
+): "retro/before-created" | "retro/future" | null => {
+  if (isAheadOfNow(at, now)) {
+    return "retro/future";
+  }
+  return isAfter(task.createdAt, at) ? "retro/before-created" : null;
+};
+
 const checkPreset = (presets: PresetsState, presetId: string): RetroError | undefined =>
   presetById(presets, presetId) === undefined ? "preset/unknown" : undefined;
 
@@ -118,8 +138,6 @@ export const validateEventInput = (
   if (!isTaskInput(input)) {
     return ok(input);
   }
-  const problem = isAfter(input.occurredAt, addMinutesIso(now, FUTURE_TOLERANCE_MINUTES))
-    ? "retro/future"
-    : checkTask(state, input);
+  const problem = isAheadOfNow(input.occurredAt, now) ? "retro/future" : checkTask(state, input);
   return problem === undefined ? ok(input) : err(problem);
 };

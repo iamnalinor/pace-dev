@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { call, json, loginAsDev } from "./helpers.ts";
+import { endpoints } from "@pace/core";
+
+import { answerOf, call, json, loginAsDev } from "./helpers.ts";
 
 const RANGE = "from=2026-10-05T00:00:00.000Z&to=2026-10-12T00:00:00.000Z";
 
@@ -19,7 +21,7 @@ const sync = async (token: string, deviceId: string, events: readonly unknown[])
   });
 
 const titles = async (token: string): Promise<readonly string[]> =>
-  (await json<{ events: { title: string }[] }>(`/api/calendar?${RANGE}`, { token })).events.map(
+  (await answerOf(endpoints.calendar.list, `/api/calendar?${RANGE}`, { token })).events.map(
     (item) => item.title,
   );
 
@@ -39,6 +41,38 @@ describe("the calendar copy", () => {
     expect(await titles(token)).toEqual([]);
     expect((await call(`/api/calendar?${RANGE}`)).status).toBe(401);
   });
+
+  it("keeps what the phone tells about an event: place, notes, link, calendar and people", async () => {
+    const token = await loginAsDev("1002");
+    const details = {
+      attendeeCount: 12,
+      calendarName: "University",
+      location: "Room 214, Main building",
+      notes: "Bring the problem set.\nhttps://example.org/sheet",
+      organizer: "Prof. Ivanova",
+      url: "https://meet.google.com/abc-defg-hij",
+    };
+    await sync(token, "phone-a", [
+      { ...event("e1", 6, "Алгебра"), ...details },
+      event("e2", 7, "Матанализ"),
+    ]);
+    const { events } = await answerOf(endpoints.calendar.list, `/api/calendar?${RANGE}`, { token });
+    // An event the phone said nothing more about comes back as it went (an older phone).
+    expect(events).toEqual([
+      { ...event("e1", 6, "Алгебра"), ...details },
+      event("e2", 7, "Матанализ"),
+    ]);
+    const tooLong = await call("/api/calendar/sync", {
+      body: {
+        deviceId: "phone-a",
+        events: [{ ...event("e3", 8, "Английский"), notes: "x".repeat(2001) }],
+        from: "2026-10-05T00:00:00.000Z",
+        to: "2026-10-12T00:00:00.000Z",
+      },
+      token,
+    });
+    expect(tooLong.status).toBe(422);
+  });
 });
 
 /** The laptop's one VS Code session, seen until `endAt`. */
@@ -54,7 +88,7 @@ describe("usage and device tokens", () => {
     await json("/api/usage/sessions", { body: upload("2026-10-06T10:20:00.000Z"), token });
     await json("/api/usage/sessions", { body: upload("2026-10-06T10:45:00.000Z"), token });
     await json("/api/usage/sessions", { body: upload("2026-10-06T10:30:00.000Z"), token });
-    const { sessions } = await json<{ sessions: unknown[] }>(`/api/usage?${RANGE}`, { token });
+    const { sessions } = await answerOf(endpoints.usage.list, `/api/usage?${RANGE}`, { token });
     expect(sessions).toEqual([
       {
         app: "code",
@@ -68,7 +102,7 @@ describe("usage and device tokens", () => {
 
   it("gives a computer a token that can only upload its usage, until it is revoked", async () => {
     const token = await loginAsDev("1002");
-    const device = await json<{ id: string; token: string; name: string }>("/api/devices", {
+    const device = await answerOf(endpoints.devices.create, "/api/devices", {
       body: { name: "Linux Mint" },
       token,
     });
@@ -91,7 +125,7 @@ describe("usage and device tokens", () => {
       body: { ...upload("2026-10-06T10:45:00.000Z"), deviceName: "Pixel" },
       token,
     });
-    const { devices } = await json<{ devices: unknown[] }>("/api/devices", { token });
+    const { devices } = await answerOf(endpoints.devices.list, "/api/devices", { token });
     expect(devices).toEqual([
       expect.objectContaining({
         kind: "phone",

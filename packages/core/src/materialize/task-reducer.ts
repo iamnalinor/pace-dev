@@ -88,6 +88,7 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
   const { payload, occurredAt } = event;
   return {
     id: payload.taskId,
+    createdEventId: event.id,
     title: payload.title,
     presetId: payload.presetId,
     projectId: payload.projectId ?? null,
@@ -147,7 +148,9 @@ const close = (
 const statusSet: Handler<"task.status.set"> = (task, event) => {
   const status = event.payload.status === "waiting" ? "in_progress" : event.payload.status;
   if (status === task.status) {
-    return task;
+    // The status it has already changes no field, yet it says the task is still on (the
+    // review's Keep open): activity on the task, so `lastEventAt` moves.
+    return { ...task };
   }
   return {
     ...task,

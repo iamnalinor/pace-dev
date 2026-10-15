@@ -45,7 +45,9 @@ describe("PresetDefinitionSchema", () => {
       submission: "per_subtask",
       urgencyPolicy: "resubmission",
     };
-    expect(parsePresetDefinition(full)).toEqual({ ok: true, value: full });
+    // The notification thresholds were never used (stage 8): old presets parse, they are dropped.
+    const { notify: _thresholds, ...kept } = full;
+    expect(parsePresetDefinition(full)).toEqual({ ok: true, value: kept });
   });
 
   it("is strict: an unknown key fails", () => {

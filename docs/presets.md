@@ -32,9 +32,9 @@ Resolution walks the chain from the base preset down to the task:
 base preset  →  user preset  →  …  →  child preset  →  task overrides
 ```
 
-The later value wins. `fields` and `notify` are merged key by key, so a child that sets
-`notify.criticalHours` keeps the parent's other thresholds. `recurrence` is replaced as a
-whole; a child may set it to `null` to switch off an inherited schedule.
+The later value wins. `fields` are merged key by key, so a child that sets
+`fields.link` keeps the parent's other fields. `recurrence` is replaced as a whole; a child
+may set it to `null` to switch off an inherited schedule.
 
 Rules the editor enforces:
 
@@ -71,16 +71,14 @@ others differ.
 | `fields.description` | `true` / `false` | Show a free-text description. | `true` |
 | `fields.startAt` | `true` / `false` | Show a start date; a task whose start is in the future waits under "In future" until then. | `false` |
 | `fields.submitVia` | `true` / `false` | Show "where to submit". | `false` |
-| `notify.criticalHours` | hours ≥ 0 | A task is *critical* when less than this many hours remain to its deadline … | `12` |
-| `notify.criticalProgress` | 0–1 | … and its progress is below this share. | `0.5` |
-| `notify.inProgressIdleDays` | days ≥ 0 | A task *in progress* with no activity for this long is reported as stuck. | `5` |
 | `defaultEstimateMinutes` | minutes ≥ 0 | Estimate for a task created without one. | `60` |
 | `color` | `blue`, `violet`, `green`, `amber`, `coral`, `pink`, `teal`, `slate`, `orange`, `yellow` | Accent used for the preset's tasks when they have no project colour. | `yellow` |
 
-Critical and stuck notifications are sent at most once per task; retroactive edits never
-trigger them. Stage 6 removed urgency scoring, the waiting status and their settings
-(`urgencyPolicy`, `notify.criticalScore`, `notify.waitingDays`): old presets that still carry
-them parse, and the values are ignored.
+Stage 6 removed urgency scoring, the waiting status and their settings (`urgencyPolicy`,
+`notify.criticalScore`, `notify.waitingDays`); stage 8 removed the other `notify` thresholds
+(`criticalHours`, `criticalProgress`, `inProgressIdleDays`), which no notification ever read
+(deadlines come in the deadline digest instead). Old presets
+that still carry them parse, and the values are dropped.
 
 ## Base presets
 
@@ -93,9 +91,6 @@ them parse, and the values are ignored.
 | `progressMode` | `subtasks` | `slider` | `subtasks` | `none` | `none` |
 | `recurrence` | `null` | `null` | `null` | `null` | `null` |
 | `fields` | description | ticket, description, startAt | — | startAt | — |
-| `notify.criticalHours` | 12 | 24 | 24 | 24 | 24 |
-| `notify.criticalProgress` | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 |
-| `notify.inProgressIdleDays` | 5 | 5 | 5 | 5 | 5 |
 | `defaultEstimateMinutes` | 60 | 120 | 30 | 15 | 15 |
 | `color` | yellow | violet | orange | slate | teal |
 

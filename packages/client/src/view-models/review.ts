@@ -37,3 +37,18 @@ export const reviewViewModel = (state: CoreState, ctx: QueryContext): ReviewView
   }));
   return { count: items.length, items };
 };
+
+/**
+The decisions the rules want from the person: every row but "unsorted too long", whose capture
+already has its own card in the Inbox. What the Inbox lists under its cards and what its badge
+counts (`waitingCount`).
+*/
+export const reviewDecisions = (review: ReviewViewModel): readonly ReviewRow[] =>
+  review.items.filter((row) => row.kind !== "unsorted-too-long");
+
+/**
+What waits on the person in the Inbox, the figure on its badge (sidebar and phone tab): the
+captures plus the decisions, each counted once. Zero hides the badge.
+*/
+export const waitingCount = (inbox: { readonly count: number }, review: ReviewViewModel): number =>
+  inbox.count + reviewDecisions(review).length;

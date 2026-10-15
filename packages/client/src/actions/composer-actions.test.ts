@@ -37,7 +37,7 @@ describe("createFromComposer", () => {
     expect(created?.type === "task.created" && created.payload.sourceText).toBe(text);
   });
 
-  it("adds typed problems to this week's homework instead of a new task", async () => {
+  it("adds typed subtasks to this week's homework instead of a new task", async () => {
     const world = await setupActions();
     const before = world.state.store.getState().tasks.byId[HW_ID]?.subtasks.length ?? 0;
     const events = unwrap(
@@ -65,7 +65,7 @@ describe("createFromComposer", () => {
     expect(events.map((event) => event.type)).toEqual(["project.created", "task.created"]);
   });
 
-  it("keeps the description and extra problems of the expanded composer", async () => {
+  it("keeps the description and extra subtasks of the expanded composer", async () => {
     const world = await setupActions();
     const [created] = unwrap(
       await world.actions.createFromComposer(read(world, "read the paper"), {
@@ -118,6 +118,40 @@ describe("createFromComposer", () => {
       fields: { link: "https://example.com/sheet" },
     });
     expect(task?.description).toContain("Метод линейных множителей");
+  });
+
+  it("adds a title typed in the form over an empty line", async () => {
+    const world = await setupActions();
+    const model = composerModel(
+      world.state.store.getState(),
+      { edits: { title: "read the paper" }, text: "" },
+      ctx(),
+    );
+    expect(model.canAdd).toBe(true);
+    const [created] = unwrap(await world.actions.createFromComposer(model));
+    expect(created?.payload).toMatchObject({ title: "read the paper" });
+  });
+
+  it("never refuses a model that can be added", async () => {
+    const world = await setupActions();
+    const drafts = [
+      { text: "" },
+      { text: "  " },
+      { text: "read the paper" },
+      { edits: { title: "by hand" }, text: "" },
+      { edits: { title: " " }, text: "read the paper" },
+      { text: "дз по алгебре 8" },
+      { edits: { title: "" }, text: "дз по алгебре 8" },
+    ];
+    const agrees: Record<string, boolean> = {};
+    for (const draft of drafts) {
+      const model = composerModel(world.state.store.getState(), draft, ctx());
+      const result = await world.actions.createFromComposer(model);
+      // Refused as empty exactly when the model said it cannot be added.
+      agrees[JSON.stringify(draft)] =
+        !result.ok && result.error === "action/empty-text" ? !model.canAdd : model.canAdd;
+    }
+    expect(Object.values(agrees).every(Boolean)).toBe(true);
   });
 
   it("refuses an empty line", async () => {

@@ -136,6 +136,7 @@ export const trk231Events = (): readonly Event[] => [
 /** A plain open task; override what a test needs. */
 export const taskFixture = (overrides: Partial<Task> = {}): Task => ({
   id: HW_ID,
+  createdEventId: stamp(1),
   title: "Algebra HW 6",
   presetId: "hw.algebra",
   projectId: null,

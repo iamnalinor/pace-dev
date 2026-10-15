@@ -7,6 +7,8 @@ export type ActivityCategory = z.output<typeof ActivityCategorySchema>;
 /** One stretch of time: started live (and stopped by the next start) or logged afterwards. */
 export type Activity = {
   readonly id: string;
+  /** The `activity.started` or `activity.logged` that made it: deleting it revokes that. */
+  readonly originEventId: string;
   readonly label: string;
   readonly category: ActivityCategory;
   readonly taskId: null | string;

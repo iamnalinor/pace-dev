@@ -8,13 +8,6 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 
-/**
-The decisions to show beside the Inbox's captures: a capture unsorted for too long is the
-capture's own card there, not a second line.
-*/
-export const decisionsOf = (rows: readonly ReviewRow[]): readonly ReviewRow[] =>
-  rows.filter((row) => row.kind !== "unsorted-too-long");
-
 /** One decision the rules want, with its one-tap answers (also on the Inbox). */
 export const ReviewCard = ({ row }: { readonly row: ReviewRow }) => {
   const t = useT();

@@ -1,8 +1,124 @@
 import { describe, expect, it } from "vitest";
 
+import type { CalendarEvent, CoreState } from "@pace/core";
+
 import { artboardState, ctx, MOSCOW } from "@pace/core/testing";
 
-import { lanesOf, placeIn, weekModel } from "./week.ts";
+import { fitHourPx, gridFromHour, lanesOf, placeIn, weekModel } from "./week.ts";
+
+/** The artboard world with Week's night hours on or off, and these tracked stretches. */
+const world = ({
+  nightHours = false,
+  tracked = [],
+}: {
+  readonly nightHours?: boolean;
+  readonly tracked?: readonly { readonly startAt: string; readonly endAt: string }[];
+}): CoreState => {
+  const base = artboardState();
+  return {
+    ...base,
+    settings: { ...base.settings, nightHours },
+    time: {
+      ...base.time,
+      activities: Object.fromEntries(
+        tracked.map((stretch, index) => [
+          `a${String(index)}`,
+          {
+            buttonId: null,
+            category: "study",
+            endAt: stretch.endAt,
+            expectMinutes: null,
+            id: `a${String(index)}`,
+            isAlongside: false,
+            isLogged: true,
+            label: "Reading",
+            originEventId: `e-a${String(index)}`,
+            startAt: stretch.startAt,
+            stillAt: null,
+            taskId: null,
+          },
+        ]),
+      ),
+    },
+  };
+};
+
+const event = (startAt: string, endAt: string): CalendarEvent => ({
+  endAt,
+  id: `ev-${startAt}`,
+  series: null,
+  startAt,
+  title: "Seminar",
+});
+
+describe("Week's hour range", () => {
+  it("is 07–24 by default, and 00–24 with night hours on", () => {
+    expect(weekModel(world({}), null, ctx()).fromHour).toBe(7);
+    expect(weekModel(world({ nightHours: true }), null, ctx()).fromHour).toBe(0);
+  });
+
+  it("starts earlier for tracked time or a calendar event before seven, never later than 00", () => {
+    // 05:10–06:00 in Moscow on Tuesday.
+    const early = world({
+      tracked: [{ endAt: "2026-10-06T03:00:00.000Z", startAt: "2026-10-06T02:10:00.000Z" }],
+    });
+    const week = weekModel(early, null, ctx());
+    expect(week.fromHour).toBe(5);
+    // A 04:30 event that week widens it again; one in another week does not.
+    const at0430 = event("2026-10-07T01:30:00.000Z", "2026-10-07T02:00:00.000Z");
+    const nextWeek = event("2026-10-13T00:00:00.000Z", "2026-10-13T01:00:00.000Z");
+    expect(gridFromHour(week, [at0430, nextWeek])).toBe(4);
+    expect(gridFromHour(week, [nextWeek])).toBe(5);
+    // With night hours the day is whole whatever it held.
+    const night = weekModel(world({ nightHours: true }), null, ctx());
+    expect(gridFromHour(night, [at0430])).toBe(0);
+  });
+});
+
+describe("whether the week shown is this one", () => {
+  it("is this week (from any day in it) and not the one before", () => {
+    const week = weekModel(world({}), null, ctx());
+    expect(week.isCurrent).toBe(true);
+    // Thursday of this week, asked for by date, is still this week.
+    expect(weekModel(world({}), "2026-10-08T09:00:00.000Z", ctx()).isCurrent).toBe(true);
+    expect(weekModel(world({}), week.previous, ctx()).isCurrent).toBe(false);
+  });
+
+  it("turns at Monday's midnight in the account zone, not in UTC", () => {
+    // Monday 12 October 00:00 in Moscow is Sunday 21:00 UTC.
+    const monday = "2026-10-11T21:00:00.000Z";
+    const justBefore = "2026-10-11T20:59:59.999Z";
+    const lastWeek = "2026-10-05T12:00:00.000Z";
+    expect(weekModel(world({}), lastWeek, ctx(justBefore)).isCurrent).toBe(true);
+    expect(weekModel(world({}), lastWeek, ctx(monday)).isCurrent).toBe(false);
+    expect(weekModel(world({}), null, ctx(monday)).isCurrent).toBe(true);
+  });
+});
+
+describe("fitHourPx", () => {
+  it("shares the measured height between the hours, so the grid fits without scrolling", () => {
+    expect(fitHourPx({ available: 680, floorPx: 18, hours: 17 })).toEqual({
+      hourPx: 40,
+      scrolls: false,
+    });
+    expect(fitHourPx({ available: 480, floorPx: 18, hours: 24 })).toEqual({
+      hourPx: 20,
+      scrolls: false,
+    });
+  });
+
+  it("keeps an hour at least the floor tall and only then lets the grid scroll", () => {
+    expect(fitHourPx({ available: 300, floorPx: 18, hours: 24 })).toEqual({
+      hourPx: 18,
+      scrolls: true,
+    });
+    // Not measured yet: the floor, without scrolling.
+    expect(fitHourPx({ available: 0, floorPx: 18, hours: 17 })).toEqual({
+      hourPx: 18,
+      scrolls: false,
+    });
+  });
+});
 
 describe("weekModel", () => {
   it("is Monday to Sunday in the account zone, today marked, the next week only for a past one", () => {

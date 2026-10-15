@@ -1,15 +1,12 @@
+import * as Notifications from "expo-notifications";
 import { createContext, type ReactNode, use, useCallback, useEffect, useState } from "react";
 import { AppState, View } from "react-native";
 import { useStore } from "zustand";
 
+import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
+
 import {
-  type Auth,
-  type AuthState,
-  type AppState as ClientState,
-  type SyncStatus,
-  timeBarModel,
-} from "@pace/client";
-import {
+  isAnswer,
   type Language,
   type MessageKey,
   type MessageParams,
@@ -18,12 +15,22 @@ import {
   type User,
 } from "@pace/core";
 
+import { deviceLanguage } from "./platform/device-language.ts";
 import { IS_PHONE } from "./platform/device.ts";
-import { syncActivityTimers, syncLocalNotifications } from "./platform/notifications.ts";
-import { type PhoneContext, startPhoneChecks } from "./platform/phone-background.ts";
+import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
+import { notificationIdOf } from "./platform/notification-id.ts";
+import {
+  answerFromButton,
+  dismissPoolNotification,
+  pollNow,
+  pushStore,
+  registerPush,
+  setupNotificationCategories,
+} from "./platform/notifications.ts";
 import { uploadPhoneData } from "./platform/phone-upload.ts";
+import { startPushTask } from "./platform/push-task.ts";
+import { isForSession } from "./platform/session-fingerprint.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
-import { remindCalendar } from "./shared/tracking/calendar-reminders.ts";
 
 /**
 How often the client pulls on its own. While the live channel is up the server says when
@@ -33,16 +40,7 @@ const POLL_OFFLINE_MS = 30_000;
 const POLL_LIVE_MS = 5 * 60_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
-
-/**
-A signed-in start: this week's homework instances, a first sync, then the account's time
-zone from the device when it has none yet (never "not set").
-*/
-/** The account's language and zone, for the background phone check that runs without a store. */
-const phoneContextOf = (runtime: PaceRuntime): PhoneContext => {
-  const { settings } = runtime.state.store.getState();
-  return { language: settings.language, zone: settings.timezone ?? runtime.clock.deviceTz };
-};
+const LanguageReadyContext = createContext<null | string>(null);
 
 /** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
 const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
@@ -51,15 +49,37 @@ const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
   }
 };
 
+/**
+The phone's side of the notification pool, on every start and return: the answer buttons,
+the push method (registered again: a token may have changed) and, when it polls, what waits.
+*/
+const startPhonePush = async (runtime: PaceRuntime): Promise<void> => {
+  if (!IS_PHONE) {
+    return;
+  }
+  try {
+    await setupNotificationCategories(runtime.state.store.getState().settings.language);
+    await startPushTask();
+    if ((await registerPush(runtime.api)) === "poll") {
+      await pollNow(runtime.api);
+    }
+  } catch {
+    // Offline: the next start or return tries again; the feed has everything meanwhile.
+  }
+};
+
+/**
+A signed-in start: this week's homework instances, a first sync, then the account's time
+zone from the device when it has none yet (never "not set").
+*/
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
-  await syncLocalNotifications(runtime);
-  await remindCalendar(runtime);
+  await runtime.notifications.refresh();
   await sendPhoneData(runtime);
-  await startPhoneChecks(phoneContextOf(runtime));
+  await startPhonePush(runtime);
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status !== "signed-in") {
     return;
@@ -69,39 +89,108 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   runtime.live.start();
 };
 
-/** The running activity and when it asks next: the timers change only when this does. */
-const timerKey = (runtime: PaceRuntime): string => {
-  const { running } = timeBarModel(runtime.state.store.getState(), {
-    deviceTz: runtime.clock.deviceTz,
-    now: runtime.clock.now(),
+/**
+What the live socket says about the pool, on a phone: a notification resolved elsewhere goes
+away at once; a polling phone fetches what waits for it right away; changed push methods mean
+registering again. And an answer button tapped while the app is open answers like the feed.
+*/
+const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
+  if (!IS_PHONE) {
+    return () => undefined;
+  }
+  const pollIfPolling = (): void => {
+    if (pushStore.getState().method === "poll") {
+      void (async () => {
+        try {
+          await pollNow(runtime.api);
+        } catch {
+          // Offline: the next notice or start fetches it.
+        }
+      })();
+    }
+  };
+  const stopNotices = runtime.onNotice((notice) => {
+    switch (notice.type) {
+      case "push-methods-changed": {
+        void startPhonePush(runtime);
+        break;
+      }
+      case "dismiss": {
+        void dismissPoolNotification(notice.id);
+        pollIfPolling();
+        break;
+      }
+      case "notification": {
+        pollIfPolling();
+        break;
+      }
+      case "read": {
+        break;
+      }
+    }
   });
-  return running === null
-    ? ""
-    : [running.activityId, running.startAt, running.label, running.remindAt].join("|");
-};
-
-/** Reschedules the phone's "still doing this?" timer on every switch, stop or edit of the running activity. */
-const followActivityTimers = (runtime: PaceRuntime): (() => void) => {
-  let last = timerKey(runtime);
-  void syncActivityTimers(runtime);
-  return runtime.state.store.subscribe(() => {
-    const key = timerKey(runtime);
-    if (key === last) {
+  const responses = Notifications.addNotificationResponseReceivedListener((response) => {
+    const id = notificationIdOf(response.notification.request.content.data);
+    if (id === null || !isAnswer(response.actionIdentifier)) {
       return;
     }
+    const resolution = response.actionIdentifier;
+    void answerFromButton({
+      content: response.notification.request.content,
+      id,
+      save: async () => await runtime.notifications.resolve(id, resolution),
+      stillCurrent: async () =>
+        await isForSession(
+          response.notification.request.content.data,
+          runtime.api.currentSessionToken(),
+        ),
+    });
+  });
+  return () => {
+    stopNotices();
+    responses.remove();
+  };
+};
 
-    last = key;
-    void syncActivityTimers(runtime);
+/** A successful sync makes account settings safe to show for that run's session. */
+const followSyncedLanguage = (
+  runtime: PaceRuntime,
+  onLanguageReady: (token: null | string) => void,
+): (() => void) => {
+  const { auth, sync } = runtime;
+  let syncOwner = sync.status.getState().syncing ? runtime.api.currentSessionToken() : undefined;
+  return sync.status.subscribe((current, previous) => {
+    if (current.syncing && !previous.syncing) {
+      syncOwner = runtime.api.currentSessionToken();
+    }
+    if (
+      syncOwner !== undefined &&
+      !current.syncing &&
+      previous.syncing &&
+      current.lastError === null &&
+      current.lastSyncAt !== null &&
+      runtime.api.isCurrentSession(syncOwner) &&
+      auth.store.getState().status === "signed-in"
+    ) {
+      onLanguageReady(syncOwner);
+    }
   });
 };
 
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
-const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
+const runSyncLoop = (
+  runtime: PaceRuntime,
+  onLanguageReady: (token: null | string) => void,
+): (() => void) => {
   const { actions, auth, sync } = runtime;
+  let activeSession = runtime.api.currentSessionToken();
+  const stopLanguageSync = followSyncedLanguage(runtime, onLanguageReady);
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
+      activeSession = runtime.api.currentSessionToken();
       void bootstrap(runtime);
     } else {
+      onLanguageReady(null);
       sync.stop();
       runtime.live.stop();
     }
@@ -112,13 +201,23 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       return;
     }
     follow(current.status);
-    if (previous.status === "signed-in" && current.status === "signed-out") {
-      void runtime.resetLocalData();
+    if (!(previous.status === "signed-in" && current.status === "signed-out")) {
+      return;
     }
+
+    if (activeSession !== undefined) {
+      void clearPresentedPoolNotifications(activeSession);
+    }
+    activeSession = undefined;
+    void runtime.resetLocalData();
   });
   // The poll is a safety net while the server can say "changed" itself.
-  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }) => {
+  const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {
     sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
+    // Back on the line: what the pool got meanwhile.
+    if (isConnected && !previous.isConnected) {
+      void runtime.notifications.refresh();
+    }
   });
   const subscription = AppState.addEventListener("change", (next) => {
     if (auth.store.getState().status !== "signed-in") {
@@ -136,17 +235,17 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     void actions.ensureInstances();
     void (async () => {
       await sync.syncNow();
-      await syncLocalNotifications(runtime);
-      await remindCalendar(runtime);
+      await runtime.notifications.refresh();
       await sendPhoneData(runtime);
-      await startPhoneChecks(phoneContextOf(runtime));
+      await startPhonePush(runtime);
     })();
   });
-  const stopTimers = followActivityTimers(runtime);
+  const stopNotices = followPhoneNotices(runtime);
   return () => {
     unsubscribe();
     subscription.remove();
-    stopTimers();
+    stopNotices();
+    stopLanguageSync();
     stopFollowingLive();
     sync.stop();
     runtime.live.stop();
@@ -165,6 +264,7 @@ export const PaceProvider = ({
   readonly runtime?: PaceRuntime;
 }) => {
   const [runtime, setRuntime] = useState<null | PaceRuntime>(provided ?? null);
+  const [languageReadyToken, setLanguageReadyToken] = useState<null | string>(null);
 
   useEffect(() => {
     if (provided !== undefined) {
@@ -182,12 +282,17 @@ export const PaceProvider = ({
     };
   }, [provided]);
 
-  useEffect(() => (runtime === null ? undefined : runSyncLoop(runtime)), [runtime]);
+  useEffect(
+    () => (runtime === null ? undefined : runSyncLoop(runtime, setLanguageReadyToken)),
+    [runtime],
+  );
 
   return runtime === null ? (
     <View className="flex-1 bg-bg" />
   ) : (
-    <RuntimeContext value={runtime}>{children}</RuntimeContext>
+    <RuntimeContext value={runtime}>
+      <LanguageReadyContext value={languageReadyToken}>{children}</LanguageReadyContext>
+    </RuntimeContext>
   );
 };
 
@@ -209,6 +314,16 @@ export const useAuth = (): {
   return { auth, status, user };
 };
 
+/**
+The owner's first name from their Telegram profile. A session that began before the server kept it
+falls back to the first word of their full name; null until the server has told who they are.
+*/
+export const useOwnerName = (): null | string => {
+  const { user } = useAuth();
+  const name = (user?.firstName ?? user?.name.split(/\s+/u, 1)[0])?.trim();
+  return name === undefined || name === "" ? null : name;
+};
+
 export const useSync = (): {
   readonly status: SyncStatus;
   readonly syncNow: () => Promise<unknown>;
@@ -222,7 +337,15 @@ export const useAppState = <T,>(selector: (state: ClientState) => T): T =>
 
 export const useSettings = (): Settings => useAppState((state) => state.settings);
 
-export const useLanguage = (): Language => useAppState((state) => state.settings.language);
+export const useLanguage = (): Language => {
+  const { status } = useAuth();
+  const { api } = usePace();
+  const readyToken = use(LanguageReadyContext);
+  const accountLanguage = useAppState((state) => state.settings.language);
+  return status === "signed-in" && readyToken !== null && readyToken === api.currentSessionToken()
+    ? accountLanguage
+    : deviceLanguage();
+};
 
 /** `t` bound to the account language. */
 export const useT = (): ((key: MessageKey, params?: MessageParams) => string) => {

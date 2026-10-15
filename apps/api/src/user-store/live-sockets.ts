@@ -46,6 +46,32 @@ export const announceChange = (
   }
 };
 
+/** Sends a message to every live client (a feed update: a notification new or resolved). */
+export const broadcast = (ctx: DurableObjectState, message: object): void => {
+  const text = JSON.stringify(message);
+  for (const socket of ctx.getWebSockets()) {
+    try {
+      socket.send(text);
+    } catch {
+      // A socket closing meanwhile: its client reloads the feed when it reconnects.
+    }
+  }
+};
+
+/**
+Whether a socket may close with this code (RFC 6455 §7.4): 1000–1003 and 1007–1014 of the
+protocol's, and 3000–4999 for libraries and apps. The rest are only ever received (1005 none
+given, 1006 dropped, 1015 TLS failed) or reserved: sending one throws.
+*/
+const isSendable = (code: number): boolean =>
+  (code >= 1000 && code <= 1003) ||
+  (code >= 1007 && code <= 1014) ||
+  (code >= 3000 && code <= 4999);
+
+/** The code to close with in answer to a device's close: its own, unless that may not be sent. */
+export const replyCloseCode = (received: number): number =>
+  isSendable(received) ? received : 1000;
+
 /**
 The live channel's half of a user's store: it accepts live clients (the Worker has checked the
 bearer), answers their keep-alive without waking (no duration billed) and closes cleanly.
@@ -61,6 +87,6 @@ export class LiveStore extends DurableObject {
   }
 
   override webSocketClose(socket: WebSocket, code: number): void {
-    socket.close(code === 1005 ? 1000 : code, "closing");
+    socket.close(replyCloseCode(code), "closing");
   }
 }

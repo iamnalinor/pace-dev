@@ -1,30 +1,31 @@
+import { Moon } from "lucide-react-native";
 import { useState } from "react";
-import { Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
-import type { WeekModel } from "@pace/client";
-
-import { usePace, useT } from "#app/app-state.tsx";
-import { clockTime } from "#app/format/time.ts";
-import { useOpenTask } from "#app/shared/task-opener.tsx";
+import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { BackToToday } from "#app/shared/back-to-today.tsx";
+import { useBack } from "#app/shared/use-back.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
-import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
-import { Button } from "#app/ui/button.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
-import { Sheet } from "#app/ui/sheet.tsx";
+import { SplitPane } from "#app/ui/split-pane.tsx";
+import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Tooltip } from "#app/ui/tooltip.tsx";
+import { fitHourPx, gridFromHour, type WeekModel } from "@pace/client";
 import { useCalendarRange, useUsage } from "@pace/client/react";
-import { addDaysIn, formatDuration, type Language } from "@pace/core";
+import { addDaysIn, type Language } from "@pace/core";
 
-import { dayLabel, gridFromHour, hourNow, type Picked, WeekGrid } from "./week-grid.tsx";
+import { PickedPane, PickedSheet } from "./picked-details.tsx";
+import { BOTTOM_PX, LABELS_PX, type Picked, pickedKey, WeekGrid } from "./week-grid.tsx";
 
-/** The day labels' row above the grid. */
-const LABELS_PX = 28;
+/** An hour is never drawn shorter than this; a day that would need less scrolls instead. */
+const HOUR_FLOOR_PX = 18;
 
-/** What the screen's header and a phone's tab bar take of the window's height, roughly. */
-const CHROME_PX = 200;
+/** On a phone a day column keeps this width at least, and the week scrolls sideways. */
+const PHONE_COLUMN_PX = 72;
 
 /** "5 Oct", "5 окт." */
 const monthDay = (date: string, zone: string, language: Language): string =>
@@ -32,160 +33,178 @@ const monthDay = (date: string, zone: string, language: Language): string =>
     new Date(date),
   );
 
-/** [This week] [‹] [›], as on Day. */
+/** The moon: the night hours (00–07) on the grid, or not; the same switch as in Settings. */
+const NightHoursToggle = () => {
+  const t = useT();
+  const { actions } = usePace();
+  const { nightHours } = useSettings();
+  const { palette } = useTheme();
+  const label = t("week.nightHours");
+  return (
+    <Tooltip label={label}>
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole="switch"
+        aria-checked={nightHours}
+        className={cx(
+          "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
+          nightHours && "bg-accentQuiet",
+        )}
+        onPress={() => {
+          void actions.setNightHours(!nightHours);
+        }}
+      >
+        <Moon
+          color={nightHours ? palette.accentQuietFg : palette.fg2}
+          size={18}
+          strokeWidth={1.75}
+        />
+      </Pressable>
+    </Tooltip>
+  );
+};
+
+/** [moon] [Back to today] [‹] [›]: Back to today only on a week that is not this one. */
 const WeekNav = ({
   onWeek,
   week,
 }: {
   readonly week: WeekModel;
   readonly onWeek: (weekOf: null | string) => void;
-}) => {
+}) => (
+  <View className="flex-row items-center gap-1">
+    <NightHoursToggle />
+    <BackToToday
+      isAway={!week.isCurrent}
+      onPress={() => {
+        onWeek(null);
+      }}
+    />
+    <WeekArrows next={week.next} onWeek={onWeek} previous={week.previous} />
+  </View>
+);
+
+type GridArgs = Omit<Parameters<typeof WeekGrid>[0], "hourPx" | "minColumnPx">;
+
+/**
+The grid in the height the screen leaves it: the hours share that height, so the whole day is
+in sight without scrolling; only when an hour would be shorter than the floor does it scroll.
+*/
+const FittedGrid = (props: GridArgs) => {
   const t = useT();
+  const isWide = useIsWide();
+  const [available, setAvailable] = useState(0);
+  const hours = 24 - gridFromHour(props.week, props.calendar);
+  const { hourPx, scrolls } = fitHourPx({
+    available: available - LABELS_PX - BOTTOM_PX - (isWide ? 0 : BOTTOM_PX),
+    floorPx: HOUR_FLOOR_PX,
+    hours,
+  });
   return (
-    <View className="flex-row items-center gap-1">
-      <Button
-        disabled={week.next === null}
-        onPress={() => {
-          onWeek(null);
-        }}
-        variant="secondary"
-      >
-        {t("week.thisWeek")}
-      </Button>
-      <WeekArrows next={week.next} onWeek={onWeek} previous={week.previous} />
+    <View
+      className="flex-1"
+      onLayout={(event) => {
+        setAvailable(event.nativeEvent.layout.height);
+      }}
+      testID="week-body"
+    >
+      <ScrollView className="flex-1" scrollEnabled={scrolls} testID="week-scroller">
+        <WeekGrid {...props} hourPx={hourPx} minColumnPx={isWide ? 0 : PHONE_COLUMN_PX} />
+      </ScrollView>
+      {isWide ? null : (
+        <View className="h-6 items-end justify-center pr-3">
+          <Text className="font-sans text-[11px] text-muted">{t("week.scrollHint")}</Text>
+        </View>
+      )}
     </View>
   );
 };
 
-/** The block was time on a task: its page is one tap away. */
-const OpenTaskButton = ({
-  onOpened,
-  taskId,
-}: {
-  readonly taskId: string;
-  readonly onOpened: () => void;
-}) => {
-  const t = useT();
-  const openTask = useOpenTask();
-  return (
-    <Button
-      onPress={() => {
-        onOpened();
-        openTask(taskId);
-      }}
-      variant="secondary"
-    >
-      {t("week.openTask")}
-    </Button>
-  );
-};
-
-/** A tapped block (with where its time went) or calendar event. */
-const PickedSheet = ({
-  onClose,
+/** The week's grid under its header: the dates, the moon, Back to today and the arrows. */
+const WeekPage = ({
+  onPick,
+  onWeek,
   picked,
   week,
 }: {
-  readonly picked: Picked;
   readonly week: WeekModel;
-  readonly onClose: () => void;
+  readonly picked: null | Picked;
+  readonly onPick: (picked: Picked) => void;
+  readonly onWeek: (weekOf: null | string) => void;
 }) => {
   const t = useT();
-  const { language } = useViewer();
-  const sat = useWhereSat(week.weekStart, week.weekEnd);
-  const stretch = picked.kind === "block" ? picked.block : picked.event;
-  const title = picked.kind === "block" ? picked.block.label : picked.event.title;
-  const hours = `${clockTime(stretch.startAt, week.zone)}–${clockTime(stretch.endAt, week.zone)}`;
-  const when = `${dayLabel(stretch.startAt, week.zone, language)}, ${hours}`;
+  const { api } = usePace();
+  const { language, now } = useViewer();
+  const calendar = useCalendarRange(api, week.weekStart, week.weekEnd);
+  const usage = useUsage(api, week.weekStart, week.weekEnd);
+  const lastDay = addDaysIn(week.weekStart, 6, week.zone);
+  // A phone opens Week from More: the chevron goes back there; beside the sidebar there is none.
+  const back = useBack();
   return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} subtitle={when} title={title} visible>
-      {picked.kind === "block" ? (
-        <View className="gap-1">
-          <Text className="font-sans text-[14px] text-fg">
-            {[
-              t(`category.${picked.block.category}`),
-              formatDuration(picked.block.minutes, language),
-            ].join(" · ")}
-          </Text>
-          <View className="-ml-[98px]">
-            <WhereSatLine rows={sat(stretch.startAt, stretch.endAt)} />
-          </View>
-          {picked.block.taskId === null ? null : (
-            <OpenTaskButton onOpened={onClose} taskId={picked.block.taskId} />
-          )}
-        </View>
-      ) : (
-        <Text className="font-sans text-[14px] text-muted">{t("week.calendarEvent")}</Text>
-      )}
-    </Sheet>
+    <Screen
+      fills
+      header={
+        <ScreenHeader
+          {...(back !== undefined && { backLabel: t("common.back"), onBack: back })}
+          eyebrow={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
+          right={<WeekNav onWeek={onWeek} week={week} />}
+          title={t("nav.week")}
+        />
+      }
+    >
+      <FittedGrid
+        calendar={calendar}
+        language={language}
+        now={now}
+        onPick={onPick}
+        selectedKey={picked === null ? null : pickedKey(picked)}
+        usage={usage}
+        week={week}
+      />
+    </Screen>
   );
 };
 
 /**
-How far down the week opens: this week only as far as needed to bring now into sight (the day
-names stay whenever now already is); a past week at its top.
-*/
-const useOpenAt = (
-  week: WeekModel,
-  calendar: Parameters<typeof gridFromHour>[1],
-  hourPx: number,
-): number => {
-  const { now } = useViewer();
-  const { height } = useWindowDimensions();
-  const nowTop =
-    LABELS_PX + (hourNow(now, week.zone) - gridFromHour(week, calendar) + 0.5) * hourPx;
-  // Scrolled only when now (and two hours after it) would be below what is in sight under the
-  // header and the tab bar; otherwise the top stays, day names included.
-  const overflow = nowTop + 2 * hourPx - (height - CHROME_PX);
-  return week.next === null ? Math.max(0, Math.round(overflow)) : 0;
-};
-
-/**
-The week as lived: Monday to Sunday on one hour grid, tracked time filled in its color, the
-calendar's events outlined, a thin strip where some device was in use. A tap tells more.
+The week as lived: Monday to Sunday on one hour grid that fits the screen, tracked time filled
+in its color, the calendar's events outlined, a thin strip where some device was in use. A tap
+tells more: beside the grid on a wide window, in a sheet on a phone.
 */
 export const WeekScreen = () => {
   const t = useT();
-  const { api, hooks } = usePace();
-  const { language, now } = useViewer();
+  const { hooks } = usePace();
   const isWide = useIsWide();
   const [weekOf, setWeekOf] = useState<null | string>(null);
   const [picked, setPicked] = useState<null | Picked>(null);
   const week = hooks.useWeek(weekOf);
-  const calendar = useCalendarRange(api, week.weekStart, week.weekEnd);
-  const usage = useUsage(api, week.weekStart, week.weekEnd);
-  const lastDay = addDaysIn(week.weekStart, 6, week.zone);
-  const header = (
-    <ScreenHeader
-      eyebrow={`${monthDay(week.weekStart, week.zone, language)} – ${monthDay(lastDay, week.zone, language)}`}
-      right={<WeekNav onWeek={setWeekOf} week={week} />}
-      title={t("week.title")}
+  const close = (): void => {
+    setPicked(null);
+  };
+  const grid = (
+    <WeekPage
+      onPick={setPicked}
+      onWeek={(next) => {
+        setWeekOf(next);
+        // What was picked belongs to the week it was on.
+        setPicked(null);
+      }}
+      picked={picked}
+      week={week}
     />
   );
-  const hourPx = isWide ? 40 : 30;
-  // This week opens at the hour before now; a past one at its first hour.
-  const scrollTo = useOpenAt(week, calendar, hourPx);
-  return (
-    <Screen header={header} scrollTo={scrollTo}>
-      <WeekGrid
-        calendar={calendar}
-        hourPx={hourPx}
-        language={language}
-        minColumnPx={isWide ? 0 : 72}
-        now={now}
-        onPick={setPicked}
-        usage={usage}
-        week={week}
+  if (isWide) {
+    return (
+      <SplitPane
+        main={grid}
+        side={<PickedPane onClose={close} picked={picked} week={week} />}
+        sideLabel={t("week.details")}
       />
-      {picked === null ? null : (
-        <PickedSheet
-          onClose={() => {
-            setPicked(null);
-          }}
-          picked={picked}
-          week={week}
-        />
-      )}
-    </Screen>
+    );
+  }
+  return (
+    <>
+      {grid}
+      {picked === null ? null : <PickedSheet onClose={close} picked={picked} week={week} />}
+    </>
   );
 };

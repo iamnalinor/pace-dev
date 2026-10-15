@@ -8,7 +8,14 @@ type FakeEvent = {
   readonly recurrenceRule?: null | { readonly frequency: string };
   readonly organizerEmail?: string;
   /** The invitation's people; `undefined` for one's own event. */
-  readonly attendees?: readonly { readonly email: string; readonly status: string }[];
+  readonly attendees?: readonly {
+    readonly email: string;
+    readonly status: string;
+    readonly name?: string;
+  }[];
+  readonly location?: null | string;
+  readonly notes?: string;
+  readonly url?: string;
 };
 
 /** An event as `listEvents` hands it out: with its calendar and a way to read its people. */
@@ -25,7 +32,7 @@ export type FakeCalendar = {
   readonly getCalendarPermissions: () => Promise<{ status: string; canAskAgain: boolean }>;
   readonly requestCalendarPermissions: () => Promise<{ status: string; canAskAgain: boolean }>;
   readonly getCalendars: () => Promise<
-    readonly { id: string; isVisible: boolean; ownerAccount: string }[]
+    readonly { id: string; isVisible: boolean; ownerAccount: string; title: string }[]
   >;
   readonly listEvents: (
     ids: readonly string[],
@@ -55,7 +62,9 @@ export const createFakeCalendar = (): FakeCalendar => {
       canAskAgain: state.canAskAgain,
       status: state.status,
     }),
-    getCalendars: async () => [{ id: "cal-1", isVisible: true, ownerAccount: FAKE_OWNER }],
+    getCalendars: async () => [
+      { id: "cal-1", isVisible: true, ownerAccount: FAKE_OWNER, title: "University" },
+    ],
     listEvents: async (_ids, from, to) =>
       state.events
         .filter(

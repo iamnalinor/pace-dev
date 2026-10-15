@@ -22,6 +22,11 @@ declare global {
       GEMINI_API_KEY?: string;
       /** `fake` keeps the LLM inside the Worker (tests, e2e). */
       LLM_PROVIDER?: string;
+      /**
+      The Firebase service account's JSON key (Project settings → Service accounts). Without it
+      push is off and every other channel still works.
+      */
+      FIREBASE_SERVICE_ACCOUNT?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
       /**

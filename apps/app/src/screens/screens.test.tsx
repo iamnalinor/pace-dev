@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -39,11 +39,36 @@ describe("InboxScreen — decisions", () => {
   });
 });
 
+const row = (name: string) => screen.getByRole("link", { name });
+
 describe("ProjectsScreen and ProjectScreen", () => {
   it("lists the projects and opens one", async () => {
     await renderScreen(<ProjectsScreen />, await createTestRuntime());
     await fireEvent.press(screen.getByRole("link", { name: "Algebra" }));
     expect(router.push).toHaveBeenCalledWith(`/project/${ALGEBRA_ID}`);
+  });
+
+  it("says how many tasks are open in each project, whatever Now's chips show", async () => {
+    await renderScreen(<ProjectsScreen />, await createTestRuntime());
+    expect(within(row("Algebra")).getByText("2 tasks")).toBeOnTheScreen();
+    expect(within(row("Work")).getByText("3 tasks")).toBeOnTheScreen();
+  });
+
+  it("says one task, and none", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.createProject({ color: "blue", name: "Garden" });
+    await runtime.actions.createProject({ color: "teal", name: "Attic" });
+    const garden = Object.values(runtime.state.store.getState().projects.byId).find(
+      (project) => project.name === "Garden",
+    );
+    await runtime.actions.createTask({
+      presetId: "personal",
+      projectId: garden?.id,
+      title: "Weed",
+    });
+    await renderScreen(<ProjectsScreen />, runtime);
+    expect(within(row("Garden")).getByText("1 task")).toBeOnTheScreen();
+    expect(within(row("Attic")).getByText("No open tasks")).toBeOnTheScreen();
   });
 
   it("shows a project's figures and open tasks", async () => {
@@ -56,6 +81,36 @@ describe("ProjectsScreen and ProjectScreen", () => {
 });
 
 describe("HistoryScreen", () => {
+  it("asks before undoing a history event and lets the user cancel", async () => {
+    const runtime = await createTestRuntime();
+    const revoke = jest.spyOn(runtime.actions, "revoke");
+    await renderScreen(<HistoryScreen />, runtime);
+
+    const [firstUndo] = screen.getAllByRole("button", { name: en("common.undo") });
+    if (firstUndo === undefined) {
+      throw new Error("no History Undo button");
+    }
+    await fireEvent.press(firstUndo);
+    expect(revoke).not.toHaveBeenCalled();
+    expect(screen.getByRole("header", { name: en("history.undoConfirm") })).toBeOnTheScreen();
+    expect(screen.getByText(en("history.undoConfirmQuestion"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    expect(revoke).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: en("history.undoConfirm") })).toBeNull();
+
+    const [secondUndo] = screen.getAllByRole("button", { name: en("common.undo") });
+    if (secondUndo === undefined) {
+      throw new Error("no History Undo button after Cancel");
+    }
+    await fireEvent.press(secondUndo);
+    const confirm = screen.getByRole("button", { name: en("history.undoConfirm") });
+    expect(confirm.props["aria-keyshortcuts"]).toBeUndefined();
+    await fireEvent.press(confirm);
+    await waitFor(() => {
+      expect(revoke).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("shows the board and the events, each undoable", async () => {
     await renderScreen(<HistoryScreen />, await createTestRuntime());
     expect(screen.getByRole("header", { name: en("history.title") })).toBeOnTheScreen();

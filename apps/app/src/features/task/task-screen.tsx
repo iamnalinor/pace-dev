@@ -9,9 +9,9 @@ import { type TaskViewModel, workLeftAt } from "@pace/client";
 import type { CloseMode } from "./close-model.ts";
 
 import { CloseSheet } from "./close-sheet.tsx";
-import { ProblemsList } from "./problems-list.tsx";
 import { ProjectSheet } from "./project-sheet.tsx";
 import { SourceText } from "./source-text.tsx";
+import { SubtaskChecklist } from "./subtask-checklist.tsx";
 import { TaskFooter } from "./task-footer.tsx";
 import { TaskHeader } from "./task-header.tsx";
 import { EditTaskSheet } from "./task-sheets.tsx";
@@ -37,7 +37,7 @@ const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
         <Text className="px-5 font-sans text-[14px] leading-5 text-fg2">{view.description}</Text>
       )}
       <WorkProgress live={live} view={view} />
-      <ProblemsList view={view} />
+      <SubtaskChecklist view={view} />
       <SourceText text={view.sourceText} />
     </View>
   );
@@ -67,7 +67,7 @@ const OpenSheet = ({
 );
 
 /**
-The task (artboards 2 and 3): summary, progress or problems, the source text; the footer
+The task (artboards 2 and 3): summary, progress or subtasks, the source text; the footer
 holds Focus and Done / Submit.
 */
 export const TaskScreen = ({
@@ -75,7 +75,7 @@ export const TaskScreen = ({
   openClose = false,
 }: {
   readonly id: string;
-  /** Lands with the close sheet open (a per-problem check on Now). */
+  /** Lands with the close sheet open (a per-subtask check on Now). */
   readonly openClose?: boolean;
 }) => {
   const t = useT();

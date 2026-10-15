@@ -14,6 +14,10 @@ export class ApiError extends Error {
 }
 
 export type ApiClient = {
+  /** The in-memory credential the next request will send. */
+  readonly currentSessionToken: () => string | undefined;
+  /** Reads the same in-memory credential that `call` uses before sending a request. */
+  readonly isCurrentSession: (session: string) => boolean;
   readonly call: <E extends EndpointShape>(
     endpoint: E,
     input: EndpointInput<E>,
@@ -59,6 +63,8 @@ export const createApiClient = (options: {
 }): ApiClient => {
   const doFetch: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
   return {
+    currentSessionToken: options.token,
+    isCurrentSession: (session) => options.token() === session,
     call: async (endpoint, input) => {
       const { body, params, query } = input as {
         body?: unknown;

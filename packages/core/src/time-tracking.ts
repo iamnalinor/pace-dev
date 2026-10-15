@@ -7,6 +7,16 @@ export {
   timeButton,
 } from "./tracking/buttons.ts";
 export {
+  activityExpect,
+  activityLabel,
+  CALENDAR_LEAD_MINUTES,
+  calendarAttend,
+  type CalendarOccurrence,
+  calendarStart,
+  type CalendarStartPlan,
+  isCalendarRun,
+} from "./tracking/calendar-run.ts";
+export {
   ACTIVITY_CATEGORIES,
   CATEGORY_COLORS,
   CATEGORY_EXPECT,
@@ -68,5 +78,5 @@ export {
   timeline,
   type Timeline,
 } from "./tracking/timeline.ts";
-export { typedActivity, type TypedActivity } from "./tracking/typed.ts";
+export { typedActivity, type TypedActivity, typedSpan, type TypedSpan } from "./tracking/typed.ts";
 export { type SatRow, whereSat } from "./tracking/where-sat.ts";

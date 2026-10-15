@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 
-import type { DayModel } from "@pace/client";
-
+import { usePace } from "#app/app-state.tsx";
 import {
   calendarAccess,
   type CalendarAccess,
@@ -14,18 +13,21 @@ import { appLabels, readPhoneEvents } from "#app/platform/phone-data.ts";
 import {
   calendarKey,
   dismissedKeys,
-  markNotified,
   dismiss as rememberDismissed,
   type SeriesRule,
   seriesRules,
   setSeriesRule,
   sleepKey,
+  usePhoneMemoryVersion,
 } from "#app/platform/phone-memory.ts";
+import { useFeed } from "#app/shared/notifications/use-feed.ts";
+import { activityLabel, type DayModel, eventAnswers } from "@pace/client";
 import {
   addDaysIn,
   addMinutesIso,
   type AppMinutes,
   appUsage,
+  calendarEventKey,
   detectSleep,
   type PhoneEvent,
   phonePickupAt,
@@ -44,8 +46,13 @@ export type DayPhone = {
   readonly sleep: null | SleepCandidate;
   readonly calendar: {
     readonly access: CalendarAccess;
-    /** The day's events, minus skipped ones and series the person always skips. */
+    /**
+    The day's events, minus ones skipped here or on any other channel (the notification pool)
+    and series the person always skips.
+    */
     readonly events: readonly PhoneCalendarEvent[];
+    /** Attended on another channel (Telegram, the web, a phone notification): nothing to ask. */
+    readonly isAttendedElsewhere: (event: PhoneCalendarEvent) => boolean;
     /** Ended events of a series marked "always attended": logged without asking. */
     readonly autoLog: readonly PhoneCalendarEvent[];
   };
@@ -55,8 +62,11 @@ export type DayPhone = {
   readonly pickupAt: null | string;
   readonly askCalendar: () => void;
   readonly dismiss: (key: string) => void;
-  /** Logged from Day: the background check need not ask about it any more. */
-  readonly answered: (key: string) => void;
+  /**
+  Skips one occurrence on every channel, then here, as Now's Skip does; `false` (and still shown)
+  when the server did not take it.
+  */
+  readonly skip: (event: PhoneCalendarEvent) => Promise<boolean>;
   /** "Every time" for a repeating event's series. */
   readonly remember: (rule: SeriesRule) => void;
 };
@@ -110,7 +120,7 @@ export const isCalendarLogged = (
   entries.some(
     (entry) =>
       entry.kind === "activity" &&
-      entry.row.label === event.title &&
+      entry.row.label === activityLabel(event.title) &&
       entry.row.startAt < event.endAt &&
       entry.row.endAt > event.startAt,
   );
@@ -148,8 +158,12 @@ block, and the calendar's events. Reloads when the app comes back (after grantin
 */
 export const useDayPhone = (day: DayModel, now: string): DayPhone => {
   const [loaded, setLoaded] = useState<Loaded>(EMPTY);
+  const { notifications } = usePace();
+  const { items } = useFeed();
+  const answers = useMemo(() => eventAnswers(items), [items]);
   const { date, zone } = day;
-  // A new day or the minute tick is what changes the answer.
+  // A new day, the minute tick or a change to what the phone remembers changes the answer.
+  const memory = usePhoneMemoryVersion();
   const reload = useCallback(() => {
     void (async () => {
       setLoaded(await load({ date, zone }, now));
@@ -165,7 +179,7 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
     return () => {
       subscription.remove();
     };
-  }, [reload]);
+  }, [reload, memory]);
   const remember = (rule: SeriesRule): void => {
     void (async () => {
       await setSeriesRule(rule);
@@ -173,12 +187,18 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
     })();
   };
   const shown = loaded.calendar.filter(
-    (event) => !loaded.dismissed.has(calendarKey(event)) && ruleOf(loaded, event) !== "skip",
+    (event) =>
+      !loaded.dismissed.has(calendarKey(event)) &&
+      ruleOf(loaded, event) !== "skip" &&
+      answers.get(calendarEventKey(event)) !== "skipped",
   );
+  const dismiss = (key: string): void => {
+    void (async () => {
+      await rememberDismissed(key);
+      reload();
+    })();
+  };
   return {
-    answered: (key) => {
-      void markNotified(key);
-    },
     askCalendar: () => {
       void (async () => {
         await requestCalendarAccess();
@@ -194,16 +214,20 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
           !isCalendarLogged(day.entries, event),
       ),
       events: shown,
+      isAttendedElsewhere: (event) => answers.get(calendarEventKey(event)) === "attended",
     },
-    dismiss: (key) => {
-      void (async () => {
-        await rememberDismissed(key);
-        reload();
-      })();
-    },
+    dismiss,
     hasUsageAccess: loaded.hasUsageAccess,
     pickupAt: day.isToday ? phonePickupAt(loaded.events, now) : null,
     remember,
+    skip: async (event) => {
+      // Hidden only once the server took it: a skip that did not go through stays to tap again.
+      const isSkipped = await notifications.skipEvent(calendarEventKey(event));
+      if (isSkipped) {
+        dismiss(calendarKey(event));
+      }
+      return isSkipped;
+    },
     sleep: sleepOf(day, loaded, now),
     usageIn: (startAt, endAt) =>
       named(appUsage(loaded.events, { from: startAt, now, to: endAt }), loaded.labels),

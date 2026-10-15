@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { autoOutcomeId, type Event, EXAMPLE_PRESET_IDS, isUlid, reviewItems } from "@pace/core";
+import {
+  autoOutcomeId,
+  DEFAULT_SETTINGS,
+  type Event,
+  EXAMPLE_PRESET_IDS,
+  isUlid,
+  reviewItems,
+} from "@pace/core";
 import {
   ALGEBRA_ID,
   CALC_HW5_ID,
@@ -220,7 +227,7 @@ describe("deleteTask", () => {
 });
 
 describe("subtasks", () => {
-  it("marks a problem solved at the given instant and unmarks it by revoking", async () => {
+  it("marks a subtask solved at the given instant and unmarks it by revoking", async () => {
     const world = await setupActions();
     const [solved] = unwrap(
       await world.actions.markSolved(HW_ID, "s5", { at: HOUR_AGO, precision: "approx" }),
@@ -246,7 +253,7 @@ describe("subtasks", () => {
     });
   });
 
-  it("adds problems with fresh ids", async () => {
+  it("adds subtasks with fresh ids", async () => {
     const world = await setupActions();
     const [added] = unwrap(
       await world.actions.addSubtasks(HW_ID, ["Problem 8", { label: "Problem 9", number: 9 }]),
@@ -263,8 +270,8 @@ describe("subtasks", () => {
   });
 });
 
-describe("removing a problem", () => {
-  it("takes an unsent problem off the task; a sent or unknown one stays", async () => {
+describe("removing a subtask", () => {
+  it("takes an unsent subtask off the task; a sent or unknown one stays", async () => {
     const world = await setupActions();
     const [removed] = unwrap(await world.actions.removeSubtask(HW_ID, "s7"));
     expect(removed?.type).toBe("task.subtask.removed");
@@ -281,7 +288,7 @@ describe("removing a problem", () => {
 });
 
 describe("submit", () => {
-  it("sends the solved problems by default and closes with the last ones", async () => {
+  it("sends the solved subtasks by default and closes with the last ones", async () => {
     const world = await setupActions();
     const [partial] = unwrap(await world.actions.submit({ taskId: HW_ID }));
     expect(partial?.type === "task.submitted" && partial.payload).toEqual({
@@ -638,10 +645,15 @@ describe("review", () => {
     const [closed] = unwrap(await world.actions.runReviewAction(item, "mark-done"));
     expect(closed).toMatchObject({ source: "web", type: "task.closed" });
     expect(world.rematerializeCalls()).toBe(0);
+    // Keep open answers the card with the task's own status again (see the core's review); on a
+    // task closed meanwhile there is nothing to keep open.
     await expect(world.actions.runReviewAction(item, "keep-open")).resolves.toEqual({
-      ok: true,
-      value: [],
+      error: "retro/task-closed",
+      ok: false,
     });
+    const fresh = await setupActions();
+    const [kept] = unwrap(await fresh.actions.runReviewAction(item, "keep-open"));
+    expect(kept).toMatchObject({ source: "web", type: "task.status.set" });
     await expect(world.actions.runReviewAction(item, "undo")).resolves.toEqual({
       error: "action/unknown-review-action",
       ok: false,
@@ -693,9 +705,16 @@ describe("settings", () => {
     unwrap(await world.actions.setTimezone("UTC"));
     unwrap(await world.actions.setDigestWindows(["08:00", "20:00"]));
     unwrap(await world.actions.setQuietHours({ from: "22:00", to: "07:00" }));
+    unwrap(await world.actions.setNightHours(true));
+    unwrap(await world.actions.setNotificationChannel("deadline_digest", "web", true));
     expect(world.state.store.getState().settings).toEqual({
       digestWindows: ["08:00", "20:00"],
       language: "ru",
+      nightHours: true,
+      notificationChannels: {
+        ...DEFAULT_SETTINGS.notificationChannels,
+        deadline_digest: { app: false, telegram: true, web: true },
+      },
       quietHours: { from: "22:00", to: "07:00" },
       timezone: "UTC",
     });

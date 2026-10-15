@@ -33,6 +33,8 @@ A bearer session resolved: whose it is and, for a device token, its one permissi
 device it belongs to (whatever it sends is filed under that device).
 */
 export type SessionAccess = {
+  /** The session the bearer opened (its row in D1). */
+  readonly sessionId: string;
   readonly user: User;
   readonly scope: null | SessionScope;
   readonly device: DeviceIdentity | null;
@@ -82,6 +84,7 @@ export const findSession = async (
         id: users.id,
         telegramId: users.telegramId,
         name: users.name,
+        firstName: users.firstName,
         username: users.username,
         photoUrl: users.photoUrl,
       },
@@ -103,6 +106,7 @@ export const findSession = async (
   return {
     device: scope === null ? null : { id: row.sessionId, name: row.label },
     scope,
+    sessionId: row.sessionId,
     user: row.user,
   };
 };

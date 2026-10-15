@@ -1,6 +1,154 @@
+import type { z } from "zod";
+
 import { describe, expect, it } from "vitest";
 
 import { endpointList, endpoints } from "./endpoints.ts";
+
+/** Every object schema reachable from `schema` that refuses keys it does not know. */
+/** Containers that hold schemas but that `loosen` does not walk into. */
+const UNWALKED: ReadonlySet<string> = new Set([
+  "catch",
+  "intersection",
+  "lazy",
+  "map",
+  "set",
+  "tuple",
+]);
+
+const strictObjectsIn = (schema: z.ZodType, path: string): readonly string[] => {
+  const def = schema._zod.def as unknown as Record<string, unknown> & { readonly type: string };
+  const inner = (key: string): readonly string[] => {
+    const child = def[key] as undefined | z.ZodType;
+    return child === undefined ? [] : strictObjectsIn(child, path);
+  };
+  switch (def.type) {
+    case "object": {
+      const catchall = def["catchall"] as undefined | z.ZodType;
+      const own = catchall?._zod.def.type === "never" ? [path] : [];
+      const shape = def["shape"] as Readonly<Record<string, z.ZodType>>;
+      return [
+        ...own,
+        ...Object.entries(shape).flatMap(([key, child]) =>
+          strictObjectsIn(child, `${path}.${key}`),
+        ),
+      ];
+    }
+    case "array": {
+      return strictObjectsIn(def["element"] as z.ZodType, `${path}[]`);
+    }
+    case "record": {
+      return strictObjectsIn(def["valueType"] as z.ZodType, `${path}{}`);
+    }
+    case "union": {
+      return (def["options"] as readonly z.ZodType[]).flatMap((option) =>
+        strictObjectsIn(option, path),
+      );
+    }
+    case "pipe": {
+      return [...inner("in"), ...inner("out")];
+    }
+    default: {
+      // A container `loosen` does not walk would hide a strict object from both: fail loudly.
+      return UNWALKED.has(def.type)
+        ? [`${path} (${def.type}: not walked by loosen)`]
+        : inner("innerType");
+    }
+  }
+};
+
+const calendarEvent = {
+  endAt: "2026-10-06T11:30:00.000Z",
+  id: "ev-1",
+  series: null,
+  startAt: "2026-10-06T10:00:00.000Z",
+  title: "Seminar",
+};
+
+describe("what the server answers", () => {
+  it("never refuses a key a newer server adds: no output schema is strict, at any depth", () => {
+    const strict = endpointList.flatMap((definition) =>
+      strictObjectsIn(definition.output, `${definition.method} ${definition.path}`),
+    );
+    expect(strict).toEqual([]);
+  });
+
+  it("parses a calendar answer with keys it does not know, dropping them", () => {
+    const answer = { events: [{ ...calendarEvent, colour: "#ff0000" }], nextCursor: "abc" };
+    expect(endpoints.calendar.list.output.parse(answer)).toEqual({ events: [calendarEvent] });
+  });
+
+  it("reads a device of a kind a newer server added as a phone, keeping the list", () => {
+    const device = {
+      connectedAt: null,
+      id: "d-1",
+      lastActivityAt: null,
+      lastSeenAt: null,
+      name: "Watch",
+    };
+    const answer = {
+      devices: [
+        { ...device, kind: "watch" },
+        { ...device, kind: "computer" },
+      ],
+    };
+    expect(endpoints.devices.list.output.parse(answer).devices.map((d) => d.kind)).toEqual([
+      "phone",
+      "computer",
+    ]);
+  });
+
+  it("pulls events of a precision or source a newer server added, and drops an unreadable one", () => {
+    const event = {
+      deviceId: "dev-1",
+      id: "01JA0000000000000000000000",
+      occurredAt: "2026-10-06T10:00:00.000Z",
+      payload: {},
+      recordedAt: "2026-10-06T10:00:00.000Z",
+      type: "task.created",
+    };
+    const page = {
+      events: [
+        { ...event, precision: "estimated", source: "watch" },
+        { ...event, precision: "exact", source: "bot" },
+        { ...event, occurredAt: "not a time", precision: "exact", source: "app" },
+      ],
+      more: false,
+      seq: 3,
+      storeId: "s-1",
+    };
+    expect(
+      endpoints.sync.pull.output
+        .parse(page)
+        .events.map(({ precision, source }) => ({ precision, source })),
+    ).toEqual([
+      { precision: "approx", source: "system" },
+      { precision: "exact", source: "bot" },
+    ]);
+    // What a client sends stays strict.
+    expect(() =>
+      endpoints.sync.push.body.parse({
+        events: [{ ...event, precision: "estimated", source: "app" }],
+        storeId: "s-1",
+      }),
+    ).toThrow();
+  });
+
+  it("still refuses a key it does not know in what a phone sends", () => {
+    const sync = {
+      deviceId: "phone",
+      events: [calendarEvent],
+      from: "2026-10-05T00:00:00.000Z",
+      to: "2026-10-12T00:00:00.000Z",
+    };
+    expect(endpoints.calendar.sync.body.parse(sync)).toEqual(sync);
+    expect(() =>
+      endpoints.calendar.sync.body.parse({
+        ...sync,
+        events: [{ ...calendarEvent, colour: "red" }],
+      }),
+    ).toThrow();
+  });
+});
 
 describe("endpoints", () => {
   it("declares every path under /api with a unique method+path", () => {
@@ -29,7 +177,6 @@ describe("endpoints", () => {
     expect(endpoints.me.auth).toBe(true);
     expect(endpoints.sync.push.auth).toBe(true);
     expect(endpoints.sync.pull.auth).toBe(true);
-    expect(endpoints.sync.observations.auth).toBe(true);
   });
 
   it("accepts the Telegram Login Widget payload with optional fields", () => {
@@ -65,12 +212,17 @@ describe("endpoints", () => {
       source: "app",
       type: "task.created",
     };
-    expect(endpoints.sync.push.body.parse({ events: [event] })).toEqual({ events: [event] });
+    const storeId = "store-a";
+    expect(endpoints.sync.push.body.parse({ events: [event], storeId })).toEqual({
+      events: [event],
+      storeId,
+    });
+    expect(() => endpoints.sync.push.body.parse({ events: [event] })).toThrow();
     expect(() =>
-      endpoints.sync.push.body.parse({ events: [{ ...event, precision: "fuzzy" }] }),
+      endpoints.sync.push.body.parse({ events: [{ ...event, precision: "fuzzy" }], storeId }),
     ).toThrow();
     expect(() =>
-      endpoints.sync.push.body.parse({ events: [{ ...event, occurredAt: "today" }] }),
+      endpoints.sync.push.body.parse({ events: [{ ...event, occurredAt: "today" }], storeId }),
     ).toThrow();
   });
 });

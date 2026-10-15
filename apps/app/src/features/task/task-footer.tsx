@@ -17,7 +17,7 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
   const t = useT();
   const { actions, hooks } = usePace();
   const run = useRunAction();
-  const isFocused = hooks.useTimeBar().running?.taskId === view.id;
+  const isFocused = hooks.useTimeBar().focusedTaskId === view.id;
   return (
     <Button
       hotkey={HOTKEYS.focus}

@@ -10,6 +10,7 @@ import type { PaceRuntime } from "../runtime.ts";
 import { PaceProvider } from "../app-state.tsx";
 import { ThemeProvider } from "../ui/theme-provider.tsx";
 import { ToastProvider } from "../ui/toast.tsx";
+import { TooltipHost } from "../ui/tooltip.tsx";
 
 const METRICS = {
   frame: { height: 844, width: 390, x: 0, y: 0 },
@@ -25,7 +26,9 @@ export const renderScreen = async (
     <SafeAreaProvider initialMetrics={METRICS}>
       <ThemeProvider>
         <PaceProvider runtime={runtime}>
-          <ToastProvider>{ui}</ToastProvider>
+          <ToastProvider>
+            <TooltipHost>{ui}</TooltipHost>
+          </ToastProvider>
         </PaceProvider>
       </ThemeProvider>
     </SafeAreaProvider>,

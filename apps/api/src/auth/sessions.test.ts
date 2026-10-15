@@ -14,7 +14,13 @@ const DAY = 24 * HOUR;
 const seedUser = async () =>
   await upsertTelegramUser(
     d1(env.DB),
-    { name: "Ada", photoUrl: null, telegramId: `2000-${crypto.randomUUID()}`, username: "ada" },
+    {
+      firstName: "Ada",
+      name: "Ada",
+      photoUrl: null,
+      telegramId: `2000-${crypto.randomUUID()}`,
+      username: "ada",
+    },
     NOW,
   );
 
@@ -33,6 +39,7 @@ describe("sessions", () => {
     expect(await findSession(db, session.token, NOW + 89 * DAY)).toEqual({
       device: null,
       scope: null,
+      sessionId: session.id,
       user,
     });
     expect(await findSession(db, session.token, NOW + 90 * DAY + 1)).toBeNull();

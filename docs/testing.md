@@ -2,6 +2,8 @@
 
 Every level tests what the others cannot. Behaviour changes start with a failing test
 (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+The composer's `canAdd` is one predicate shared by button enablement and the action;
+action-level tests check that every enabled draft is accepted from each entry path.
 
 | Level | Tool | Runs against | Where | Command |
 |---|---|---|---|---|
@@ -13,7 +15,7 @@ Every level tests what the others cannot. Behaviour changes start with a failing
 | Mutation | Stryker | the core tests themselves | `packages/core` | `bun test:mutation` (on demand in CI) |
 | LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
-`bun test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
+`bun run test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
 
 ## Unit tests (core, client)
 
@@ -55,7 +57,7 @@ wrong bot, stale); whitelist; nonce lifecycle (pending → ready once, expiry, d
 bind); sessions (token never stored, revoke, hourly touch); dev login 404 in production;
 webhook secret check, login deep link, "Not allowed", expired link; sync push/pull
 ordering, idempotent re-push, paging, `recordedAt` clamping, partial rejection, user
-isolation; observations idempotency.
+isolation; the store id (stable, new after a wipe, an old epoch emptied on start).
 
 ## App tests (jest-expo)
 
@@ -120,6 +122,9 @@ slow, so `mutation.yml` runs it weekly and on demand; reports land in `reports/`
 
 ## LLM regression (planned)
 
-Stage 2 adds `packages/core/src/parse/regression/` with cases and `run.ts`;
-`bun test:llm` will run them against Groq and Gemini and write `docs/llm.md`.
-`llm-regression.yml` already exists for it (weekly, with the provider secrets).
+The cases are in `packages/core/src/parse/regression/cases.fake.ts`: a message, the field it was
+typed into (`task`, `activity` or `auto`), the instant over the artboard world, and the
+proposals expected (kinds in order, fields of the first, the domain and how sure for `auto`).
+`cases.test.ts` keeps them well-formed in `bun test:unit`. The runner (`run.ts`) is still to
+come: `bun test:llm` will run them against Groq and Gemini and write `docs/llm.md`.
+`llm-regression.yml` already exists for it (on demand, with the provider secrets).

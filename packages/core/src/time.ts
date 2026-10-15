@@ -1,4 +1,4 @@
-import { tz, tzOffset } from "@date-fns/tz";
+import { tz, TZDate, tzOffset } from "@date-fns/tz";
 import {
   addDays,
   addMinutes,
@@ -44,6 +44,13 @@ export const isoWeekKey = (atIso: string, zone: string): string => {
   const year = getISOWeekYear(atIso, options);
   const week = getISOWeek(atIso, options);
   return `${year}-W${String(week).padStart(2, "0")}`;
+};
+
+/** `2026-10-07` + `18:00` on the wall clock of `zone`, as an instant. */
+export const wallClockInstant = (date: string, time: string, zone: string): string => {
+  const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
+  const [hours = 0, minutes = 0] = time.split(":").map(Number);
+  return toIso(new TZDate(year, month - 1, day, hours, minutes, zone));
 };
 
 export const addMinutesIso = (atIso: string, minutes: number): string =>

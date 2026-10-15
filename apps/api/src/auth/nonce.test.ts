@@ -12,7 +12,13 @@ const MINUTE = 60 * 1000;
 const seedUser = async () =>
   await upsertTelegramUser(
     d1(env.DB),
-    { name: "Ada", photoUrl: null, telegramId: `3000-${crypto.randomUUID()}`, username: "ada" },
+    {
+      firstName: "Ada",
+      name: "Ada",
+      photoUrl: null,
+      telegramId: `3000-${crypto.randomUUID()}`,
+      username: "ada",
+    },
     NOW,
   );
 

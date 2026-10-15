@@ -1,171 +1,180 @@
-import { useRouter } from "expo-router";
-import { Check } from "lucide-react-native";
+import { Search, Square } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
-
-import type { ActionResult, ChoiceView, StartOptions, TimeButtonView } from "@pace/client";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { clockTime } from "#app/format/time.ts";
-import { IS_PHONE } from "#app/platform/device.ts";
+import { MetaLine } from "#app/shared/meta-line.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { useIsWide } from "#app/ui/layout.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { formatDuration, type MessageKey } from "@pace/core";
+import { type ActionResult, taskChoices, type TimeButtonView } from "@pace/client";
+import { formatDuration } from "@pace/core";
 
 import type { CalendarToday } from "./calendar-today.ts";
 
-/** One line of the sheet: what starts, how long it usually takes, a check on the running one. */
-const ChoiceRow = ({
-  aside,
-  isRunning = false,
-  label,
-  onPress,
+import { CalendarChoices } from "./calendar-choices.tsx";
+import { ChoiceItem, ChoiceList, type ListProps, Nothing } from "./choice-row.tsx";
+
+/**
+A button's own choices (the chores, the ways to rest), each with its usual length. The one
+running already is checked, and picking it only closes the picker: Stop has its own row.
+*/
+const ButtonChoices = ({ button, close, options, start }: ListProps) => {
+  const t = useT();
+  const { language } = useViewer();
+  const { actions } = usePace();
+  return (
+    <ChoiceList label={t(button.labelKey)}>
+      {button.choices.map((choice) => (
+        <ChoiceItem
+          aside={`~${formatDuration(choice.expectMinutes, language)}`}
+          isRunning={choice.isRunning}
+          key={choice.id}
+          label={t(choice.labelKey)}
+          onPress={() => {
+            if (choice.isRunning) {
+              close();
+              return;
+            }
+            start(actions.startChoice(choice.id, options));
+          }}
+        />
+      ))}
+    </ChoiceList>
+  );
+};
+
+/**
+The open tasks in Now's order, narrowed by the search above; a pick starts Focus on it, as the
+task's own Focus button does. The task in focus already is checked and only closes the picker.
+*/
+const TaskChoices = ({
+  button,
+  close,
+  focused,
+  options,
+  query,
+  start,
+}: ListProps & { readonly query: string; readonly focused: null | string }) => {
+  const t = useT();
+  const { actions, hooks } = usePace();
+  const board = hooks.useNow();
+  const rows = taskChoices(board, query);
+  if (rows.length === 0) {
+    const isEmpty = board.rows.length === 0 && board.future.length === 0;
+    return <Nothing>{t(isEmpty ? "time.taskNone" : "time.taskNoMatch")}</Nothing>;
+  }
+  return (
+    <ChoiceList label={t(button.labelKey)}>
+      {rows.map((row) => (
+        <ChoiceItem
+          aside={null}
+          isRunning={row.id === focused}
+          key={row.id}
+          label={row.title}
+          onPress={() => {
+            if (row.id === focused) {
+              close();
+              return;
+            }
+            start(actions.focusTask(row.id, options));
+          }}
+        >
+          <MetaLine parts={[]} tag={row} />
+        </ChoiceItem>
+      ))}
+    </ChoiceList>
+  );
+};
+
+/** The Task picker's search: narrows the list by title as it is typed. */
+const TaskSearch = ({
+  onChange,
+  query,
 }: {
-  readonly label: string;
-  readonly aside: null | string;
-  readonly isRunning?: boolean;
-  readonly onPress: () => void;
+  readonly query: string;
+  readonly onChange: (query: string) => void;
 }) => {
+  const t = useT();
+  const { palette } = useTheme();
+  // On a phone the keyboard would cover the list it narrows: it opens on a tap in the field.
+  const isWide = useIsWide();
+  return (
+    <View className="h-11 flex-row items-center gap-2 rounded-lg border border-line bg-bg px-3">
+      <Search color={palette.muted} size={16} />
+      <TextInput
+        accessibilityLabel={t("time.taskSearch")}
+        autoFocus={isWide}
+        className="h-11 flex-1 font-sans text-[15px] text-fg"
+        onChangeText={onChange}
+        placeholder={t("time.taskSearch")}
+        placeholderTextColor={palette.muted}
+        returnKeyType="search"
+        value={query}
+      />
+    </View>
+  );
+};
+
+/**
+The running button's way out, first in its picker: Stop is one tap away. Filled, centred and
+without an outline, it reads as an action, not as one more thing to start.
+*/
+const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
+  const t = useT();
   const { palette } = useTheme();
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={t("time.stop")}
       accessibilityRole="button"
-      className="min-h-12 flex-row items-center gap-3 rounded-lg border border-line bg-surface px-3.5 active:opacity-70"
-      onPress={onPress}
+      className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg bg-track px-3.5 active:opacity-70"
+      onPress={onStop}
     >
-      <Text className="flex-1 font-sans text-[15px] text-fg">{label}</Text>
-      {aside === null ? null : (
-        <Text className="font-sans text-[13px] tabular-nums text-muted">{aside}</Text>
-      )}
-      {isRunning ? <Check color={palette.fg} size={16} /> : null}
+      <Square color={palette.fg} size={14} />
+      <Text className="font-sans text-[15px] font-medium text-fg">{t("time.stop")}</Text>
     </Pressable>
   );
 };
 
-type ListProps = {
+/** What the picker shows of the bar: its button, whether "alongside" applies, the task in focus. */
+type Shown = {
   readonly button: TimeButtonView;
-  readonly calendar: CalendarToday | null;
-  readonly start: (result: ActionResult) => void;
-  readonly options: StartOptions;
-  readonly close: () => void;
-};
-
-/** A button's choices: sport by its length, chores by name, each with its usual length. */
-const ButtonChoices = ({ button, options, start }: ListProps) => {
-  const t = useT();
-  const { language } = useViewer();
-  const { actions } = usePace();
-  const labelOf = (choice: ChoiceView): string => {
-    if (choice.labelKey !== null) {
-      return t(choice.labelKey);
-    }
-    return button.choices.length > 1
-      ? formatDuration(choice.expectMinutes, language)
-      : t(button.labelKey);
-  };
-  return button.choices.map((choice) => (
-    <ChoiceRow
-      aside={
-        choice.labelKey === null && button.choices.length > 1
-          ? null
-          : `~${formatDuration(choice.expectMinutes, language)}`
-      }
-      isRunning={choice.isRunning}
-      key={choice.id}
-      label={labelOf(choice)}
-      onPress={() => {
-        start(actions.startChoice(choice.id, options));
-      }}
-    />
-  ));
-};
-
-/** Why there is nothing to pick: on the web the calendar is the copy the phone sends. */
-const noEventsKey = (calendar: CalendarToday | null): MessageKey => {
-  if (!IS_PHONE) {
-    return "time.calendarNoneWeb";
-  }
-  return calendar?.access === "granted" ? "time.calendarNone" : "phone.calendarAsk";
+  readonly canGoAlongside: boolean;
+  readonly focused: null | string;
 };
 
 /**
-Nothing in the calendar: why, and the way on anyway — a meeting without an event (named later
-on Day), and on the web where the calendar comes from.
+The bar as the picker shows it: live, until a pick is being written. From then on it stays as
+it was when tapped, so the pick's own effect (Stop, a check) never flashes in before the picker
+closes; a refused pick lets go of it again.
 */
-const NoEvents = ({ calendar, close, options, start }: ListProps) => {
-  const t = useT();
-  const router = useRouter();
-  const { actions } = usePace();
-  return (
-    <View className="gap-2">
-      <Text className="font-sans text-[14px] text-muted">{t(noEventsKey(calendar))}</Text>
-      <ChoiceRow
-        aside={null}
-        label={t("time.calendarStartUntitled")}
-        onPress={() => {
-          start(
-            actions.startActivity({
-              alongside: options.alongside,
-              buttonId: "calendar",
-              category: "other",
-              label: t("time.calendarUntitled"),
-            }),
-          );
-        }}
-      />
-      {IS_PHONE ? null : (
-        <ChoiceRow
-          aside={null}
-          label={t("time.calendarSetUp")}
-          onPress={() => {
-            close();
-            router.push("/devices");
-          }}
-        />
-      )}
-    </View>
-  );
-};
-
-/** Today's events from the calendar (own or accepted), or why there are none. */
-const CalendarChoices = (props: ListProps) => {
-  const t = useT();
-  const { deviceTz } = useViewer();
-  const { actions } = usePace();
-  const { calendar, options, start } = props;
-  const events = calendar?.events ?? [];
-  if (events.length === 0) {
-    return <NoEvents {...props} />;
-  }
-  return (
-    <View aria-label={t("time.calendarToday")} className="gap-2" role="list">
-      {events.map((event) => (
-        <ChoiceRow
-          aside={`${clockTime(event.startAt, deviceTz)}–${clockTime(event.endAt, deviceTz)}`}
-          key={event.id}
-          label={event.title}
-          onPress={() => {
-            start(actions.startCalendar(event, options));
-          }}
-        />
-      ))}
-    </View>
-  );
+const useShownWhileWriting = (live: Shown, onClose: () => void) => {
+  const run = useRunAction();
+  const [frozen, setFrozen] = useState<null | Shown>(null);
+  const start = (result: ActionResult): void => {
+    setFrozen(live);
+    void (async () => {
+      if (await run(result)) {
+        onClose();
+        return;
+      }
+      setFrozen(null);
+    })();
+  };
+  return { shown: frozen ?? live, start };
 };
 
 /**
-Behind a button (a tap on Sport or Chores, a long press, a right click or "⋯" on any): what it
-can start, and whether it should run alongside the activity going on now.
+Behind every button of the time bar: what it can start. Its header holds Stop when the button's
+own activity runs, the "alongside" switch when something else runs, and Task's search.
 */
 export const ChoicesSheet = ({
-  button,
   calendar,
-  canGoAlongside,
   onClose,
+  ...live
 }: {
   readonly button: TimeButtonView;
   readonly calendar: CalendarToday | null;
@@ -173,29 +182,50 @@ export const ChoicesSheet = ({
   readonly onClose: () => void;
 }) => {
   const t = useT();
-  const run = useRunAction();
+  const { actions, hooks } = usePace();
   const [isAlongside, setIsAlongside] = useState(false);
+  const [query, setQuery] = useState("");
+  const { shown, start } = useShownWhileWriting(
+    { ...live, focused: hooks.useTimeBar().focusedTaskId },
+    onClose,
+  );
+  const { button, canGoAlongside } = shown;
   const props: ListProps = {
     button,
     calendar,
     close: onClose,
     options: { alongside: isAlongside },
-    start: (result) => {
-      void (async () => {
-        if (await run(result)) {
-          onClose();
-        }
-      })();
-    },
+    start,
   };
-  return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} title={t(button.labelKey)} visible>
+  const hasHeader = button.isRunning || canGoAlongside || button.kind === "task";
+  const header = (
+    <>
+      {button.isRunning ? (
+        <StopRow
+          onStop={() => {
+            start(actions.stopActivity());
+          }}
+        />
+      ) : null}
       {canGoAlongside ? (
         <SwitchRow isOn={isAlongside} label={t("time.alongside")} onChange={setIsAlongside} />
       ) : null}
-      <View className="gap-2">
-        {button.kind === "calendar" ? <CalendarChoices {...props} /> : <ButtonChoices {...props} />}
-      </View>
+      {button.kind === "task" ? <TaskSearch onChange={setQuery} query={query} /> : null}
+    </>
+  );
+  return (
+    <Sheet
+      closeLabel={t("common.close")}
+      {...(hasHeader && { header })}
+      onClose={onClose}
+      title={t(button.labelKey)}
+      visible
+    >
+      {button.kind === "calendar" ? <CalendarChoices {...props} /> : null}
+      {button.kind === "task" ? (
+        <TaskChoices {...props} focused={shown.focused} query={query} />
+      ) : null}
+      {button.kind === "choices" ? <ButtonChoices {...props} /> : null}
     </Sheet>
   );
 };

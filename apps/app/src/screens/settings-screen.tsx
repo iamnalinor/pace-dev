@@ -8,14 +8,19 @@ import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { DeleteAccount } from "#app/features/settings/delete-account.tsx";
 import { ExportRow } from "#app/features/settings/export-row.tsx";
-import { DigestWindows, QuietHours } from "#app/features/settings/notification-settings.tsx";
+import {
+  DigestWindows,
+  NotificationChannels,
+  PushStatus,
+  QuietHours,
+} from "#app/features/settings/notification-settings.tsx";
 import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
-import { ScreenHeader } from "#app/ui/screen-header.tsx";
-import { Screen } from "#app/ui/screen.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
+import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { LANGUAGES } from "@pace/core";
 
@@ -61,7 +66,7 @@ const PermissionsRow = () => {
   );
 };
 
-/** Theme (this device) and language (the account). */
+/** Theme (this device), language and Week's night hours (the account). */
 const LookRows = () => {
   const t = useT();
   const theme = useTheme();
@@ -88,6 +93,16 @@ const LookRows = () => {
           value={settings.language}
         />
       </Row>
+      <Row label={t("nav.week")}>
+        <SwitchRow
+          hint={t("settings.nightHours.hint")}
+          isOn={settings.nightHours}
+          label={t("settings.nightHours")}
+          onChange={(isOn) => {
+            void actions.setNightHours(isOn);
+          }}
+        />
+      </Row>
     </>
   );
 };
@@ -100,15 +115,17 @@ export const SettingsScreen = () => {
     await auth.logout();
     router.replace("/login");
   };
-  // A tab on a phone and a sidebar destination on a wide window: nothing to dismiss.
-  const header = <ScreenHeader title={t("settings.title")} />;
   return (
-    <Screen header={header}>
+    <DestinationScreen title={t("settings.title")}>
       <LookRows />
       <Row label={t("settings.timezone")}>
         <TimezoneRow />
       </Row>
       {IS_PHONE ? <PermissionsRow /> : null}
+      <Row label={t("settings.notifications")}>
+        <NotificationChannels />
+        <PushStatus />
+      </Row>
       <Row label={t("settings.digestWindows")}>
         <DigestWindows />
       </Row>
@@ -142,6 +159,6 @@ export const SettingsScreen = () => {
         </Button>
         <DeleteAccount />
       </View>
-    </Screen>
+    </DestinationScreen>
   );
 };

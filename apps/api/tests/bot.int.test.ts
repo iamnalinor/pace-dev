@@ -7,8 +7,8 @@ import { newId } from "@pace/core";
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
-import { echoParse, fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev, readJson } from "./helpers.ts";
+import { echoReply, fakeParseModel } from "../src/shared/llm/fake-model.ts";
+import { json, loginAsDev, pushEvents, readJson } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -45,7 +45,7 @@ const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<R
     fetch: async () => {
       throw new Error("no network in tests");
     },
-    parseProviders: () => [{ model: fakeParseModel(echoParse), name: "fake" }],
+    parseProviders: () => [{ model: fakeParseModel(echoReply), name: "fake" }],
     telegramFetch,
   }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
@@ -131,6 +131,13 @@ describe("POST /telegram/webhook", () => {
       `/api/auth/nonce/${nonce}`,
     );
     expect(ready).toMatchObject({ status: "ready", user: { name: "Ada", telegramId: "1001" } });
+  });
+
+  it("keeps the person's Telegram first name, which /api/me then serves", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce", { method: "POST" });
+    await webhook(startUpdate(1001, `/start login_${nonce}`));
+    const ready = await json<{ token: string }>(`/api/auth/nonce/${nonce}`);
+    expect(await json("/api/me", { token: ready.token })).toMatchObject({ firstName: "Ada" });
   });
 
   it("sends a login started in the browser back to the website", async () => {
@@ -243,6 +250,37 @@ describe("the bot as an assistant", () => {
     });
   });
 
+  it("previews a change to an existing task by its summary and writes it on Accept", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("water the balcony plants"));
+    await webhook(callbackUpdate(buttonData("Accept")));
+    sent.length = 0;
+    await webhook(textUpdate("close task water the balcony plants"));
+    const text = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
+    expect(text).toBe("Close “water the balcony plants” as Done");
+    const accept = buttonData("Accept");
+    sent.length = 0;
+    await webhook(callbackUpdate(accept));
+    expect(sent[1]?.body).toMatchObject({ text: "Done ✓" });
+    expect(await pulledEvent(token, "task.closed")).toMatchObject({ payload: { outcome: "done" } });
+  });
+
+  it("adds problems to a task from the chat, the message kept as the task's source", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("geometry sheet three"));
+    await webhook(callbackUpdate(buttonData("Accept")));
+    sent.length = 0;
+    const text = "add to geometry sheet three: 4, 5";
+    await webhook(textUpdate(text));
+    await webhook(callbackUpdate(buttonData("Accept")));
+    expect(await pulledEvent(token, "task.subtasks.added")).toMatchObject({
+      payload: { subtasks: [{ label: "4" }, { label: "5" }] },
+    });
+    expect(await pulledEvent(token, "task.source.attached")).toMatchObject({
+      payload: { sourceText: text },
+    });
+  });
+
   it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {
     const token = await loginAsDev("1002");
     await webhook(textUpdate("подумать об отпуске"));
@@ -265,37 +303,74 @@ describe("notification buttons", () => {
     sent.length = 0;
   });
 
-  it("snoozes a task's alerts and closes it from the chat, keeping the notification text", async () => {
+  it("attends an event from the chat: the activity starts and the message keeps its text", async () => {
     const token = await loginAsDev("1002");
-    const taskId = `t-${crypto.randomUUID()}`;
-    const now = new Date().toISOString();
-    await json("/api/sync/push", {
+    const { id: userId } = await json<{ id: string }>("/api/me", { token });
+    const now = Date.now();
+    await pushEvents(token, [
+      {
+        deviceId: "test",
+        id: newId(),
+        occurredAt: new Date(now).toISOString(),
+        payload: { quietHours: { from: "00:00", to: "00:00" } },
+        precision: "exact",
+        recordedAt: new Date(now).toISOString(),
+        source: "app",
+        type: "settings.updated",
+      },
+    ]);
+    const title = `Seminar ${crypto.randomUUID().slice(0, 6)}`;
+    await json("/api/calendar/sync", {
       body: {
+        deviceId: "phone-1",
         events: [
           {
-            deviceId: "dev-1",
-            id: newId(),
-            occurredAt: now,
-            payload: { presetId: "personal", subtasks: [], taskId, title: "Renew the passport" },
-            precision: "exact",
-            recordedAt: now,
-            source: "app",
-            type: "task.created",
+            endAt: new Date(now + 60 * 60_000).toISOString(),
+            id: "ev-1",
+            series: null,
+            startAt: new Date(now - 2 * 60_000).toISOString(),
+            title,
           },
         ],
+        from: new Date(now - 24 * 3_600_000).toISOString(),
+        to: new Date(now + 24 * 3_600_000).toISOString(),
       },
       token,
     });
+    const store = env.USER_STORE.get(env.USER_STORE.idFromName(userId));
+    await store.runNotifications(new Date().toISOString());
+    const { items } = await json<{ items: { id: string; kind: string }[] }>("/api/notifications", {
+      token,
+    });
+    const announced = items.find((item) => item.kind === "event_start");
+    expect(announced).toBeDefined();
 
-    await webhook(callbackUpdate(`z:${taskId}`));
+    await webhook(callbackUpdate(`na:${announced?.id ?? ""}`));
     expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
-    expect(sent[1]?.body["text"]).toMatch(/^preview\n\nSnoozed until \d\d:\d\d\.$/u);
+    expect(sent[1]?.body["text"]).toBe("preview\n\n✓ Attending");
+    expect(await pulledEvent(token, "activity.started")).toMatchObject({
+      payload: { buttonId: "calendar", label: title },
+    });
+    const after = await json<{ items: { id: string; resolution: null | string }[] }>(
+      "/api/notifications",
+      { token },
+    );
+    expect(after.items.find((item) => item.id === announced?.id)?.resolution).toBe("attended");
 
+    // A second tap changes nothing.
     sent.length = 0;
-    await webhook(callbackUpdate(`d:${taskId}`));
-    expect(sent[1]?.body["text"]).toBe("preview\n\nMarked done ✓");
-    expect(await pulledEvent(token, "task.closed")).toMatchObject({
-      payload: { outcome: "done", taskId },
+    await webhook(callbackUpdate(`na:${announced?.id ?? ""}`));
+    expect(sent[1]?.body["text"]).toBe("preview\n\n✓ Attending");
+  });
+
+  it("keeps the message and its buttons when the answer is refused, and says why", async () => {
+    await loginAsDev("1002");
+    await webhook(callbackUpdate("na:no-such-notification"));
+    // Not edited: the buttons stay to be tapped again; the refusal shows as an alert.
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery"]);
+    expect(sent[0]?.body).toMatchObject({
+      show_alert: true,
+      text: "That did not work: notification/not-found",
     });
   });
 });

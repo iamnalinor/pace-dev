@@ -61,18 +61,13 @@ export { createPaceClient, type PaceClient, type PaceClientOptions } from "./cre
 export type { EventStore } from "./event-store.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
 export {
-  activityNotifications,
-  calendarNotifications,
-  type CalendarReminder,
-  fetchNotificationPlan,
-  isActivityId,
-  isCalendarId,
-  type LocalNotification,
-  localNotifications,
-  type RunningTimer,
-  scheduleChanges,
-  type ScheduleChanges,
-} from "./local-notifications.ts";
+  createNotificationFeed,
+  type DeliveryEntry,
+  type FeedAnswer,
+  type FeedState,
+  type NotificationFeed,
+  parseLiveNotice,
+} from "./notifications.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {
   type AppState,
@@ -88,6 +83,7 @@ export {
   type SyncSummary,
 } from "./sync-client.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
+export { type EventDetails, eventDetails } from "./view-models/calendar-event.ts";
 export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
@@ -112,7 +108,14 @@ export {
   trackedDates,
 } from "./view-models/day.ts";
 export { decisionLabelKey } from "./view-models/decisions.ts";
-export { bridgeCommand } from "./view-models/devices.ts";
+export {
+  agentCommand,
+  agentLogsCommand,
+  COMPUTER_OSES,
+  type ComputerOs,
+  computerOsOf,
+  LINUX_PACKAGES,
+} from "./view-models/devices.ts";
 export { type ExportCell, type ExportSheet, exportSheets } from "./view-models/export.ts";
 export {
   type HistoryEntry,
@@ -142,6 +145,14 @@ export {
   type OnTimeView,
 } from "./view-models/insights.ts";
 export { type PlainMetaPart, plainMetaText } from "./view-models/meta-text.ts";
+export {
+  type EventAnswer,
+  eventAnswers,
+  type FeedDay,
+  type FeedModel,
+  feedModel,
+  type FeedPlatform,
+} from "./view-models/notifications.ts";
 export {
   type MetaPart,
   type NowRow,
@@ -179,13 +190,24 @@ export {
   type ProjectViewModel,
   projectViewModel,
 } from "./view-models/project.ts";
+export {
+  openTasksLabel,
+  type ProjectListRow,
+  projectsViewModel,
+} from "./view-models/projects.ts";
 export { type DueRelative, relativeDay } from "./view-models/relative-day.ts";
-export { type ReviewRow, type ReviewViewModel, reviewViewModel } from "./view-models/review.ts";
+export {
+  reviewDecisions,
+  type ReviewRow,
+  type ReviewViewModel,
+  reviewViewModel,
+  waitingCount,
+} from "./view-models/review.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,
-  type ProblemRow,
-  type ProblemState,
+  type SubtaskRow,
+  type SubtaskState,
   type TaskLink,
   type TaskTag,
   type TaskViewModel,
@@ -197,6 +219,7 @@ export {
   type MessageText,
   PACE_STATUS_TEXT,
   type RunningView,
+  taskChoices,
   type TimeBarModel,
   timeBarModel,
   type TimeButtonView,
@@ -213,6 +236,8 @@ export {
   typeTime,
 } from "./view-models/time-forms.ts";
 export {
+  fitHourPx,
+  gridFromHour,
   type Lane,
   lanesOf,
   placeIn,
@@ -222,3 +247,10 @@ export {
   type WeekModel,
   weekModel,
 } from "./view-models/week.ts";
+// The one answer to "attended already?" lives in core; the app reads it from here too.
+export {
+  activityLabel,
+  CALENDAR_LEAD_MINUTES,
+  type CalendarOccurrence,
+  isCalendarRun,
+} from "@pace/core";

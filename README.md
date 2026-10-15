@@ -16,13 +16,13 @@ phone, in the browser and on the server.
 | 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
 | 3 — Time | the time ledger: a time bar under Now (one tap switches), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers, alerts through the bot, MCP time tools | **done** — `v0.3.0` |
 | 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
-| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | in progress |
+| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | PR 1 preparing for `v0.10.0`; later work remains in PR 2 and PR 3 |
 
 Still `v0.x`: the product is in daily use but not final.
 
 | Now (desktop) | Insights (desktop) |
 |---|---|
-| ![Now on a desktop: the composer, the task list and the time bar](docs/screenshots/now-desktop.png) | ![Insights: time by category, focus by hour, fragmentation, sleep and focus](docs/screenshots/insights-desktop.png) |
+| ![Now on a desktop: the composer, what is running and the task list](docs/screenshots/now-desktop.png) | ![Insights: time by category, focus by hour, fragmentation, sleep and focus](docs/screenshots/insights-desktop.png) |
 | **Day (desktop)** | **Now (phone, dark)** |
 | ![Day: the blocks of a day and the gaps between them](docs/screenshots/day-desktop.png) | ![Now on a phone in the dark theme](docs/screenshots/now-phone-dark.png) |
 
@@ -32,8 +32,9 @@ with a seeded week.
 Phone data (`v0.3.1`, Android only): the Day screen reads the phone's own screen and app
 events and its calendar, on the device. It proposes last night's sleep from the longest
 screen-off stretch, shows phone time and top apps inside each block, and lists the day's
-calendar events with Attended / Skip. Nothing is uploaded; only what you confirm becomes an
-event. A first-run walk-through explains and asks for each permission (Settings →
+calendar events with Attended / Skip. Confirming a suggestion writes an event; cloud calendar
+and app-usage copies are described under [Devices](#devices-calendar-and-app-usage-in-the-cloud).
+A first-run walk-through explains and asks for each permission (Settings →
 Permissions later). See [Phone data on the device](#phone-data-on-the-device) for what to check.
 
 The three product stages are each meant to be usable daily before the next one starts.
@@ -41,14 +42,14 @@ The three product stages are each meant to be usable daily before the next one s
 ## Architecture
 
 ```
-apps/app (Expo: Android ──┐                         ┌─ Telegram (webhook: bot login, digests)
+apps/app (Expo: Android ──┐                         ┌─ Telegram (webhook: bot login, notifications)
   and the web, through     ├─► packages/client ─► apps/api (Cloudflare Worker, Hono)
   react-native-web; the   │   (typed API client,   │  /api/auth  /api/sync  /telegram/webhook
   web build is served by  │    store, view-models) │
   Worker pace-web)        │                        │
 packages/core ◄───────────┘                        ├─ D1 "pace": users, sessions, login_nonces
   events + payload schemas, sort, materialize,     ├─ Durable Object UserStore (SQLite, one per user):
-  settings reducer, i18n (en/ru), design tokens,   │    events, observations, decisions, meta
+  settings reducer, i18n (en/ru), design tokens,   │    events, decisions, phone data, meta
   zod API contract (endpoints)                     └─ KV OAUTH_KV (MCP OAuth clients, grants, tokens)
 ```
 
@@ -87,7 +88,7 @@ apps/
     src/app.ts          createApp(): CORS, config, error shape, route mounting
     src/auth/           Telegram widget HMAC, whitelist, sessions, nonces, routes
     src/bot/            grammY bot (login deep link) + webhook route
-    src/sync/           push / pull / observations
+    src/sync/           push / pull / live
     src/user-store/     Durable Object (drizzle on SQLite), event-log validation
     src/shared/         config (zod over env), mount() for contract endpoints, D1 schema
     drizzle/d1, drizzle/do   committed migrations (D1 and Durable Object)
@@ -129,7 +130,7 @@ the route exists).
 | `bun test:api` | Vitest inside workerd with real D1 / KV / Durable Object bindings |
 | `bun test:app` | jest-expo + React Native Testing Library |
 | `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
-| `bun test` | the four above, in that order |
+| `bun run test` | the four above, in that order |
 | `bun test:mutation` | Stryker on core (slow; on demand in CI) |
 | `bun test:llm` | LLM parsing regression set (stage 2; the runner does not exist yet) |
 | `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |
@@ -193,7 +194,7 @@ the workflow do it.
 |---|---|---|
 | `ci.yml` | pull requests and pushes to `main` (not for docs-only changes), manual | one checks job (lint with a clean tree afterwards, `bun audit`, unit, app, api), then e2e once it passes; manual runs also build the arm64 **release APK** as an artifact (R8 and all, unpublished; the step summary shows its size) |
 | `deploy.yml` | after a green CI on `main`, or manual | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
-| `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk` |
+| `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk`, sends the APK to the owner in Telegram when `TELEGRAM_RELEASE_CHAT_ID` is set |
 | `mutation.yml` | manual | Stryker on core and web |
 | `llm-regression.yml` | manual | `bun test:llm` with real providers (stage 2) |
 
@@ -207,9 +208,12 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider; several keys may be given (comma or newline separated): a key that hits its rate limit rests while the next one answers |
-| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; several keys rotate the same way |
+| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider; one or more keys separated by commas (or one per line): a key that hits its rate limit rests while the next one answers |
+| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; one or more keys separated by commas (or one per line), rotated the same way |
+| `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
+| `GOOGLE_SERVICES_JSON` | secret | release | the Firebase `google-services.json` (raw JSON) for push through FCM; absent → the APK has no Google push and phones poll |
+| `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, Worker | the Firebase service account's JSON key the Worker sends pushes with; absent → push is off, everything else works |
 
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
@@ -218,7 +222,10 @@ Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_U
 
 ## Android release
 
-Releases are APKs on GitHub Releases, not the Play Store, and there are no OTA updates.
+Releases are APKs (arm64-v8a, about 25 MB) on GitHub Releases, not the Play Store, and there are no OTA updates.
+Set the repository variable `TELEGRAM_RELEASE_CHAT_ID` to your Telegram user id to get each
+release's APK from the bot (open the bot once first); a bot may send files up to 50 MB, and the
+release job fails the Telegram step if the APK ever grows past that.
 `apps/app/app-version.ts` derives `version` and `versionCode` from the tag (`v1.2.3` →
 `1.2.3`, `10203000`). A build between releases sits on the last tag (`git describe`):
 `1.2.3-dev.7+cfd5334` (7 commits since), and its code adds the hours from the tag's commit to
@@ -271,10 +278,13 @@ next release installs over it, and main after a squash merge installs over the b
 
 ## Devices: calendar and app usage in the cloud
 
-The phone sends its calendar (own and accepted events; *Settings → Devices → Send this phone's
-calendar*, off deletes the copy) and the apps it had in front, names and times only. A computer
-sends its apps through ActivityWatch and a small bridge: *Settings → Devices → Add a computer*
-gives one install command (see [docs/desktop.md](docs/desktop.md)). Day and Week show where the
+The phone can send its calendar (own and accepted events) when *Settings → Devices → Send this
+phone's calendar* is enabled for the current login. A new login starts with this switch off;
+turning it off deletes that login's cloud copy. The phone also sends the apps it had in front,
+names and times only. A computer
+runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
+*Settings → Devices → Add a computer* gives one install line per system (see
+[docs/desktop.md](docs/desktop.md)). Day and Week show where the
 time of each block went; MCP has `get_calendar`, `get_usage` and `get_week`.
 
 ## Phone data on the device
@@ -302,15 +312,69 @@ the native code and runs the JS logic against mocks).
 - **Calendar**: "From your calendar" lists the day's timed events from every visible
   calendar that are yours to attend: your own events and subscriptions, and invitations you
   accepted (declined, tentative and unanswered ones, and all-day events, are skipped). The
-  time bar's *Calendar* starts the event near now (starting, going on or just over within 15
-  minutes) under its title, from its start; with none, or no access, it is greyed and a tap
-  says why. *Attended* logs the event as a block, *Skip* hides it
-  on this phone. For a repeating event, the toast offers *Every time*: the whole series is
-  then logged when it ends, or always hidden. Exchange or work accounts appear only if
+  time bar sits at the foot of Day (today). Every one of its buttons (*Calendar*, *Task*,
+  *Chores*, *Rest*) opens a picker, with *Stop* first when that button's activity runs.
+  *Calendar*'s picker lists today's events; one picked starts under its title, from its
+  start. When nothing is near now (starting, going on or just over within 15 minutes), or
+  without access, the button is greyed: its tooltip and its picker say why, and the picker
+  still offers a meeting without an event. Now shows what runs in one compact row with
+  *Stop*. *Attended* (offered from 15 minutes before the start) tracks the event from its
+  start, as Now's offer does. *Skip* skips that occurrence on every channel (Telegram, the web
+  and the feed stop asking); one that did not reach the server stays, with a note to try again.
+  For a repeating event, the toast offers *Every time*: the whole series is then logged when it
+  ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.
-- **In the background**: about every half hour (Android decides exactly when), Pace looks
-  at the phone with the app closed. It sends a notification about last night's sleep and
-  about calendar events that just ended. Each one is asked about once, and a tap opens Day.
+- **Notifications** come from the server only (see [Notifications](#notifications)); the
+  phone computes and schedules none of its own.
+
+## Notifications
+
+One pool on the server holds every notification, and each channel shows it: Telegram, the app
+and the web (a bell with an unread count in the sidebar header and on Now's phone header; the
+`/notifications` screen, grouped by day, with the assistant's log one link away). Kinds and their
+default channels (*Settings → Notifications* switches each kind per channel):
+
+| Kind | What | Default |
+|---|---|---|
+| Sign-in | a new session (who, where from) | Telegram, app, web |
+| Deadline digest | at each digest time: open tasks due before a day after the next digest time, each task and deadline once | Telegram |
+| Event starting | a calendar event (own or accepted, not all-day) as it starts: *Attend* / *Skip* | Telegram |
+| Still doing X? | the running activity at twice its Expect: *Yes, still* / *Stop* | app |
+
+An answer anywhere resolves the notification everywhere: answered in Telegram, the message is
+edited; from anywhere else (the app, the web, Now's offer, a phone notification) the Telegram
+message is deleted and the phone's copy is taken back. An event attended from Now resolves its
+notification too; one not answered by its end expires. Quiet hours hold back "event starting"
+and "still doing X?"; sign-ins and digests always come.
+
+The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
+server offers it and the phone has a Google token, else polling (it fetches what waits for it;
+the open app does so at once on each live update). *Settings → Notifications* on the phone picks
+it by hand (*Auto*, *Google*, *Pace checks* or *Off*) and says which one the phone uses; a pick the
+server or the phone cannot take right now falls back to the other, and is tried again later. `GET /api/push/methods` says what the server
+accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and
+phones switch to polling on their next start or at once while open. Each item's delivery log
+("Delivered to android via Google · 13:47") is shown under it in the feed.
+
+### Push notifications (Firebase)
+
+1. In the [Firebase console](https://console.firebase.google.com/) create a project (no
+   Analytics needed).
+2. *Add app → Android*, package name `dev.nalinor.pace`. Download `google-services.json` and
+   store its contents as the GitHub secret `GOOGLE_SERVICES_JSON`; the release workflow writes
+   it next to `app.config.ts` (`GOOGLE_SERVICES_FILE`) before prebuild.
+3. *Project settings → Cloud Messaging*: make sure **Firebase Cloud Messaging API (V1)** is
+   enabled.
+4. *Project settings → Service accounts → Generate new private key*: store the downloaded JSON
+   as the GitHub secret `FIREBASE_SERVICE_ACCOUNT`; the deploy workflow puts it into the Worker.
+5. Release a new APK and deploy. Without either secret everything works and phones poll.
+
+Both secrets must come from the **same** Firebase project: FCM refuses every push to a token
+another project issued (`SENDER_ID_MISMATCH`). The APK knows the project it was built with and
+`GET /api/push/methods` says the server's (`fcmProject`); when they differ (a self-hosted server
+with its own project, say) the phone polls and Settings says why. A phone that got a token
+refused anyway (an older APK) is moved to polling by the server, and its token is not taken for
+FCM again while the server sends with that project.
 
 ## Telegram bot setup
 
@@ -344,16 +408,10 @@ What the bot does, in the account language:
   model has requests left, the text goes straight to the Inbox and the reply says when the
   assistant is back.
 - `/now` lists the top five of Now.
-- Notifications: digests at the account's digest times (09:00, 14:00, 21:00 by default)
-  with the top of Now, what is left to sort and the Inbox count; a **critical** alert once
-  per task when its deadline is within the preset's `criticalHours` and progress is below
-  `criticalProgress` (buttons: Snooze until the next digest, Done); a **stuck** report with
-  the digest when a task sits in progress untouched for `inProgressIdleDays` (Snooze, Cancel
-  task). Nothing is sent in the quiet hours (23:00–08:00 by default): a
-  crossing at night is reported in the morning. A deadline that was already critical before
-  the previous check — a back-dated edit, or anything before notifications started — is
-  logged as held back instead of sent; the digest shows it. The Durable Object's alarm
-  drives all of it and re-arms itself after every write.
+- Notifications: the kinds on for Telegram (see [Notifications](#notifications)), with
+  *Attend* / *Skip* under an event starting and *Yes, still* / *Stop* under "still doing X?".
+  An answer there edits the message; an answer anywhere else deletes it. The Durable Object's
+  alarm drives the pool and re-arms itself after every write.
 
 ## MCP
 
@@ -381,15 +439,24 @@ AI SDK: **Groq** (`openai/gpt-oss-120b`, strict JSON schema) first, **Gemini**
 (`gemini-flash-latest`) when Groq is rate limited, and a **fake** provider
 (`LLM_PROVIDER=fake`) in tests and the e2e Worker. Keys come from the `GROQ_API_KEY` and
 `GEMINI_API_KEY` secrets; a provider without a key is skipped, and with none the assistant
-reports itself unavailable. The prompt (categories, projects, open tasks, now, zone) stays
-under 3k tokens, the free tier's per-minute budget.
+reports itself unavailable. The prompt (categories, projects, up to 40 open tasks and today's
+and yesterday's activities under short aliases such as `t3` and `a2`, never their ids, now,
+zone) stays under 3k tokens, the free tier's per-minute budget.
 
 The LLM never rewrites your text: the line is stored verbatim, every extracted string must
 be a literal quote of it, and numbers and dates need a quote as evidence — anything else
 comes back marked "check this". Where it is used:
 
-- `POST /api/parse` — the composer's **Read with AI** (web and app) fills the same chips
-  the rule-based reading does; questions show as one-tap answers.
+- `POST /api/parse` — `{ text, domain: "task" | "activity" | "auto" }` → proposals for the
+  person to accept: create, edit, delete or close a task (or add and mark its subtasks);
+  start, log, edit or delete an activity. Each comes with a summary written by code. The
+  model answers with aliases of the lists it was shown; code maps them back and checks
+  them: an alias outside the lists is dropped, a delete must quote the item's title, times
+  must name real minutes. With `auto` it also says whether the text is about a task or an
+  activity and how sure it is (below `CLASSIFY_CONFIDENT` = 0.8 the bot asks). Without a
+  model the rules propose a new task, or the activity a typed span names ("7:30 - 8:30 -
+  ходил в военкомат" is logged). The composer's **Read with AI** (web and app) fills the
+  same chips the rule-based reading does; questions show as one-tap answers.
 - The bot's previews (above).
 - `GET /api/decisions` and the **Decision log** page (Settings), plus the MCP tool
   `search_decisions`: every parse and every notification sent or held back, with the rule,
@@ -399,12 +466,10 @@ comes back marked "check this". Where it is used:
 `retry-after`) and skipped until then, so the next calls go straight to the one still
 answering; `GET /api/llm/status` says whether the assistant can read now and when it is back.
 With every provider out, the composer offers **Read it when it's back**: the line is kept in
-your Durable Object and read at that time, then written as read (History can undo it) or put in
-the Inbox if it cannot be placed or is still unread a day later. The bot does the same with any
+your Durable Object and read at that time, then written as read (History can undo it: new
+tasks, problems added or solved, a task closed) or put in the Inbox if it cannot be placed,
+asks for an edit or a delete, or is still unread a day later. The bot does the same with any
 message and writes back once it has read it.
-
-The Android app mirrors `GET /api/notify/plan` into local reminders (digest windows and
-deadline crossings for the next day) after every sync; it has no rules of its own.
 
 ## License
 

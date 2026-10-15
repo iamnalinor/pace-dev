@@ -4,11 +4,10 @@ import { Text, View } from "react-native";
 import type { InsightBar, InsightsModel } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
-import { ScreenHeader } from "#app/ui/screen-header.tsx";
-import { Screen } from "#app/ui/screen.tsx";
 import { formatDuration, formatWeekRange } from "@pace/core";
 
 import { Card } from "./card.tsx";
@@ -93,15 +92,12 @@ export const InsightsScreen = () => {
   const { deviceTz, language } = useViewer();
   const [weekOf, setWeekOf] = useState<null | string>(null);
   const week = hooks.useInsights(weekOf);
-  const header = (
-    <ScreenHeader
+  return (
+    <DestinationScreen
       eyebrow={formatWeekRange(week.weekStart, week.zone, language)}
       right={<WeekNav onWeek={setWeekOf} week={week} />}
       title={t("insights.title")}
-    />
-  );
-  return (
-    <Screen header={header}>
+    >
       <View className="gap-3 px-5">
         {week.totalMinutes > 0 ? (
           <>
@@ -149,6 +145,6 @@ export const InsightsScreen = () => {
           </Card>
         ) : null}
       </View>
-    </Screen>
+    </DestinationScreen>
   );
 };

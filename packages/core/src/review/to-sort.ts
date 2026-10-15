@@ -62,7 +62,17 @@ const suggested = (now: string, body: Payload): EventInput => ({
 const closeAs = (task: Task, now: string, outcome: "cancelled" | "done" | "skipped"): EventInput =>
   suggested(now, { type: "task.closed", payload: { taskId: task.id, outcome } });
 
-const KEEP_OPEN: ReviewAction = { key: "keep-open", events: [] };
+/**
+"Keep open": the task stays as it is, and the question is answered. Its own status set again
+says so in the log (the reducer counts it as activity on the task), so the card goes: a passed
+deadline is answered, "submitted?" waits another day.
+*/
+const keepOpen = (task: Task, now: string): ReviewAction => ({
+  key: "keep-open",
+  events: [
+    suggested(now, { type: "task.status.set", payload: { status: task.status, taskId: task.id } }),
+  ],
+});
 
 /** The last solve for per-problem progress, else the last activity (the slider has no own instant). */
 const byInstant = (a: string, b: string): number => Date.parse(a) - Date.parse(b);
@@ -100,12 +110,14 @@ const submittedItem = (task: Task, preset: ResolvedPreset, now: string): ReviewI
     return undefined;
   }
   const since = fullSince(task, preset);
-  return minutesBetween(since, now) >= SUBMITTED_AFTER_MINUTES
+  // A day after the last solve, and after anything since (a Keep open asks again a day later).
+  const quietSince = [since, task.lastEventAt].toSorted(byInstant).at(-1) ?? since;
+  return minutesBetween(quietSince, now) >= SUBMITTED_AFTER_MINUTES
     ? {
         kind: "submitted",
         taskId: task.id,
         since,
-        actions: [finishAction(task, preset, now), KEEP_OPEN],
+        actions: [finishAction(task, preset, now), keepOpen(task, now)],
       }
     : undefined;
 };
@@ -124,7 +136,7 @@ const deadlinePassedItem = (task: Task, now: string): ReviewItem | undefined => 
       { key: "mark-done", events: [closeAs(task, now, "done")] },
       { key: "cancel", events: [closeAs(task, now, "cancelled")] },
       { key: "skip", events: [closeAs(task, now, "skipped")] },
-      KEEP_OPEN,
+      keepOpen(task, now),
     ],
   };
 };

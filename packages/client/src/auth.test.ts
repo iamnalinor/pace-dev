@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "./api-client.ts";
 import { type Auth, createAuth } from "./auth.ts";
-import { createFakeFetch, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
+import { createFakeFetch, fakeMe, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
 import { createMemorySessionStore, type SessionStore } from "./session.ts";
 
 const setup = async (
@@ -53,7 +53,7 @@ describe("createAuth session", () => {
   });
 
   it("me() caches the user", async () => {
-    const { auth } = await setup({ "GET /api/me": () => fakeUser }, "ok");
+    const { auth } = await setup({ "GET /api/me": () => fakeMe }, "ok");
     await expect(auth.me()).resolves.toEqual({ ok: true, value: fakeUser });
     expect(auth.store.getState()).toEqual({ status: "signed-in", user: fakeUser });
   });
@@ -238,7 +238,7 @@ describe("createAuth deleteAccount", () => {
 
 describe("adoptToken", () => {
   it("stores a token minted elsewhere and loads the user behind it", async () => {
-    const { auth, calls, session } = await setup({ "GET /api/me": () => fakeUser });
+    const { auth, calls, session } = await setup({ "GET /api/me": () => fakeMe });
     await expect(auth.adoptToken("tok_web")).resolves.toEqual({ ok: true, value: fakeUser });
     expect(auth.token()).toBe("tok_web");
     await expect(session.get()).resolves.toBe("tok_web");

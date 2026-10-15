@@ -1,29 +1,53 @@
-import type { ParseField, ParseResult } from "./schema.ts";
+import type { ContextActivity, ContextTask, ProposalContext } from "../proposals/context.ts";
+import type { ModelAction, ParseField } from "./schema.ts";
 
-import { isQuotedFrom, isWordFrom } from "./normalize.ts";
+import { err, ok, type Result } from "../result.ts";
+import { formatInZone, wallClockInstant } from "../time.ts";
+import { hasWords, isQuotedFrom, isWordFrom, normalizeForEvidence } from "./normalize.ts";
+
+/** Why an action the model gave cannot be proposed at all. */
+export type ActionRejection =
+  | "proposal/bad-time"
+  | "proposal/unknown-activity"
+  | "proposal/unknown-task"
+  | "proposal/unquoted-delete";
 
 /**
-A parse with the fields that could not be checked against the message. Nothing is
-dropped: a doubtful field is shown marked, and the person confirms or fixes it.
+An action that checks out, with what it refers to and the fields that could not be checked
+against the message. A doubtful field is not dropped: it is shown marked, and the person
+confirms or fixes it.
 */
-export type VerifiedParse = {
-  readonly result: ParseResult;
+export type VerifiedAction = {
+  readonly action: ModelAction;
   readonly doubtful: readonly ParseField[];
-  /** All fields check out and nothing is asked: safe to accept in one tap. */
-  readonly isClean: boolean;
+  readonly task: ContextTask | null;
+  readonly activity: ContextActivity | null;
+  /** The start and end read on the account's clock. */
+  readonly start: null | string;
+  readonly end: null | string;
 };
 
-type Context = {
+export type VerifyContext = {
   readonly source: string;
   /** Names of existing projects: picking one needs no quote. */
   readonly projectNames: readonly string[];
+  /** The lists the model was shown: every alias it uses must be one of them. */
+  readonly context: ProposalContext;
+  readonly zone: string;
 };
 
-/** Fields whose value is a number or a date: they need a quote that says it. */
-const NEEDS_EVIDENCE: readonly ParseField[] = ["dueDate", "dueTime", "estimateMinutes"];
+/** Fields whose value is a number, a date or a time: they need a quote that says it. */
+const NEEDS_EVIDENCE = [
+  "dueDate",
+  "dueTime",
+  "estimateMinutes",
+  "expectMinutes",
+  "start",
+  "end",
+] as const satisfies readonly (keyof ModelAction & ParseField)[];
 
-const hasEvidence = (result: ParseResult, field: ParseField, source: string): boolean =>
-  result.evidence.some((entry) => entry.field === field && isQuotedFrom(entry.quote, source));
+const hasEvidence = (action: ModelAction, field: ParseField, source: string): boolean =>
+  action.evidence.some((entry) => entry.field === field && isQuotedFrom(entry.quote, source));
 
 const isVerbatim = (value: null | string, source: string): boolean =>
   value === null || isQuotedFrom(value, source);
@@ -46,35 +70,118 @@ const isKnownProject = (name: null | string, names: readonly string[]): boolean 
   name !== null && names.some((known) => known.toLowerCase() === name.toLowerCase());
 
 const textDoubts = (
-  result: ParseResult,
-  { projectNames, source }: Context,
+  action: ModelAction,
+  { projectNames, source }: VerifyContext,
 ): readonly ParseField[] => [
-  ...(isFittingTitle(result.title, source) ? [] : ["title" as const]),
-  ...(isVerbatim(result.description, source) ? [] : ["description" as const]),
-  ...(isKnownProject(result.project, projectNames) || isVerbatim(result.project, source)
+  ...(isFittingTitle(action.title, source) ? [] : ["title" as const]),
+  ...(isFittingTitle(action.label, source) ? [] : ["label" as const]),
+  ...(isVerbatim(action.description, source) ? [] : ["description" as const]),
+  ...(isVerbatim(action.link, source) ? [] : ["link" as const]),
+  ...(isKnownProject(action.project, projectNames) || isVerbatim(action.project, source)
     ? []
     : ["project" as const]),
-  ...(result.subtasks.every((subtask) => isWordFrom(subtask.label, source))
+  ...(action.subtasks.every((subtask) => isWordFrom(subtask.label, source))
     ? []
     : ["subtasks" as const]),
 ];
 
-const numberDoubts = (result: ParseResult, source: string): readonly ParseField[] =>
-  NEEDS_EVIDENCE.filter((field) => {
-    const value = result[field as "dueDate" | "dueTime" | "estimateMinutes"];
-    return value !== null && !hasEvidence(result, field, source);
-  });
+const numberDoubts = (action: ModelAction, source: string): readonly ParseField[] =>
+  NEEDS_EVIDENCE.filter((field) => action[field] !== null && !hasEvidence(action, field, source));
+
+/** `YYYY-MM-DD HH:MM` on the zone's wall clock, if it names a real minute there. */
+export const readWallClock = (value: string, zone: string): null | string => {
+  const [date = "", time = ""] = value.split(" ", 2);
+  const instant = wallClockInstant(date, time, zone);
+  return Number.isNaN(Date.parse(instant)) ||
+    formatInZone(instant, zone, "yyyy-MM-dd HH:mm") !== value
+    ? null
+    : instant;
+};
+
+const TASK_KINDS: ReadonlySet<ModelAction["kind"]> = new Set([
+  "task.update",
+  "task.delete",
+  "task.close",
+  "task.addSubtasks",
+  "task.markSubtasks",
+]);
+
+const ACTIVITY_KINDS: ReadonlySet<ModelAction["kind"]> = new Set([
+  "activity.update",
+  "activity.delete",
+]);
+
+type Refs = Pick<VerifiedAction, "activity" | "task">;
+
+/** The task or activity an action names, by an alias of the lists the model was shown. */
+const refsOf = (action: ModelAction, context: ProposalContext): Result<Refs, ActionRejection> => {
+  const task = context.tasks.find((item) => item.alias === action.task) ?? null;
+  const activity = context.activities.find((item) => item.alias === action.activity) ?? null;
+  if (task === null && TASK_KINDS.has(action.kind)) {
+    return err("proposal/unknown-task");
+  }
+  return activity === null && ACTIVITY_KINDS.has(action.kind)
+    ? err("proposal/unknown-activity")
+    : ok({ activity, task });
+};
+
+/** Shorter than this a title could hide inside another word: it must stand as whole words. */
+const SHORT_TITLE = 4;
+
+/** The listed name occurs in the quote; a short one only as whole words. */
+const isNamedIn = (name: string, quote: string): boolean =>
+  normalizeForEvidence(name).length < SHORT_TITLE
+    ? hasWords(name, quote)
+    : isQuotedFrom(name, quote);
+
+/** A delete names the item as listed: a wrong alias then deletes nothing instead of something else. */
+const isQuotedDelete = (action: ModelAction, refs: Refs): boolean => {
+  const listed: Partial<Record<ModelAction["kind"], string | undefined>> = {
+    "activity.delete": refs.activity?.label,
+    "task.delete": refs.task?.title,
+  };
+  const name = listed[action.kind];
+  return name === undefined || (action.quote !== null && isNamedIn(name, action.quote));
+};
+
+type Times = Pick<VerifiedAction, "end" | "start">;
+
+/** `undefined` for a time given that names no real minute. */
+const timeOf = (value: null | string, zone: string): null | string | undefined =>
+  value === null ? null : (readWallClock(value, zone) ?? undefined);
+
+const timesOf = (action: ModelAction, zone: string): Result<Times, "proposal/bad-time"> => {
+  const start = timeOf(action.start, zone);
+  const end = timeOf(action.end, zone);
+  return start === undefined || end === undefined ? err("proposal/bad-time") : ok({ end, start });
+};
 
 /**
-Checks a parse against its message: copied strings must occur in it (normalized compare),
-the title may be a short name in the message's language, numbers and dates need a quote
-from it. Invented values come back as doubtful.
+Checks one action against the message and the lists the model was shown: every alias must be
+one of them, a delete must quote the item's title, times must name real minutes. Copied strings
+must occur in the message (normalized compare), a title or label may be a short name in the
+message's language, numbers, dates and times need a quote from it: what fails those comes
+back as doubtful.
 */
-export const verifyParse = (result: ParseResult, context: Context): VerifiedParse => {
-  const doubtful = [...textDoubts(result, context), ...numberDoubts(result, context.source)];
-  return {
-    doubtful,
-    isClean: doubtful.length === 0 && result.questions.length === 0,
-    result,
-  };
+export const verifyAction = (
+  action: ModelAction,
+  context: VerifyContext,
+): Result<VerifiedAction, ActionRejection> => {
+  const refs = refsOf(action, context.context);
+  if (!refs.ok) {
+    return refs;
+  }
+  if (!isQuotedDelete(action, refs.value)) {
+    return err("proposal/unquoted-delete");
+  }
+  const times = timesOf(action, context.zone);
+  if (!times.ok) {
+    return times;
+  }
+  return ok({
+    action,
+    doubtful: [...textDoubts(action, context), ...numberDoubts(action, context.source)],
+    ...refs.value,
+    ...times.value,
+  });
 };

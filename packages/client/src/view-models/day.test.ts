@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Activity, ActivityCategory, CoreState } from "@pace/core";
 
-import { artboardState, ctx, MOSCOW, NOW } from "@pace/core/testing";
+import { artboardState, ctx, HW_ID, MOSCOW, NOW } from "@pace/core/testing";
 
 import { dayModel, trackedDates } from "./day.ts";
 
@@ -33,6 +33,7 @@ const activity = ({
   isAlongside,
   isLogged: endAt !== null,
   label,
+  originEventId: `e-${id}`,
   startAt,
   stillAt: null,
   taskId: null,
@@ -95,6 +96,68 @@ describe("dayModel rows", () => {
       ["Gym", true, 90, false],
       ["Music", true, null, true],
     ]);
+  });
+});
+
+/** A finished block on a task (or on no task), labelled so; `order` sets it apart in time. */
+const onTask = (id: string, label: string, taskId: null | string): Activity => {
+  const order = Number(id.slice(1));
+  const block = activity({
+    category: "task",
+    endAt: minutesBefore(30),
+    id,
+    label,
+    startAt: minutesBefore(60 + order),
+  });
+  return { ...block, taskId };
+};
+
+/** Each block's label and its link to its task, as Day shows them. */
+const linksOf = (activities: readonly Activity[]) =>
+  dayModel(withActivities(activities), null, ctx()).entries.flatMap((entry) =>
+    entry.kind === "activity" ? [[entry.row.label, entry.row.taskLink]] : [],
+  );
+
+describe("dayModel task links", () => {
+  it("says Open task when the label is the task's title, and names the task when it is not", () => {
+    const title = artboardState().tasks.byId[HW_ID]?.title ?? "";
+    expect(
+      linksOf([
+        onTask("a1", title, HW_ID),
+        onTask("a2", "Reading for it", HW_ID),
+        onTask("a3", "No task", null),
+        onTask("a4", "A task gone since", "01GONE0000000000000000000"),
+      ]),
+    ).toEqual([
+      ["A task gone since", null],
+      ["No task", null],
+      ["Reading for it", { id: HW_ID, text: { title } }],
+      [title, { id: HW_ID, text: { key: "day.openTask" } }],
+    ]);
+  });
+
+  it("reads a label cut to 80 characters as the long title it came from", () => {
+    const base = artboardState();
+    const long = `${"Подготовить доклад ".repeat(6)}к семинару`;
+    const task = base.tasks.byId[HW_ID];
+    const state = withActivities([onTask("a1", long.slice(0, 80).trim(), HW_ID)]);
+    const withLongTitle: CoreState = {
+      ...state,
+      tasks: {
+        ...state.tasks,
+        byId: {
+          ...state.tasks.byId,
+          [HW_ID]: { ...(task ?? Object.values(base.tasks.byId)[0]), title: long },
+        },
+      },
+    } as CoreState;
+    const entry = dayModel(withLongTitle, null, ctx()).entries.find(
+      (one) => one.kind === "activity",
+    );
+    expect(entry?.kind === "activity" && entry.row.taskLink).toEqual({
+      id: HW_ID,
+      text: { key: "day.openTask" },
+    });
   });
 });
 

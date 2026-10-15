@@ -44,3 +44,13 @@ export const isWordFrom = (quote: string, source: string): boolean => {
   const words = tokens(quote);
   return words.length === 1 ? tokens(source).includes(words[0] ?? "") : isQuotedFrom(quote, source);
 };
+
+/** Whether the words of `needle` stand together, whole, in `haystack` ("ян" is not in "янтарь"). */
+export const hasWords = (needle: string, haystack: string): boolean => {
+  const words = tokens(needle);
+  const within = tokens(haystack);
+  return (
+    words.length > 0 &&
+    within.some((_, start) => words.every((word, offset) => within[start + offset] === word))
+  );
+};

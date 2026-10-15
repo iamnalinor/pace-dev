@@ -1,4 +1,11 @@
-import { err, isValidTimeZone, type Language, ok } from "@pace/core";
+import {
+  err,
+  isValidTimeZone,
+  type Language,
+  type NotificationChannel,
+  type NotificationKind,
+  ok,
+} from "@pace/core";
 
 import { type ActionDeps, type ActionResult, emit, stamp } from "./deps.ts";
 
@@ -15,6 +22,14 @@ export type SettingsActions = {
   /** `HH:MM` on the account's zone. */
   readonly setDigestWindows: (digestWindows: readonly string[]) => ActionResult;
   readonly setQuietHours: (quietHours: QuietHours) => ActionResult;
+  /** Week from midnight to midnight (on), or from seven (off). */
+  readonly setNightHours: (isOn: boolean) => ActionResult;
+  /** Turns one kind of notification on or off for one channel. */
+  readonly setNotificationChannel: (
+    kind: NotificationKind,
+    channel: NotificationChannel,
+    isOn: boolean,
+  ) => ActionResult;
 };
 
 export const settingsActions = (deps: ActionDeps): SettingsActions => ({
@@ -30,6 +45,15 @@ export const settingsActions = (deps: ActionDeps): SettingsActions => ({
     ]),
   setLanguage: async (language) =>
     await emit(deps, [stamp(deps, { type: "settings.updated", payload: { language } })]),
+  setNightHours: async (isOn) =>
+    await emit(deps, [stamp(deps, { type: "settings.updated", payload: { nightHours: isOn } })]),
+  setNotificationChannel: async (kind, channel, isOn) =>
+    await emit(deps, [
+      stamp(deps, {
+        type: "settings.updated",
+        payload: { notificationChannels: { [kind]: { [channel]: isOn } } },
+      }),
+    ]),
   setQuietHours: async (quietHours) =>
     await emit(deps, [
       stamp(deps, { type: "settings.updated", payload: { quietHours: { ...quietHours } } }),

@@ -31,7 +31,7 @@ export type ComposerEdits = {
   readonly link?: null | string | undefined;
   /** A project to create by name (the assistant named one that does not exist yet). */
   readonly projectName?: null | string | undefined;
-  /** The assistant's reading of the title and the problems, over the rules' one. */
+  /** The assistant's reading of the title and the subtasks, over the rules' one. */
   readonly title?: string | undefined;
   readonly subtasks?: readonly QuickSubtask[] | undefined;
   /** The details beyond the title (the assistant's reading, or typed in the form). */
@@ -57,7 +57,11 @@ export type ComposerModel = {
   /** Exactly what was typed; stored as the task's source. */
   readonly text: string;
   readonly title: string;
-  readonly isEmpty: boolean;
+  /**
+  Whether Create may add this: the title (the line's, the assistant's or the form's own) says
+  something, or the text goes to a week's homework. The one answer the button and the action share.
+  */
+  readonly canAdd: boolean;
   readonly preset: ComposerOption;
   readonly presets: readonly ComposerOption[];
   readonly project: ComposerOption | null;
@@ -217,6 +221,10 @@ export const requiresAiFirst = (text: string): boolean => {
   return trimmed.length >= LONG_TEXT_CHARS || trimmed.includes("\n");
 };
 
+/** A title says something, or the text goes to a week's homework, which needs none of its own. */
+const canAddOf = (title: string, target: ComposerTarget): boolean =>
+  title.trim() !== "" || target.kind === "instance";
+
 export const composerModel = (
   state: CoreState,
   draft: ComposerDraft,
@@ -231,14 +239,16 @@ export const composerModel = (
   const defaultImportance = defaultImportanceOf(state, presetId);
   const textImportance = parsed.isImportanceExplicit ? parsed.importance : undefined;
   const due = dueOf(parsed, edits);
+  const target = targetOf(state, presetId, { due, now: ctx.now, picked: edits.targetTaskId });
+  const title = edits.title ?? parsed.title;
   return {
+    canAdd: canAddOf(title, target),
     defaultImportance,
     description: edits.description ?? null,
     due,
     start: edits.start ?? null,
     estimateMinutes: pick(edits.estimateMinutes, parsed.estimateMinutes),
     importance: edits.importance ?? textImportance ?? defaultImportance,
-    isEmpty: text.trim() === "",
     link: linkOf(parsed, edits),
     newProjectName: newProjectNameOf(parsed, edits),
     preset: optionOf(presets, presetId) ?? { color: null, id: presetId, name: presetId },
@@ -247,9 +257,9 @@ export const composerModel = (
     projects,
     spans: parsed.spans,
     subtasks: edits.subtasks ?? parsed.subtasks,
-    target: targetOf(state, presetId, { due, now: ctx.now, picked: edits.targetTaskId }),
+    target,
     instances: openInstancesOf(state, presetId).map((task) => ({ id: task.id, title: task.title })),
     text,
-    title: edits.title ?? parsed.title,
+    title,
   };
 };

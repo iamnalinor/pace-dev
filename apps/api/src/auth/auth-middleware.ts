@@ -32,5 +32,6 @@ export const requireAuth =
     }
     c.set("user", access.user);
     c.set("device", access.device ?? undefined);
+    c.set("sessionId", access.sessionId);
     await next();
   };

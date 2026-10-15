@@ -12,8 +12,9 @@ import {
   type Task,
 } from "@pace/core";
 
+import { taskUrl } from "../../shared/web-links.ts";
 import { defineTool } from "../registry.ts";
-import { projectUrl, rowOf, type TaskRow, taskUrl, thenBy } from "../rows.ts";
+import { projectUrl, rowOf, type TaskRow, thenBy } from "../rows.ts";
 import { type Rendered, runRead, type Scope, type ToolFailure } from "../tool-kit.ts";
 
 /** Case folding that treats Cyrillic like Latin and `ё` like `е`. */

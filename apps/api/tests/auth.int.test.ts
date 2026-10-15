@@ -28,8 +28,16 @@ describe("dev login", () => {
     const response = await call("/api/auth/dev", { body: { telegramId: "1001" } });
     expect(response.status).toBe(200);
     const session = await readJson<{ token: string; user: { telegramId: string } }>(response);
-    expect(session.user).toMatchObject({ telegramId: "1001", username: null, photoUrl: null });
-    expect(await json("/api/me", { token: session.token })).toEqual(session.user);
+    expect(session.user).toMatchObject({
+      firstName: null,
+      photoUrl: null,
+      telegramId: "1001",
+      username: null,
+    });
+    expect(await json("/api/me", { token: session.token })).toEqual({
+      ...session.user,
+      storeId: expect.any(String) as string,
+    });
   });
 
   it("refuses ids outside the whitelist", async () => {
@@ -58,7 +66,6 @@ describe("bearer sessions", () => {
     endpoints.auth.logout,
     endpoints.sync.push,
     endpoints.sync.pull,
-    endpoints.sync.observations,
   ];
 
   it.each(protectedEndpoints)("$method $path is 401 without a bearer", async (endpoint) => {
@@ -95,6 +102,20 @@ describe("Telegram Login Widget", () => {
     const session = await readJson<{ token: string; user: { name: string } }>(response);
     expect(session.user).toMatchObject({ name: "Ada", telegramId: "1001", username: "ada" });
     expect((await call("/api/me", { token: session.token })).status).toBe(200);
+  });
+
+  it("serves the first name from the widget payload on /api/me, not the full name", async () => {
+    const body = await widgetPayload({
+      auth_date: nowSeconds(),
+      first_name: "Albert",
+      id: 1001,
+      last_name: "Einstein",
+    });
+    const session = await readJson<{ token: string }>(await call("/api/auth/telegram", { body }));
+    expect(await json("/api/me", { token: session.token })).toMatchObject({
+      firstName: "Albert",
+      name: "Albert Einstein",
+    });
   });
 
   it("rejects a bad hash with 401", async () => {
@@ -142,7 +163,7 @@ describe("login nonce", () => {
     const { nonce } = await json<{ nonce: string }>("/api/auth/nonce", { method: "POST" });
     const user = await upsertTelegramUser(
       d1(env.DB),
-      { name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
+      { firstName: "Ada", name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
       Date.now(),
     );
     await bindNonce(d1(env.DB), { nonce, now: Date.now(), userId: user.id });

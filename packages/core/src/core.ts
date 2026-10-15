@@ -14,6 +14,8 @@ export {
   AuthSessionSchema,
   DevLoginSchema,
   LogoutSchema,
+  type Me,
+  MeSchema,
   NonceCreatedSchema,
   NoncePollSchema,
   type TelegramLogin,
@@ -21,7 +23,12 @@ export {
   type User,
   UserSchema,
 } from "./api/schemas/auth.ts";
-export type { CalendarEvent, Device, UsageRow } from "./api/schemas/cloud.ts";
+export {
+  CALENDAR_LIMITS,
+  type CalendarEvent,
+  type Device,
+  type UsageRow,
+} from "./api/schemas/cloud.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,
@@ -46,12 +53,10 @@ export {
   requestedScopes,
 } from "./api/schemas/oauth.ts";
 export {
-  type Observation,
-  ObservationSchema,
+  STORE_CHANGED,
+  StoreIdSchema,
   type SyncEvent,
   SyncEventSchema,
-  SyncObservationsBodySchema,
-  SyncObservationsOutputSchema,
   SyncPullOutputSchema,
   SyncPullQuerySchema,
   SyncPushBodySchema,
@@ -111,7 +116,14 @@ export {
 export { parseQuickInput, type QuickInput } from "./input/parse-quick-input.ts";
 export type { QuickSubtask } from "./input/quick-fields.ts";
 export type { QuickSpan, QuickSpanKind } from "./input/quick-spans.ts";
-export { extractLink, isHttpUrl, linkHost } from "./links.ts";
+export {
+  allLinks,
+  extractLink,
+  isHttpUrl,
+  linkHost,
+  splitLinks,
+  type TextPart,
+} from "./links.ts";
 export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/core-state.ts";
 export {
   apply,
@@ -129,7 +141,6 @@ export { taskReducer } from "./materialize/task-reducer.ts";
 export {
   type DeadlinePolicy,
   type Importance,
-  type NotifyParams,
   type Preset,
   type PresetDefinition,
   type PresetFields,
@@ -212,7 +223,7 @@ export {
   taskPreset,
   validatePresetInput,
 } from "./presets/resolve-preset.ts";
-export { importanceOf, presetOf } from "./queries/classify.ts";
+export { importanceOf, isInboxTask, presetOf } from "./queries/classify.ts";
 export { accountTz, type QueryContext } from "./queries/context.ts";
 export { type InboxItem, inboxList, UNSORTED_TOO_LONG_MINUTES } from "./queries/inbox.ts";
 export { compareNowItems, hasLaterStart, nowItem } from "./queries/now-item.ts";
@@ -257,12 +268,14 @@ export {
   minutesBetween,
   startOfDayIn,
   startOfWeekIn,
+  wallClockInstant,
   type ZonedInstant,
   zonesDiffer,
 } from "./time.ts";
 export {
   FUTURE_TOLERANCE_MINUTES,
   type RetroError,
+  taskInstantProblem,
   validateEventInput,
   type ValidationState,
 } from "./validation/retro-rules.ts";

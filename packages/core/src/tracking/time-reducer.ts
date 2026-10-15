@@ -39,6 +39,7 @@ const started = (state: TimeState, event: EventOf<"activity.started">): TimeStat
       expectMinutes: payload.expectMinutes ?? null,
       id: payload.activityId,
       isAlongside,
+      originEventId: event.id,
       isLogged: false,
       label: payload.label,
       startAt: event.occurredAt,
@@ -59,6 +60,7 @@ const logged = (state: TimeState, event: EventOf<"activity.logged">): TimeState 
         expectMinutes: null,
         id: payload.activityId,
         isAlongside: false,
+        originEventId: event.id,
         isLogged: true,
         label: payload.label,
         startAt: payload.startAt,
@@ -113,9 +115,6 @@ const HANDLERS: Handlers = {
       taskId: taskId === undefined ? activity.taskId : taskId,
     }));
   },
-  // The bar's buttons are fixed now: the old edits stay in the log and change nothing.
-  "activity.button.set": (state) => state,
-  "activity.button.removed": (state) => state,
 };
 
 const isActivityEvent = (event: Event): event is ActivityEvent =>

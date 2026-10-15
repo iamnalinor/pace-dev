@@ -16,13 +16,20 @@ test("adds a computer, which then reports its apps and shows on Week", async ({ 
   await page.getByRole("button", { name: "Добавить компьютер" }).click();
   await page.getByRole("textbox", { name: "Название" }).fill("Linux Mint");
   await page.getByRole("button", { name: "Создать токен" }).click();
-  const command = page.getByText(/pace_aw_bridge\.py install /u);
+  // Picked explicitly: what comes preselected depends on the browser's platform.
+  await page.getByRole("radio", { name: "Linux" }).click();
+  await expect(page.getByRole("radio", { name: "Linux" })).toBeChecked();
+  const command = page.getByText(/^curl .*pace_agent\.py install /u);
   await expect(command).toBeVisible();
   await expectNoA11yViolations(page);
   const text = (await command.textContent()) ?? "";
-  const [, deviceToken = "", deviceId = ""] = /--token (\S+) --device-id (\S+)/u.exec(text) ?? [];
+  expect(text).not.toContain("--token");
+  const deviceToken = (await page.getByTestId("device-setup-token").textContent()) ?? "";
+  expect(deviceToken).not.toBe("");
+  // The server files the sessions under the token's computer, whatever id the agent sends.
+  const deviceId = "agent-generated-id";
 
-  // What the bridge would send, with the token from the command.
+  // What the agent would send, with the separately displayed token.
   const now = Date.now();
   const sent = await fetch(`${API_URL}/api/usage/sessions`, {
     body: JSON.stringify({

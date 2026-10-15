@@ -15,12 +15,17 @@ import { Pressable, Text, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
-import { useT } from "../app-state.tsx";
+import { useOwnerName, useT } from "../app-state.tsx";
+import { requestNewTask } from "../shared/new-task-request.ts";
+import { NotificationBell } from "../shared/notifications/notification-bell.tsx";
+import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { KeyHint } from "./button.tsx";
+import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { HOTKEYS } from "./hotkeys.ts";
 import { PaceMark } from "./logo.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { useDockToastsHere } from "./toast.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
 const STROKE = 1.75;
@@ -29,6 +34,8 @@ type Destination = {
   readonly href: Href;
   readonly icon: LucideIcon;
   readonly label: MessageKey;
+  /** For a row that carries a count badge: its accessibility label, which takes the `{count}`. */
+  readonly countedLabel?: MessageKey;
   /** Whether a path belongs to this destination (a project page belongs to Projects). */
   readonly owns: (path: string) => boolean;
 };
@@ -41,7 +48,19 @@ const DESTINATIONS: readonly Destination[] = [
     owns: (path) => path === "/" || path.startsWith("/task/"),
   },
   { href: "/day", icon: Clock, label: "nav.day", owns: (path) => path === "/day" },
-  { href: "/week", icon: CalendarRange, label: "nav.week", owns: (path) => path === "/week" },
+  {
+    href: "/week",
+    icon: CalendarRange,
+    label: "nav.week",
+    owns: (path) => path === "/week",
+  },
+  {
+    href: "/inbox",
+    icon: Inbox,
+    countedLabel: "nav.inboxWaiting",
+    label: "nav.inbox",
+    owns: (path) => path === "/inbox",
+  },
   {
     href: "/projects",
     icon: Folder,
@@ -54,7 +73,6 @@ const DESTINATIONS: readonly Destination[] = [
     label: "nav.insights",
     owns: (path) => path === "/insights",
   },
-  { href: "/inbox", icon: Inbox, label: "nav.inbox", owns: (path) => path === "/inbox" },
   { href: "/history", icon: History, label: "nav.history", owns: (path) => path === "/history" },
   {
     href: "/settings",
@@ -69,10 +87,13 @@ export const isSidebarPath = (path: string): boolean =>
   DESTINATIONS.some((destination) => destination.href === path);
 
 const SidebarLink = ({
+  count,
   destination,
   isCurrent,
   onPress,
 }: {
+  /** What waits behind this row (the Inbox's badge); 0 for a row without one. */
+  readonly count: number;
   readonly destination: Destination;
   readonly isCurrent: boolean;
   readonly onPress: () => void;
@@ -82,6 +103,11 @@ const SidebarLink = ({
   const Icon = destination.icon;
   return (
     <Pressable
+      accessibilityLabel={
+        count > 0 && destination.countedLabel !== undefined
+          ? t(destination.countedLabel, { count })
+          : t(destination.label)
+      }
       accessibilityRole="link"
       aria-current={isCurrent ? "page" : undefined}
       className={cx(
@@ -90,10 +116,20 @@ const SidebarLink = ({
       )}
       onPress={onPress}
     >
-      <Icon color={isCurrent ? palette.fg : palette.muted} size={18} strokeWidth={STROKE} />
-      <Text className={cx("font-sans text-[14px]", isCurrent ? "font-medium text-fg" : "text-fg2")}>
+      <Icon
+        color={isCurrent ? palette.accentQuietText : palette.muted}
+        size={18}
+        strokeWidth={STROKE}
+      />
+      <Text
+        className={cx(
+          "flex-1 font-sans text-[14px]",
+          isCurrent ? "font-medium text-fg" : "text-fg2",
+        )}
+      >
         {t(destination.label)}
       </Text>
+      <CountBadge count={count} />
     </Pressable>
   );
 };
@@ -107,10 +143,17 @@ export const Sidebar = () => {
   const router = useRouter();
   const path = usePathname();
   const { palette } = useTheme();
+  const owner = useOwnerName();
+  const waiting = useWaitingCount();
+  useDockToastsHere();
+  // The empty form opens on Now (in its right pane): asked for, and Now brought to the front.
   const newTask = (): void => {
-    router.navigate("/add");
+    requestNewTask();
+    if (path !== "/" && path !== "/add") {
+      router.navigate("/");
+    }
   };
-  // Elsewhere than Now, N opens it with the cursor in the composer (Now's composer takes N itself).
+  // Elsewhere than Now, N does the same (Now's composer takes N itself).
   useHotkey(HOTKEYS.newTask, newTask);
   return (
     <View
@@ -121,6 +164,13 @@ export const Sidebar = () => {
       <View className="mb-3 flex-row items-center gap-2 px-2">
         <PaceMark size={22} />
         <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
+        <Text
+          className="min-w-0 flex-1 text-right font-sans text-[13px] text-muted"
+          numberOfLines={1}
+        >
+          {owner ?? ""}
+        </Text>
+        <NotificationBell variant="plain" />
       </View>
       <Pressable
         accessibilityLabel={t("nav.newTask")}
@@ -136,6 +186,7 @@ export const Sidebar = () => {
       </Pressable>
       {DESTINATIONS.map((destination) => (
         <SidebarLink
+          count={destination.countedLabel === undefined ? 0 : waiting}
           destination={destination}
           isCurrent={destination.owns(path)}
           key={destination.label}

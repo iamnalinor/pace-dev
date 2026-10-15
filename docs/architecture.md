@@ -30,8 +30,10 @@ build differs in three ways, all in `metro.config.js`:
 - **Layout**: from 1024 px the tabs become a sidebar and Now shows the picked task beside the
   list (`src/ui/layout.ts`, `src/screens/now-screen.tsx`).
 
-The service worker precaches the build and waits; the update banner offers "Reload", which
-hands control to the new worker.
+The service worker precaches the build and waits; the update strip offers "Refresh page",
+which hands control to the new worker. The phone tabs are Now, Day, Inbox and More (which
+opens Week and the other destinations). On a wide screen the sidebar lists Now, Day, Week,
+Inbox, Projects, Insights, Devices and Settings.
 
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs
@@ -108,12 +110,13 @@ once (`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op.
   same rule: rebuild only when a retro edit makes it necessary.
 
 Reducers are `(state, event) => state` and pure. `settings-reducer.ts` is the first one
-(`settings.updated` patches `language`, `timezone`, `digestWindows`, `quietHours` on top
+(`settings.updated` patches `language`, `timezone`, `digestWindows`, `quietHours` and, per kind,
+the `notificationChannels` switches on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
-High-volume phone facts (app usage, calendar entries, sleep candidates) are **not**
-events. They are *observations* (`kind`, `key`, `at`, `payload`), stored once per
-`kind+key`; only derived decisions become events.
+High-volume phone facts (the calendar copy, app usage) are **not** events. They have
+their own tables in the Durable Object (`calendar_events`, `usage_sessions`), replaced or
+added per device through the cloud routes; only derived decisions become events.
 
 ## API contract
 
@@ -161,10 +164,12 @@ secrets with zod once per request and stores the result on the context.
 - **Sessions** (`auth/sessions.ts`): 32 random bytes as the bearer token, SHA-256 in D1
   `sessions` with a label (`web`, `android`, `dev`), 90-day expiry, `lastSeenAt` touched at
   most hourly. `requireAuth` middleware resolves the bearer to `CurrentUser`; handlers
-  read it with `requireUser(c)`.
+  read it with `requireUser(c)`. The fuller session list and login notices belong to a
+  later stage; this release does not expose them.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
 
-D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`. They are
+D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`,
+`push_subscriptions` (each session's one push method) and `broken_push_methods`. They are
 global; everything per user lives in the Durable Object.
 
 ## Sync protocol
@@ -173,20 +178,50 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 
 | Call | Request | Response | Rules |
 |---|---|---|---|
-| `POST /api/sync/push` | `{ events: Event[] }` (≤ 500) | `{ accepted: id[], rejected: { id, reason }[], seq }` | each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
-| `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again |
-| `POST /api/sync/observations` | `{ observations }` (≤ 1000) | `{ accepted: n }` | append-only, idempotent by `kind+key` |
-| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
+| `POST /api/sync/push` | `{ events: Event[] (≤ 500), storeId }` | `{ accepted: id[], rejected: { id, reason }[], seq }` | a `storeId` that is not the store's current one refuses the whole batch with `409 store/changed`; each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
+| `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
+| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages, and the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
 
 The client sends a local change within 0.8 s of writing it (and what is unsent when the tab
 is hidden or the app goes to the background), pulls on every `changed` and on every
 reconnect of the live socket (back after 1 s, 2 s, … 60 s), and polls as a safety net: every
 5 minutes while the socket is up, every 30 s while it is down.
 
+**The store id.** Every user store has a random `storeId` (16 bytes, base64url), made when it
+is created and again whenever it is wiped (account deletion, an epoch change). The pull
+answers it (so does `GET /api/me`). The client keeps it next to its cursor: the first pull
+of an empty cursor adopts it; a different one means the server's data was reset, so the
+client drops its local log, outbox and cursor, keeps the new id and pulls from 0. A run
+pulls before it pushes, and the push names the store that pull confirmed (the server
+refuses a push for any other with `409 store/changed`, which the client treats as a reset),
+so an outbox meant for a store that no longer exists never lands in the fresh one; it pulls
+again after a push for what the server derived from it. A run resets at most once: a second
+change in the same run stops it and the next run retries. What was written on the old copy
+while a reset was under way goes with it. Signing out (a 401 on `/api/me` included) drops
+the local log, outbox, cursor and id as well.
+
+A reset also forgets the store's Telegram chat; the store then sends to the user's private
+chat, whose id is their Telegram id (looked up in D1 by the store's name, the user id).
+
 The transport validates only the envelope (`SyncEventSchema`); the per-type payload is
 checked by the Durable Object. `seq` is a server-assigned integer, so a client that
 pulls from its last `seq` gets exactly what it missed, in any order of `occurredAt`; the
 materialization rule above decides whether an incremental apply is enough.
+
+## Assistant proposals and time tracking
+
+`POST /api/parse` reads free text in the requested `task` or `activity` domain and answers
+with checked proposals. Core names the proposal kinds in `proposals/kinds.ts` (create,
+update, delete, close and subtask changes for tasks; start, log, update and delete for
+activities). `planProposal` in `proposals/plan.ts` validates one accepted proposal against
+the current state and produces events; `planProposals` plans a batch in order. Parsing
+alone does not write events. The app's full proposal cards and the bot's proposal picker
+are planned for later PRs.
+
+On Day, the time bar offers Calendar, Task, Chores and Rest, plus a typed activity; Now
+shows a compact row for what is running. A computer can contribute foreground-app and
+idle-time observations through the scoped token and the Python agent described in
+[desktop.md](desktop.md). Observations are separate from the immutable user-action log.
 
 ## Durable Object per user
 
@@ -194,11 +229,17 @@ materialization rule above decides whether an incremental apply is enough.
 instance per user (`USER_STORE.idFromName(user.id)`). Storage is the DO's SQLite through
 drizzle (`drizzle-orm/durable-sqlite`); migrations (`drizzle/do`, bundled as
 `migrations.js`) run in the constructor inside `blockConcurrencyWhile`, so no request
-sees a half-migrated store. Tables (`user-store/schema.ts`): `events` (`seq` primary key,
-`id` unique, indexed by `occurredAt`), `observations`, `decisions` (every automatic
-decision with its inputs, for "why?"), `meta` (cursors, budgets) and the projections
-`tasks`, `subtasks`, `projects`, `presets` (the materialized state as SQL rows for SQL
-readers; never the source of truth).
+sees a half-migrated store. Before they run, a store whose stored epoch is not
+`STORE_EPOCH` (`user-store/store-identity.ts`; a store from before epochs has none) is
+emptied: `deleteAll` (SQL tables and keys) and its alarm. Raising the epoch drops every
+user's data at once, so a breaking change never needs a data migration (and the DO
+migrations could be squashed into one `0000`). Tables (`user-store/schema.ts`): `events`
+(`seq` primary key, `id` unique, indexed by `occurredAt`), `calendar_events`,
+`usage_sessions`, `decisions` (every automatic decision with its inputs, for "why?"), the
+notification pool (`notifications`, its delivery log `notification_deliveries`, and
+`poll_outbox` for phones that poll),
+`meta` (cursors, budgets) and the projections `tasks`, `subtasks`, `projects`, `presets`
+(the materialized state as SQL rows for SQL readers; never the source of truth).
 
 The object keeps core's `CoreState` materialized in memory (`user-store/state.ts`), tagged
 with the log `seq` it was built at; a cache behind the log is rebuilt. A batch that is in
@@ -212,7 +253,14 @@ append (a client's sync push, an `apply`) and before every read and every `apply
 (`user-store/derive-steps.ts`), with deterministic ids, so they are idempotent
 against clients that derived the same events.
 
-Methods: `append` and `list` (sync), `appendObservations`, `find(id)`, `read(now)`,
+The notification pool (`user-store/pool-service.ts`) evaluates calendar starts, activity
+overruns and deadline digest slots. A pass stores notifications once per subject, records
+delivery per channel and device, and arms the Durable Object alarm for the next due time.
+The feed and open app update through the live socket. Telegram and a configured FCM project
+can deliver outside the app; a phone with a different Firebase project uses polling.
+Answering or settling a notification resolves it in the pool and takes back its copies.
+
+Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,
 `apply(inputs, { source, deviceId, now })` (derives, then validates the batch in order with
 core's `validateEventInput`, the first refusal stops it and none of it is written; stamps
 ids, `recordedAt` and the device; returns the stored events and the new state), `dryRun`

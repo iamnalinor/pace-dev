@@ -1,10 +1,166 @@
 import { X } from "lucide-react-native";
+import { useEffect } from "react";
 import { Text, View } from "react-native";
+import { useStore } from "zustand";
 
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { IS_PHONE } from "#app/platform/device.ts";
+import {
+  loadOfferedMethods,
+  loadPushState,
+  type PushMethod,
+  type PushState,
+  pushStore,
+  registerPush,
+  setPushChoice,
+} from "#app/platform/notifications.ts";
 import { Button } from "#app/ui/button.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { Segmented } from "#app/ui/segmented.tsx";
+import { PaceSwitch } from "#app/ui/switch-row.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
+import { isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
+
+/**
+Where each kind of notification goes: a row per kind, a switch per channel (Telegram, the app,
+the web). The switches read the one rule the server and the feed read (`isChannelOn`).
+*/
+export const NotificationChannels = () => {
+  const t = useT();
+  const { actions } = usePace();
+  const settings = useSettings();
+  return (
+    <View className="gap-1" role="table">
+      <Text className="font-sans text-[13px] text-muted">{t("settings.notifications.hint")}</Text>
+      <View className="flex-row items-center gap-2 pt-1" role="row">
+        <View className="flex-1" />
+        {NOTIFICATION_CHANNELS.map((channel) => (
+          <Text
+            className="w-14 text-center font-sans text-[11px] text-muted"
+            key={channel}
+            role="columnheader"
+          >
+            {t(`notify.channel.${channel}`)}
+          </Text>
+        ))}
+      </View>
+      {NOTIFICATION_KINDS.map((kind) => (
+        <View className="min-h-11 flex-row items-center gap-2" key={kind} role="row">
+          <Text className="min-w-0 flex-1 font-sans text-[14px] text-fg" role="rowheader">
+            {t(`notify.kind.${kind}`)}
+          </Text>
+          {NOTIFICATION_CHANNELS.map((channel) => (
+            <View className="w-14 items-center" key={channel} role="cell">
+              <PaceSwitch
+                isOn={isChannelOn(settings, kind, channel)}
+                label={t("notify.switch", {
+                  channel: t(`notify.channel.${channel}`),
+                  kind: t(`notify.kind.${kind}`),
+                })}
+                onChange={(isOn) => {
+                  void actions.setNotificationChannel(kind, channel, isOn);
+                }}
+              />
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/** What the picker offers: automatic, then a way through the server, then Off. */
+type PushOption = "auto" | PushMethod;
+
+/**
+The methods to pick from: what the server takes (asked again when Settings opens, and on every
+registration, so a change while open shows); before it ever answered (offline), the method in
+use and the one picked, so the current pick stays shown and selected.
+*/
+const offeredMethods = ({
+  choice,
+  method,
+  offered,
+}: Pick<PushState, "choice" | "method" | "offered">): readonly ("fcm" | "poll")[] =>
+  offered ?? (["fcm", "poll"] as const).filter((option) => option === choice || option === method);
+
+/** Reads the stored push state and asks the server's methods when Settings opens. */
+const useLoadPushState = (): void => {
+  const { api } = usePace();
+  useEffect(() => {
+    void (async () => {
+      await loadPushState();
+      await loadOfferedMethods(api);
+    })();
+  }, [api]);
+};
+
+/** What the phone uses now, and why when it is not what was picked. */
+const pushLine = (
+  {
+    choice,
+    isAllowed,
+    method,
+  }: {
+    readonly choice: null | PushMethod;
+    readonly isAllowed: boolean;
+    readonly method: PushMethod;
+  },
+  t: ReturnType<typeof useT>,
+): readonly string[] => {
+  if (!isAllowed) {
+    return [t("settings.push.denied")];
+  }
+  const fellBack =
+    choice !== null && choice !== method
+      ? [t("settings.push.unavailable", { method: t(`settings.push.option.${choice}`) })]
+      : [];
+  return [...fellBack, t(`settings.push.${method}`)];
+};
+
+/**
+On a phone: how system notifications reach it, picked from what the server takes now (Google's
+push, Pace's own check) or Off, or left automatic (the default, and a way back after a pick). It
+follows every change (`pushStore`): a pick, a start that registered again, the server's methods
+changing (the live notice registers again).
+*/
+export const PushStatus = () => {
+  const t = useT();
+  const { api } = usePace();
+  useLoadPushState();
+  const state = useStore(pushStore);
+  if (!IS_PHONE) {
+    return null;
+  }
+  const values: readonly PushOption[] = ["auto", ...offeredMethods(state), "none"];
+  const options = values.map((value) => ({ label: t(`settings.push.option.${value}`), value }));
+  const pick = (option: PushOption): void => {
+    void (async () => {
+      await setPushChoice(option === "auto" ? null : option);
+      try {
+        await registerPush(api);
+      } catch {
+        // Offline: the pick is kept and registered on the next start.
+      }
+    })();
+  };
+  return (
+    <View className="gap-2">
+      <Text className="font-sans text-[13px] text-muted">{t("settings.push.hint")}</Text>
+      <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
+      {state.isFcmOtherProject ? (
+        <Text className="font-sans text-[13px] text-muted">{t("settings.push.otherProject")}</Text>
+      ) : null}
+      {state.method === null
+        ? null
+        : pushLine({ ...state, method: state.method }, t).map((line) => (
+            <Text className="font-sans text-[13px] text-muted" key={line}>
+              {line}
+            </Text>
+          ))}
+    </View>
+  );
+};
 
 /** The daily digest times (`HH:MM` on the account's zone); every change is saved at once. */
 export const DigestWindows = () => {

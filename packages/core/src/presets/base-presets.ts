@@ -1,4 +1,4 @@
-import type { NotifyParams, Preset, PresetFields, ResolvedPreset } from "../model/preset.ts";
+import type { Preset, PresetFields, ResolvedPreset } from "../model/preset.ts";
 
 export const BASE_PRESET_IDS = ["hw", "work", "personal", "deferred", "inbox"] as const;
 
@@ -12,12 +12,6 @@ export const isBuiltInPreset = (id: string): id is BasePresetId =>
 
 /** Built-ins predate every event: a fixed `createdAt` keeps them first in any ordering. */
 const BUILT_IN_CREATED_AT = "1970-01-01T00:00:00.000Z";
-
-const DEFAULT_NOTIFY: NotifyParams = {
-  criticalHours: 24,
-  criticalProgress: 0.5,
-  inProgressIdleDays: 5,
-};
 
 const NO_FIELDS: PresetFields = {
   link: false,
@@ -46,7 +40,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     recurrence: null,
     fields: { ...NO_FIELDS, description: true },
     // Homework is short and dense: half a day of warning is what makes a difference.
-    notify: { ...DEFAULT_NOTIFY, criticalHours: 12 },
     defaultEstimateMinutes: 60,
     color: "yellow",
   }),
@@ -57,7 +50,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     progressMode: "slider",
     recurrence: null,
     fields: { ...NO_FIELDS, link: true, description: true, startAt: true },
-    notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 120,
     color: "violet",
   }),
@@ -68,7 +60,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     progressMode: "subtasks",
     recurrence: null,
     fields: NO_FIELDS,
-    notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 30,
     color: "orange",
   }),
@@ -79,7 +70,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     progressMode: "none",
     recurrence: null,
     fields: { ...NO_FIELDS, startAt: true },
-    notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 15,
     color: "slate",
   }),
@@ -90,7 +80,6 @@ export const BASE_PRESETS: Readonly<Record<BasePresetId, BasePreset>> = {
     progressMode: "none",
     recurrence: null,
     fields: NO_FIELDS,
-    notify: DEFAULT_NOTIFY,
     defaultEstimateMinutes: 15,
     color: "teal",
   }),

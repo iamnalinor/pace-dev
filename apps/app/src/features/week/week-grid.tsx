@@ -1,5 +1,4 @@
-import { type ReactNode, useRef } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import type { CalendarEvent, Language, UsageRow } from "@pace/core";
 
@@ -8,6 +7,7 @@ import { clockTime } from "#app/format/time.ts";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import {
+  gridFromHour,
   type Lane,
   lanesOf,
   placeIn,
@@ -17,10 +17,16 @@ import {
   type WeekModel,
 } from "@pace/client";
 
+import { SidewaysDays } from "./sideways-days.tsx";
+
 /** What a tap on the grid opens: a tracked block, or a calendar event. */
 export type Picked =
   | { readonly kind: "block"; readonly block: WeekBlock }
   | { readonly kind: "event"; readonly event: CalendarEvent };
+
+/** Which block or event a pick is, so the grid can mark it. */
+export const pickedKey = (picked: Picked): string =>
+  picked.kind === "event" ? `e-${picked.event.id}-${picked.event.startAt}` : `b-${picked.block.id}`;
 
 export type GridProps = {
   readonly week: WeekModel;
@@ -29,6 +35,8 @@ export type GridProps = {
   readonly hourPx: number;
   readonly language: Language;
   readonly onPick: (picked: Picked) => void;
+  /** The picked block or event (its `pickedKey`), marked; `null` for none. */
+  readonly selectedKey: null | string;
   /** Where the "now" line goes in today's column. */
   readonly now: string;
   /** A phone keeps each day readable at this width and scrolls the week sideways. */
@@ -41,7 +49,6 @@ export const dayLabel = (date: string, zone: string, language: Language): string
     new Date(date),
   );
 
-/** Text inside a box only when it has room for a line. */
 /** A block or an event is at least this tall: a two-minute one is still something to tap. */
 const MIN_TARGET_PX = 24;
 
@@ -108,75 +115,109 @@ const isPlaced = <T extends { readonly at: null | Placement }>(
   item: T,
 ): item is T & { readonly at: Placement } => item.at !== null;
 
-const keyOf = (item: Item): string =>
-  item.kind === "event" ? `e-${item.event.id}-${item.event.startAt}` : `b-${item.block.id}`;
+const pickOf = (item: Item): Picked =>
+  item.kind === "event"
+    ? { event: item.event, kind: "event" }
+    : { block: item.block, kind: "block" };
+
+/** How an item looks: events outlined, blocks filled; the picked one ringed in the quiet accent. */
+const itemLook = (
+  item: Item,
+  isSelected: boolean,
+): { readonly box: string; readonly text: string } => {
+  if (item.kind === "block") {
+    return {
+      box: cx(
+        PROJECT_FILL[item.block.color],
+        isSelected ? "border-2 border-accentQuietText" : "opacity-90",
+      ),
+      text: "font-medium text-onColor",
+    };
+  }
+  return isSelected
+    ? { box: "border-2 border-accentQuietText bg-accentQuiet", text: "text-accentQuietFg" }
+    : { box: "border border-dashed border-ink-slate", text: "text-fg2" };
+};
+
+/** One block or event on its column, in its lane; a tap picks it. */
+const ItemBox = ({
+  grid,
+  item,
+  lane,
+  onPick,
+  selectedKey,
+  zone,
+}: {
+  readonly item: Item;
+  readonly lane: Lane;
+  readonly grid: Grid;
+  readonly onPick: GridProps["onPick"];
+  readonly selectedKey: null | string;
+  readonly zone: string;
+}) => {
+  const t = useT();
+  const picked = pickOf(item);
+  const isSelected = pickedKey(picked) === selectedKey;
+  const look = itemLook(item, isSelected);
+  const stretch = item.kind === "event" ? item.event : item.block;
+  const label = item.kind === "event" ? item.event.title : item.block.label;
+  return (
+    <Pressable
+      accessibilityLabel={
+        item.kind === "event"
+          ? `${t("week.calendarEvent")}: ${label}`
+          : `${label}, ${clockTime(stretch.startAt, zone)}–${clockTime(stretch.endAt, zone)}`
+      }
+      accessibilityRole="button"
+      aria-current={isSelected ? "true" : undefined}
+      className={cx("absolute overflow-hidden rounded-md px-1", look.box)}
+      onPress={() => {
+        onPick(picked);
+      }}
+      style={{
+        ...laneStyle(lane),
+        height: Math.max(MIN_TARGET_PX, px(item.at.height, grid.hourPx)),
+        top: px(item.at.top, grid.hourPx),
+      }}
+    >
+      <Text className={cx("font-sans text-[10px]", look.text)} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
 
 /** The day's calendar events and blocks, overlapping ones side by side in lanes. */
 const DayItems = ({
   blocks,
   calendar,
-  grid,
-  onPick,
-  zone,
+  ...rest
 }: {
   readonly blocks: readonly WeekBlock[];
   readonly calendar: readonly CalendarEvent[];
   readonly grid: Grid;
   readonly onPick: GridProps["onPick"];
+  readonly selectedKey: null | string;
   readonly zone: string;
 }) => {
-  const t = useT();
   const items: Item[] = [
     ...calendar
-      .map((event) => ({ at: grid.place(event), event, kind: "event" as const }))
+      .map((event) => ({ at: rest.grid.place(event), event, kind: "event" as const }))
       .filter((item) => isPlaced(item)),
     // Placed again here: the grid may start earlier than the model did (an early event).
     ...blocks
-      .map((block) => ({ at: grid.place(block), block, kind: "block" as const }))
+      .map((block) => ({ at: rest.grid.place(block), block, kind: "block" as const }))
       .filter((item) => isPlaced(item)),
   ];
   const lanes = lanesOf(items.map((item) => (item.kind === "event" ? item.event : item.block)));
-  return items.map((item, index) => {
-    const height = px(item.at.height, grid.hourPx);
-    const isEvent = item.kind === "event";
-    const label = isEvent ? item.event.title : item.block.label;
-    const stretch = isEvent ? item.event : item.block;
-    return (
-      <Pressable
-        accessibilityLabel={
-          isEvent
-            ? `${t("week.calendarEvent")}: ${label}`
-            : `${label}, ${clockTime(stretch.startAt, zone)}–${clockTime(stretch.endAt, zone)}`
-        }
-        accessibilityRole="button"
-        className={cx(
-          "absolute overflow-hidden rounded-md px-1",
-          isEvent ? "border border-dashed border-ink-slate" : "opacity-90",
-          item.kind === "block" && PROJECT_FILL[item.block.color],
-        )}
-        key={keyOf(item)}
-        onPress={() => {
-          onPick(
-            item.kind === "event"
-              ? { event: item.event, kind: "event" }
-              : { block: item.block, kind: "block" },
-          );
-        }}
-        style={{
-          ...laneStyle(lanes[index] ?? { lane: 0, lanes: 1 }),
-          height: Math.max(MIN_TARGET_PX, height),
-          top: px(item.at.top, grid.hourPx),
-        }}
-      >
-        <Text
-          className={cx("font-sans text-[10px]", isEvent ? "text-fg2" : "font-medium text-onColor")}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </Pressable>
-    );
-  });
+  return items.map((item, index) => (
+    <ItemBox
+      key={pickedKey(pickOf(item))}
+      {...rest}
+      item={item}
+      lane={lanes[index] ?? { lane: 0, lanes: 1 }}
+    />
+  ));
 };
 
 /** One day: its date, the hour lines, and what the day held laid over them. */
@@ -188,6 +229,7 @@ const DayColumn = ({
   minColumnPx,
   now,
   onPick,
+  selectedKey,
   usage,
   week,
 }: GridProps & { readonly day: WeekDay }) => {
@@ -229,6 +271,7 @@ const DayColumn = ({
             calendar={calendar}
             grid={grid}
             onPick={onPick}
+            selectedKey={selectedKey}
             zone={week.zone}
           />
         </View>
@@ -237,29 +280,14 @@ const DayColumn = ({
   );
 };
 
-const hourIn = (at: string, zone: string): number =>
-  Number(
-    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: zone }).format(
-      new Date(at),
-    ),
-  );
-
-/** The grid's first hour: the model's, or earlier for the week's first calendar event. */
-export const gridFromHour = (week: WeekModel, calendar: readonly CalendarEvent[]): number =>
-  Math.min(
-    week.fromHour,
-    ...calendar
-      .filter((event) => event.startAt >= week.weekStart && event.startAt < week.weekEnd)
-      .map((event) => hourIn(event.startAt, week.zone)),
-  );
-
-/** The hour in the week's zone, for opening the grid there. */
-export const hourNow = (now: string, zone: string): number => hourIn(now, zone);
+/** The day names' row above the columns, and the room left under the grid. */
+export const LABELS_PX = 28;
+export const BOTTOM_PX = 24;
 
 /**
 Monday to Sunday side by side on one hour grid; it starts early enough for the first tracked
-block or calendar event of the week. On a phone the days keep a readable width and the week
-scrolls sideways.
+block or calendar event of the week (or at midnight with night hours). On a phone the days keep
+a readable width and the week scrolls sideways.
 */
 export const WeekGrid = (props: GridProps) => {
   const fromHour = gridFromHour(props.week, props.calendar);
@@ -268,7 +296,7 @@ export const WeekGrid = (props: GridProps) => {
     <DayColumn key={day.date} {...props} day={day} week={week} />
   ));
   return (
-    <View className="flex-1 flex-row px-3 pb-6">
+    <View className="flex-row px-3" style={{ paddingBottom: BOTTOM_PX }}>
       <HourGutter fromHour={fromHour} hourPx={props.hourPx} />
       {props.minColumnPx === 0 ? (
         days
@@ -278,33 +306,5 @@ export const WeekGrid = (props: GridProps) => {
         </SidewaysDays>
       )}
     </View>
-  );
-};
-
-/** The phone's days: scrolled sideways so that today (with the day before) is in sight. */
-const SidewaysDays = ({
-  children,
-  minColumnPx,
-  week,
-}: {
-  readonly children: ReactNode;
-  readonly minColumnPx: number;
-  readonly week: WeekModel;
-}) => {
-  const scrollerRef = useRef<ScrollView>(null);
-  const today = week.days.findIndex((day) => day.isToday);
-  return (
-    <ScrollView
-      contentContainerClassName="min-w-full flex-row"
-      horizontal
-      onContentSizeChange={() => {
-        if (today > 0) {
-          scrollerRef.current?.scrollTo({ animated: false, x: (today - 1) * minColumnPx });
-        }
-      }}
-      ref={scrollerRef}
-    >
-      {children}
-    </ScrollView>
   );
 };

@@ -1,26 +1,35 @@
 import {
-  dueOfInput,
-  type EventBody,
+  type BatchError,
+  type EventInput,
   type Language,
   newId,
-  openInstanceOf,
-  planParse,
-  type QueryContext,
-  quickInputBodies,
+  planProposals,
+  type Proposal,
+  type Result,
   t,
-  type VerifiedParse,
-  verifyParse,
 } from "@pace/core";
+
+import type { ParseProvider } from "../shared/llm/llm.ts";
 
 import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
-import { type ParseProvider, runParse } from "../shared/llm/llm.ts";
-import { buildParsePrompt } from "../shared/llm/prompt.ts";
-import { describePlan } from "./describe.ts";
-import { applyBodies, type BotReply, plain, timeOf, type Turn, zoneOf } from "./turn.ts";
+import { type ModelRead, readMessage } from "../shared/llm/read.ts";
+import { describeProposals } from "./describe.ts";
+import {
+  applyBodies,
+  applyInputs,
+  type BotReply,
+  plain,
+  timeOf,
+  type Turn,
+  zoneOf,
+} from "./turn.ts";
 
-/** A preview waiting for its button: the text and, when it was understood, what to write. */
-export type Pending = { readonly text: string; readonly bodies: null | readonly EventBody[] };
+/**
+A preview waiting for its button: the text and, when it was understood, its proposals. They are
+planned again on Accept, so the events are stamped then and checked against the state then.
+*/
+export type Pending = { readonly text: string; readonly proposals: null | readonly Proposal[] };
 
 /** Callback data of the preview buttons: `<action>:<preview id>`. */
 export const PREVIEW_ACTIONS = { accept: "a", cancel: "c", inbox: "i" } as const;
@@ -53,90 +62,97 @@ const unavailable = async (turn: Turn, text: string, retryAt: null | string): Pr
   );
 };
 
-type Reading = {
-  readonly text: string;
-  readonly verified: VerifiedParse;
-  readonly ctx: QueryContext;
-};
+/** The events of every proposal as the bot writes them now, the text as a task's source. */
+const planAll = (
+  turn: Turn,
+  { proposals, text }: { readonly text: string; readonly proposals: readonly Proposal[] },
+): Result<readonly EventInput[], BatchError> =>
+  planProposals(turn.state, proposals, {
+    deviceTz: zoneOf(turn.state),
+    newId: () => newId(),
+    now: turn.now,
+    source: "bot",
+    sourceText: text,
+  });
 
-/** A checked reading → the events it implies, kept until a button decides; the preview text. */
-const previewOf = async (turn: Turn, { ctx, text, verified }: Reading): Promise<BotReply> => {
+/** The proposals → the events they imply, kept until a button decides; the preview text. */
+const previewOf = async (turn: Turn, text: string, read: ModelRead): Promise<BotReply> => {
   const { now, state, store } = turn;
   const { language } = state.settings;
-  const plan = planParse(verified, text, { ctx, state });
+  const canAccept =
+    read.proposals.length > 0 && planAll(turn, { proposals: read.proposals, text }).ok;
   const id = newId();
-  if (!plan.ok) {
-    await store.remember(id, { bodies: null, text } satisfies Pending);
+  await store.remember(id, {
+    proposals: canAccept ? [...read.proposals] : null,
+    text,
+  } satisfies Pending);
+  if (!canAccept) {
     return { buttons: buttonsFor(id, language, false), text: t(language, "bot.notUnderstood") };
   }
-  const bodies =
-    plan.value.kind === "update"
-      ? plan.value.bodies
-      : quickInputBodies(plan.value.input, { now, state }, newId);
-  await store.remember(id, { bodies, text } satisfies Pending);
-  const instance =
-    plan.value.kind === "create"
-      ? openInstanceOf(state, plan.value.input.presetId, {
-          due: dueOfInput(plan.value.input),
-          now,
-        })
-      : undefined;
   return {
     buttons: buttonsFor(id, language, true),
-    text: describePlan(plan.value, {
-      doubtful: verified.doubtful,
-      instanceTitle: instance?.title ?? null,
+    text: describeProposals(read.proposals, {
       language,
-      questions: verified.result.questions.map((question) => question.question),
+      now,
+      questions: read.questions.map((question) => question.question),
       state,
     }),
   };
 };
 
-/** Free text → the LLM's reading, checked against the text, shown with Accept / To Inbox / Cancel. */
+/** Free text → the assistant's proposals, checked against the text, shown with Accept / To Inbox / Cancel. */
 export const preview = async (
   turn: Turn,
   providers: readonly ParseProvider[],
   text: string,
 ): Promise<BotReply> => {
   const { now, state } = turn;
-  const ctx = { deviceTz: zoneOf(state), now };
-  const prompt = buildParsePrompt(text, { ctx, language: state.settings.language, state });
-  const answer = await runParse(providers, prompt, {
+  const read = await readMessage(providers, text, {
     cooldowns: await turn.store.llmCooldowns(now),
+    domain: "task",
+    now,
+    state,
   });
-  await turn.store.noteLlmLimits(answer.ok ? answer.value.limited : answer.error.limited, now);
-  if (!answer.ok) {
-    return await unavailable(turn, text, answer.error.retryAt);
+  await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
+  if (!read.ok) {
+    return await unavailable(turn, text, read.error.retryAt);
   }
-  const projectNames = Object.values(state.projects.byId).map((project) => project.name);
-  const verified = verifyParse(answer.value.result, { projectNames, source: text });
-  const { doubtful, result } = verified;
+  const { output, proposals, provider, rejected } = read.value;
   await turn.store.logDecisions(
-    [
-      parseDecision(text, "bot", {
-        doubtful,
-        provider: answer.value.provider,
-        result,
-        status: "parsed",
-      }),
-    ],
+    [parseDecision(text, "bot", { output, proposals, provider, rejected, status: "parsed" })],
     now,
   );
-  return await previewOf(turn, { ctx, text, verified });
+  return await previewOf(turn, text, read.value);
+};
+
+/** Accept: the proposals planned now, over the state now, and written; `null` once done. */
+const accept = async (
+  turn: Turn,
+  pending: { readonly text: string; readonly proposals: readonly Proposal[] },
+): Promise<null | string> => {
+  const planned = planAll(turn, pending);
+  return planned.ok
+    ? await applyInputs(turn, planned.value)
+    : t(turn.state.settings.language, "bot.failed", { reason: planned.error.error });
 };
 
 /** A preview button: write what was understood, keep the text in the Inbox, or drop it. */
 export const choosePreview = async (turn: Turn, action: string, id: string): Promise<BotReply> => {
   const { language } = turn.state.settings;
-  const pending = (await turn.store.recall(id)) as Pending | undefined;
-  if (pending === undefined) {
+  const pending = (await turn.store.recall(id)) as Partial<Pending> | undefined;
+  // A preview kept before this shape (or none at all) cannot be written any more.
+  if (pending?.text === undefined || pending.proposals === undefined) {
     return plain(t(language, "bot.expired"));
   }
   if (action === PREVIEW_ACTIONS.cancel) {
     return plain(t(language, "bot.cancelled"));
   }
-  const accepted = action === PREVIEW_ACTIONS.accept ? pending.bodies : null;
-  const failure = await applyBodies(turn, accepted ?? [inboxBody(pending.text)]);
-  return plain(failure ?? t(language, accepted === null ? "bot.savedToInbox" : "bot.done"));
+  if (action !== PREVIEW_ACTIONS.accept || pending.proposals === null) {
+    const failure = await applyBodies(turn, [inboxBody(pending.text)]);
+    return plain(failure ?? t(language, "bot.savedToInbox"));
+  }
+  return plain(
+    (await accept(turn, { proposals: pending.proposals, text: pending.text })) ??
+      t(language, "bot.done"),
+  );
 };

@@ -20,7 +20,9 @@ against `wrangler dev`). Clients discover the rest: the first unauthenticated ca
 `401` whose `WWW-Authenticate` names the protected resource metadata
 (`/.well-known/oauth-protected-resource/mcp`), which names the authorization server
 (`/.well-known/oauth-authorization-server`), which names `/authorize`, `/oauth/token` and
-`/oauth/register`.
+`/oauth/register`. A token whose user no longer exists (a deleted account, a data reset that
+gave everyone new ids) gets the same `401` with `error="invalid_token"`, so the client
+connects again instead of reaching a store that belongs to nobody.
 
 | Client | How |
 |---|---|
@@ -95,7 +97,7 @@ shows.
 | `create_preset` | write | a user preset extending a built-in or another user preset, validated like the web editor (`preset/exists`, `preset/unknown-parent`, `preset/invalid-definition`, …) | `id`, `name`, `extends`, `definition` |
 | `update_preset` | write | a user preset's name, parent or definition (a definition replaces the stored one); built-ins are refused | `id`, `name?`, `extends?`, `definition?` |
 | `archive_preset` | write | archives a user preset; its tasks keep working (`preset/built-in` for built-ins) | `id` |
-| `list_activity_buttons` | time read | what the time bar's buttons start (Rest, Sport by length, Chores by name): each choice's id, its button, label in the account language, category and Expect minutes | — |
+| `list_activity_buttons` | time read | what the time bar's Chores and Rest start (Rest: a short break, rest, a walk, a workout, a nap, sleep; Calendar and Task start an event or a task, not a choice): each choice's id, its button, label in the account language, category and Expect minutes | — |
 | `get_day` | time read | one day in the account zone: blocks (label, category, start, end, minutes, task), gaps of 15 min or more, minutes per category, what is running, what ran alongside the main line | `date?` (YYYY-MM-DD, default today) |
 | `summary_time` | time read | minutes per category and per project (through the task) over a range, largest first | `from`, `to` |
 | `get_calendar` | time read | the calendar events the phone sends (own and accepted) overlapping a range | `from`, `to` |
@@ -104,9 +106,9 @@ shows.
 | `start_activity` | time write | starts an activity; the main one running ends at the same instant, unless `alongside` (then both run, each stopped on its own). A choice's defaults, or a label and category; `taskId` counts the time as work on the task. At twice its Expect the person is asked whether it still goes on | `buttonId?`, `label?`, `category?`, `taskId?`, `expectMinutes?`, `alongside?`, `at?` |
 | `stop_activity` | time write | stops the main activity, or the one `activityId` names (`activity/none-running` otherwise) | `activityId?`, `at?` |
 | `log_activity` | time write | records a past block; it wins over live time it overlaps (`activity/bad-range` when the end is not after the start) | `label`, `category`, `startAt`, `endAt`, `taskId?` |
-| `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `observations`) with their CREATE statements | — |
+| `describe_schema` | analytics | the tables `query_sql` can read (`events`, `tasks`, `subtasks`, `projects`, `presets`, `decisions`, `calendar_events`, `usage_sessions`) with their CREATE statements | — |
 | `query_sql` | analytics | one read-only SQLite `SELECT` (or `WITH … SELECT`), at most 500 rows, run in a transaction that always rolls back; a second statement, `PRAGMA`, `ATTACH` or any write is refused (`sql/forbidden`, `sql/not-select`) | `sql` |
-| `simulate` | analytics | replays the reminder rules over a past range (at most 31 days) from a fresh memory: every digest, critical alert, stuck report and "still doing this?" they would send (`simulate/range` for a bad range) | `from`, `to` |
+| `simulate` | analytics | replays the notification pool over a past range (at most 31 days) from a fresh memory: every deadline digest and "still doing X?" it would send (calendar events are not replayed) (`simulate/range` for a bad range) | `from`, `to` |
 | `export_all` | analytics | the event log as NDJSON (one event per line, corrections included), a page at a time | `since?`, `limit?` (default 1000, max 5000) |
 
 ### Writes: `at`, `precision`, `dryRun`

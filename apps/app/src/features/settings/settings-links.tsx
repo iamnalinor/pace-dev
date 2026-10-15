@@ -5,7 +5,6 @@ import { Pressable, Text, View } from "react-native";
 import type { MessageKey } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
-import { useIsWide } from "#app/ui/layout.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 type Entry = {
@@ -36,18 +35,14 @@ const LinkRow = ({ hintKey, titleKey, to }: Entry) => {
 };
 
 /**
-The settings that live on their own pages: presets, history (beside the sidebar it is there
-already), the notification log. The decisions to sort are on the Inbox.
+The settings that live on their own pages: presets. History is a row of More on a phone and of
+the sidebar beside it; the decisions to sort are on the Inbox; the assistant's log is on the
+notifications page.
 */
 export const SettingsLinks = () => {
-  const isWide = useIsWide();
   return (
     <View>
       <LinkRow hintKey="settings.presets.hint" titleKey="settings.presets" to="/presets" />
-      {isWide ? null : (
-        <LinkRow hintKey="settings.history.hint" titleKey="settings.history" to="/history" />
-      )}
-      <LinkRow hintKey="settings.decisions.hint" titleKey="settings.decisions" to="/decisions" />
     </View>
   );
 };

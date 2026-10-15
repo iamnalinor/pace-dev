@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isValidTimeZone } from "@pace/core";
-import { HW_DUE, MOSCOW, NOW, taskFixture } from "@pace/core/testing";
+import { MOSCOW, NOW, taskFixture } from "@pace/core/testing";
 
 import { type Clock, queryContext, quickTimes, systemClock } from "./clock.ts";
 
@@ -31,8 +31,16 @@ describe("quickTimes", () => {
     ]);
   });
 
-  it("adds the deadline when the task has one", () => {
-    expect(quickTimes(fakeClock, taskFixture()).at(-1)).toEqual({ at: HW_DUE, key: "at-deadline" });
+  it("adds the deadline once it has passed, never one still ahead", () => {
+    const passed = "2026-10-06T09:00:00.000Z";
+    expect(quickTimes(fakeClock, taskFixture({ dueAt: passed })).at(-1)).toEqual({
+      at: passed,
+      key: "at-deadline",
+    });
+    // The fixture is due tomorrow night: closing then would be refused as the future.
+    expect(quickTimes(fakeClock, taskFixture()).map((pill) => pill.key)).not.toContain(
+      "at-deadline",
+    );
     expect(quickTimes(fakeClock, taskFixture({ dueAt: null, dueTz: null }))).toHaveLength(3);
   });
 

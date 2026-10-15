@@ -104,6 +104,27 @@ describe("createLiveChannel", () => {
     expect(socket?.closed).toBe(true);
   });
 
+  it("hands every other message (the notification pool's) to onMessage, parsed", () => {
+    const sockets = fakeSockets();
+    const onChange = vi.fn();
+    const onMessage = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange,
+      onMessage,
+      token: () => "tok",
+    });
+    live.start();
+    const [socket] = sockets.made;
+    socket?.open();
+    socket?.receive(JSON.stringify({ id: "n-1", resolution: "attended", type: "dismiss" }));
+    expect(onMessage).toHaveBeenCalledWith({ id: "n-1", resolution: "attended", type: "dismiss" });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    live.stop();
+  });
+
   it("keeps the socket alive with pings and reconnects with a growing pause after a drop", () => {
     const sockets = fakeSockets();
     const live = createLiveChannel({

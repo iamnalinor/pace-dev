@@ -75,7 +75,6 @@ export const RunningRow = ({
 }) => {
   const t = useT();
   const { actions } = usePace();
-  const { palette } = useTheme();
   const run = useRunAction();
   const isLong = running.status === "long";
   const statusKey = PACE_STATUS_TEXT[running.status];
@@ -111,18 +110,68 @@ export const RunningRow = ({
           <Text className="font-sans text-[13px] text-fg">{t("time.stillYes")}</Text>
         </Pressable>
       ) : null}
+      <StopButton running={running} />
+    </View>
+  );
+};
+
+/** Stop for this one activity (the main one or one alongside), named after it. */
+const StopButton = ({ running }: { readonly running: RunningView }) => {
+  const t = useT();
+  const { actions } = usePace();
+  const { palette } = useTheme();
+  const run = useRunAction();
+  return (
+    <Pressable
+      accessibilityLabel={`${t("time.stop")}: ${running.label}`}
+      accessibilityRole="button"
+      className="h-11 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
+      hitSlop={6}
+      onPress={() => {
+        void run(actions.stopActivity({ activityId: running.activityId }));
+      }}
+    >
+      <Square color={palette.fg} size={14} />
+      <Text className="font-sans text-[13px] text-fg">{t("time.stop")}</Text>
+    </Pressable>
+  );
+};
+
+/**
+The compact line for a running activity away from the time bar (Now): the category's tag, the
+label when it says more than the tag, the time it has run, and Stop. The words lead to Day,
+where the bar is; Stop stays one tap away here.
+*/
+export const CompactRunningRow = ({
+  onOpen,
+  running,
+}: {
+  readonly running: RunningView;
+  readonly onOpen: () => void;
+}) => {
+  const t = useT();
+  const { language } = useViewer();
+  const category = t(`category.${running.category}`);
+  return (
+    <View className="min-h-12 flex-row items-center gap-2">
       <Pressable
-        accessibilityLabel={`${t("time.stop")}: ${running.label}`}
-        accessibilityRole="button"
-        className="h-11 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
-        hitSlop={6}
-        onPress={() => {
-          void run(actions.stopActivity({ activityId: running.activityId }));
-        }}
+        accessibilityHint={t("time.openDay")}
+        accessibilityRole="link"
+        className="min-h-11 flex-1 flex-row flex-wrap content-center items-center gap-2 active:opacity-70"
+        onPress={onOpen}
       >
-        <Square color={palette.fg} size={14} />
-        <Text className="font-sans text-[13px] text-fg">{t("time.stop")}</Text>
+        <PulseDot className={PROJECT_FILL[running.color]} />
+        <ColorTag color={running.color}>{category}</ColorTag>
+        {running.label === category ? null : (
+          <Text className="shrink font-sans text-[14px] font-medium text-fg" numberOfLines={1}>
+            {running.label}
+          </Text>
+        )}
+        <Text className="font-sans text-[13px] tabular-nums text-fg2">
+          {formatDuration(running.minutes, language)}
+        </Text>
       </Pressable>
+      <StopButton running={running} />
     </View>
   );
 };

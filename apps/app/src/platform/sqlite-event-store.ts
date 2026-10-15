@@ -20,6 +20,7 @@ const MIGRATIONS: readonly string[] = [
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 const CURSOR_KEY = "cursor";
+const STORE_ID_KEY = "storeId";
 
 const migrate = async (db: SQLiteDatabase): Promise<void> => {
   await db.execAsync("PRAGMA journal_mode = WAL");
@@ -84,9 +85,25 @@ const deletePending = async (db: SQLiteDatabase, ids: readonly string[]): Promis
   });
 };
 
+const readMeta = async (db: SQLiteDatabase, key: string): Promise<null | string> => {
+  const row = await db.getFirstAsync<{ readonly value: string }>(
+    "SELECT value FROM meta WHERE key = $key",
+    { $key: key },
+  );
+  return row?.value ?? null;
+};
+
+const writeMeta = async (db: SQLiteDatabase, key: string, value: string): Promise<void> => {
+  await db.runAsync(
+    "INSERT INTO meta (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    { $key: key, $value: value },
+  );
+};
+
 /**
 `EventStore` on expo-sqlite (`pace.db`, WAL). Events are stored as JSON next to their
-`occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor.
+`occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor
+and the store id.
 */
 export const createSqliteEventStore = (): EventStore => {
   let connection: Promise<SQLiteDatabase> | undefined;
@@ -105,14 +122,8 @@ export const createSqliteEventStore = (): EventStore => {
       const connection = await db();
       await connection.execAsync("DELETE FROM events; DELETE FROM pending; DELETE FROM meta;");
     },
-    getCursor: async () => {
-      const connection = await db();
-      const row = await connection.getFirstAsync<{ readonly value: string }>(
-        "SELECT value FROM meta WHERE key = $key",
-        { $key: CURSOR_KEY },
-      );
-      return row === null ? 0 : Number(row.value);
-    },
+    getCursor: async () => Number((await readMeta(await db(), CURSOR_KEY)) ?? 0),
+    getStoreId: async () => await readMeta(await db(), STORE_ID_KEY),
     listAll: async () => {
       const connection = await db();
       return parseRows(
@@ -133,11 +144,10 @@ export const createSqliteEventStore = (): EventStore => {
       }
     },
     setCursor: async (seq) => {
-      const connection = await db();
-      await connection.runAsync(
-        "INSERT INTO meta (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        { $key: CURSOR_KEY, $value: String(seq) },
-      );
+      await writeMeta(await db(), CURSOR_KEY, String(seq));
+    },
+    setStoreId: async (storeId) => {
+      await writeMeta(await db(), STORE_ID_KEY, storeId);
     },
   };
 };

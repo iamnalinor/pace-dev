@@ -43,6 +43,18 @@ export type ScreenedBatch = {
 Sorts a pushed batch into the events that may be stored and the ones refused (with why); the
 validator seam may be wider than the core schema, storage never is.
 */
+export type AppendOptions = {
+  readonly now: string;
+  /** Only for in-process callers (tests); RPC callers get the core event schema. */
+  readonly validateEvent?: EventValidator;
+};
+
+export type AppendResult = {
+  readonly accepted: readonly string[];
+  readonly rejected: ScreenedBatch["rejected"];
+  readonly seq: number;
+};
+
 export const screenBatch = (raw: readonly unknown[], options: NormalizeOptions): ScreenedBatch => {
   const results = raw.map((item) => {
     const normalized = normalizeEvent(item, options);

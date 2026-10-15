@@ -7,6 +7,7 @@ import { AppState, type AppStateStatus, Linking } from "react-native";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
+import { removeSeriesRule, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -43,6 +44,7 @@ const comeBack = async (): Promise<void> => {
 
 beforeEach(() => {
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  (SecureStore as unknown as FakeSecureStore).values.set("pace.session", "session-test");
   mockPhone.restricted = false;
   mockPhone.usage = false;
   notifications.state.granted = false;
@@ -80,6 +82,24 @@ describe("Settings → Permissions", () => {
     mockPhone.usage = true;
     await comeBack();
     expect(await within(usageCard).findByText("On")).toBeOnTheScreen();
+  });
+});
+
+describe("Settings → Permissions, the series answered for good", () => {
+  it("lists a rule remembered on Day while it is open, and forgets one (bug class 8)", async () => {
+    await renderScreen(<PermissionsScreen />, await createTestRuntime());
+    await screen.findByLabelText("Notifications");
+    expect(screen.queryByText("Standup")).toBeNull();
+    await act(async () => {
+      await setSeriesRule({ rule: "skip", series: "cal-1:Standup", title: "Standup" });
+    });
+    expect(await screen.findByText("Standup", { exact: false })).toBeOnTheScreen();
+    await act(async () => {
+      await removeSeriesRule("cal-1:Standup");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Standup", { exact: false })).toBeNull();
+    });
   });
 });
 

@@ -61,7 +61,15 @@ const wash = (color: string, background: string, alpha: number): string => {
 };
 
 describe("tokens", () => {
-  const TEXT: readonly PaletteName[] = ["fg", "fg2", "muted", "accentText", "warn", "question"];
+  const TEXT: readonly PaletteName[] = [
+    "fg",
+    "fg2",
+    "muted",
+    "accentText",
+    "accentQuietText",
+    "warn",
+    "question",
+  ];
   const BACKGROUNDS: readonly PaletteName[] = ["bg", "surface"];
 
   it.each(THEMES)("%s text colours reach 4.5:1 on bg and surface", (theme) => {
@@ -77,11 +85,12 @@ describe("tokens", () => {
   });
 
   it.each(THEMES)(
-    "%s outlines and the mark (ink-*, accentText) reach 3:1 on bg, surface and raised",
+    "%s outlines and the mark (ink-*, accentText, accentQuietText) reach 3:1 on bg, surface and raised",
     (theme) => {
       const palette = tokens[theme];
       const marks: readonly PaletteName[] = [
         "accentText",
+        "accentQuietText",
         "faint",
         ...COLORS.map((color) => inkOf(color)),
       ];
@@ -102,11 +111,27 @@ describe("tokens", () => {
     expect(contrastRatio(tokens[theme].accentFg, tokens[theme].accent)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each(THEMES)("%s accent is a calm indigo, never the old acid lime", (theme) => {
-    expect(tokens[theme].accent.toLowerCase()).not.toBe("#d4ff3a");
-    const accent = parseHex(tokens[theme].accent);
-    // Blue leads: an indigo, not a green or a yellow.
-    expect(accent !== null && accent.b > accent.g && accent.b > accent.r).toBe(true);
+  it.each(THEMES)("%s accentQuietFg reaches 4.5:1 on accentQuiet", (theme) => {
+    expect(
+      contrastRatio(tokens[theme].accentQuietFg, tokens[theme].accentQuiet),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(THEMES)(
+    "%s keeps two accents: a lime for important actions, an indigo for quiet states",
+    (theme) => {
+      const palette = tokens[theme];
+      const lime = parseHex(palette.accent);
+      const indigo = parseHex(palette.accentQuiet);
+      // Lime: green and red lead, blue trails. Indigo: blue leads.
+      expect(lime !== null && lime.g > lime.b && lime.r > lime.b).toBe(true);
+      expect(indigo !== null && indigo.b > indigo.g && indigo.b > indigo.r).toBe(true);
+    },
+  );
+
+  it("fills the dark theme's actions with the brand lime", () => {
+    expect(tokens.dark.accent).toBe("#d4ff3a");
+    expect(tokens.dark.accentText).toBe("#d4ff3a");
   });
 
   it.each(THEMES)(

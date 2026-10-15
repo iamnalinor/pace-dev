@@ -12,6 +12,26 @@ const jsonResponse = (status: number, body: unknown): Response =>
   });
 
 describe("createApiClient", () => {
+  it("checks the same current credential that the next request sends", async () => {
+    let token = "session-A";
+    const fetchMock = vi.fn(async () => jsonResponse(200, { status: "ok" }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      token: () => token,
+    });
+    expect(client.currentSessionToken()).toBe("session-A");
+    expect(client.isCurrentSession("session-A")).toBe(true);
+    token = "session-B";
+    expect(client.currentSessionToken()).toBe("session-B");
+    expect(client.isCurrentSession("session-A")).toBe(false);
+    await client.call(endpoints.health, {});
+    expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/health", {
+      headers: { Accept: "application/json", Authorization: "Bearer session-B" },
+      method: "GET",
+    });
+  });
+
   it("sends the bearer token and parses the declared output", async () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, { status: "ok" }));
     const client = createApiClient({

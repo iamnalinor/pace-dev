@@ -95,12 +95,14 @@ jobs:
         working-directory: apps/api
         run: if [ -n "$WEBHOOK_SECRET" ]; then printf '%s' "$WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
 
+      # Several keys may be given, separated by commas, newlines or spaces: every run of
+      # separators becomes one comma and the ends are trimmed. The Worker splits them again.
       - name: Secret GROQ_API_KEY
         working-directory: apps/api
         env:
           VALUE: ${{ secrets.GROQ_API_KEY }}
         run: |
-          VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+          VALUE="$(printf '%s' "$VALUE" | tr -s '[:space:],' ',' | sed 's/^,//; s/,$//')"
           if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GROQ_API_KEY; fi
 
       - name: Secret GEMINI_API_KEY
@@ -108,8 +110,26 @@ jobs:
         env:
           VALUE: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+          VALUE="$(printf '%s' "$VALUE" | tr -s '[:space:],' ',' | sed 's/^,//; s/,$//')"
           if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | bunx wrangler secret put GEMINI_API_KEY; fi
+
+      # The Firebase service account's JSON key: the Worker sends pushes through FCM with it.
+      # Without it push is off (the phones poll) and everything else works.
+      - name: Secret FIREBASE_SERVICE_ACCOUNT
+        working-directory: apps/api
+        env:
+          VALUE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$VALUE" ]; then
+            echo "No FIREBASE_SERVICE_ACCOUNT: push is off, phones poll"
+            exit 0
+          fi
+          # An unreadable key would leave push off without a word; fail here (never print it).
+          if ! printf '%s' "$VALUE" | jq -e '.project_id and .client_email and .private_key' >/dev/null 2>&1; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT is not a service account JSON key"
+            exit 1
+          fi
+          printf '%s' "$VALUE" | bunx wrangler secret put FIREBASE_SERVICE_ACCOUNT
 
       # BOT_INFO is the JSON of getMe, stored at deploy time so the bot never calls Telegram
       # on a cold start. Stored as a secret (same mechanism, not committed to wrangler.jsonc).

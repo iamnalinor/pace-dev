@@ -125,7 +125,31 @@ describe("reviewItems", () => {
     expect(action(item, "skip")).toEqual([
       input(NOW, { type: "task.closed", payload: { taskId: CALC_HW5_ID, outcome: "skipped" } }),
     ]);
-    expect(action(item, "keep-open")).toEqual([]);
+    const status = artboardState().tasks.byId[CALC_HW5_ID]?.status ?? "not_started";
+    expect(action(item, "keep-open")).toEqual([
+      input(NOW, { type: "task.status.set", payload: { status, taskId: CALC_HW5_ID } }),
+    ]);
+  });
+
+  it("takes the card away on Keep open: the task stays open, the deadline is answered (bug class 10)", () => {
+    // Keep open wrote nothing: the card stayed, a button that did nothing on every platform.
+    const item = itemFor(review(NOW), CALC_HW5_ID);
+    const kept = action(item, "keep-open").map((entry, index) => event(300 + index, entry));
+    expect(kept).toHaveLength(1);
+    const after = review(addMinutesIso(NOW, 1), kept);
+    expect(taskIds(after)).not.toContain(CALC_HW5_ID);
+    expect(artboardState(NOW, kept).tasks.byId[CALC_HW5_ID]?.closed).toBeNull();
+  });
+
+  it("asks 'submitted?' again a day after Keep open, not at once", () => {
+    const solvedWorld = allSolved();
+    const item = itemFor(review(TOMORROW, solvedWorld), HW_ID);
+    const kept = action(item, "keep-open").map((entry, index) => event(300 + index, entry));
+    const world = [...solvedWorld, ...kept];
+    const anHourOn = review(addMinutesIso(TOMORROW, 60), world);
+    const aDayOn = review(addMinutesIso(TOMORROW, DAY + 1), world);
+    expect(taskIds(anHourOn)).not.toContain(HW_ID);
+    expect(taskIds(aDayOn)).toContain(HW_ID);
   });
 
   it("drops the passed deadline once the task sees a later event", () => {

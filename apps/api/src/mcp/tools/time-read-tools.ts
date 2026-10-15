@@ -25,7 +25,7 @@ const ROW = z.record(z.string(), z.unknown());
 export const listActivityButtons = defineTool({
   annotations: READ,
   description:
-    "Lists what the time bar's four buttons start (From calendar aside): each choice's id, the button it sits under, its label in the account language, category and Expect minutes. Pass an id to start_activity to start that activity.",
+    "Lists what the time bar's Chores and Rest buttons start (Calendar and Task aside: they start an event or a task): each choice's id, the button it sits under, its label in the account language, category and Expect minutes. Pass an id to start_activity to start that activity.",
   handler: async (_args, ctx) =>
     await runRead(ctx, ({ state }) => {
       const { language } = state.settings;
@@ -35,7 +35,7 @@ export const listActivityButtons = defineTool({
           category: choice.category,
           expectMinutes: choice.expectMinutes,
           id: choice.id,
-          label: t(language, choice.labelKey ?? button.labelKey),
+          label: t(language, choice.labelKey),
         })),
       );
       return ok({

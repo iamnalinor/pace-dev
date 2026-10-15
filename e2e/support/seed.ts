@@ -16,7 +16,7 @@ const DAY = 24 * HOUR;
 const ZONE = "Europe/Moscow";
 
 /** A ULID whose time part is `at`, so the seeded ids sort like real ones. */
-const ulid = (at: number): string => {
+export const ulid = (at: number): string => {
   const time = Array.from({ length: 10 }, (_, index) =>
     CROCKFORD.charAt(Math.floor(at / 32 ** (9 - index)) % 32),
   ).join("");
@@ -57,8 +57,6 @@ const SEEDED_TYPES = [
   "activity.logged",
   "activity.adjusted",
   "activity.labelled",
-  "activity.button.set",
-  "activity.button.removed",
   "event.amended",
   "event.revoked",
 ] as const;
@@ -295,19 +293,25 @@ const events = (now: number, ids: LivedIn & { readonly workId: string }): readon
       },
       type: "activity.started",
     },
-    {
-      at: now - 3 * DAY,
-      payload: {
-        buttonId: "btn:seeded",
-        category: "rest",
-        color: "green",
-        label: "Отдых",
-        order: 9,
-      },
-      type: "activity.button.set",
-    },
-    { at: now - 3 * DAY + 1, payload: { buttonId: "btn:seeded" }, type: "activity.button.removed" },
   ];
+};
+
+/**
+`POST /api/sync/push` as a client sends it: a pull first confirms the store, and the push
+names it (the server refuses a push for any other store).
+*/
+export const pushAsClient = async (
+  token: string,
+  events: readonly unknown[],
+): Promise<Response> => {
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const pulled = await fetch(`${API_URL}/api/sync/pull?limit=1`, { headers });
+  const { storeId } = (await pulled.json()) as { readonly storeId: string };
+  return await fetch(`${API_URL}/api/sync/push`, {
+    body: JSON.stringify({ events, storeId }),
+    headers,
+    method: "POST",
+  });
 };
 
 /** Pushes the lived-in log for the account behind `token`; every event must be accepted. */
@@ -331,11 +335,7 @@ export const seedLivedIn = async (token: string): Promise<LivedIn> => {
     source: "web",
     type: event.type,
   }));
-  const response = await fetch(`${API_URL}/api/sync/push`, {
-    body: JSON.stringify({ events: envelopes }),
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    method: "POST",
-  });
+  const response = await pushAsClient(token, envelopes);
   expect(response.ok).toBe(true);
   const result = (await response.json()) as { rejected: readonly unknown[] };
   expect(result.rejected).toEqual([]);

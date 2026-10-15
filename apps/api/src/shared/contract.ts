@@ -1,9 +1,14 @@
 import type {
+  Answer,
   CalendarEvent,
   CoreState,
   EventInput,
-  NotifyMessage,
+  NewNotification,
+  NotificationKind,
+  PoolNotification,
   PresetDefinition,
+  RequestDomain,
+  Resolution,
   Result,
   RetroError,
   SyncEvent,
@@ -11,7 +16,7 @@ import type {
   UsageRow,
 } from "@pace/core";
 
-export type { Observation, SyncEvent } from "@pace/core";
+export type { SyncEvent } from "@pace/core";
 
 /**
 A JSON value as read back from storage. Deliberately not recursive: the Durable Object
@@ -36,7 +41,7 @@ export type RpcState = Omit<CoreState, "tasks"> & {
 /** Who is writing through `apply`: the envelope fields the store stamps on every input. */
 export type ApplyMeta = {
   /** `system`: what the server writes on the person's behalf (a text read later, as asked). */
-  readonly source: "bot" | "mcp" | "system";
+  readonly source: "app" | "bot" | "mcp" | "system" | "web";
   readonly deviceId: string;
   /** Server time as ISO: `recordedAt`, and the clock the retro rules check against. */
   readonly now: string;
@@ -97,7 +102,18 @@ export type UserStoreApi = {
   readonly querySql: (sql: string) => Promise<Result<SqlRows, SqlError>>;
   readonly describeSchema: () => Promise<readonly TableSchema[]>;
   readonly simulate: (args: SimulationArgs) => Promise<Simulation>;
+  /**
+  Adds a notification to the pool and delivers it to every channel its kind is on for (the
+  sessions feature calls it with a sign-in); a payload its kind's schema refuses is not added.
+  */
+  readonly notify: (
+    created: NewNotification,
+    now: string,
+  ) => Promise<Result<PoolNotification, NotifyError>>;
 };
+
+/** Why a notification was not added: its payload breaks its kind's contract. */
+export type NotifyError = { readonly code: "notification/invalid" };
 
 export type EventPage = {
   readonly events: readonly StoredEvent[];
@@ -126,7 +142,7 @@ export type SimulationArgs = {
 
 export type SimulatedMessage = {
   readonly at: string;
-  readonly kind: NotifyMessage["kind"];
+  readonly kind: NotificationKind;
   readonly taskId: null | string;
   readonly text: string;
 };
@@ -143,8 +159,12 @@ export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
   readonly recall: (key: string) => Promise<JsonValue | undefined>;
   /** Where notifications go: the user's chat with the bot. */
   readonly notifyTo: (chatId: string, now: string) => Promise<void>;
-  /** Silences a task's alerts until `until`. */
-  readonly snoozeTask: (taskId: string, until: string, now: string) => Promise<void>;
+  /** Answers a notification of the pool (a button in the chat). */
+  readonly resolveNotification: (
+    id: string,
+    resolution: Resolution,
+    meta: ResolveMeta,
+  ) => Promise<Result<PoolNotification, ResolveError>>;
   readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
   /** Providers known to be rate limited at `now` → when they are back. */
   readonly llmCooldowns: (now: string) => Promise<Readonly<Record<string, string>>>;
@@ -153,6 +173,8 @@ export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
   readonly enqueueParse: (
     item: {
       readonly channel: "api" | "bot";
+      /** The field it was typed into; a text kept before fields existed is a task's. */
+      readonly domain?: RequestDomain | undefined;
       readonly retryAt: null | string;
       readonly text: string;
     },
@@ -184,5 +206,26 @@ export type DecisionQuery = {
   readonly limit: number;
 };
 
-/** Callback data of the notification buttons, `<action>:<taskId>`: sent by the store, handled by the bot. */
-export const NOTIFY_ACTIONS = { cancel: "x", done: "d", snooze: "z" } as const;
+/**
+Where an answer to a notification came from. Telegram edits its own message; from anywhere else
+the Telegram copy is deleted.
+*/
+export type AnswerOrigin = "app" | "system" | "telegram" | "web";
+
+export type ResolveMeta = { readonly origin: AnswerOrigin; readonly now: string };
+
+export type ResolveErrorCode = "notification/mismatch" | "notification/not-found" | ApplyErrorCode;
+
+/** Why an answer was refused: no such notification, not an answer for its kind, or the write failed. */
+export type ResolveError = { readonly code: ResolveErrorCode };
+
+/**
+Callback data of a pool notification's buttons, `<code>:<notificationId>`: sent by the store,
+handled by the bot.
+*/
+export const POOL_ACTIONS = {
+  attended: "na",
+  skipped: "ns",
+  still: "nk",
+  stopped: "nx",
+} as const satisfies Record<Answer, string>;

@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { QuickTimeKey, TaskViewModel } from "@pace/client";
 
 import { fromWallClock, type WallClock, wallClock } from "#app/format/time.ts";
+import { taskInstantProblem } from "@pace/core";
 
 import { type CloseMode, initialMode } from "./close-model.ts";
 
@@ -20,6 +21,8 @@ export type CloseForm = {
   readonly setTyped: (typed: WallClock) => void;
   /** The chosen instant; `null` while the typed time is not a real one. */
   readonly at: null | string;
+  /** Why the write would refuse that instant (the rule it applies); `null` when it takes it. */
+  readonly problem: null | ReturnType<typeof taskInstantProblem>;
   readonly isExact: boolean;
   readonly setIsExact: (isExact: boolean) => void;
   readonly outcome: GiveUp;
@@ -31,7 +34,7 @@ export type CloseForm = {
 /** The close sheet's state: which time, how precise, and how the task ends. */
 export const useCloseForm = (
   view: TaskViewModel,
-  deviceTz: string,
+  { deviceTz, now }: { readonly deviceTz: string; readonly now: string },
   startMode?: CloseMode,
 ): CloseForm => {
   const [mode, setMode] = useState<CloseMode>(() => startMode ?? initialMode(view));
@@ -43,6 +46,7 @@ export const useCloseForm = (
   const pillAt = (key: TimeChoice): null | string =>
     view.quickTimes.find((quick) => quick.key === key)?.at ?? null;
   const at = choice === "custom" ? fromWallClock({ ...typed, tz: deviceTz }) : pillAt(choice);
+  const problem = at === null ? null : taskInstantProblem(view, at, now);
   const choose = (next: TimeChoice): void => {
     if (next === "custom" && choice !== "custom") {
       // The typed fields start from the time that was chosen, on this device's clock.
@@ -57,6 +61,7 @@ export const useCloseForm = (
     isExact,
     mode,
     outcome,
+    problem,
     reason,
     setIsExact,
     setMode,

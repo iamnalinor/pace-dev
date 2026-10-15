@@ -5,8 +5,11 @@ import type { OutgoingMessage } from "../shared/telegram-api.ts";
 
 import { clockIn } from "../shared/clock.ts";
 
-/** A reply with its inline keyboard. */
-export type BotReply = OutgoingMessage;
+/**
+A reply with its inline keyboard. `isRefused`: a button's answer that did not go through; the
+message it came from stays as it was, buttons and all, to be tapped again.
+*/
+export type BotReply = OutgoingMessage & { readonly isRefused?: true };
 
 /** One bot update being handled: the user's store, their state and the instant. */
 export type Turn = {
@@ -29,12 +32,12 @@ export const timeOf = (iso: string, state: CoreState): string =>
 const stampAll = (bodies: readonly EventBody[], now: string): readonly EventInput[] =>
   bodies.map((body) => ({ ...body, occurredAt: now, precision: "exact", source: "bot" }));
 
-/** Writes the events as the bot; `null` on success, otherwise the reason in the user's language. */
-export const applyBodies = async (
+/** Writes events as the bot; `null` on success, otherwise the reason in the user's language. */
+export const applyInputs = async (
   turn: Turn,
-  bodies: readonly EventBody[],
+  inputs: readonly EventInput[],
 ): Promise<null | string> => {
-  const result = await turn.store.apply(stampAll(bodies, turn.now), {
+  const result = await turn.store.apply(inputs, {
     deviceId: BOT_DEVICE,
     now: turn.now,
     source: "bot",
@@ -43,3 +46,9 @@ export const applyBodies = async (
     ? null
     : t(turn.state.settings.language, "bot.failed", { reason: result.error.code });
 };
+
+/** Writes the bodies as the bot, now. */
+export const applyBodies = async (
+  turn: Turn,
+  bodies: readonly EventBody[],
+): Promise<null | string> => await applyInputs(turn, stampAll(bodies, turn.now));

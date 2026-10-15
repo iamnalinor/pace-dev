@@ -1,4 +1,4 @@
-import type { Event, User } from "@pace/core";
+import type { Event, Me, User } from "@pace/core";
 
 /** One fake route: returns a JSON body (or a full `Response`) for `METHOD /path`. */
 export type FakeRoute = (request: { readonly body: unknown; readonly url: URL }) => unknown;
@@ -40,9 +40,12 @@ export const createFakeFetch = (routes: Readonly<Record<string, FakeRoute>>): Fa
   };
 };
 
+/** The id of the fake server's store (see `StoreIdSchema`). */
+export const FAKE_STORE_ID = "store-test";
+
 /** The sync routes of an empty server: nothing to pull, everything accepted. */
 export const emptySyncRoutes: Readonly<Record<string, FakeRoute>> = {
-  "GET /api/sync/pull": () => ({ events: [], more: false, seq: 0 }),
+  "GET /api/sync/pull": () => ({ events: [], more: false, seq: 0, storeId: FAKE_STORE_ID }),
   "POST /api/sync/push": ({ body }) => ({
     accepted: (body as { readonly events: readonly { readonly id: string }[] }).events.map(
       (event) => event.id,
@@ -74,9 +77,13 @@ export const settingsEvent = (
 });
 
 export const fakeUser: User = {
+  firstName: "Ann",
   id: "u1",
   name: "Ann",
   photoUrl: null,
   telegramId: "1",
   username: null,
 };
+
+/** What the fake `GET /api/me` answers: the user and their store's id. */
+export const fakeMe: Me = { ...fakeUser, storeId: FAKE_STORE_ID };

@@ -1,6 +1,7 @@
 import {
   accountTz,
   type ActivityCategory,
+  activityLabel,
   addDaysIn,
   addMinutesIso,
   CATEGORY_COLORS,
@@ -29,13 +30,37 @@ export type DayRow = {
   readonly isRunning: boolean;
   readonly isLogged: boolean;
   readonly taskId: null | string;
-  readonly taskTitle: null | string;
+  /**
+  Where the block's task opens: "Open task" when the label already is the task's title (Focus
+  names it so), else the task's title; `null` without a task, or with one removed since.
+  */
+  readonly taskLink: null | TaskLink;
   /** The activity's Expect, when it has one. */
   readonly expectMinutes: null | number;
   /** `false` when the label only repeats the category ("Food" in Food): the tag says it. */
   readonly showsLabel: boolean;
   /** Ran next to the main line: shown, not counted in the day's totals. */
   readonly isAlongside: boolean;
+};
+
+/** The link to a block's task: its words, a message to translate or the task's own title. */
+export type TaskLink = {
+  readonly id: string;
+  readonly text: { readonly key: "day.openTask" } | { readonly title: string };
+};
+
+/** The block's link to its task, worded so it never repeats the label above it. */
+const taskLinkOf = (
+  state: Pick<CoreState, "tasks">,
+  segment: { readonly label: string; readonly taskId: null | string },
+): null | TaskLink => {
+  const task = segment.taskId === null ? undefined : taskById(state.tasks, segment.taskId);
+  if (task === undefined) {
+    return null;
+  }
+  // The label is the title as an activity stores it: cut to its limit.
+  const isTitle = segment.label === activityLabel(task.title);
+  return { id: task.id, text: isTitle ? { key: "day.openTask" } : { title: task.title } };
 };
 
 /** A line of the day: an activity or a gap, with its list key and what tapping it opens. */
@@ -113,8 +138,7 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
       ...segment,
       color: CATEGORY_COLORS[segment.category],
       showsLabel: !isCategoryName(segment.label, segment.category),
-      taskTitle:
-        segment.taskId === null ? null : (taskById(state.tasks, segment.taskId)?.title ?? null),
+      taskLink: taskLinkOf(state, segment),
     },
   }));
   // A day with nothing on it is empty, not one gap from midnight to now.

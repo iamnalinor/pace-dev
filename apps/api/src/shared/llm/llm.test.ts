@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { artboardState, ctx } from "@pace/core/testing";
+import { type Event, MAX_CONTEXT_TASKS, proposalContext, type RequestDomain } from "@pace/core";
+import { artboardState, at, ctx } from "@pace/core/testing";
 
 import { echoParse, fakeParseModel } from "./fake-model.ts";
 import { availability, runParse } from "./llm.ts";
@@ -8,11 +9,47 @@ import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts
 import { parseProviders } from "./providers.ts";
 
 const NOW = Date.parse("2026-10-06T12:00:00.000Z");
-const prompt = buildParsePrompt("купить кабель", {
-  ctx: ctx(),
-  language: "en",
-  state: artboardState(),
-});
+
+const promptFor = (state = artboardState(), domain: RequestDomain = "task") =>
+  buildParsePrompt("купить кабель", {
+    context: proposalContext(state, ctx()),
+    ctx: ctx(),
+    domain,
+    language: "en",
+    state,
+  });
+
+const prompt = promptFor();
+
+/** The most a prompt lists: 40 open tasks and 40 activities, every title at its longest. */
+const crowded = (): ReturnType<typeof artboardState> => {
+  const long = "Подготовить отчёт по проекту с длинным названием и деталями внутри";
+  const events: Event[] = [];
+  for (let index = 0; index < MAX_CONTEXT_TASKS; index += 1) {
+    const occurredAt = new Date(NOW - (index + 1) * 60_000).toISOString();
+    events.push(
+      at(2000 + index, occurredAt, {
+        payload: {
+          fields: {},
+          presetId: "personal",
+          subtasks: [],
+          taskId: `t-many-${String(index)}`,
+          title: long,
+        },
+        type: "task.created",
+      }),
+      at(3000 + index, new Date(NOW - (index + 1) * 20 * 60_000).toISOString(), {
+        payload: {
+          activityId: `a-many-${String(index)}`,
+          category: "commute",
+          label: long.slice(0, 80),
+        },
+        type: "activity.started",
+      }),
+    );
+  }
+  return artboardState(new Date(NOW).toISOString(), events);
+};
 
 describe("buildParsePrompt", () => {
   it("lists categories, projects and open tasks within the token budget", () => {
@@ -21,6 +58,16 @@ describe("buildParsePrompt", () => {
     expect(prompt.system).toContain("Europe/Moscow");
     expect(prompt.prompt).toBe("купить кабель");
     expect(approxTokens(prompt.system + prompt.prompt)).toBeLessThan(PROMPT_TOKEN_BUDGET);
+  });
+
+  it("names tasks and activities by aliases only, and stays within the budget at its fullest", () => {
+    const full = promptFor(crowded(), "auto");
+    expect(full.system).toMatch(/^- t40: Подготовить/mu);
+    expect(full.system).toMatch(/^- a1: \d{4}-\d{2}-\d{2} \d{2}:\d{2}–\d{2}:\d{2} Подготовить/mu);
+    expect(full.system).not.toContain("t-many-");
+    expect(full.system).not.toContain("a-many-");
+    expect(full.system).toContain("Domain: decide.");
+    expect(approxTokens(full.system + full.prompt)).toBeLessThan(PROMPT_TOKEN_BUDGET);
   });
 
   it("describes a weekly course with its rhythm and its open weeks", () => {

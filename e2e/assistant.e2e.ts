@@ -8,21 +8,19 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   await page.goto("/");
   const line = page.getByRole("textbox", { name: "New task" });
   await line.pressSequentially("разобрать почту");
-  // Enter: the assistant reads it, and the card unfolds into the form in place.
+  // Enter: the assistant reads it into the form, which says so.
   await line.press("Enter");
-  await expect(page.getByText(/Read by the assistant\./u)).toBeVisible();
+  const form = page.getByRole("form", { name: "Suggested by the assistant" });
+  await expect(form).toBeVisible();
   await expectNoA11yViolations(page);
-  await page
-    .getByRole("form", { name: "Check before adding" })
-    .getByRole("button", { name: /^Create/u })
-    .click();
+  await form.getByRole("button", { name: /^Create/u }).click();
   await expect(line).toHaveValue("");
   await expect(
     page.getByRole("list", { name: "Tasks" }).getByText("разобрать почту"),
   ).toBeVisible();
 
   await page.goto("/decisions");
-  await expect(page.getByRole("heading", { name: "Notification log" })).toBeVisible();
-  await expect(page.getByText("parse.create_task")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Assistant log" })).toBeVisible();
+  await expect(page.getByText("parse.task.create")).toBeVisible();
   await expectNoA11yViolations(page);
 });

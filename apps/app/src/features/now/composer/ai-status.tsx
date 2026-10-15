@@ -15,7 +15,57 @@ type Props = {
   readonly onLater: () => void;
 };
 
-/** What the assistant made of the line: done (and what to check), its questions, or why not. */
+/**
+What the assistant asks of its reading: the fields to double-check and its questions (the
+form's title already says the assistant filled it in).
+*/
+const Reading = ({
+  onAnswer,
+  reading,
+}: {
+  readonly reading: Extract<AiState, { readonly status: "read" }>["reading"];
+  readonly onAnswer: (answer: string) => void;
+}) => {
+  const t = useT();
+  const { doubtful, questions } = reading;
+  if (doubtful.length === 0 && questions.length === 0) {
+    return null;
+  }
+  const fields = doubtful.map((field) => t(`parseField.${field}`)).join(", ");
+  return (
+    <View className="gap-2 px-1">
+      {doubtful.length > 0 ? (
+        <Text className="font-sans text-[12px] text-muted">
+          {t("composer.aiCheck", { fields })}
+        </Text>
+      ) : null}
+      {questions.map((question) => (
+        <View className="gap-1" key={question.question}>
+          <Text className="font-sans text-[13px] text-fg">{question.question}</Text>
+          <View
+            accessibilityLabel={t("composer.aiQuestion")}
+            className="flex-row flex-wrap gap-1.5"
+            role="group"
+          >
+            {question.options.map((option) => (
+              <Chip
+                key={option}
+                onPress={() => {
+                  onAnswer(option);
+                }}
+                selected={false}
+              >
+                {option}
+              </Chip>
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/** What the assistant made of the line: what to check, its questions, or why it could not. */
 export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
   const t = useT();
   const viewer = useViewer();
@@ -52,38 +102,7 @@ export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
       );
     }
     case "read": {
-      const { doubtful, questions } = state.reading;
-      const fields = doubtful.map((field) => t(`parseField.${field}`)).join(", ");
-      return (
-        <View className="gap-2 px-1 pt-2">
-          <Text className="font-sans text-[12px] text-muted">
-            {t("composer.aiRead")}
-            {doubtful.length > 0 ? ` ${t("composer.aiCheck", { fields })}` : ""}
-          </Text>
-          {questions.map((question) => (
-            <View className="gap-1" key={question.question}>
-              <Text className="font-sans text-[13px] text-fg">{question.question}</Text>
-              <View
-                accessibilityLabel={t("composer.aiQuestion")}
-                className="flex-row flex-wrap gap-1.5"
-                role="group"
-              >
-                {question.options.map((option) => (
-                  <Chip
-                    key={option}
-                    onPress={() => {
-                      onAnswer(option);
-                    }}
-                    selected={false}
-                  >
-                    {option}
-                  </Chip>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
-      );
+      return <Reading onAnswer={onAnswer} reading={state.reading} />;
     }
   }
 };

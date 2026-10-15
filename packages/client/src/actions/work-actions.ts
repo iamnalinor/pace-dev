@@ -23,7 +23,7 @@ import { type SubtaskForm, subtaskInputs } from "./task-actions.ts";
 
 export type SubmitInput = When & {
   readonly taskId: string;
-  /** Per-problem tasks: which problems to send; default = every solved, unsent one. */
+  /** Per-subtask tasks: which subtasks to send; default = every solved, unsent one. */
   readonly subtaskIds?: readonly string[] | undefined;
 };
 
@@ -35,12 +35,12 @@ export type CloseInput = When & {
 
 export type WorkActions = {
   readonly markSolved: (taskId: string, subtaskId: string, when?: When) => ActionResult;
-  /** Revokes the latest solve of the problem. */
+  /** Revokes the latest solve of the subtask. */
   readonly unmarkSolved: (taskId: string, subtaskId: string) => ActionResult;
   readonly addSubtasks: (taskId: string, items: readonly (string | SubtaskForm)[]) => ActionResult;
-  /** Takes an unsent problem off the task (History brings it back). */
+  /** Takes an unsent subtask off the task (History brings it back). */
   readonly removeSubtask: (taskId: string, subtaskId: string) => ActionResult;
-  /** Per problem: sends the given (or every solved) problem, closing with the last one; whole: closes as done. */
+  /** Per subtask: sends the given (or every solved) subtask, closing with the last one; whole: closes as done. */
   readonly submit: (input: SubmitInput) => ActionResult;
   readonly closeTask: (input: CloseInput) => ActionResult;
   readonly reopen: (taskId: string) => ActionResult;
@@ -75,7 +75,7 @@ const unmarkSolved =
       : fromStore(await deps.state.revoke(latest.id));
   };
 
-/** Which problems a submission sends and whether that is the last of them. */
+/** Which subtasks a submission sends and whether that is the last of them. */
 const submission = (
   deps: ActionDeps,
   input: SubmitInput,

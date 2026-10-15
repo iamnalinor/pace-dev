@@ -1,6 +1,14 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { endpoints, err, ok, type Result, type TelegramLogin, type User } from "@pace/core";
+import {
+  endpoints,
+  err,
+  ok,
+  type Result,
+  type TelegramLogin,
+  type User,
+  UserSchema,
+} from "@pace/core";
 
 import type { SessionStore } from "./session.ts";
 
@@ -177,7 +185,8 @@ export const createAuth = (options: {
 
   const me = async (): Promise<Result<User, string>> => {
     try {
-      const user = await api.call(endpoints.me, {});
+      // The answer carries the store id too; the sync confirms that on its own pulls.
+      const user = UserSchema.parse(await api.call(endpoints.me, {}));
       session.store.setState({ status: "signed-in", user });
       return ok(user);
     } catch (error) {

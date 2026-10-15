@@ -6,16 +6,18 @@ import { useCalendarPrompt } from "#app/shared/tracking/use-calendar-prompt.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { useToast } from "#app/ui/toast.tsx";
 
 /**
 A calendar event about to start (or going on) that nobody answered yet: Attend tracks it under
-its title from its start, Skip hides it on this phone.
+its title from its start, Skip waves it away on every channel (or says it did not go through).
 */
 export const CalendarPrompt = () => {
   const t = useT();
   const { actions } = usePace();
   const { deviceTz } = useViewer();
   const run = useRunAction();
+  const toast = useToast();
   const { event, skip } = useCalendarPrompt();
   if (event === null) {
     return null;
@@ -45,7 +47,11 @@ export const CalendarPrompt = () => {
         <View className="flex-1">
           <Button
             onPress={() => {
-              skip(event);
+              void (async () => {
+                if (!(await skip(event))) {
+                  toast.show({ message: t("notifications.failedAction") });
+                }
+              })();
             }}
             variant="secondary"
           >

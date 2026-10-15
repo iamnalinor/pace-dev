@@ -16,6 +16,7 @@ export type TelegramLoginPayload = {
 export type TelegramUser = {
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: string;
   readonly username: null | string;
   readonly photoUrl: null | string;
 };
@@ -65,6 +66,7 @@ export const verifyTelegramLogin = async (
   return ok({
     telegramId: String(payload.id),
     name,
+    firstName: payload.first_name,
     username: payload.username ?? null,
     photoUrl: payload.photo_url ?? null,
   });

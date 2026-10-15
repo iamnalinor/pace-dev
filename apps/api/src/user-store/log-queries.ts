@@ -1,10 +1,10 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { and, asc, eq, gt, max } from "drizzle-orm";
+import { asc, eq, gt, max } from "drizzle-orm";
 
 import { type Event, parseEvent } from "@pace/core";
 
-import type { EventPage, JsonValue, Observation, StoredEvent } from "../shared/contract.ts";
+import type { EventPage, JsonValue, StoredEvent } from "../shared/contract.ts";
 
 import * as schema from "./schema.ts";
 
@@ -24,20 +24,6 @@ export const toEvent = (row: typeof schema.events.$inferSelect): StoredEvent => 
 export const latestSeq = async (db: Db): Promise<number> => {
   const [row] = await db.select({ seq: max(schema.events.seq) }).from(schema.events);
   return row?.seq ?? 0;
-};
-
-export const hasObservation = async (db: Db, observation: Observation): Promise<boolean> => {
-  const [existing] = await db
-    .select({ seq: schema.observations.seq })
-    .from(schema.observations)
-    .where(
-      and(
-        eq(schema.observations.kind, observation.kind),
-        eq(schema.observations.key, observation.key),
-      ),
-    )
-    .limit(1);
-  return existing !== undefined;
 };
 
 /** Every event of the log as the core sees it; a row the schema no longer accepts is skipped. */
@@ -84,24 +70,6 @@ export const listPage = async (db: Db, since: number, limit: number): Promise<Ev
     more: rows.length > limit,
     seq: last === undefined ? since : last.seq,
   };
-};
-
-/** Append-only facts from the phone; a `kind+key` pair is stored once. Returns how many were new. */
-export const insertObservations = async (
-  db: Db,
-  observations: readonly Observation[],
-): Promise<number> => {
-  let inserted = 0;
-  for (const observation of observations) {
-    if (await hasObservation(db, observation)) {
-      continue;
-    }
-    await db
-      .insert(schema.observations)
-      .values({ ...observation, payload: JSON.stringify(observation.payload ?? null) });
-    inserted += 1;
-  }
-  return inserted;
 };
 
 /** Smoke check used by tests: how many events the log holds. */

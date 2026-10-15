@@ -1,10 +1,17 @@
 import { act, render, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import { createHash } from "node:crypto";
 import { AppState, Text } from "react-native";
 
-import { createMemoryEventStore, createMemorySessionStore } from "@pace/client";
-import { createFakeFetch, emptySyncRoutes, fakeUser } from "@pace/client/testing";
-import { addMinutesIso } from "@pace/core";
+import { createMemoryEventStore, createMemorySessionStore, type EventStore } from "@pace/client";
+import {
+  createFakeFetch,
+  emptySyncRoutes,
+  fakeMe,
+  type FakeRoute,
+  fakeUser,
+  problem,
+} from "@pace/client/testing";
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
@@ -22,25 +29,30 @@ const Probe = () => {
   );
 };
 
-const setup = async (): Promise<{
+const setup = async (
+  routes: Readonly<Record<string, FakeRoute>> = {},
+): Promise<{
   readonly api: ReturnType<typeof createFakeFetch>;
+  readonly eventStore: EventStore;
   readonly runtime: PaceRuntime;
 }> => {
   const api = createFakeFetch({
     ...emptySyncRoutes,
-    "GET /api/me": () => fakeUser,
+    "GET /api/me": () => fakeMe,
     "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
     "POST /api/auth/logout": () => ({ ok: true }),
+    ...routes,
   });
+  const eventStore = createMemoryEventStore();
   const runtime = await createRuntime({
     baseUrl: "https://api.test",
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    eventStore: createMemoryEventStore(),
+    eventStore,
     fetch: api.fetch,
     session: createMemorySessionStore(),
   });
   await runtime.state.ready;
-  return { api, runtime };
+  return { api, eventStore, runtime };
 };
 
 // eslint-disable-next-line @typescript-eslint/unbound-method -- inspecting the jest mock, never calling it
@@ -51,34 +63,127 @@ afterEach(() => {
 });
 
 type FakeNotifications = {
-  state: { granted: boolean; scheduled: { identifier: string }[] };
+  state: {
+    granted: boolean;
+    pushToken: null | string;
+    dismissed: string[];
+    scheduled: { readonly identifier: string }[];
+    responseListeners: ((response: {
+      readonly actionIdentifier: string;
+      readonly notification: { readonly request: { readonly content: object } };
+    }) => void)[];
+  };
 };
 
 const notifications = Notifications as unknown as FakeNotifications;
 
+/** A "still doing X?" in the pool, as the resolve endpoint answers it. */
+const overrunNotice = {
+  createdAt: "2026-10-07T08:00:00.000Z",
+  id: "n-9",
+  kind: "activity_overrun",
+  payload: {
+    activityId: "a-1",
+    askedAt: "2026-10-07T08:00:00.000Z",
+    expectMinutes: 30,
+    label: "Commute",
+    startAt: "2026-10-07T07:00:00.000Z",
+  },
+  readAt: null,
+  resolution: null,
+  resolvedAt: "2026-10-07T08:01:00.000Z",
+};
+
 describe("PaceProvider", () => {
-  it('schedules the next "still doing this?" once it was answered yes', async () => {
+  it("registers how the phone gets notifications once signed in, and fetches what waits", async () => {
     notifications.state.granted = true;
-    notifications.state.scheduled = [];
-    const { runtime } = await setup();
-    const now = runtime.clock.now();
-    await runtime.actions.startActivity(
-      { category: "rest", expectMinutes: 30, label: "Rest" },
-      { at: addMinutesIso(now, -70) },
-    );
+    notifications.state.pushToken = null;
+    const { api, runtime } = await setup({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "GET /api/push/methods": () => ({ pushMethods: ["fcm", "poll"] }),
+      "GET /api/push/poll": () => ({ cursor: 0, entries: [] }),
+      "PUT /api/push/subscription": () => ({ method: "poll" }),
+    });
     await render(
       <PaceProvider runtime={runtime}>
         <Probe />
       </PaceProvider>,
     );
-    const [running] = Object.values(runtime.state.store.getState().time.activities);
     await act(async () => {
-      await runtime.actions.stillGoing(running?.id ?? "");
+      await runtime.auth.loginWithDev("1");
+    });
+    // No Google token on this phone: it polls, and fetches what waits at once.
+    await waitFor(() => {
+      expect(api.pathsCalled("/api/push/poll")).toHaveLength(1);
+    });
+    expect(api.calls.find((call) => call.path === "/api/push/subscription")?.body).toEqual({
+      method: "poll",
+    });
+    expect(api.pathsCalled("/api/notifications")).not.toEqual([]);
+  });
+
+  it("takes a notification away only once its answer button's answer is saved", async () => {
+    notifications.state.granted = true;
+    notifications.state.pushToken = null;
+    notifications.state.dismissed = [];
+    notifications.state.scheduled = [];
+    const answers = { isUp: false };
+    const { runtime } = await setup({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "GET /api/push/methods": () => ({ pushMethods: ["poll"] }),
+      "GET /api/push/poll": () => ({ cursor: 0, entries: [] }),
+      "POST /api/notifications/n-9/resolve": () =>
+        answers.isUp
+          ? { notification: { ...overrunNotice, resolution: "still" } }
+          : Response.json({ code: "server/error", message: "Down" }, { status: 503 }),
+      "PUT /api/push/subscription": () => ({ method: "poll" }),
+    });
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
     });
     await waitFor(() => {
-      expect(notifications.state.scheduled.map((item) => item.identifier)).toEqual([
-        expect.stringContaining(`:long@`),
-      ]);
+      expect(notifications.state.responseListeners).not.toEqual([]);
+    });
+    const tap = () => {
+      for (const listener of notifications.state.responseListeners) {
+        listener({
+          actionIdentifier: "still",
+          notification: {
+            request: {
+              content: {
+                body: "Still doing Commute?",
+                categoryIdentifier: "activity_overrun",
+                data: {
+                  notificationId: "n-9",
+                  sessionHash: createHash("sha256").update("tok_dev").digest("hex"),
+                },
+                title: "Still going?",
+              },
+            },
+          },
+        });
+      }
+    };
+    await act(async () => {
+      tap();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(notifications.state.scheduled.map((item) => item.identifier)).toContain("n-9");
+    });
+    expect(notifications.state.dismissed).not.toContain("n-9");
+    answers.isUp = true;
+    await act(async () => {
+      tap();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(notifications.state.dismissed).toContain("n-9");
     });
   });
 
@@ -122,6 +227,7 @@ describe("PaceProvider", () => {
 
   it("follows the account language", async () => {
     const { runtime } = await setup();
+    await runtime.auth.loginWithDev("1");
     await render(
       <PaceProvider runtime={runtime}>
         <Probe />
@@ -135,6 +241,89 @@ describe("PaceProvider", () => {
       });
     });
     expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+  });
+
+  it("uses the browser language while signed out, then the account language after sign-in", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    try {
+      const { runtime } = await setup();
+      await render(
+        <PaceProvider runtime={runtime}>
+          <Probe />
+        </PaceProvider>,
+      );
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      await act(async () => {
+        await runtime.auth.loginWithDev("1");
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Now");
+    } finally {
+      locale.mockRestore();
+    }
+  });
+
+  it("keeps the guest language until the signed-in account has synced", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    const { promise: waiting, resolve: releasePull } = Promise.withResolvers<undefined>();
+    try {
+      const { runtime } = await setup({
+        "GET /api/sync/pull": async () => {
+          await waiting;
+          return { events: [], more: false, seq: 0, storeId: "store-test" };
+        },
+      });
+      await render(
+        <PaceProvider runtime={runtime}>
+          <Probe />
+        </PaceProvider>,
+      );
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      await act(async () => {
+        await runtime.auth.loginWithDev("1");
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      await act(async () => {
+        releasePull(undefined);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("title")).toHaveTextContent("Now");
+      });
+    } finally {
+      releasePull(undefined);
+      locale.mockRestore();
+    }
+  });
+
+  it("uses account language after a later successful sync when the first pull failed", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    let isOnline = false;
+    try {
+      const { runtime } = await setup({
+        "GET /api/sync/pull": () =>
+          isOnline
+            ? { events: [], more: false, seq: 0, storeId: "store-test" }
+            : problem(503, "offline"),
+      });
+      await render(
+        <PaceProvider runtime={runtime}>
+          <Probe />
+        </PaceProvider>,
+      );
+      await act(async () => {
+        await runtime.auth.loginWithDev("1");
+      });
+      await waitFor(() => {
+        expect(runtime.sync.status.getState().lastError).not.toBeNull();
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      isOnline = true;
+      await act(async () => {
+        await runtime.sync.syncNow();
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Now");
+    } finally {
+      locale.mockRestore();
+    }
   });
 
   it("syncs again when the app returns to the foreground", async () => {
@@ -183,6 +372,40 @@ describe("PaceProvider", () => {
       expect(screen.getByTestId("title")).toHaveTextContent("Now");
     });
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+  });
+
+  it("drops the local log, outbox, cursor and store id when a 401 signs the device out", async () => {
+    const { eventStore, runtime } = await setup({
+      "GET /api/me": () => problem(401, "auth/unauthorized"),
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    });
+    await act(async () => {
+      runtime.sync.stop();
+      await runtime.state.dispatch({
+        occurredAt: "2026-10-06T10:00:00.000Z",
+        payload: { language: "ru" },
+        type: "settings.updated",
+      });
+    });
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("title")).toHaveTextContent("Now");
+    });
+    await expect(eventStore.listAll()).resolves.toEqual([]);
+    await expect(eventStore.listPending()).resolves.toEqual([]);
+    await expect(eventStore.getCursor()).resolves.toBe(0);
+    await expect(eventStore.getStoreId()).resolves.toBeNull();
   });
 });
 

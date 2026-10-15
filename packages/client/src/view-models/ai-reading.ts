@@ -1,11 +1,4 @@
-import {
-  type CoreState,
-  type ParseField,
-  type ParseQuestion,
-  type ParseResponse,
-  parseToQuickInput,
-  type QueryContext,
-} from "@pace/core";
+import type { ParseField, ParseQuestion, ParseResponse, Proposal } from "@pace/core";
 
 import type { ComposerEdits } from "./composer.ts";
 
@@ -18,39 +11,41 @@ export type AiReading = {
   readonly doubtful: readonly ParseField[];
   readonly questions: readonly ParseQuestion[];
   readonly provider: string;
+  /** Everything it proposed, edits and deletes of existing tasks included. */
+  readonly proposals: readonly Proposal[];
+};
+
+const editsOf = (proposal: Extract<Proposal, { kind: "task.create" }>): ComposerEdits => {
+  const { task } = proposal;
+  return {
+    description: task.description ?? undefined,
+    due:
+      task.dueAt === null || task.dueTz === null ? undefined : { at: task.dueAt, tz: task.dueTz },
+    estimateMinutes: task.estimateMinutes ?? undefined,
+    importance: task.importance ?? undefined,
+    presetId: task.presetId,
+    projectId: task.projectId ?? undefined,
+    projectName: task.projectId === null ? (task.projectName ?? undefined) : undefined,
+    subtasks: task.subtasks,
+    title: task.title,
+  };
 };
 
 /**
-Turns `POST /api/parse`'s answer into composer edits: everything it found fills a chip, a
-field it left empty keeps the rules' reading (never cleared). The text stays as typed.
+Turns `POST /api/parse`'s answer into composer edits: the new task it proposes fills the chips
+(the server already let the rules fill what the model left empty). Without a new task the
+chips keep the rules' reading. The text stays as typed.
 */
-export const aiReading = (
-  text: string,
-  response: Parsed,
-  world: { readonly state: CoreState; readonly ctx: QueryContext },
-): AiReading => {
-  const { ctx, state } = world;
-  const input = parseToQuickInput(
-    { doubtful: response.doubtful, isClean: response.isClean, result: response.result },
-    text,
-    { ctx, state },
+export const aiReading = (response: Parsed): AiReading => {
+  const create = response.proposals.find(
+    (proposal): proposal is Extract<Proposal, { kind: "task.create" }> =>
+      proposal.kind === "task.create",
   );
-  const due =
-    input.dueAt === null || input.dueTz === null ? undefined : { at: input.dueAt, tz: input.dueTz };
   return {
-    doubtful: response.doubtful,
-    edits: {
-      description: input.description ?? undefined,
-      due,
-      estimateMinutes: input.estimateMinutes ?? undefined,
-      importance: input.isImportanceExplicit ? input.importance : undefined,
-      presetId: input.presetId,
-      projectId: input.projectId ?? undefined,
-      projectName: input.projectId === null ? (input.projectName ?? undefined) : undefined,
-      subtasks: input.subtasks,
-      title: input.title,
-    },
+    doubtful: create?.doubtful ?? [],
+    edits: create === undefined ? {} : editsOf(create),
+    proposals: response.proposals,
     provider: response.provider,
-    questions: response.result.questions,
+    questions: response.questions ?? [],
   };
 };

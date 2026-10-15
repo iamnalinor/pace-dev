@@ -90,3 +90,52 @@ test("/oauth/authorize exists as the API's redirect target", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Connecting an app" })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("not a valid connection request");
 });
+
+test("a desktop's sidebar keeps the owner's order, Week after Day", async ({ page }) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await loginViaApi(page);
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "Main" });
+  await expect(nav.getByRole("link")).toHaveText([
+    "Now",
+    "Day",
+    "Week",
+    "Inbox",
+    "Projects",
+    "Insights",
+    "History",
+    "Settings",
+  ]);
+  await nav.getByRole("link", { name: "Week" }).click();
+  await expect(page).toHaveURL(/\/week$/u);
+  await expect(page.getByRole("heading", { level: 1, name: "Week" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Week" })).toHaveAttribute("aria-current", "page");
+});
+
+test("a phone has Now, Day, Inbox and More; More leads to Week and the rest and back", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  await page.goto("/");
+  const tabs = page.getByRole("tablist", { name: "Main" }).getByRole("tab");
+  await expect(tabs).toHaveText(["Now", "Day", "Inbox", "More"]);
+  await tabs.getByText("More").click();
+  await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
+  for (const name of ["Week", "Projects", "Insights", "History", "Settings"]) {
+    await expect(page.getByRole("link", { name })).toBeVisible();
+  }
+  await expectNoA11yViolations(page);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();
+});
+
+test("a signed-out deep link to a signed-in screen lands on the login screen", async ({ page }) => {
+  for (const path of ["/settings", "/projects", "/insights", "/history", "/week"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login$/u);
+    await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+  }
+});

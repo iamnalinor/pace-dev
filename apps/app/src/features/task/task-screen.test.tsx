@@ -18,14 +18,14 @@ const hwScreen = async () => {
 };
 
 describe("TaskScreen — homework", () => {
-  it("shows the start, the due, the work left and the problems with their states", async () => {
+  it("shows the start, the due, the work left and the subtasks with their states", async () => {
     await hwScreen();
     expect(screen.getByRole("header", { name: "Algebra HW 6" })).toBeOnTheScreen();
     expect(screen.getByText("today 23:59")).toBeOnTheScreen();
     expect(screen.getByText("1h 43m")).toBeOnTheScreen();
     expect(screen.getByText(en("task.start"))).toBeOnTheScreen();
     expect(screen.queryByText(/of window gone/u)).toBeNull();
-    expect(screen.getByText(en("task.problemsSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
+    expect(screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }))).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Submit 3 and 4" })).toBeOnTheScreen();
@@ -48,11 +48,26 @@ describe("TaskScreen — homework", () => {
     });
   });
 
-  it("toggles a problem solved and back", async () => {
+  it("reads a button's choice that names the task as that button's, not as Focus", async () => {
+    const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+    // The assistant can start a choice on a task: a walk to think the homework over.
+    await runtime.actions.startActivity({
+      buttonId: "rest:walk",
+      category: "rest",
+      label: "Walk",
+      taskId: HW_ID,
+    });
+    await renderScreen(<TaskScreen id={HW_ID} />, runtime);
+    // The same answer as the time bar's Task button (off) and its picker (no check).
+    expect(screen.getByRole("button", { name: "Focus" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Focusing" })).toBeNull();
+  });
+
+  it("toggles a subtask solved and back", async () => {
     const runtime = await hwScreen();
-    const problem = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
-    expect(problem).not.toBeChecked();
-    await fireEvent.press(problem);
+    const subtask = screen.getByRole("checkbox", { name: "Kronecker–Capelli" });
+    expect(subtask).not.toBeChecked();
+    await fireEvent.press(subtask);
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeChecked();
     });
@@ -83,8 +98,21 @@ const trkScreen = async () => {
   return runtime;
 };
 
-describe("TaskScreen — editing problems", () => {
-  it("takes an unsent problem off in the editor; a sent one has no remove", async () => {
+describe("TaskScreen — editing subtasks", () => {
+  it("saves a subtask still being typed in the editor", async () => {
+    const runtime = await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("form.addSubtask") }));
+    await fireEvent.changeText(screen.getByPlaceholderText(en("form.addSubtask")), "Bonus");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(
+        runtime.state.store.getState().tasks.byId[HW_ID]?.subtasks.map((item) => item.label),
+      ).toContain("Bonus");
+    });
+  });
+
+  it("takes an unsent subtask off in the editor; a sent one has no remove", async () => {
     const runtime = await hwScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
     expect(
@@ -204,6 +232,10 @@ describe("TaskScreen — work", () => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed).toMatchObject({
         outcome: "done",
       });
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed).toBeNull();
     });
   });
 

@@ -5,7 +5,7 @@ import type { MetaPart } from "./now.ts";
 /** Meta parts whose text needs no zone or color: everything but the dates and the importance. */
 export type PlainMetaPart = Exclude<MetaPart, { readonly kind: "due" | "importance" | "starts" }>;
 
-/** "6d 12h left", "15h late", "2 problems left", "4/7 solved" … */
+/** "6d 12h left", "15h late", "2 subtasks left", "4/7 solved" … */
 export const plainMetaText = (part: PlainMetaPart, language: Language): string => {
   switch (part.kind) {
     case "age": {
@@ -24,12 +24,12 @@ export const plainMetaText = (part: PlainMetaPart, language: Language): string =
         span: formatLate(part.minutes, language, part.isSoft),
       });
     }
-    case "problems-left": {
+    case "subtasks-left": {
       return plural(language, part.count, {
-        few: t(language, "meta.problemsLeft.few"),
-        many: t(language, "meta.problemsLeft.many"),
-        one: t(language, "meta.problemsLeft.one"),
-        other: t(language, "meta.problemsLeft.other"),
+        few: t(language, "meta.subtasksLeft.few"),
+        many: t(language, "meta.subtasksLeft.many"),
+        one: t(language, "meta.subtasksLeft.one"),
+        other: t(language, "meta.subtasksLeft.other"),
       });
     }
     case "sent": {

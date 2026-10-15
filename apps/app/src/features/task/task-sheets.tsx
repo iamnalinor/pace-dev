@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import type { PaceRuntime } from "#app/runtime.ts";
 
 import { useAppState, usePace, useT } from "#app/app-state.tsx";
-import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
+import { SubtaskList, withDraft } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -66,9 +66,9 @@ type SaveInput = {
   readonly view: TaskViewModel;
   readonly before: TaskFormValues;
   readonly values: TaskFormValues;
-  /** Problems added in the sheet. */
+  /** Subtasks added in the sheet. */
   readonly added: readonly string[];
-  /** Problems taken off in the sheet. */
+  /** Subtasks taken off in the sheet. */
   readonly removed: readonly string[];
 };
 
@@ -104,7 +104,7 @@ const saveSteps = ({ actions, added, before, removed, values, view }: SaveInput)
 
 /**
 Everything about a task, editable in one place: title, category, importance, project, start,
-due (clearable), estimate (clearable), description, link, new problems and unsent ones taken
+due (clearable), estimate (clearable), description, link, new subtasks and unsent ones taken
 off. Only what changed is written.
 */
 export const EditTaskSheet = ({
@@ -123,9 +123,17 @@ export const EditTaskSheet = ({
   const before = useMemo(() => valuesOf(view, deviceTz), [view, deviceTz]);
   const [values, setValues] = useState(before);
   const [added, setAdded] = useState<readonly string[]>([]);
+  const [subtaskDraft, setSubtaskDraft] = useState("");
   const [removed, setRemoved] = useState<readonly string[]>([]);
   const save = async (): Promise<void> => {
-    const steps = saveSteps({ actions, added, before, removed, values, view });
+    const steps = saveSteps({
+      actions,
+      added: withDraft(added, subtaskDraft),
+      before,
+      removed,
+      values,
+      view,
+    });
     for (const step of steps) {
       // One after another: each write is validated against the state the previous one left.
       if (!(await run(step()))) {
@@ -158,15 +166,17 @@ export const EditTaskSheet = ({
         values={values}
       />
       <SubtaskList
+        draft={subtaskDraft}
         items={added}
-        kept={view.problems
-          .filter((problem) => !removed.includes(problem.id))
-          .map((problem) => ({
-            id: problem.id,
-            isSent: problem.submittedAt !== null,
-            label: problem.label,
+        kept={view.subtasks
+          .filter((subtask) => !removed.includes(subtask.id))
+          .map((subtask) => ({
+            id: subtask.id,
+            isSent: subtask.submittedAt !== null,
+            label: subtask.label,
           }))}
         onChange={setAdded}
+        onDraftChange={setSubtaskDraft}
         onRemoveKept={(id) => {
           setRemoved((current) => [...current, id]);
         }}

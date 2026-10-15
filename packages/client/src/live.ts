@@ -26,6 +26,8 @@ export type LiveChannelOptions = {
   readonly token: () => string | undefined;
   /** Something may have changed on the server: pull. Called on every (re)connect too. */
   readonly onChange: () => void;
+  /** Any other message the server sends (the notification pool's), parsed from JSON. */
+  readonly onMessage?: (message: unknown) => void;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
   readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
@@ -48,15 +50,15 @@ const globalSocket =
     ? undefined
     : (url: string, protocols: readonly string[]): SocketLike => new WebSocket(url, [...protocols]);
 
-const isChanged = (data: unknown): boolean => {
+/** A JSON message as an object; `null` for `pong` and anything else. */
+const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
   if (typeof data !== "string" || !data.startsWith("{")) {
-    return false;
+    return null;
   }
   try {
-    const parsed = JSON.parse(data) as { readonly type?: unknown };
-    return parsed.type === "changed";
+    return JSON.parse(data) as { readonly type?: unknown };
   } catch {
-    return false;
+    return null;
   }
 };
 
@@ -86,15 +88,26 @@ const createTimers = () => {
   };
 };
 
-/** Wires one socket: open, a `changed` message, close. */
+/** Wires one socket: open, a `changed` message, any other message, close. */
 const follow = (
   socket: SocketLike,
-  on: { readonly open: () => void; readonly changed: () => void; readonly close: () => void },
+  on: {
+    readonly open: () => void;
+    readonly changed: () => void;
+    readonly message: (message: unknown) => void;
+    readonly close: () => void;
+  },
 ): void => {
   socket.addEventListener("open", on.open);
   socket.addEventListener("message", ({ data }) => {
-    if (isChanged(data)) {
+    const message = parseMessage(data);
+    if (message === null) {
+      return;
+    }
+    if (message.type === "changed") {
       on.changed();
+    } else {
+      on.message(message);
     }
   });
   socket.addEventListener("close", on.close);
@@ -122,6 +135,9 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     current = socket;
     follow(socket, {
       changed: options.onChange,
+      message: (message) => {
+        options.onMessage?.(message);
+      },
       close: () => {
         if (current !== socket) {
           return;

@@ -103,6 +103,10 @@ describe("taskReducer: artboard scenarios", () => {
     expect(task === undefined ? -1 : progressOf(task, "slider")).toBeCloseTo(0.4, 10);
   });
 
+  it("remembers the event that created it, which a delete revokes", () => {
+    expect(hw([hwCreated(1)]).createdEventId).toBe(hwCreated(1).id);
+  });
+
   it("starts a fresh task not started, untouched and without optional data", () => {
     const task = hw([hwCreated()]);
     expect(task).toMatchObject({
@@ -195,10 +199,10 @@ describe("taskReducer: status", () => {
     expect(task.touched).toBe(true);
   });
 
-  it("treats setting the current status again as a no-op", () => {
-    const state = fold([hwCreated(1), status(2, T(10), "paused")]);
-    const again = status(3, T(11), "paused");
-    expect(taskReducer(state, again)).toBe(state);
+  it("keeps the status and its since when it is set again, and counts it as activity (Keep open)", () => {
+    const before = hw([hwCreated(1), status(2, T(10), "paused")]);
+    const again = hw([hwCreated(1), status(2, T(10), "paused"), status(3, T(11), "paused")]);
+    expect(again).toEqual({ ...before, lastEventAt: T(11) });
   });
 
   it("lets an explicit status win over the implicit in-progress", () => {

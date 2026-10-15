@@ -1,10 +1,7 @@
-import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { useToast } from "#app/ui/toast.tsx";
 
 import { calendarToday } from "./calendar-source.ts";
 import {
@@ -58,60 +55,23 @@ const UNAVAILABLE_KEY = {
 } as const;
 
 export type CalendarButton = {
-  /** Today's calendar for the picker, read first when it was not yet. */
-  readonly forPicker: () => Promise<CalendarToday>;
-  /** Why it cannot link anything now (the button is greyed), or undefined. */
-  readonly unavailable: string | undefined;
   /**
-  A tap: the one event near now starts; several open the picker; none (or no access) explains
-  in a toast what the button is and why not now.
+  Today's calendar for the picker. Read again while the button is greyed: access may have
+  been granted, or an event added, since the last read.
   */
-  readonly tap: (openPicker: () => Promise<void>) => Promise<void>;
+  readonly forPicker: () => Promise<CalendarToday>;
+  /** Why it cannot link anything now (the button is greyed, its tooltip says it), or undefined. */
+  readonly unavailable: string | undefined;
 };
 
-/** The Calendar button of the time bar: whether an event is near, and what a tap does. */
+/** The Calendar button of the time bar: whether an event is near, and today's calendar for its picker. */
 export const useCalendarButton = (): CalendarButton => {
   const t = useT();
-  const toast = useToast();
-  const router = useRouter();
-  const { actions } = usePace();
-  const run = useRunAction();
   const { now } = useViewer();
   const { refresh, today } = useCalendarToday();
   const shown: CalendarButtonState = calendarButtonState(today, now);
-  const why = shown.kind === "ready" ? undefined : t(UNAVAILABLE_KEY[shown.kind]);
-  const explain = (state: CalendarButtonState): void => {
-    if (state.kind === "ready") {
-      return;
-    }
-    toast.show({
-      ...(state.kind === "noAccess" && {
-        action: {
-          label: t("permissions.title"),
-          onPress: () => {
-            router.push("/permissions");
-          },
-        },
-      }),
-      message: `${t("time.calendar.what")} ${t(UNAVAILABLE_KEY[state.kind])}`,
-    });
-  };
   return {
-    forPicker: async () => today ?? (await refresh()),
-    tap: async (openPicker) => {
-      // Greyed: the calendar may have changed since it was read (access granted, an event added).
-      const state = shown.kind === "ready" ? shown : calendarButtonState(await refresh(), now);
-      if (state.kind !== "ready") {
-        explain(state);
-        return;
-      }
-      const [only, ...others] = state.events;
-      if (only !== undefined && others.length === 0) {
-        await run(actions.startCalendar(only));
-        return;
-      }
-      await openPicker();
-    },
-    unavailable: why,
+    forPicker: async () => (today !== null && shown.kind === "ready" ? today : await refresh()),
+    unavailable: shown.kind === "ready" ? undefined : t(UNAVAILABLE_KEY[shown.kind]),
   };
 };

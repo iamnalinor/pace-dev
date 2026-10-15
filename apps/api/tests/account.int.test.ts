@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { newId } from "@pace/core";
 
-import { call, json, loginAsDev, readJson } from "./helpers.ts";
+import { call, json, loginAsDev, pushEvents, readJson } from "./helpers.ts";
 import { mcpCall, obtainToken } from "./oauth-flow.ts";
 
 const taskCreated = () => ({
@@ -20,7 +20,7 @@ describe("DELETE /api/me", () => {
   it("removes the account: its events, sessions and user; the next login starts empty", async () => {
     const token = await loginAsDev("1002");
     const me = await json<{ id: string }>("/api/me", { token });
-    await json("/api/sync/push", { body: { events: [taskCreated()] }, token });
+    await pushEvents(token, [taskCreated()]);
     const other = await loginAsDev("1002");
 
     const response = await call("/api/me", { method: "DELETE", token });

@@ -1,5 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
+import { notifyOnboarded } from "./onboarding-store.ts";
+
 /** Bumped when the onboarding gains a step everyone should see once more. */
 const KEY = "pace.onboarding.v1";
 
@@ -14,4 +16,5 @@ export const isOnboarded = async (): Promise<boolean> => {
 
 export const markOnboarded = async (): Promise<void> => {
   await SecureStore.setItemAsync(KEY, "done");
+  notifyOnboarded();
 };

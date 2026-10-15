@@ -45,6 +45,11 @@ build history) is in [context/](context/README.md).
 - Code, comments and identifiers in English.
 - **Merge pull requests with squash only** (Dependabot's included), never a merge commit or a
   rebase merge.
+- **Every bug teaches a class**: when a bug is found (by the owner, QA, review or a failing run), write
+  down in [context/bug-lessons.md](context/bug-lessons.md) why the existing tests missed it and which
+  class of mistake it is; sweep the code for every other instance of that class and fix them in the
+  same change; add the guard that catches the class from now on (property test, shared helper, e2e
+  sweep, QA checklist line or lint rule). Write new code against the classes already listed there.
 - **Exploratory QA before every release and after UI changes**: launch a Sonnet agent that
   clicks through the web build in a browser and writes `context/qa-round-<n>.md`
   (procedure and prompt: [docs/qa.md](docs/qa.md)); in parallel, a code-review agent over

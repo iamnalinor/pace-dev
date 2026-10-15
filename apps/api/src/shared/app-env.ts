@@ -4,6 +4,7 @@ export type CurrentUser = {
   readonly id: string;
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: null | string;
   readonly username: null | string;
   readonly photoUrl: null | string;
 };
@@ -16,6 +17,8 @@ export type AppEnv = {
     config: Config;
     /** Set by the auth guard on endpoints declared `auth: true`. */
     user?: CurrentUser;
+    /** Set by the auth guard: the session the bearer belongs to. */
+    sessionId?: string;
     /** Set for a device token: the computer it belongs to, whatever its requests claim. */
     device?: undefined | { readonly id: string; readonly name: string };
   };

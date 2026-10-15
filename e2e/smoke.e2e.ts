@@ -15,10 +15,11 @@ test("a signed-in session lands on Now", async ({ page }) => {
   await expectNoA11yViolations(page);
 });
 
-test("New task puts the cursor in the composer", async ({ page }) => {
+test("New task opens the empty form with the cursor in its title", async ({ page }) => {
   await loginViaApi(page);
-  await page.goto("/");
-  await page.getByRole("button", { name: "New task" }).click();
-  await expect(page).toHaveURL(/\/add$/u);
-  await expect(page.getByRole("textbox", { name: "New task" })).toBeFocused();
+  await page.goto("/day");
+  await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
+  await expect(page).toHaveURL(/\/$/u);
+  const form = page.getByRole("form", { name: "New task" });
+  await expect(form.getByRole("textbox", { exact: true, name: "Title" })).toBeFocused();
 });

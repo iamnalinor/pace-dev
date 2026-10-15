@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { StoreIdSchema } from "./sync.ts";
+
 /** What the Telegram Login Widget hands the web app (field names are Telegram's). */
 export const TelegramLoginSchema = z.object({
   id: z.number().int(),
@@ -18,11 +20,18 @@ export const UserSchema = z.object({
   id: z.string(),
   telegramId: z.string(),
   name: z.string(),
+  /** Telegram's first name, shown as the owner's name; null until a login has carried one. */
+  firstName: z.string().nullable(),
   username: z.string().nullable(),
   photoUrl: z.string().nullable(),
 });
 
 export type User = z.output<typeof UserSchema>;
+
+/** `GET /api/me`: the person and the id of their store (see `StoreIdSchema`). */
+export const MeSchema = UserSchema.extend({ storeId: StoreIdSchema });
+
+export type Me = z.output<typeof MeSchema>;
 
 /** A fresh bearer session: the token is shown once, the client keeps it. */
 export const AuthSessionSchema = z.object({

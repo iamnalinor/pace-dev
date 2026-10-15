@@ -2,16 +2,15 @@ import type { UserFromGetMe } from "grammy/types";
 
 import { Bot, type Context } from "grammy";
 
-import type { TelegramTransport } from "../shared/telegram-api.ts";
-import type { Assistant, BotReply } from "./assistant.ts";
-
-import { NOTIFY_ACTIONS } from "../shared/contract.ts";
 import { readLoginPayload, returnUrl } from "../shared/login-link.ts";
+import { inlineKeyboardButton, type TelegramTransport } from "../shared/telegram-api.ts";
+import { answerOfCode, type Assistant, type BotReply } from "./assistant.ts";
 
 /** Who opened the bot, as the login flow needs them. */
 export type BotUser = {
   readonly telegramId: string;
   readonly name: string;
+  readonly firstName: string;
   readonly username: null | string;
 };
 
@@ -49,6 +48,7 @@ export const REPLIES = {
 const toBotUser = (from: NonNullable<Context["from"]>): BotUser => ({
   telegramId: String(from.id),
   name: [from.first_name, from.last_name].filter(Boolean).join(" "),
+  firstName: from.first_name,
   username: from.username ?? null,
 });
 
@@ -69,7 +69,7 @@ const replyOf = (
   reply: BotReply,
 ): [
   string,
-  { reply_markup?: { inline_keyboard: { text: string; callback_data: string }[][] } },
+  { reply_markup?: { inline_keyboard: ReturnType<typeof inlineKeyboardButton>[][] } },
 ] => [
   reply.text,
   reply.buttons.length === 0
@@ -77,7 +77,7 @@ const replyOf = (
     : {
         reply_markup: {
           inline_keyboard: reply.buttons.map((row) =>
-            row.map((button) => ({ callback_data: button.data, text: button.label })),
+            row.map((button) => inlineKeyboardButton(button)),
           ),
         },
       },
@@ -129,12 +129,15 @@ export const createBot = (deps: BotDeps): Bot => {
     bot.on("callback_query:data", async (ctx) => {
       const { data } = ctx.callbackQuery;
       const reply = await assistant.choose(String(ctx.from.id), data);
+      if (reply.isRefused === true) {
+        // Refused: the message keeps its buttons to try again; the reason shows as an alert.
+        await ctx.answerCallbackQuery({ show_alert: true, text: reply.text });
+        return;
+      }
       await ctx.answerCallbackQuery();
       // A notification keeps its text (the buttons go away); a preview is replaced by the result.
       const original = ctx.callbackQuery.message?.text;
-      const isNotification = Object.values(NOTIFY_ACTIONS).some((action) =>
-        data.startsWith(`${action}:`),
-      );
+      const isNotification = answerOfCode(data.slice(0, data.indexOf(":"))) !== undefined;
       await ctx.editMessageText(
         isNotification && original !== undefined ? `${original}\n\n${reply.text}` : reply.text,
       );

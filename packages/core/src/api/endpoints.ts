@@ -1,15 +1,16 @@
 import { z } from "zod";
 
 import { endpoint, type EndpointShape } from "./endpoint.ts";
+import { notificationEndpoints } from "./notification-endpoints.ts";
 import {
   AccountDeletedSchema,
   AuthSessionSchema,
   DevLoginSchema,
   LogoutSchema,
+  MeSchema,
   NonceCreatedSchema,
   NoncePollSchema,
   TelegramLoginSchema,
-  UserSchema,
 } from "./schemas/auth.ts";
 import {
   CalendarOutputSchema,
@@ -25,9 +26,9 @@ import {
 } from "./schemas/cloud.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import {
+  CalendarSkipSchema,
   DecisionsOutputSchema,
   DecisionsQuerySchema,
-  NotifyPlanOutputSchema,
 } from "./schemas/notify.ts";
 import {
   OAuthClientInfoQuerySchema,
@@ -38,16 +39,8 @@ import {
   OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
+import { LlmStatusSchema, ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
 import {
-  ActivityParseRequestSchema,
-  ActivityParseResponseSchema,
-  LlmStatusSchema,
-  ParseRequestSchema,
-  ParseResponseSchema,
-} from "./schemas/parse.ts";
-import {
-  SyncObservationsBodySchema,
-  SyncObservationsOutputSchema,
   SyncPullOutputSchema,
   SyncPullQuerySchema,
   SyncPushBodySchema,
@@ -65,7 +58,7 @@ export const endpoints = {
   me: endpoint({
     auth: true,
     method: "GET",
-    output: UserSchema,
+    output: MeSchema,
     path: "/api/me",
   }),
   /** Deletes the account: its event log, sessions, OAuth grants and the user itself. */
@@ -133,30 +126,18 @@ export const endpoints = {
       path: "/api/sync/pull",
       query: SyncPullQuerySchema,
     }),
-    observations: endpoint({
-      auth: true,
-      body: SyncObservationsBodySchema,
-      method: "POST",
-      output: SyncObservationsOutputSchema,
-      path: "/api/sync/observations",
-    }),
   },
   parse: {
-    /** Free text read by the LLM into a task, or changes to one; nothing is saved. */
+    /**
+    Free text read into proposals: new tasks and activities, edits and deletes of existing ones,
+    for the person to accept; nothing is saved.
+    */
     run: endpoint({
       auth: true,
       body: ParseRequestSchema,
       method: "POST",
       output: ParseResponseSchema,
       path: "/api/parse",
-    }),
-    /** A note of what the person is doing, read into a label, a category and a length. */
-    activity: endpoint({
-      auth: true,
-      body: ActivityParseRequestSchema,
-      method: "POST",
-      output: ActivityParseResponseSchema,
-      path: "/api/parse/activity",
     }),
     /** Whether a model can answer now (none configured counts as never). */
     status: endpoint({
@@ -166,15 +147,7 @@ export const endpoints = {
       path: "/api/llm/status",
     }),
   },
-  notify: {
-    /** The next day's local reminders for the phone: digest windows and deadline crossings. */
-    plan: endpoint({
-      auth: true,
-      method: "GET",
-      output: NotifyPlanOutputSchema,
-      path: "/api/notify/plan",
-    }),
-  },
+  notifications: notificationEndpoints,
   decisions: {
     /** The decision log (notifications sent or held back, and why), newest first. */
     list: endpoint({
@@ -254,6 +227,14 @@ export const endpoints = {
       output: CalendarOutputSchema,
       path: "/api/calendar",
       query: RangeQuerySchema,
+    }),
+    /** Skips one occurrence everywhere: never announced, an announcement out is resolved. */
+    skip: endpoint({
+      auth: true,
+      body: CalendarSkipSchema,
+      method: "POST",
+      output: DoneSchema,
+      path: "/api/calendar/skip",
     }),
     /** Forgets one phone's calendar copy (it turned sending off). */
     clear: endpoint({

@@ -69,14 +69,24 @@ describe("createSqliteEventStore", () => {
     await expect(store.getCursor()).resolves.toBe(42);
   });
 
-  it("clears events, the outbox and the cursor", async () => {
+  it("knows no store id at first and remembers the one it is given", async () => {
+    const store = createSqliteEventStore();
+    await expect(store.getStoreId()).resolves.toBeNull();
+    await store.setStoreId("store-a");
+    await store.setStoreId("store-b");
+    await expect(store.getStoreId()).resolves.toBe("store-b");
+  });
+
+  it("clears events, the outbox, the cursor and the store id", async () => {
     const store = createSqliteEventStore();
     await store.append([a]);
     await store.setCursor(7);
+    await store.setStoreId("store-a");
     await store.clear();
     await expect(store.listAll()).resolves.toEqual([]);
     await expect(store.listPending()).resolves.toEqual([]);
     await expect(store.getCursor()).resolves.toBe(0);
+    await expect(store.getStoreId()).resolves.toBeNull();
   });
 
   it("opens the database once for every operation", async () => {

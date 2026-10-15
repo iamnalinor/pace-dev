@@ -1,8 +1,10 @@
 import type { ExpoConfig } from "expo/config";
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 import { appVersion } from "./app-version.ts";
+import { firebaseProjectOf } from "./firebase-project.ts";
 
 // Expo types `process.env` loosely (EXPO_PUBLIC_* are injected at bundle time): narrow it here.
 const envString = (name: string): string | undefined => {
@@ -40,6 +42,22 @@ const { version, versionCode } = appVersion({
   releaseTag: envString("PACE_RELEASE_TAG") ?? envString("GITHUB_REF_NAME") ?? "",
 });
 
+/** The Firebase config file, when the build has one (see release.yml). */
+const GOOGLE_SERVICES_FILE = envString("GOOGLE_SERVICES_FILE");
+
+/** The Firebase project that file is for: the app compares it with the server's. */
+const firebaseProject = (() => {
+  if (GOOGLE_SERVICES_FILE === undefined) {
+    return null;
+  }
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- the build's own Firebase file, named by release.yml
+    return firebaseProjectOf(JSON.parse(readFileSync(GOOGLE_SERVICES_FILE, "utf8")) as unknown);
+  } catch {
+    return null;
+  }
+})();
+
 const config: ExpoConfig = {
   name: "Pace",
   slug: "pace",
@@ -56,6 +74,9 @@ const config: ExpoConfig = {
   ios: { bundleIdentifier: "dev.nalinor.pace" },
   android: {
     package: "dev.nalinor.pace",
+    // Firebase (push through FCM): the file release.yml writes from a secret; without it the
+    // build has no Google push and the phone polls instead.
+    ...(GOOGLE_SERVICES_FILE !== undefined && { googleServicesFile: GOOGLE_SERVICES_FILE }),
     versionCode,
     adaptiveIcon: {
       backgroundColor: "#0b0b0c",
@@ -120,7 +141,7 @@ const config: ExpoConfig = {
     ],
     [
       "expo-notifications",
-      { color: "#4263eb", defaultChannel: "default", icon: "./assets/notification-icon.png" },
+      { color: "#d4ff3a", defaultChannel: "default", icon: "./assets/notification-icon.png" },
     ],
     ["expo-share-intent", { androidIntentFilters: ["text/*"] }],
     "expo-sqlite",
@@ -158,6 +179,8 @@ const config: ExpoConfig = {
     botUsername: envString("EXPO_PUBLIC_TELEGRAM_BOT") ?? "PaceTaskTrackerBot",
     // A build made for e2e shows the dev login form (only the test Worker accepts it).
     isDevLogin: envString("EXPO_PUBLIC_DEV_LOGIN") === "1",
+    // FCM works only with a server sending with this same project (`src/platform/notifications.ts`).
+    firebaseProject,
   },
 };
 

@@ -55,8 +55,8 @@ export const CloseSheet = ({
   readonly view: TaskViewModel;
 }) => {
   const t = useT();
-  const { deviceTz } = useViewer();
-  const form = useCloseForm(view, deviceTz, startMode);
+  const { deviceTz, now } = useViewer();
+  const form = useCloseForm(view, { deviceTz, now }, startMode);
   const submitTitle = useSubmitTitle(view);
   const submit = useSubmitClose(view, form, onClose);
   const isSubmit = form.mode === "submit";
@@ -75,7 +75,11 @@ export const CloseSheet = ({
       closeLabel={t("common.close")}
       // In sight however short the window: the action stays under the scrolling body.
       footer={
-        <SheetActions isDisabled={form.at === null} onPrimary={submit} primaryLabel={primary} />
+        <SheetActions
+          isDisabled={form.at === null || form.problem !== null}
+          onPrimary={submit}
+          primaryLabel={primary}
+        />
       }
       onClose={onClose}
       subtitle={isSubmit ? t("close.subtitleSolved", { title: view.title }) : view.title}

@@ -87,6 +87,8 @@ export default defineConfig([
     "apps/app/android/",
     "apps/app/.expo/",
     "apps/app/expo-env.d.ts",
+    // Parallel agents' git worktrees: each is a whole checkout with its own config.
+    ".claude/worktrees/",
   ]),
 
   // ── Base: JS + TypeScript, type-aware ───────────────────────────────────────

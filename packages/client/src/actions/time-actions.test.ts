@@ -1,5 +1,7 @@
+import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
+import { activityLabel } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
 import { dayModel } from "../view-models/day.ts";
@@ -8,14 +10,42 @@ import { nowViewModel } from "../view-models/now.ts";
 import { timeBarModel } from "../view-models/time-bar.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
+/** `offset` seconds from the frozen now. */
+const seconds = (offset: number): string => new Date(Date.parse(NOW) + offset * 1000).toISOString();
+
 const later = (minutes: number): string =>
   new Date(Date.parse(NOW) + minutes * 60_000).toISOString();
 const ctx = (now: string) => ({ deviceTz: "Europe/Moscow", now });
 
+/**
+Attends an event `startSeconds` from now lasting `lengthSeconds`, with something running for
+`runningFor` seconds before (or nothing): whether it started, at now or before, unrefused.
+*/
+const isAttendedNow = async ([startSeconds, lengthSeconds, runningFor]: readonly [
+  number,
+  number,
+  null | number,
+]): Promise<boolean> => {
+  const world = await setupActions([]);
+  const now = Date.parse(NOW);
+  if (runningFor !== null) {
+    world.setNow(new Date(now - runningFor * 1000).toISOString());
+    unwrap(await world.actions.startTyped("Reading"));
+    world.setNow(NOW);
+  }
+  const startAt = new Date(now + startSeconds * 1000).toISOString();
+  const endAt = new Date(now + (startSeconds + lengthSeconds) * 1000).toISOString();
+  const result = await world.actions.startCalendar({ endAt, startAt, title: "Коллоквиум" });
+  const attended = Object.values(world.state.store.getState().time.activities).find(
+    (activity) => activity.label === "Коллоквиум",
+  );
+  return result.ok && attended !== undefined && Date.parse(attended.startAt) <= now;
+};
+
 describe("time actions", () => {
-  it("switches with one tap and stops with a second tap on the running choice", async () => {
+  it("switches with one pick; the running choice picked again keeps running (Stop stops it)", async () => {
     const world = await setupActions();
-    unwrap(await world.actions.startChoice("sport:60"));
+    unwrap(await world.actions.startChoice("rest:workout"));
     world.setNow(later(50));
     unwrap(await world.actions.startChoice("chores:eating"));
     const bar = timeBarModel(world.state.store.getState(), ctx(later(80)));
@@ -27,8 +57,13 @@ describe("time actions", () => {
     });
     expect(bar.buttons.find((button) => button.isRunning)?.id).toBe("chores");
 
+    world.setNow(later(85));
+    // Picked again: nothing new, the same block runs on.
+    expect(unwrap(await world.actions.startChoice("chores:eating"))).toEqual([]);
+    const again = timeBarModel(world.state.store.getState(), ctx(later(86)));
+    expect(again.running).toMatchObject({ label: "Eating", minutes: 36 });
     world.setNow(later(90));
-    unwrap(await world.actions.startChoice("chores:eating"));
+    unwrap(await world.actions.stopActivity());
     const after = world.state.store.getState();
     const at = ctx(later(95));
     expect(timeBarModel(after, at).running).toBeNull();
@@ -36,7 +71,7 @@ describe("time actions", () => {
     const rowOf = (entry: (typeof day.entries)[number]) =>
       entry.kind === "activity" ? [[entry.row.label, entry.row.minutes]] : [];
     expect(day.entries.flatMap((entry) => rowOf(entry))).toEqual([
-      ["Sport", 50],
+      ["Workout", 50],
       ["Eating", 40],
     ]);
   });
@@ -119,6 +154,20 @@ describe("time actions", () => {
     });
   });
 
+  it("logs a past block with a long title cut to the stored label length", async () => {
+    const world = await setupActions();
+    const title = `Seminar ${"x".repeat(100)}`;
+    const [event] = unwrap(
+      await world.actions.logPast({
+        category: "study",
+        endAt: later(-60),
+        label: title,
+        startAt: later(-120),
+      }),
+    );
+    expect(event?.type === "activity.logged" && event.payload.label).toBe(activityLabel(title));
+  });
+
   it("runs an activity alongside: the main one keeps going, each stops on its own", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startChoice("chores:commute"));
@@ -135,6 +184,19 @@ describe("time actions", () => {
     const after = timeBarModel(world.state.store.getState(), ctx(later(21)));
     expect(after.running).toMatchObject({ label: "Commute" });
     expect(after.alongside).toEqual([]);
+  });
+
+  it("focuses a task alongside what runs, from the Task picker's switch", async () => {
+    const world = await setupActions();
+    const taskId =
+      Object.values(world.state.store.getState().tasks.byId).find(
+        (task) => task.title === "Algebra HW 6",
+      )?.id ?? "";
+    unwrap(await world.actions.startChoice("chores:commute"));
+    unwrap(await world.actions.focusTask(taskId, { alongside: true }));
+    const bar = timeBarModel(world.state.store.getState(), ctx(later(1)));
+    expect(bar.running).toMatchObject({ label: "Commute" });
+    expect(bar.alongside).toEqual([expect.objectContaining({ label: "Algebra HW 6", taskId })]);
   });
 
   it("starts what was typed at once, a length in it as the Expect", async () => {
@@ -203,6 +265,105 @@ describe("time actions", () => {
     expect(open.map((activity) => activity.label)).toEqual(["Seminar"]);
   });
 
+  it.each([
+    ["10 minutes ago", -10 * 60_000],
+    ["1 second ago", -1000],
+    ["right now", 0],
+    ["in 1 second", 1000],
+    ["in 2 minutes", 2 * 60_000],
+    ["in 15 minutes", 15 * 60_000],
+  ])("attends an event starting %s: never before its start, never in the future", async (_, ms) => {
+    const world = await setupActions();
+    const startAt = new Date(Date.parse(NOW) + ms).toISOString();
+    const endAt = new Date(Date.parse(startAt) + 60 * 60_000).toISOString();
+    unwrap(await world.actions.startCalendar({ endAt, startAt, title: "Colloquium" }));
+    const running = timeBarModel(world.state.store.getState(), ctx(NOW)).running;
+    // Started: at the event's start once that has passed, else now.
+    expect(running).toMatchObject({ label: "Colloquium", startAt: ms < 0 ? startAt : NOW });
+    // Expected to last until the event's end, wherever it began.
+    const expected = Math.round((Date.parse(endAt) - Date.parse(running?.startAt ?? NOW)) / 60_000);
+    expect(running?.expectMinutes).toBe(expected);
+  });
+
+  it("attending the same event again keeps it running: a second tap does not start it over", async () => {
+    const world = await setupActions();
+    const event = { endAt: later(60), startAt: later(5), title: "Colloquium" };
+    unwrap(await world.actions.startCalendar(event));
+    const first = timeBarModel(world.state.store.getState(), ctx(NOW)).running?.activityId;
+    world.setNow(later(1));
+    unwrap(await world.actions.startCalendar(event));
+    const after = timeBarModel(world.state.store.getState(), ctx(later(1)));
+    expect(after.running).toMatchObject({ activityId: first, label: "Colloquium", startAt: NOW });
+    const named = Object.values(world.state.store.getState().time.activities).filter(
+      (activity) => activity.label === "Colloquium",
+    );
+    expect(named).toHaveLength(1);
+  });
+
+  it("a run of the same title left open since yesterday does not answer today's occurrence", async () => {
+    const world = await setupActions([]);
+    world.setNow(later(-24 * 60));
+    unwrap(
+      await world.actions.startCalendar({
+        endAt: later(-24 * 60 + 90),
+        startAt: later(-24 * 60),
+        title: "Colloquium",
+      }),
+    );
+    // Never stopped: still open a day later.
+    world.setNow(NOW);
+    unwrap(
+      await world.actions.startCalendar({
+        endAt: later(95),
+        startAt: later(5),
+        title: "Colloquium",
+      }),
+    );
+    const bar = timeBarModel(world.state.store.getState(), ctx(NOW));
+    expect(bar.running).toMatchObject({ label: "Colloquium", startAt: NOW });
+    const named = Object.values(world.state.store.getState().time.activities).filter(
+      (activity) => activity.label === "Colloquium",
+    );
+    expect(named).toHaveLength(2);
+  });
+
+  it("back-to-back events of one title get a run each", async () => {
+    const world = await setupActions([]);
+    world.setNow(later(-90));
+    unwrap(
+      await world.actions.startCalendar({ endAt: NOW, startAt: later(-90), title: "Lecture" }),
+    );
+    world.setNow(NOW);
+    unwrap(await world.actions.startCalendar({ endAt: later(90), startAt: NOW, title: "Lecture" }));
+    const runs = Object.values(world.state.store.getState().time.activities)
+      .filter((activity) => activity.label === "Lecture")
+      .map((activity) => activity.startAt)
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(runs).toEqual([later(-90), NOW]);
+  });
+
+  it("a title over 80 characters is still recognised as attended: a second tap keeps the run", async () => {
+    const world = await setupActions([]);
+    const event = { endAt: later(60), startAt: later(-5), title: `Lecture ${"x".repeat(100)}` };
+    unwrap(await world.actions.startCalendar(event));
+    world.setNow(later(1));
+    unwrap(await world.actions.startCalendar(event));
+    expect(Object.values(world.state.store.getState().time.activities)).toHaveLength(1);
+  });
+
+  it("never refuses an event as the future, whatever its offset from now and what runs", async () => {
+    // Instants as an Android phone hands them (UTC, ".SSSZ"), seconds around now on either side,
+    // with or without something running since before: the attend path must always answer ok.
+    const offsets = fc.tuple(
+      fc.integer({ max: 6 * 3600, min: -6 * 3600 }),
+      fc.integer({ max: 4 * 3600, min: 1 }),
+      fc.option(fc.integer({ max: 12 * 3600, min: 0 })),
+    );
+    await fc.assert(fc.asyncProperty(offsets, isAttendedNow), { numRuns: 150 });
+    // The owner's: on for 92 minutes, 93 to go, with something running for 47.
+    expect(await isAttendedNow([-92 * 60, 185 * 60, 47 * 60])).toBe(true);
+  });
+
   it("logs a calendar event already over as a closed block and leaves what runs alone", async () => {
     const world = await setupActions();
     unwrap(await world.actions.startChoice("rest"));
@@ -220,6 +381,80 @@ describe("time actions", () => {
       (activity) => activity.label === "Seminar",
     );
     expect(seminar).toMatchObject({ endAt: later(60), startAt: later(-30) });
+  });
+
+  it("logs any block that is over, to the second, and refuses only an end still ahead (bug class 9)", async () => {
+    // Offsets from now in seconds, a day either way: across midnight (Moscow's is 21:00 UTC,
+    // three hours after the frozen 12:00 UTC) and ±1 s around now.
+    const span = fc
+      .tuple(fc.integer({ max: 86_400, min: -86_400 }), fc.integer({ max: 86_400, min: 1 }))
+      .map(([start, length]) => [start, start + length] as const);
+    await fc.assert(
+      fc.asyncProperty(span, async ([start, end]) => {
+        const world = await setupActions([]);
+        const result = await world.actions.logPast({
+          category: "other",
+          endAt: seconds(end),
+          label: "Block",
+          startAt: seconds(start),
+        });
+        return result.ok === end <= 0 && (result.ok || result.error === "retro/future");
+      }),
+      { numRuns: 150 },
+    );
+    const world = await setupActions([]);
+    const block = { category: "other" as const, label: "Block", startAt: seconds(-60) };
+    expect((await world.actions.logPast({ ...block, endAt: seconds(0) })).ok).toBe(true);
+    expect(await world.actions.logPast({ ...block, endAt: seconds(1) })).toEqual({
+      error: "retro/future",
+      ok: false,
+    });
+  });
+
+  it("takes a deadline at any instant, past or ahead (bug class 9)", async () => {
+    const due = fc.integer({ max: 86_400, min: -86_400 });
+    await fc.assert(
+      fc.asyncProperty(due, async (offset) => {
+        const world = await setupActions([]);
+        const dueAt = new Date(Date.parse(NOW) + offset * 1000).toISOString();
+        return (
+          await world.actions.createTask({
+            dueAt,
+            dueTz: "Europe/Moscow",
+            presetId: "personal",
+            title: "Due",
+          })
+        ).ok;
+      }),
+      { numRuns: 60 },
+    );
+    // Due a second ago: overdue, still a deadline.
+    const world = await setupActions([]);
+    const dueAt = new Date(Date.parse(NOW) - 1000).toISOString();
+    const made = await world.actions.createTask({
+      dueAt,
+      dueTz: "Europe/Moscow",
+      presetId: "personal",
+      title: "Late",
+    });
+    expect(made.ok).toBe(true);
+  });
+
+  it("starts whatever the time bar's field lets ▶ start: any text that is not blank", async () => {
+    // Bug class 1: ▶ is enabled for `text.trim() !== ""`; the action must take every such text.
+    const typed = fc
+      .string({ maxLength: 200, unit: "grapheme" })
+      .filter((text) => text.trim() !== "");
+    await fc.assert(
+      fc.asyncProperty(typed, async (text) => {
+        const world = await setupActions([]);
+        return (await world.actions.startTyped(text)).ok;
+      }),
+      { numRuns: 100 },
+    );
+    // Spaces round a word, as a field hands them.
+    const world = await setupActions([]);
+    expect((await world.actions.startTyped("  reading ")).ok).toBe(true);
   });
 
   it("keeps a typed activity within the limits: 80 characters, a day at most", async () => {
