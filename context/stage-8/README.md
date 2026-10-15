@@ -20,16 +20,17 @@ override the plan and the briefs where they differ.
 
 - `claude/new-session-sy3n4a` (see `git log`): everything for PR 1 is merged and reviewed —
   Tasks 0–7, 11, 15, 16, 3d and the notification pool (8 + 8b) — except Tasks 18 and 17.
-- Task 18 (bug-class sweep) is on `claude/new-session-sy3n4a-sweep-wip` (pushed from the worktree branch). Done:
-  the review leftovers of the pool and the time bar, FCM only between the same Firebase project (server names its
-  project, the app compares, mismatch → poll for good), classes 1–10 and 13 swept with guards. Remaining: classes
-  11, 12, 14, 15 (check other code for instances; guards exist), the Log's "Swept?" column in
-  `context/bug-lessons.md`, a full `bun lint` / unit / api / app run, then a task review of the sweep.
+- Task 18 (bug-class sweep) is on `claude/new-session-sy3n4a-sweep-wip` (`a89f8ae`, based on `d3d1f8d`). All 16
+  classes swept with verdicts and guards (class 16 is new: two sides check they have FCM, nobody checks it is the same
+  project); the review leftovers and the FCM project match are in. Remaining: a full `bun test:unit`, `bun test:api`,
+  `bun test:app` run after commits `2d72486..a89f8ae`, the task review, the merge. Follow-ups it listed: a tolerant
+  proposal list in the parse answer, the remaining bare `json<>` reads in API tests, the press-every-control test on
+  the other screens. "Add a computer does nothing on phones" no longer reproduces (root cause needs a device).
 - The owner asked to stop after the sweep; PR 2 waits (owner: finish PR 1 first, one agent at a time, PR 3 later).
 
 ## To resume
 
-1. Finish Task 18 on its branch (above), review it, merge into `claude/new-session-sy3n4a`.
+1. Run the full suites on the sweep branch (above), review it, merge into `claude/new-session-sy3n4a`.
 2. Task 17 (docs).
 3. QA round (`docs/qa.md`) and a whole-branch code review; fix until only cosmetic findings remain.
 4. Open PR 1, CI green, squash-merge, release `v0.10.0` (dispatch `release.yml` with the tag), check the release

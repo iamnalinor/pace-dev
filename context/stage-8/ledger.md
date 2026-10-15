@@ -157,3 +157,4 @@ Owner: FCM available on both sides ≠ usable — different Firebase projects (k
 Task 18: rate limit stop; progress d89305f..f4cfa1c (carried items, FCM project match, classes 1-4, 8, 13); resumed 04:46
 Owner: finish PR1 and STOP (PR2 not now)
 Owner: stop after the bug-class sweep (Task 18): integrate it, push, update context/stage-8 handoff, stop
+Task 18: stopped by owner at a89f8ae (all classes swept; full suites + review pending); pushed as claude/new-session-sy3n4a-sweep-wip. STOP.
