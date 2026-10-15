@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { addTask } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
+import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
 
 const SIZES = [
@@ -215,9 +216,7 @@ for (const width of [1440, 1920]) {
 }
 
 for (const size of SIZES) {
-  test(`a toast floats above the time bar, not over its buttons (${size.name})`, async ({
-    page,
-  }) => {
+  test(`a toast covers none of the time bar's buttons (${size.name})`, async ({ page }) => {
     await loginViaApi(page);
     await page.setViewportSize({ height: size.height, width: size.width });
     await page.goto("/");
@@ -234,14 +233,8 @@ for (const size of SIZES) {
     const bar = timeBar(page);
     await expect(bar).toBeVisible();
     await expect(toast).toBeVisible();
-    await page.waitForFunction(() =>
-      document.getAnimations().every((animation) => animation.playState !== "running"),
-    );
-    const toastBox = await toast.boundingBox();
-    const barBox = await bar.boundingBox();
-    expect(toastBox).not.toBeNull();
-    expect(barBox).not.toBeNull();
-    expect((toastBox?.y ?? 0) + (toastBox?.height ?? 0)).toBeLessThanOrEqual(barBox?.y ?? 0);
+    // Above the bar on a phone, at the sidebar's foot on a computer: over none of its buttons.
+    expect(await controlsUnder(page, '[role="alert"]')).toEqual([]);
   });
 }
 

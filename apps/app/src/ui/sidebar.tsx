@@ -25,6 +25,7 @@ import { cx } from "./cx.ts";
 import { HOTKEYS } from "./hotkeys.ts";
 import { PaceMark } from "./logo.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { useDockToastsHere } from "./toast.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
 const STROKE = 1.75;
@@ -144,6 +145,7 @@ export const Sidebar = () => {
   const { palette } = useTheme();
   const owner = useOwnerName();
   const waiting = useWaitingCount();
+  useDockToastsHere();
   // The empty form opens on Now (in its right pane): asked for, and Now brought to the front.
   const newTask = (): void => {
     requestNewTask();

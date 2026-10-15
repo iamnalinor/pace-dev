@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
 
 export type ToastInput = {
@@ -31,6 +32,24 @@ beside it both have one.
 type SetFooter = (screenId: string, height: null | number) => void;
 
 const FooterHeightContext = createContext<SetFooter>(() => undefined);
+
+/** The sidebar says it is there (`true`) or gone: a wide window's toast docks at its foot. */
+const SidebarDockContext = createContext<(isDocked: boolean) => void>(() => undefined);
+
+/**
+Called by the sidebar: while it is on screen, toasts sit at its foot, below its links, where
+they cover nothing (bug class 6). Floating over a screen's content, a toast lay over whatever
+control was there (Settings' digest times on a computer).
+*/
+export const useDockToastsHere = (): void => {
+  const setDocked = use(SidebarDockContext);
+  useEffect(() => {
+    setDocked(true);
+    return () => {
+      setDocked(false);
+    };
+  }, [setDocked]);
+};
 
 /**
 Keeps the toast above this screen's footer while the screen is the one in front. A screen under
@@ -84,20 +103,29 @@ const bottomAbove = (footerHeight: number, isWide: boolean): number => {
   return (isWide ? 0 : TAB_BAR_HEIGHT) + footerHeight + FOOTER_GAP;
 };
 
+/** Where a toast docked in the sidebar sits: inside its 224 px column, at its foot. */
+const DOCKED = "bottom-4 left-3 w-[200px]";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-[480px]";
+
 const ToastBar = ({
   bottom,
+  isDocked,
   onDone,
   toast,
 }: {
   readonly bottom: number;
+  readonly isDocked: boolean;
   readonly onDone: () => void;
   readonly toast: Shown;
 }) => (
   <View
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
-    className="absolute inset-x-4 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg"
-    style={{ bottom }}
+    className={cx(
+      "absolute flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg",
+      isDocked ? DOCKED : FLOATING,
+    )}
+    style={isDocked ? undefined : { bottom }}
     testID="toast"
   >
     {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
@@ -129,6 +157,7 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   const [toast, setToast] = useState<null | Shown>(null);
   const { footerHeight, setFooter } = useFooters();
   const isWide = useIsWide();
+  const [isDocked, setIsDocked] = useState(false);
   const hide = useCallback(() => {
     setToast(null);
   }, []);
@@ -152,17 +181,20 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   return (
     <ToastContext value={handle}>
       <FooterHeightContext value={setFooter}>
-        <View className="flex-1">
-          {children}
-          {toast === null ? null : (
-            <ToastBar
-              bottom={bottomAbove(footerHeight, isWide)}
-              key={toast.id}
-              onDone={hide}
-              toast={toast}
-            />
-          )}
-        </View>
+        <SidebarDockContext value={setIsDocked}>
+          <View className="flex-1">
+            {children}
+            {toast === null ? null : (
+              <ToastBar
+                bottom={bottomAbove(footerHeight, isWide)}
+                isDocked={isWide && isDocked}
+                key={toast.id}
+                onDone={hide}
+                toast={toast}
+              />
+            )}
+          </View>
+        </SidebarDockContext>
       </FooterHeightContext>
     </ToastContext>
   );
