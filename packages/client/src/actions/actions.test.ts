@@ -645,10 +645,15 @@ describe("review", () => {
     const [closed] = unwrap(await world.actions.runReviewAction(item, "mark-done"));
     expect(closed).toMatchObject({ source: "web", type: "task.closed" });
     expect(world.rematerializeCalls()).toBe(0);
+    // Keep open answers the card with the task's own status again (see the core's review); on a
+    // task closed meanwhile there is nothing to keep open.
     await expect(world.actions.runReviewAction(item, "keep-open")).resolves.toEqual({
-      ok: true,
-      value: [],
+      error: "retro/task-closed",
+      ok: false,
     });
+    const fresh = await setupActions();
+    const [kept] = unwrap(await fresh.actions.runReviewAction(item, "keep-open"));
+    expect(kept).toMatchObject({ source: "web", type: "task.status.set" });
     await expect(world.actions.runReviewAction(item, "undo")).resolves.toEqual({
       error: "action/unknown-review-action",
       ok: false,
