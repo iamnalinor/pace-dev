@@ -146,3 +146,14 @@ Task 6: review spec ✅ Approved; minors fix round 1 sent (taskLink in Day VM w/
 Owner: pause — agents told to wrap up at a sensible point and commit; then integrate what is reviewed, push, stop
 Owner: OK to push the pool WIP to a separate branch claude/new-session-sy3n4a-pool-wip
 Paused: main 7e4aead pushed (Task 6 integrated; fix round re-review pending). Pool WIP pushed to claude/new-session-sy3n4a-pool-wip (4980726). Handoff in context/stage-8/
+Owner: continue. Finish PR1 (merge+release), then do PR2 to the end; strictly ONE agent at a time. PR3 not now.
+Resume: cleaned merged worktrees; pool agent resumed (rebase onto 5fe5dbd, bug-lessons rows, e2e, screenshots). Queue (one agent at a time): pool re-review → integrate → Task 6 fix-round re-review → 18 → 17 → QA → whole-branch review → fixes → PR1 → CI → merge → release v0.10.0 → verify. Then PR2: 12, 13, 5b, 10 → QA/review → PR2 → CI → merge → release
+Owner: think of proposals as actions the assistant was going to take anyway; we only approve them. Ruling: in Tasks 12/13 the UI speaks in the assistant's voice as a pending action ('Assistant will create…/change…/delete…', [Approve] [Cancel]; no 'Suggested by the assistant'), and the code term 'proposal' is renamed to 'action' (pending assistant action) across core/api/client/bot in Task 12 — cost: one rename sweep
+Owner: a follow-up can be sent on pending actions — it goes to the model together with the original request and the actions already shown. Ruling: Task 12 adds it end to end (contract: /api/parse takes optional 'thread' = [{text, actions}] of earlier turns; prompt shows them; revised answer replaces the cards; fake LLM + regression fixtures); Task 13 wires the bot (a text reply while actions are pending = follow-up)
+Task 8+8b: fix round + rebase done (worktree HEAD d3d1f8d on fbc3da2; 17 commits; e2e 55 ✓; new e2e/notifications.e2e.ts; FCM class → 15). Carry to Task 18: closed enums in cloud device kind and sync precision/source. Re-review (pool fix + Task 6 fix round) dispatched as ONE agent
+Re-review: pool all addressed; Task 6 fix round all addressed → Task 8+8b complete, Task 6 complete. Integrated pool (ff to d3d1f8d), verified unit 578/278, api 278, app 355 ✓, pushed. Residual minors carried into Task 18 brief. Next: Task 18
+Task 18: dispatched (opus, worktree, base d3d1f8d)
+Owner: FCM available on both sides ≠ usable — different Firebase projects (keys) → nothing arrives. Sent to Task 18 agent: server advertises its FCM project identity; app compares with its baked google-services project; mismatch → poll + reason in picker; SENDER_ID_MISMATCH → subscription incompatible (not gone), no re-register loop
+Task 18: rate limit stop; progress d89305f..f4cfa1c (carried items, FCM project match, classes 1-4, 8, 13); resumed 04:46
+Owner: finish PR1 and STOP (PR2 not now)
+Owner: stop after the bug-class sweep (Task 18): integrate it, push, update context/stage-8 handoff, stop
