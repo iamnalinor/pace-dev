@@ -1,9 +1,13 @@
 import type { ReactElement } from "react";
 
+import { act } from "@testing-library/react-native";
+
 import { DayScreen } from "#app/features/day/day-screen.tsx";
 import { DevicesScreen } from "#app/features/devices/devices-screen.tsx";
+import { NotificationsScreen } from "#app/features/notifications/notifications-screen.tsx";
 import { WeekScreen } from "#app/features/week/week-screen.tsx";
 import { deadControls } from "#app/test/dead-controls.ts";
+import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
@@ -57,6 +61,21 @@ describe("every control on a phone screen does something", () => {
     ["Week", <WeekScreen key="week" />],
   ])("%s", async (_name, ui) => {
     expect(await deadControls(onArtboard(ui), OUTSIDE_THE_APP)).toEqual([]);
+  });
+
+  it.each([
+    ["Now", <NowScreen key="now" />],
+    ["Day", <DayScreen key="day" />],
+    ["Inbox", <InboxScreen key="inbox" />],
+    ["Settings", <SettingsScreen key="settings" />],
+    ["Week", <WeekScreen key="week" />],
+    ["Notifications", <NotificationsScreen key="notifications" />],
+  ])("%s holds no control inside another (bug class 14)", async (_name, ui) => {
+    await onArtboard(ui)();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(controlsInsideControls()).toEqual([]);
   });
 
   it("Devices, where Add a computer once did nothing on phones", async () => {
