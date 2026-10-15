@@ -8,8 +8,8 @@ import { TaskScreen } from "./task-screen.tsx";
 
 const HOUR_AGO = "2026-10-07T08:50:00.000Z";
 
-const openSubmit = async () => {
-  const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
+const openSubmit = async (now = HW_VIEW_NOW) => {
+  const runtime = await createTestRuntime({ now });
   await renderScreen(<TaskScreen id={HW_ID} openClose />, runtime);
   return runtime;
 };
@@ -42,9 +42,22 @@ describe("CloseSheet — submitting subtasks", () => {
     expect(screen.queryByRole("radio", { name: en("quickTime.at-deadline") })).toBeNull();
     expect(preview("outcome")).toHaveTextContent(en("close.beforeDeadline"), { exact: false });
     expect(preview("open")).toHaveTextContent("5, 6, 7a Bonus", { exact: false });
-    expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50", { exact: false });
+    expect(preview("recorded")).toHaveTextContent("12:50", { exact: false });
+    expect(screen.queryByText("12:50 · happened 12:50")).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.hour-ago") }));
     expect(preview("recorded")).toHaveTextContent("12:50 · happened 11:50", { exact: false });
+  });
+
+  it("shows only recorded time when the chosen instant is in the same minute", async () => {
+    await openSubmit("2026-10-07T09:50:37.000Z");
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
+    await fireEvent.changeText(screen.getByLabelText(en("close.time")), "12:50");
+    expect(preview("recorded")).toHaveTextContent("12:50", { exact: false });
+    expect(screen.queryByText("12:50 · happened 12:50")).toBeNull();
+
+    // The same clock reading on an earlier day is still a different instant.
+    await fireEvent.changeText(screen.getByLabelText(en("close.date")), "2026-10-06");
+    expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50", { exact: false });
   });
 
   it("submits an hour ago as an approximate time", async () => {

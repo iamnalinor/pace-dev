@@ -192,6 +192,10 @@ for (const size of SIZES) {
     }, info) => {
       const { token } = await loginViaApi(page);
       const { wednesday } = await seedWeek(token);
+      // The first sync replaces the device zone with the account's UTC zone. Navigating while
+      // that happens can reinterpret the previous day's instant as a different calendar date.
+      await page.goto("/settings");
+      await expect(page.getByText("Account: UTC")).toBeVisible();
       await page.goto("/day");
       const back = page.getByRole("button", { name: "Back to today" });
       await expect(back).toHaveCount(0);

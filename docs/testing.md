@@ -15,7 +15,7 @@ action-level tests check that every enabled draft is accepted from each entry pa
 | Mutation | Stryker | the core tests themselves | `packages/core` | `bun test:mutation` (on demand in CI) |
 | LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
 
-`bun test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
+`bun run test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
 
 ## Unit tests (core, client)
 

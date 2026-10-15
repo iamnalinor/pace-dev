@@ -233,6 +233,10 @@ describe("TaskScreen — work", () => {
         outcome: "done",
       });
     });
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.undo") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed).toBeNull();
+    });
   });
 
   it("says so when the task does not exist", async () => {

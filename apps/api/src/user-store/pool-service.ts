@@ -27,7 +27,6 @@ import { broadcast } from "./live-sockets.ts";
 import {
   type Couriers,
   deliverNew,
-  hasPendingAfterWithdraw,
   hasSendRetry,
   type PoolDeps,
   poolMemoryOf,
@@ -38,6 +37,7 @@ import * as notifier from "./notifier.ts";
 import { answerInputs } from "./pool-answers.ts";
 import { armRetry, scheduleNextPass } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
+import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
 import { type Materialized, prepareBatch } from "./state.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;

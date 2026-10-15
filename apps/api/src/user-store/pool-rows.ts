@@ -24,7 +24,7 @@ type Row = typeof schema.notifications.$inferSelect;
 
 /** Telegram's copy of a notification: where it went, if anywhere. */
 export type TelegramCopy = {
-  readonly state: "failed" | "kept" | "pending" | "sent" | "skipped";
+  readonly state: "failed" | "kept" | "pending" | "sent" | "skipped" | "undismissable";
   readonly chatId: null | string;
   readonly messageId: null | number;
 };
@@ -205,4 +205,12 @@ export const setTelegramCopy = async (
 /** A Telegram-origin answer leaves its edited message in chat on purpose. */
 export const markTelegramKept = async (db: Db, id: string): Promise<void> => {
   await db.update(notifications).set({ telegramState: "kept" }).where(eq(notifications.id, id));
+};
+
+/** The provider permanently refused taking this copy back. */
+export const markTelegramUndismissable = async (db: Db, id: string): Promise<void> => {
+  await db
+    .update(notifications)
+    .set({ telegramState: "undismissable" })
+    .where(eq(notifications.id, id));
 };

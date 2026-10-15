@@ -1,6 +1,18 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  notLike,
+  or,
+  type SQL,
+} from "drizzle-orm";
 
 import type { PushSubscription } from "../shared/push-subscriptions.ts";
 import type { PollEntry } from "../shared/push/poll-transport.ts";
@@ -35,6 +47,10 @@ export type DeliveryEntry = {
 };
 
 const { notificationDeliveries } = schema;
+const pendingDismissal = or(
+  isNull(notificationDeliveries.reason),
+  notLike(notificationDeliveries.reason, "dismissal-%"),
+);
 
 /** The reason logged for a device whose push method is not set up here, or found broken. */
 const UNAVAILABLE = "unavailable";
@@ -193,6 +209,7 @@ export const takeBackDeliveries = async (
         eq(notificationDeliveries.notificationId, notificationId),
         inArray(notificationDeliveries.result, ["queued", "sent"]),
         isNull(notificationDeliveries.dismissedAt),
+        pendingDismissal,
         isTelegramGone ? undefined : ne(notificationDeliveries.method, "telegram"),
       ),
     );
@@ -220,6 +237,7 @@ export const pendingDismissalIds = async (db: Db): Promise<readonly string[]> =>
       and(
         inArray(notificationDeliveries.result, ["queued", "sent"]),
         isNull(notificationDeliveries.dismissedAt),
+        pendingDismissal,
         or(pushCopy, telegramCopy),
         isNotNull(schema.notifications.resolvedAt),
       ),

@@ -1,11 +1,40 @@
 import { ANSWERS } from "@pace/core";
 
-import type { PushTransport } from "./transport.ts";
+import type { DeviceAddress, PushTransport, SendOutcome } from "./transport.ts";
 
 import { type FcmTarget, sendFcm } from "../fcm.ts";
 
 /** Where a tap on a notification opens the app. */
 const urlOf = (kind: string): string => (kind === "deadline_digest" ? "/" : "/notifications");
+
+const dismissFcm = async (
+  target: FcmTarget,
+  to: DeviceAddress,
+  notificationId: string,
+): Promise<SendOutcome> => {
+  const outcome = await sendFcm(target, {
+    collapseKey: `dismiss:${notificationId}`,
+    data: { notificationId, type: "dismiss" },
+    token: to.endpoint,
+  });
+  switch (outcome) {
+    case "sent": {
+      return "sent";
+    }
+    case "unregistered": {
+      return "gone";
+    }
+    case "mismatch": {
+      return "incompatible";
+    }
+    case "auth": {
+      return "unavailable";
+    }
+    case "failed": {
+      return "failed";
+    }
+  }
+};
 
 /**
 Firebase Cloud Messaging: data-only, high-priority messages the app presents itself (expo-
@@ -13,17 +42,7 @@ notifications shows `title`/`message` under the `tag`, with the `categoryId`'s b
 silent `dismiss` messages that take one back. Both carry the pool id as the tag and collapse key.
 */
 export const fcmTransport = (target: FcmTarget): PushTransport => ({
-  dismiss: async (to, notificationId) => {
-    const outcome = await sendFcm(target, {
-      collapseKey: `dismiss:${notificationId}`,
-      data: { notificationId, type: "dismiss" },
-      token: to.endpoint,
-    });
-    if (outcome === "sent") {
-      return "sent";
-    }
-    return outcome === "unregistered" ? "gone" : "failed";
-  },
+  dismiss: async (to, notificationId) => await dismissFcm(target, to, notificationId),
   fingerprint: target.fingerprint,
   method: "fcm",
   send: async (to, { body, notification, title }) => {

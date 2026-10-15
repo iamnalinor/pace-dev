@@ -12,6 +12,7 @@ export const enBoard = {
   "now.tasks": "Tasks",
   "now.future": "In future",
   "now.markDone": "Mark {title} done",
+  "now.doneToast": "Done: {title}",
   "meta.due": "Due {when}",
   "meta.starts": "Starts {when}",
   "meta.solved": "{solved}/{total} solved",

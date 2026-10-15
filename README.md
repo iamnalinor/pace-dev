@@ -129,7 +129,7 @@ the route exists).
 | `bun test:api` | Vitest inside workerd with real D1 / KV / Durable Object bindings |
 | `bun test:app` | jest-expo + React Native Testing Library |
 | `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
-| `bun test` | the four above, in that order |
+| `bun run test` | the four above, in that order |
 | `bun test:mutation` | Stryker on core (slow; on demand in CI) |
 | `bun test:llm` | LLM parsing regression set (stage 2; the runner does not exist yet) |
 | `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |

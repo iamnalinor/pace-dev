@@ -83,6 +83,102 @@ const couriersOf = (telegram: TelegramTarget, fcm: FcmTarget | null = null): Cou
 });
 
 describe("the deadline digest", () => {
+  it("stops retrying a Telegram dismissal when the bot transport is no longer configured", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const started = new Date().toISOString();
+      await instance.notifyTo("1002", started);
+      const telegram = telegramRecorder();
+      const notification = added(
+        await instance.notify(
+          {
+            kind: "login",
+            payload: {
+              country: "Germany",
+              ip: SIGN_IN_IP,
+              kind: "web",
+              name: "Chrome",
+              sessionId: "unconfigured-telegram-dismiss",
+            },
+          },
+          started,
+          couriersOf(telegram.target),
+        ),
+      );
+      const withoutTelegram: Couriers = { push: { fcm: null }, telegram: null };
+      await instance.resolveNotification(notification.id, "read", {
+        couriers: withoutTelegram,
+        now: new Date(Date.parse(started) + 1000).toISOString(),
+        origin: "app",
+      });
+      const run = await instance.runNotifications(
+        new Date(Date.parse(started) + 61_000).toISOString(),
+        withoutTelegram,
+      );
+      expect(telegram.sent()).toHaveLength(1);
+      expect(telegram.calls.filter((entry) => entry.method === "deleteMessage")).toHaveLength(0);
+      expect(await state.storage.getAlarm()).toBe(
+        run.nextAt === null ? null : Date.parse(run.nextAt),
+      );
+      expect(
+        (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0],
+      ).toMatchObject({ dismissedAt: null, reason: "dismissal-unavailable" });
+    });
+  });
+
+  it("does not keep retrying a Telegram deletion refused as permanently impossible", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const started = new Date().toISOString();
+      await instance.notifyTo("1002", started);
+      let removalAttempts = 0;
+      const normal = telegramRecorder();
+      const telegram: TelegramTarget = {
+        ...normal.target,
+        fetch: async (input, init) => {
+          if (String(input).endsWith("/deleteMessage")) {
+            removalAttempts += 1;
+            return Response.json(
+              { ok: false, description: "Bad Request: message to delete not found" },
+              { status: 400 },
+            );
+          }
+          return await normal.target.fetch(input, init);
+        },
+      };
+      const couriers = couriersOf(telegram);
+      const notification = added(
+        await instance.notify(
+          {
+            kind: "login",
+            payload: {
+              country: "Germany",
+              ip: SIGN_IN_IP,
+              kind: "web",
+              name: "Chrome",
+              sessionId: "terminal-delete",
+            },
+          },
+          started,
+          couriers,
+        ),
+      );
+      const resolvedAt = new Date(Date.parse(started) + 1000).toISOString();
+      await instance.resolveNotification(notification.id, "read", {
+        couriers,
+        now: resolvedAt,
+        origin: "app",
+      });
+      const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      const run = await instance.runNotifications(passAt, couriers);
+      expect(removalAttempts).toBe(1);
+      expect(await state.storage.getAlarm()).toBe(
+        run.nextAt === null ? null : Date.parse(run.nextAt),
+      );
+      expect(
+        (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0],
+      ).toMatchObject({ dismissedAt: null, reason: "dismissal-refused" });
+    });
+  });
+
   it("retries a refused Telegram deletion after an app answer", async () => {
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
       await instance.notifyTo("1002", CROSSED);
@@ -639,6 +735,92 @@ const phoneWithToken = async (pushToken: string) => {
 };
 
 describe("Firebase push", () => {
+  it("stops retrying a failed push when that notification's app channel is turned off", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder({ send: 500 });
+    await runInDurableObject(stub, async (instance: UserStore, state) => {
+      const started = new Date().toISOString();
+      const couriers = couriersOf(telegramRecorder().target, fcm.target);
+      added(
+        await instance.notify(
+          {
+            kind: "login",
+            payload: {
+              country: "Germany",
+              ip: SIGN_IN_IP,
+              kind: "web",
+              name: "Chrome",
+              sessionId: "disabled-app-retry",
+            },
+          },
+          started,
+          couriers,
+        ),
+      );
+      const changedAt = new Date(Date.parse(started) + 1000).toISOString();
+      await instance.append(
+        [
+          envelope("settings.updated", changedAt, {
+            notificationChannels: { login: { app: false } },
+          }),
+        ],
+        { now: changedAt },
+      );
+      const run = await instance.runNotifications(
+        new Date(Date.parse(started) + 61_000).toISOString(),
+        couriers,
+      );
+      expect(fcm.sends()).toHaveLength(1);
+      expect(await state.storage.getAlarm()).toBe(
+        run.nextAt === null ? null : Date.parse(run.nextAt),
+      );
+    });
+  });
+
+  it("stops retrying a dismissal when the delivering push transport is no longer configured", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder();
+    await runInDurableObject(stub, async (instance: UserStore, state) => {
+      const started = new Date().toISOString();
+      const telegram = telegramRecorder().target;
+      const notification = added(
+        await instance.notify(
+          {
+            kind: "login",
+            payload: {
+              country: "Germany",
+              ip: SIGN_IN_IP,
+              kind: "web",
+              name: "Chrome",
+              sessionId: "unconfigured-dismiss",
+            },
+          },
+          started,
+          couriersOf(telegram, fcm.target),
+        ),
+      );
+      const withoutFcm = couriersOf(telegram);
+      await instance.resolveNotification(notification.id, "read", {
+        couriers: withoutFcm,
+        now: new Date(Date.parse(started) + 1000).toISOString(),
+        origin: "app",
+      });
+      const run = await instance.runNotifications(
+        new Date(Date.parse(started) + 61_000).toISOString(),
+        withoutFcm,
+      );
+      expect(fcm.sends()).toHaveLength(1);
+      expect(await state.storage.getAlarm()).toBe(
+        run.nextAt === null ? null : Date.parse(run.nextAt),
+      );
+      expect(
+        (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.find(
+          (entry) => entry.method === "fcm",
+        ),
+      ).toMatchObject({ dismissedAt: null, reason: "dismissal-unavailable" });
+    });
+  });
+
   it("stops retry alarms when the device with a failed send unsubscribes", async () => {
     const { stub, sessionId } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
     const fcm = await fcmRecorder({ send: 500 });
@@ -866,6 +1048,50 @@ describe("Firebase push", () => {
         )?.dismissedAt,
       ).toBe("2026-10-07T08:02:00.000Z");
       expect(fcm.sends()).toHaveLength(3);
+    });
+  });
+
+  it("stops retrying an FCM dismissal rejected for a mismatched project", async () => {
+    const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
+    const fcm = await fcmRecorder({
+      send: [200, { errorCode: "SENDER_ID_MISMATCH", status: 403 }],
+    });
+    await runInDurableObject(stub, async (instance: UserStore, state) => {
+      const started = new Date().toISOString();
+      const couriers = couriersOf(telegramRecorder().target, fcm.target);
+      const notification = added(
+        await instance.notify(
+          {
+            kind: "login",
+            payload: {
+              country: "Germany",
+              ip: SIGN_IN_IP,
+              kind: "web",
+              name: "Chrome",
+              sessionId: "terminal-dismiss",
+            },
+          },
+          started,
+          couriers,
+        ),
+      );
+      const resolvedAt = new Date(Date.parse(started) + 1000).toISOString();
+      await instance.resolveNotification(notification.id, "read", {
+        couriers,
+        now: resolvedAt,
+        origin: "app",
+      });
+      const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      const run = await instance.runNotifications(passAt, couriers);
+      expect(fcm.sends()).toHaveLength(2);
+      expect(await state.storage.getAlarm()).toBe(
+        run.nextAt === null ? null : Date.parse(run.nextAt),
+      );
+      expect(
+        (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.find(
+          (entry) => entry.method === "fcm",
+        ),
+      ).toMatchObject({ dismissedAt: null, reason: "dismissal-incompatible" });
     });
   });
 

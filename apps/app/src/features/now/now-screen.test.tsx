@@ -102,7 +102,7 @@ describe("NowBoard", () => {
     expect(router.push).toHaveBeenCalledWith(`/task/${HW_ID}`);
   });
 
-  it("checks a task off: it dissolves, then closes, without a toast (History undoes it)", async () => {
+  it("checks a task off, then offers Undo while the row is gone", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<Board />, runtime);
     const check = screen.getByRole("checkbox", { name: "Mark Reply to course curator done" });
@@ -120,8 +120,7 @@ describe("NowBoard", () => {
     await waitFor(() => {
       expect(screen.queryByText("Reply to course curator")).toBeNull();
     });
-    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
-    await runtime.actions.undoLast();
+    await fireEvent.press(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => {
       expect(screen.getByText("Reply to course curator")).toBeOnTheScreen();
     });

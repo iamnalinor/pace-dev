@@ -77,6 +77,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.outcome": "Итог",
   "close.stillOpen": "Ещё открыты",
   "close.recorded": "Записано",
+  "close.recordedOnly": "{recorded}",
   "close.recordedAt": "{recorded} · произошло {happened}",
   "close.beforeDeadline": "Сделано · до срока",
   "close.late": "Сделано · с опозданием",

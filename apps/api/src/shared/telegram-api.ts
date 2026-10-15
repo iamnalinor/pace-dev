@@ -86,11 +86,25 @@ export const wasTelegramMessageSent = async (
   message: OutgoingMessage,
 ): Promise<boolean> => (await sendTelegramMessage(target, chatId, message)) !== null;
 
-/** Deletes a message the bot sent; whether Telegram accepted that. */
-export const wasTelegramMessageDeleted = async (
+/** A 4xx refusal except rate limiting cannot be fixed by retrying this deletion. */
+export const deleteTelegramMessage = async (
   target: TelegramTarget,
   chatId: string,
   messageId: number,
-): Promise<boolean> =>
-  (await callTelegram(target, "deleteMessage", { chat_id: chatId, message_id: messageId })) !==
-  null;
+): Promise<"deleted" | "retry" | "terminal"> => {
+  try {
+    const response = await target.fetch(`${target.apiRoot}/bot${target.token}/deleteMessage`, {
+      body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (response.ok) {
+      return "deleted";
+    }
+    return response.status >= 400 && response.status < 500 && response.status !== 429
+      ? "terminal"
+      : "retry";
+  } catch {
+    return "retry";
+  }
+};

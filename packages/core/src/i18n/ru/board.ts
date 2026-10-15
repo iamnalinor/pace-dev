@@ -14,6 +14,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "now.tasks": "Задачи",
   "now.future": "В будущем",
   "now.markDone": "Отметить «{title}» сделанной",
+  "now.doneToast": "Готово: {title}",
   "meta.due": "Срок {when}",
   "meta.starts": "Начало {when}",
   "meta.solved": "{solved}/{total} решено",

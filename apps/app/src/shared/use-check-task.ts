@@ -6,7 +6,7 @@ import { usePace } from "#app/app-state.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { resolvePreset } from "@pace/core";
 
-import { useRunAction } from "./use-run-action.ts";
+import { useCloseWithUndo } from "./use-close-with-undo.ts";
 
 export type CheckTask = {
   /** A task submitted subtask by subtask: the check opens its submit sheet (which, when). */
@@ -20,9 +20,9 @@ export type CheckTask = {
 
 /** The row's check: close as done, or the submit sheet of a task sent subtask by subtask. */
 export const useCheckTask = (): CheckTask => {
-  const { actions, state } = usePace();
+  const { state } = usePace();
   const openTask = useOpenTask();
-  const run = useRunAction();
+  const closeWithUndo = useCloseWithUndo();
   const opensSheet = useCallback(
     (row: NowRow): boolean => {
       const current = state.store.getState();
@@ -42,9 +42,9 @@ export const useCheckTask = (): CheckTask => {
         openTask(row.id, { close: true });
         return true;
       }
-      return await run(actions.closeTask({ outcome: "done", taskId: row.id }));
+      return await closeWithUndo(row.id, row.title);
     },
-    [actions, openTask, opensSheet, run],
+    [closeWithUndo, openTask, opensSheet],
   );
   return { check, opensSheet };
 };

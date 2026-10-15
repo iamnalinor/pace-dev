@@ -27,6 +27,8 @@ export const createFakeNotifications = () => {
     grantOnRequest: true,
     /** Everything scheduled (or presented) so far, newest last. */
     scheduled: [] as Scheduled[],
+    scheduleGate: null as null | Promise<boolean>,
+    scheduleStarted: null as (() => void) | null,
     /** Identifiers taken away with `dismissNotificationAsync`. */
     dismissed: [] as string[],
     categories: new Map<string, readonly Category[]>(),
@@ -78,6 +80,8 @@ export const createFakeNotifications = () => {
       return permission();
     },
     scheduleNotificationAsync: async (request: Scheduled): Promise<string> => {
+      state.scheduleStarted?.();
+      await state.scheduleGate;
       state.scheduled = [...state.scheduled, request];
       return request.identifier;
     },

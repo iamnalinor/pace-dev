@@ -5,11 +5,9 @@ import {
   isChannelOn,
   type PoolMemory,
   type PoolNotification,
-  type Resolution,
   type Settings,
 } from "@pace/core";
 
-import type { AnswerOrigin } from "../shared/contract.ts";
 import type { PushMessage, PushTransport, SendOutcome } from "../shared/push/transport.ts";
 import type * as schema from "./schema.ts";
 
@@ -27,24 +25,17 @@ import {
   type PushConfig,
   transportFor,
 } from "../shared/push/registry.ts";
-import {
-  sendTelegramMessage,
-  type TelegramTarget,
-  wasTelegramMessageDeleted,
-} from "../shared/telegram-api.ts";
+import { sendTelegramMessage, type TelegramTarget } from "../shared/telegram-api.ts";
 import {
   hasFailedCopy,
   latestAttempt,
   logAttempt,
   logUnavailable,
-  markDismissed,
-  pendingDismissalIds,
-  takeBackDeliveries,
   wasDelivered,
 } from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
-import { markTelegramKept, setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
+import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -269,64 +260,6 @@ export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Pr
   broadcast(deps.ctx, { notification, type: "notification" });
 };
 
-/**
-Deletes the Telegram copy, unless the answer came from Telegram (the bot edits it there and the
-message stays). Whether the copy is gone: only then does the log mark it taken back.
-*/
-const wasTelegramCopyDeleted = async (
-  deps: PoolDeps,
-  telegram: StoredNotification["telegram"],
-  origin: AnswerOrigin,
-): Promise<boolean> => {
-  const { chatId, messageId, state } = telegram;
-  const target = deps.couriers.telegram;
-  return origin === "telegram" || state !== "sent" || target === null
-    ? false
-    : chatId !== null &&
-        messageId !== null &&
-        (await wasTelegramMessageDeleted(target, chatId, messageId));
-};
-
-/**
-Takes a resolved notification back everywhere: the Telegram copy is deleted unless the answer
-came from Telegram (the bot edits it there), every push copy is dismissed through the method
-that delivered it, and open clients update their feed.
-*/
-export const hasPendingAfterWithdraw = async (
-  deps: PoolDeps,
-  stored: StoredNotification,
-  { origin, resolution }: { readonly origin: AnswerOrigin; readonly resolution: Resolution },
-): Promise<boolean> => {
-  const { notification, telegram } = stored;
-  if (origin === "telegram" && telegram.state === "sent") {
-    await markTelegramKept(deps.db, notification.id);
-  }
-  const isTelegramGone = await wasTelegramCopyDeleted(deps, telegram, origin);
-  const copies = await takeBackDeliveries(deps.db, notification.id, {
-    isTelegramGone,
-  });
-  for (const copy of copies) {
-    if (copy.method === "telegram") {
-      await markDismissed(deps.db, copy.id, deps.now);
-      continue;
-    }
-    const outcome = await transportFor(deps.couriers.push, copy.method)?.dismiss(
-      copy,
-      notification.id,
-    );
-    if (["sent", "queued", "gone"].includes(outcome ?? "")) {
-      await markDismissed(deps.db, copy.id, deps.now);
-    }
-  }
-  broadcast(deps.ctx, { id: notification.id, resolution, type: "dismiss" });
-  return await hasPendingDismissal(deps.db, notification.id);
-};
-
-const hasPendingDismissal = async (db: Db, notificationId: string): Promise<boolean> => {
-  const pending = await pendingDismissalIds(db);
-  return pending.includes(notificationId);
-};
-
 /** Open notifications whose latest copy failed and can be retried by a pool pass. */
 export const hasSendRetry = async (
   deps: PoolDeps,
@@ -335,7 +268,7 @@ export const hasSendRetry = async (
   if (stored.telegram.state === "failed") {
     return true;
   }
-  if (deps.userId === undefined) {
+  if (deps.userId === undefined || !isChannelOn(deps.settings, stored.notification.kind, "app")) {
     return false;
   }
   const subscriptions = await subscriptionsOf(deps.binding, deps.userId, Date.parse(deps.now));

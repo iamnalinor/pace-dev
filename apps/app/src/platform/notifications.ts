@@ -3,6 +3,8 @@ import * as SecureStore from "expo-secure-store";
 import { createStore } from "zustand/vanilla";
 
 import { appFirebaseProject } from "#app/platform/firebase-project.ts";
+import { seriallyBySession } from "#app/platform/session-poll-queue.ts";
+import { readSessionValue, writeSessionValue } from "#app/platform/session-value.ts";
 import { type ApiClient, ApiError } from "@pace/client";
 import {
   type Answer,
@@ -243,11 +245,21 @@ export const answerFromButton = async ({
 Fetches what waits for this phone when it polls (its background check, the open app on a live
 notice), shows or takes back each entry and acknowledges them with the next fetch's cursor.
 */
-export const pollNow = async (api: ApiClient): Promise<number> => {
-  const stored = Number(await readKey(CURSOR_KEY));
-  const after = Number.isFinite(stored) ? stored : 0;
-  const { cursor, entries } = await api.call(endpoints.notifications.poll, { query: { after } });
+type PollEntries = ReturnType<typeof endpoints.notifications.poll.output.parse>["entries"];
+
+const didApplyPollEntries = async ({
+  entries,
+  session,
+  api,
+}: {
+  readonly entries: PollEntries;
+  readonly session: string;
+  readonly api: ApiClient;
+}): Promise<boolean> => {
   for (const entry of entries) {
+    if (!api.isCurrentSession(session)) {
+      return false;
+    }
     if (entry.type === "dismiss") {
       await dismissPoolNotification(entry.notificationId);
     } else if (entry.notification !== null && entry.notification.resolvedAt === null) {
@@ -257,10 +269,44 @@ export const pollNow = async (api: ApiClient): Promise<number> => {
         kind: entry.notification.kind,
         title: entry.title,
       });
+      if (!api.isCurrentSession(session)) {
+        await dismissPoolNotification(entry.notificationId);
+        return false;
+      }
     }
   }
-  await SecureStore.setItemAsync(CURSOR_KEY, String(cursor));
+  return true;
+};
+
+const pollForSession = async (api: ApiClient, session: string): Promise<number> => {
+  const stored = await readSessionValue(CURSOR_KEY, session);
+  if (!api.isCurrentSession(session)) {
+    return 0;
+  }
+  const after =
+    typeof stored === "number" && Number.isSafeInteger(stored) && stored >= 0 ? stored : 0;
+  const { cursor, entries } = await api.call(endpoints.notifications.poll, { query: { after } });
+  if (
+    !api.isCurrentSession(session) ||
+    !(await didApplyPollEntries({ entries, session, api })) ||
+    !api.isCurrentSession(session)
+  ) {
+    return 0;
+  }
+  await writeSessionValue({
+    key: CURSOR_KEY,
+    session,
+    value: cursor,
+    isCurrentSession: () => api.isCurrentSession(session),
+  });
   return entries.length;
+};
+
+export const pollNow = async (api: ApiClient): Promise<number> => {
+  const session = api.currentSessionToken();
+  return session === undefined
+    ? 0
+    : await seriallyBySession(session, async () => await pollForSession(api, session));
 };
 
 /** The phone's FCM token; `null` without Google Play services (or Firebase in the build). */

@@ -6,6 +6,8 @@ import type { SleepCandidate } from "@pace/core";
 
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
 
+import { readSessionValue, writeSessionValue } from "./session-value.ts";
+
 /**
 Counts the changes to what this phone remembers (a dismissal, a series answered for good, one
 forgotten). Each screen that reads it (Now's offer, Day, Settings → Permissions) reads it again
@@ -119,11 +121,15 @@ export const setCalendarSync = async (isOn: boolean): Promise<void> => {
 const USAGE_CURSOR_KEY = "pace.phone.usageCursor";
 
 /** Where the next usage upload starts: the start of the last session sent (it may have grown). */
-export const usageCursor = async (): Promise<null | string> => {
-  const value = await readJson(USAGE_CURSOR_KEY);
+export const usageCursor = async (session: string): Promise<null | string> => {
+  const value = await readSessionValue(USAGE_CURSOR_KEY, session);
   return typeof value === "string" ? value : null;
 };
 
-export const setUsageCursor = async (at: string): Promise<void> => {
-  await SecureStore.setItemAsync(USAGE_CURSOR_KEY, JSON.stringify(at));
+export const setUsageCursor = async (
+  session: string,
+  at: string,
+  isCurrentSession: () => boolean,
+): Promise<void> => {
+  await writeSessionValue({ key: USAGE_CURSOR_KEY, session, value: at, isCurrentSession });
 };

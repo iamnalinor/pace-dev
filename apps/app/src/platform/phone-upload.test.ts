@@ -6,6 +6,8 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
 
+import type { calendarEvents as actualCalendarEvents } from "./phone-calendar.ts";
+
 import { setCalendarSync } from "./phone-memory.ts";
 import { uploadPhoneData } from "./phone-upload.ts";
 
@@ -18,6 +20,30 @@ const mockEvents = [
   { className: null, eventType: 2, packageName: "org.telegram.messenger", timestamp: at("09:20") },
   { className: null, eventType: 1, packageName: "com.android.chrome", timestamp: at("09:40") },
 ];
+const mockUsageRead = {
+  gate: null as null | Promise<boolean>,
+  started: null as (() => void) | null,
+};
+const mockCalendarRead = {
+  gate: null as null | Promise<boolean>,
+  started: null as (() => void) | null,
+};
+
+jest.mock("./phone-calendar.ts", () => {
+  const actual = jest.requireActual<{ readonly calendarEvents: typeof actualCalendarEvents }>(
+    "./phone-calendar.ts",
+  );
+  return {
+    ...actual,
+    calendarEvents: async (from: string, to: string) => {
+      if (mockCalendarRead.gate !== null) {
+        mockCalendarRead.started?.();
+        await mockCalendarRead.gate;
+      }
+      return await actual.calendarEvents(from, to);
+    },
+  };
+});
 
 jest.mock("../../modules/pace-native/index.ts", () => ({
   paceNative: {
@@ -27,7 +53,11 @@ jest.mock("../../modules/pace-native/index.ts", () => ({
       ),
     hasUsageAccess: () => true,
     openUsageAccessSettings: jest.fn(),
-    queryUsageEvents: async () => mockEvents,
+    queryUsageEvents: async () => {
+      mockUsageRead.started?.();
+      await mockUsageRead.gate;
+      return mockEvents;
+    },
   },
 }));
 
@@ -35,8 +65,8 @@ const calendar = Calendar as unknown as FakeCalendar;
 
 type Sent = { readonly url: string; readonly body: Record<string, unknown> };
 
-const world = async (sent: Sent[]) =>
-  await createTestRuntime({
+const world = async (sent: Sent[]) => {
+  const runtime = await createTestRuntime({
     now: "2026-10-06T10:00:00.000Z",
     routes: {
       "POST /api/calendar/sync": ({ body }) => {
@@ -49,9 +79,17 @@ const world = async (sent: Sent[]) =>
       },
     },
   });
+  await runtime.auth.adoptToken("session-A");
+  return runtime;
+};
 
-beforeEach(() => {
+beforeEach(async () => {
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  mockUsageRead.gate = null;
+  mockUsageRead.started = null;
+  mockCalendarRead.gate = null;
+  mockCalendarRead.started = null;
+  await SecureStore.setItemAsync("pace.session", "session-A");
   calendar.state.status = "granted";
   calendar.state.events = [
     {
@@ -65,6 +103,58 @@ beforeEach(() => {
 });
 
 describe("what the phone sends to Pace", () => {
+  it("does not send A's calendar after the session changes during its read", async () => {
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    const started = Promise.withResolvers<boolean>();
+    const gate = Promise.withResolvers<boolean>();
+    mockCalendarRead.started = () => {
+      started.resolve(true);
+    };
+    mockCalendarRead.gate = gate.promise;
+    const pending = uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    await started.promise;
+    // Auth's in-memory token can change before SecureStore is written.
+    await runtime.auth.adoptToken("session-B");
+    gate.resolve(true);
+    await pending;
+    expect(sent.filter((item) => item.url === "calendar")).toEqual([]);
+  });
+
+  it("does not send an old session's usage to the newly signed-in account", async () => {
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    const started = Promise.withResolvers<boolean>();
+    const gate = Promise.withResolvers<boolean>();
+    mockUsageRead.started = () => {
+      started.resolve(true);
+    };
+    mockUsageRead.gate = gate.promise;
+    const pending = uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    await started.promise;
+    await SecureStore.setItemAsync("pace.session", "session-B");
+    await runtime.auth.adoptToken("session-B");
+    gate.resolve(true);
+    await pending;
+    expect(sent.map((item) => item.url)).toEqual(["calendar"]);
+    expect(await SecureStore.getItemAsync("pace.phone.usageCursor")).toBeNull();
+  });
+
+  it("starts usage history again for another signed-in session", async () => {
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    await uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    await SecureStore.setItemAsync("pace.session", "session-B");
+    await runtime.auth.adoptToken("session-B");
+    await uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    expect(
+      sent.filter((item) => item.url === "usage").map((item) => item.body["sessions"]),
+    ).toEqual([
+      expect.arrayContaining([expect.objectContaining({ app: "Telegram" })]),
+      expect.arrayContaining([expect.objectContaining({ app: "Telegram" })]),
+    ]);
+  });
+
   it("sends its calendar and the apps it had in front, by name, then only what is new", async () => {
     const sent: Sent[] = [];
     const runtime = await world(sent);

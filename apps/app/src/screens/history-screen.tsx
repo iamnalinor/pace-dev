@@ -12,6 +12,8 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
+import { SheetActions } from "#app/ui/sheet-actions.tsx";
+import { Sheet } from "#app/ui/sheet.tsx";
 import { addMinutesIso, EVENT_LABEL_KEYS } from "@pace/core";
 
 import { PushedScreen } from "./pushed-screen.tsx";
@@ -23,32 +25,74 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const viewer = useViewer();
   const { actions } = usePace();
   const run = useRunAction();
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const eventLabel = t(EVENT_LABEL_KEYS[entry.type]);
+  const closeConfirmation = () => {
+    if (!isBusy) {
+      setIsConfirming(false);
+    }
+  };
+  const undo = async () => {
+    setIsBusy(true);
+    try {
+      if (await run(actions.revoke(entry.id))) {
+        setIsConfirming(false);
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  };
   return (
-    <View className="flex-row items-center gap-3 border-t border-line py-2.5">
-      <View className="flex-1 gap-0.5">
-        <Text className="font-sans text-[14px] text-fg">
-          {t(EVENT_LABEL_KEYS[entry.type])}
-          {entry.taskTitle === null ? "" : ` · ${entry.taskTitle}`}
-        </Text>
-        <Text className="font-sans text-[12px] text-muted">
-          {[
-            zonedText({ at: entry.occurredAt, mode: "datetime", tz: viewer.deviceTz }, viewer),
-            t(`source.${entry.source}`),
-          ].join(" · ")}
-        </Text>
+    <View className="gap-2 border-t border-line py-2.5">
+      <View className="flex-row items-center gap-3">
+        <View className="flex-1 gap-0.5">
+          <Text className="font-sans text-[14px] text-fg">
+            {eventLabel}
+            {entry.taskTitle === null ? "" : ` · ${entry.taskTitle}`}
+          </Text>
+          <Text className="font-sans text-[12px] text-muted">
+            {[
+              zonedText({ at: entry.occurredAt, mode: "datetime", tz: viewer.deviceTz }, viewer),
+              t(`source.${entry.source}`),
+            ].join(" · ")}
+          </Text>
+        </View>
+        {entry.revokedBy === null ? null : (
+          <Text className="font-sans text-[12px] text-muted">{t("history.revoked")}</Text>
+        )}
+        {!isConfirming && entry.revocable ? (
+          <Button
+            onPress={() => {
+              setIsConfirming(true);
+            }}
+            variant="ghost"
+          >
+            {t("common.undo")}
+          </Button>
+        ) : null}
       </View>
-      {entry.revokedBy === null ? null : (
-        <Text className="font-sans text-[12px] text-muted">{t("history.revoked")}</Text>
-      )}
-      {entry.revocable ? (
-        <Button
-          onPress={() => {
-            void run(actions.revoke(entry.id));
-          }}
-          variant="ghost"
+      {isConfirming && entry.revocable ? (
+        <Sheet
+          closeLabel={t("common.close")}
+          footer={
+            <SheetActions
+              cancelLabel={t("common.cancel")}
+              isBusy={isBusy}
+              onCancel={closeConfirmation}
+              onPrimary={() => {
+                void undo();
+              }}
+              primaryLabel={t("history.undoConfirm")}
+            />
+          }
+          onClose={closeConfirmation}
+          subtitle={entry.taskTitle === null ? eventLabel : `${eventLabel} · ${entry.taskTitle}`}
+          title={t("history.undoConfirm")}
+          visible
         >
-          {t("common.undo")}
-        </Button>
+          <Text className="font-sans text-[14px] text-fg">{t("history.undoConfirmQuestion")}</Text>
+        </Sheet>
       ) : null}
     </View>
   );

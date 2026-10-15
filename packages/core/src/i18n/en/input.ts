@@ -75,6 +75,7 @@ export const enInput = {
   "close.outcome": "Outcome",
   "close.stillOpen": "Still open",
   "close.recorded": "Recorded",
+  "close.recordedOnly": "{recorded}",
   "close.recordedAt": "{recorded} · happened {happened}",
   "close.beforeDeadline": "Done · before deadline",
   "close.late": "Done · late",

@@ -21,6 +21,12 @@ const MAX_EVENTS = 2000;
 /** At most this many sessions go in one request. */
 const BATCH = 1000;
 
+const quietUsageCursor = (since: string, now: string): string => {
+  const reread = addMinutesIso(now, -REREAD_MINUTES);
+  const at = Math.max(Date.parse(since), Date.parse(reread));
+  return new Date(at).toISOString();
+};
+
 /** How the phone is named next to the computers in Settings → Devices. */
 const deviceName = (): string => {
   const name = (Constants.deviceName ?? "").trim();
@@ -28,13 +34,21 @@ const deviceName = (): string => {
 };
 
 const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Promise<void> => {
-  if (!(await isCalendarSyncOn()) || (await calendarAccess()) !== "granted") {
+  const session = api.currentSessionToken();
+  if (
+    session === undefined ||
+    !(await isCalendarSyncOn()) ||
+    (await calendarAccess()) !== "granted"
+  ) {
     return;
   }
   const from = addMinutesIso(now, -CALENDAR_BACK_MINUTES);
   const to = addMinutesIso(now, CALENDAR_AHEAD_MINUTES);
   const events = await calendarEvents(from, to);
   const rules = await seriesRules();
+  if (!api.isCurrentSession(session)) {
+    return;
+  }
   await api.call(endpoints.calendar.sync, {
     body: {
       deviceId,
@@ -51,8 +65,36 @@ const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Pr
   });
 };
 
+type NamedSession = { readonly app: string; readonly endAt: string; readonly startAt: string };
+
+const didSendUsageBatches = async ({
+  api,
+  deviceId,
+  named,
+  session,
+}: {
+  readonly api: ApiClient;
+  readonly deviceId: string;
+  readonly named: readonly NamedSession[];
+  readonly session: string;
+}): Promise<boolean> => {
+  for (let index = 0; index < named.length; index += BATCH) {
+    if (!api.isCurrentSession(session)) {
+      return false;
+    }
+    await api.call(endpoints.usage.upload, {
+      body: { deviceId, deviceName: deviceName(), sessions: named.slice(index, index + BATCH) },
+    });
+  }
+  return true;
+};
+
 const uploadUsage = async (api: ApiClient, deviceId: string, now: string): Promise<void> => {
-  const since = (await usageCursor()) ?? addMinutesIso(now, -FIRST_LOOKBACK_MINUTES);
+  const session = api.currentSessionToken();
+  if (session === undefined) {
+    return;
+  }
+  const since = (await usageCursor(session)) ?? addMinutesIso(now, -FIRST_LOOKBACK_MINUTES);
   const phone = await readPhoneEvents(since, now);
   if (!phone.hasAccess) {
     return;
@@ -64,16 +106,15 @@ const uploadUsage = async (api: ApiClient, deviceId: string, now: string): Promi
     endAt: session.endAt,
     startAt: session.startAt,
   }));
-  for (let index = 0; index < named.length; index += BATCH) {
-    await api.call(endpoints.usage.upload, {
-      body: { deviceId, deviceName: deviceName(), sessions: named.slice(index, index + BATCH) },
-    });
+  if (!(await didSendUsageBatches({ api, deviceId, named, session }))) {
+    return;
   }
   // The last session may still grow: the next upload starts from its start and sends it again.
   // With none, it starts a little back, so an app opened just now is not cut at its start.
-  const reread = addMinutesIso(now, -REREAD_MINUTES);
-  const quiet = new Date(Math.max(Date.parse(since), Date.parse(reread))).toISOString();
-  await setUsageCursor(named.at(-1)?.startAt ?? quiet);
+  const quiet = quietUsageCursor(since, now);
+  await setUsageCursor(session, named.at(-1)?.startAt ?? quiet, () =>
+    api.isCurrentSession(session),
+  );
 };
 
 /**
