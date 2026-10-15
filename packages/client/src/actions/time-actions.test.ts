@@ -10,6 +10,9 @@ import { nowViewModel } from "../view-models/now.ts";
 import { timeBarModel } from "../view-models/time-bar.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
+/** `offset` seconds from the frozen now. */
+const seconds = (offset: number): string => new Date(Date.parse(NOW) + offset * 1000).toISOString();
+
 const later = (minutes: number): string =>
   new Date(Date.parse(NOW) + minutes * 60_000).toISOString();
 const ctx = (now: string) => ({ deviceTz: "Europe/Moscow", now });
@@ -378,6 +381,63 @@ describe("time actions", () => {
       (activity) => activity.label === "Seminar",
     );
     expect(seminar).toMatchObject({ endAt: later(60), startAt: later(-30) });
+  });
+
+  it("logs any block that is over, to the second, and refuses only an end still ahead (bug class 9)", async () => {
+    // Offsets from now in seconds, a day either way: across midnight (Moscow's is 21:00 UTC,
+    // three hours after the frozen 12:00 UTC) and ±1 s around now.
+    const span = fc
+      .tuple(fc.integer({ max: 86_400, min: -86_400 }), fc.integer({ max: 86_400, min: 1 }))
+      .map(([start, length]) => [start, start + length] as const);
+    await fc.assert(
+      fc.asyncProperty(span, async ([start, end]) => {
+        const world = await setupActions([]);
+        const result = await world.actions.logPast({
+          category: "other",
+          endAt: seconds(end),
+          label: "Block",
+          startAt: seconds(start),
+        });
+        return result.ok === end <= 0 && (result.ok || result.error === "retro/future");
+      }),
+      { numRuns: 150 },
+    );
+    const world = await setupActions([]);
+    const block = { category: "other" as const, label: "Block", startAt: seconds(-60) };
+    expect((await world.actions.logPast({ ...block, endAt: seconds(0) })).ok).toBe(true);
+    expect(await world.actions.logPast({ ...block, endAt: seconds(1) })).toEqual({
+      error: "retro/future",
+      ok: false,
+    });
+  });
+
+  it("takes a deadline at any instant, past or ahead (bug class 9)", async () => {
+    const due = fc.integer({ max: 86_400, min: -86_400 });
+    await fc.assert(
+      fc.asyncProperty(due, async (offset) => {
+        const world = await setupActions([]);
+        const dueAt = new Date(Date.parse(NOW) + offset * 1000).toISOString();
+        return (
+          await world.actions.createTask({
+            dueAt,
+            dueTz: "Europe/Moscow",
+            presetId: "personal",
+            title: "Due",
+          })
+        ).ok;
+      }),
+      { numRuns: 60 },
+    );
+    // Due a second ago: overdue, still a deadline.
+    const world = await setupActions([]);
+    const dueAt = new Date(Date.parse(NOW) - 1000).toISOString();
+    const made = await world.actions.createTask({
+      dueAt,
+      dueTz: "Europe/Moscow",
+      presetId: "personal",
+      title: "Late",
+    });
+    expect(made.ok).toBe(true);
   });
 
   it("starts whatever the time bar's field lets ▶ start: any text that is not blank", async () => {
