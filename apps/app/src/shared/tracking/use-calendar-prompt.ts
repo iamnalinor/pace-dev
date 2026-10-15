@@ -4,7 +4,13 @@ import { AppState } from "react-native";
 import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
 
 import { useAppState, usePace } from "#app/app-state.tsx";
-import { calendarKey, dismiss, dismissedKeys, seriesRules } from "#app/platform/phone-memory.ts";
+import {
+  calendarKey,
+  dismiss,
+  dismissedKeys,
+  seriesRules,
+  usePhoneMemoryVersion,
+} from "#app/platform/phone-memory.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { eventAnswers } from "@pace/client";
@@ -40,6 +46,8 @@ export const useCalendarPrompt = (): {
   const { deviceTz, now } = useViewer();
   const activities = useAppState((state) => state.time.activities);
   const [loaded, setLoaded] = useState<Loaded>(EMPTY);
+  // Read again when Day (or Settings) changes what the phone remembers.
+  const memory = usePhoneMemoryVersion();
   const reload = useCallback(() => {
     void (async () => {
       const today = await calendarToday({ api, now: clock.now(), zone: deviceTz });
@@ -63,7 +71,7 @@ export const useCalendarPrompt = (): {
       clearInterval(timer);
       subscription.remove();
     };
-  }, [reload]);
+  }, [reload, memory]);
   const offered = promptedEvent(
     loaded.events.filter((event) => !answered.has(calendarEventKey(event))),
     now,

@@ -1,8 +1,24 @@
 import * as SecureStore from "expo-secure-store";
+import { useStore } from "zustand";
+import { createStore } from "zustand/vanilla";
 
 import type { SleepCandidate } from "@pace/core";
 
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
+
+/**
+Counts the changes to what this phone remembers (a dismissal, a series answered for good, one
+forgotten). Each screen that reads it (Now's offer, Day, Settings → Permissions) reads it again
+when the count moves: a tab stays mounted while another screen changes it (bug class 8).
+*/
+const changes = createStore<{ readonly version: number }>(() => ({ version: 0 }));
+
+const changed = (): void => {
+  changes.setState(({ version }) => ({ version: version + 1 }));
+};
+
+/** The change count of the phone's memory: a dependency of every effect that reads it. */
+export const usePhoneMemoryVersion = (): number => useStore(changes, (state) => state.version);
 
 /** Only recent choices matter; older ones are dropped. */
 const KEEP = 200;
@@ -31,6 +47,7 @@ const keyList = (storeKey: string) => {
         storeKey,
         JSON.stringify([...current.filter((item) => item !== key), key].slice(-KEEP)),
       );
+      changed();
     },
     all: async (): Promise<ReadonlySet<string>> => new Set(await load()),
   };
@@ -76,6 +93,7 @@ export const seriesRules = async (): Promise<readonly SeriesRule[]> => {
 
 const saveRules = async (rules: readonly SeriesRule[]): Promise<void> => {
   await SecureStore.setItemAsync(RULES_KEY, JSON.stringify(rules));
+  changed();
 };
 
 export const setSeriesRule = async (rule: SeriesRule): Promise<void> => {

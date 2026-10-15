@@ -18,6 +18,7 @@ import {
   seriesRules,
   setSeriesRule,
   sleepKey,
+  usePhoneMemoryVersion,
 } from "#app/platform/phone-memory.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { activityLabel, type DayModel, eventAnswers } from "@pace/client";
@@ -161,7 +162,8 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
   const { items } = useFeed();
   const answers = useMemo(() => eventAnswers(items), [items]);
   const { date, zone } = day;
-  // A new day or the minute tick is what changes the answer.
+  // A new day, the minute tick or a change to what the phone remembers changes the answer.
+  const memory = usePhoneMemoryVersion();
   const reload = useCallback(() => {
     void (async () => {
       setLoaded(await load({ date, zone }, now));
@@ -177,7 +179,7 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
     return () => {
       subscription.remove();
     };
-  }, [reload]);
+  }, [reload, memory]);
   const remember = (rule: SeriesRule): void => {
     void (async () => {
       await setSeriesRule(rule);

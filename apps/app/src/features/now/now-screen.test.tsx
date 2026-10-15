@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
+import { setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -332,6 +333,30 @@ describe("NowBoard", () => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
     expect(Object.values(runtime.state.store.getState().time.activities)).toEqual([]);
+  });
+
+  it("drops the card of a series answered for good on Day while Now stays open (bug class 8)", async () => {
+    // Now is a tab: it stays mounted while Day remembers "every time" for the series.
+    calendar.state.status = "granted";
+    calendar.state.events = [
+      {
+        allDay: false,
+        calendarId: "cal-1",
+        endDate: addMinutesIso(NOW, 95),
+        id: "standup-6",
+        recurrenceRule: { frequency: "daily" },
+        startDate: addMinutesIso(NOW, 5),
+        title: "Standup",
+      },
+    ];
+    await renderScreen(<Board />, await createTestRuntime());
+    expect(await screen.findByLabelText("From your calendar")).toBeOnTheScreen();
+    await act(async () => {
+      await setSeriesRule({ rule: "skip", series: "cal-1:Standup", title: "Standup" });
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    });
   });
 
   it("keeps the calendar card when its skip did not go through, and says so", async () => {

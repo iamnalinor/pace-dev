@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
-import { removeSeriesRule, type SeriesRule, seriesRules } from "#app/platform/phone-memory.ts";
+import {
+  removeSeriesRule,
+  type SeriesRule,
+  seriesRules,
+  usePhoneMemoryVersion,
+} from "#app/platform/phone-memory.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
 
@@ -13,6 +18,8 @@ import { usePermissions } from "./use-permissions.ts";
 const SeriesRules = () => {
   const t = useT();
   const [rules, setRules] = useState<readonly SeriesRule[]>([]);
+  // Read again whenever Day remembers or this list forgets one, while the screen is open.
+  const memory = usePhoneMemoryVersion();
   const reload = useCallback(() => {
     void (async () => {
       setRules(await seriesRules());
@@ -20,7 +27,7 @@ const SeriesRules = () => {
   }, []);
   useEffect(() => {
     reload();
-  }, [reload]);
+  }, [reload, memory]);
   if (rules.length === 0) {
     return null;
   }
