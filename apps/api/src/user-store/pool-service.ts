@@ -25,16 +25,18 @@ import * as cloud from "./cloud-data.ts";
 import * as deliveries from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
 import {
-  answerInputs,
   type Couriers,
   deliverNew,
+  hasPendingAfterWithdraw,
+  hasSendRetry,
   type PoolDeps,
   poolMemoryOf,
   ruledSeriesOf,
   savePoolMemory,
-  withdraw,
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
+import { answerInputs } from "./pool-answers.ts";
+import { armRetry, scheduleNextPass } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { type Materialized, prepareBatch } from "./state.ts";
 
@@ -134,8 +136,15 @@ export class NotificationPool {
   async #settle(id: string, resolution: Resolution, meta: AnswerMeta): Promise<void> {
     const { db } = this.#host;
     const stored = await rows.findNotification(db, id);
-    if (stored !== undefined && (await rows.didResolve(db, { id, now: meta.now, resolution }))) {
-      await withdraw(await this.#deps(meta.now, meta.couriers), stored, { ...meta, resolution });
+    if (
+      stored !== undefined &&
+      (await rows.didResolve(db, { id, now: meta.now, resolution })) &&
+      (await hasPendingAfterWithdraw(await this.#deps(meta.now, meta.couriers), stored, {
+        ...meta,
+        resolution,
+      }))
+    ) {
+      await armRetry(this.#host.ctx.storage, meta.now);
     }
   }
 
@@ -165,6 +174,40 @@ export class NotificationPool {
     await this.#host.derive(meta.now);
     await this.afterWrite(meta.now);
     return ok(null);
+  }
+
+  /** Retries copies still pending and reports whether another alarm is needed. */
+  async #retryPending(now: string, couriers?: Couriers): Promise<boolean> {
+    const deps = await this.#deps(now, couriers);
+    const open = await rows.openNotifications(this.#host.db);
+    for (const stored of open) {
+      if (await hasSendRetry(deps, stored)) {
+        await deliverNew(deps, stored);
+      }
+    }
+    await this.#retryDismissals(deps);
+    const remaining = await rows.openNotifications(this.#host.db);
+    for (const stored of remaining) {
+      if (await hasSendRetry(deps, stored)) {
+        return true;
+      }
+    }
+    const pending = await deliveries.pendingDismissalIds(this.#host.db);
+    return pending.length > 0;
+  }
+
+  async #retryDismissals(deps: PoolDeps): Promise<void> {
+    const pendingIds = await deliveries.pendingDismissalIds(this.#host.db);
+    for (const id of pendingIds) {
+      const stored = await rows.findNotification(this.#host.db, id);
+      if (stored === undefined) {
+        continue;
+      }
+      await hasPendingAfterWithdraw(deps, stored, {
+        origin: "system",
+        resolution: stored.notification.resolution ?? "read",
+      });
+    }
   }
 
   /**
@@ -199,6 +242,9 @@ export class NotificationPool {
       return stored;
     }
     await deliverNew(await this.#deps(now, couriers), stored.value);
+    if (await hasSendRetry(await this.#deps(now, couriers), stored.value)) {
+      await armRetry(this.#host.ctx.storage, now);
+    }
     return ok(stored.value.notification);
   }
 
@@ -311,9 +357,8 @@ export class NotificationPool {
     for (const settled of pass.settled) {
       await this.#settle(settled.id, settled.resolution, { couriers, now, origin: "system" });
     }
-    await (pass.nextAt === null
-      ? storage.deleteAlarm()
-      : storage.setAlarm(Date.parse(pass.nextAt)));
+    const isRetry = await this.#retryPending(now, couriers);
+    await scheduleNextPass(storage, { now, nextAt: pass.nextAt, isRetry });
     return { created, nextAt: pass.nextAt };
   }
 }

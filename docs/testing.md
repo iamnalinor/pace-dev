@@ -2,6 +2,8 @@
 
 Every level tests what the others cannot. Behaviour changes start with a failing test
 (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+The composer's `canAdd` is one predicate shared by button enablement and the action;
+action-level tests check that every enabled draft is accepted from each entry path.
 
 | Level | Tool | Runs against | Where | Command |
 |---|---|---|---|---|

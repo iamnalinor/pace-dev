@@ -2,11 +2,13 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { newId } from "@pace/core";
+
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
 import { createApp } from "../src/app.ts";
 import { echoReply, fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev, readJson } from "./helpers.ts";
+import { json, loginAsDev, pushEvents, readJson } from "./helpers.ts";
 
 /** Every outgoing Telegram API call lands here instead of the network. */
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -305,6 +307,18 @@ describe("notification buttons", () => {
     const token = await loginAsDev("1002");
     const { id: userId } = await json<{ id: string }>("/api/me", { token });
     const now = Date.now();
+    await pushEvents(token, [
+      {
+        deviceId: "test",
+        id: newId(),
+        occurredAt: new Date(now).toISOString(),
+        payload: { quietHours: { from: "00:00", to: "00:00" } },
+        precision: "exact",
+        recordedAt: new Date(now).toISOString(),
+        source: "app",
+        type: "settings.updated",
+      },
+    ]);
     const title = `Seminar ${crypto.randomUUID().slice(0, 6)}`;
     await json("/api/calendar/sync", {
       body: {

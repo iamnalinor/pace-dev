@@ -38,5 +38,5 @@ export type PushTransport = {
   /** Which credentials the transport sends with: a method broken with them is retried with others. */
   readonly fingerprint: string;
   readonly send: (to: DeviceAddress, message: PushMessage) => Promise<SendOutcome>;
-  readonly dismiss: (to: DeviceAddress, notificationId: string) => Promise<void>;
+  readonly dismiss: (to: DeviceAddress, notificationId: string) => Promise<SendOutcome>;
 };

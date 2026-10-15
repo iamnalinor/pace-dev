@@ -1,18 +1,11 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import {
-  type ActivityOverrunPayload,
-  calendarAttend,
-  type CoreState,
-  type EventInput,
-  type EventStartPayload,
   INITIAL_POOL_MEMORY,
   isChannelOn,
-  newId,
   type PoolMemory,
   type PoolNotification,
   type Resolution,
-  runningActivity,
   type Settings,
 } from "@pace/core";
 
@@ -39,10 +32,19 @@ import {
   type TelegramTarget,
   wasTelegramMessageDeleted,
 } from "../shared/telegram-api.ts";
-import { logAttempt, logUnavailable, takeBackDeliveries, wasDelivered } from "./delivery-rows.ts";
+import {
+  hasFailedCopy,
+  latestAttempt,
+  logAttempt,
+  logUnavailable,
+  markDismissed,
+  pendingDismissalIds,
+  takeBackDeliveries,
+  wasDelivered,
+} from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
-import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
+import { markTelegramKept, setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -180,6 +182,15 @@ const afterSend = async (
   }
 };
 
+const isRetryTooSoon = async (
+  deps: PoolDeps,
+  notificationId: string,
+  sessionId: string,
+): Promise<boolean> => {
+  const last = await latestAttempt(deps.db, notificationId, sessionId);
+  return last?.reason === "failed" && Date.parse(deps.now) - Date.parse(last.attemptedAt) < 60_000;
+};
+
 /** One device by its push method, logged; nothing when it got this one already. */
 const pushToDevice = async (
   deps: PoolDeps,
@@ -188,7 +199,10 @@ const pushToDevice = async (
 ): Promise<void> => {
   const transport = transportFor(deps.couriers.push, subscription.transport);
   const { notification } = message;
-  if (await wasDelivered(deps.db, notification.id, subscription.sessionId)) {
+  if (
+    (await wasDelivered(deps.db, notification.id, subscription.sessionId)) ||
+    (await isRetryTooSoon(deps, notification.id, subscription.sessionId))
+  ) {
     return;
   }
   if (transport === null || (await isBroken(deps.binding, transport, Date.now()))) {
@@ -244,8 +258,11 @@ export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Pr
   if (notification.resolvedAt !== null) {
     return;
   }
-  if (stored.telegram.state === "pending") {
-    await sendToTelegram(deps, stored);
+  if (stored.telegram.state === "pending" || stored.telegram.state === "failed") {
+    const last = await latestAttempt(deps.db, notification.id, "telegram");
+    if (last === undefined || Date.parse(deps.now) - Date.parse(last.attemptedAt) >= 60_000) {
+      await sendToTelegram(deps, stored);
+    }
   }
   // Queued for polling devices before the open clients hear of it: an open app fetches at once.
   await pushToDevices(deps, notification);
@@ -275,73 +292,53 @@ Takes a resolved notification back everywhere: the Telegram copy is deleted unle
 came from Telegram (the bot edits it there), every push copy is dismissed through the method
 that delivered it, and open clients update their feed.
 */
-export const withdraw = async (
+export const hasPendingAfterWithdraw = async (
   deps: PoolDeps,
   stored: StoredNotification,
   { origin, resolution }: { readonly origin: AnswerOrigin; readonly resolution: Resolution },
-): Promise<void> => {
+): Promise<boolean> => {
   const { notification, telegram } = stored;
+  if (origin === "telegram" && telegram.state === "sent") {
+    await markTelegramKept(deps.db, notification.id);
+  }
   const isTelegramGone = await wasTelegramCopyDeleted(deps, telegram, origin);
   const copies = await takeBackDeliveries(deps.db, notification.id, {
     isTelegramGone,
-    now: deps.now,
   });
   for (const copy of copies) {
-    await transportFor(deps.couriers.push, copy.method)?.dismiss(copy, notification.id);
+    if (copy.method === "telegram") {
+      await markDismissed(deps.db, copy.id, deps.now);
+      continue;
+    }
+    const outcome = await transportFor(deps.couriers.push, copy.method)?.dismiss(
+      copy,
+      notification.id,
+    );
+    if (["sent", "queued", "gone"].includes(outcome ?? "")) {
+      await markDismissed(deps.db, copy.id, deps.now);
+    }
   }
   broadcast(deps.ctx, { id: notification.id, resolution, type: "dismiss" });
+  return await hasPendingDismissal(deps.db, notification.id);
 };
 
-const at = (
-  occurredAt: string,
-  body: Omit<EventInput, "occurredAt" | "precision" | "source">,
-): EventInput => ({ ...body, occurredAt, precision: "exact", source: "system" }) as EventInput;
-
-type AnswerContext = { readonly state: CoreState; readonly now: string };
-
-/** Attend: the event tracked the way Now's offer does (`calendarAttend`: label and Expect fitted). */
-const attendInputs = (
-  { end, start, title }: EventStartPayload,
-  { now, state }: AnswerContext,
-): readonly EventInput[] => {
-  const write = calendarAttend(
-    state.time,
-    { endAt: end, startAt: start, title },
-    { activityId: newId(), now },
-  );
-  return [at(write.occurredAt, write.body)];
+const hasPendingDismissal = async (db: Db, notificationId: string): Promise<boolean> => {
+  const pending = await pendingDismissalIds(db);
+  return pending.includes(notificationId);
 };
 
-/** "Yes, still" moves the next ask on; Stop stops it; nothing once the activity is not running. */
-const overrunInputs = (
-  { activityId }: ActivityOverrunPayload,
-  resolution: Resolution,
-  { now, state }: AnswerContext,
-): readonly EventInput[] => {
-  if (runningActivity(state.time, now)?.id !== activityId) {
-    return [];
+/** Open notifications whose latest copy failed and can be retried by a pool pass. */
+export const hasSendRetry = async (
+  deps: PoolDeps,
+  stored: StoredNotification,
+): Promise<boolean> => {
+  if (stored.telegram.state === "failed") {
+    return true;
   }
-  if (resolution === "still") {
-    return [at(now, { payload: { activityId, stillAt: now }, type: "activity.labelled" })];
+  if (deps.userId === undefined) {
+    return false;
   }
-  return resolution === "stopped"
-    ? [at(now, { payload: { activityId }, type: "activity.stopped" })]
-    : [];
-};
-
-/**
-The events an answer writes: Attend tracks the event, "Yes, still" and Stop act on the activity.
-Skip and Read write nothing.
-*/
-export const answerInputs = (
-  notification: PoolNotification,
-  resolution: Resolution,
-  context: AnswerContext,
-): readonly EventInput[] => {
-  if (notification.kind === "event_start") {
-    return resolution === "attended" ? attendInputs(notification.payload, context) : [];
-  }
-  return notification.kind === "activity_overrun"
-    ? overrunInputs(notification.payload, resolution, context)
-    : [];
+  const subscriptions = await subscriptionsOf(deps.binding, deps.userId, Date.parse(deps.now));
+  const activeSessions = new Set(subscriptions.map((subscription) => subscription.sessionId));
+  return await hasFailedCopy(deps.db, stored.notification.id, activeSessions);
 };

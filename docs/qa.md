@@ -43,7 +43,8 @@ the test suites).
 >
 > Cover: every screen at 1440×900 and 390×844, light and dark (`localStorage["pace.theme"]`),
 > Russian and English; the owner's scenarios in `context/feedback-*.md` and the plan's scenario
-> table; every form, sheet, picker and button; keyboard (Tab, Enter, Escape); empty, loading,
+> table; every form, sheet, picker and button; open every form by hand and from each other
+> entry path in the table below, then submit from each; keyboard (Tab, Enter, Escape); empty, loading,
 > error and offline states; console errors and failed requests on every screen; translation
 > gaps and raw keys; text overflow, contrast, tap targets; anything that contradicts itself.
 > Compare with what the owner asked for and list every request that is still not met.
@@ -66,6 +67,13 @@ the test suites).
 > - **Copy**: plain words that say what happened and what to do («A new version is ready ·
 >   Refresh»), never vague («We changed a few things»).
 > - **Color**: one calm accent for actions; no colour that shouts without a reason.
+> - **Forms keep their promise**: try every entry path (empty by hand, assistant, paste,
+>   New task/N, edit) and submit; anything an enabled button offers must be accepted by
+>   the action, since separate UI and action decisions can disagree.
+> - **Overlays in context**: check when every toast, tooltip and popup appears, where it
+>   lands and which controls it covers; late or misplaced feedback hides the next action.
+> - **Visual matrix**: inspect each changed screen at 390 px and 1280 px, in both themes
+>   with Russian text; wrapping and contrast can fail only in one combination.
 >
 > Report (English): a summary with counts by severity; findings most severe first, each with an
 > id, severity (blocker/high/medium/low), screen + width + theme + language, exact steps, what

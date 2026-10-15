@@ -22,6 +22,7 @@ fetches what waits for it and shows or takes back each, under the pool id. Sendi
 export const pollTransport = (queue: PollQueue): PushTransport => ({
   dismiss: async (to, notificationId) => {
     await queue.enqueue(to.sessionId, { notificationId, type: "dismiss" });
+    return "queued";
   },
   // Nothing to be refused: the queue is Pace's own.
   fingerprint: "poll",

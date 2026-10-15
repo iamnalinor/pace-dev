@@ -30,8 +30,10 @@ build differs in three ways, all in `metro.config.js`:
 - **Layout**: from 1024 px the tabs become a sidebar and Now shows the picked task beside the
   list (`src/ui/layout.ts`, `src/screens/now-screen.tsx`).
 
-The service worker precaches the build and waits; the update banner offers "Reload", which
-hands control to the new worker.
+The service worker precaches the build and waits; the update strip offers "Refresh page",
+which hands control to the new worker. The phone tabs are Now, Day, Inbox and More (which
+opens Week and the other destinations). On a wide screen the sidebar lists Now, Day, Week,
+Inbox, Projects, Insights, Devices and Settings.
 
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs
@@ -162,7 +164,8 @@ secrets with zod once per request and stores the result on the context.
 - **Sessions** (`auth/sessions.ts`): 32 random bytes as the bearer token, SHA-256 in D1
   `sessions` with a label (`web`, `android`, `dev`), 90-day expiry, `lastSeenAt` touched at
   most hourly. `requireAuth` middleware resolves the bearer to `CurrentUser`; handlers
-  read it with `requireUser(c)`.
+  read it with `requireUser(c)`. The fuller session list and login notices belong to a
+  later stage; this release does not expose them.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
 
 D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`,
@@ -205,6 +208,21 @@ checked by the Durable Object. `seq` is a server-assigned integer, so a client t
 pulls from its last `seq` gets exactly what it missed, in any order of `occurredAt`; the
 materialization rule above decides whether an incremental apply is enough.
 
+## Assistant proposals and time tracking
+
+`POST /api/parse` reads free text in the requested `task` or `activity` domain and answers
+with checked proposals. Core names the proposal kinds in `proposals/kinds.ts` (create,
+update, delete, close and subtask changes for tasks; start, log, update and delete for
+activities). `planProposal` in `proposals/plan.ts` validates one accepted proposal against
+the current state and produces events; `planProposals` plans a batch in order. Parsing
+alone does not write events. The app's full proposal cards and the bot's proposal picker
+are planned for later PRs.
+
+On Day, the time bar offers Calendar, Task, Chores and Rest, plus a typed activity; Now
+shows a compact row for what is running. A computer can contribute foreground-app and
+idle-time observations through the scoped token and the Python agent described in
+[desktop.md](desktop.md). Observations are separate from the immutable user-action log.
+
 ## Durable Object per user
 
 `apps/api/src/user-store/user-store.ts`: `class UserStore extends DurableObject`, one
@@ -234,6 +252,13 @@ append (a client's sync push, an `apply`) and before every read and every `apply
 `cancelled_missed` / `skipped` outcomes, then the next instance of a course left with none open
 (`user-store/derive-steps.ts`), with deterministic ids, so they are idempotent
 against clients that derived the same events.
+
+The notification pool (`user-store/pool-service.ts`) evaluates calendar starts, activity
+overruns and deadline digest slots. A pass stores notifications once per subject, records
+delivery per channel and device, and arms the Durable Object alarm for the next due time.
+The feed and open app update through the live socket. Telegram and a configured FCM project
+can deliver outside the app; a phone with a different Firebase project uses polling.
+Answering or settling a notification resolves it in the pool and takes back its copies.
 
 Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,
 `apply(inputs, { source, deviceId, now })` (derives, then validates the batch in order with

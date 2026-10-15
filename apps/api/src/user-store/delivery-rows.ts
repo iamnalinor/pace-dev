@@ -1,6 +1,6 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { and, eq, inArray, isNull, lte, ne, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, or, type SQL } from "drizzle-orm";
 
 import type { PushSubscription } from "../shared/push-subscriptions.ts";
 import type { PollEntry } from "../shared/push/poll-transport.ts";
@@ -68,6 +68,54 @@ export const wasDelivered = async (
     inArray(notificationDeliveries.result, ["queued", "sent"]),
   ]);
 
+/** The latest attempt for one copy; a failed attempt may be retried after a short pause. */
+export const latestAttempt = async (
+  db: Db,
+  notificationId: string,
+  sessionId: string,
+): Promise<typeof notificationDeliveries.$inferSelect | undefined> => {
+  const attempts = await db
+    .select()
+    .from(notificationDeliveries)
+    .where(
+      and(
+        eq(notificationDeliveries.notificationId, notificationId),
+        eq(notificationDeliveries.sessionId, sessionId),
+      ),
+    )
+    .orderBy(desc(notificationDeliveries.id))
+    .limit(1);
+  return attempts[0];
+};
+
+/** Whether any copy's latest attempt failed transiently. */
+export const hasFailedCopy = async (
+  db: Db,
+  notificationId: string,
+  activeSessions: ReadonlySet<string>,
+): Promise<boolean> => {
+  const attempts = await db
+    .select()
+    .from(notificationDeliveries)
+    .where(eq(notificationDeliveries.notificationId, notificationId))
+    .orderBy(desc(notificationDeliveries.id));
+  const seen = new Set<string>();
+  for (const attempt of attempts) {
+    if (seen.has(attempt.sessionId)) {
+      continue;
+    }
+    seen.add(attempt.sessionId);
+    if (
+      activeSessions.has(attempt.sessionId) &&
+      attempt.result === "failed" &&
+      attempt.reason === "failed"
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /** Whether the device's attempt was logged already as unreachable by this method. */
 const wasLoggedUnavailable = async (
   db: Db,
@@ -128,11 +176,18 @@ marked only when it was deleted (`isTelegramGone`): one answered in Telegram sta
 export const takeBackDeliveries = async (
   db: Db,
   notificationId: string,
-  { isTelegramGone, now }: { readonly isTelegramGone: boolean; readonly now: string },
-): Promise<readonly Pick<DeliveryAttempt, "endpoint" | "method" | "sessionId">[]> =>
+  { isTelegramGone }: { readonly isTelegramGone: boolean },
+): Promise<
+  readonly (Pick<DeliveryAttempt, "endpoint" | "method" | "sessionId"> & { readonly id: number })[]
+> =>
   await db
-    .update(notificationDeliveries)
-    .set({ dismissedAt: now })
+    .select({
+      id: notificationDeliveries.id,
+      endpoint: notificationDeliveries.endpoint,
+      method: notificationDeliveries.method,
+      sessionId: notificationDeliveries.sessionId,
+    })
+    .from(notificationDeliveries)
     .where(
       and(
         eq(notificationDeliveries.notificationId, notificationId),
@@ -140,12 +195,37 @@ export const takeBackDeliveries = async (
         isNull(notificationDeliveries.dismissedAt),
         isTelegramGone ? undefined : ne(notificationDeliveries.method, "telegram"),
       ),
+    );
+
+/** Commit the dismissal after the transport accepted it. */
+export const markDismissed = async (db: Db, id: number, now: string): Promise<void> => {
+  await db
+    .update(notificationDeliveries)
+    .set({ dismissedAt: now })
+    .where(and(eq(notificationDeliveries.id, id), isNull(notificationDeliveries.dismissedAt)));
+};
+
+/** Resolved notifications with push copies still awaiting dismissal. */
+export const pendingDismissalIds = async (db: Db): Promise<readonly string[]> => {
+  const pushCopy = ne(notificationDeliveries.method, "telegram");
+  const telegramCopy = eq(schema.notifications.telegramState, "sent");
+  const rows = await db
+    .select({ notificationId: notificationDeliveries.notificationId })
+    .from(notificationDeliveries)
+    .innerJoin(
+      schema.notifications,
+      eq(schema.notifications.id, notificationDeliveries.notificationId),
     )
-    .returning({
-      endpoint: notificationDeliveries.endpoint,
-      method: notificationDeliveries.method,
-      sessionId: notificationDeliveries.sessionId,
-    });
+    .where(
+      and(
+        inArray(notificationDeliveries.result, ["queued", "sent"]),
+        isNull(notificationDeliveries.dismissedAt),
+        or(pushCopy, telegramCopy),
+        isNotNull(schema.notifications.resolvedAt),
+      ),
+    );
+  return [...new Set(rows.map((row) => row.notificationId))];
+};
 
 /** The delivery log of some notifications, oldest attempt first. */
 export const deliveriesOf = async (

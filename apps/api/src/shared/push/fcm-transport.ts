@@ -14,11 +14,15 @@ silent `dismiss` messages that take one back. Both carry the pool id as the tag 
 */
 export const fcmTransport = (target: FcmTarget): PushTransport => ({
   dismiss: async (to, notificationId) => {
-    await sendFcm(target, {
+    const outcome = await sendFcm(target, {
       collapseKey: `dismiss:${notificationId}`,
       data: { notificationId, type: "dismiss" },
       token: to.endpoint,
     });
+    if (outcome === "sent") {
+      return "sent";
+    }
+    return outcome === "unregistered" ? "gone" : "failed";
   },
   fingerprint: target.fingerprint,
   method: "fcm",
