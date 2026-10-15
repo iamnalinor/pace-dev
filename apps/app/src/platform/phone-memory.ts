@@ -6,6 +6,8 @@ import type { SleepCandidate } from "@pace/core";
 
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
 
+import { createSecureSessionStore } from "./secure-session.ts";
+import { sessionHashOf } from "./session-fingerprint.ts";
 import { readSessionValue, writeSessionValue } from "./session-value.ts";
 
 /**
@@ -25,33 +27,56 @@ export const usePhoneMemoryVersion = (): number => useStore(changes, (state) => 
 /** Only recent choices matter; older ones are dropped. */
 const KEEP = 200;
 
-const readJson = async (key: string): Promise<unknown> => {
+/** A capped list of keys kept on this phone. */
+const currentSession = async (): Promise<null | string> => await createSecureSessionStore().get();
+
+const privateKey = async (key: string, session: string): Promise<string> =>
+  `${key}.${await sessionHashOf(session)}`;
+
+const readPrivate = async (key: string, session: string): Promise<unknown> => {
   try {
-    const stored = await SecureStore.getItemAsync(key);
-    return stored === null ? null : (JSON.parse(stored) as unknown);
+    const stored = await SecureStore.getItemAsync(await privateKey(key, session));
+    return stored === null || (await currentSession()) !== session
+      ? null
+      : (JSON.parse(stored) as unknown);
   } catch {
     return null;
   }
 };
 
-/** A capped list of keys kept on this phone. */
+const writePrivate = async (key: string, session: string, value: unknown): Promise<void> => {
+  if ((await currentSession()) !== session) {
+    return;
+  }
+
+  await SecureStore.setItemAsync(await privateKey(key, session), JSON.stringify(value));
+  changed();
+};
+
 const keyList = (storeKey: string) => {
-  const load = async (): Promise<readonly string[]> => {
-    const parsed = await readJson(storeKey);
+  const load = async (session: string): Promise<readonly string[]> => {
+    const parsed = await readPrivate(storeKey, session);
     return Array.isArray(parsed)
       ? parsed.filter((item): item is string => typeof item === "string")
       : [];
   };
   return {
     add: async (key: string): Promise<void> => {
-      const current = await load();
-      await SecureStore.setItemAsync(
+      const session = await currentSession();
+      if (session === null) {
+        return;
+      }
+      const current = await load(session);
+      await writePrivate(
         storeKey,
-        JSON.stringify([...current.filter((item) => item !== key), key].slice(-KEEP)),
+        session,
+        [...current.filter((item) => item !== key), key].slice(-KEEP),
       );
-      changed();
     },
-    all: async (): Promise<ReadonlySet<string>> => new Set(await load()),
+    all: async (): Promise<ReadonlySet<string>> => {
+      const session = await currentSession();
+      return new Set(session === null ? [] : await load(session));
+    },
   };
 };
 
@@ -89,33 +114,53 @@ const isRule = (value: unknown): value is SeriesRule =>
   (value.rule === "attended" || value.rule === "skip");
 
 export const seriesRules = async (): Promise<readonly SeriesRule[]> => {
-  const parsed = await readJson(RULES_KEY);
+  const session = await currentSession();
+  const parsed = session === null ? null : await readPrivate(RULES_KEY, session);
   return Array.isArray(parsed) ? parsed.filter((item) => isRule(item)) : [];
 };
 
-const saveRules = async (rules: readonly SeriesRule[]): Promise<void> => {
-  await SecureStore.setItemAsync(RULES_KEY, JSON.stringify(rules));
-  changed();
-};
-
 export const setSeriesRule = async (rule: SeriesRule): Promise<void> => {
+  const session = await currentSession();
+  if (session === null) {
+    return;
+  }
   const current = await seriesRules();
-  await saveRules([...current.filter((item) => item.series !== rule.series), rule]);
+  await writePrivate(RULES_KEY, session, [
+    ...current.filter((item) => item.series !== rule.series),
+    rule,
+  ]);
 };
 
 export const removeSeriesRule = async (series: string): Promise<void> => {
+  const session = await currentSession();
+  if (session === null) {
+    return;
+  }
   const current = await seriesRules();
-  await saveRules(current.filter((item) => item.series !== series));
+  await writePrivate(
+    RULES_KEY,
+    session,
+    current.filter((item) => item.series !== series),
+  );
 };
 
 const CALENDAR_SYNC_KEY = "pace.phone.calendarSync";
 
-/** Whether this phone sends its calendar to Pace (on until turned off in Settings). */
-export const isCalendarSyncOn = async (): Promise<boolean> =>
-  (await readJson(CALENDAR_SYNC_KEY)) !== false;
+/** Per-session calendar upload consent; a different login begins with it off. */
+export const isCalendarSyncOn = async (session: string): Promise<boolean> =>
+  (await readSessionValue(CALENDAR_SYNC_KEY, session)) === 1;
 
-export const setCalendarSync = async (isOn: boolean): Promise<void> => {
-  await SecureStore.setItemAsync(CALENDAR_SYNC_KEY, JSON.stringify(isOn));
+export const setCalendarSync = async (
+  session: string,
+  isOn: boolean,
+  isCurrentSession: () => boolean,
+): Promise<void> => {
+  await writeSessionValue({
+    isCurrentSession,
+    key: CALENDAR_SYNC_KEY,
+    session,
+    value: isOn ? 1 : 0,
+  });
 };
 
 const USAGE_CURSOR_KEY = "pace.phone.usageCursor";

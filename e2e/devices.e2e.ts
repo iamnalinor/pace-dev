@@ -23,11 +23,13 @@ test("adds a computer, which then reports its apps and shows on Week", async ({ 
   await expect(command).toBeVisible();
   await expectNoA11yViolations(page);
   const text = (await command.textContent()) ?? "";
-  const [, deviceToken = ""] = /--token '([^']+)'/u.exec(text) ?? [];
+  expect(text).not.toContain("--token");
+  const deviceToken = (await page.getByTestId("device-setup-token").textContent()) ?? "";
+  expect(deviceToken).not.toBe("");
   // The server files the sessions under the token's computer, whatever id the agent sends.
   const deviceId = "agent-generated-id";
 
-  // What the agent would send, with the token from the command.
+  // What the agent would send, with the separately displayed token.
   const now = Date.now();
   const sent = await fetch(`${API_URL}/api/usage/sessions`, {
     body: JSON.stringify({

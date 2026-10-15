@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import { createHash } from "node:crypto";
 import { AppState, Text } from "react-native";
 
 import { createMemoryEventStore, createMemorySessionStore, type EventStore } from "@pace/client";
@@ -157,7 +158,10 @@ describe("PaceProvider", () => {
               content: {
                 body: "Still doing Commute?",
                 categoryIdentifier: "activity_overrun",
-                data: { notificationId: "n-9" },
+                data: {
+                  notificationId: "n-9",
+                  sessionHash: createHash("sha256").update("tok_dev").digest("hex"),
+                },
                 title: "Still going?",
               },
             },
@@ -223,6 +227,7 @@ describe("PaceProvider", () => {
 
   it("follows the account language", async () => {
     const { runtime } = await setup();
+    await runtime.auth.loginWithDev("1");
     await render(
       <PaceProvider runtime={runtime}>
         <Probe />
@@ -236,6 +241,89 @@ describe("PaceProvider", () => {
       });
     });
     expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+  });
+
+  it("uses the browser language while signed out, then the account language after sign-in", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    try {
+      const { runtime } = await setup();
+      await render(
+        <PaceProvider runtime={runtime}>
+          <Probe />
+        </PaceProvider>,
+      );
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      await act(async () => {
+        await runtime.auth.loginWithDev("1");
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Now");
+    } finally {
+      locale.mockRestore();
+    }
+  });
+
+  it("keeps the guest language until the signed-in account has synced", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    const { promise: waiting, resolve: releasePull } = Promise.withResolvers<undefined>();
+    try {
+      const { runtime } = await setup({
+        "GET /api/sync/pull": async () => {
+          await waiting;
+          return { events: [], more: false, seq: 0, storeId: "store-test" };
+        },
+      });
+      await render(
+        <PaceProvider runtime={runtime}>
+          <Probe />
+        </PaceProvider>,
+      );
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      await act(async () => {
+        await runtime.auth.loginWithDev("1");
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      await act(async () => {
+        releasePull(undefined);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("title")).toHaveTextContent("Now");
+      });
+    } finally {
+      releasePull(undefined);
+      locale.mockRestore();
+    }
+  });
+
+  it("uses account language after a later successful sync when the first pull failed", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    let isOnline = false;
+    try {
+      const { runtime } = await setup({
+        "GET /api/sync/pull": () =>
+          isOnline
+            ? { events: [], more: false, seq: 0, storeId: "store-test" }
+            : problem(503, "offline"),
+      });
+      await render(
+        <PaceProvider runtime={runtime}>
+          <Probe />
+        </PaceProvider>,
+      );
+      await act(async () => {
+        await runtime.auth.loginWithDev("1");
+      });
+      await waitFor(() => {
+        expect(runtime.sync.status.getState().lastError).not.toBeNull();
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Сейчас");
+      isOnline = true;
+      await act(async () => {
+        await runtime.sync.syncNow();
+      });
+      expect(screen.getByTestId("title")).toHaveTextContent("Now");
+    } finally {
+      locale.mockRestore();
+    }
   });
 
   it("syncs again when the app returns to the foreground", async () => {

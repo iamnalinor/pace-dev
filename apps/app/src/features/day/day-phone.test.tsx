@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
+import { seriesRules, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -64,6 +65,7 @@ const calendar = Calendar as unknown as FakeCalendar;
 beforeEach(() => {
   // What a test waved away stays on its fake phone only.
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  (SecureStore as unknown as FakeSecureStore).values.set("pace.session", "session-test");
   mockEvents.splice(NIGHT_EVENTS);
   mockAccess.granted = true;
   calendar.state.status = "granted";
@@ -292,21 +294,14 @@ describe("Day with the phone's data", () => {
     await fireEvent.press(within(list).getByRole("button", { name: "Attended" }));
     await fireEvent.press(await screen.findByRole("button", { name: "Every time" }));
     expect(await screen.findByText("Will do the same every time")).toBeOnTheScreen();
-    expect(
-      JSON.parse(
-        (SecureStore as unknown as FakeSecureStore).values.get("pace.phone.rules") ?? "[]",
-      ),
-    ).toEqual([{ rule: "attended", series: "cal-1:Standup", title: "Standup" }]);
+    expect(await seriesRules()).toEqual([
+      { rule: "attended", series: "cal-1:Standup", title: "Standup" },
+    ]);
   });
 
   it("logs an always-attended series by itself and hides an always-skipped one", async () => {
-    (SecureStore as unknown as FakeSecureStore).values.set(
-      "pace.phone.rules",
-      JSON.stringify([
-        { rule: "attended", series: "cal-1:Standup", title: "Standup" },
-        { rule: "skip", series: "cal-1:Gym", title: "Gym" },
-      ]),
-    );
+    await setSeriesRule({ rule: "attended", series: "cal-1:Standup", title: "Standup" });
+    await setSeriesRule({ rule: "skip", series: "cal-1:Gym", title: "Gym" });
     const daily = { frequency: "daily" };
     calendar.state.events = [
       {

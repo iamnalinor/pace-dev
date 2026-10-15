@@ -31,6 +31,7 @@ const calendar = Calendar as unknown as FakeCalendar;
 beforeEach(() => {
   jest.clearAllMocks();
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  (SecureStore as unknown as FakeSecureStore).values.set("pace.session", "session-test");
   calendar.state.status = "undetermined";
   calendar.state.events = [];
 });

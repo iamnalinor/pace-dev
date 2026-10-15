@@ -6,10 +6,11 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
 
+import type { loadDeviceId as actualLoadDeviceId } from "./device-id.ts";
 import type { calendarEvents as actualCalendarEvents } from "./phone-calendar.ts";
 
 import { setCalendarSync } from "./phone-memory.ts";
-import { uploadPhoneData } from "./phone-upload.ts";
+import { clearPhoneCalendar, uploadPhoneData } from "./phone-upload.ts";
 
 const at = (hhmm: string): number => Date.parse(`2026-10-06T${hhmm}:00.000Z`);
 
@@ -28,6 +29,24 @@ const mockCalendarRead = {
   gate: null as null | Promise<boolean>,
   started: null as (() => void) | null,
 };
+const mockDeviceRead = {
+  gate: null as null | Promise<boolean>,
+  started: null as (() => void) | null,
+};
+
+jest.mock("./device-id.ts", () => {
+  const actual = jest.requireActual<{ readonly loadDeviceId: typeof actualLoadDeviceId }>(
+    "./device-id.ts",
+  );
+  return {
+    ...actual,
+    loadDeviceId: async () => {
+      mockDeviceRead.started?.();
+      await mockDeviceRead.gate;
+      return await actual.loadDeviceId();
+    },
+  };
+});
 
 jest.mock("./phone-calendar.ts", () => {
   const actual = jest.requireActual<{ readonly calendarEvents: typeof actualCalendarEvents }>(
@@ -65,13 +84,21 @@ const calendar = Calendar as unknown as FakeCalendar;
 
 type Sent = { readonly url: string; readonly body: Record<string, unknown> };
 
-const world = async (sent: Sent[]) => {
+const world = async (
+  sent: Sent[],
+  calendarSync?: (body: Record<string, unknown>) => Promise<void>,
+) => {
   const runtime = await createTestRuntime({
     now: "2026-10-06T10:00:00.000Z",
     routes: {
-      "POST /api/calendar/sync": ({ body }) => {
+      "POST /api/calendar/sync": async ({ body }) => {
+        await calendarSync?.(body as Record<string, unknown>);
         sent.push({ body: body as Record<string, unknown>, url: "calendar" });
         return { stored: 1 };
+      },
+      "DELETE /api/calendar": () => {
+        sent.push({ body: {}, url: "clear" });
+        return { ok: true };
       },
       "POST /api/usage/sessions": ({ body }) => {
         sent.push({ body: body as Record<string, unknown>, url: "usage" });
@@ -89,7 +116,10 @@ beforeEach(async () => {
   mockUsageRead.started = null;
   mockCalendarRead.gate = null;
   mockCalendarRead.started = null;
+  mockDeviceRead.gate = null;
+  mockDeviceRead.started = null;
   await SecureStore.setItemAsync("pace.session", "session-A");
+  await setCalendarSync("session-A", true, () => true);
   calendar.state.status = "granted";
   calendar.state.events = [
     {
@@ -227,9 +257,76 @@ describe("what the phone sends to Pace", () => {
   });
 
   it("keeps the calendar on the phone once sending it is turned off", async () => {
-    await setCalendarSync(false);
+    await setCalendarSync("session-A", false, () => true);
     const sent: Sent[] = [];
     await uploadPhoneData((await world(sent)).api, "2026-10-06T10:00:00.000Z");
     expect(sent.map((item) => item.url)).toEqual(["usage"]);
+  });
+
+  it("does not inherit another session's calendar upload choice", async () => {
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    await setCalendarSync("session-A", true, () => true);
+    await uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    expect(sent.some((item) => item.url === "calendar")).toBe(true);
+    sent.length = 0;
+    await runtime.auth.adoptToken("session-B");
+    await uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    expect(sent.some((item) => item.url === "calendar")).toBe(false);
+  });
+
+  it("does not restore a calendar copy after upload was turned off during a read", async () => {
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    const started = Promise.withResolvers<boolean>();
+    const gate = Promise.withResolvers<boolean>();
+    mockCalendarRead.started = () => {
+      started.resolve(true);
+    };
+    mockCalendarRead.gate = gate.promise;
+    const pending = uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    await started.promise;
+    await setCalendarSync("session-A", false, () => true);
+    gate.resolve(true);
+    await pending;
+    expect(sent.some((item) => item.url === "calendar")).toBe(false);
+  });
+
+  it("clears after an already started calendar upload finishes", async () => {
+    const sent: Sent[] = [];
+    const started = Promise.withResolvers<boolean>();
+    const gate = Promise.withResolvers<boolean>();
+    const runtime = await world(sent, async () => {
+      started.resolve(true);
+      await gate.promise;
+    });
+    const upload = uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    await started.promise;
+    await setCalendarSync("session-A", false, () => true);
+    const clear = clearPhoneCalendar(runtime.api, "session-A");
+    gate.resolve(true);
+    await Promise.all([upload, clear]);
+    expect(sent.map((item) => item.url)).toEqual(["calendar", "clear", "usage"]);
+  });
+
+  it("does not clear B's calendar when A signs out while the device id is loading", async () => {
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    const started = Promise.withResolvers<boolean>();
+    const gate = Promise.withResolvers<boolean>();
+    mockDeviceRead.started = () => {
+      started.resolve(true);
+    };
+    mockDeviceRead.gate = gate.promise;
+    try {
+      const clear = clearPhoneCalendar(runtime.api, "session-A");
+      await started.promise;
+      await runtime.auth.adoptToken("session-B");
+      gate.resolve(true);
+      await clear;
+      expect(sent.some((item) => item.url === "clear")).toBe(false);
+    } finally {
+      gate.resolve(true);
+    }
   });
 });

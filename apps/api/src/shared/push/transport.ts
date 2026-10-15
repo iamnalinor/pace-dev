@@ -18,7 +18,11 @@ export type PushMessage = {
 };
 
 /** One device's push address: the FCM token; for polling, the session itself. */
-export type DeviceAddress = { readonly sessionId: string; readonly endpoint: string };
+export type DeviceAddress = {
+  readonly sessionId: string;
+  readonly sessionHash: string;
+  readonly endpoint: string;
+};
 
 /**
 `sent`; `queued`: waiting for the device to fetch it; `gone`: this device's address is dead (its

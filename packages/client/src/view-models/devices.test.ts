@@ -10,7 +10,7 @@ const setup = {
 
 describe("the command that connects a computer", () => {
   it("on macOS and Linux downloads the agent with curl and installs it with python3", () => {
-    const expected = String.raw`curl -fsSL https://pace.test/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --token 'tok_123' --api https://api.pace.test --name 'Mint'\''s laptop'`;
+    const expected = String.raw`curl -fsSL https://pace.test/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api https://api.pace.test --name 'Mint'\''s laptop'`;
     expect(agentCommand({ ...setup, os: "linux" })).toBe(expected);
     expect(agentCommand({ ...setup, os: "macos" })).toBe(expected);
   });
@@ -22,17 +22,25 @@ describe("the command that connects a computer", () => {
       String.raw`Invoke-WebRequest -UseBasicParsing https://pace.test/pace_agent.py -OutFile "$d\pace_agent.py"`,
     );
     expect(command).toContain(
-      String.raw`& $py "$d\pace_agent.py" install --token 'tok_123' --api https://api.pace.test --name 'Mint''s laptop'`,
+      String.raw`& $py "$d\pace_agent.py" install --api https://api.pace.test --name 'Mint''s laptop'`,
     );
     expect(command.startsWith(String.raw`$d="$env:APPDATA\Pace";`)).toBe(true);
     expect(command).not.toContain("\n");
+  });
+
+  it("never puts the one-time bearer token in the pasted command for any system", () => {
+    for (const os of ["linux", "macos", "windows"] as const) {
+      const command = agentCommand({ ...setup, os });
+      expect(command).not.toContain(setup.device.token);
+      expect(command).not.toContain("--token");
+    }
   });
 
   it("keeps a name with typographic quotes inside PowerShell's single quotes", () => {
     // PowerShell ends a single-quoted string at ‘ ’ ‚ ‛ too; doubled, each stays literal.
     const command = agentCommand({
       ...setup,
-      device: { name: "Ilya’s ‘big’ ‚PC‛ 'x'", token: "tok_123" },
+      device: { name: "Ilya’s ‘big’ ‚PC‛ 'x'" },
       os: "windows",
     });
     expect(command).toContain("--name 'Ilya’’s ‘‘big’’ ‚‚PC‛‛ ''x'''");
@@ -41,7 +49,7 @@ describe("the command that connects a computer", () => {
   it("drops double quotes from the name on Windows: PowerShell 5 would split the argument there", () => {
     const command = agentCommand({
       ...setup,
-      device: { name: 'The "big" PC', token: "tok_123" },
+      device: { name: 'The "big" PC' },
       os: "windows",
     });
     expect(command).toContain("--name 'The big PC'");

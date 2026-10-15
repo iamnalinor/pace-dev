@@ -595,10 +595,11 @@ class CommandsTest(unittest.TestCase):
             out=self.out,
             python="/usr/bin/python3",
             script=self.dir / ".pace_agent.py",
+            read_token=lambda: "tok",
         )
 
     def test_install_saves_the_settings_privately_and_starts_the_service(self):
-        code = agent.main(["install", "--token", "tok", "--api", "https://api.pace.test/", "--name", "Mint"], self.env())
+        code = agent.main(["install", "--api", "https://api.pace.test/", "--name", "Mint"], self.env())
         self.assertEqual(code, 0)
         config = json.loads((self.dir / "pace" / "config.json").read_text())
         self.assertEqual(config["api"], "https://api.pace.test")
@@ -615,14 +616,15 @@ class CommandsTest(unittest.TestCase):
         env = self.env()
         env.environ = {"XDG_SESSION_TYPE": "wayland", "XDG_CURRENT_DESKTOP": "GNOME"}
         env.which = lambda tool: None
-        code = agent.main(["install", "--token", "tok", "--api", "https://api.pace.test"], env)
+        code = agent.main(["install", "--api", "https://api.pace.test"], env)
         self.assertEqual(code, 3)
         self.assertIn("Unsupported desktop (GNOME on Wayland)", self.out.getvalue())
         self.assertFalse((self.dir / "pace" / "config.json").exists())
 
     def test_status_tells_the_settings_the_last_send_and_the_buffer(self):
         env = self.env()
-        agent.main(["install", "--token", "s3cr3t-token", "--api", "https://api.pace.test"], env)
+        env.read_token = lambda: "s3cr3t-token"
+        agent.main(["install", "--api", "https://api.pace.test"], env)
         outbox = agent.Outbox(self.dir / "pace" / "buffer.json")
         outbox.add([agent.Session("code", at("10:00:00"), at("10:02:00"))])
         outbox.save()
@@ -636,11 +638,18 @@ class CommandsTest(unittest.TestCase):
 
     def test_uninstall_removes_the_service_and_the_settings(self):
         env = self.env()
-        agent.main(["install", "--token", "tok", "--api", "https://api.pace.test"], env)
+        agent.main(["install", "--api", "https://api.pace.test"], env)
         self.assertEqual(agent.main(["uninstall"], env), 0)
         self.assertFalse((self.dir / "pace" / "config.json").exists())
         self.assertFalse((self.dir / ".config" / "systemd" / "user" / "pace-agent.service").exists())
         self.assertIn(["systemctl", "--user", "disable", "--now", "pace-agent.service"], self.ran)
+
+    def test_install_refuses_empty_or_unavailable_prompt_without_writing_settings(self):
+        env = self.env()
+        for read_token in (lambda: "  ", lambda: (_ for _ in ()).throw(EOFError())):
+            env.read_token = read_token
+            self.assertNotEqual(agent.main(["install", "--api", "https://api.pace.test"], env), 0)
+            self.assertFalse((self.dir / "pace" / "config.json").exists())
 
 
 if __name__ == "__main__":

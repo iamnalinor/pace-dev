@@ -15,11 +15,13 @@ import {
   type User,
 } from "@pace/core";
 
+import { deviceLanguage } from "./platform/device-language.ts";
 import { IS_PHONE } from "./platform/device.ts";
+import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
+import { notificationIdOf } from "./platform/notification-id.ts";
 import {
   answerFromButton,
   dismissPoolNotification,
-  notificationIdOf,
   pollNow,
   pushStore,
   registerPush,
@@ -27,6 +29,7 @@ import {
 } from "./platform/notifications.ts";
 import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { startPushTask } from "./platform/push-task.ts";
+import { isForSession } from "./platform/session-fingerprint.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 /**
@@ -37,6 +40,7 @@ const POLL_OFFLINE_MS = 30_000;
 const POLL_LIVE_MS = 5 * 60_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
+const LanguageReadyContext = createContext<null | string>(null);
 
 /** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
 const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
@@ -135,6 +139,11 @@ const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
       content: response.notification.request.content,
       id,
       save: async () => await runtime.notifications.resolve(id, resolution),
+      stillCurrent: async () =>
+        await isForSession(
+          response.notification.request.content.data,
+          runtime.api.currentSessionToken(),
+        ),
     });
   });
   return () => {
@@ -143,13 +152,45 @@ const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
   };
 };
 
+/** A successful sync makes account settings safe to show for that run's session. */
+const followSyncedLanguage = (
+  runtime: PaceRuntime,
+  onLanguageReady: (token: null | string) => void,
+): (() => void) => {
+  const { auth, sync } = runtime;
+  let syncOwner = sync.status.getState().syncing ? runtime.api.currentSessionToken() : undefined;
+  return sync.status.subscribe((current, previous) => {
+    if (current.syncing && !previous.syncing) {
+      syncOwner = runtime.api.currentSessionToken();
+    }
+    if (
+      syncOwner !== undefined &&
+      !current.syncing &&
+      previous.syncing &&
+      current.lastError === null &&
+      current.lastSyncAt !== null &&
+      runtime.api.isCurrentSession(syncOwner) &&
+      auth.store.getState().status === "signed-in"
+    ) {
+      onLanguageReady(syncOwner);
+    }
+  });
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
-const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
+const runSyncLoop = (
+  runtime: PaceRuntime,
+  onLanguageReady: (token: null | string) => void,
+): (() => void) => {
   const { actions, auth, sync } = runtime;
+  let activeSession = runtime.api.currentSessionToken();
+  const stopLanguageSync = followSyncedLanguage(runtime, onLanguageReady);
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
+      activeSession = runtime.api.currentSessionToken();
       void bootstrap(runtime);
     } else {
+      onLanguageReady(null);
       sync.stop();
       runtime.live.stop();
     }
@@ -160,9 +201,15 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
       return;
     }
     follow(current.status);
-    if (previous.status === "signed-in" && current.status === "signed-out") {
-      void runtime.resetLocalData();
+    if (!(previous.status === "signed-in" && current.status === "signed-out")) {
+      return;
     }
+
+    if (activeSession !== undefined) {
+      void clearPresentedPoolNotifications(activeSession);
+    }
+    activeSession = undefined;
+    void runtime.resetLocalData();
   });
   // The poll is a safety net while the server can say "changed" itself.
   const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {
@@ -198,6 +245,7 @@ const runSyncLoop = (runtime: PaceRuntime): (() => void) => {
     unsubscribe();
     subscription.remove();
     stopNotices();
+    stopLanguageSync();
     stopFollowingLive();
     sync.stop();
     runtime.live.stop();
@@ -216,6 +264,7 @@ export const PaceProvider = ({
   readonly runtime?: PaceRuntime;
 }) => {
   const [runtime, setRuntime] = useState<null | PaceRuntime>(provided ?? null);
+  const [languageReadyToken, setLanguageReadyToken] = useState<null | string>(null);
 
   useEffect(() => {
     if (provided !== undefined) {
@@ -233,12 +282,17 @@ export const PaceProvider = ({
     };
   }, [provided]);
 
-  useEffect(() => (runtime === null ? undefined : runSyncLoop(runtime)), [runtime]);
+  useEffect(
+    () => (runtime === null ? undefined : runSyncLoop(runtime, setLanguageReadyToken)),
+    [runtime],
+  );
 
   return runtime === null ? (
     <View className="flex-1 bg-bg" />
   ) : (
-    <RuntimeContext value={runtime}>{children}</RuntimeContext>
+    <RuntimeContext value={runtime}>
+      <LanguageReadyContext value={languageReadyToken}>{children}</LanguageReadyContext>
+    </RuntimeContext>
   );
 };
 
@@ -283,7 +337,15 @@ export const useAppState = <T,>(selector: (state: ClientState) => T): T =>
 
 export const useSettings = (): Settings => useAppState((state) => state.settings);
 
-export const useLanguage = (): Language => useAppState((state) => state.settings.language);
+export const useLanguage = (): Language => {
+  const { status } = useAuth();
+  const { api } = usePace();
+  const readyToken = use(LanguageReadyContext);
+  const accountLanguage = useAppState((state) => state.settings.language);
+  return status === "signed-in" && readyToken !== null && readyToken === api.currentSessionToken()
+    ? accountLanguage
+    : deviceLanguage();
+};
 
 /** `t` bound to the account language. */
 export const useT = (): ((key: MessageKey, params?: MessageParams) => string) => {

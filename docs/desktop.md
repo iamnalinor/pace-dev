@@ -31,9 +31,11 @@ Nothing is judged: Pace only shows where the time went.
 computer's system (the web app preselects the one it runs on) and follow its steps.
 
 The token is shown once and may only upload usage (`usage:write`): it cannot read or change
-anything else, and whatever it sends is filed under its own computer. It sits inside the pasted
-line, so it also stays in that terminal's history (and in `config.json`); *Disconnect* in
-Settings → Devices revokes it at once. Lost it? Disconnect the computer and add it again.
+anything else, and whatever it sends is filed under its own computer. Paste the install command
+first; when the agent prompts for the token, copy it separately from Pace and paste it there.
+The prompt hides it and the install command contains no token, so it stays out of terminal
+history and process arguments. The agent saves it in `config.json` with private file permissions;
+*Disconnect* in Settings → Devices revokes it at once. Lost it? Disconnect the computer and add it again.
 
 ### Windows
 
@@ -43,7 +45,7 @@ Open PowerShell (Start → "PowerShell") and paste the line Pace shows. It:
    opens the Microsoft Store), and without one installs it:
    `winget install -e --id Python.Python.3.12` (winget may ask to allow it);
 2. downloads `pace_agent.py` from the web app to `%APPDATA%\Pace`;
-3. runs `pace_agent.py install --token … --api … --name …`, which saves the settings to
+3. runs `pace_agent.py install --api … --name …`, prompts for the token without echo, saves the settings to
    `%APPDATA%\Pace\config.json` and registers the Task Scheduler task **Pace agent**: at logon,
    without elevation (`LeastPrivilege`), running `pythonw.exe pace_agent.py run` (no window), then
    starts it.
@@ -62,7 +64,7 @@ Idle time: `GetLastInputInfo` against `GetTickCount64`.
 Open Terminal (⌘ Space → "Terminal") and paste:
 
 ```sh
-curl -fsSL https://<web app>/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --token '…' --api https://<api> --name '…'
+curl -fsSL https://<web app>/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api https://<api> --name '…'
 ```
 
 `python3` comes with the Command Line Tools: on a fresh Mac the first `python3` offers to

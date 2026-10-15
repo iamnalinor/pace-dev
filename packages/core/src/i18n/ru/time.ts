@@ -114,6 +114,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "week.openTask": "Открыть задачу",
   "common.backToToday": "К сегодня",
   "week.nightHours": "Ночные часы",
+  "week.scrollHint": "Листайте дни вбок",
   "week.pickHint": "Выберите событие или блок, чтобы увидеть подробности",
   "calendar.joinCall": "Подключиться к звонку",
   "calendar.openLink": "Открыть ссылку",

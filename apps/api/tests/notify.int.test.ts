@@ -9,6 +9,7 @@ import type { TelegramTarget } from "../src/shared/telegram-api.ts";
 import type { Couriers } from "../src/user-store/notification-pool.ts";
 import type { UserStore } from "../src/user-store/user-store.ts";
 
+import { sha256Hex } from "../src/shared/crypto.ts";
 import { subscribe, subscriptionsOf, unsubscribe } from "../src/shared/push-subscriptions.ts";
 import { acceptedMethods, isRegistrable, pushMethodsOf } from "../src/shared/push/registry.ts";
 import { answerOf, call, json, loginAsDev } from "./helpers.ts";
@@ -914,7 +915,7 @@ describe("Firebase push", () => {
 
   it("pushes an app-channel notification with the pool id as tag, logs it and dismisses it on resolve", async () => {
     const pushToken = `fcm-${crypto.randomUUID()}`;
-    const { stub } = await phoneWithToken(pushToken);
+    const { stub, token } = await phoneWithToken(pushToken);
     const fcm = await fcmRecorder();
     await runInDurableObject(stub, async (instance: UserStore) => {
       const couriers = couriersOf(telegramRecorder().target, fcm.target);
@@ -929,15 +930,18 @@ describe("Firebase push", () => {
             android: { collapse_key: id, priority: "high" },
             data: expect.objectContaining({
               categoryId: "activity_overrun",
-              message: "Still doing Commute? Started 07:00, usually ~30m.",
+              paceBody: "Still doing Commute? Started 07:00, usually ~30m.",
+              sessionHash: await sha256Hex(token),
               tag: id,
-              title: "Still going?",
+              paceTitle: "Still going?",
               type: "notification",
             }) as unknown,
             token: pushToken,
           },
         },
       ]);
+      expect(fcm.sends()[0]?.message.data).not.toHaveProperty("title");
+      expect(fcm.sends()[0]?.message.data).not.toHaveProperty("message");
       const page = await instance.listNotifications({ limit: 5 });
       expect(page.deliveries[id]).toEqual([
         expect.objectContaining({ device: "dev", method: "fcm", reason: null, result: "sent" }),
@@ -947,7 +951,11 @@ describe("Firebase push", () => {
         now: "2026-10-07T08:02:00.000Z",
         origin: "app",
       });
-      expect(fcm.sends().at(-1)?.message.data).toEqual({ notificationId: id, type: "dismiss" });
+      expect(fcm.sends().at(-1)?.message.data).toEqual({
+        notificationId: id,
+        sessionHash: await sha256Hex(token),
+        type: "dismiss",
+      });
       const after = await instance.listNotifications({ limit: 5 });
       expect(after.deliveries[id]?.[0]).toMatchObject({
         at: CROSSED,
@@ -956,6 +964,35 @@ describe("Firebase push", () => {
       });
       // The access token is reused: one token call for three messages.
       expect(fcm.calls.filter((entry) => entry.url.includes("oauth2"))).toHaveLength(1);
+    });
+  });
+
+  it("withdraws an old FCM copy after its live session switches to polling", async () => {
+    const pushToken = `fcm-${crypto.randomUUID()}`;
+    const { sessionId, stub, token, userId } = await phoneWithToken(pushToken);
+    const fcm = await fcmRecorder();
+    await runInDurableObject(stub, async (instance: UserStore) => {
+      const couriers = couriersOf(telegramRecorder().target, fcm.target);
+      await instance.append([commute], { now: COMMUTE_START });
+      const id = (await instance.runNotifications(CROSSED, couriers)).created[0]?.id ?? "";
+      await subscribe(env.DB, {
+        endpoint: sessionId,
+        now: Date.now(),
+        sessionId,
+        transport: "poll",
+        userId,
+      });
+      await instance.resolveNotification(id, "stopped", {
+        couriers,
+        now: "2026-10-07T08:02:00.000Z",
+        origin: "app",
+      });
+      expect(fcm.sends().at(-1)?.message.data).toEqual({
+        notificationId: id,
+        sessionHash: await sha256Hex(token),
+        type: "dismiss",
+      });
+      expect(fcm.sends().at(-1)?.message.token).toBe(pushToken);
     });
   });
 

@@ -2,16 +2,19 @@ import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 
 import { type ApiClient, createApiClient } from "@pace/client";
-import { endpoints, isAnswer } from "@pace/core";
+import { endpoints, isAnswer, NOTIFICATION_KINDS, type NotificationKind } from "@pace/core";
 
 import { API_BASE_URL } from "./api-base.ts";
+import { notificationIdOf } from "./notification-id.ts";
 import {
   answerFromButton,
   dismissPoolNotification,
-  notificationIdOf,
   type ShownContent,
+  showPoolNotification,
 } from "./notifications.ts";
+import { rememberPushDismissal, wasPushDismissed } from "./push-dismissed.ts";
 import { createSecureSessionStore } from "./secure-session.ts";
+import { isForSession } from "./session-fingerprint.ts";
 
 /** The task Android runs for a push (Firebase data message) and for an answer button tapped. */
 export const PUSH_TASK = "pace.push";
@@ -21,6 +24,9 @@ const backgroundApi = async (): Promise<ApiClient | null> => {
   const token = await createSecureSessionStore().get();
   return token === null ? null : createApiClient({ baseUrl: API_BASE_URL, token: () => token });
 };
+
+const currentToken = async (api: ApiClient | null | undefined): Promise<null | string> =>
+  api === undefined ? await createSecureSessionStore().get() : (api?.currentSessionToken() ?? null);
 
 type Payload = {
   readonly actionIdentifier?: unknown;
@@ -47,6 +53,7 @@ const answer = async (
   await answerFromButton({
     content,
     id,
+    stillCurrent: async () => await isForSession(content.data, await currentToken(api)),
     save: async () => {
       if (client === null) {
         return false;
@@ -64,19 +71,89 @@ const answer = async (
 const isDismissal = (data: unknown): boolean =>
   typeof data === "object" && data !== null && "type" in data && data.type === "dismiss";
 
-/**
-One push or tap, with the app possibly closed: a `dismiss` data message takes the notification
-away at once; an answer button answers (`answer`).
-*/
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isNotificationKind = (value: unknown): value is NotificationKind =>
+  typeof value === "string" && (NOTIFICATION_KINDS as readonly string[]).includes(value);
+
+const incomingNotice = (
+  data: unknown,
+): null | {
+  readonly id: string;
+  readonly kind: NotificationKind;
+  readonly title: string;
+  readonly body: string;
+  readonly sessionHash: string;
+} => {
+  if (!isRecord(data) || data["type"] !== "notification") {
+    return null;
+  }
+  const id = notificationIdOf(data);
+  if (
+    id === null ||
+    !isNotificationKind(data["kind"]) ||
+    typeof data["paceTitle"] !== "string" ||
+    typeof data["paceBody"] !== "string" ||
+    typeof data["sessionHash"] !== "string"
+  ) {
+    return null;
+  }
+  return {
+    body: data["paceBody"],
+    id,
+    kind: data["kind"],
+    sessionHash: data["sessionHash"],
+    title: data["paceTitle"],
+  };
+};
+
+const didHandleIncoming = async (
+  data: unknown,
+  api: ApiClient | null | undefined,
+): Promise<boolean> => {
+  const notice = incomingNotice(data);
+  if (notice === null) {
+    return false;
+  }
+  if (
+    !(await isForSession(data, await currentToken(api))) ||
+    (await wasPushDismissed(notice.sessionHash, notice.id))
+  ) {
+    return true;
+  }
+  await showPoolNotification(notice);
+  if (
+    !(await isForSession(data, await currentToken(api))) ||
+    (await wasPushDismissed(notice.sessionHash, notice.id))
+  ) {
+    await dismissPoolNotification(notice.id);
+  }
+  return true;
+};
+
+const withdrawIncoming = async (
+  data: unknown,
+  api: ApiClient | null | undefined,
+): Promise<void> => {
+  const id = isDismissal(data) ? notificationIdOf(data) : null;
+  if (id === null || !(await isForSession(data, await currentToken(api)))) {
+    return;
+  }
+  const sessionHash = (data as { readonly sessionHash: string }).sessionHash;
+  await rememberPushDismissal(sessionHash, id);
+  await dismissPoolNotification(id);
+};
+
+/** One push or tap, with the app possibly closed. */
 export const handlePushTask = async (payload: Payload, api?: ApiClient | null): Promise<void> => {
   const { actionIdentifier, data } = payload;
   if (typeof actionIdentifier === "string") {
     await answer({ ...payload, actionIdentifier }, api);
     return;
   }
-  const id = isDismissal(data) ? notificationIdOf(data) : null;
-  if (id !== null) {
-    await dismissPoolNotification(id);
+  if (!(await didHandleIncoming(data, api))) {
+    await withdrawIncoming(data, api);
   }
 };
 

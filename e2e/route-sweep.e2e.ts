@@ -130,6 +130,16 @@ test("signed out, every screen but signing in lands on the login (bug class 7)",
   expect(failures).toEqual([]);
 });
 
+test.describe("guest document language", () => {
+  test.use({ locale: "ru-RU" });
+
+  test("Russian browser language reaches login and the HTML document", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByText("Ваши задачи и время — в своём темпе.")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "ru");
+  });
+});
+
 for (const size of SIZES) {
   test.describe(`route sweep, ${size.name}`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });

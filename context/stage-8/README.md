@@ -1,4 +1,4 @@
-# Stage 8 — paused 2026-10-14
+# Stage 8 — PR 1 final verification (2026-10-15)
 
 Feedback round 4 (`context/feedback-4.md`). The plan is `plan.md`; the controller's log of every
 dispatch, review, ruling and owner decision is `ledger.md`; each task's requirements are in
@@ -16,27 +16,25 @@ override the plan and the briefs where they differ.
 - **PR 3**: 8c (poll background check, battery step), 9 (sessions, login notices), 14 (automatic
   sleep), 19 (self-hosting), 20 (WebSocket).
 
-## Where it stopped (2026-10-15)
+## Current PR 1 state (2026-10-15)
 
 - `claude/new-session-sy3n4a` (see `git log`): everything for PR 1 is merged and reviewed —
   Tasks 0–7, 11, 15, 16, 3d and the notification pool (8 + 8b) — except Tasks 18 and 17.
-- Task 18 (bug-class sweep) is on `claude/new-session-sy3n4a-sweep-wip` (`a89f8ae`, based on `d3d1f8d`). All 16
-  classes swept with verdicts and guards (class 16 is new: two sides check they have FCM, nobody checks it is the same
-  project); the review leftovers and the FCM project match are in. Remaining: a full `bun test:unit`, `bun test:api`,
-  `bun test:app` run after commits `2d72486..a89f8ae`, the task review, the merge. Follow-ups it listed: a tolerant
-  proposal list in the parse answer, the remaining bare `json<>` reads in API tests, the press-every-control test on
-  the other screens. "Add a computer does nothing on phones" no longer reproduces (root cause needs a device).
-- The owner asked to stop after the sweep; PR 2 waits (owner: finish PR 1 first, one agent at a time, PR 3 later).
+- Task 18's sweep is integrated in the PR 1 working branch. The log and guards now cover 24 bug
+  classes; the later classes include cross-session phone privacy, secret-free computer setup and
+  signed-out language. `context/bug-lessons.md` records each sweep and guard.
+- Task 17's architecture, testing and QA documentation is updated for PR 1's actual scope.
+- Exploratory QA rounds 8 and 9 found no new browser issues after fixes; their reports are
+  `context/qa-round-8.md` and `context/qa-round-9.md`. Code review findings were addressed with
+  regression tests. Android-only flows still need device verification after the APK release.
+- PR 1 is [#42](https://github.com/iamnalinor/pace-dev/pull/42), still draft until exact-head
+  checks and CI pass. PR 2 stays out of scope.
 
 ## To resume
 
-1. Run the full suites on the sweep branch (above), review it, merge into `claude/new-session-sy3n4a`.
-2. Task 17 (docs).
-3. QA round (`docs/qa.md`) and a whole-branch code review; fix until only cosmetic findings remain.
-4. Open PR 1, CI green, squash-merge, release `v0.10.0` (dispatch `release.yml` with the tag), check the release
-   and that the APK reached Telegram.
-5. Then PR 2 (Tasks 12, 13, 5b, 10; briefs include the owner's framing: the assistant's actions wait for one
-   approval, with a follow-up thread), one agent at a time.
+1. Finish exact-head lint, unit, API, app and e2e checks; fix any failure and update #42.
+2. Mark #42 ready, wait for CI, squash-merge, and dispatch `release.yml` for `v0.10.0`.
+3. Verify the GitHub release, APK artifact and Telegram delivery. Stop; PR 2 is a separate task.
 
 The owner has set `TELEGRAM_RELEASE_CHAT_ID`, `GOOGLE_SERVICES_JSON` and
 `FIREBASE_SERVICE_ACCOUNT` in GitHub; all keys stay in GitHub only.

@@ -13,8 +13,8 @@ const dismissFcm = async (
   notificationId: string,
 ): Promise<SendOutcome> => {
   const outcome = await sendFcm(target, {
-    collapseKey: `dismiss:${notificationId}`,
-    data: { notificationId, type: "dismiss" },
+    collapseKey: notificationId,
+    data: { notificationId, sessionHash: to.sessionHash, type: "dismiss" },
     token: to.endpoint,
   });
   switch (outcome) {
@@ -37,9 +37,10 @@ const dismissFcm = async (
 };
 
 /**
-Firebase Cloud Messaging: data-only, high-priority messages the app presents itself (expo-
-notifications shows `title`/`message` under the `tag`, with the `categoryId`'s buttons), and
-silent `dismiss` messages that take one back. Both carry the pool id as the tag and collapse key.
+Firebase Cloud Messaging: data-only, high-priority messages with text in private `paceTitle` and
+`paceBody` fields. The app checks the session hash before presenting them; Expo's native Firebase
+receiver would present `title`/`message` immediately, before that check. Dismissals carry the same
+session hash. Both use the pool id as the collapse key.
 */
 export const fcmTransport = (target: FcmTarget): PushTransport => ({
   dismiss: async (to, notificationId) => await dismissFcm(target, to, notificationId),
@@ -49,15 +50,14 @@ export const fcmTransport = (target: FcmTarget): PushTransport => ({
     const outcome = await sendFcm(target, {
       collapseKey: notification.id,
       data: {
-        body: JSON.stringify({
-          kind: notification.kind,
-          notificationId: notification.id,
-          url: urlOf(notification.kind),
-        }),
-        message: body,
+        kind: notification.kind,
+        notificationId: notification.id,
+        paceBody: body,
+        paceTitle: title,
+        sessionHash: to.sessionHash,
         tag: notification.id,
-        title,
         type: "notification",
+        url: urlOf(notification.kind),
         ...(ANSWERS[notification.kind].length > 0 && { categoryId: notification.kind }),
       },
       token: to.endpoint,

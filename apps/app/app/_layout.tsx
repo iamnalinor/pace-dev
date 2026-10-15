@@ -9,7 +9,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
 import { isBarePath, RouteGate } from "#app/auth/route-gate.tsx";
+import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
+import { DocumentLanguage } from "#app/platform/document-language.tsx";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the push task (and the foreground handler) before Android may run it.
@@ -47,6 +49,7 @@ const Navigator = () => {
     <UpdateBanner>
       <View className="flex-1 flex-row bg-bg">
         <CrashContext />
+        <DocumentLanguage />
         {hasSidebar ? <Sidebar /> : null}
         <View className="flex-1">
           <Stack
@@ -88,6 +91,7 @@ export function ErrorBoundary({ error }: Readonly<ErrorBoundaryProps>) {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
+        <CrashDocumentLanguage />
         <CrashScreen error={error} />
       </ThemeProvider>
     </SafeAreaProvider>

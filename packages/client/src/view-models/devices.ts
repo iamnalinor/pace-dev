@@ -45,8 +45,8 @@ const windowsCommand = (download: string, install: string): string =>
   ].join("; ");
 
 /**
-The one line that connects a computer: it downloads the agent from the web app and installs
-it with the computer's token, which starts it with the computer (see docs/desktop.md).
+The one line that connects a computer: it downloads the agent from the web app and starts its
+installer. The installer asks for the token separately so it never enters shell history or argv.
 */
 export const agentCommand = ({
   apiBase,
@@ -57,14 +57,14 @@ export const agentCommand = ({
   readonly os: ComputerOs;
   readonly webOrigin: string;
   readonly apiBase: string;
-  readonly device: { readonly name: string; readonly token: string };
+  readonly device: { readonly name: string };
 }): string => {
   const download = `${webOrigin}/pace_agent.py`;
   if (os === "windows") {
-    const install = `install --token ${powerShellQuote(device.token)} --api ${apiBase} --name ${powerShellQuote(withoutDoubleQuotes(device.name))}`;
+    const install = `install --api ${apiBase} --name ${powerShellQuote(withoutDoubleQuotes(device.name))}`;
     return windowsCommand(download, install);
   }
-  const install = `install --token ${shellQuote(device.token)} --api ${apiBase} --name ${shellQuote(device.name)}`;
+  const install = `install --api ${apiBase} --name ${shellQuote(device.name)}`;
   return `curl -fsSL ${download} -o ${AGENT_PATH} && python3 ${AGENT_PATH} ${install}`;
 };
 

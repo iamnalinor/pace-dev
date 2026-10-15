@@ -1,3 +1,6 @@
+import type * as ExpoCrypto from "expo-crypto";
+import type * as NodeCrypto from "node:crypto";
+
 import type * as RouterFake from "./src/test/router.ts";
 import type * as BackgroundFake from "./src/testing/background-task.fake.ts";
 import type * as CalendarFake from "./src/testing/calendar.fake.ts";
@@ -25,6 +28,15 @@ jest.mock("expo-secure-store", () =>
 jest.mock("expo-calendar", () =>
   jest.requireActual<typeof CalendarFake>("./src/testing/calendar.fake.ts").createFakeCalendar(),
 );
+jest.mock("expo-crypto", () => {
+  const actual = jest.requireActual<typeof ExpoCrypto>("expo-crypto");
+  const { createHash } = jest.requireActual<typeof NodeCrypto>("node:crypto");
+  return {
+    ...actual,
+    digestStringAsync: async (_algorithm: unknown, data: string) =>
+      createHash("sha256").update(data).digest("hex"),
+  };
+});
 jest.mock("expo-notifications", () =>
   jest
     .requireActual<typeof NotificationsFake>("./src/testing/notifications.fake.ts")

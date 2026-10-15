@@ -7,6 +7,7 @@ import type { Resolution } from "@pace/core";
 import type { AnswerOrigin } from "../shared/contract.ts";
 import type { PoolDeps } from "./notification-pool.ts";
 
+import { sessionHashFor } from "../shared/push-subscriptions.ts";
 import { transportFor } from "../shared/push/registry.ts";
 import { deleteTelegramMessage } from "../shared/telegram-api.ts";
 import {
@@ -78,6 +79,38 @@ const wasTelegramDeleted = async (
   return outcome === "deleted";
 };
 
+type Copy = Awaited<ReturnType<typeof takeBackDeliveries>>[number];
+
+const withdrawCopy = async (deps: PoolDeps, copy: Copy, id: string): Promise<void> => {
+  if (copy.method === "telegram") {
+    await markDismissed(deps.db, copy.id, deps.now);
+    return;
+  }
+  const transport = transportFor(deps.couriers.push, copy.method);
+  if (transport === null) {
+    await markDismissalTerminal(deps.db, copy.id, "unavailable");
+    return;
+  }
+  const sessionHash =
+    deps.userId === undefined
+      ? null
+      : await sessionHashFor(deps.binding, {
+          now: Date.parse(deps.now),
+          sessionId: copy.sessionId,
+          userId: deps.userId,
+        });
+  if (sessionHash === null) {
+    await markDismissalTerminal(deps.db, copy.id, "session-gone");
+    return;
+  }
+  const outcome = await transport.dismiss({ ...copy, sessionHash }, id);
+  if (["sent", "queued", "gone"].includes(outcome)) {
+    await markDismissed(deps.db, copy.id, deps.now);
+  } else if (outcome === "incompatible" || outcome === "unavailable") {
+    await markDismissalTerminal(deps.db, copy.id, outcome);
+  }
+};
+
 const withdrawCopies = async (
   deps: PoolDeps,
   stored: StoredNotification,
@@ -86,21 +119,7 @@ const withdrawCopies = async (
   const id = stored.notification.id;
   const copies = await takeBackDeliveries(deps.db, id, { isTelegramGone });
   for (const copy of copies) {
-    if (copy.method === "telegram") {
-      await markDismissed(deps.db, copy.id, deps.now);
-      continue;
-    }
-    const transport = transportFor(deps.couriers.push, copy.method);
-    if (transport === null) {
-      await markDismissalTerminal(deps.db, copy.id, "unavailable");
-      continue;
-    }
-    const outcome = await transport.dismiss(copy, id);
-    if (["sent", "queued", "gone"].includes(outcome)) {
-      await markDismissed(deps.db, copy.id, deps.now);
-    } else if (outcome === "incompatible" || outcome === "unavailable") {
-      await markDismissalTerminal(deps.db, copy.id, outcome);
-    }
+    await withdrawCopy(deps, copy, id);
   }
 };
 

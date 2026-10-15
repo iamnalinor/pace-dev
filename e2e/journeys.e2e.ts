@@ -24,12 +24,14 @@ for (const size of SIZES) {
       const board = page.getByRole("list", { name: "Tasks" });
       await board.getByRole("checkbox", { name: `Mark ${title} done` }).click();
       await expect(board.getByText(title)).toHaveCount(0);
-      // No toast: the change is in History, undone from there.
+      // History asks before it writes the correction.
       await page.goto("/history");
       // The newest change is the close; the undo is stored once its correction is listed, and
       // navigating sooner can reload the page before the write.
       await expect(page.getByText(`Task closed · ${title}`)).toBeVisible();
       await page.getByRole("button", { name: "Undo" }).first().click();
+      await expect(page.getByText("Correction: revoked")).toHaveCount(0);
+      await page.getByRole("dialog").getByRole("button", { name: "Undo event" }).click();
       await expect(page.getByText("Correction: revoked")).toBeVisible();
       await page.goto("/");
       await expect(page.getByRole("list", { name: "Tasks" }).getByText(title)).toBeVisible();

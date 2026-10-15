@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { createStore } from "zustand/vanilla";
 
 import { appFirebaseProject } from "#app/platform/firebase-project.ts";
+import { sessionHashOf } from "#app/platform/session-fingerprint.ts";
 import { seriallyBySession } from "#app/platform/session-poll-queue.ts";
 import { readSessionValue, writeSessionValue } from "#app/platform/session-value.ts";
 import { type ApiClient, ApiError } from "@pace/client";
@@ -164,11 +165,17 @@ export const showPoolNotification = async (notice: {
   readonly kind: NotificationKind;
   readonly title: string;
   readonly body: string;
+  readonly sessionHash: string;
 }): Promise<void> => {
   await Notifications.scheduleNotificationAsync({
     content: {
       body: notice.body,
-      data: { kind: notice.kind, notificationId: notice.id, url: urlOf(notice.kind) },
+      data: {
+        kind: notice.kind,
+        notificationId: notice.id,
+        sessionHash: notice.sessionHash,
+        url: urlOf(notice.kind),
+      },
       title: notice.title,
       ...(ANSWERS[notice.kind].length > 0 && { categoryIdentifier: notice.kind }),
     },
@@ -227,16 +234,26 @@ export const answerFromButton = async ({
   content,
   id,
   save,
+  stillCurrent,
 }: {
   readonly id: string;
   readonly content: ShownContent;
   readonly save: () => Promise<boolean>;
+  readonly stillCurrent: () => Promise<boolean>;
 }): Promise<void> => {
+  if (!(await stillCurrent())) {
+    await dismissPoolNotification(id);
+    return;
+  }
   let isSaved = false;
   try {
     isSaved = await save();
   } catch {
     // Offline or refused: not saved.
+  }
+  if (!(await stillCurrent())) {
+    await dismissPoolNotification(id);
+    return;
   }
   await (isSaved ? dismissPoolNotification(id) : showNotSent(id, content));
 };
@@ -267,6 +284,7 @@ const didApplyPollEntries = async ({
         body: entry.body,
         id: entry.notificationId,
         kind: entry.notification.kind,
+        sessionHash: await sessionHashOf(session),
         title: entry.title,
       });
       if (!api.isCurrentSession(session)) {
@@ -372,13 +390,4 @@ export const registerPush = async (api: ApiClient): Promise<PushMethod> => {
   await SecureStore.setItemAsync(METHOD_KEY, method);
   pushStore.setState({ choice, isAllowed, method });
   return method;
-};
-
-/** The pool id a notification response or a tapped notification carries, if any. */
-export const notificationIdOf = (data: unknown): null | string => {
-  const id: unknown =
-    typeof data === "object" && data !== null && "notificationId" in data
-      ? data.notificationId
-      : null;
-  return typeof id === "string" ? id : null;
 };

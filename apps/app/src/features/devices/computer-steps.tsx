@@ -15,12 +15,20 @@ import { OsPicker } from "./os-picker.tsx";
 const STEP = "font-sans text-[14px] leading-[20px] text-fg";
 const NOTE = "font-sans text-[12px] leading-[17px] text-muted";
 
+const tokenShareLabel = (isShared: boolean) => {
+  if (SHARE_LABEL_KEY !== "devices.copy") {
+    return "devices.shareToken";
+  }
+  return isShared ? "devices.copied" : "devices.copyToken";
+};
+
 /** A command to paste: selectable, and read out whole. */
-const Code = ({ children }: { readonly children: string }) => (
+const Code = ({ children, testID }: { readonly children: string; readonly testID?: string }) => (
   <Text
     accessibilityLabel={children}
     className="rounded-lg border border-line bg-raised p-3 font-sans text-[12px] leading-[18px] text-fg"
     selectable
+    testID={testID}
   >
     {children}
   </Text>
@@ -28,7 +36,7 @@ const Code = ({ children }: { readonly children: string }) => (
 
 /**
 After the token is made: the computer's system (preselected from the browser on a computer),
-then that system's steps around the one line that installs Pace's agent with the token.
+then that system's steps around the install command and its separate one-time token.
 Self-contained, so it can sit in a sheet or inline in Settings.
 */
 export const ComputerSteps = ({
@@ -41,6 +49,7 @@ export const ComputerSteps = ({
   const t = useT();
   const [os, setOs] = useState<ComputerOs>(() => browserComputerOs() ?? "windows");
   const [isShared, setIsShared] = useState(false);
+  const [isTokenShared, setIsTokenShared] = useState(false);
   const command = agentCommand({ apiBase: API_BASE_URL, device, os, webOrigin: WEB_ORIGIN });
   return (
     <View className="gap-3">
@@ -72,6 +81,18 @@ export const ComputerSteps = ({
         {t(isShared && SHARE_LABEL_KEY === "devices.copy" ? "devices.copied" : SHARE_LABEL_KEY)}
       </Button>
       {os === "macos" && <Text className={NOTE}>{t("devices.macPython")}</Text>}
+      <Text className={STEP}>{t("devices.tokenPrompt")}</Text>
+      <Code testID="device-setup-token">{device.token}</Code>
+      <Button
+        onPress={() => {
+          void (async () => {
+            setIsTokenShared((await shareText(device.token)) === "done");
+          })();
+        }}
+        variant="secondary"
+      >
+        {t(tokenShareLabel(isTokenShared))}
+      </Button>
       <Text className="font-sans text-[13px] leading-[18px] text-warn">
         {t("devices.tokenOnce")}
       </Text>

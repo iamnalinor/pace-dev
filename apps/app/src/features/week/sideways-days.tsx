@@ -3,6 +3,8 @@ import { ScrollView } from "react-native";
 
 import type { WeekModel } from "@pace/client";
 
+import { useT } from "#app/app-state.tsx";
+
 /**
 Where the phone's days scroll to when a week shows: today with the day before in sight, or the
 Monday of a week without today. `null` while the same week stays: the person's own scroll is
@@ -32,6 +34,7 @@ export const SidewaysDays = ({
   readonly minColumnPx: number;
   readonly week: WeekModel;
 }) => {
+  const t = useT();
   const scrollerRef = useRef<ScrollView>(null);
   const scrolledWeekRef = useRef<null | string>(null);
   const scrollToStart = (): void => {
@@ -48,10 +51,13 @@ export const SidewaysDays = ({
   useEffect(scrollToStart);
   return (
     <ScrollView
+      accessibilityLabel={t("week.scrollHint")}
       contentContainerClassName="min-w-full flex-row"
       horizontal
       onContentSizeChange={scrollToStart}
       ref={scrollerRef}
+      tabIndex={0}
+      testID="week-days"
     >
       {children}
     </ScrollView>

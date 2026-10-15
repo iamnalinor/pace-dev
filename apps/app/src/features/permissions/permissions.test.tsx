@@ -44,6 +44,7 @@ const comeBack = async (): Promise<void> => {
 
 beforeEach(() => {
   (SecureStore as unknown as FakeSecureStore).values.clear();
+  (SecureStore as unknown as FakeSecureStore).values.set("pace.session", "session-test");
   mockPhone.restricted = false;
   mockPhone.usage = false;
   notifications.state.granted = false;

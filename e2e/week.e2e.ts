@@ -229,3 +229,14 @@ for (const size of SIZES) {
     });
   });
 }
+
+test.describe("phone Week sideways navigation", () => {
+  test.use({ viewport: { height: 844, width: 390 } });
+
+  test("names and exposes the off-screen days to pointer and keyboard users", async ({ page }) => {
+    await loginViaApi(page);
+    await page.goto("/week");
+    await expect(page.getByText("Swipe to see all days")).toBeVisible();
+    await expect(page.getByTestId("week-days")).toHaveAttribute("tabindex", "0");
+  });
+});

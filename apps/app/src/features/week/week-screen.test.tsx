@@ -126,9 +126,9 @@ describe("WeekScreen", () => {
   it("fits the day into the measured height, and scrolls only below the floor", async () => {
     await renderScreen(<WeekScreen />, await world());
     await measure(700);
-    // 700 less the day names (28) and the bottom room (24), shared by the 17 hours 07–24.
+    // 700 less the day names (28), bottom room (24), and scroll hint (24), shared by 17 hours.
     await waitFor(() => {
-      expect(hourHeight()).toBe(38);
+      expect(hourHeight()).toBe(36);
     });
     expect(screen.getByTestId("week-scroller")).toHaveProp("scrollEnabled", false);
     await measure(300);
@@ -136,6 +136,12 @@ describe("WeekScreen", () => {
       expect(hourHeight()).toBe(18);
     });
     expect(screen.getByTestId("week-scroller")).toHaveProp("scrollEnabled", true);
+  });
+
+  it("makes the phone's sideways days discoverable and keyboard reachable", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    expect(screen.getByText("Swipe to see all days")).toBeOnTheScreen();
+    expect(screen.getByTestId("week-days")).toHaveProp("tabIndex", 0);
   });
 
   it("shows the night hours when asked, from the header and in the settings", async () => {
@@ -151,8 +157,8 @@ describe("WeekScreen", () => {
     });
     expect(screen.getByRole("switch", { name: "Night hours" })).toBeChecked();
     expect(runtime.state.store.getState().settings.nightHours).toBe(true);
-    // 648 shared by the 24 hours.
-    expect(hourHeight()).toBe(27);
+    // 624 shared by the 24 hours.
+    expect(hourHeight()).toBe(26);
     // Turned off elsewhere (the settings, another device): the grid follows while open.
     await act(async () => {
       await runtime.actions.setNightHours(false);

@@ -2,15 +2,13 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { loadDeviceId } from "#app/platform/device-id.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { isCalendarSyncOn, setCalendarSync } from "#app/platform/phone-memory.ts";
-import { uploadPhoneData } from "#app/platform/phone-upload.ts";
+import { clearPhoneCalendar, uploadPhoneData } from "#app/platform/phone-upload.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useDevices } from "@pace/client/react";
-import { endpoints } from "@pace/core";
 
 import { AddComputer } from "./add-computer.tsx";
 import { DeviceRow } from "./device-row.tsx";
@@ -19,21 +17,35 @@ import { DeviceRow } from "./device-row.tsx";
 const CalendarSyncRow = () => {
   const t = useT();
   const { api, clock } = usePace();
-  const [isOn, setIsOn] = useState(true);
+  const [isOn, setIsOn] = useState(false);
   useEffect(() => {
     void (async () => {
-      setIsOn(await isCalendarSyncOn());
+      const session = api.currentSessionToken();
+      if (session === undefined) {
+        return;
+      }
+      const isSaved = await isCalendarSyncOn(session);
+      if (api.isCurrentSession(session)) {
+        setIsOn(isSaved);
+      }
     })();
-  }, []);
+  }, [api]);
   const change = async (isWanted: boolean): Promise<void> => {
+    const session = api.currentSessionToken();
+    if (session === undefined) {
+      return;
+    }
     setIsOn(isWanted);
-    await setCalendarSync(isWanted);
+    await setCalendarSync(session, isWanted, () => api.isCurrentSession(session));
+    if (!api.isCurrentSession(session)) {
+      return;
+    }
     if (isWanted) {
       await uploadPhoneData(api, clock.now());
       return;
     }
     try {
-      await api.call(endpoints.calendar.clear, { query: { deviceId: await loadDeviceId() } });
+      await clearPhoneCalendar(api, session);
     } catch {
       // Offline: the copy stays until the next time it is turned off; nothing new is sent.
     }

@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import { createHash } from "node:crypto";
 
 import type { createFakeNotifications } from "#app/testing/notifications.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
@@ -10,6 +11,7 @@ import { createFakeFetch } from "@pace/client/testing";
 import type { readSessionValue as actualReadSessionValue } from "./session-value.ts";
 
 import * as firebaseProject from "./firebase-project.ts";
+import { clearPresentedPoolNotifications } from "./notification-cleanup.ts";
 import {
   pollNow,
   pushMethodOf,
@@ -21,6 +23,8 @@ import {
 import { handlePushTask } from "./push-task.ts";
 
 const fake = Notifications as unknown as ReturnType<typeof createFakeNotifications>;
+const SESSION_TOKEN = "session-a";
+const SESSION_HASH = createHash("sha256").update(SESSION_TOKEN).digest("hex");
 const mockCursorRead = {
   gate: null as null | Promise<boolean>,
   started: null as (() => void) | null,
@@ -94,6 +98,9 @@ const registering = (
   });
 
 beforeEach(async () => {
+  const secure = (SecureStore as unknown as FakeSecureStore).values;
+  secure.clear();
+  secure.set("pace.session", SESSION_TOKEN);
   mockCursorRead.gate = null;
   mockCursorRead.started = null;
   await setPushChoice(null);
@@ -447,14 +454,122 @@ const SEMINAR_BODY = "📅 Seminar, 10:00–11:00. Attend?";
 const seminarContent = {
   body: SEMINAR_BODY,
   categoryIdentifier: "event_start",
-  data: { kind: "event_start", notificationId: "n-2", url: "/notifications" },
+  data: {
+    kind: "event_start",
+    notificationId: "n-2",
+    sessionHash: SESSION_HASH,
+    url: "/notifications",
+  },
   title: "Starting now",
 };
 
 describe("the push task", () => {
+  it("shows a silent FCM notice only while its intended session is current", async () => {
+    const store = SecureStore as unknown as FakeSecureStore;
+    const token = "session-a";
+    const sessionHash = createHash("sha256").update(token).digest("hex");
+    const data = {
+      kind: "activity_overrun",
+      notificationId: "n-silent",
+      paceBody: "Still doing Commute?",
+      paceTitle: "Still going?",
+      sessionHash,
+      type: "notification",
+    };
+    store.values.set("pace.session", token);
+    await handlePushTask({ data });
+    expect(fake.state.scheduled).toEqual([expect.objectContaining({ identifier: "n-silent" })]);
+    store.values.set("pace.session", "session-b");
+    await handlePushTask({ data });
+    expect(fake.state.scheduled).toHaveLength(1);
+    store.values.delete("pace.session");
+    await handlePushTask({ data });
+    expect(fake.state.scheduled).toHaveLength(1);
+  });
+
+  it("dismisses a previous session's answer without sending it or showing it again", async () => {
+    const store = SecureStore as unknown as FakeSecureStore;
+    store.values.set("pace.session", "session-b");
+    const { api, fetcher } = apiWith({});
+    await handlePushTask(
+      {
+        actionIdentifier: "attended",
+        notification: {
+          request: {
+            content: {
+              ...seminarContent,
+              data: { ...seminarContent.data, sessionHash: "old-session-hash" },
+            },
+          },
+        },
+      },
+      api,
+    );
+    expect(fetcher.calls).toEqual([]);
+    expect(fake.state.dismissed).toEqual(["n-2"]);
+    expect(fake.state.scheduled).toEqual([]);
+  });
+
+  it("clears only presented Pace pool notices on logout", async () => {
+    fake.state.scheduled = [
+      { content: seminarContent, identifier: "n-2" },
+      { content: { data: { local: true }, title: "Other" }, identifier: "other" },
+      {
+        content: { data: { notificationId: "n-b", sessionHash: "session-b" }, title: "B" },
+        identifier: "n-b",
+      },
+    ];
+    await clearPresentedPoolNotifications(SESSION_TOKEN);
+    expect(fake.state.dismissed).toEqual(["n-2"]);
+  });
   it("takes a notification away on a dismiss push", async () => {
-    await handlePushTask({ data: { notificationId: "n-1", type: "dismiss" } }, null);
+    await handlePushTask({
+      data: { notificationId: "n-1", sessionHash: SESSION_HASH, type: "dismiss" },
+    });
     expect(fake.state.dismissed).toEqual(["n-1"]);
+  });
+
+  it("does not show a late FCM notice after its dismissal arrived first", async () => {
+    await handlePushTask({
+      data: { notificationId: "n-late", sessionHash: SESSION_HASH, type: "dismiss" },
+    });
+    await handlePushTask({
+      data: {
+        kind: "activity_overrun",
+        notificationId: "n-late",
+        paceBody: "Private body",
+        paceTitle: "Private title",
+        sessionHash: SESSION_HASH,
+        type: "notification",
+      },
+    });
+    expect(fake.state.scheduled.some((item) => item.identifier === "n-late")).toBe(false);
+  });
+
+  it("withdraws a notice when dismissal arrives while Android is scheduling it", async () => {
+    const started = Promise.withResolvers<boolean>();
+    const gate = Promise.withResolvers<boolean>();
+    fake.state.scheduleStarted = () => {
+      started.resolve(true);
+    };
+    fake.state.scheduleGate = gate.promise;
+    const show = handlePushTask({
+      data: {
+        kind: "activity_overrun",
+        notificationId: "n-racing",
+        paceBody: "Private body",
+        paceTitle: "Private title",
+        sessionHash: SESSION_HASH,
+        type: "notification",
+      },
+    });
+    await started.promise;
+    await handlePushTask({
+      data: { notificationId: "n-racing", sessionHash: SESSION_HASH, type: "dismiss" },
+    });
+    gate.resolve(true);
+    await show;
+    expect(fake.state.dismissed).toContain("n-racing");
   });
 
   it("answers an answer button through the resolve endpoint, the notification gone", async () => {
@@ -464,7 +579,9 @@ describe("the push task", () => {
     await handlePushTask(
       {
         actionIdentifier: "attended",
-        notification: { request: { content: { data: { notificationId: "n-2" } } } },
+        notification: {
+          request: { content: { data: { notificationId: "n-2", sessionHash: SESSION_HASH } } },
+        },
       },
       api,
     );
@@ -500,13 +617,13 @@ describe("the push task", () => {
     expect(fake.state.scheduled.at(-1)).toEqual(expect.objectContaining(shownAgain));
   });
 
-  it("keeps the notification when the phone is signed out", async () => {
+  it("dismisses a private notification when the phone is signed out", async () => {
     await handlePushTask(
       { actionIdentifier: "skipped", notification: { request: { content: seminarContent } } },
       null,
     );
-    expect(fake.state.dismissed).toEqual([]);
-    expect(fake.state.scheduled.map((item) => item.identifier)).toEqual(["n-2"]);
+    expect(fake.state.dismissed).toEqual(["n-2"]);
+    expect(fake.state.scheduled).toEqual([]);
   });
 
   it("ignores a default tap and an unknown button", async () => {

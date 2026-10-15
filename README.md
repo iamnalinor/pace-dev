@@ -16,7 +16,7 @@ phone, in the browser and on the server.
 | 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
 | 3 — Time | the time ledger: a time bar under Now (one tap switches), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers, alerts through the bot, MCP time tools | **done** — `v0.3.0` |
 | 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
-| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | in progress |
+| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | PR 1 preparing for `v0.10.0`; later work remains in PR 2 and PR 3 |
 
 Still `v0.x`: the product is in daily use but not final.
 
@@ -32,8 +32,9 @@ with a seeded week.
 Phone data (`v0.3.1`, Android only): the Day screen reads the phone's own screen and app
 events and its calendar, on the device. It proposes last night's sleep from the longest
 screen-off stretch, shows phone time and top apps inside each block, and lists the day's
-calendar events with Attended / Skip. Nothing is uploaded; only what you confirm becomes an
-event. A first-run walk-through explains and asks for each permission (Settings →
+calendar events with Attended / Skip. Confirming a suggestion writes an event; cloud calendar
+and app-usage copies are described under [Devices](#devices-calendar-and-app-usage-in-the-cloud).
+A first-run walk-through explains and asks for each permission (Settings →
 Permissions later). See [Phone data on the device](#phone-data-on-the-device) for what to check.
 
 The three product stages are each meant to be usable daily before the next one starts.
@@ -277,8 +278,10 @@ next release installs over it, and main after a squash merge installs over the b
 
 ## Devices: calendar and app usage in the cloud
 
-The phone sends its calendar (own and accepted events; *Settings → Devices → Send this phone's
-calendar*, off deletes the copy) and the apps it had in front, names and times only. A computer
+The phone can send its calendar (own and accepted events) when *Settings → Devices → Send this
+phone's calendar* is enabled for the current login. A new login starts with this switch off;
+turning it off deletes that login's cloud copy. The phone also sends the apps it had in front,
+names and times only. A computer
 runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
 *Settings → Devices → Add a computer* gives one install line per system (see
 [docs/desktop.md](docs/desktop.md)). Day and Week show where the

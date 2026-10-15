@@ -6,7 +6,7 @@ key press or mouse move was. Only the application's name and the times leave the
 never window titles, URLs or what is in them. Python 3.9+, standard library only; Windows,
 macOS and Linux (X11, or KDE on Wayland with kdotool).
 
-    pace_agent.py install --token TOKEN --api URL [--name NAME]
+    pace_agent.py install --api URL [--name NAME]
     pace_agent.py run [--logs]
     pace_agent.py status
     pace_agent.py uninstall
@@ -20,6 +20,7 @@ docs/desktop.md.
 from __future__ import annotations
 
 import argparse
+import getpass
 import http.client
 import json
 import os
@@ -84,6 +85,13 @@ LINUX_PACKAGES = (
 
 class ProbeError(Exception):
     """The system could not tell which app is in front or how long it was idle."""
+
+
+def read_setup_token() -> str:
+    """Read the one-time token at a hidden terminal prompt, never from argv or shell history."""
+    if not sys.stdin.isatty():
+        raise EOFError("A terminal is required to enter the token privately")
+    return getpass.getpass("Paste the token from Pace (hidden): ")
 
 
 # --- Sessions ---------------------------------------------------------------------------
@@ -828,6 +836,7 @@ class Env:
     script: Path = field(default_factory=lambda: Path(__file__).resolve())
     uid: int = field(default_factory=lambda: os.getuid() if hasattr(os, "getuid") else 0)
     user: str = field(default_factory=lambda: windows_user(os.environ))
+    read_token: Callable[[], str] = read_setup_token
 
     @property
     def dir(self) -> Path:
@@ -887,12 +896,20 @@ def install(args: argparse.Namespace, env: Env) -> int:
     if problem is not None:
         env.say(problem)
         return 3
+    try:
+        token = env.read_token().strip()
+    except (EOFError, KeyboardInterrupt, OSError) as error:
+        env.say(f"Token was not entered: {error}")
+        return 2
+    if not token:
+        env.say("Token was not entered. Run the install command again and paste it at the prompt.")
+        return 2
     previous = load_config(env)
     config = {
         "api": args.api.rstrip("/"),
         "deviceId": previous.get("deviceId") or str(uuid.uuid4()),
         "deviceName": args.name or socket.gethostname(),
-        "token": args.token,
+        "token": token,
     }
     if env.system not in ("Windows", "Darwin"):
         # A user service may start before the desktop: it takes the display from here.
@@ -984,7 +1001,7 @@ def lock(path: Path) -> Optional[IO[str]]:
 def run(logs: bool, env: Env) -> int:
     config = load_config(env)
     if not config and not logs:
-        env.say("Not installed: run `pace_agent.py install --token TOKEN --api URL` first.")
+        env.say("Not installed: run `pace_agent.py install --api URL` first.")
         return 2
     for name, value in config.get("env", {}).items():
         os.environ.setdefault(name, value)
@@ -1047,7 +1064,6 @@ def main(argv: list[str], env: Optional[Env] = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     setup = commands.add_parser("install", help="save the settings and start with the computer")
-    setup.add_argument("--token", required=True, help="this computer's token from Pace")
     setup.add_argument("--api", required=True, help="the Pace server, e.g. https://pace-api.example")
     setup.add_argument("--name", help="how this computer is named (default: its hostname)")
     once = commands.add_parser("run", help="sample every 5 seconds and send every 5 minutes")

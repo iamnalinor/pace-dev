@@ -39,7 +39,7 @@ describe("Settings → Devices", () => {
     expect(await screen.findByText("Nothing sends app usage yet.")).toBeOnTheScreen();
   });
 
-  it("adds a computer: an install line per system, with the token and the web app's origin", async () => {
+  it("adds a computer: install commands omit the separately displayed token", async () => {
     const runtime = await createTestRuntime({
       routes: {
         "GET /api/devices": () => ({ devices: [] }),
@@ -64,10 +64,13 @@ describe("Settings → Devices", () => {
       `Invoke-WebRequest -UseBasicParsing ${WEB_ORIGIN}/pace_agent.py`,
       { exact: false },
     );
-    expect(windowsLine).toHaveTextContent(
-      `install --token 'tok_secret' --api ${API_BASE_URL} --name 'Work laptop'`,
-      { exact: false },
-    );
+    expect(windowsLine).toHaveTextContent(`install --api ${API_BASE_URL} --name 'Work laptop'`, {
+      exact: false,
+    });
+    expect(windowsLine).not.toHaveTextContent("tok_secret");
+    expect(screen.getByText("tok_secret")).toBeOnTheScreen();
+    expect(screen.getByText(/hidden prompt/u)).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Send the token" })).toBeOnTheScreen();
     expect(
       screen.getByText(String.raw`py "$env:APPDATA\Pace\pace_agent.py" run --logs`),
     ).toBeOnTheScreen();
@@ -80,7 +83,7 @@ describe("Settings → Devices", () => {
     expect(screen.getByText(/GNOME on Wayland/u)).toBeOnTheScreen();
     expect(
       screen.getByText(
-        `curl -fsSL ${WEB_ORIGIN}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --token 'tok_secret' --api ${API_BASE_URL} --name 'Work laptop'`,
+        `curl -fsSL ${WEB_ORIGIN}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${API_BASE_URL} --name 'Work laptop'`,
       ),
     ).toBeOnTheScreen();
     expect(screen.queryByText(/winget/u)).toBeNull();
@@ -88,7 +91,7 @@ describe("Settings → Devices", () => {
     // macOS: the same line, in Terminal, without the Linux packages.
     await fireEvent.press(within(picker).getByRole("radio", { name: "macOS" }));
     expect(screen.getByText(/open Terminal/u)).toBeOnTheScreen();
-    expect(screen.getByText(/^curl -fsSL .*--token 'tok_secret'/u)).toBeOnTheScreen();
+    expect(screen.getByText(/^curl -fsSL .* install --api/u)).toBeOnTheScreen();
     expect(screen.queryByText(/xprintidle/u)).toBeNull();
     expect(screen.getByText("python3 ~/.pace_agent.py run --logs")).toBeOnTheScreen();
     expect(screen.getByText(/never window titles or URLs/u)).toBeOnTheScreen();

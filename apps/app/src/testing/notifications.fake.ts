@@ -61,6 +61,7 @@ export const createFakeNotifications = () => {
     getAllScheduledNotificationsAsync: async (): Promise<readonly Scheduled[]> => [
       ...state.scheduled,
     ],
+    getPresentedNotificationsAsync: async () => state.scheduled.map((item) => ({ request: item })),
     getDevicePushTokenAsync: async (): Promise<{
       readonly data: string;
       readonly type: string;

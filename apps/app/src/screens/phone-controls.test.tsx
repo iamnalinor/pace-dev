@@ -37,6 +37,7 @@ const devices = async () => {
       "POST /api/devices": () => ({ id: "01NEW", name: "My computer", token: "tok" }),
     },
   });
+  await runtime.auth.adoptToken("session-devices");
   await renderScreen(<DevicesScreen />, runtime);
   return { extra: () => runtime.state.store.getState().log.length };
 };

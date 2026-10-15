@@ -1,4 +1,4 @@
-/** Polls for one session must apply their entries and advance their cursor in request order. */
+/** Operations on one session's remote copy run in order (poll and calendar use distinct keys). */
 const queues = new Map<string, Promise<unknown>>();
 
 export const seriallyBySession = async <T>(session: string, run: () => Promise<T>): Promise<T> => {

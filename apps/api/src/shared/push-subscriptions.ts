@@ -8,6 +8,8 @@ import { d1 } from "./db/d1.ts";
 export type PushSubscription = {
   readonly id: string;
   readonly sessionId: string;
+  /** Fingerprint of the bearer, so a late push cannot be shown after account switching. */
+  readonly sessionHash: string;
   /** The device as its session is named. */
   readonly device: string;
   readonly transport: string;
@@ -27,11 +29,30 @@ export const subscriptionsOf = async (
       endpoint: pushSubscriptions.endpoint,
       id: pushSubscriptions.id,
       sessionId: pushSubscriptions.sessionId,
+      sessionHash: sessions.tokenHash,
       transport: pushSubscriptions.transport,
     })
     .from(pushSubscriptions)
     .innerJoin(sessions, eq(sessions.id, pushSubscriptions.sessionId))
     .where(and(eq(pushSubscriptions.userId, userId), liveSession));
+};
+
+/** A still-live session's hash, even if it registered another push method since a send. */
+export const sessionHashFor = async (
+  binding: D1Database,
+  {
+    userId,
+    sessionId,
+    now,
+  }: { readonly userId: string; readonly sessionId: string; readonly now: number },
+): Promise<null | string> => {
+  const live = gt(sessions.expiresAt, new Date(now));
+  const rows = await d1(binding)
+    .select({ hash: sessions.tokenHash })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId), live))
+    .limit(1);
+  return rows[0]?.hash ?? null;
 };
 
 /**

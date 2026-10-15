@@ -8,6 +8,7 @@ import { loadDeviceId } from "./device-id.ts";
 import { calendarAccess, calendarEvents } from "./phone-calendar.ts";
 import { appLabels, readPhoneEvents } from "./phone-data.ts";
 import { isCalendarSyncOn, seriesRules, setUsageCursor, usageCursor } from "./phone-memory.ts";
+import { seriallyBySession } from "./session-poll-queue.ts";
 
 /** The calendar copy covers last week and the next two. */
 const CALENDAR_BACK_MINUTES = 7 * 24 * 60;
@@ -33,20 +34,22 @@ const deviceName = (): string => {
   return name === "" ? "Android" : name;
 };
 
-const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Promise<void> => {
-  const session = api.currentSessionToken();
-  if (
-    session === undefined ||
-    !(await isCalendarSyncOn()) ||
-    (await calendarAccess()) !== "granted"
-  ) {
+const syncCalendar = async (
+  api: ApiClient,
+  {
+    deviceId,
+    now,
+    session,
+  }: { readonly deviceId: string; readonly now: string; readonly session: string },
+): Promise<void> => {
+  if (!(await isCalendarSyncOn(session)) || (await calendarAccess()) !== "granted") {
     return;
   }
   const from = addMinutesIso(now, -CALENDAR_BACK_MINUTES);
   const to = addMinutesIso(now, CALENDAR_AHEAD_MINUTES);
   const events = await calendarEvents(from, to);
   const rules = await seriesRules();
-  if (!api.isCurrentSession(session)) {
+  if (!api.isCurrentSession(session) || !(await isCalendarSyncOn(session))) {
     return;
   }
   await api.call(endpoints.calendar.sync, {
@@ -59,9 +62,28 @@ const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Pr
       })),
       from,
       to,
-      // Series answered "every time" here: the server never announces them as they start.
       ruledSeries: rules.map((rule) => rule.series.slice(0, 300)).slice(0, 500),
     },
+  });
+};
+
+const uploadCalendar = async (api: ApiClient, deviceId: string, now: string): Promise<void> => {
+  const session = api.currentSessionToken();
+  if (session === undefined) {
+    return;
+  }
+  await seriallyBySession(`calendar:${session}`, async () => {
+    await syncCalendar(api, { deviceId, now, session });
+  });
+};
+
+/** Clears this session's calendar copy after any upload already in flight has finished. */
+export const clearPhoneCalendar = async (api: ApiClient, session: string): Promise<void> => {
+  await seriallyBySession(`calendar:${session}`, async () => {
+    const deviceId = await loadDeviceId();
+    if (api.isCurrentSession(session)) {
+      await api.call(endpoints.calendar.clear, { query: { deviceId } });
+    }
   });
 };
 

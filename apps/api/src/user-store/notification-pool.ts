@@ -200,7 +200,11 @@ const pushToDevice = async (
     await logUnavailable(deps.db, { notificationId: notification.id, now: deps.now, subscription });
     return;
   }
-  const address = { endpoint: subscription.endpoint, sessionId: subscription.sessionId };
+  const address = {
+    endpoint: subscription.endpoint,
+    sessionHash: subscription.sessionHash,
+    sessionId: subscription.sessionId,
+  };
   const outcome = await transport.send(address, message);
   const isOk = outcome === "sent" || outcome === "queued";
   const attempt = {

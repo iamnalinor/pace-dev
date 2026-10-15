@@ -1,6 +1,6 @@
 import { Moon } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackToToday } from "#app/shared/back-to-today.tsx";
@@ -91,11 +91,12 @@ The grid in the height the screen leaves it: the hours share that height, so the
 in sight without scrolling; only when an hour would be shorter than the floor does it scroll.
 */
 const FittedGrid = (props: GridArgs) => {
+  const t = useT();
   const isWide = useIsWide();
   const [available, setAvailable] = useState(0);
   const hours = 24 - gridFromHour(props.week, props.calendar);
   const { hourPx, scrolls } = fitHourPx({
-    available: available - LABELS_PX - BOTTOM_PX,
+    available: available - LABELS_PX - BOTTOM_PX - (isWide ? 0 : BOTTOM_PX),
     floorPx: HOUR_FLOOR_PX,
     hours,
   });
@@ -107,9 +108,14 @@ const FittedGrid = (props: GridArgs) => {
       }}
       testID="week-body"
     >
-      <ScrollView scrollEnabled={scrolls} testID="week-scroller">
+      <ScrollView className="flex-1" scrollEnabled={scrolls} testID="week-scroller">
         <WeekGrid {...props} hourPx={hourPx} minColumnPx={isWide ? 0 : PHONE_COLUMN_PX} />
       </ScrollView>
+      {isWide ? null : (
+        <View className="h-6 items-end justify-center pr-3">
+          <Text className="font-sans text-[11px] text-muted">{t("week.scrollHint")}</Text>
+        </View>
+      )}
     </View>
   );
 };

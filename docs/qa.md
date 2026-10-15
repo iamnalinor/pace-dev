@@ -74,6 +74,9 @@ the test suites).
 >   lands and which controls it covers; late or misplaced feedback hides the next action.
 > - **Visual matrix**: inspect each changed screen at 390 px and 1280 px, in both themes
 >   with Russian text; wrapping and contrast can fail only in one combination.
+> - **Guest language and sideways content**: check signed-out pages with a Russian browser
+>   locale and verify the document language; on narrow screens, every sideways region needs
+>   a visible scroll cue and a keyboard focus target.
 >
 > Report (English): a summary with counts by severity; findings most severe first, each with an
 > id, severity (blocker/high/medium/low), screen + width + theme + language, exact steps, what

@@ -2,14 +2,11 @@ import { reloadAppAsync } from "expo";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
+import { deviceLanguage } from "#app/platform/device-language.ts";
 import { Button } from "#app/ui/button.tsx";
-import { type Language, t } from "@pace/core";
+import { t } from "@pace/core";
 
 import { paceNative } from "../../modules/pace-native/index.ts";
-
-/** The account may be what failed to load, so the crash screen reads the device's language. */
-const deviceLanguage = (): Language =>
-  new Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith("ru") ? "ru" : "en";
 
 /** The error with its stack, as the crash file keeps it (Hermes' stack starts with the message). */
 const traceOf = (error: Error): string => {
