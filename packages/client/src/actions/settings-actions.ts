@@ -1,4 +1,5 @@
 import {
+  type ActivityCategory,
   err,
   isValidTimeZone,
   type Language,
@@ -24,6 +25,10 @@ export type SettingsActions = {
   readonly setQuietHours: (quietHours: QuietHours) => ActionResult;
   /** Week from midnight to midnight (on), or from seven (off). */
   readonly setNightHours: (isOn: boolean) => ActionResult;
+  readonly setCategoryEstimate: (
+    category: ActivityCategory,
+    minutes: null | number,
+  ) => ActionResult;
   /** Turns one kind of notification on or off for one channel. */
   readonly setNotificationChannel: (
     kind: NotificationKind,
@@ -33,6 +38,13 @@ export type SettingsActions = {
 };
 
 export const settingsActions = (deps: ActionDeps): SettingsActions => ({
+  setCategoryEstimate: async (category, minutes) =>
+    await emit(deps, [
+      stamp(deps, {
+        type: "settings.updated",
+        payload: { categoryEstimates: { [category]: minutes } },
+      }),
+    ]),
   ensureTimezone: async () =>
     deps.state.store.getState().settings.timezone === null && isValidTimeZone(deps.clock.deviceTz)
       ? await emit(deps, [

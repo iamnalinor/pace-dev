@@ -12,6 +12,8 @@ export type DeadlinePolicy =
       readonly kind: "resubmission";
       /** Days after the deadline during which late work is still the soft target. */
       readonly softDays: number;
+      /** New policies may make the final deadline relative; absent keeps old open-ended logs. */
+      readonly finalMode?: "fixed" | "offset" | undefined;
       /** Final hard deadline (UTC instant) and the zone it was set in; `null` = none. */
       readonly finalAt: null | string;
       readonly finalTz: null | string;

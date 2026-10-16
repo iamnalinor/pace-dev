@@ -17,9 +17,12 @@ declare global {
       TELEGRAM_WEBHOOK_ALLOWED_CIDRS?: string;
       /** JSON of `getMe`, stored at deploy time so the bot never calls Telegram on cold start. */
       BOT_INFO?: string;
-      /** Groq and Gemini keys for the LLM parse; without either the parse reports unavailable. */
-      GROQ_API_KEY?: string;
-      GEMINI_API_KEY?: string;
+      /** Comma- or newline-separated keys for the configured compatible model. */
+      LLM_API_KEY?: string;
+      /** The OpenAI-compatible API prefix, for example an endpoint ending in /v1. */
+      LLM_BASE_URL?: string;
+      /** Model identifier understood by that endpoint. */
+      LLM_MODEL?: string;
       /** `fake` keeps the LLM inside the Worker (tests, e2e). */
       LLM_PROVIDER?: string;
       /**

@@ -153,7 +153,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     }
   })();
 
-  const assistant = createAssistant({ api });
+  const assistant = createAssistant({ api, clock, state });
   const { feed: notifications, onNotice } = notices;
   return { actions, api, assistant, auth, clock, live, notifications, onNotice, state, sync };
 };

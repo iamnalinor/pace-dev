@@ -16,14 +16,14 @@ const taskCreated = () => ({
   type: "task.created",
 });
 
-describe("DELETE /api/me", () => {
+describe("DELETE /api/test/account", () => {
   it("removes the account: its events, sessions and user; the next login starts empty", async () => {
     const token = await loginAsDev("1002");
     const me = await json<{ id: string }>("/api/me", { token });
     await pushEvents(token, [taskCreated()]);
     const other = await loginAsDev("1002");
 
-    const response = await call("/api/me", { method: "DELETE", token });
+    const response = await call("/api/test/account", { method: "DELETE", token });
     expect(response.status).toBe(200);
     expect(await readJson(response)).toEqual({ deleted: true });
 
@@ -42,11 +42,11 @@ describe("DELETE /api/me", () => {
     const { tokens } = await obtainToken({ devTelegramId: "1001" });
     expect((await mcpCall(tokens.access_token, "tools/list")).status).toBe(200);
     const token = await loginAsDev("1001");
-    expect((await call("/api/me", { method: "DELETE", token })).status).toBe(200);
+    expect((await call("/api/test/account", { method: "DELETE", token })).status).toBe(200);
     expect((await mcpCall(tokens.access_token, "tools/list")).status).toBe(401);
   });
 
   it("needs a session", async () => {
-    expect((await call("/api/me", { method: "DELETE" })).status).toBe(401);
+    expect((await call("/api/test/account", { method: "DELETE" })).status).toBe(401);
   });
 });

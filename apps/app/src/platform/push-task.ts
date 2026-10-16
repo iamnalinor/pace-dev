@@ -85,6 +85,7 @@ const incomingNotice = (
   readonly title: string;
   readonly body: string;
   readonly sessionHash: string;
+  readonly url: string;
 } => {
   if (!isRecord(data) || data["type"] !== "notification") {
     return null;
@@ -104,6 +105,10 @@ const incomingNotice = (
     id,
     kind: data["kind"],
     sessionHash: data["sessionHash"],
+    url:
+      typeof data["url"] === "string" && data["url"].startsWith("/")
+        ? data["url"]
+        : "/notifications",
     title: data["paceTitle"],
   };
 };

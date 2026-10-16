@@ -26,10 +26,12 @@ describe("parseQuickInput", () => {
     });
   });
 
-  it("drops a leading hw tag from the title, but keeps a numbered one", () => {
-    expect(parse("hw Algebra")).toMatchObject({ presetId: "hw.algebra", title: "Algebra" });
-    expect(parse("дз по физике")).toMatchObject({ presetId: "hw", title: "по физике" });
+  it("keeps homework words that are part of the typed title", () => {
+    expect(parse("hw Algebra")).toMatchObject({ presetId: "hw.algebra", title: "hw Algebra" });
+    expect(parse("дз по физике")).toMatchObject({ presetId: "hw", title: "дз по физике" });
     expect(parse("дз 7 по физике").title).toBe("дз 7 по физике");
+    expect(parse("ДЗ по алгебре").title).toBe("ДЗ по алгебре");
+    expect(parse("Написать челику").title).toBe("Написать челику");
   });
 
   it("reads a work sync with a time, an estimate and a link", () => {
@@ -119,7 +121,7 @@ describe("parseQuickInput", () => {
         { label: "12", number: 12 },
         { label: "14", number: 14 },
       ],
-      title: "по алгебре сдать",
+      title: "дз по алгебре сдать",
     });
     expect(parse("report due October 12 18:00").dueAt).toBe("2026-10-12T15:00:00.000Z");
     expect(parse("продлить визу 3 марта").dueAt).toBe("2027-03-03T20:59:00.000Z");

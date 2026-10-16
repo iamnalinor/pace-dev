@@ -23,9 +23,8 @@ const renderComposer = async (runtime: PaceRuntime, initialText?: string) =>
 /** The line (its label, "New task", is the + button's name as well). */
 const line = () => screen.getByPlaceholderText(en("composer.placeholder"));
 const button = (key: Parameters<typeof en>[0]) => screen.getByRole("button", { name: en(key) });
-/** The open form's title: "New task", or where the suggestion came from. */
-const formTitle = (key: "composer.form.suggested" | "form.newTask") =>
-  screen.getByRole("header", { name: en(key) });
+/** The manual form's title. */
+const formTitle = () => screen.getByRole("header", { name: en("form.newTask") });
 
 /** The keyboard's Enter on a phone submits the line (the web reads the key itself). */
 const enter = async (): Promise<void> => {
@@ -46,7 +45,7 @@ const parsed = (
 ) => ({
   confidence: 1,
   domain: "task",
-  proposals: [
+  actions: [
     {
       ...(doubtful.length > 0 && { doubtful }),
       kind: "task.create",
@@ -85,6 +84,40 @@ const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: 
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
 describe("Composer", () => {
+  it("shows the category estimate in the chip but only overrides in its picker", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
+    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.getByRole("radio", { name: "Estimate: Default (1h)" })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
+    await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
+    expect(screen.getByRole("radio", { name: "Estimate: 30m" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
+    expect(screen.getByRole("radio", { name: "1h" })).toBeOnTheScreen();
+  });
+
+  it("closes the due calendar after picking a day", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
+    expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
+    expect(screen.getByRole("radio", { name: "Due: tomorrow 23:59" })).toBeOnTheScreen();
+  });
+
+  it("closes the due calendar when another form field is touched", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    expect(screen.getByRole("button", { name: /October 7/u })).toBeOnTheScreen();
+    await fireEvent(screen.getByLabelText(en("edit.description")), "touchStart");
+    expect(screen.queryByRole("button", { name: /October 7/u })).toBeNull();
+  });
+
   it("is one line with New task, To Inbox and Send at its edges, and no hint or chevron", async () => {
     await renderComposer(await createTestRuntime());
     expect(
@@ -99,23 +132,38 @@ describe("Composer", () => {
   });
 
   it("asks the assistant on Send, as on Enter", async () => {
-    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
+    await renderComposer(runtime);
     await fireEvent.changeText(line(), "срочно почта");
     await fireEvent.press(button("composer.send"));
-    expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
-    expect(formTitle("composer.form.suggested")).toBeOnTheScreen();
-    expect(title()).toHaveDisplayValue("разобрать почту");
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(created(runtime, "разобрать почту")).toBeUndefined();
+    await fireEvent.press(screen.getByRole("button", { name: en("assistant.approve") }));
+    await waitFor(() => {
+      expect(created(runtime, "разобрать почту")).toBeDefined();
+    });
+  });
+
+  it("discards a preview when its source line changes", async () => {
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    await fireEvent.changeText(line(), "срочно почта!");
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
+    expect(screen.queryByRole("button", { name: en("assistant.approve") })).toBeNull();
+    expect(created(runtime, "разобрать почту")).toBeUndefined();
   });
 
   it("opens by hand on + after the assistant read the line: its reading gives way, the title says New task", async () => {
     await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
     await fireEvent.changeText(line(), "срочно почта");
     await enter();
-    expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
-    await fireEvent.press(button("common.close"));
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
     await fireEvent.press(button("nav.newTask"));
-    expect(formTitle("form.newTask")).toBeOnTheScreen();
-    expect(screen.queryByRole("header", { name: en("composer.form.suggested") })).toBeNull();
+    expect(formTitle()).toBeOnTheScreen();
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
     expect(title()).not.toHaveDisplayValue("разобрать почту");
   });
 
@@ -137,7 +185,7 @@ describe("Composer", () => {
   it("opens an empty form titled New task from its + and on a New task request", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
-    expect(formTitle("form.newTask")).toBeOnTheScreen();
+    expect(formTitle()).toBeOnTheScreen();
     expect(title()).toHaveDisplayValue("");
     await fireEvent.press(button("common.close"));
     await waitFor(() => {
@@ -147,24 +195,20 @@ describe("Composer", () => {
     await act(() => {
       requestNewTask();
     });
-    expect(formTitle("form.newTask")).toBeOnTheScreen();
+    expect(formTitle()).toBeOnTheScreen();
   });
 
-  it("reads the line on Enter into the form in place; a second Enter adds it", async () => {
+  it("reads the line on Enter into a preview; a second Enter approves it", async () => {
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
     await renderComposer(runtime);
     // Typed, not pasted: nothing goes to the assistant until Enter.
     await fireEvent.changeText(line(), "срочно почта");
     expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
     await enter();
-    // The same card turns into the form, which says where it came from: no sheet, no second window.
-    expect(await screen.findByText(/Check: estimate/u)).toBeOnTheScreen();
-    expect(formTitle("composer.form.suggested")).toBeOnTheScreen();
-    expect(screen.queryByText(/Check before adding/u)).toBeNull();
-    expect(title()).toHaveDisplayValue("разобрать почту");
-    expect(screen.getByRole("radio", { checked: true, name: "Work" })).toBeOnTheScreen();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
     expect(created(runtime, "разобрать почту")).toBeUndefined();
-    await enterInTitle();
+    await enter();
     await waitFor(() => {
       expect(created(runtime, "разобрать почту")).toMatchObject({
         estimateMinutes: 90,
@@ -175,23 +219,20 @@ describe("Composer", () => {
     });
     // Back to an empty line for the next one.
     expect(line()).toHaveDisplayValue("");
-    await waitFor(() => {
-      expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
-    });
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
   });
 
-  it("opens the form with the rules' reading when the assistant cannot be reached", async () => {
+  it("offers a rule-based task preview when the assistant cannot be reached", async () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);
     // Typed in steps (all at once it would read as a paste).
     await fireEvent.changeText(line(), "синк по дашборду");
     await fireEvent.changeText(line(), "синк по дашборду завтра 15:00 1ч");
     await enter();
-    expect(await screen.findByText(en("composer.aiFailed"))).toBeOnTheScreen();
-    // The assistant read nothing: the form is the person's own.
-    expect(formTitle("form.newTask")).toBeOnTheScreen();
-    expect(title()).toHaveDisplayValue("синк по дашборду");
-    await enterInTitle();
+    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(screen.getByText(/синк по дашборду/u)).toBeOnTheScreen();
+    expect(created(runtime, "синк по дашборду")).toBeUndefined();
+    await fireEvent.press(screen.getByRole("button", { name: en("assistant.approve") }));
     await waitFor(() => {
       expect(created(runtime, "синк по дашборду")).toMatchObject({
         importance: "normal",
@@ -199,8 +240,9 @@ describe("Composer", () => {
         projectId: WORK_ID,
       });
     });
-    // Typed by hand: the line is the title, nothing to keep as an original message.
-    expect(created(runtime, "синк по дашборду")?.sourceText).toBeNull();
+    expect(created(runtime, "синк по дашборду")?.sourceText).toBe(
+      "синк по дашборду завтра 15:00 1ч",
+    );
   });
 
   it("expands to the form by hand: the line moves into the title, a category brings its importance", async () => {
@@ -299,7 +341,7 @@ describe("Composer", () => {
     });
   });
 
-  it("parses a pasted homework at once and writes nothing until Create", async () => {
+  it("parses a pasted homework at once and writes nothing until Approve", async () => {
     const homework =
       "№№ 290, 292, 293 — решить методом выделения линейных множителей. № 365 (определитель)";
     const reading = parsed({
@@ -310,18 +352,39 @@ describe("Composer", () => {
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => reading } });
     await renderComposer(runtime);
     await fireEvent.changeText(line(), homework);
-    expect(await screen.findByLabelText(en("edit.taskTitle"))).toHaveDisplayValue(
-      "ДЗ по алгебре: № 290–365",
-    );
+    expect(await screen.findByText("New task: ДЗ по алгебре: № 290–365")).toBeOnTheScreen();
     const added = () =>
       Object.values(runtime.state.store.getState().tasks.byId).find(
         (task) => task.sourceText === homework,
       );
     expect(added()).toBeUndefined();
-    await fireEvent.press(screen.getByRole("button", { name: en("form.create") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("assistant.approve") }));
     await waitFor(() => {
       expect(added()?.title).toBe("ДЗ по алгебре: № 290–365");
     });
     expect(added()?.subtasks).toHaveLength(4);
+  });
+
+  it("applies an assistant action only once when Approve is pressed twice before rerender", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/parse": () => parsed({ sourceText: "Buy cable", title: "Buy cable" }),
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "Buy cable");
+    await enter();
+    const approve = await screen.findByRole("button", { name: en("assistant.approve") });
+    await act(async () => {
+      void fireEvent.press(approve);
+      void fireEvent.press(approve);
+    });
+    await waitFor(() => {
+      expect(
+        Object.values(runtime.state.store.getState().tasks.byId).filter(
+          (task) => task.title === "Buy cable",
+        ),
+      ).toHaveLength(1);
+    });
   });
 });

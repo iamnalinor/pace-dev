@@ -13,13 +13,14 @@ import {
   parseEvent,
   parsePresetDefinition,
   type Result,
+  type Series,
   shouldRematerialize,
   sortEvents,
   type Task,
   validateEventInput,
 } from "@pace/core";
 
-import type { ApplyError, ApplyMeta, RpcState, RpcTask } from "../shared/contract.ts";
+import type { ApplyError, ApplyMeta, RpcSeries, RpcState, RpcTask } from "../shared/contract.ts";
 
 /**
 The state the Durable Object answers from: the core slices folded from the log, with the
@@ -188,9 +189,26 @@ const toRpcTask = (task: Task): RpcTask => {
   return { ...task, overrides: overrides.ok ? overrides.value : null };
 };
 
-/** The state as it crosses RPC: overrides validated into their typed shape (see `RpcState`). */
+const toRpcSeries = (series: Series): RpcSeries => {
+  const { overrides, ...template } = series.template;
+  if (overrides === undefined) {
+    return { ...series, template };
+  }
+  const parsed = parsePresetDefinition(overrides);
+  return {
+    ...series,
+    template: { ...template, ...(parsed.ok && { overrides: parsed.value }) },
+  };
+};
+
+/** The state as it crosses RPC: opaque overrides become serializable definitions. */
 export const toRpcState = (state: CoreState): RpcState => ({
   ...state,
+  series: {
+    byId: Object.fromEntries(
+      Object.entries(state.series.byId).map(([id, series]) => [id, toRpcSeries(series)]),
+    ),
+  },
   tasks: {
     byId: Object.fromEntries(
       Object.entries(state.tasks.byId).map(([id, task]) => [id, toRpcTask(task)]),

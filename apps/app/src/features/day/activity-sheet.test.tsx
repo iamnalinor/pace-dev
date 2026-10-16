@@ -6,6 +6,85 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { ActivitySheet } from "./activity-sheet.tsx";
 
 describe("the activity sheet", () => {
+  it("links an existing block to a task and shows the selected task in its editor", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: "2026-10-06T10:00:00.000Z",
+      label: "Reading",
+      startAt: "2026-10-06T09:00:00.000Z",
+    });
+    const [activity] = Object.values(runtime.state.store.getState().time.activities);
+    const task = Object.values(runtime.state.store.getState().tasks.byId).find(
+      (item) => item.title === "Algebra HW 6",
+    );
+    const onClose = jest.fn();
+    await renderScreen(
+      <ActivitySheet
+        onClose={onClose}
+        target={{
+          activityId: activity?.id ?? "",
+          category: "study",
+          endAt: "2026-10-06T10:00:00.000Z",
+          kind: "edit",
+          label: "Reading",
+          startAt: "2026-10-06T09:00:00.000Z",
+          taskId: null,
+        }}
+        zone="Europe/Moscow"
+      />,
+      runtime,
+    );
+    await fireEvent.press(screen.getByRole("button", { name: "Task: No task" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "Algebra HW 6" }));
+    expect(screen.getByRole("button", { name: "Task: Algebra HW 6" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    expect(runtime.state.store.getState().time.activities[activity?.id ?? ""]?.taskId).toBe(
+      task?.id,
+    );
+  });
+
+  it("removes a task link from an existing block", async () => {
+    const runtime = await createTestRuntime();
+    const task = Object.values(runtime.state.store.getState().tasks.byId).find(
+      (item) => item.title === "Algebra HW 6",
+    );
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: "2026-10-06T10:00:00.000Z",
+      label: "Reading",
+      startAt: "2026-10-06T09:00:00.000Z",
+      taskId: task?.id,
+    });
+    const [activity] = Object.values(runtime.state.store.getState().time.activities);
+    await renderScreen(
+      <ActivitySheet
+        onClose={jest.fn()}
+        target={{
+          activityId: activity?.id ?? "",
+          category: "study",
+          endAt: "2026-10-06T10:00:00.000Z",
+          kind: "edit",
+          label: "Reading",
+          startAt: "2026-10-06T09:00:00.000Z",
+          taskId: task?.id ?? null,
+        }}
+        zone="Europe/Moscow"
+      />,
+      runtime,
+    );
+    expect(screen.getByRole("button", { name: "Task: Algebra HW 6" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Task: Algebra HW 6" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "No task" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().time.activities[activity?.id ?? ""]?.taskId).toBeNull();
+    });
+  });
+
   it("renames a block and closes on save", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({
@@ -188,8 +267,8 @@ describe("deleting a block", () => {
       />,
       runtime,
     );
-    await fireEvent.press(screen.getByRole("button", { name: "Delete this block" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Delete it? Tap again" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Delete activity" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Delete activity? Tap again" }));
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });

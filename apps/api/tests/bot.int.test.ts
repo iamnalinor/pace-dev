@@ -35,6 +35,7 @@ type WebhookOptions = {
   readonly secret?: string;
   /** The `CF-Connecting-IP` Cloudflare sets; `null` leaves the header out. */
   readonly ip?: null | string;
+  readonly noModel?: boolean;
 };
 
 /** Calls the webhook as Telegram would: from one of its subnets, with the shared secret. */
@@ -45,7 +46,8 @@ const webhook = async (update: unknown, options: WebhookOptions = {}): Promise<R
     fetch: async () => {
       throw new Error("no network in tests");
     },
-    parseProviders: () => [{ model: fakeParseModel(echoReply), name: "fake" }],
+    parseProviders: () =>
+      options.noModel === true ? [] : [{ model: fakeParseModel(echoReply), name: "fake" }],
     telegramFetch,
   }).fetch(
     new Request("https://pace-api.test/telegram/webhook", {
@@ -206,9 +208,17 @@ type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] }
 
 /** The callback data of the preview button labelled `label` in the last message sent. */
 const buttonData = (label: string): string => {
-  const preview = sent.find((call) => call.method === "sendMessage");
+  const preview = sent.findLast((call) => ["sendMessage", "editMessageText"].includes(call.method));
   const keyboard = preview?.body["reply_markup"] as Keyboard | undefined;
   return keyboard?.inline_keyboard[0]?.find((button) => button.text === label)?.callback_data ?? "";
+};
+
+/** Plain free text is intentionally ambiguous until the owner chooses its domain. */
+const chooseTaskPreview = async (): Promise<void> => {
+  const choose = buttonData("Task");
+  expect(choose).toMatch(/^t:/u);
+  sent.length = 0;
+  await webhook(callbackUpdate(choose));
 };
 
 type Pulled = {
@@ -226,13 +236,14 @@ describe("the bot as an assistant", () => {
     sent.length = 0;
   });
 
-  it("previews a message with buttons and writes the task on Accept", async () => {
+  it("previews a message with buttons and writes the task on Approve", async () => {
     const token = await loginAsDev("1002");
     await webhook(textUpdate("купить кабель USB-C"));
-    const text = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
-    expect(text).toContain("I read it as:");
+    await chooseTaskPreview();
+    const text = String(sent.find((call) => call.method === "editMessageText")?.body["text"]);
+    expect(text).toContain("The assistant will create this task:");
     expect(text).toContain("купить кабель USB-C");
-    const accept = buttonData("Accept");
+    const accept = buttonData("Approve");
     expect(accept).toMatch(/^a:/u);
 
     sent.length = 0;
@@ -250,15 +261,37 @@ describe("the bot as an assistant", () => {
     });
   });
 
-  it("previews a change to an existing task by its summary and writes it on Accept", async () => {
+  it("offers an immediate rule preview and domain choice without a configured model", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("eating"), { noModel: true });
+    expect(buttonData("Activity")).toMatch(/^v:/u);
+    expect(await pulledEvent(token, "activity.started")).toBeUndefined();
+
+    const choose = buttonData("Activity");
+    sent.length = 0;
+    await webhook(callbackUpdate(choose), { noModel: true });
+    expect(String(sent.find((call) => call.method === "editMessageText")?.body["text"])).toMatch(
+      /eating/u,
+    );
+    const accept = buttonData("Approve");
+    expect(accept).toMatch(/^a:/u);
+    sent.length = 0;
+    await webhook(callbackUpdate(accept), { noModel: true });
+    expect(await pulledEvent(token, "activity.started")).toMatchObject({
+      payload: { category: "food", label: "eating" },
+    });
+  });
+
+  it("previews a change to an existing task by its summary and writes it on Approve", async () => {
     const token = await loginAsDev("1002");
     await webhook(textUpdate("water the balcony plants"));
-    await webhook(callbackUpdate(buttonData("Accept")));
+    await chooseTaskPreview();
+    await webhook(callbackUpdate(buttonData("Approve")));
     sent.length = 0;
     await webhook(textUpdate("close task water the balcony plants"));
     const text = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
-    expect(text).toBe("Close “water the balcony plants” as Done");
-    const accept = buttonData("Accept");
+    expect(text).toBe("The assistant will close “water the balcony plants” as Done");
+    const accept = buttonData("Approve");
     sent.length = 0;
     await webhook(callbackUpdate(accept));
     expect(sent[1]?.body).toMatchObject({ text: "Done ✓" });
@@ -268,11 +301,12 @@ describe("the bot as an assistant", () => {
   it("adds problems to a task from the chat, the message kept as the task's source", async () => {
     const token = await loginAsDev("1002");
     await webhook(textUpdate("geometry sheet three"));
-    await webhook(callbackUpdate(buttonData("Accept")));
+    await chooseTaskPreview();
+    await webhook(callbackUpdate(buttonData("Approve")));
     sent.length = 0;
     const text = "add to geometry sheet three: 4, 5";
     await webhook(textUpdate(text));
-    await webhook(callbackUpdate(buttonData("Accept")));
+    await webhook(callbackUpdate(buttonData("Approve")));
     expect(await pulledEvent(token, "task.subtasks.added")).toMatchObject({
       payload: { subtasks: [{ label: "4" }, { label: "5" }] },
     });
@@ -284,6 +318,7 @@ describe("the bot as an assistant", () => {
   it("keeps a message in the Inbox on To Inbox and lists Now on /now", async () => {
     const token = await loginAsDev("1002");
     await webhook(textUpdate("подумать об отпуске"));
+    await chooseTaskPreview();
     const toInbox = buttonData("To Inbox");
     sent.length = 0;
     await webhook(callbackUpdate(toInbox));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type Event, MAX_CONTEXT_TASKS, proposalContext, type RequestDomain } from "@pace/core";
+import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from "@pace/core";
 import { artboardState, at, ctx } from "@pace/core/testing";
 
 import { echoParse, fakeParseModel } from "./fake-model.ts";
@@ -12,7 +12,7 @@ const NOW = Date.parse("2026-10-06T12:00:00.000Z");
 
 const promptFor = (state = artboardState(), domain: RequestDomain = "task") =>
   buildParsePrompt("купить кабель", {
-    context: proposalContext(state, ctx()),
+    context: actionContext(state, ctx()),
     ctx: ctx(),
     domain,
     language: "en",
@@ -79,30 +79,33 @@ describe("buildParsePrompt", () => {
 
 describe("runParse", () => {
   it("returns the first provider's structured answer", async () => {
-    const result = await runParse([{ model: fakeParseModel(echoParse), name: "groq" }], prompt);
+    const result = await runParse(
+      [{ model: fakeParseModel(echoParse), name: "compatible" }],
+      prompt,
+    );
     expect(result).toEqual({
       ok: true,
-      value: { limited: {}, provider: "groq", result: echoParse("купить кабель") },
+      value: { limited: {}, provider: "compatible", result: echoParse("купить кабель") },
     });
   });
 
   it("moves to the next provider when one is rate limited", async () => {
     const result = await runParse(
       [
-        { model: fakeParseModel(() => ({ rateLimitedFor: 20 })), name: "groq" },
-        { model: fakeParseModel(echoParse), name: "gemini" },
+        { model: fakeParseModel(() => ({ rateLimitedFor: 20 })), name: "compatible" },
+        { model: fakeParseModel(echoParse), name: "backup" },
       ],
       prompt,
     );
-    expect(result).toMatchObject({ ok: true, value: { provider: "gemini" } });
-    expect(Object.keys(result.ok ? result.value.limited : {})).toEqual(["groq"]);
+    expect(result).toMatchObject({ ok: true, value: { provider: "backup" } });
+    expect(Object.keys(result.ok ? result.value.limited : {})).toEqual(["compatible"]);
   });
 
   it("says when the soonest provider is back once all are out", async () => {
     const result = await runParse(
       [
-        { model: fakeParseModel(() => ({ rateLimitedFor: 120 })), name: "groq" },
-        { model: fakeParseModel(() => ({ rateLimitedFor: 30 })), name: "gemini" },
+        { model: fakeParseModel(() => ({ rateLimitedFor: 120 })), name: "compatible" },
+        { model: fakeParseModel(() => ({ rateLimitedFor: 30 })), name: "backup" },
       ],
       prompt,
       { now: () => NOW },
@@ -110,7 +113,7 @@ describe("runParse", () => {
     expect(result).toEqual({
       error: {
         code: "llm/unavailable",
-        limited: { gemini: "2026-10-06T12:00:30.000Z", groq: "2026-10-06T12:02:00.000Z" },
+        limited: { backup: "2026-10-06T12:00:30.000Z", compatible: "2026-10-06T12:02:00.000Z" },
         retryAt: "2026-10-06T12:00:30.000Z",
       },
       ok: false,
@@ -126,28 +129,30 @@ describe("runParse", () => {
       });
     const result = await runParse(
       [
-        { model: model("groq"), name: "groq" },
-        { model: model("gemini"), name: "gemini" },
+        { model: model("compatible"), name: "compatible" },
+        { model: model("backup"), name: "backup" },
       ],
       prompt,
-      { cooldowns: { groq: "2026-10-06T12:05:00.000Z" }, now: () => NOW },
+      { cooldowns: { compatible: "2026-10-06T12:05:00.000Z" }, now: () => NOW },
     );
-    expect(result).toMatchObject({ ok: true, value: { provider: "gemini" } });
-    expect(asked).toEqual(["gemini"]);
+    expect(result).toMatchObject({ ok: true, value: { provider: "backup" } });
+    expect(asked).toEqual(["backup"]);
   });
 });
 
 describe("availability", () => {
   it("is available while one provider is not cooling down, else says when", () => {
     const now = "2026-10-06T12:00:00.000Z";
-    expect(availability(["groq", "gemini"], { groq: "2026-10-06T12:05:00.000Z" }, now)).toEqual({
+    expect(
+      availability(["compatible", "backup"], { compatible: "2026-10-06T12:05:00.000Z" }, now),
+    ).toEqual({
       available: true,
       retryAt: null,
     });
     expect(
       availability(
-        ["groq", "gemini"],
-        { gemini: "2026-10-06T12:03:00.000Z", groq: "2026-10-06T12:05:00.000Z" },
+        ["compatible", "backup"],
+        { backup: "2026-10-06T12:03:00.000Z", compatible: "2026-10-06T12:05:00.000Z" },
         now,
       ),
     ).toEqual({ available: false, retryAt: "2026-10-06T12:03:00.000Z" });
@@ -155,29 +160,35 @@ describe("availability", () => {
 });
 
 describe("parseProviders", () => {
-  it("makes one provider per key, Groq keys first, so a limited key rests while the next answers", () => {
+  it("makes one compatible provider per key, so a limited key rests while the next answers", () => {
     const providers = parseProviders({
-      geminiApiKeys: ["g1"],
-      groqApiKeys: ["k1", "k2", "k3"],
+      llmApiKeys: ["k1", "k2", "k3"],
+      llmBaseUrl: "https://models.example/v1",
+      llmModel: "reader-small",
       llmProvider: "auto",
     });
     expect(providers.map((provider) => provider.name)).toEqual([
-      "groq",
-      "groq-2",
-      "groq-3",
-      "gemini",
+      "compatible",
+      "compatible-2",
+      "compatible-3",
     ]);
+  });
+
+  it("has no network providers when no model is configured", () => {
+    expect(
+      parseProviders({ llmApiKeys: [], llmBaseUrl: "", llmModel: "", llmProvider: "auto" }),
+    ).toEqual([]);
   });
 
   it("rotates to the second key of the same provider on a rate limit", async () => {
     const result = await runParse(
       [
-        { model: fakeParseModel(() => ({ rateLimitedFor: 20 })), name: "groq" },
-        { model: fakeParseModel(echoParse), name: "groq-2" },
+        { model: fakeParseModel(() => ({ rateLimitedFor: 20 })), name: "compatible" },
+        { model: fakeParseModel(echoParse), name: "compatible-2" },
       ],
       prompt,
       { now: () => NOW },
     );
-    expect(result).toMatchObject({ ok: true, value: { provider: "groq-2" } });
+    expect(result).toMatchObject({ ok: true, value: { provider: "compatible-2" } });
   });
 });

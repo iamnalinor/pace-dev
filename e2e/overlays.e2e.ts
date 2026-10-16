@@ -113,7 +113,7 @@ test.describe("motion and overlays at one width", () => {
     // A pointer to hover with: a computer.
     await loginViaApi(page);
     await page.setViewportSize({ height: 900, width: 1280 });
-    await page.goto("/day");
+    await page.goto("/");
     await page.getByRole("button", { exact: true, name: "Calendar" }).hover();
     await expect(page.getByRole("tooltip")).toBeVisible();
     // Over the typed field above the bar, only while the pointer rests on Calendar: a hover

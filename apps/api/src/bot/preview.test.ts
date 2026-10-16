@@ -56,7 +56,10 @@ describe("the bot's preview", () => {
     expect(accept).toBeDefined();
     const id = accept !== undefined && "data" in accept ? accept.data.slice(2) : "";
     expect(written).toEqual([]);
-    await choosePreview(turn(LATER), PREVIEW_ACTIONS.accept, id);
+    await choosePreview(turn(LATER), [{ model: fakeParseModel(echoReply), name: "fake" }], {
+      action: PREVIEW_ACTIONS.accept,
+      id,
+    });
     expect(written).toEqual([
       [
         expect.objectContaining({

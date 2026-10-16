@@ -86,6 +86,18 @@ export const wasTelegramMessageSent = async (
   message: OutgoingMessage,
 ): Promise<boolean> => (await sendTelegramMessage(target, chatId, message)) !== null;
 
+/** Replaces an older confirmation prompt after a newer request superseded it. */
+export const editTelegramMessage = async (
+  target: TelegramTarget,
+  message: { readonly chatId: string; readonly messageId: number; readonly text: string },
+): Promise<void> => {
+  await callTelegram(target, "editMessageText", {
+    chat_id: message.chatId,
+    message_id: message.messageId,
+    text: message.text,
+  });
+};
+
 /** A 4xx refusal except rate limiting cannot be fixed by retrying this deletion. */
 export const deleteTelegramMessage = async (
   target: TelegramTarget,

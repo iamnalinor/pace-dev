@@ -135,12 +135,35 @@ describe("TaskScreen — editing subtasks", () => {
 describe("TaskScreen — work", () => {
   it("shows its link and description, and no ranking card", async () => {
     await trkScreen();
-    expect(screen.getByText("tracker.example.com ↗")).toBeOnTheScreen();
+    expect(screen.getByText("https://tracker.example.com/browse/TRK-231 ↗")).toBeOnTheScreen();
     expect(
       screen.getByText("p99 check fails ~1 in 5 runs on the shared runner."),
     ).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: /^Why it's/u })).toBeNull();
     expect(screen.queryByRole("button", { name: "Waiting" })).toBeNull();
+  });
+
+  it("edits the description directly on the task page", async () => {
+    const runtime = await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.editDescription") }));
+    const input = screen.getByLabelText(en("edit.description"));
+    expect(input.props["value"]).toBe("p99 check fails ~1 in 5 runs on the shared runner.");
+    await fireEvent.changeText(input, "Investigation notes pasted here");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.description).toBe(
+        "Investigation notes pasted here",
+      );
+    });
+    expect(screen.getByText("Investigation notes pasted here")).toBeOnTheScreen();
+  });
+
+  it("offers to add a description on a task with none", async () => {
+    await hwScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.addDescription") }));
+    expect(screen.getByLabelText(en("edit.description"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    expect(screen.getByRole("button", { name: en("task.addDescription") })).toBeOnTheScreen();
   });
 
   it("moves the progress slider in percent, the work left following at once", async () => {

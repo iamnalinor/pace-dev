@@ -1,39 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { type TextInput, View } from "react-native";
-
-import type { ComposerOption } from "@pace/client";
+import { Text, type TextInput, View } from "react-native";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
 import { Chip } from "#app/ui/chip.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { type Importance, IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
+import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 
-import { DateChip, DatePanel, type Zoned } from "./date-field.tsx";
-import { EstimateChip, EstimateOptions } from "./estimate-field.tsx";
+import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
+
+import { DatePanel } from "./date-field.tsx";
+import { isDeadlineChoiceValid } from "./deadline-choice.ts";
+import { DeadlinePolicyField } from "./deadline-policy-field.tsx";
+import { EstimateOptions } from "./estimate-field.tsx";
 import { OptionRow } from "./option-row.tsx";
+import { RecurrenceField } from "./recurrence-field.tsx";
+import { TaskTextFields } from "./task-text-fields.tsx";
+import { useOutsidePress } from "./use-outside-press.ts";
+import { WhenChips } from "./when-chips.tsx";
 
-/** Everything a task form shows, as plain values: the composer's and the editor's alike. */
-export type TaskFormValues = {
-  readonly title: string;
-  readonly presetId: string;
-  readonly projectId: null | string;
-  /** A project to create on save (the assistant or a `#tag` named one that does not exist). */
-  readonly newProjectName: null | string;
-  readonly importance: Importance;
-  readonly start: Zoned;
-  readonly due: Zoned;
-  readonly estimateMinutes: null | number;
-  readonly description: string;
-  readonly link: string;
-};
-
-export type TaskFormOptions = {
-  readonly presets: readonly ComposerOption[];
-  readonly projects: readonly ComposerOption[];
-  /** Each category's own estimate, shown when the task has none of its own. */
-  readonly estimates: Readonly<Record<string, number>>;
-};
+export type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 
 type Panel = "due" | "estimate" | "start" | null;
 
@@ -41,14 +27,21 @@ type Panel = "due" | "estimate" | "start" | null;
 const WhenFields = ({
   fallback,
   onChange,
+  onClose,
+  panel,
+  setPanel,
   values,
 }: {
   readonly values: TaskFormValues;
   /** The category's estimate, used while the task has none of its own. */
   readonly fallback: null | number;
   readonly onChange: (patch: Partial<TaskFormValues>) => void;
+  readonly panel: Panel;
+  readonly setPanel: (panel: Panel) => void;
+  readonly onClose: () => void;
 }) => {
-  const [panel, setPanel] = useState<Panel>(null);
+  const wrapperRef = useRef<View>(null);
+  useOutsidePress(wrapperRef, panel === "due" || panel === "start", onClose);
   const toggle = (next: Exclude<Panel, null>): void => {
     setPanel(panel === next ? null : next);
   };
@@ -56,33 +49,14 @@ const WhenFields = ({
     setPanel(null);
   };
   return (
-    <View className="gap-2">
-      <View className="flex-row flex-wrap gap-1.5">
-        <DateChip
-          isOpen={panel === "start"}
-          kind="start"
-          onToggle={() => {
-            toggle("start");
-          }}
-          value={values.start}
-        />
-        <DateChip
-          isOpen={panel === "due"}
-          kind="due"
-          onToggle={() => {
-            toggle("due");
-          }}
-          value={values.due}
-        />
-        <EstimateChip
-          fallback={fallback}
-          isOpen={panel === "estimate"}
-          minutes={values.estimateMinutes}
-          onToggle={() => {
-            toggle("estimate");
-          }}
-        />
-      </View>
+    <View
+      className="gap-2"
+      onTouchStart={(event) => {
+        event.stopPropagation();
+      }}
+      ref={wrapperRef}
+    >
+      <WhenChips fallback={fallback} panel={panel} toggle={toggle} values={values} />
       {panel === "start" || panel === "due" ? (
         <DatePanel
           key={panel}
@@ -191,6 +165,7 @@ export const TaskFields = ({
   onChange,
   onSubmit,
   options,
+  showDeadlineIssue = false,
   values,
 }: {
   readonly values: TaskFormValues;
@@ -200,9 +175,12 @@ export const TaskFields = ({
   readonly onSubmit?: () => void;
   /** The cursor lands in the title (the composer's line moved there). */
   readonly isTitleFocused?: boolean;
+  readonly showDeadlineIssue?: boolean;
 }) => {
   const t = useT();
   const titleRef = useRef<TextInput>(null);
+  const [panel, setPanel] = useState<Panel>(null);
+  const [isFinalOpen, setIsFinalOpen] = useState(false);
   // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in.
   useEffect(() => {
     if (isTitleFocused) {
@@ -210,7 +188,13 @@ export const TaskFields = ({
     }
   }, [isTitleFocused]);
   return (
-    <View className="gap-3.5">
+    <View
+      className="gap-3.5"
+      onTouchStart={() => {
+        setPanel(null);
+        setIsFinalOpen(false);
+      }}
+    >
       <TextField
         error={values.title.trim() === "" ? t("edit.titleRequired") : null}
         label={t("edit.taskTitle")}
@@ -227,26 +211,32 @@ export const TaskFields = ({
       <WhenFields
         fallback={options.estimates[values.presetId] ?? null}
         onChange={onChange}
+        onClose={() => {
+          setPanel(null);
+        }}
+        panel={panel}
+        setPanel={setPanel}
         values={values}
       />
-      <TextField
-        label={t("edit.description")}
-        multiline
-        onChangeText={(description) => {
-          onChange({ description });
+      <DeadlinePolicyField
+        isFinalOpen={isFinalOpen}
+        onChange={(deadlinePolicy) => {
+          onChange({ deadlinePolicy });
         }}
-        value={values.description}
+        onFinalOpenChange={setIsFinalOpen}
+        value={values.deadlinePolicy}
       />
-      <TextField
-        autoCapitalize="none"
-        inputMode="url"
-        label={t("edit.link")}
-        onChangeText={(link) => {
-          onChange({ link });
+      <RecurrenceField
+        onChange={(recurrence) => {
+          onChange({ recurrence });
         }}
-        placeholder="https://"
-        value={values.link}
+        start={values.start}
+        value={values.recurrence}
       />
+      {showDeadlineIssue && !isDeadlineChoiceValid(values.deadlinePolicy, values.due) ? (
+        <Text className="font-sans text-[12px] text-warn">{t("form.deadlineInvalid")}</Text>
+      ) : null}
+      <TaskTextFields onChange={onChange} values={values} />
     </View>
   );
 };

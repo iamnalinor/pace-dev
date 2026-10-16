@@ -1,4 +1,13 @@
-import { err, type Importance, newId, type Result } from "@pace/core";
+import {
+  type DeadlinePolicy,
+  err,
+  formatInZone,
+  type Importance,
+  newId,
+  type Result,
+  seriesInstanceId,
+  type SeriesSchedule,
+} from "@pace/core";
 
 import {
   type ActionDeps,
@@ -39,6 +48,8 @@ export type CreateTaskForm = ScheduleForm &
     readonly projectName?: string | undefined;
     readonly importance?: Importance | undefined;
     readonly estimateMinutes?: number | undefined;
+    readonly deadlinePolicy?: DeadlinePolicy | undefined;
+    readonly recurrence?: SeriesSchedule | undefined;
     readonly subtasks?: readonly SubtaskForm[] | undefined;
     readonly description?: string | undefined;
     readonly sourceText?: string | undefined;
@@ -133,6 +144,83 @@ const projectOf = (
     : resolveProject(deps, { projectName: form.projectName }, form);
 };
 
+const taskDetails = (form: CreateTaskForm) => ({
+  ...(form.importance !== undefined && { importance: form.importance }),
+  ...(form.estimateMinutes !== undefined && { estimateMinutes: form.estimateMinutes }),
+  subtasks: subtaskInputs(form.subtasks ?? []),
+  ...(form.description !== undefined && { description: form.description }),
+  ...(form.sourceText !== undefined && { sourceText: form.sourceText }),
+  fields: fieldsInput(form.fields ?? {}),
+  ...(form.deadlinePolicy !== undefined && { overrides: { deadlinePolicy: form.deadlinePolicy } }),
+});
+
+const taskPayload = (
+  form: CreateTaskForm,
+  options: {
+    readonly projectId: string;
+    readonly taskId: string;
+    readonly start: { readonly at?: string; readonly tz: string };
+    readonly seriesId?: string;
+  },
+) => ({
+  taskId: options.taskId,
+  title: form.title,
+  presetId: form.presetId,
+  ...(options.projectId !== "" && { projectId: options.projectId }),
+  ...schedule(
+    {
+      ...form,
+      ...(options.start.at !== undefined && {
+        startAt: options.start.at,
+        startTz: options.start.tz,
+      }),
+    },
+    options.start.tz,
+  ),
+  ...taskDetails(form),
+  ...(options.seriesId !== undefined && { seriesId: options.seriesId, seriesRevision: 0 }),
+});
+
+const recurringCreated = async (
+  deps: ActionDeps,
+  form: CreateTaskForm & { readonly recurrence: SeriesSchedule },
+  project: ResolvedProject,
+): ActionResult => {
+  const seriesId = newId();
+  const startAt = form.startAt ?? deps.clock.now();
+  const startTz = form.startTz ?? deps.clock.deviceTz;
+  if (
+    form.recurrence.until !== undefined &&
+    form.recurrence.until < formatInZone(startAt, startTz, "yyyy-MM-dd")
+  ) {
+    return err("action/invalid-input");
+  }
+  const payload = taskPayload(form, {
+    projectId: project.projectId,
+    taskId: seriesInstanceId(seriesId, 0, 0),
+    start: { at: startAt, tz: startTz },
+    seriesId,
+  });
+  const series = stamp(
+    deps,
+    {
+      type: "series.created",
+      payload: {
+        seriesId,
+        schedule: form.recurrence,
+        template: { ...payload, startAt, startTz, seriesId, seriesRevision: 0 },
+      },
+    },
+    form,
+  );
+  const first = stamp(deps, { type: "task.created", payload }, form);
+  return await emit(deps, [
+    ...project.events,
+    series,
+    { ...first, source: "system", id: payload.taskId },
+  ]);
+};
+
 const createTask =
   (deps: ActionDeps): TaskActions["createTask"] =>
   async (form) => {
@@ -141,27 +229,18 @@ const createTask =
       return project;
     }
     const { projectId, events } = project.value;
-    const created = stamp(
-      deps,
-      {
-        type: "task.created",
-        payload: {
-          taskId: newId(),
-          title: form.title,
-          presetId: form.presetId,
-          ...(projectId !== "" && { projectId }),
-          ...(form.importance !== undefined && { importance: form.importance }),
-          ...schedule(form, deps.clock.deviceTz),
-          ...(form.estimateMinutes !== undefined && { estimateMinutes: form.estimateMinutes }),
-          subtasks: subtaskInputs(form.subtasks ?? []),
-          ...(form.description !== undefined && { description: form.description }),
-          ...(form.sourceText !== undefined && { sourceText: form.sourceText }),
-          fields: fieldsInput(form.fields ?? {}),
-        },
+    if (form.recurrence !== undefined) {
+      return await recurringCreated(deps, { ...form, recurrence: form.recurrence }, project.value);
+    }
+    const payload = taskPayload(form, {
+      projectId,
+      taskId: newId(),
+      start: {
+        ...(form.startAt !== undefined && { at: form.startAt }),
+        tz: form.startTz ?? deps.clock.deviceTz,
       },
-      form,
-    );
-    return await emit(deps, [...events, created]);
+    });
+    return await emit(deps, [...events, stamp(deps, { type: "task.created", payload }, form)]);
   };
 
 const updateTask =

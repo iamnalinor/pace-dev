@@ -43,6 +43,9 @@ export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
 export type { AiOutcome, Assistant } from "./assistant.ts";
 export {
+  type AccountAction,
+  type AccountConfirmation,
+  type AccountConfirmationStatus,
   type Auth,
   type AuthState,
   type BotLogin,
@@ -154,6 +157,7 @@ export {
   type FeedPlatform,
 } from "./view-models/notifications.ts";
 export {
+  groupNowRows,
   type MetaPart,
   type NowRow,
   nowRow,
@@ -203,6 +207,13 @@ export {
   reviewViewModel,
   waitingCount,
 } from "./view-models/review.ts";
+export {
+  appsDuring,
+  type AppTime,
+  type DeviceTime,
+  screenTime,
+  type ScreenTime,
+} from "./view-models/screen-time.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,

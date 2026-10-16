@@ -2,6 +2,7 @@ import { createContext, type ReactNode, use, useRef, useState } from "react";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
+import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
 import { useNewTaskRequest } from "#app/shared/new-task-request.ts";
 import { withDraft } from "#app/shared/task-fields/subtask-list.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -141,12 +142,25 @@ const useAddTask = (model: ComposerModel, isReadByAssistant: boolean, done: () =
   };
 };
 
+const resetAndClose =
+  (reset: () => void, close: () => void): (() => void) =>
+  () => {
+    reset();
+    close();
+  };
+
 /** The composer's state and moves: the text, the reading, the form, and what each key does. */
-const useFlowState = (
-  initialText: string,
-  initialForm: FormOrigin | null,
-  isFormInPane: boolean,
-) => {
+const useFlowState = ({
+  initialText,
+  initialForm,
+  isFormInPane,
+  onCreatedTask,
+}: {
+  readonly initialText: string;
+  readonly initialForm: FormOrigin | null;
+  readonly isFormInPane: boolean;
+  readonly onCreatedTask: (taskId: string) => void;
+}) => {
   const { actions, assistant, hooks } = usePace();
   const run = useRunAction();
   const draft = useDraft(initialText, assistant);
@@ -158,50 +172,36 @@ const useFlowState = (
     text,
   });
   const { close, form, hide, lineFocus, setForm } = useFormState(initialForm);
-  const done = (): void => {
-    reset();
-    close();
-  };
-  /** The assistant's reading (or, when it cannot read, the rules') opens the form. */
-  const parse = async (line: string): Promise<void> => {
-    const outcome = await ai.read(line, onReading);
-    if (outcome !== null && outcome.status !== "queued") {
-      // The rules' reading when the assistant could not: the person fills it in, by hand.
-      setForm(outcome.status === "read" ? "assistant" : "by-hand");
+  const done = resetAndClose(reset, close);
+  const pending = usePendingActions("task", (createdTaskId) => {
+    done();
+    if (createdTaskId !== null) {
+      onCreatedTask(createdTaskId);
     }
-  };
+  });
   const add = useAddTask(toAdd, form === "assistant", done);
   return {
     add,
     ai,
-    /** An answer to the assistant's question joins the line, which is read again. */
-    answer: (answer: string): void => {
-      const next = `${text.trimEnd()} ${answer}`;
-      onText(next);
-      void parse(next);
-    },
+    pending,
+    answer: pending.followup,
     close,
-    /**
-    Enter (or Send): the assistant reads the line into the form (a line it already read reopens
-    as it was left); a line too short to read opens the form as it is.
-    */
+    /** Enter reviews an action or approves the preview already shown. */
     enter: (): void => {
-      if (ai.state.status === "read") {
-        setForm("assistant");
+      if (pending.pending !== null) {
+        void pending.approve();
       } else if (canAiRead(text)) {
-        void parse(text);
+        pending.submit(text);
       } else {
         setForm("by-hand");
       }
     },
-    /**
-    New task: the form by hand, the line (if any) as its title by the rules; an assistant's
-    reading of it gives way. An open form stays as it is.
-    */
+    /** New task opens the manual form and dismisses any assistant preview. */
     expand: (): void => {
       if (form !== null) {
         return;
       }
+      pending.cancel();
       if (ai.state.status === "read") {
         onText(text);
       }
@@ -228,9 +228,10 @@ const useFlowState = (
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.
       const isPaste = isPasted(text, next) && canAiRead(next);
+      pending.cancel();
       onText(next);
       if (isPaste) {
-        void parse(next);
+        pending.submit(next);
       }
     },
   };
@@ -239,6 +240,7 @@ const useFlowState = (
 export type ComposerFlow = ReturnType<typeof useFlowState>;
 
 const ComposerContext = createContext<ComposerFlow | null>(null);
+const ignoreCreatedTask = (_taskId: string): void => undefined;
 
 /**
 One composer for Now: the line in the list and the form (in the card on a phone, in the right
@@ -249,14 +251,21 @@ export const ComposerProvider = ({
   children,
   initialText = "",
   isFormInPane = false,
+  onCreatedTask = ignoreCreatedTask,
   opensForm = false,
 }: {
   readonly children: ReactNode;
   readonly initialText?: string | undefined;
   readonly isFormInPane?: boolean;
+  readonly onCreatedTask?: (taskId: string) => void;
   readonly opensForm?: boolean;
 }) => {
-  const flow = useFlowState(initialText, opensForm ? "by-hand" : null, isFormInPane);
+  const flow = useFlowState({
+    initialForm: opensForm ? "by-hand" : null,
+    initialText,
+    isFormInPane,
+    onCreatedTask,
+  });
   useNewTaskRequest(flow.expand);
   useHotkey(HOTKEYS.newTask, flow.expand);
   return <ComposerContext value={flow}>{children}</ComposerContext>;

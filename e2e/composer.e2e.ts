@@ -51,7 +51,7 @@ for (const [width, height, size] of [
       }
       const board = page.getByRole("list", { name: "Tasks" });
       await expect(board.getByText("синк по дашборду")).toBeVisible();
-      await expect(board.getByText("позвонить в банк")).toBeVisible();
+      await expect(board.getByText("срочно позвонить в банк")).toBeVisible();
       await shoot(page, `now-${size}-${theme}`);
       await expectNoA11yViolations(page);
 
@@ -63,17 +63,17 @@ for (const [width, height, size] of [
   }
 }
 
-test("a pasted message opens the form and is written only on Create", async ({ page }) => {
+test("a pasted message shows actions and is written only on Approve", async ({ page }) => {
   await loginViaApi(page);
   await page.goto("/");
   const message = "№№ 290, 292, 293 — решить методом выделения линейных множителей";
-  // A fill is a paste: the (fake) assistant reads it at once and the form opens.
+  // A fill is a paste: the assistant reads it at once and shows a reviewable action.
   await page.getByRole("textbox", { name: "New task" }).fill(message);
-  const form = page.getByRole("form", { name: "Suggested by the assistant" });
-  await expect(form.getByRole("textbox", { exact: true, name: "Title" })).toHaveValue(message);
+  await expect(page.getByText(`The assistant will create “${message}”`)).toBeVisible();
   await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toHaveCount(0);
   await expectNoA11yViolations(page);
-  await form.getByRole("button", { name: /^Create/u }).click();
+  await page.getByRole("button", { name: "Approve" }).click();
+  await page.goto("/");
   await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toBeVisible();
 });
 

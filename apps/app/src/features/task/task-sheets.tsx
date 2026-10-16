@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 
 import type { PaceRuntime } from "#app/runtime.ts";
+import type { SeriesSchedule } from "@pace/core";
 
 import { useAppState, usePace, useT } from "#app/app-state.tsx";
+import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.ts";
 import { SubtaskList, withDraft } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -12,8 +14,14 @@ import { Sheet } from "#app/ui/sheet.tsx";
 import { taskFormOptions, type TaskPatch, type TaskViewModel } from "@pace/client";
 
 /** The task as the form shows it: its own values (an estimate it never set reads as none). */
-const valuesOf = (view: TaskViewModel, deviceTz: string): TaskFormValues => ({
+const valuesOf = (
+  view: TaskViewModel,
+  deviceTz: string,
+  recurrence: null | SeriesSchedule,
+): TaskFormValues => ({
   description: view.description ?? "",
+  deadlinePolicy: view.stats.deadlinePolicy,
+  recurrence,
   due:
     view.stats.dueAt === null ? null : { at: view.stats.dueAt, tz: view.stats.dueTz ?? deviceTz },
   estimateMinutes: view.overrideSheet.isEstimateOwn ? view.overrideSheet.estimateMinutes : null,
@@ -28,6 +36,14 @@ const valuesOf = (view: TaskViewModel, deviceTz: string): TaskFormValues => ({
 
 const isSameTime = (a: TaskFormValues["due"], b: TaskFormValues["due"]): boolean =>
   a?.at === b?.at && a?.tz === b?.tz;
+
+const deadlineStatus = (before: TaskFormValues, after: TaskFormValues) => {
+  const isChanged = JSON.stringify(after.deadlinePolicy) !== JSON.stringify(before.deadlinePolicy);
+  return {
+    changed: isChanged,
+    valid: !isChanged || isDeadlineChoiceValid(after.deadlinePolicy, after.due),
+  };
+};
 
 /** A changed date as the patch writes it: the new time with its zone, or `null` to clear. */
 const timePatch = (
@@ -70,10 +86,19 @@ type SaveInput = {
   readonly added: readonly string[];
   /** Subtasks taken off in the sheet. */
   readonly removed: readonly string[];
+  readonly seriesId: null | string;
+};
+
+/** New and removed subtasks while the editor is open. */
+const useSubtaskEdits = () => {
+  const [added, setAdded] = useState<readonly string[]>([]);
+  const [subtaskDraft, setSubtaskDraft] = useState("");
+  const [removed, setRemoved] = useState<readonly string[]>([]);
+  return { added, removed, setAdded, setRemoved, setSubtaskDraft, subtaskDraft };
 };
 
 /** The writes a save makes, in order: only what changed. */
-const saveSteps = ({ actions, added, before, removed, values, view }: SaveInput) => {
+const saveSteps = ({ actions, added, before, removed, seriesId, values, view }: SaveInput) => {
   const patch = patchOf(before, values);
   return [
     ...(Object.keys(patch).length === 0
@@ -97,6 +122,29 @@ const saveSteps = ({ actions, added, before, removed, values, view }: SaveInput)
     ...(values.estimateMinutes === before.estimateMinutes
       ? []
       : [async () => await actions.setEstimate(view.id, values.estimateMinutes)]),
+    ...(JSON.stringify(values.deadlinePolicy) === JSON.stringify(before.deadlinePolicy)
+      ? []
+      : [
+          async () =>
+            await actions.setOverrides(view.id, {
+              ...view.overrideSheet.overrides,
+              deadlinePolicy: values.deadlinePolicy,
+            }),
+        ]),
+    ...(JSON.stringify(values.recurrence) === JSON.stringify(before.recurrence)
+      ? []
+      : [
+          async () => {
+            if (seriesId === null) {
+              return values.recurrence === null
+                ? await actions.updateTask(view.id, {})
+                : await actions.startSeriesForTask(view.id, values.recurrence);
+            }
+            return values.recurrence === null
+              ? await actions.archiveSeries(seriesId)
+              : await actions.updateSeries(seriesId, values.recurrence);
+          },
+        ]),
     ...removed.map((id) => async () => await actions.removeSubtask(view.id, id)),
     ...(added.length === 0 ? [] : [async () => await actions.addSubtasks(view.id, added)]),
   ];
@@ -119,23 +167,24 @@ export const EditTaskSheet = ({
   const run = useRunAction();
   const { deviceTz } = useViewer();
   const state = useAppState((current) => current);
+  const seriesId = state.tasks.byId[view.id]?.seriesId ?? null;
+  const recurrence = seriesId === null ? null : (state.series.byId[seriesId]?.schedule ?? null);
   const options = useMemo(() => taskFormOptions(state), [state]);
-  const before = useMemo(() => valuesOf(view, deviceTz), [view, deviceTz]);
+  const before = useMemo(() => valuesOf(view, deviceTz, recurrence), [view, deviceTz, recurrence]);
   const [values, setValues] = useState(before);
-  const [added, setAdded] = useState<readonly string[]>([]);
-  const [subtaskDraft, setSubtaskDraft] = useState("");
-  const [removed, setRemoved] = useState<readonly string[]>([]);
+  const { added, removed, setAdded, setRemoved, setSubtaskDraft, subtaskDraft } = useSubtaskEdits();
+  const deadline = deadlineStatus(before, values);
   const save = async (): Promise<void> => {
     const steps = saveSteps({
       actions,
       added: withDraft(added, subtaskDraft),
       before,
       removed,
+      seriesId,
       values,
       view,
     });
     for (const step of steps) {
-      // One after another: each write is validated against the state the previous one left.
       if (!(await run(step()))) {
         return;
       }
@@ -147,7 +196,7 @@ export const EditTaskSheet = ({
       closeLabel={t("common.close")}
       footer={
         <SheetActions
-          isDisabled={values.title.trim() === ""}
+          isDisabled={values.title.trim() === "" || !deadline.valid}
           onPrimary={() => {
             void save();
           }}
@@ -163,6 +212,7 @@ export const EditTaskSheet = ({
           setValues((current) => ({ ...current, ...patch }));
         }}
         options={options}
+        showDeadlineIssue={deadline.changed}
         values={values}
       />
       <SubtaskList

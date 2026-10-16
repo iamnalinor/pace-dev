@@ -285,4 +285,25 @@ describe("expect", () => {
       source: "category",
     });
   });
+
+  it("uses a manually set category estimate before a matching history", () => {
+    const runs = ["06:00", "07:00", "08:00"].flatMap((hhmm, index) => [
+      start(hhmm, { activityId: `m${String(index)}`, category: "commute", label: "Commute" }),
+      act(`0${String(6 + index)}:30`, {
+        payload: { activityId: `m${String(index)}` },
+        type: "activity.stopped",
+      }),
+    ]);
+    expect(
+      defaultsFor(
+        timeOf(runs),
+        { category: "commute", label: "Commute" },
+        { manual: { commute: 45 } },
+      ),
+    ).toEqual({
+      expectMinutes: 45,
+      samples: 3,
+      source: "manual",
+    });
+  });
 });

@@ -39,7 +39,7 @@ for (const size of SIZES) {
   test.describe(`time tracking, ${size.name} (${String(size.width)}px)`, () => {
     test.use({ viewport: { height: size.height, width: size.width } });
 
-    test("on Day: every button opens its picker, a pick starts, one runs alongside, one is typed", async ({
+    test("on Now: every button opens its picker, a pick starts, one runs alongside, one is typed", async ({
       page,
     }, info) => {
       // Every picker, three axe passes and seven shots: longer than the default.
@@ -47,7 +47,6 @@ for (const size of SIZES) {
       await loginViaApi(page);
       await page.goto("/");
       await addTask(page, `Write the lab report ${size.name}`);
-      await page.goto("/day");
       const bar = timeBar(page);
       // Four buttons, nothing else: no «⋯», no switches.
       await expect(bar.getByRole("button", { name: /^(Calendar|Task|Chores|Rest)$/u })).toHaveCount(
@@ -119,6 +118,8 @@ for (const size of SIZES) {
       const typed = bar.getByRole("textbox", { name: "What are you doing?" });
       await typed.fill("Пошел в ЦСС, 20мин");
       await typed.press("Enter");
+      await expect(bar.getByRole("button", { name: "Approve" })).toBeVisible();
+      await bar.getByRole("button", { name: "Approve" }).click();
       await expect(bar.getByRole("button", { name: "Stop: Пошел в ЦСС" })).toBeVisible();
       await expect(bar.getByText(/of ~20m/u)).toBeVisible();
       await bar.getByRole("button", { name: "Stop: Пошел в ЦСС" }).click();
@@ -126,37 +127,29 @@ for (const size of SIZES) {
       await expect(bar.getByRole("button", { name: /^Stop/u })).toHaveCount(0);
     });
 
-    test("Now shows what runs in one row above the tasks; Stop there, the row opens Day", async ({
+    test("Now keeps the full running panel with its task rows and Stop controls", async ({
       page,
     }, info) => {
       await loginViaApi(page);
       await page.goto("/");
       await addTask(page, `Planes and lines ${size.name}`);
-      await expect(page.getByRole("region", { name: "Time" })).toHaveCount(0);
-      await expect(page.getByRole("region", { name: "Running now" })).toHaveCount(0);
-      await page.goto("/day");
+      await expect(timeBar(page)).toBeVisible();
+      await expect(timeBar(page).getByText("Walk")).toHaveCount(0);
       await timeBar(page).getByRole("button", { name: "Rest", exact: true }).click();
       await page.getByRole("list", { name: "Rest" }).getByRole("button", { name: "Walk" }).click();
       await expect(timeBar(page).getByRole("button", { name: "Rest, running" })).toBeVisible();
-      await page.goto("/");
-      const running = page.getByRole("region", { name: "Running now" });
+      const running = timeBar(page);
       await expect(running.getByText("Walk")).toBeVisible();
       const firstRow = page.getByRole("list", { name: "Tasks" }).getByRole("listitem").first();
       await expect(firstRow).toBeVisible();
-      await page.waitForFunction(() =>
-        document.getAnimations().every((animation) => animation.playState !== "running"),
-      );
-      expect(await gapAbove(running, firstRow)).toBeGreaterThanOrEqual(0);
       await shoot(page, `now-running-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
-      await running.getByRole("link").click();
+      await page.goto("/day");
       await expect(page.getByRole("heading", { level: 1, name: "Day" })).toBeVisible();
+      await expect(timeBar(page)).toHaveCount(0);
       await page.goto("/");
-      await page
-        .getByRole("region", { name: "Running now" })
-        .getByRole("button", { name: "Stop: Walk" })
-        .click();
-      await expect(page.getByRole("region", { name: "Running now" })).toHaveCount(0);
+      await timeBar(page).getByRole("button", { name: "Stop: Walk" }).click();
+      await expect(timeBar(page).getByRole("button", { name: "Stop: Walk" })).toHaveCount(0);
     });
 
     test("logs a past block on Day and sees it in Insights", async ({ page }, info) => {
@@ -220,16 +213,13 @@ for (const size of SIZES) {
     await loginViaApi(page);
     await page.setViewportSize({ height: size.height, width: size.width });
     await page.goto("/");
-    // Deleting a task says so in a toast (with Undo); it is still up on Day, where the bar is.
+    // Deleting a task says so in a toast (with Undo); the bar is below it on Now.
     await addTask(page, `Toast ${size.name}`);
     await page.getByRole("list", { name: "Tasks" }).getByText(`Toast ${size.name}`).click();
     await page.getByRole("button", { name: "Delete the task" }).click();
     const toast = page.getByRole("alert");
     await expect(toast).toBeVisible();
-    await page
-      .getByRole("link", { name: "Day" })
-      .or(page.getByRole("tab", { name: "Day" }))
-      .click();
+    await page.goto("/");
     const bar = timeBar(page);
     await expect(bar).toBeVisible();
     await expect(toast).toBeVisible();
@@ -241,7 +231,7 @@ for (const size of SIZES) {
 test("the greyed Calendar button says why the moment the pointer is over it", async ({ page }) => {
   await loginViaApi(page);
   await page.setViewportSize({ height: 900, width: 1280 });
-  await page.goto("/day");
+  await page.goto("/");
   const calendar = timeBar(page).getByRole("button", { exact: true, name: "Calendar" });
   await expect(calendar).toHaveAttribute("aria-describedby", /.+/u);
   await calendar.hover();
@@ -302,8 +292,6 @@ test.describe("the calendar's Attend or skip on Now, phone (390px)", () => {
     await prompt.getByRole("button", { name: "Attend" }).click();
     await expect(prompt).toBeHidden();
     await expect(page.getByText("That time is in the future.")).toHaveCount(0);
-    await expect(
-      page.getByRole("region", { name: "Running now" }).getByText("Colloquium"),
-    ).toBeVisible();
+    await expect(timeBar(page).getByText("Colloquium")).toBeVisible();
   });
 });

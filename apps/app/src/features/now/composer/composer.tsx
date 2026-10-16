@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
+import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
 import { AnimatedHeight } from "#app/ui/animated-height.tsx";
 import { cx } from "#app/ui/cx.ts";
 
@@ -46,20 +47,40 @@ const LineBlock = ({
   readonly flow: ComposerFlow;
   readonly isFocused: boolean;
   readonly onFocusChange: (isInFocus: boolean) => void;
-}) => (
-  <>
-    <QuickLine
-      flow={flow}
-      isFocused={isFocused}
-      isLocked={flow.form !== null && flow.isFormInPane}
-      isReading={flow.ai.state.status === "reading"}
-      onFocusChange={onFocusChange}
-    />
-    {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
-      <Status flow={flow} />
-    )}
-  </>
-);
+}) => {
+  const t = useT();
+  return (
+    <>
+      <QuickLine
+        flow={flow}
+        isFocused={isFocused}
+        isLocked={flow.form !== null && flow.isFormInPane}
+        isReading={flow.pending.busy}
+        onFocusChange={onFocusChange}
+      />
+      {flow.pending.pending === null ? null : (
+        <ActionCards
+          actions={flow.pending.pending.actions}
+          busy={flow.pending.busy}
+          onApprove={() => {
+            void flow.pending.approve();
+          }}
+          onCancel={flow.pending.cancel}
+          onFollowup={flow.pending.followup}
+          source={flow.pending.pending.status}
+        />
+      )}
+      {flow.pending.issue === null ? null : (
+        <Text accessibilityRole="alert" className="font-sans text-[13px] text-warn">
+          {t(flow.pending.issue)}
+        </Text>
+      )}
+      {flow.text.trim() === "" || flow.form !== null || flow.ai.state.status === "read" ? null : (
+        <Status flow={flow} />
+      )}
+    </>
+  );
+};
 
 /**
 Now's composer, one card. The line takes a task in words: Enter (or Send) has the assistant

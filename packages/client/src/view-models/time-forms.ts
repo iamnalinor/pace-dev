@@ -11,6 +11,8 @@ export const hasEnd = (target: ActivityTarget): boolean =>
 export type ActivityForm = {
   readonly label: string;
   readonly category: ActivityCategory;
+  readonly expectMinutes: null | number;
+  readonly taskId: null | string;
   readonly from: string;
   readonly to: string;
 };
@@ -21,6 +23,8 @@ export const activityFormOf = (
   clock: (atIso: string) => string,
 ): ActivityForm => ({
   category: target.kind === "edit" ? target.category : "other",
+  expectMinutes: target.kind === "edit" ? (target.expectMinutes ?? null) : null,
+  taskId: target.kind === "edit" ? (target.taskId ?? null) : null,
   from: clock(target.startAt),
   label: target.kind === "edit" ? target.label : "",
   to: target.endAt === null ? "" : clock(target.endAt),

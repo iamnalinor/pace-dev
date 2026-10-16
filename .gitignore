@@ -47,6 +47,7 @@ expo-env.d.ts
 .wrangler/
 .dev.vars
 .dev.vars.*
+!apps/api/.dev.vars.example
 
 # Android signing: only the shared debug keystore is committed
 *.keystore

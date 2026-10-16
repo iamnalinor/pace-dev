@@ -19,7 +19,7 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
-import { type NowRow, nowViewModel } from "./now.ts";
+import { groupNowRows, type NowRow, nowViewModel } from "./now.ts";
 
 const row = (rows: readonly NowRow[], id: string): NowRow => {
   const found = rows.find((entry) => entry.id === id);
@@ -31,6 +31,18 @@ const row = (rows: readonly NowRow[], id: string): NowRow => {
 
 describe("nowViewModel", () => {
   const board = nowViewModel(artboardState(), ctx());
+
+  it("groups dated tasks by deadline and undated tasks by importance", () => {
+    const groups = groupNowRows(board.rows);
+    expect(groups.dated.map((entry) => entry.id)).toEqual(
+      board.rows.slice(0, 6).map((entry) => entry.id),
+    );
+    expect(groups.undated.map((entry) => entry.importance)).toEqual([
+      "asap",
+      "prioritized",
+      "nice_to_have",
+    ]);
+  });
 
   it("lists the rows by deadline, with the inbox counter and the In future fold", () => {
     expect(board.rows.map((entry) => entry.id).slice(0, 2)).toEqual([CALC_HW5_ID, HW_ID]);

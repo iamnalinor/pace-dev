@@ -1,4 +1,4 @@
-import type { ContextActivity, ContextTask, ProposalContext } from "../proposals/context.ts";
+import type { ActionContext, ContextActivity, ContextTask } from "../actions/context.ts";
 import type { ModelAction, ParseField } from "./schema.ts";
 
 import { err, ok, type Result } from "../result.ts";
@@ -7,10 +7,10 @@ import { hasWords, isQuotedFrom, isWordFrom, normalizeForEvidence } from "./norm
 
 /** Why an action the model gave cannot be proposed at all. */
 export type ActionRejection =
-  | "proposal/bad-time"
-  | "proposal/unknown-activity"
-  | "proposal/unknown-task"
-  | "proposal/unquoted-delete";
+  | "action/bad-time"
+  | "action/unknown-activity"
+  | "action/unknown-task"
+  | "action/unquoted-delete";
 
 /**
 An action that checks out, with what it refers to and the fields that could not be checked
@@ -32,7 +32,7 @@ export type VerifyContext = {
   /** Names of existing projects: picking one needs no quote. */
   readonly projectNames: readonly string[];
   /** The lists the model was shown: every alias it uses must be one of them. */
-  readonly context: ProposalContext;
+  readonly context: ActionContext;
   readonly zone: string;
 };
 
@@ -114,14 +114,14 @@ const ACTIVITY_KINDS: ReadonlySet<ModelAction["kind"]> = new Set([
 type Refs = Pick<VerifiedAction, "activity" | "task">;
 
 /** The task or activity an action names, by an alias of the lists the model was shown. */
-const refsOf = (action: ModelAction, context: ProposalContext): Result<Refs, ActionRejection> => {
+const refsOf = (action: ModelAction, context: ActionContext): Result<Refs, ActionRejection> => {
   const task = context.tasks.find((item) => item.alias === action.task) ?? null;
   const activity = context.activities.find((item) => item.alias === action.activity) ?? null;
   if (task === null && TASK_KINDS.has(action.kind)) {
-    return err("proposal/unknown-task");
+    return err("action/unknown-task");
   }
   return activity === null && ACTIVITY_KINDS.has(action.kind)
-    ? err("proposal/unknown-activity")
+    ? err("action/unknown-activity")
     : ok({ activity, task });
 };
 
@@ -150,10 +150,10 @@ type Times = Pick<VerifiedAction, "end" | "start">;
 const timeOf = (value: null | string, zone: string): null | string | undefined =>
   value === null ? null : (readWallClock(value, zone) ?? undefined);
 
-const timesOf = (action: ModelAction, zone: string): Result<Times, "proposal/bad-time"> => {
+const timesOf = (action: ModelAction, zone: string): Result<Times, "action/bad-time"> => {
   const start = timeOf(action.start, zone);
   const end = timeOf(action.end, zone);
-  return start === undefined || end === undefined ? err("proposal/bad-time") : ok({ end, start });
+  return start === undefined || end === undefined ? err("action/bad-time") : ok({ end, start });
 };
 
 /**
@@ -172,7 +172,7 @@ export const verifyAction = (
     return refs;
   }
   if (!isQuotedDelete(action, refs.value)) {
-    return err("proposal/unquoted-delete");
+    return err("action/unquoted-delete");
   }
   const times = timesOf(action, context.zone);
   if (!times.ok) {

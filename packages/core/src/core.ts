@@ -249,6 +249,24 @@ export {
   missingInstanceEvents,
   type MissingInstancesInput,
 } from "./recurrence/hw-instances.ts";
+export {
+  missingSeriesEvents,
+  type MissingSeriesInput,
+  seriesInstanceId,
+} from "./recurrence/series-instances.ts";
+export {
+  INITIAL_SERIES_STATE,
+  type Series,
+  seriesById,
+  seriesReducer,
+  type SeriesState,
+} from "./recurrence/series-reducer.ts";
+export {
+  nextSeriesSlot,
+  type SeriesSchedule,
+  type SeriesSlot,
+  seriesSlotAt,
+} from "./recurrence/series.ts";
 export { err, ok, type Result } from "./result.ts";
 export {
   type ReviewAction,

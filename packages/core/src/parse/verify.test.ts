@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProposalContext } from "../proposals/context.ts";
+import type { ActionContext } from "../actions/context.ts";
 
 import { normalizeForEvidence } from "./normalize.ts";
 import { blankModelAction as blankAction, type ModelAction } from "./schema.ts";
@@ -9,7 +9,7 @@ import { readWallClock, verifyAction } from "./verify.ts";
 const SOURCE = "Дз 7 по алгебре: задачи 1, 3, 5а до среды 23:59, часа на два";
 const MOSCOW = "Europe/Moscow";
 
-const context: ProposalContext = {
+const context: ActionContext = {
   activities: [
     {
       alias: "a1",
@@ -109,19 +109,19 @@ describe("verifyAction: references", () => {
 
   it("refuses an alias that was not in the lists, or an id instead of one", () => {
     expect(verify({ kind: "task.close", task: "t3" })).toEqual({
-      error: "proposal/unknown-task",
+      error: "action/unknown-task",
       ok: false,
     });
     expect(verify({ kind: "task.update", task: "task-1" })).toEqual({
-      error: "proposal/unknown-task",
+      error: "action/unknown-task",
       ok: false,
     });
     expect(verify({ kind: "task.markSubtasks", task: null })).toEqual({
-      error: "proposal/unknown-task",
+      error: "action/unknown-task",
       ok: false,
     });
     expect(verify({ activity: "a9", kind: "activity.delete", quote: "x" })).toEqual({
-      error: "proposal/unknown-activity",
+      error: "action/unknown-activity",
       ok: false,
     });
   });
@@ -130,7 +130,7 @@ describe("verifyAction: references", () => {
     expect(verify({ kind: "task.delete", quote: "позвонить Ян", task: "t2" }).ok).toBe(true);
     for (const quote of ["Янтарь", "купить янтарь"]) {
       expect(verify({ kind: "task.delete", quote, task: "t2" })).toEqual({
-        error: "proposal/unquoted-delete",
+        error: "action/unquoted-delete",
         ok: false,
       });
     }
@@ -141,13 +141,13 @@ describe("verifyAction: references", () => {
     expect(verify({ kind: "task.delete", quote: "algebra hw 6", task: "t1" }).ok).toBe(true);
     for (const quote of [null, "Algebra", "Geometry HW 6"]) {
       expect(verify({ kind: "task.delete", quote, task: "t1" })).toEqual({
-        error: "proposal/unquoted-delete",
+        error: "action/unquoted-delete",
         ok: false,
       });
     }
     expect(verify({ activity: "a1", kind: "activity.delete", quote: "Военкомат" }).ok).toBe(true);
     expect(verify({ activity: "a1", kind: "activity.delete", quote: "Сон" })).toEqual({
-      error: "proposal/unquoted-delete",
+      error: "action/unquoted-delete",
       ok: false,
     });
   });
@@ -166,7 +166,7 @@ describe("verifyAction: times", () => {
   it("refuses a time that names no real minute", () => {
     for (const start of ["2026-02-30 07:30", "2026-10-14 24:10", "2026-10-14 07:61"]) {
       expect(verify({ kind: "activity.log", start })).toEqual({
-        error: "proposal/bad-time",
+        error: "action/bad-time",
         ok: false,
       });
     }

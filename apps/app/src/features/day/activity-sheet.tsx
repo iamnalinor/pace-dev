@@ -3,6 +3,8 @@ import { Text, type TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
+import { ActivityApps } from "#app/shared/activity-usage.tsx";
+import { EstimateChip, EstimateOptions } from "#app/shared/task-fields/estimate-field.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -36,6 +38,7 @@ import {
   notIntoNext,
   readDraft,
 } from "./activity-draft.ts";
+import { ActivityTaskField } from "./activity-task-field.tsx";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
 export type SheetTarget = ActivityTarget;
@@ -71,20 +74,60 @@ const CategoryPicker = ({
   );
 };
 
-/** What it was, its category and its boundaries (the end only once it has one). */
-const ActivityFields = ({
-  draft,
-  faults,
-  isEndEditable,
-  patch,
-}: FormPartProps<Draft> & {
+type ActivityFieldsProps = FormPartProps<Draft> & {
   readonly faults: Faults | null;
   readonly isEndEditable: boolean;
-}) => {
+};
+
+const ActivityTimeFields = ({ draft, faults, isEndEditable, patch }: ActivityFieldsProps) => {
+  const t = useT();
+  const toFieldRef = useRef<TextInput>(null);
+  const said = (key: MessageKey | null | undefined): null | string =>
+    key === null || key === undefined ? null : t(key);
+  return (
+    <View className="flex-row gap-3">
+      <View className="flex-1">
+        <TextField
+          error={said(faults?.from)}
+          keyboardType="number-pad"
+          label={t("day.from")}
+          maxLength={5}
+          onChangeText={(from) => {
+            const typed = typeTime(from);
+            patch({ from: typed.text });
+            if (typed.isComplete) {
+              toFieldRef.current?.focus();
+            }
+          }}
+          placeholder="09:00"
+          value={draft.from}
+        />
+      </View>
+      {isEndEditable ? (
+        <View className="flex-1">
+          <TextField
+            error={said(faults?.to)}
+            keyboardType="number-pad"
+            label={t("day.to")}
+            maxLength={5}
+            onChangeText={(to) => {
+              patch({ to: typeTime(to).text });
+            }}
+            placeholder="10:30"
+            ref={toFieldRef}
+            value={draft.to}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+/** What it was, its category and its boundaries (the end only once it has one). */
+const ActivityFields = ({ draft, faults, isEndEditable, patch }: ActivityFieldsProps) => {
   const t = useT();
   const said = (key: MessageKey | null | undefined): null | string =>
     key === null || key === undefined ? null : t(key);
-  const toFieldRef = useRef<TextInput>(null);
   return (
     <>
       <TextField
@@ -98,51 +141,67 @@ const ActivityFields = ({
       />
       <CategoryPicker
         onChange={(category) => {
-          patch({ category });
+          patch(
+            draft.label.trim() === ""
+              ? { category, label: t(`category.${category}`) }
+              : { category },
+          );
         }}
         value={draft.category}
       />
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <TextField
-            error={said(faults?.from)}
-            keyboardType="number-pad"
-            label={t("day.from")}
-            maxLength={5}
-            onChangeText={(from) => {
-              // Digits only: the colon comes by itself, and the end takes over after the minutes.
-              const typed = typeTime(from);
-              patch({ from: typed.text });
-              if (typed.isComplete) {
-                toFieldRef.current?.focus();
-              }
-            }}
-            placeholder="09:00"
-            value={draft.from}
-          />
-        </View>
-        {isEndEditable ? (
-          <View className="flex-1">
-            <TextField
-              error={said(faults?.to)}
-              keyboardType="number-pad"
-              label={t("day.to")}
-              maxLength={5}
-              onChangeText={(to) => {
-                patch({ to: typeTime(to).text });
-              }}
-              placeholder="10:30"
-              ref={toFieldRef}
-              value={draft.to}
-            />
-          </View>
-        ) : null}
-      </View>
+      <ActivityEstimate
+        minutes={draft.expectMinutes}
+        onChange={(expectMinutes) => {
+          patch({ expectMinutes });
+        }}
+      />
+      <ActivityTaskField
+        onChange={(taskId) => {
+          patch({ taskId });
+        }}
+        value={draft.taskId}
+      />
+      <ActivityTimeFields
+        draft={draft}
+        faults={faults}
+        isEndEditable={isEndEditable}
+        patch={patch}
+      />
     </>
   );
 };
 
-/** Takes the block off the day after a second tap (History brings it back). */
+const ActivityEstimate = ({
+  minutes,
+  onChange,
+}: {
+  readonly minutes: null | number;
+  readonly onChange: (minutes: null | number) => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <View className="gap-2">
+      <EstimateChip
+        isOpen={isOpen}
+        minutes={minutes}
+        onToggle={() => {
+          setIsOpen(!isOpen);
+        }}
+      />
+      {isOpen ? (
+        <EstimateOptions
+          minutes={minutes}
+          onEstimate={(value) => {
+            onChange(value);
+            setIsOpen(false);
+          }}
+        />
+      ) : null}
+    </View>
+  );
+};
+
+/** Takes the activity off the day after a second tap (History brings it back). */
 const DeleteBlock = ({
   activityId,
   onDeleted,
@@ -191,7 +250,13 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
       return;
     }
     const isSaved = await run(
-      actions.saveActivity(target, { category: draft.category, label: draft.label, ...range }),
+      actions.saveActivity(target, {
+        category: draft.category,
+        expectMinutes: draft.expectMinutes,
+        label: draft.label,
+        taskId: draft.taskId,
+        ...range,
+      }),
     );
     if (isSaved) {
       onClose();
@@ -213,6 +278,9 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         isEndEditable={hasEnd(target)}
         patch={patch}
       />
+      {target.kind === "edit" ? (
+        <ActivityApps endAt={target.endAt} startAt={target.startAt} zone={zone} />
+      ) : null}
       <SheetActions
         onPrimary={() => {
           void save();

@@ -241,12 +241,85 @@ The same rule applies when a previously successful channel is no longer configur
 - **Missed because.** Push tests used one session and assumed JavaScript handled the FCM payload before native presentation. The calendar test checked off/on within one account.
 - **Rule.** A system notification and private phone memory must name the session that owns it. Firebase data messages carry no native `title`/`message`; JavaScript validates a session hash before showing or withdrawing them, and keeps a durable dismissal marker against reordered delivery. The server withdraws a sent copy through its original transport even after the session changes push method. Clear only the old session's presented copies at logout. A new session starts with calendar upload off; serialize upload and clear, and recheck the choice after device reads. Test A → B, push-method switches and Off while a push or read is in flight, and inspect the Android tray.
 
+### 25. Model-suggested account references accepted without checking current state
+- **Bug.** An assistant task could name a project absent from the account. Approval created it with the task, even when that was not what the owner intended (PR 2).
+- **Missed because.** Tests expected the model's unknown project name to become `project.created` and checked only that the name was present in the user's text, not that it belonged to the account's project list. The fallback rules and approval path had the same assumption.
+- **Rule.** An assistant may refer only to existing account entities. The model converter, rule fallback and approval planner each resolve names or IDs against the current active state; unknown references are omitted from previews or refused on approval. Test both named and ID references, including an unknown name in a model answer and in typed fallback text. Manual project creation remains a separate explicit action.
+
+### 26. A parser treats words of a short title as disposable metadata
+- **Bug.** A leading «ДЗ» was masked as a category tag, and a model could turn «Написать челику» into the task «челику» with «Написать» as description (PR 2).
+- **Missed because.** The quick-input tests explicitly expected the shortened homework title; model conversion tests covered long pasted homework and structured fields, not short one-line titles with a model-shortened answer.
+- **Rule.** A short one-line task name with no explicit metadata stays the complete title the owner typed. Category inference must not erase its words. The assistant may put text in the description when there is a separate details line or other clear structure. Test the same title through the rule parser and model conversion, including RU and EN homework words and an imperative verb.
+
+### 27. A picker saves its value but leaves its open state behind
+- **Bug.** Picking a task deadline saved the date but kept the calendar open; tapping another field left it open too (PR 2).
+- **Missed because.** The date panel's tests covered conversion and form values, but never checked dismissal after a choice or an outside press.
+- **Rule.** Every temporary picker must close after a final choice and on an outside press. Check both the value and visibility in a form-level test, and inspect sibling pickers for the same missed transition. Day's calendar and the recurrence end picker already closed on selection; the task's due, start and fixed final date share the repaired panel.
+
+### 28. An optional task reference is mistaken for a command on a task
+- **Bug.** Unlinking an activity sent `activity.labelled` with `taskId: null`; the generic retro validator treated every payload with a `taskId` key as a task command and rejected it with `task/unknown`.
+- **Missed because.** Core validation tests covered task commands and activity events separately, but not an activity event carrying an optional task link. The sheet tests had no unlink case.
+- **Rule.** Classify an event by its command kind before applying task command rules. Sweep all event payloads with `taskId`; only `task.*` and focus commands use this validator. Test both linked and unlinked activity corrections through core and the sheet.
+
+### 29. External handoff waits exist only in a mounted screen
+- **Bug.** Reloading `/login` after opening the Telegram bot lost the nonce and returned to the idle login card. The account Wipe/Delete Telegram confirmation had the same reload gap.
+- **Missed because.** Login and Settings tests kept each screen mounted through the external action; they did not remount with a pending server request.
+- **Rule.** A short-lived external request keeps its opaque ID and expiry in tab storage before leaving the page, restores its poll on remount, and clears the ID on success, cancellation or expiry. Test the storage lifetime and remount of each Telegram wait.
+
+### 30. An assistant failure silently keeps an unclassified activity
+- **Bug.** The released activity bar first wrote a typed label under Other, then silently ignored a failed or non-start model answer. The rules also inferred category only from an exact earlier label, so a first «ем» remained Other. The PR 2 preview initially hid both in-flight reading and local fallback source.
+- **Missed because.** Tests supplied a successful model answer and checked the resulting activity; they did not assert what the person sees while waiting or after an API failure. The rules tests had no short meal phrase or earlier automatic Other case.
+- **Rule.** Every assistant entry shows reading and either a reviewable result or an explicit refusal; fallback cards identify their rule source. Classify clear food phrases without rewriting the label and guard both network failure and unavailable provider responses. Sweep the task composer and follow-up path for silent loss.
+
+### 31. A new nested state field bypasses the RPC boundary
+- **Bug.** The new series state carried a template with opaque `overrides` values. `toRpcState` sanitized task overrides but copied series unchanged, so Durable Object RPC inferred `read()` and `apply()` as non-callable and could forward a non-serializable value.
+- **Missed because.** Series tests checked sync events, not the whole materialized state returned across RPC. The first full typecheck exposed `never` at unrelated readers.
+- **Rule.** When adding a slice to `CoreState`, inspect its nested `unknown` fields and map them to validated, serializable shapes at every RPC boundary. The sweep found task overrides already handled and series template overrides missing. Test both valid and invalid series overrides at `toRpcState`, plus a real Durable Object read after creating a series.
+
+### 32. A multi-event user action writes its first half before validating the rest
+- **Bug.** Moving an activity and linking it to a nonexistent task returned an error after the move event was already stored. A batch of assistant actions could also delete a target and then plan an update against the reducer's provisional state, which had not applied the revocation.
+- **Missed because.** The tests checked successful edits and single-action failures, but not the event log after a later step failed or the effect of corrections inside one batch.
+- **Rule.** Validate every event and reference before dispatching any part of one user action. For provisional assistant batches, track revocations explicitly. The sweep covered client action emission and core batch planning. Guard with tests that inspect the log after a refused activity edit and refuse update-after-delete batches for tasks and activities.
+
+### 33. A derived template reads the creation event after the entity was edited
+- **Bug.** Starting a recurring series from an edited task copied its original title, deadline and estimate from `task.created`, losing later changes.
+- **Missed because.** Series tests started from a freshly created task. They never edited the source task before turning it into a series.
+- **Rule.** A new derived object must read the current materialized entity, not a historical creation payload, unless the product explicitly asks for the original. The sweep checked series templates and other task-derived drafts; the regression edits every copied field before starting a series.
+
+### 34. A preview survives a change to the text it describes
+- **Bug.** Editing a task or activity input after an assistant preview left the old Approve card on screen; an in-flight response could also restore it.
+- **Missed because.** Tests approved the same text they had submitted and never edited it while the request was pending.
+- **Rule.** Invalidate both the visible preview and the in-flight request when its source changes. The sweep covered the Now composer and activity input; tests change text after a preview and during a delayed response.
+
+### 35. A confirmation reports an outcome without owning its state transition
+- **Bug.** Two concurrent Wipe requests could both remain pending. Cancel could report success after Confirm had claimed the request for processing, and Settings repeated that false success without checking the response. Expiry could also report `expired` after its conditional update lost to Confirm.
+- **Missed because.** Confirmation tests used one sequential request and checked only the happy path. No test overlapped requests or observed a conditional update losing a race; none passed a stale row to the expiry path.
+- **Rule.** Replace old requests and insert the new one in one database transaction. Report Cancel or Expired only when the conditional update affected a row; otherwise read the current status. Let the UI follow the returned state. The sweep covered web and bot cancellation, concurrent creation, expiry and the existing confirmation claim; integration and app regressions cover these races.
+
+### 36. A one-shot write is guarded only by React state
+- **Bug.** Two Approve presses before rerender each applied the same assistant action and created two tasks.
+- **Missed because.** Tests pressed Approve once, then awaited the result. React's `busy` state was never challenged before its next render.
+- **Rule.** A write that must run once from one preview needs a synchronous ref latch as well as disabled UI state. In a test, invoke the press twice inside one render batch and assert one recorded result. The sweep found the manual task create path already uses `isAddingRef`; both task and activity assistant approvals share the repaired hook.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
 
 | Date | Bug | Class | Swept? | Guard added |
 |---|---|---|---|---|
+| 2026-10-16 | Series template overrides bypassed the Durable Object RPC shape | 31 (new) | yes: searched all nested opaque state fields; task overrides already had a boundary conversion | API RPC-state unit test and series integration read |
+| 2026-10-16 | Activity edit partly wrote after a later validation failed; a batch could update a deleted target | 32 (new) | yes: client event emission and core assistant batch planning | activity log remains unchanged on refusal; task and activity delete-then-update batches refuse |
+| 2026-10-16 | A new recurring series copied fields from the task's creation event | 33 (new) | yes: inspected other task-derived drafts | client regression edits all copied fields before series creation |
+| 2026-10-16 | An assistant preview stayed actionable after its source text changed | 34 (new) | yes: both text entry points using action cards | app tests for composer and time bar, including an in-flight response |
+| 2026-10-16 | Concurrent account requests stayed active and cancellation claimed success after Confirm | 35 (new) | yes: web and bot cancel, creation and confirmation claim paths | workerd overlap/processing tests and Settings cancellation test |
+| 2026-10-16 | Expiry reported success after its conditional update lost to Confirm | 35 | yes: checked every conditional confirmation transition | workerd test passes a stale pending row after processing claimed it |
+| 2026-10-16 | Two quick assistant Approve presses created two tasks | 36 (new) | yes: manual task create already had a ref latch; task and activity assistant previews share the repaired hook | app test presses twice inside one render batch and finds one task |
+| 2026-10-16 | Activity task link could not be removed | 28 (new) | yes: inspected all `taskId` event kinds; the retro task rule now selects task and focus commands by kind | core validator and activity sheet link/unlink tests |
+| 2026-10-16 | Bot login forgot the nonce after a web reload | 29 (new) | yes: account Wipe/Delete Telegram confirmation had the same mounted-screen lifetime and now persists its opaque request | client resume poll, app remount, and web storage lifetime tests for both flows |
+| 2026-10-16 | «ем» stayed Other with no parsing feedback on production; the bot only queued text when no model answered | 30 (new) | yes: activity preview, task composer and bot now show a rule-based reading; the lexical meal rule takes priority over an earlier automatic Other; explicit API deferral remains available | core Russian/English meal and title rules, API rate-limit fallback, bot no-model preview and approval, app activity preview |
+| 2026-10-16 | Task deadline calendar stayed open after selecting a date or touching elsewhere | 27 (new) | yes: task due/start/final share `DatePanel`; Day's calendar and recurrence end picker already close after selection | composer tests for date selection and outside touch; web pointer dismissal to be checked in browser QA |
+| 2026-10-16 | Assistant saved a project that did not exist before approval | 25 (new) | yes: checked model conversion, rule fallback, approval of stale cards, task and activity aliases, and preset selection | core tests for unknown project name/ID on create and update, plus model and fallback readings |
+| 2026-10-16 | Assistant shortened «Написать челику» and «ДЗ по алгебре» | 26 (new) | yes: checked manual quick input, rule fallback, model conversion and shared bot/API readers; the same core functions serve all those entry paths | parser and model tests for both reported phrases, plus the existing multiline description tests |
 | 2026-10-14 | Composer refuses a hand-typed title | 1, 2 | yes (stage 8 sweep): class 1 found the close sheet's pills and typed time (its own row below); class 2 listed every form's ways in (docs/qa.md, "Every form, every way in") and found one way with no test submitting from it, the share into the composer (`/add`): it works (the address becomes the task's link), now tested; the others each have a submitting test | `canAdd` property test, e2e N → title → Enter; the entry-path table in docs/qa.md; share → Create test |
 | 2026-10-14 | Dissolved task flashes back | 3 | yes (stage 8 sweep): every component holding local state around a write was read (the slider's saving step, the feed's pending answer, the time bar's pickers, the composer, the task edit sheet, Settings' account deletion, Devices' add and disconnect, the calendar sync switch): each releases after the call returns with the store updated, or keeps a refusal on screen. Two were not: Day's and Now's Skip hid the event and ignored a failed `skipEvent` (row below), and a refused Telegram button answer took the buttons away (row below) | deferred-promise app test; `heldRoute()` (apps/app/src/test/held-route.ts): a fake route held pending, answered or refused by the test, used by the Skip tests on Day and Now |
 | 2026-10-14 | Day's and Now's Skip hid the calendar event at once and ignored a failed `skipEvent`: offline, the event was gone here and still asked about everywhere else | 3 | yes (see the class 3 row above) | Day and Now tests with `heldRoute()`: shown while it is sent, gone once accepted, kept with "That did not go through. Try again." when refused |

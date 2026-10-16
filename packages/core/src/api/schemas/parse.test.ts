@@ -7,9 +7,9 @@ const newer = {
   confidence: 1,
   domain: "task",
   extra: "top",
-  proposals: [
+  actions: [
     {
-      extra: "proposal",
+      extra: "action",
       kind: "task.create",
       summary: "New task: x",
       task: {
@@ -29,7 +29,7 @@ const newer = {
       },
     },
     {
-      extra: "proposal",
+      extra: "action",
       kind: "task.update",
       patch: {
         due: { at: "2026-10-09T20:59:00.000Z", extra: "due", tz: "UTC" },
@@ -52,6 +52,21 @@ const newer = {
 };
 
 describe("the parse answer", () => {
+  it("accepts a bounded follow-up thread but rejects untrusted extra fields", () => {
+    const thread = [{ text: "move it to Friday", actions: newer.actions }];
+    expect(
+      ParseRequestSchema.safeParse({ domain: "task", text: "Saturday instead", thread }).success,
+    ).toBe(true);
+    expect(
+      ParseRequestSchema.safeParse({
+        text: "x",
+        thread: Array.from({ length: 6 }, () => thread[0]),
+      }).success,
+    ).toBe(false);
+    expect(
+      ParseRequestSchema.safeParse({ text: "x", thread: [{ ...thread[0], extra: 1 }] }).success,
+    ).toBe(false);
+  });
   it("is read by an older client: keys it does not know are dropped, not refused", () => {
     const read = ParseResponseSchema.safeParse(newer);
     expect(read.success).toBe(true);

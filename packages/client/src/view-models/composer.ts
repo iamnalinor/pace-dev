@@ -1,6 +1,7 @@
 import {
   byPresetOrder,
   type CoreState,
+  type DeadlinePolicy,
   type Importance,
   isHttpUrl,
   linkHost,
@@ -14,6 +15,7 @@ import {
   type QuickSpan,
   type QuickSubtask,
   resolvePreset,
+  type SeriesSchedule,
 } from "@pace/core";
 
 import type { TaskLink } from "./task.ts";
@@ -28,6 +30,8 @@ export type ComposerEdits = {
   readonly importance?: Importance | undefined;
   readonly due?: null | undefined | { readonly at: string; readonly tz: string };
   readonly estimateMinutes?: null | number | undefined;
+  readonly deadlinePolicy?: DeadlinePolicy | undefined;
+  readonly recurrence?: null | SeriesSchedule | undefined;
   readonly link?: null | string | undefined;
   /** A project to create by name (the assistant named one that does not exist yet). */
   readonly projectName?: null | string | undefined;
@@ -75,6 +79,9 @@ export type ComposerModel = {
   readonly start: null | { readonly at: string; readonly tz: string };
   readonly description: null | string;
   readonly estimateMinutes: null | number;
+  readonly deadlinePolicy: DeadlinePolicy;
+  readonly recurrence: null | SeriesSchedule;
+  readonly isDeadlineOwn: boolean;
   readonly link: null | TaskLink;
   readonly subtasks: readonly QuickSubtask[];
   /** Which part of the text produced each chip, for highlighting. */
@@ -127,6 +134,11 @@ const optionOf = (options: readonly ComposerOption[], id: null | string): Compos
 const defaultImportanceOf = (state: CoreState, presetId: string): Importance => {
   const resolved = resolvePreset(state.presets, presetId);
   return resolved.ok ? resolved.value.defaultImportance : "normal";
+};
+
+const defaultDeadlineOf = (state: CoreState, presetId: string): DeadlinePolicy => {
+  const resolved = resolvePreset(state.presets, presetId);
+  return resolved.ok ? resolved.value.deadlinePolicy : { kind: "hard" };
 };
 
 /** A tap wins over the text; a tap on "none" is `null`, which `??` would skip. */
@@ -225,6 +237,11 @@ export const requiresAiFirst = (text: string): boolean => {
 const canAddOf = (title: string, target: ComposerTarget): boolean =>
   title.trim() !== "" || target.kind === "instance";
 
+const deadlineChoice = (state: CoreState, presetId: string, edits: ComposerEdits): DeadlinePolicy =>
+  edits.deadlinePolicy ?? defaultDeadlineOf(state, presetId);
+
+const recurrenceChoice = (edits: ComposerEdits): null | SeriesSchedule => edits.recurrence ?? null;
+
 export const composerModel = (
   state: CoreState,
   draft: ComposerDraft,
@@ -245,6 +262,9 @@ export const composerModel = (
     canAdd: canAddOf(title, target),
     defaultImportance,
     description: edits.description ?? null,
+    deadlinePolicy: deadlineChoice(state, presetId, edits),
+    recurrence: recurrenceChoice(edits),
+    isDeadlineOwn: edits.deadlinePolicy !== undefined,
     due,
     start: edits.start ?? null,
     estimateMinutes: pick(edits.estimateMinutes, parsed.estimateMinutes),

@@ -3,6 +3,7 @@ import { type ReactNode, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
+import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.ts";
 import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
@@ -21,6 +22,8 @@ import { subtaskOf } from "./composer-flow.tsx";
 /** The form's values from the composer's reading: the edits over the rules' reading of the text. */
 const valuesOf = (model: ComposerModel): TaskFormValues => ({
   description: model.description ?? "",
+  deadlinePolicy: model.deadlinePolicy,
+  recurrence: model.recurrence,
   due: model.due,
   estimateMinutes: model.estimateMinutes,
   importance: model.importance,
@@ -191,6 +194,7 @@ const FormFields = ({
           onChange={change}
           onSubmit={onAdd}
           options={options}
+          showDeadlineIssue={model.isDeadlineOwn}
           values={values}
         />
       )}
@@ -252,7 +256,10 @@ export const ComposerForm = ({
               ? t("composer.addTo", { title: model.target.title })
               : t("form.create")
           }
-          canAdd={model.canAdd}
+          canAdd={
+            model.canAdd &&
+            (!model.isDeadlineOwn || isDeadlineChoiceValid(model.deadlinePolicy, model.due))
+          }
           onAdd={onAdd}
           onClose={onClose}
           title={title}

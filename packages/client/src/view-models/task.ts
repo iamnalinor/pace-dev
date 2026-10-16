@@ -1,6 +1,7 @@
 import {
   type Closure,
   type CoreState,
+  type DeadlinePolicy,
   extractLink,
   type Importance,
   linkHost,
@@ -82,7 +83,7 @@ export type TaskViewModel = {
   readonly description: null | string;
   /**
   The task's link: set explicitly, else the first web address in the source text or the
-  description. `host` is what the chip shows until the page title is known.
+  description. Keep both the full address and its host for surfaces that need either form.
   */
   readonly link: null | TaskLink;
   readonly submitVia: null | string;
@@ -103,6 +104,7 @@ export type TaskViewModel = {
     readonly workLeftMinutes: number;
     readonly trackedMinutes: number;
     readonly estimateMinutes: number;
+    readonly deadlinePolicy: DeadlinePolicy;
   };
   readonly progress: {
     readonly mode: ProgressMode;
@@ -170,6 +172,7 @@ const stats = (view: TaskView): TaskViewModel["stats"] => ({
   workLeftMinutes: view.task.closed === null ? view.workLeftMinutes : 0,
   trackedMinutes: view.trackedMinutes,
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
+  deadlinePolicy: view.preset.deadlinePolicy,
 });
 
 const subtaskRows = (task: Task): readonly SubtaskRow[] =>

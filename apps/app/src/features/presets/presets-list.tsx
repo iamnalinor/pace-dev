@@ -92,7 +92,7 @@ const PresetRow = ({
   );
 };
 
-/** "Start from [Homework] [Work] …  New preset". */
+/** Picking a kind opens a new unsaved preset based on it. */
 const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
   const t = useT();
   const language = useLanguage();
@@ -107,17 +107,13 @@ const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
           const preset = choices.find((choice) => choice.id === id);
           return preset === undefined ? id : presetLabel(preset, language);
         }}
-        onChange={setFrom}
+        onChange={(id) => {
+          setFrom(id);
+          router.push({ params: { from: id, id: "new" }, pathname: "/presets/[id]" });
+        }}
         value={from}
         values={choices.map((preset) => preset.id)}
       />
-      <Button
-        onPress={() => {
-          router.push({ params: { from, id: "new" }, pathname: "/presets/[id]" });
-        }}
-      >
-        {t("presets.new")}
-      </Button>
     </View>
   );
 };

@@ -42,12 +42,21 @@ const DeadlinePolicySchema = z.discriminatedUnion("kind", [
     .strictObject({
       kind: z.literal("resubmission"),
       softDays: z.int().min(0),
+      finalMode: z.enum(["fixed", "offset"]).optional(),
       finalAt: InstantSchema.nullable(),
       finalTz: TimeZoneSchema.nullable(),
     })
     .refine((policy) => policy.finalAt === null || policy.finalTz !== null, {
       message: "finalTz is required with finalAt",
       path: ["finalTz"],
+    })
+    .refine((policy) => policy.finalMode !== "fixed" || policy.finalAt !== null, {
+      message: "A fixed final deadline needs a date",
+      path: ["finalAt"],
+    })
+    .refine((policy) => policy.finalMode !== "offset" || policy.finalAt === null, {
+      message: "An offset final deadline has no fixed date",
+      path: ["finalAt"],
     }),
 ]);
 

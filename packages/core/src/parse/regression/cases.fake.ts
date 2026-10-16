@@ -1,11 +1,11 @@
-import type { ParseDomain, ProposalKind } from "../../proposals/kinds.ts";
+import type { ActionKind, ParseDomain } from "../../actions/kinds.ts";
 
 import { BOOKS_ID, HW_VIEW_NOW, NOW, REPLY_ID } from "../../queries/fixture.fake.ts";
 
 /**
 One message of the LLM regression set (`bun test:llm`, against the real providers): read over
 the artboard world (`artboardState(now)`, account zone Europe/Moscow) from the field `domain`,
-the answer must propose `kinds` in order; `first` lists fields the first proposal must have.
+the answer must propose `kinds` in order; `first` lists fields the first action must have.
 */
 export type RegressionCase = {
   readonly name: string;
@@ -13,7 +13,7 @@ export type RegressionCase = {
   readonly domain: "auto" | ParseDomain;
   readonly now: string;
   readonly expect: {
-    readonly kinds: readonly ProposalKind[];
+    readonly kinds: readonly ActionKind[];
     /** The domain the answer names; with `auto`, at least `minConfidence` sure of it. */
     readonly domain?: ParseDomain;
     readonly minConfidence?: number;
