@@ -1,7 +1,7 @@
 import { z } from "zod";
 
+import { ACTION_KINDS, ParseDomainSchema } from "../actions/kinds.ts";
 import { ImportanceSchema } from "../events/payloads.ts";
-import { ParseDomainSchema, PROPOSAL_KINDS } from "../proposals/kinds.ts";
 
 /** The fields of a reading the person may be asked to double-check. */
 export const PARSE_FIELDS = [
@@ -64,7 +64,7 @@ Strings it extracts are copied from the message verbatim; `evidence` quotes the 
 number, date or time came from.
 */
 export const ModelActionSchema = z.strictObject({
-  kind: z.enum(PROPOSAL_KINDS),
+  kind: z.enum(ACTION_KINDS),
   /** An open task's alias from the list, for every task kind but a create. */
   task: z.string().max(20).nullable(),
   /** An activity's alias from the list, for an activity's edit or delete. */

@@ -7,7 +7,7 @@ import { endpoints, ok } from "@pace/core";
 import type { AppEnv } from "./shared/app-env.ts";
 import type { ParseProvider } from "./shared/llm/llm.ts";
 
-import { mountAccountRoutes } from "./account/account-routes.ts";
+import { answerAccountConfirmation, mountAccountRoutes } from "./account/account-routes.ts";
 import { mountAuthRoutes } from "./auth/auth-routes.ts";
 import { bindBotLogin } from "./auth/bot-login.ts";
 import { findUserIdByTelegramId } from "./auth/users.ts";
@@ -80,10 +80,11 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   });
 
   mount(app, endpoints.health, () => ok({ status: "ok" as const }));
-  mountAuthRoutes(app);
-  mountAccountRoutes(app);
+  mountAuthRoutes(app, deps.telegramFetch);
+  mountAccountRoutes(app, deps.telegramFetch);
   mountBotRoutes(app, {
     bindLogin: bindBotLogin,
+    confirmAccount: answerAccountConfirmation,
     isAllowed,
     parseProviders: deps.parseProviders,
     telegramFetch: deps.telegramFetch,

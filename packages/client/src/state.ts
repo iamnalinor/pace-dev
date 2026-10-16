@@ -9,6 +9,7 @@ import {
   type EventInput,
   INITIAL_PRESETS_STATE,
   INITIAL_PROJECTS_STATE,
+  INITIAL_SERIES_STATE,
   INITIAL_TASKS_STATE,
   INITIAL_TIME_STATE,
   materialize,
@@ -21,6 +22,8 @@ import {
   type ProjectsState,
   type Reducer,
   type Result,
+  seriesReducer,
+  type SeriesState,
   type Settings,
   settingsReducer,
   shouldRematerialize,
@@ -48,6 +51,7 @@ export type AppState = {
   readonly presets: PresetsState;
   readonly settings: Settings;
   readonly time: TimeState;
+  readonly series: SeriesState;
   readonly deviceId: string;
   readonly lastAppliedOccurredAt: null | string;
   /** Bumps on every change; cheap way for view-models to memoize. */
@@ -55,7 +59,7 @@ export type AppState = {
 };
 
 /** Materialized slices, each folded by its core reducer. */
-type SliceKey = "presets" | "projects" | "settings" | "tasks" | "time";
+type SliceKey = "presets" | "projects" | "series" | "settings" | "tasks" | "time";
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -103,6 +107,7 @@ export const rootReducer: Reducer<AppState> = composeReducers([
   slice("presets", presetReducer),
   slice("settings", settingsReducer),
   slice("time", timeReducer),
+  slice("series", seriesReducer),
 ]);
 
 const initialState = (deviceId: string): AppState => ({
@@ -116,6 +121,7 @@ const initialState = (deviceId: string): AppState => ({
   status: "loading",
   tasks: INITIAL_TASKS_STATE,
   time: INITIAL_TIME_STATE,
+  series: INITIAL_SERIES_STATE,
   version: 0,
 });
 

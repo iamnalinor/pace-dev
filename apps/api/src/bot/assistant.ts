@@ -3,7 +3,7 @@ import { type Answer, nowList, t } from "@pace/core";
 import type { ParseProvider } from "../shared/llm/llm.ts";
 
 import { type BotStoreApi, POOL_ACTIONS } from "../shared/contract.ts";
-import { choosePreview, preview } from "./preview.ts";
+import { choosePreview, followupPreview, preview } from "./preview.ts";
 import { type BotReply, plain, type Turn, zoneOf } from "./turn.ts";
 
 export type { BotReply } from "./turn.ts";
@@ -18,8 +18,9 @@ export type AssistantDeps = {
 
 export type Assistant = {
   readonly now: (telegramId: string) => Promise<BotReply>;
-  readonly message: (telegramId: string, text: string) => Promise<BotReply>;
+  readonly message: (telegramId: string, text: string, replyTo?: number) => Promise<BotReply>;
   readonly choose: (telegramId: string, data: string) => Promise<BotReply>;
+  readonly bindPreview: (telegramId: string, id: string, messageId: number) => Promise<void>;
 };
 
 const NOW_ROWS = 5;
@@ -83,16 +84,40 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
   };
 
   return {
+    bindPreview: async (telegramId, id, messageId) => {
+      const userId = await deps.userIdOf(telegramId);
+      if (userId === null) {
+        return;
+      }
+      const store = deps.storeOf(userId);
+      const binding = { id, messageId };
+      await store.remember(`bot:message:${String(messageId)}`, binding);
+      await store.remember("bot:latest", binding);
+    },
     choose: async (telegramId, data) =>
       await withUser(telegramId, async (turn) => {
         const { action, id } = splitData(data);
         const answer = answerOfCode(action);
         return answer === undefined
-          ? await choosePreview(turn, action, id)
+          ? await choosePreview(turn, deps.providers, { action, id })
           : await notificationAnswer(turn, answer, id);
       }),
-    message: async (telegramId, text) =>
-      await withUser(telegramId, async (turn) => await preview(turn, deps.providers, text)),
+    message: async (telegramId, text, replyTo) =>
+      await withUser(telegramId, async (turn) => {
+        const key = replyTo === undefined ? "bot:latest" : `bot:message:${String(replyTo)}`;
+        const binding = (await turn.store.peek(key)) as
+          | undefined
+          | { readonly id?: string; readonly messageId?: number };
+        if (binding?.id !== undefined && binding.messageId !== undefined) {
+          const revised = await followupPreview(turn, deps.providers, { id: binding.id, text });
+          if (revised !== null) {
+            return revised.pendingId === undefined
+              ? revised
+              : { ...revised, editMessageId: binding.messageId };
+          }
+        }
+        return await preview(turn, deps.providers, text);
+      }),
     now: async (telegramId) => await withUser(telegramId, nowReply),
   };
 };

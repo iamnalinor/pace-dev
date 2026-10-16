@@ -19,7 +19,7 @@ import { mount } from "../shared/mount.ts";
 
 /**
 `POST /api/parse`: the user's state (categories, projects, open tasks, recent activities)
-frames the prompt; the answer comes back as proposals checked against the text. Nothing is
+frames the prompt; the answer comes back as actions checked against the text. Nothing is
 written, unless no model can answer and the caller asked to `defer`: then the text waits in
 the store and is read (and written) once one is back. Without a model the rules propose what
 they can. `GET /api/llm/status`: can the assistant read now?
@@ -40,13 +40,13 @@ const unavailable = async (
   );
   const rules = readByRules(request.text, request.domain, world);
   if (request.defer !== true) {
-    return { ...rules, proposals: [...rules.proposals], retryAt, status: "unavailable" };
+    return { ...rules, actions: [...rules.actions], retryAt, status: "unavailable" };
   }
   await store.enqueueParse(
     { channel: "api", domain: request.domain, retryAt, text: request.text },
     now,
   );
-  return { ...rules, proposals: [], retryAt, status: "queued" };
+  return { ...rules, actions: [], retryAt, status: "queued" };
 };
 
 export const mountParseRoutes = (
@@ -62,19 +62,20 @@ export const mountParseRoutes = (
       domain: body.domain,
       now,
       state,
+      thread: body.thread,
     });
     await store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
     if (!read.ok) {
       return ok(await unavailable(store, body, { now, retryAt: read.error.retryAt, state }));
     }
-    const { confidence, domain, output, proposals, provider, questions, rejected } = read.value;
+    const { confidence, domain, output, actions, provider, questions, rejected } = read.value;
     // Readings while typing come every pause: only the ones the person acts on are logged.
     if (body.draft !== true) {
       await store.logDecisions(
         [
           parseDecision(body.text, "api", {
             output,
-            proposals,
+            actions,
             provider,
             rejected,
             status: "parsed",
@@ -86,7 +87,7 @@ export const mountParseRoutes = (
     return ok({
       confidence,
       domain,
-      proposals: [...proposals],
+      actions: [...actions],
       provider,
       ...(questions.length > 0 && { questions: [...questions] }),
       status: "parsed" as const,

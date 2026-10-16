@@ -1,13 +1,14 @@
 import {
   accountTz,
+  ACTION_KINDS,
+  type ActionContext,
   ACTIVITY_CATEGORIES,
   type CoreState,
   formatInZone,
   type Language,
   openInstancesOf,
+  type ParseRequestBody,
   type Preset,
-  PROPOSAL_KINDS,
-  type ProposalContext,
   type QueryContext,
   type RequestDomain,
   resolvePreset,
@@ -28,7 +29,7 @@ export const DOMAIN_LINES: Readonly<Record<RequestDomain, string>> = {
 
 const RULES = `You read one message from the owner of a personal task and time tracker and answer with JSON: what to do with it.
 Rules:
-- actions: usually one; several only when the message asks for several. kind is one of ${PROPOSAL_KINDS.join(", ")}.
+- actions: usually one; several only when the message asks for several. kind is one of ${ACTION_KINDS.join(", ")}.
 - Existing items only by their alias from the lists below (task: "t3", activity: "a2"); never invent one. A delete also copies the item's title, as listed, into quote.
 - title: a short name (at most 60 characters) in the message's language, e.g. "ДЗ по алгебре: №290–534" for a pasted homework. Never translate it.
 - Copy every other string (project, description, subtask labels) verbatim from the message. Never translate, fix or rephrase it.
@@ -36,7 +37,7 @@ Rules:
 - Weekly homework: pick that course's category (marked "weekly homework" below); leave dueDate and dueTime null unless the message names a deadline.
 - Homework: every problem number is one subtask (label = the number as written, e.g. "290", "5а"); a task described in words is one subtask with those words.
 - category: for a task an id from Categories, for an activity one of ${ACTIVITY_CATEGORIES.join(", ")}; null when unsure.
-- project: a name from the list, or a new name only when the message names one. importance only when the message says it.
+- project: only a name from Projects below; null if the requested project is not in the list. Never propose a new project. importance only when the message says it.
 - link: a web address the message gives, verbatim.
 - task.update: only the fields that change; clear lists what to empty; subtasks to add, subtaskRefs (label or number) to remove, renames. task.markSubtasks: subtaskRefs solved. task.close: outcome.
 - activity.log: time already spent, with start and end. activity.start: going on now (start only when it began earlier; expectMinutes when a length is said). activity.update: start, end, label or category. label: 2–4 words in the message's language. Times are "YYYY-MM-DD HH:MM" on the clock below.
@@ -75,10 +76,10 @@ const projectLines = (state: CoreState): string =>
     .map((project) => `- ${project.name}`)
     .join("\n");
 
-const taskLines = (context: ProposalContext): string =>
+const taskLines = (context: ActionContext): string =>
   context.tasks.map((task) => `- ${task.alias}: ${task.title}`).join("\n");
 
-const activityLines = (context: ProposalContext, zone: string): string =>
+const activityLines = (context: ActionContext, zone: string): string =>
   context.activities
     .map((activity) => {
       const start = formatInZone(activity.startAt, zone, "yyyy-MM-dd HH:mm");
@@ -103,10 +104,11 @@ export const buildParsePrompt = (
     readonly ctx: QueryContext;
     readonly language: Language;
     readonly domain: RequestDomain;
-    readonly context: ProposalContext;
+    readonly context: ActionContext;
+    readonly thread?: ParseRequestBody["thread"];
   },
 ): ParsePrompt => {
-  const { context, ctx, domain, language, state } = world;
+  const { context, ctx, domain, language, state, thread } = world;
   const zone = accountTz(state, ctx);
   const system = [
     RULES,
@@ -116,6 +118,17 @@ export const buildParsePrompt = (
     `Projects:\n${orNone(projectLines(state))}`,
     `Open tasks:\n${orNone(taskLines(context))}`,
     `Activities (today and yesterday):\n${orNone(activityLines(context, zone))}`,
+    ...(thread === undefined || thread.length === 0
+      ? []
+      : [
+          `Conversation so far (oldest first):\n${thread
+            .map(
+              (turn, index) =>
+                `${String(index + 1)}. Owner: ${turn.text}\nActions shown: ${orNone(turn.actions.map((action) => action.summary).join("; "))}`,
+            )
+            .join("\n")}`,
+          "The latest message corrects the earlier actions. Return the complete revised set of actions, not a diff. Nothing has been applied yet.",
+        ]),
   ].join("\n\n");
   return { prompt: text, system };
 };

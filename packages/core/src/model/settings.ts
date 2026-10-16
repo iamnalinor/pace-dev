@@ -1,4 +1,5 @@
 import type { Language } from "../i18n/i18n.ts";
+import type { ActivityCategory } from "../tracking/model.ts";
 
 import {
   DEFAULT_NOTIFICATION_CHANNELS,
@@ -16,6 +17,7 @@ export type Settings = {
   readonly quietHours: { readonly from: string; readonly to: string };
   /** Week shows the whole day, 00–24, instead of starting at seven in the morning. */
   readonly nightHours: boolean;
+  readonly categoryEstimates: Readonly<Partial<Record<ActivityCategory, number>>>;
   /** Per kind of notification, the channels it goes to. */
   readonly notificationChannels: NotificationChannels;
 };
@@ -26,5 +28,6 @@ export const DEFAULT_SETTINGS: Settings = {
   digestWindows: ["09:00", "14:00", "21:00"],
   quietHours: { from: "23:00", to: "08:00" },
   nightHours: false,
+  categoryEstimates: {},
   notificationChannels: DEFAULT_NOTIFICATION_CHANNELS,
 };

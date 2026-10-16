@@ -1,4 +1,4 @@
-import type { ParseField, ParseQuestion, ParseResponse, Proposal } from "@pace/core";
+import type { Action, ParseField, ParseQuestion, ParseResponse } from "@pace/core";
 
 import type { ComposerEdits } from "./composer.ts";
 
@@ -12,11 +12,11 @@ export type AiReading = {
   readonly questions: readonly ParseQuestion[];
   readonly provider: string;
   /** Everything it proposed, edits and deletes of existing tasks included. */
-  readonly proposals: readonly Proposal[];
+  readonly actions: readonly Action[];
 };
 
-const editsOf = (proposal: Extract<Proposal, { kind: "task.create" }>): ComposerEdits => {
-  const { task } = proposal;
+const editsOf = (action: Extract<Action, { kind: "task.create" }>): ComposerEdits => {
+  const { task } = action;
   return {
     description: task.description ?? undefined,
     due:
@@ -37,14 +37,13 @@ Turns `POST /api/parse`'s answer into composer edits: the new task it proposes f
 chips keep the rules' reading. The text stays as typed.
 */
 export const aiReading = (response: Parsed): AiReading => {
-  const create = response.proposals.find(
-    (proposal): proposal is Extract<Proposal, { kind: "task.create" }> =>
-      proposal.kind === "task.create",
+  const create = response.actions.find(
+    (action): action is Extract<Action, { kind: "task.create" }> => action.kind === "task.create",
   );
   return {
     doubtful: create?.doubtful ?? [],
     edits: create === undefined ? {} : editsOf(create),
-    proposals: response.proposals,
+    actions: response.actions,
     provider: response.provider,
     questions: response.questions ?? [],
   };

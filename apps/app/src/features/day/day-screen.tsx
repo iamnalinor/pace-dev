@@ -8,13 +8,14 @@ import type { DayEntry, DayModel, DayRowProps } from "@pace/client";
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { ScreenTimeSection } from "#app/shared/activity-usage.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
-import { TimeBar } from "#app/shared/tracking/time-bar.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { useIsWide } from "#app/ui/layout.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
@@ -66,10 +67,16 @@ A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category
 label when it says more than the tag, then the duration against its Expect or Limit and a
 pencil. The whole row opens the edit sheet; its task is linked on the line under it.
 */
-const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
+const ActivityRow = ({
+  onEdit,
+  row,
+  satRows,
+  zone,
+}: DayRowProps & { readonly satRows: readonly SatRow[] }) => {
   const t = useT();
   const { language } = useViewer();
   const { palette } = useTheme();
+  const isWide = useIsWide();
   const range = rangeText(
     row.startAt,
     row.isRunning ? t("day.now") : clockTime(row.endAt, zone),
@@ -92,6 +99,7 @@ const ActivityRow = ({ onEdit, row, zone }: DayRowProps) => {
               {row.label}
             </Text>
           ) : null}
+          {isWide ? <WhereSatLine compact isIndented={false} rows={satRows} /> : null}
         </View>
       </View>
       <View className="items-end">
@@ -215,6 +223,7 @@ const EntryRow = ({
   readonly sat: SatOf;
   readonly onOpen: (target: SheetTarget) => void;
 }) => {
+  const isWide = useIsWide();
   const open = (): void => {
     onOpen(entry.target);
   };
@@ -223,10 +232,15 @@ const EntryRow = ({
   }
   return (
     <>
-      <ActivityRow onEdit={open} row={entry.row} zone={zone} />
+      <ActivityRow
+        onEdit={open}
+        row={entry.row}
+        satRows={sat(entry.row.startAt, entry.row.endAt)}
+        zone={zone}
+      />
       <TaskLine row={entry.row} />
       <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
-      <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />
+      {isWide ? null : <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />}
       <EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
     </>
   );
@@ -301,7 +315,7 @@ export const DayScreen = () => {
     />
   );
   return (
-    <Screen {...(day.isToday && { footer: <TimeBar /> })} header={header}>
+    <Screen header={header}>
       <Totals day={day} />
       {phone.hasUsageAccess ? <SleepCard phone={phone} zone={day.zone} /> : null}
       {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
@@ -317,6 +331,7 @@ export const DayScreen = () => {
         }}
       />
       {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
+      <ScreenTimeSection date={day.date} key={day.date} zone={day.zone} />
       {sheet === null ? null : (
         <ActivitySheet
           onClose={() => {

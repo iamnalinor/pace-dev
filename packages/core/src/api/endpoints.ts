@@ -3,6 +3,12 @@ import { z } from "zod";
 import { endpoint, type EndpointShape } from "./endpoint.ts";
 import { notificationEndpoints } from "./notification-endpoints.ts";
 import {
+  ConfirmationCreatedSchema,
+  ConfirmationCreateSchema,
+  ConfirmationParamsSchema,
+  ConfirmationStatusSchema,
+} from "./schemas/account.ts";
+import {
   AccountDeletedSchema,
   AuthSessionSchema,
   DevLoginSchema,
@@ -61,13 +67,36 @@ export const endpoints = {
     output: MeSchema,
     path: "/api/me",
   }),
-  /** Deletes the account: its event log, sessions, OAuth grants and the user itself. */
-  deleteMe: endpoint({
-    auth: true,
-    method: "DELETE",
-    output: AccountDeletedSchema,
-    path: "/api/me",
-  }),
+  account: {
+    createConfirmation: endpoint({
+      auth: true,
+      body: ConfirmationCreateSchema,
+      method: "POST",
+      output: ConfirmationCreatedSchema,
+      path: "/api/account/confirmations",
+    }),
+    confirmationStatus: endpoint({
+      auth: false,
+      method: "GET",
+      output: ConfirmationStatusSchema,
+      params: ConfirmationParamsSchema,
+      path: "/api/account/confirmations/:id",
+    }),
+    cancelConfirmation: endpoint({
+      auth: true,
+      method: "POST",
+      output: ConfirmationStatusSchema,
+      params: ConfirmationParamsSchema,
+      path: "/api/account/confirmations/:id/cancel",
+    }),
+    /** Test-only reset; the Worker rejects it outside the test environment. */
+    testReset: endpoint({
+      auth: true,
+      method: "DELETE",
+      output: AccountDeletedSchema,
+      path: "/api/test/account",
+    }),
+  },
   auth: {
     /** Web login: the Telegram Login Widget payload, verified against the bot token. */
     telegram: endpoint({
@@ -129,7 +158,7 @@ export const endpoints = {
   },
   parse: {
     /**
-    Free text read into proposals: new tasks and activities, edits and deletes of existing ones,
+    Free text read into actions: new tasks and activities, edits and deletes of existing ones,
     for the person to accept; nothing is saved.
     */
     run: endpoint({

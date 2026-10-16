@@ -157,6 +157,7 @@ export type Simulation = {
 export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
   readonly remember: (key: string, value: JsonValue) => Promise<void>;
   readonly recall: (key: string) => Promise<JsonValue | undefined>;
+  readonly peek: (key: string) => Promise<JsonValue | undefined>;
   /** Where notifications go: the user's chat with the bot. */
   readonly notifyTo: (chatId: string, now: string) => Promise<void>;
   /** Answers a notification of the pool (a button in the chat). */

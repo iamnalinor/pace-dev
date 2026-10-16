@@ -50,6 +50,10 @@ export type Task = {
   readonly createdEventId: string;
   readonly title: string;
   readonly presetId: string;
+  readonly seriesId: null | string;
+  readonly seriesRevision: null | number;
+  /** An instance the person touched keeps its own fields when the series changes. */
+  readonly userModified: boolean;
   readonly projectId: null | string;
   /** `null` means "use the preset default". */
   readonly importance: Importance | null;

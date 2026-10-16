@@ -107,6 +107,8 @@ const newTaskForm = (
   importance: model.importance,
   ...scheduleOf(model),
   estimateMinutes: model.estimateMinutes ?? undefined,
+  deadlinePolicy: model.isDeadlineOwn ? model.deadlinePolicy : undefined,
+  recurrence: model.recurrence ?? undefined,
   subtasks: details.subtasks,
   description: details.description ?? undefined,
   // A line typed as it is is the title; only a message the assistant read is worth keeping.

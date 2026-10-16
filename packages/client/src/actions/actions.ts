@@ -1,6 +1,7 @@
 import type { Clock } from "../clock.ts";
 import type { AppStateHandle } from "../state.ts";
 
+import { type AssistantActions, assistantActions } from "./assistant-actions.ts";
 import { type ComposerActions, composerActions } from "./composer-actions.ts";
 import { type ActionDeps, type ActionResult, fromStore } from "./deps.ts";
 import { defaultEstimateHints, type EstimateBucket, type EstimateHints } from "./estimate-hints.ts";
@@ -9,6 +10,7 @@ import { type InstanceActions, instanceActions } from "./instances.ts";
 import { type PresetActions, presetActions } from "./preset-actions.ts";
 import { type ProjectActions, projectActions } from "./project-actions.ts";
 import { type ReviewActions, reviewActions } from "./review-actions.ts";
+import { type SeriesActions, seriesActions } from "./series-actions.ts";
 import { type SettingsActions, settingsActions } from "./settings-actions.ts";
 import { type TaskActions, taskActions } from "./task-actions.ts";
 import { type TimeActions, timeActions } from "./time-actions.ts";
@@ -22,13 +24,15 @@ export type ActionsOptions = {
   readonly hints?: EstimateHints | undefined;
 };
 
-export type Actions = ComposerActions &
+export type Actions = AssistantActions &
+  ComposerActions &
   InboxActions &
   InstanceActions &
   PresetActions &
   ProjectActions &
   ReviewActions &
   SettingsActions &
+  SeriesActions &
   TaskActions &
   TimeActions &
   WorkActions & {
@@ -47,6 +51,7 @@ export const createActions = (options: ActionsOptions): Actions => {
   const deps: ActionDeps = { clock: options.clock, source: options.source, state: options.state };
   const hints = options.hints ?? defaultEstimateHints;
   return {
+    ...assistantActions(deps),
     ...composerActions(deps),
     ...inboxActions(deps),
     ...instanceActions(deps),
@@ -54,6 +59,7 @@ export const createActions = (options: ActionsOptions): Actions => {
     ...projectActions(deps),
     ...reviewActions(deps),
     ...settingsActions(deps),
+    ...seriesActions(deps),
     ...taskActions(deps),
     ...timeActions(deps),
     ...workActions(deps),

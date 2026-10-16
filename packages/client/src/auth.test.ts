@@ -148,6 +148,20 @@ describe("createAuth bot login", () => {
     await expect(session.get()).resolves.toBe("bot");
   });
 
+  it("resumes polling a nonce after the login page recreates its auth client", async () => {
+    const first = await setup({ "POST /api/auth/nonce": nonceRoute });
+    const nonce = (await first.auth.startBotLogin("web")).nonce;
+    const restored = await setup({
+      "GET /api/auth/nonce/n1": () => ({ status: "ready", token: "bot", user: fakeUser }),
+    });
+    const result = await restored.auth.resumeBotLogin(nonce).waitForToken({
+      intervalMs: 10,
+      timeoutMs: 1000,
+    });
+    expect(result).toEqual({ ok: true, value: fakeUser });
+    expect(restored.auth.token()).toBe("bot");
+  });
+
   it("gives up on not-allowed, timeout and cancellation", async () => {
     vi.useFakeTimers();
     const denied = await setup({
@@ -217,21 +231,43 @@ describe("createAuth logout", () => {
   });
 });
 
-describe("createAuth deleteAccount", () => {
-  it("deletes the account on the server, then signs the device out", async () => {
+describe("createAuth account confirmation", () => {
+  const id = "123e4567-e89b-42d3-a456-426614174000";
+  it("requests Telegram confirmation and polls after the session is gone", async () => {
     const { auth, calls, session } = await setup(
-      { "DELETE /api/me": () => ({ deleted: true }) },
+      {
+        "POST /api/account/confirmations": () => ({ id, expiresAt: "2026-10-16T12:05:00.000Z" }),
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
+      },
       "stored",
     );
-    await expect(auth.deleteAccount()).resolves.toEqual({ ok: true, value: true });
-    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual(["DELETE /api/me"]);
+    await expect(auth.requestAccountConfirmation("delete")).resolves.toEqual({
+      ok: true,
+      value: { id, expiresAt: "2026-10-16T12:05:00.000Z" },
+    });
+    expect(auth.token()).toBe("stored");
+    await auth.finishAccountDeletion();
+    await expect(auth.accountConfirmationStatus(id)).resolves.toEqual({
+      ok: true,
+      value: "confirmed",
+    });
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
+      "POST /api/account/confirmations",
+      `GET /api/account/confirmations/${id}`,
+    ]);
     await expect(session.get()).resolves.toBeNull();
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
   });
 
-  it("keeps the device signed in when the server could not delete it", async () => {
-    const { auth } = await setup({ "DELETE /api/me": () => problem(500, "boom") }, "stored");
-    await expect(auth.deleteAccount()).resolves.toEqual({ error: "boom", ok: false });
+  it("keeps the device signed in when a request could not be sent", async () => {
+    const { auth } = await setup(
+      { "POST /api/account/confirmations": () => problem(500, "boom") },
+      "stored",
+    );
+    await expect(auth.requestAccountConfirmation("wipe")).resolves.toEqual({
+      error: "boom",
+      ok: false,
+    });
     expect(auth.token()).toBe("stored");
   });
 });

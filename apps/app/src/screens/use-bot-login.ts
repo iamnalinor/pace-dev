@@ -6,6 +6,11 @@ import type { BotLogin, BotLoginError } from "@pace/client";
 import { useAuth } from "../app-state.tsx";
 import { openTelegram } from "../auth/open-telegram.ts";
 import { LOGIN_FROM } from "../platform/login-from.ts";
+import {
+  clearPendingBotLogin,
+  readPendingBotLogin,
+  savePendingBotLogin,
+} from "./bot-login-pending.ts";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
@@ -27,8 +32,14 @@ export const useBotLogin = (): {
   readonly reset: () => void;
 } => {
   const { auth } = useAuth();
-  const [phase, setPhase] = useState<BotLoginPhase>({ kind: "idle" });
-  const [login, setLogin] = useState<BotLogin | undefined>();
+  const [pending] = useState(() => readPendingBotLogin(Date.now()));
+  const [phase, setPhase] = useState<BotLoginPhase>({
+    kind: pending === null ? "idle" : "waiting",
+  });
+  const [login, setLogin] = useState<Pick<BotLogin, "nonce" | "waitForToken"> | undefined>(() =>
+    pending === null ? undefined : auth.resumeBotLogin(pending.nonce),
+  );
+  const [expiresAt, setExpiresAt] = useState(pending?.expiresAt);
   const mountedRef = useRef(true);
 
   useEffect(
@@ -42,39 +53,47 @@ export const useBotLogin = (): {
     if (login === undefined) {
       return;
     }
+    const remaining = Math.max(0, (expiresAt ?? Date.now()) - Date.now());
     const controller = new AbortController();
     void (async () => {
       const result = await login.waitForToken({
         intervalMs: POLL_INTERVAL_MS,
         signal: controller.signal,
-        timeoutMs: POLL_TIMEOUT_MS,
+        timeoutMs: remaining,
       });
       if (!mountedRef.current || (!result.ok && result.error === "cancelled")) {
         return;
       }
       // On success the auth status flips to signed-in and the screen redirects.
+      clearPendingBotLogin();
       setLogin(undefined);
       setPhase(result.ok ? { kind: "idle" } : { error: result.error, kind: "error" });
     })();
     return () => {
       controller.abort();
     };
-  }, [login]);
+  }, [expiresAt, login]);
   useFocusEffect(poll);
 
   const start = useCallback(async () => {
     setPhase({ kind: "starting" });
     try {
       const created = await auth.startBotLogin(LOGIN_FROM);
-      await openTelegram(created.deepLink);
+      const deadline = Date.now() + POLL_TIMEOUT_MS;
+      savePendingBotLogin({ expiresAt: deadline, nonce: created.nonce });
+      setExpiresAt(deadline);
       setLogin(created);
       setPhase({ kind: "waiting" });
+      await openTelegram(created.deepLink);
     } catch {
+      clearPendingBotLogin();
+      setLogin(undefined);
       setPhase({ error: "network", kind: "error" });
     }
   }, [auth]);
 
   const reset = useCallback(() => {
+    clearPendingBotLogin();
     setLogin(undefined);
     setPhase({ kind: "idle" });
   }, []);

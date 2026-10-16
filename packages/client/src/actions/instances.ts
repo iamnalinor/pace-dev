@@ -2,6 +2,7 @@ import {
   autoOutcomeEvents,
   type EventInput,
   missingInstanceEvents,
+  missingSeriesEvents,
   validateEventInput,
 } from "@pace/core";
 
@@ -48,6 +49,11 @@ export const instanceActions = (deps: ActionDeps): InstanceActions => ({
       deps,
       missingInstanceEvents({ ...before, existingEventIds: idsOf(before), now }),
     );
+    const seriesBefore = deps.state.store.getState();
+    const series = await appendSystem(
+      deps,
+      missingSeriesEvents({ ...seriesBefore, existingEventIds: idsOf(seriesBefore), now }),
+    );
     // The outcomes are read after the instances: a fresh instance cannot be due yet, but a
     // revoked and recreated one keeps its id out of the "already emitted" set otherwise.
     const after = deps.state.store.getState();
@@ -61,6 +67,6 @@ export const instanceActions = (deps: ActionDeps): InstanceActions => ({
       deps,
       missingInstanceEvents({ ...closed, existingEventIds: idsOf(closed), now }),
     );
-    return instances + outcomes + ahead;
+    return instances + series + outcomes + ahead;
   },
 });

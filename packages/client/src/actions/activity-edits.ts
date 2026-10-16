@@ -1,4 +1,12 @@
-import { type ActivityCategory, activityLabel, err, type Event, newId, ok } from "@pace/core";
+import {
+  type ActivityCategory,
+  activityLabel,
+  err,
+  type Event,
+  newId,
+  ok,
+  taskById,
+} from "@pace/core";
 
 import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
 
@@ -9,6 +17,8 @@ export type ActivityTarget =
       readonly activityId: string;
       readonly label: string;
       readonly category: ActivityCategory;
+      readonly expectMinutes?: null | number;
+      readonly taskId?: null | string;
       readonly startAt: string;
       /** `null` while it runs: only the start can move. */
       readonly endAt: null | string;
@@ -19,6 +29,8 @@ export type ActivityTarget =
 export type ActivityEntry = {
   readonly label: string;
   readonly category: ActivityCategory;
+  readonly expectMinutes?: null | number;
+  readonly taskId?: null | string;
   readonly startAt: string;
   readonly endAt: null | string;
 };
@@ -26,6 +38,7 @@ export type ActivityEntry = {
 export type PastActivity = {
   readonly label: string;
   readonly category: ActivityCategory;
+  readonly expectMinutes?: null | number;
   readonly startAt: string;
   readonly endAt: string;
   readonly taskId?: string | undefined;
@@ -69,6 +82,12 @@ export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionR
   if (isAhead(deps, activity.endAt)) {
     return err("retro/future");
   }
+  if (
+    activity.taskId !== undefined &&
+    taskById(deps.state.store.getState().tasks, activity.taskId) === undefined
+  ) {
+    return err("task/unknown");
+  }
   return await emit(deps, [
     stamp(
       deps,
@@ -79,6 +98,8 @@ export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionR
           endAt: activity.endAt,
           label,
           startAt: activity.startAt,
+          ...(activity.expectMinutes !== null &&
+            activity.expectMinutes !== undefined && { expectMinutes: activity.expectMinutes }),
           ...(activity.taskId !== undefined && { taskId: activity.taskId }),
         },
         type: "activity.logged",
@@ -109,12 +130,36 @@ const corrections = (
       stamp(deps, { payload: { activityId, ...change }, type: "activity.adjusted" }),
     ]);
   },
-  relabelActivity: async (activityId, change) =>
-    timeOf(deps).activities[activityId] === undefined
-      ? err("event/not-found")
-      : await emit(deps, [
-          stamp(deps, { payload: { activityId, ...change }, type: "activity.labelled" }),
-        ]),
+  relabelActivity: async (activityId, change) => {
+    if (timeOf(deps).activities[activityId] === undefined) {
+      return err("event/not-found");
+    }
+    if (
+      change.taskId !== undefined &&
+      change.taskId !== null &&
+      taskById(deps.state.store.getState().tasks, change.taskId) === undefined
+    ) {
+      return err("task/unknown");
+    }
+    return await emit(deps, [
+      stamp(deps, { payload: { activityId, ...change }, type: "activity.labelled" }),
+    ]);
+  },
+});
+
+const moveChange = (
+  target: Extract<ActivityTarget, { kind: "edit" }>,
+  entry: ActivityEntry,
+): { readonly startAt: string; readonly endAt?: string } => ({
+  startAt: entry.startAt,
+  ...(entry.endAt !== null && target.endAt !== null && { endAt: entry.endAt }),
+});
+
+const labelChange = (entry: ActivityEntry) => ({
+  category: entry.category,
+  label: activityLabel(entry.label),
+  ...(entry.expectMinutes !== undefined && { expectMinutes: entry.expectMinutes }),
+  ...(entry.taskId !== undefined && { taskId: entry.taskId }),
 });
 
 /** Moves the block if its boundaries changed, then renames it if its name or category did. */
@@ -127,24 +172,26 @@ const saveEdit = async (
   const isMoved =
     entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
   const moved = isMoved
-    ? await edits.adjustActivity(target.activityId, {
-        startAt: entry.startAt,
-        ...(entry.endAt !== null && target.endAt !== null && { endAt: entry.endAt }),
-      })
+    ? await edits.adjustActivity(target.activityId, moveChange(target, entry))
     : ok([]);
   if (!moved.ok) {
     return moved;
   }
-  const isRenamed =
-    activityLabel(entry.label) !== target.label || entry.category !== target.category;
+  const isRenamed = shouldRelabel(target, entry);
   const renamed = isRenamed
-    ? await edits.relabelActivity(target.activityId, {
-        category: entry.category,
-        label: activityLabel(entry.label),
-      })
+    ? await edits.relabelActivity(target.activityId, labelChange(entry))
     : ok([]);
   return renamed.ok ? ok([...moved.value, ...renamed.value]) : renamed;
 };
+
+const shouldRelabel = (
+  target: Extract<ActivityTarget, { kind: "edit" }>,
+  entry: ActivityEntry,
+): boolean =>
+  activityLabel(entry.label) !== target.label ||
+  entry.category !== target.category ||
+  (entry.expectMinutes !== undefined && entry.expectMinutes !== (target.expectMinutes ?? null)) ||
+  (entry.taskId !== undefined && entry.taskId !== (target.taskId ?? null));
 
 const saveActivity = async (
   deps: ActionDeps,
@@ -161,6 +208,9 @@ const saveActivity = async (
         endAt: entry.endAt,
         label: entry.label,
         startAt: entry.startAt,
+        ...(entry.expectMinutes !== null &&
+          entry.expectMinutes !== undefined && { expectMinutes: entry.expectMinutes }),
+        ...(entry.taskId !== null && entry.taskId !== undefined && { taskId: entry.taskId }),
       });
 };
 

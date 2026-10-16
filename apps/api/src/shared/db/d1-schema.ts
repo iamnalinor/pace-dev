@@ -11,6 +11,34 @@ export const users = sqliteTable("users", {
   createdAt: integer({ mode: "timestamp_ms" }).notNull(),
 });
 
+/** A small cached Telegram profile photo; the public route never exposes the bot token. */
+export const userAvatars = sqliteTable("user_avatars", {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  mime: text().notNull(),
+  data: text().notNull(),
+});
+
+/** Opaque Telegram confirmation capabilities survive account deletion for terminal polling. */
+export const accountConfirmations = sqliteTable(
+  "account_confirmations",
+  {
+    id: text().primaryKey(),
+    userId: text().notNull(),
+    telegramId: text().notNull(),
+    action: text({ enum: ["wipe", "delete"] }).notNull(),
+    status: text({
+      enum: ["pending", "processing", "confirmed", "cancelled", "expired", "replaced"],
+    }).notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
+    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
+    sessionId: text().notNull(),
+    messageId: integer(),
+  },
+  (table) => [index("account_confirmations_user_idx").on(table.userId, table.action, table.status)],
+);
+
 /** Bearer sessions: the client holds the random token, the database only its SHA-256. */
 export const sessions = sqliteTable(
   "sessions",

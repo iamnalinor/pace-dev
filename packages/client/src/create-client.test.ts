@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { endpoints } from "@pace/core";
+import { endpoints, ParseResponseSchema } from "@pace/core";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createPaceClient, type PaceClient } from "./create-client.ts";
@@ -100,10 +100,10 @@ describe("createPaceClient", () => {
 });
 
 /** The assistant's answer from the activity field. */
-const activityAnswer = (proposals: readonly object[]) => ({
+const activityAnswer = (actions: readonly object[]) => ({
   confidence: 1,
   domain: "activity",
-  proposals,
+  actions,
   provider: "fake",
   status: "parsed",
 });
@@ -126,7 +126,7 @@ describe("client.assistant", () => {
   const parsed = {
     confidence: 1,
     domain: "task",
-    proposals: [{ kind: "task.create", summary: "New task: разобрать почту", task }],
+    actions: [{ kind: "task.create", summary: "New task: разобрать почту", task }],
     provider: "fake",
     status: "parsed",
   };
@@ -144,7 +144,7 @@ describe("client.assistant", () => {
     const newer = {
       ...parsed,
       extra: "top",
-      proposals: [{ ...parsed.proposals[0], extra: "proposal", task: { ...task, extra: "draft" } }],
+      actions: [{ ...parsed.actions[0], extra: "action", task: { ...task, extra: "draft" } }],
     };
     const { client } = await setup({ "POST /api/parse": () => newer });
     expect(await client.assistant.read("разобрать почту, полтора часа")).toMatchObject({
@@ -159,7 +159,7 @@ describe("client.assistant", () => {
       "POST /api/parse": () => ({
         confidence: 1,
         domain: "task",
-        proposals: [],
+        actions: [],
         retryAt,
         status: "unavailable",
       }),
@@ -169,7 +169,17 @@ describe("client.assistant", () => {
     expect(await broken.client.assistant.read("что-то")).toEqual({ status: "failed" });
   });
 
-  it("reads an activity note from the activity field, and nothing from another proposal", async () => {
+  it("offers a labelled rule action when the parse request itself fails", async () => {
+    const { client } = await setup({ "POST /api/parse": () => problem(503, "unavailable") });
+    const answer = await client.assistant.propose("ем", "activity");
+    expect(ParseResponseSchema.safeParse(answer).success).toBe(true);
+    expect(answer).toMatchObject({
+      actions: [{ category: "food", kind: "activity.start", label: "ем" }],
+      status: "unavailable",
+    });
+  });
+
+  it("reads an activity note from the activity field, and nothing from another action", async () => {
     const bodies: unknown[] = [];
     const start = {
       category: "commute",

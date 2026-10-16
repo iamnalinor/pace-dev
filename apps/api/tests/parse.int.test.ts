@@ -7,11 +7,15 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import {
+  type Action,
+  blankModelAction,
+  coreReducer,
   endpoints,
   type EventInput,
+  INITIAL_CORE_STATE,
+  materialize,
   newId,
   type ParseResponse,
-  type Proposal,
   type RequestDomain,
 } from "@pace/core";
 
@@ -30,20 +34,27 @@ const parse = async (token: string, text: string, domain?: RequestDomain): Promi
     await json("/api/parse", { body: { text, ...(domain !== undefined && { domain }) }, token }),
   );
 
-/** The only proposal of a parsed answer. */
-const only = (answer: ParseResponse): Proposal => {
+/** The only action of a parsed answer. */
+const only = (answer: ParseResponse): Action => {
   expect(answer.status).toBe("parsed");
-  expect(answer.proposals).toHaveLength(1);
-  const [proposal] = answer.proposals;
-  if (proposal === undefined) {
-    throw new Error("no proposal");
+  expect(answer.actions).toHaveLength(1);
+  const [action] = answer.actions;
+  if (action === undefined) {
+    throw new Error("no action");
   }
-  return proposal;
+  return action;
 };
 
 const storeOf = async (token: string) => {
   const me = await json<{ id: string }>("/api/me", { token });
   return env.USER_STORE.get(env.USER_STORE.idFromName(me.id));
+};
+
+/** Read the public sync stream rather than a Durable Object's private projection. */
+const stateFor = async (token: string) => {
+  const answer = await json("/api/sync/pull", { token });
+  const pulled = endpoints.sync.pull.output.parse(answer);
+  return materialize(pulled.events, coreReducer, INITIAL_CORE_STATE);
 };
 
 const minutesAgo = (minutes: number): string =>
@@ -144,13 +155,53 @@ const drainLater = async (token: string): Promise<void> => {
 };
 
 describe("POST /api/parse: tasks", () => {
+  it("keeps the owner's full short title when the model shortens it", async () => {
+    const token = await loginAsDev("1001");
+    const app = createApp({
+      fetch: async () => {
+        throw new Error("no network in tests");
+      },
+      parseProviders: () => [
+        {
+          model: fakeParseModel(() => ({
+            actions: [
+              blankModelAction({ kind: "task.create", title: "челику", description: "Написать" }),
+            ],
+            confidence: 1,
+            domain: "task",
+            questions: [],
+          })),
+          name: "fake",
+        },
+      ],
+      telegramFetch: async () => {
+        throw new Error("no network in tests");
+      },
+    });
+    const ctx = createExecutionContext();
+    const response = await app.fetch(
+      new Request("https://pace-api.test/api/parse", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "Написать челику", domain: "task" }),
+      }),
+      env,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    const answer = asAnswered(await readJson(response));
+    expect(only(answer)).toMatchObject({
+      task: { title: "Написать челику", description: null },
+    });
+  });
+
   it("reads a message into a new task, sure of the field it came from, and writes nothing", async () => {
     const token = await loginAsDev("1001");
     const answer = await parse(token, "купить кабель USB-C");
     expect(answer).toMatchObject({ confidence: 1, domain: "task", provider: "fake" });
     expect(only(answer)).toMatchObject({
       kind: "task.create",
-      summary: "New task: купить кабель USB-C",
+      summary: "The assistant will create “купить кабель USB-C”",
       task: {
         presetId: "personal",
         sourceText: "купить кабель USB-C",
@@ -171,7 +222,7 @@ describe("POST /api/parse: tasks", () => {
     const { taskId } = await seed(token, "Renew the passport", "Visa office");
     expect(only(await parse(token, "delete task Renew the passport"))).toEqual({
       kind: "task.delete",
-      summary: "Delete “Renew the passport”",
+      summary: "The assistant will delete “Renew the passport”",
       taskId,
     });
     expect(only(await parse(token, "close task renew the passport"))).toMatchObject({
@@ -204,7 +255,7 @@ describe("POST /api/parse: tasks", () => {
   it("proposes nothing for a task the model names but the lists do not hold", async () => {
     const token = await loginAsDev("1001");
     const answer = await parse(token, "delete task Something never created");
-    expect(answer).toMatchObject({ domain: "task", proposals: [], status: "parsed" });
+    expect(answer).toMatchObject({ domain: "task", actions: [], status: "parsed" });
   });
 });
 
@@ -217,7 +268,7 @@ describe("POST /api/parse: activities", () => {
       expectMinutes: 20,
       kind: "activity.start",
       label: "Пошел в ЦСС",
-      summary: "Start: Пошел в ЦСС",
+      summary: "The assistant will start “Пошел в ЦСС”",
     });
     expect(only(await parse(token, "20 мин читал", "activity"))).toMatchObject({
       kind: "activity.log",
@@ -236,11 +287,11 @@ describe("POST /api/parse: activities", () => {
     });
   });
 
-  it("keeps only proposals of the field the text came from", async () => {
+  it("keeps only actions of the field the text came from", async () => {
     const token = await loginAsDev("1002");
     await seed(token, "Water the plants", "Garden");
     const answer = await parse(token, "delete task Water the plants", "activity");
-    expect(answer).toMatchObject({ domain: "activity", proposals: [], status: "parsed" });
+    expect(answer).toMatchObject({ domain: "activity", actions: [], status: "parsed" });
   });
 });
 
@@ -262,11 +313,15 @@ describe("POST /api/parse: no model", () => {
     const task = await parseLimited(token, { text: "позвонить маме завтра" });
     expect(task).toMatchObject({ confidence: 1, domain: "task", status: "unavailable" });
     expect(task.status === "unavailable" ? task.retryAt : null).toMatch(/T/u);
-    expect(task.proposals).toMatchObject([
+    expect(task.actions).toMatchObject([
       { kind: "task.create", task: { title: "позвонить маме" } },
     ]);
+    const homework = await parseLimited(token, { text: "ДЗ по алгебре" });
+    expect(homework.actions).toMatchObject([
+      { kind: "task.create", task: { title: "ДЗ по алгебре", description: null } },
+    ]);
     const activity = await parseLimited(token, { domain: "activity", text: "20 мин читал" });
-    expect(activity.proposals).toMatchObject([{ kind: "activity.log", label: "читал" }]);
+    expect(activity.actions).toMatchObject([{ kind: "activity.log", label: "читал" }]);
     const auto = await parseLimited(token, {
       domain: "auto",
       text: "7:30 - 8:30 - ходил в военкомат.",
@@ -277,7 +332,7 @@ describe("POST /api/parse: no model", () => {
   it("keeps a deferred text and writes its reading once the assistant is back", async () => {
     const token = await loginAsDev("1002");
     const queued = await parseLimited(token, { defer: true, text: "позвонить в банк" });
-    expect(queued).toMatchObject({ proposals: [], status: "queued" });
+    expect(queued).toMatchObject({ actions: [], status: "queued" });
     // Queued is not written: nothing of it exists until the store reads it.
     expect(await titled(token, "позвонить в банк")).toEqual([]);
     // The limit is remembered: the status says the assistant is out until then.
@@ -320,7 +375,7 @@ describe("POST /api/parse: no model", () => {
     const text = "add to Geometry sheet: 7, 8";
     expect(await parseLimited(token, { defer: true, text })).toMatchObject({ status: "queued" });
     await drainLater(token);
-    const { state } = await (await storeOf(token)).read(new Date().toISOString());
+    const state = await stateFor(token);
     expect(state.tasks.byId[taskId]?.subtasks.map((subtask) => subtask.label)).toEqual([
       "photo",
       "form",
@@ -338,7 +393,7 @@ describe("POST /api/parse: no model", () => {
     const stub = await storeOf(token);
     await stub.noteLlmLimits({ fake: "2000-01-01T00:00:00.000Z" }, new Date().toISOString());
     await stub.drainParses(new Date(Date.now() + 60_000).toISOString());
-    const { state } = await stub.read(new Date().toISOString());
+    const state = await stateFor(token);
     expect(state.tasks.byId[taskId]).toBeDefined();
     const inbox = Object.values(state.tasks.byId).find((task) => task.title === text);
     expect(inbox?.presetId).toBe("inbox");

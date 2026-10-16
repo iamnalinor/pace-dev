@@ -27,6 +27,12 @@ export type BotDeps = {
   readonly bindLogin: (user: BotUser, nonce: string) => Promise<LoginOutcome>;
   /** Free text, `/now` and the preview buttons; without it the bot only handles login. */
   readonly assistant?: Assistant | undefined;
+  readonly confirmAccount?:
+    | ((
+        telegramId: string,
+        data: string,
+      ) => Promise<{ readonly text: string; readonly isRefused?: true }>)
+    | undefined;
   /** The website: "Return to Pace" after a login leads to it or to the app's App Link there. */
   readonly webOrigin: string;
 };
@@ -83,6 +89,83 @@ const replyOf = (
       },
 ];
 
+const answerAccountButton = async (
+  ctx: Context,
+  data: string,
+  confirm: NonNullable<BotDeps["confirmAccount"]>,
+): Promise<void> => {
+  const answer = await confirm(String(ctx.from?.id ?? ""), data);
+  if (answer.isRefused === true) {
+    await ctx.answerCallbackQuery({ show_alert: true, text: answer.text });
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageText(answer.text);
+};
+
+const shownCallbackReply = (
+  reply: BotReply,
+  data: string,
+  original: string | undefined,
+): BotReply => {
+  const isNotification = answerOfCode(data.slice(0, data.indexOf(":"))) !== undefined;
+  return isNotification && original !== undefined
+    ? { ...reply, text: `${original}\n\n${reply.text}` }
+    : reply;
+};
+
+const attachAssistant = (
+  bot: Bot,
+  assistant: Assistant,
+  confirmAccount: BotDeps["confirmAccount"],
+): void => {
+  bot.command("now", async (ctx) => {
+    const reply = await assistant.now(String(ctx.from?.id ?? ""));
+    await ctx.reply(...replyOf(reply));
+  });
+  bot.on("message:text", async (ctx) => {
+    const telegramId = String(ctx.from.id);
+    const reply = await assistant.message(
+      telegramId,
+      ctx.message.text,
+      ctx.message.reply_to_message?.message_id,
+    );
+    const messageId = reply.editMessageId;
+    if (messageId === undefined) {
+      const sent = await ctx.reply(...replyOf(reply));
+      if (reply.pendingId !== undefined) {
+        await assistant.bindPreview(telegramId, reply.pendingId, sent.message_id);
+      }
+      return;
+    }
+    await ctx.api.editMessageText(ctx.chat.id, messageId, ...replyOf(reply));
+    if (reply.pendingId !== undefined) {
+      await assistant.bindPreview(telegramId, reply.pendingId, messageId);
+    }
+  });
+  bot.on("callback_query:data", async (ctx) => {
+    const { data } = ctx.callbackQuery;
+    if (confirmAccount !== undefined && data.startsWith("account:")) {
+      await answerAccountButton(ctx, data, confirmAccount);
+      return;
+    }
+    const reply = await assistant.choose(String(ctx.from.id), data);
+    if (reply.isRefused === true) {
+      // Refused: the message keeps its buttons to try again; the reason shows as an alert.
+      await ctx.answerCallbackQuery({ show_alert: true, text: reply.text });
+      return;
+    }
+    await ctx.answerCallbackQuery();
+    // A notification keeps its text (the buttons go away); a preview is replaced by the result.
+    const message = shownCallbackReply(reply, data, ctx.callbackQuery.message?.text);
+    await ctx.editMessageText(...replyOf(message));
+    const messageId = ctx.callbackQuery.message?.message_id;
+    if (messageId !== undefined && reply.pendingId !== undefined) {
+      await assistant.bindPreview(String(ctx.from.id), reply.pendingId, messageId);
+    }
+  });
+};
+
 /** A grammY bot built per request (Workers have no long-lived state). */
 export const createBot = (deps: BotDeps): Bot => {
   const bot = new Bot(deps.token, {
@@ -118,30 +201,7 @@ export const createBot = (deps: BotDeps): Bot => {
   });
   const { assistant } = deps;
   if (assistant !== undefined) {
-    bot.command("now", async (ctx) => {
-      const reply = await assistant.now(String(ctx.from?.id ?? ""));
-      await ctx.reply(...replyOf(reply));
-    });
-    bot.on("message:text", async (ctx) => {
-      const reply = await assistant.message(String(ctx.from.id), ctx.message.text);
-      await ctx.reply(...replyOf(reply));
-    });
-    bot.on("callback_query:data", async (ctx) => {
-      const { data } = ctx.callbackQuery;
-      const reply = await assistant.choose(String(ctx.from.id), data);
-      if (reply.isRefused === true) {
-        // Refused: the message keeps its buttons to try again; the reason shows as an alert.
-        await ctx.answerCallbackQuery({ show_alert: true, text: reply.text });
-        return;
-      }
-      await ctx.answerCallbackQuery();
-      // A notification keeps its text (the buttons go away); a preview is replaced by the result.
-      const original = ctx.callbackQuery.message?.text;
-      const isNotification = answerOfCode(data.slice(0, data.indexOf(":"))) !== undefined;
-      await ctx.editMessageText(
-        isNotification && original !== undefined ? `${original}\n\n${reply.text}` : reply.text,
-      );
-    });
+    attachAssistant(bot, assistant, deps.confirmAccount);
   }
   return bot;
 };

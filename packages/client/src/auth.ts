@@ -22,8 +22,23 @@ export type AuthState = {
 
 export type BotLoginError = "cancelled" | "not-allowed" | "timeout";
 
+export type AccountAction = "delete" | "wipe";
+export type AccountConfirmation = { readonly id: string; readonly expiresAt: string };
+export type AccountConfirmationStatus =
+  | "cancelled"
+  | "confirmed"
+  | "expired"
+  | "pending"
+  | "replaced";
+
 export type BotLogin = {
   readonly deepLink: string;
+  readonly nonce: string;
+  /** Polls until the bot bound the nonce; the token is stored before it resolves. */
+  readonly waitForToken: BotLoginPoll["waitForToken"];
+};
+
+export type BotLoginPoll = {
   readonly nonce: string;
   /** Polls until the bot bound the nonce; the token is stored before it resolves. */
   readonly waitForToken: (options: {
@@ -48,13 +63,22 @@ export type Auth = {
   readonly loginWithDev: (telegramId: string) => Promise<Result<User, string>>;
   /** `from`: where the login starts; the bot's "Return to Pace" leads back there. */
   readonly startBotLogin: (from: "app" | "web") => Promise<BotLogin>;
+  /** Rebuilds the poller for a nonce held by a login page across a reload. */
+  readonly resumeBotLogin: (nonce: string) => BotLoginPoll;
   /** Tells the server, then forgets the token even when the server could not be reached. */
   readonly logout: () => Promise<void>;
-  /**
-  Deletes the account on the server (its log, sessions, grants), then signs this device out.
-  When the server refuses or cannot be reached the account stays, and so does the session.
-  */
-  readonly deleteAccount: () => Promise<Result<true, string>>;
+  /** The destructive action runs only after its Telegram button is confirmed. */
+  readonly requestAccountConfirmation: (
+    action: AccountAction,
+  ) => Promise<Result<AccountConfirmation, string>>;
+  /** Uses the request's opaque capability, so deletion can still be observed after sessions vanish. */
+  readonly accountConfirmationStatus: (
+    id: string,
+  ) => Promise<Result<AccountConfirmationStatus, string>>;
+  readonly cancelAccountConfirmation: (
+    id: string,
+  ) => Promise<Result<AccountConfirmationStatus, string>>;
+  readonly finishAccountDeletion: () => Promise<void>;
   /** Fetches the signed-in user; a 401 signs out locally. */
   readonly me: () => Promise<Result<User, string>>;
   /**
@@ -155,18 +179,41 @@ const waitForToken =
     return err("timeout");
   };
 
-/** The account goes on the server first; only then is this device signed out. */
-const deleteAccount =
-  (api: ApiClient, session: { readonly signOut: () => Promise<void> }) =>
-  async (): Promise<Result<true, string>> => {
+const confirmationActions = (
+  api: ApiClient,
+  session: Session,
+): Pick<
+  Auth,
+  | "accountConfirmationStatus"
+  | "cancelAccountConfirmation"
+  | "finishAccountDeletion"
+  | "requestAccountConfirmation"
+> => ({
+  requestAccountConfirmation: async (action) => {
     try {
-      await api.call(endpoints.deleteMe, {});
+      return ok(await api.call(endpoints.account.createConfirmation, { body: { action } }));
     } catch (error) {
       return err(errorCode(error));
     }
-    await session.signOut();
-    return ok(true);
-  };
+  },
+  accountConfirmationStatus: async (id) => {
+    try {
+      const answer = await api.call(endpoints.account.confirmationStatus, { params: { id } });
+      return ok(answer.status);
+    } catch (error) {
+      return err(errorCode(error));
+    }
+  },
+  cancelAccountConfirmation: async (id) => {
+    try {
+      const answer = await api.call(endpoints.account.cancelConfirmation, { params: { id } });
+      return ok(answer.status);
+    } catch (error) {
+      return err(errorCode(error));
+    }
+  },
+  finishAccountDeletion: session.signOut,
+});
 
 export const createAuth = (options: {
   readonly api: ApiClient;
@@ -198,6 +245,7 @@ export const createAuth = (options: {
   };
 
   return {
+    ...confirmationActions(api, session),
     adoptToken: async (token) => {
       await session.adopt(token);
       const result = await me();
@@ -208,7 +256,6 @@ export const createAuth = (options: {
     },
     loginWithDev: async (telegramId) =>
       await login(async () => await api.call(endpoints.auth.dev, { body: { telegramId } })),
-    deleteAccount: deleteAccount(api, session),
     loginWithTelegram: async (payload) =>
       await login(async () => await api.call(endpoints.auth.telegram, { body: payload })),
     logout: async () => {
@@ -222,6 +269,7 @@ export const createAuth = (options: {
     },
     me,
     ready: session.ready,
+    resumeBotLogin: (nonce) => ({ nonce, waitForToken: waitForToken(api, session, nonce) }),
     startBotLogin: async (from) => {
       const created = await api.call(endpoints.auth.nonceCreate, { query: { from } });
       return { ...created, waitForToken: waitForToken(api, session, created.nonce) };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type Event, MAX_CONTEXT_TASKS, proposalContext, type RequestDomain } from "@pace/core";
+import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from "@pace/core";
 import { artboardState, at, ctx } from "@pace/core/testing";
 
 import { echoParse, fakeParseModel } from "./fake-model.ts";
@@ -12,7 +12,7 @@ const NOW = Date.parse("2026-10-06T12:00:00.000Z");
 
 const promptFor = (state = artboardState(), domain: RequestDomain = "task") =>
   buildParsePrompt("купить кабель", {
-    context: proposalContext(state, ctx()),
+    context: actionContext(state, ctx()),
     ctx: ctx(),
     domain,
     language: "en",

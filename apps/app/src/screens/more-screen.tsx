@@ -13,6 +13,7 @@ import { Pressable, Text, View } from "react-native";
 import type { MessageKey } from "@pace/core";
 
 import { useOwnerName, useT } from "#app/app-state.tsx";
+import { UserAvatar } from "#app/shared/user-avatar.tsx";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -55,11 +56,7 @@ const MoreRow = ({ href, icon: Icon, label }: Row) => {
 /** The owner's first name from Telegram, with an initial in the quiet accent. */
 const Owner = ({ name }: { readonly name: string }) => (
   <View className="mx-5 mb-3 flex-row items-center gap-3">
-    <View className="size-11 items-center justify-center rounded-full bg-accentQuiet">
-      <Text className="font-sans text-[18px] font-semibold uppercase text-accentQuietFg">
-        {name.slice(0, 1)}
-      </Text>
-    </View>
+    <UserAvatar />
     <Text className="min-w-0 flex-1 font-sans text-[18px] font-medium text-fg" numberOfLines={1}>
       {name}
     </Text>

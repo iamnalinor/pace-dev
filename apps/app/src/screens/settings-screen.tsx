@@ -6,7 +6,8 @@ import type { ThemePreference } from "#app/platform/theme.ts";
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
-import { DeleteAccount } from "#app/features/settings/delete-account.tsx";
+import { CategoryEstimates } from "#app/features/settings/category-estimates.tsx";
+import { DangerZone } from "#app/features/settings/delete-account.tsx";
 import { ExportRow } from "#app/features/settings/export-row.tsx";
 import {
   DigestWindows,
@@ -132,6 +133,9 @@ export const SettingsScreen = () => {
       <Row label={t("settings.quietHours")}>
         <QuietHours />
       </Row>
+      <Row label={t("settings.categoryEstimates")}>
+        <CategoryEstimates />
+      </Row>
       <Row label={t("settings.more")}>
         <SettingsLinks />
       </Row>
@@ -157,7 +161,7 @@ export const SettingsScreen = () => {
         <Button onPress={() => void logout()} variant="secondary">
           {t("settings.logout")}
         </Button>
-        <DeleteAccount />
+        <DangerZone />
       </View>
     </DestinationScreen>
   );

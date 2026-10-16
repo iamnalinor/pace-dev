@@ -13,43 +13,14 @@ import { formatDuration } from "@pace/core";
 
 const percent = (share: number): `${number}%` => `${Math.round(share * 100)}%`;
 
-/**
-Typed words the assistant is still reading: a dashed outline, not a category's colored tag,
-so it reads as a draft until the name and the category come back.
-*/
-const DraftTag = ({ label }: { readonly label: string }) => {
-  const t = useT();
-  return (
-    <View
-      accessibilityLabel={t("time.draft", { label })}
-      accessible
-      className="self-start rounded-sm border border-dashed border-muted px-1.5"
-    >
-      <Text className="font-sans text-[11px] leading-4 text-fg2" numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-};
-
 /** The running activity's line: the label, the time and the Expect. */
-const RunningMeta = ({
-  isDraft,
-  running,
-}: {
-  readonly isDraft: boolean;
-  readonly running: RunningView;
-}) => {
+const RunningMeta = ({ running }: { readonly running: RunningView }) => {
   const t = useT();
   const { language } = useViewer();
   return (
     <View className="flex-row flex-wrap items-center gap-2">
       <PulseDot className={PROJECT_FILL[running.color]} />
-      {isDraft ? (
-        <DraftTag label={running.label} />
-      ) : (
-        <ColorTag color={running.color}>{running.label}</ColorTag>
-      )}
+      <ColorTag color={running.color}>{running.label}</ColorTag>
       <Text className="font-sans text-[13px] tabular-nums text-fg">
         {formatDuration(running.minutes, language)}
       </Text>
@@ -66,13 +37,7 @@ const RunningMeta = ({
 };
 
 /** One running activity: what, how long, its progress to the Expect; "Yes, still" and Stop. */
-export const RunningRow = ({
-  isDraft,
-  running,
-}: {
-  readonly isDraft: boolean;
-  readonly running: RunningView;
-}) => {
+export const RunningRow = ({ running }: { readonly running: RunningView }) => {
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
@@ -81,7 +46,7 @@ export const RunningRow = ({
   return (
     <View className="flex-row items-center gap-2">
       <View accessibilityLiveRegion="polite" className="flex-1 gap-1">
-        <RunningMeta isDraft={isDraft} running={running} />
+        <RunningMeta running={running} />
         {/* Its own line, so the bar does not move as the minutes grow. */}
         {statusKey === null ? null : (
           <Text className="font-sans text-[12px] font-medium text-warn">{t(statusKey)}</Text>
@@ -134,44 +99,5 @@ const StopButton = ({ running }: { readonly running: RunningView }) => {
       <Square color={palette.fg} size={14} />
       <Text className="font-sans text-[13px] text-fg">{t("time.stop")}</Text>
     </Pressable>
-  );
-};
-
-/**
-The compact line for a running activity away from the time bar (Now): the category's tag, the
-label when it says more than the tag, the time it has run, and Stop. The words lead to Day,
-where the bar is; Stop stays one tap away here.
-*/
-export const CompactRunningRow = ({
-  onOpen,
-  running,
-}: {
-  readonly running: RunningView;
-  readonly onOpen: () => void;
-}) => {
-  const t = useT();
-  const { language } = useViewer();
-  const category = t(`category.${running.category}`);
-  return (
-    <View className="min-h-12 flex-row items-center gap-2">
-      <Pressable
-        accessibilityHint={t("time.openDay")}
-        accessibilityRole="link"
-        className="min-h-11 flex-1 flex-row flex-wrap content-center items-center gap-2 active:opacity-70"
-        onPress={onOpen}
-      >
-        <PulseDot className={PROJECT_FILL[running.color]} />
-        <ColorTag color={running.color}>{category}</ColorTag>
-        {running.label === category ? null : (
-          <Text className="shrink font-sans text-[14px] font-medium text-fg" numberOfLines={1}>
-            {running.label}
-          </Text>
-        )}
-        <Text className="font-sans text-[13px] tabular-nums text-fg2">
-          {formatDuration(running.minutes, language)}
-        </Text>
-      </Pressable>
-      <StopButton running={running} />
-    </View>
   );
 };

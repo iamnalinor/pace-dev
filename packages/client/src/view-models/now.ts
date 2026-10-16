@@ -47,6 +47,7 @@ export type RowTag =
 export type NowRow = {
   readonly id: string;
   readonly title: string;
+  readonly dueAt: null | string;
   readonly projectId: null | string;
   /** The project's color, else the preset's. */
   readonly color: ProjectColorName;
@@ -138,6 +139,7 @@ const pausedPart = (item: NowItem): readonly MetaPart[] =>
 export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
   id: item.task.id,
   title: item.task.title,
+  dueAt: item.dueAt,
   projectId: item.task.projectId,
   color: item.project?.color ?? item.preset.color,
   tag:
@@ -155,6 +157,23 @@ export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
     ...progressParts(item),
     ...agePart(item, ctx),
   ],
+});
+
+const IMPORTANCE_ORDER: Readonly<Record<Importance, number>> = {
+  asap: 0,
+  prioritized: 1,
+  normal: 2,
+  nice_to_have: 3,
+};
+
+/** Dated tasks stay in deadline order; undated ones put urgency first, keeping ties stable. */
+export const groupNowRows = (
+  rows: readonly NowRow[],
+): { readonly dated: readonly NowRow[]; readonly undated: readonly NowRow[] } => ({
+  dated: rows.filter((row) => row.dueAt !== null),
+  undated: rows
+    .filter((row) => row.dueAt === null)
+    .toSorted((a, b) => IMPORTANCE_ORDER[a.importance] - IMPORTANCE_ORDER[b.importance]),
 });
 
 const openCount = (state: CoreState, project: Project): number =>

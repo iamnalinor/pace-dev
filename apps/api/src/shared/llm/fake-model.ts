@@ -154,7 +154,7 @@ const list = (text: string): readonly string[] =>
 
 /**
 What the fake understands besides a plain message, so tests and e2e can ask for every kind of
-proposal: "delete task <title>", "close task <title>", "rename task <title> to <new>",
+action: "delete task <title>", "close task <title>", "rename task <title> to <new>",
 "add to <title>: a, b", "solved in <title>: 1, 2", "delete activity <label>",
 "rename activity <label> to <new>". Names match the lists in the prompt.
 */
@@ -285,7 +285,7 @@ const decided = (text: string, system: string): ModelOutput => {
 };
 
 /**
-The fake's reading: a command (see `COMMANDS`) as that proposal; otherwise, by the field the
+The fake's reading: a command (see `COMMANDS`) as that action; otherwise, by the field the
 prompt names, a new task titled with the message, or the activity its words and time span say.
 */
 export const echoReply = (text: string, system: string): ModelOutput => {

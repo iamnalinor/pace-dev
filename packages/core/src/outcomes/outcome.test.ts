@@ -94,6 +94,22 @@ describe("deadlineOf", () => {
     };
     expect(deadlineOf(taskFixture(), open)).toEqual({ dueAt: HW_DUE, finalAt: null });
   });
+
+  it("computes a final deadline N calendar days later while a fixed date stays fixed", () => {
+    const offset: ResolvedPreset = {
+      ...HW,
+      deadlinePolicy: {
+        kind: "resubmission",
+        softDays: 3,
+        finalAt: null,
+        finalTz: null,
+        finalMode: "offset",
+      },
+    };
+    const task = taskFixture({ dueAt: "2026-03-28T17:00:00.000Z", dueTz: "Europe/Berlin" });
+    expect(deadlineOf(task, offset).finalAt).toBe("2026-03-31T16:00:00.000Z");
+    expect(deadlineOf(task, RESUBMISSION).finalAt).toBe(FINAL);
+  });
 });
 
 describe("subtaskOutcome", () => {

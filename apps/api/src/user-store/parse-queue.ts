@@ -1,12 +1,12 @@
 import {
+  type Action,
+  type ActionKind,
   addMinutesIso,
   type CoreState,
   type EventBody,
   type EventInput,
   newId,
-  planProposals,
-  type Proposal,
-  type ProposalKind,
+  planActions,
   type RequestDomain,
   type Result,
   t,
@@ -20,7 +20,8 @@ import { inboxBody } from "../shared/inbox.ts";
 import { parseProviders } from "../shared/llm/providers.ts";
 import { readMessage } from "../shared/llm/read.ts";
 import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
-import { telegramOf } from "./notifier.ts";
+import { taskUrl } from "../shared/web-links.ts";
+import { telegramOf, webOriginOf } from "./notifier.ts";
 
 /** A text to read once the assistant is back: kept in the store until then. */
 export type QueuedParse = {
@@ -114,7 +115,7 @@ What a text read later writes without the person looking at it: what it wrote be
 assistant could edit and delete (new tasks, problems added to one, solved, a task closed).
 An edit, a delete or an activity waits for the person in the Inbox instead.
 */
-const AUTO_APPLIED: ReadonlySet<ProposalKind> = new Set([
+const AUTO_APPLIED: ReadonlySet<ActionKind> = new Set([
   "task.create",
   "task.addSubtasks",
   "task.markSubtasks",
@@ -132,17 +133,17 @@ const toInbox = (item: QueuedParse, now: string): Exclude<Drained, { kind: "wait
 });
 
 /**
-Every proposal planned in order, the text kept as the source of a task it adds to; `null`
+Every action planned in order, the text kept as the source of a task it adds to; `null`
 when one is not for writing unseen or cannot be planned.
 */
 const planAll = (
-  proposals: readonly Proposal[],
+  actions: readonly Action[],
   world: { readonly state: CoreState; readonly now: string; readonly text: string },
 ): null | readonly EventInput[] => {
-  if (proposals.length === 0 || proposals.some((proposal) => !AUTO_APPLIED.has(proposal.kind))) {
+  if (actions.length === 0 || actions.some((action) => !AUTO_APPLIED.has(action.kind))) {
     return null;
   }
-  const planned = planProposals(world.state, proposals, {
+  const planned = planActions(world.state, actions, {
     deviceTz: world.state.settings.timezone ?? "UTC",
     newId: () => newId(),
     now: world.now,
@@ -188,7 +189,7 @@ export const drainOne = async (
       limited,
     };
   }
-  const inputs = planAll(answer.value.proposals, { now, state, text: item.text });
+  const inputs = planAll(answer.value.actions, { now, state, text: item.text });
   return {
     drained: inputs === null ? toInbox(item, now) : { inputs, item, kind: "done" },
     limited,
@@ -227,7 +228,11 @@ const stateOf = async (deps: DrainDeps): Promise<CoreState> => {
 };
 
 /** Tells the person in Telegram what became of a text read later; quiet without a bot. */
-const tell = async (deps: DrainDeps, isDone: boolean, text: string): Promise<void> => {
+const tell = async (
+  deps: DrainDeps,
+  isDone: boolean,
+  drained: Exclude<Drained, { kind: "wait" }>,
+): Promise<void> => {
   const chatId = await deps.store.chatId();
   const telegram = telegramOf(deps.env);
   if (chatId === undefined || telegram === null) {
@@ -235,9 +240,19 @@ const tell = async (deps: DrainDeps, isDone: boolean, text: string): Promise<voi
   }
   const state = await stateOf(deps);
   const key = isDone ? "parse.deferredDone" : "parse.deferredInbox";
+  const links = isDone
+    ? drained.inputs
+        .filter((input) => input.type === "task.created")
+        .map((input) => [
+          {
+            label: input.payload.title,
+            url: taskUrl(webOriginOf(deps.env), input.payload.taskId),
+          },
+        ])
+    : [];
   await wasTelegramMessageSent(telegram, chatId, {
-    buttons: [],
-    text: t(state.settings.language, key, { text }),
+    buttons: links,
+    text: t(state.settings.language, key, { text: drained.item.text }),
   });
 };
 
@@ -260,7 +275,7 @@ const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" 
     await write(deps, toInbox(drained.item, deps.now).inputs);
   }
   await deps.store.logDecisions([decisionOf(drained.item, isDone)], deps.now);
-  await tell(deps, isDone, drained.item.text);
+  await tell(deps, isDone, drained);
 };
 
 /** One queued text at the alarm: `null` once settled, else the item to keep for later. */

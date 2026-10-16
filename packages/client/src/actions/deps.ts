@@ -3,6 +3,7 @@ import {
   type Event,
   type EventInput,
   ok,
+  type ActionError as PlannedActionError,
   type PresetError,
   type PresetValidationError,
   type ResolvedPreset,
@@ -36,6 +37,7 @@ export type ActionError =
   | "event/not-found"
   | "undo/nothing"
   | `dispatch/${string}`
+  | PlannedActionError
   | PresetError
   | PresetValidationError
   | ProjectNameError

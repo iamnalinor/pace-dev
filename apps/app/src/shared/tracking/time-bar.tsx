@@ -3,10 +3,11 @@ import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import type { TimeButtonView } from "@pace/client";
-import type { Event, MessageKey } from "@pace/core";
+import type { MessageKey } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { useRunAction } from "#app/shared/use-run-action.ts";
+import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
+import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
 import { inkClass, OUTLINE } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -25,76 +26,77 @@ const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
   task: Timer,
 };
 
-const startedId = (events: readonly Event[]): null | string => {
-  const started = events.find((event) => event.type === "activity.started");
-  return started?.type === "activity.started" ? started.payload.activityId : null;
-};
-
 /**
-"What are you doing?" and ▶ on one line: Enter starts it at once with the words as typed (a
-length in them as the Expect); the assistant's reading of it follows in the background.
+"What are you doing?" first reads actions; the owner approves before anything is written.
 */
-const TypedStart = ({
-  onReading,
-}: {
-  /** The activity whose words the assistant reads (`true`), then once it answered (`false`). */
-  readonly onReading: (activityId: string, isReading: boolean) => void;
-}) => {
+const TypedStart = () => {
   const t = useT();
-  const { actions, assistant } = usePace();
   const { palette } = useTheme();
-  const run = useRunAction();
   const [text, setText] = useState("");
+  const pending = usePendingActions("activity", () => {
+    setText("");
+  });
   const typed = text.trim();
-  const start = async (): Promise<void> => {
+  const start = (): void => {
+    if (pending.pending !== null) {
+      void pending.approve();
+      return;
+    }
     if (typed === "") {
       return;
     }
-    const result = await actions.startTyped(typed);
-    if (!(await run(Promise.resolve(result))) || !result.ok) {
-      return;
-    }
-    setText("");
-    const activityId = startedId(result.value);
-    if (activityId === null) {
-      return;
-    }
-    onReading(activityId, true);
-    try {
-      const reading = await assistant.readActivity(typed);
-      if (reading !== null) {
-        await actions.refineActivity(activityId, { ...reading, typed });
-      }
-    } finally {
-      onReading(activityId, false);
-    }
+    pending.submit(typed);
   };
   return (
-    <View className="flex-row items-center gap-2">
-      <TextInput
-        accessibilityLabel={t("time.whatDoing")}
-        className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
-        maxLength={200}
-        onChangeText={setText}
-        onSubmitEditing={() => void start()}
-        placeholder={t("time.whatDoing")}
-        placeholderTextColor={palette.muted}
-        returnKeyType="go"
-        value={text}
-      />
-      <Pressable
-        accessibilityLabel={t("time.start")}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: typed === "" }}
-        className={cx(
-          "h-11 w-11 items-center justify-center rounded-lg bg-accent active:opacity-80",
-          typed === "" && "opacity-50",
-        )}
-        disabled={typed === ""}
-        onPress={() => void start()}
-      >
-        <Play color={palette.accentFg} fill={palette.accentFg} size={16} />
-      </Pressable>
+    <View className="gap-2">
+      {pending.pending === null ? null : (
+        <ActionCards
+          actions={pending.pending.actions}
+          busy={pending.busy}
+          onApprove={() => {
+            void pending.approve();
+          }}
+          onCancel={pending.cancel}
+          onFollowup={pending.followup}
+          source={pending.pending.status}
+        />
+      )}
+      {pending.busy && pending.pending === null ? (
+        <Text accessibilityRole="status" className="font-sans text-[13px] text-muted">
+          {t("assistant.reading")}
+        </Text>
+      ) : null}
+      {pending.issue === null ? null : (
+        <Text accessibilityRole="alert" className="font-sans text-[13px] text-warn">
+          {t(pending.issue)}
+        </Text>
+      )}
+      <View className="flex-row items-center gap-2">
+        <TextInput
+          accessibilityLabel={t("time.whatDoing")}
+          className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
+          maxLength={200}
+          onChangeText={setText}
+          onSubmitEditing={start}
+          placeholder={t("time.whatDoing")}
+          placeholderTextColor={palette.muted}
+          returnKeyType="go"
+          value={text}
+        />
+        <Pressable
+          accessibilityLabel={t("assistant.review")}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: typed === "" || pending.busy }}
+          className={cx(
+            "h-11 w-11 items-center justify-center rounded-lg bg-accent active:opacity-80",
+            typed === "" && "opacity-50",
+          )}
+          disabled={typed === "" || pending.busy}
+          onPress={start}
+        >
+          <Play color={palette.accentFg} fill={palette.accentFg} size={16} />
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -206,8 +208,6 @@ export const TimeBar = () => {
   const t = useT();
   const { hooks } = usePace();
   const { alongside, buttons, running } = hooks.useTimeBar();
-  // The typed activities the assistant is still reading (two can be in flight).
-  const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
   const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
@@ -218,16 +218,9 @@ export const TimeBar = () => {
       role="region"
     >
       {[...(running === null ? [] : [running]), ...alongside].map((item) => (
-        <RunningRow isDraft={reading.has(item.activityId)} key={item.activityId} running={item} />
+        <RunningRow key={item.activityId} running={item} />
       ))}
-      <TypedStart
-        onReading={(activityId, isReading) => {
-          setReading((current) => {
-            const others = [...current].filter((id) => id !== activityId);
-            return new Set(isReading ? [...others, activityId] : others);
-          });
-        }}
-      />
+      <TypedStart />
       <View className="flex-row gap-2">
         {buttons.map((button) => (
           <BarButton

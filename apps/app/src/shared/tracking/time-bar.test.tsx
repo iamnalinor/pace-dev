@@ -9,6 +9,7 @@ import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { problem } from "@pace/client/testing";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
@@ -75,7 +76,7 @@ beforeEach(() => {
 const CSS_READ = {
   confidence: 1,
   domain: "activity",
-  proposals: [
+  actions: [
     {
       category: "sport",
       expectMinutes: 20,
@@ -324,7 +325,7 @@ describe("TimeBar", () => {
     expect(screen.queryByLabelText("Alongside what is running")).toBeNull();
   });
 
-  it("starts what is typed at once with its length, then takes the assistant's name for it", async () => {
+  it("reviews the assistant's activity before starting it", async () => {
     const runtime = await createTestRuntime({
       routes: {
         "POST /api/parse": () => CSS_READ,
@@ -334,6 +335,9 @@ describe("TimeBar", () => {
     const field = screen.getByLabelText("What are you doing?");
     await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
     await fireEvent(field, "submitEditing");
+    expect(activities(runtime)).toEqual([]);
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => {
       expect(activities(runtime)).toEqual([
         expect.objectContaining({ category: "sport", expectMinutes: 20, label: "ЦСС" }),
@@ -342,7 +346,7 @@ describe("TimeBar", () => {
     expect(field).toHaveDisplayValue("");
   });
 
-  it("shows the typed words as a draft while the assistant reads them", async () => {
+  it("shows that the assistant is reading while no activity is written", async () => {
     const answer: { resolve: (value: unknown) => void } = { resolve: () => undefined };
     const runtime = await createTestRuntime({
       routes: {
@@ -356,15 +360,29 @@ describe("TimeBar", () => {
     const field = screen.getByLabelText("What are you doing?");
     await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
     await fireEvent(field, "submitEditing");
-    // Outlined, not a category's colored tag: it is still being read.
-    expect(
-      await screen.findByLabelText(en("time.draft", { label: "Пошел в ЦСС" })),
-    ).toBeOnTheScreen();
+    expect(activities(runtime)).toEqual([]);
+    expect(screen.getByText(en("assistant.reading"))).toBeOnTheScreen();
     answer.resolve(CSS_READ);
-    await waitFor(() => {
-      expect(screen.queryByLabelText(en("time.draft", { label: "Пошел в ЦСС" }))).toBeNull();
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.reading"))).toBeNull();
+    expect(activities(runtime)).toEqual([]);
+  });
+
+  it("explains a rule fallback and offers Food for «ем» when the request fails", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/parse": () => problem(503, "unavailable") },
     });
-    expect(screen.getByText("ЦСС")).toBeOnTheScreen();
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.changeText(screen.getByLabelText("What are you doing?"), "ем");
+    await fireEvent.press(screen.getByRole("button", { name: "Review assistant actions" }));
+    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(activities(runtime)).toEqual([]);
+    await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => {
+      expect(activities(runtime)).toEqual([
+        expect.objectContaining({ category: "food", label: "ем" }),
+      ]);
+    });
   });
 
   it("is greyed without calendar access; a tap opens its picker, which says why and leads to the permissions", async () => {

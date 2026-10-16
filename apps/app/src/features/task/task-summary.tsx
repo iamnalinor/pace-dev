@@ -135,7 +135,7 @@ export const TaskSummary = ({
               void Linking.openURL(view.link?.url ?? "");
             }}
           >
-            {view.link.host} ↗
+            {view.link.url} ↗
           </Text>
         )}
         <TaskTags tags={view.tags} />

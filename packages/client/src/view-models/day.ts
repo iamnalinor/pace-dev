@@ -89,14 +89,26 @@ export const trackedDates = (state: CoreState, ctx: QueryContext): ReadonlySet<s
 };
 
 const editTargetOf = (
-  row: Pick<DayRow, "activityId" | "category" | "endAt" | "isRunning" | "label" | "startAt">,
+  row: Pick<
+    DayRow,
+    | "activityId"
+    | "category"
+    | "endAt"
+    | "expectMinutes"
+    | "isRunning"
+    | "label"
+    | "startAt"
+    | "taskId"
+  >,
 ): ActivityTarget => ({
   activityId: row.activityId,
   category: row.category,
   endAt: row.isRunning ? null : row.endAt,
+  expectMinutes: row.expectMinutes,
   kind: "edit",
   label: row.label,
   startAt: row.startAt,
+  taskId: row.taskId,
 });
 
 export type DayTotal = {
