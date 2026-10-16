@@ -87,6 +87,11 @@ describe("actionsByRules", () => {
       { category: "food", expectMinutes: null, kind: "activity.start", label: "ем" },
     ]);
     expect(byRules("Пишем", "activity")[0]).toMatchObject({ category: "other", label: "Пишем" });
+    expect(byRules("eating lunch", "activity")[0]).toMatchObject({
+      category: "food",
+      label: "eating lunch",
+    });
+    expect(byRules("working", "activity")[0]).toMatchObject({ category: "other" });
     const earlierOther = artboardState(NOON, [
       at(901, "2026-10-05T10:00:00.000Z", {
         payload: { activityId: "a-meal", category: "other", label: "ем" },
@@ -98,6 +103,15 @@ describe("actionsByRules", () => {
     ).toMatchObject({
       category: "food",
       label: "ем",
+    });
+  });
+
+  it("preserves short Russian and English task titles when no model is available", () => {
+    expect(byRules("Написать челику", "task")[0]).toMatchObject({
+      task: { title: "Написать челику", description: null },
+    });
+    expect(byRules("Write algebra homework", "task")[0]).toMatchObject({
+      task: { title: "Write algebra homework", description: null },
     });
   });
 });

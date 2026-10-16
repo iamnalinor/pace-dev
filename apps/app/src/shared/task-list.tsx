@@ -73,7 +73,7 @@ export const TaskRows = ({
             key={row.id}
             // The dust is the exit of a checked row; the fade would only bring it back for a moment.
             {...(!dissolving.has(row.id) && { exiting: ROW_EXIT })}
-            layout={animateLayout ? ROW_LAYOUT : undefined}
+            {...(animateLayout && { layout: ROW_LAYOUT })}
             role="listitem"
           >
             <TaskRow

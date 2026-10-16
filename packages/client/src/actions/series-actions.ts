@@ -1,4 +1,12 @@
-import { err, formatInZone, newId, seriesById, type SeriesSchedule } from "@pace/core";
+import {
+  err,
+  type EventOf,
+  formatInZone,
+  newId,
+  seriesById,
+  type SeriesSchedule,
+  type Task,
+} from "@pace/core";
 
 import { type ActionDeps, type ActionResult, emit, stamp, taskOf } from "./deps.ts";
 
@@ -7,6 +15,42 @@ export type SeriesActions = {
   readonly archiveSeries: (seriesId: string) => ActionResult;
   readonly startSeriesForTask: (taskId: string, schedule: SeriesSchedule) => ActionResult;
 };
+
+/** A new series starts from the task as it is now, with fresh progress for each instance. */
+const templateDetails = (task: Task, startTz: string) => ({
+  ...(task.projectId !== null && { projectId: task.projectId }),
+  ...(task.importance !== null && { importance: task.importance }),
+  ...(task.dueAt !== null && { dueAt: task.dueAt, dueTz: task.dueTz ?? startTz }),
+  ...(task.estimateMinutes !== null && { estimateMinutes: task.estimateMinutes }),
+  ...(task.description !== null && { description: task.description }),
+  ...(task.sourceText !== null && { sourceText: task.sourceText }),
+  ...(task.overrides !== null && { overrides: task.overrides }),
+});
+
+const templateFields = (task: Task) => ({
+  ...(task.fields.link !== null && { link: task.fields.link }),
+  ...(task.fields.submitVia !== null && { submitVia: task.fields.submitVia }),
+});
+
+const templateOf = (
+  task: Task,
+  input: { readonly seriesId: string; readonly startAt: string; readonly startTz: string },
+): EventOf<"series.created">["payload"]["template"] => ({
+  taskId: task.id,
+  title: task.title,
+  presetId: task.presetId,
+  ...templateDetails(task, input.startTz),
+  startAt: input.startAt,
+  startTz: input.startTz,
+  subtasks: task.subtasks.map((subtask) => ({
+    id: subtask.id,
+    label: subtask.label,
+    ...(subtask.number !== null && { number: subtask.number }),
+  })),
+  fields: templateFields(task),
+  seriesId: input.seriesId,
+  seriesRevision: 0,
+});
 
 export const seriesActions = (deps: ActionDeps): SeriesActions => ({
   updateSeries: async (seriesId, schedule) => {
@@ -47,7 +91,7 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
     ) {
       return err("action/invalid-input");
     }
-    const template = { ...created.payload, taskId, startAt, startTz, seriesId, seriesRevision: 0 };
+    const template = templateOf(task.value, { seriesId, startAt, startTz });
     return await emit(deps, [
       stamp(deps, { type: "series.created", payload: { seriesId, schedule, template } }),
       stamp(deps, {

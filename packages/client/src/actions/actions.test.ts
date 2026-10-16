@@ -67,6 +67,46 @@ describe("approved assistant actions", () => {
 });
 
 describe("createTask", () => {
+  it("starts a repeat series from the task's current fields", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({
+        description: "Old note",
+        dueAt: "2026-10-08T15:00:00.000Z",
+        estimateMinutes: 20,
+        presetId: "personal",
+        startAt: "2026-10-07T15:00:00.000Z",
+        title: "Original",
+      }),
+    );
+    if (created?.type !== "task.created") {
+      throw new Error("Expected task.created");
+    }
+    const taskId = created.payload.taskId;
+    unwrap(
+      await world.actions.updateTask(taskId, {
+        description: "Current note",
+        dueAt: "2026-10-09T15:00:00.000Z",
+        title: "Current title",
+      }),
+    );
+    unwrap(await world.actions.setEstimate(taskId, 45));
+    unwrap(await world.actions.setImportance(taskId, "asap"));
+
+    const events = unwrap(await world.actions.startSeriesForTask(taskId, { kind: "daily" }));
+    const series = events.find((event) => event.type === "series.created");
+    if (series?.type !== "series.created") {
+      throw new Error("Expected series.created");
+    }
+    expect(series.payload.template).toMatchObject({
+      description: "Current note",
+      dueAt: "2026-10-09T15:00:00.000Z",
+      estimateMinutes: 45,
+      importance: "asap",
+      title: "Current title",
+    });
+  });
+
   it("creates a repeat series and an independent first task, then keeps one future instance", async () => {
     const world = await setupActions();
     const events = unwrap(

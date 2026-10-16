@@ -62,7 +62,7 @@ const TypedStart = () => {
         />
       )}
       {pending.busy && pending.pending === null ? (
-        <Text accessibilityRole="status" className="font-sans text-[13px] text-muted">
+        <Text accessibilityLiveRegion="polite" className="font-sans text-[13px] text-muted">
           {t("assistant.reading")}
         </Text>
       ) : null}
@@ -76,7 +76,10 @@ const TypedStart = () => {
           accessibilityLabel={t("time.whatDoing")}
           className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
           maxLength={200}
-          onChangeText={setText}
+          onChangeText={(next) => {
+            pending.cancel();
+            setText(next);
+          }}
           onSubmitEditing={start}
           placeholder={t("time.whatDoing")}
           placeholderTextColor={palette.muted}

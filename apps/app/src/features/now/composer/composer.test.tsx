@@ -84,6 +84,21 @@ const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: 
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
 describe("Composer", () => {
+  it("shows the category estimate in the chip but only overrides in its picker", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.press(screen.getByRole("radio", { name: "Homework" }));
+    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.getByRole("radio", { name: "Estimate: Default (1h)" })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "1h" })).toBeNull();
+    await fireEvent.press(screen.getByRole("radio", { name: "30m" }));
+    expect(screen.getByRole("radio", { name: "Estimate: 30m" })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("radio", { name: /^Estimate: /u }));
+    expect(screen.queryByRole("radio", { name: "Default (1h)" })).toBeNull();
+    expect(screen.getByRole("radio", { name: "1h" })).toBeOnTheScreen();
+  });
+
   it("closes the due calendar after picking a day", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));
@@ -127,6 +142,18 @@ describe("Composer", () => {
     await waitFor(() => {
       expect(created(runtime, "разобрать почту")).toBeDefined();
     });
+  });
+
+  it("discards a preview when its source line changes", async () => {
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    await fireEvent.changeText(line(), "срочно почта!");
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
+    expect(screen.queryByRole("button", { name: en("assistant.approve") })).toBeNull();
+    expect(created(runtime, "разобрать почту")).toBeUndefined();
   });
 
   it("opens by hand on + after the assistant read the line: its reading gives way, the title says New task", async () => {
@@ -336,5 +363,28 @@ describe("Composer", () => {
       expect(added()?.title).toBe("ДЗ по алгебре: № 290–365");
     });
     expect(added()?.subtasks).toHaveLength(4);
+  });
+
+  it("applies an assistant action only once when Approve is pressed twice before rerender", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/parse": () => parsed({ sourceText: "Buy cable", title: "Buy cable" }),
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "Buy cable");
+    await enter();
+    const approve = await screen.findByRole("button", { name: en("assistant.approve") });
+    await act(async () => {
+      void fireEvent.press(approve);
+      void fireEvent.press(approve);
+    });
+    await waitFor(() => {
+      expect(
+        Object.values(runtime.state.store.getState().tasks.byId).filter(
+          (task) => task.title === "Buy cable",
+        ),
+      ).toHaveLength(1);
+    });
   });
 });

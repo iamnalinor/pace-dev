@@ -235,7 +235,10 @@ const createTask =
     const payload = taskPayload(form, {
       projectId,
       taskId: newId(),
-      start: { at: form.startAt, tz: form.startTz ?? deps.clock.deviceTz },
+      start: {
+        ...(form.startAt !== undefined && { at: form.startAt }),
+        tz: form.startTz ?? deps.clock.deviceTz,
+      },
     });
     return await emit(deps, [...events, stamp(deps, { type: "task.created", payload }, form)]);
   };

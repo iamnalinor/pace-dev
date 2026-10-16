@@ -1,7 +1,7 @@
 import { useT } from "#app/app-state.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
-import type { TaskFormValues } from "./task-fields.tsx";
+import type { TaskFormValues } from "./task-form-types.ts";
 
 /** The freeform text at the end of both task forms. */
 export const TaskTextFields = ({

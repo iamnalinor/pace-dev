@@ -62,7 +62,7 @@ const photoFileId = async (
   const result = record(
     await telegramResult(target, "getUserProfilePhotos", { user_id: userId, limit: 1 }),
   );
-  const photos: unknown = result?.photos;
+  const photos: unknown = result?.["photos"];
   if (!Array.isArray(photos)) {
     return undefined;
   }
@@ -74,13 +74,13 @@ const photoFileId = async (
     return undefined;
   }
   const last: unknown = first.at(-1);
-  const fileId = record(last)?.file_id;
+  const fileId = record(last)?.["file_id"];
   return typeof fileId === "string" ? fileId : undefined;
 };
 
 const photoPath = async (target: TelegramTarget, fileId: string): Promise<string | undefined> => {
   const file = record(await telegramResult(target, "getFile", { file_id: fileId }));
-  const path = file?.file_path;
+  const path = file?.["file_path"];
   return typeof path === "string" && isSafeFilePath(path) ? path : undefined;
 };
 

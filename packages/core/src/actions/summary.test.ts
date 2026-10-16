@@ -19,10 +19,14 @@ const ru = (body: ActionBody) => summarize(body, { language: "ru", now: NOW, sta
 
 describe("summarize", () => {
   it("says what each task action does, by the task's title", () => {
-    expect(en({ kind: "task.delete", taskId: BOOKS_ID })).toBe("Delete “Return library books”");
-    expect(ru({ kind: "task.delete", taskId: BOOKS_ID })).toBe("Удалить «Return library books»");
+    expect(en({ kind: "task.delete", taskId: BOOKS_ID })).toBe(
+      "The assistant will delete “Return library books”",
+    );
+    expect(ru({ kind: "task.delete", taskId: BOOKS_ID })).toBe(
+      "Ассистент удалит «Return library books»",
+    );
     expect(en({ kind: "task.close", outcome: "done", taskId: BOOKS_ID })).toBe(
-      "Close “Return library books” as Done",
+      "The assistant will close “Return library books” as Done",
     );
     expect(
       en({
@@ -30,13 +34,13 @@ describe("summarize", () => {
         patch: { due: null, projectName: "X", title: "Y" },
         taskId: BOOKS_ID,
       }),
-    ).toBe("Change “Return library books”: title, due date, project");
+    ).toBe("The assistant will change “Return library books”: title, due date, project");
     expect(en({ kind: "task.markSubtasks", subtaskIds: ["s5", "s6"], taskId: HW_ID })).toBe(
-      "Mark solved in “Algebra HW 6”: Kronecker–Capelli, Block matrices",
+      "The assistant will mark solved in “Algebra HW 6”: Kronecker–Capelli, Block matrices",
     );
     expect(
       en({ kind: "task.addSubtasks", subtasks: [{ label: "8", number: 8 }], taskId: HW_ID }),
-    ).toBe("Add to “Algebra HW 6”: 8");
+    ).toBe("The assistant will add to “Algebra HW 6”: 8");
   });
 
   it("says what each activity action does, with times on the account's clock", () => {
@@ -48,7 +52,7 @@ describe("summarize", () => {
         label: "Военкомат",
         start: "2026-10-06T04:30:00.000Z",
       }),
-    ).toBe("Записать: Военкомат, 07:30–08:30");
+    ).toBe("Ассистент запишет «Военкомат», 07:30–08:30");
     expect(
       en({
         category: "other",
@@ -57,8 +61,10 @@ describe("summarize", () => {
         label: "Gym",
         start: "2026-10-05T18:00:00.000Z",
       }),
-    ).toBe("Log: Gym, 05.10 21:00–05.10 22:00");
-    expect(en({ category: "rest", kind: "activity.start", label: "Nap" })).toBe("Start: Nap");
+    ).toBe("The assistant will log “Gym”, 05.10 21:00–05.10 22:00");
+    expect(en({ category: "rest", kind: "activity.start", label: "Nap" })).toBe(
+      "The assistant will start “Nap”",
+    );
     expect(
       en({
         category: "rest",
@@ -66,11 +72,13 @@ describe("summarize", () => {
         label: "Nap",
         startAt: "2026-10-06T08:30:00.000Z",
       }),
-    ).toBe("Start: Nap, since 11:30");
+    ).toBe("The assistant will start “Nap” from 11:30");
     expect(
       en({ activityId: "a-1", kind: "activity.update", patch: { end: NOW, label: "Deep work" } }),
-    ).toBe("Change “Work”: end, name");
-    expect(en({ activityId: "a-1", kind: "activity.delete" })).toBe("Delete “Work”, 09:00–10:00");
+    ).toBe("The assistant will change “Work”: end, name");
+    expect(en({ activityId: "a-1", kind: "activity.delete" })).toBe(
+      "The assistant will delete “Work”, 09:00–10:00",
+    );
   });
 
   it("names a new task by its title, and marks doubtful fields on the answer", () => {
@@ -93,7 +101,11 @@ describe("summarize", () => {
     };
     expect(
       withSummary(body, ["estimateMinutes"], { language: "ru", now: NOW, state, zone: MOSCOW }),
-    ).toEqual({ ...body, doubtful: ["estimateMinutes"], summary: "Новая задача: Разобрать почту" });
+    ).toEqual({
+      ...body,
+      doubtful: ["estimateMinutes"],
+      summary: "Ассистент создаст «Разобрать почту»",
+    });
     expect(
       withSummary(body, [], { language: "en", now: NOW, state, zone: MOSCOW }),
     ).not.toHaveProperty("doubtful");

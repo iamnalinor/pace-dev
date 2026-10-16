@@ -119,10 +119,18 @@ const useDangerFlow = () => {
     }
   };
   const cancel = async (): Promise<void> => {
-    if (request !== null) {
-      await auth.cancelAccountConfirmation(request.id);
+    if (request === null) {
+      return;
     }
-    onTerminal("cancelled");
+    const result = await auth.cancelAccountConfirmation(request.id);
+    if (!result.ok) {
+      setNotice("failed");
+      return;
+    }
+    if (result.value === "pending" || result.value === "confirmed") {
+      return;
+    }
+    onTerminal(terminalNotice(result.value));
   };
   return { action, begin, cancel, isBusy, notice, request, setAction, setNotice };
 };

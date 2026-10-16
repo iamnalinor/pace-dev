@@ -15,17 +15,9 @@ import type { ParseProvider } from "../shared/llm/llm.ts";
 
 import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
-import { type ModelRead, readMessage } from "../shared/llm/read.ts";
+import { type ModelRead, readByRules, type Reading, readMessage } from "../shared/llm/read.ts";
 import { describeActions } from "./describe.ts";
-import {
-  applyBodies,
-  applyInputs,
-  type BotReply,
-  plain,
-  timeOf,
-  type Turn,
-  zoneOf,
-} from "./turn.ts";
+import { applyBodies, applyInputs, type BotReply, plain, type Turn, zoneOf } from "./turn.ts";
 
 /**
 A preview waiting for its button: the text and, when it was understood, its actions. They are
@@ -64,23 +56,51 @@ const buttonsFor = (
   ],
 ];
 
-/**
-No model answers: the text waits in the store and is read (and written) once one is back,
-with a message then; the reply says when to expect that.
-*/
-const unavailable = async (turn: Turn, text: string, retryAt: null | string): Promise<BotReply> => {
-  const { language } = turn.state.settings;
+/** No model answers: the bot still lets the person inspect and approve a rule-based action. */
+const unavailable = async (
+  turn: Turn,
+  {
+    text,
+    retryAt,
+    domain,
+  }: {
+    readonly text: string;
+    readonly retryAt: null | string;
+    readonly domain: "activity" | "auto" | "task";
+  },
+): Promise<BotReply> => {
   await turn.store.logDecisions(
     [parseDecision(text, "bot", { retryAt, status: "unavailable" })],
     turn.now,
   );
-  await turn.store.enqueueParse({ channel: "bot", retryAt, text }, turn.now);
-  return plain(
-    retryAt === null
-      ? t(language, "bot.unavailableSoon")
-      : t(language, "bot.unavailable", { time: timeOf(retryAt, turn.state) }),
-  );
+  return await previewOf(turn, {
+    text,
+    read: readByRules(text, domain, { now: turn.now, state: turn.state }),
+    isRuleBased: true,
+  });
 };
+
+const rulesPrefix = (language: Language, isRuleBased: boolean): string =>
+  isRuleBased ? `${t(language, "bot.rulesPreview")}\n\n` : "";
+
+const domainButtons = (id: string, language: Language): BotReply["buttons"] => [
+  [
+    { data: `${PREVIEW_ACTIONS.task}:${id}`, label: t(language, "bot.domainTask") },
+    { data: `${PREVIEW_ACTIONS.activity}:${id}`, label: t(language, "bot.domainActivity") },
+    { data: `${PREVIEW_ACTIONS.cancel}:${id}`, label: t(language, "bot.cancel") },
+  ],
+];
+
+const actionText = (
+  turn: Turn,
+  read: Reading & { readonly questions?: ModelRead["questions"] },
+): string =>
+  describeActions(read.actions, {
+    language: turn.state.settings.language,
+    now: turn.now,
+    questions: (read.questions ?? []).map((question) => question.question),
+    state: turn.state,
+  });
 
 /** The events of every action as the bot writes them now, the text as a task's source. */
 const planAll = (
@@ -101,15 +121,18 @@ const previewOf = async (
   {
     text,
     read,
+    isRuleBased = false,
     thread = [],
   }: {
     readonly text: string;
-    readonly read: ModelRead;
+    readonly read: Reading & { readonly questions?: ModelRead["questions"] };
+    readonly isRuleBased?: boolean;
     readonly thread?: NonNullable<ParseRequestBody["thread"]>;
   },
 ): Promise<BotReply> => {
-  const { now, state, store } = turn;
+  const { state, store } = turn;
   const { language } = state.settings;
+  const prefix = rulesPrefix(language, isRuleBased);
   const canAccept = read.actions.length > 0 && planAll(turn, { actions: read.actions, text }).ok;
   const id = newId();
   const isNeedsChoice = read.confidence < CLASSIFY_CONFIDENT;
@@ -122,14 +145,8 @@ const previewOf = async (
   } satisfies Pending);
   if (isNeedsChoice) {
     return {
-      buttons: [
-        [
-          { data: `${PREVIEW_ACTIONS.task}:${id}`, label: t(language, "bot.domainTask") },
-          { data: `${PREVIEW_ACTIONS.activity}:${id}`, label: t(language, "bot.domainActivity") },
-          { data: `${PREVIEW_ACTIONS.cancel}:${id}`, label: t(language, "bot.cancel") },
-        ],
-      ],
-      text: t(language, read.domain === "task" ? "bot.readAsTask" : "bot.readAsActivity"),
+      buttons: domainButtons(id, language),
+      text: prefix + t(language, read.domain === "task" ? "bot.readAsTask" : "bot.readAsActivity"),
       pendingId: id,
     };
   }
@@ -146,12 +163,7 @@ const previewOf = async (
       canInbox: read.domain === "task" && read.actions.some((item) => item.kind === "task.create"),
     }),
     pendingId: id,
-    text: describeActions(read.actions, {
-      language,
-      now,
-      questions: read.questions.map((question) => question.question),
-      state,
-    }),
+    text: prefix + actionText(turn, read),
   };
 };
 
@@ -170,7 +182,7 @@ export const preview = async (
   });
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
   if (!read.ok) {
-    return await unavailable(turn, text, read.error.retryAt);
+    return await unavailable(turn, { domain: "auto", retryAt: read.error.retryAt, text });
   }
   const { output, actions, provider, rejected } = read.value;
   await turn.store.logDecisions(
@@ -246,7 +258,7 @@ const chooseDomain = async (
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, turn.now);
   return read.ok
     ? await previewOf(turn, { text: pending.text, read: read.value, thread: pending.thread })
-    : await unavailable(turn, pending.text, read.error.retryAt);
+    : await unavailable(turn, { domain, retryAt: read.error.retryAt, text: pending.text });
 };
 
 const finishPreview = async (turn: Turn, pending: Pending, action: string): Promise<BotReply> => {

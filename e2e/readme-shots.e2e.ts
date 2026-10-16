@@ -126,15 +126,14 @@ if (SHOT_DIR !== undefined) {
       ]) {
         await add(desktop, line);
       }
-      // The time bar is on Day: Rest from there, then Now shows it in its compact row.
-      await desktop.goto("/day");
+      // The full time bar is on Now.
+      await desktop.goto("/");
       await desktop.getByRole("button", { name: "Rest", exact: true }).click();
       await desktop
         .getByRole("list", { name: "Rest" })
         .getByRole("button", { name: "Rest" })
         .click();
-      await desktop.goto("/");
-      await expect(desktop.getByRole("region", { name: "Running now" })).toBeVisible();
+      await expect(desktop.getByRole("region", { name: "Time" }).getByText("Rest")).toBeVisible();
       await shoot(desktop, "now-desktop");
       await desktop.goto("/day");
       await shoot(desktop, "day-desktop");

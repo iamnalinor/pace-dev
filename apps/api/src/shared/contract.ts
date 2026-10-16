@@ -11,6 +11,7 @@ import type {
   Resolution,
   Result,
   RetroError,
+  Series,
   SyncEvent,
   Task,
   UsageRow,
@@ -34,8 +35,15 @@ A Worker-side reader uses an `RpcState` as a `CoreState` without conversion.
 */
 export type RpcTask = Omit<Task, "overrides"> & { readonly overrides: null | PresetDefinition };
 
-export type RpcState = Omit<CoreState, "tasks"> & {
+export type RpcSeries = Omit<Series, "template"> & {
+  readonly template: Omit<Series["template"], "overrides"> & {
+    readonly overrides?: PresetDefinition;
+  };
+};
+
+export type RpcState = Omit<CoreState, "series" | "tasks"> & {
   readonly tasks: { readonly byId: Readonly<Record<string, RpcTask>> };
+  readonly series: { readonly byId: Readonly<Record<string, RpcSeries>> };
 };
 
 /** Who is writing through `apply`: the envelope fields the store stamps on every input. */

@@ -493,6 +493,29 @@ describe("planAction: activity.update, activity.delete", () => {
 });
 
 describe("planActions", () => {
+  it("refuses actions after their target was deleted earlier in the same batch", () => {
+    expect(
+      planActions(
+        artboardState(),
+        [
+          { kind: "task.delete", taskId: BOOKS_ID },
+          { kind: "task.update", patch: { title: "Bring back" }, taskId: BOOKS_ID },
+        ],
+        { ...world, newId: ids() },
+      ),
+    ).toEqual({ error: { error: "action/unknown-task", index: 1 }, ok: false });
+    expect(
+      planActions(
+        tracked(),
+        [
+          { activityId: LOGGED, kind: "activity.delete" },
+          { activityId: LOGGED, kind: "activity.update", patch: { label: "Still here" } },
+        ],
+        { ...world, newId: ids() },
+      ),
+    ).toEqual({ error: { error: "action/unknown-activity", index: 1 }, ok: false });
+  });
+
   it("plans two tasks in order in the same existing project", () => {
     const result = planActions(
       artboardState(),

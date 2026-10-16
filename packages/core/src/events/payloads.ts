@@ -119,7 +119,6 @@ export const SeriesCreatedPayload = z.object({
   template: SeriesTemplateSchema,
   schedule: SeriesScheduleSchema,
 });
-export const SeriesUpdatedPayload = SeriesCreatedPayload;
 export const SeriesArchivedPayload = z.object({ seriesId: z.string().min(1) });
 
 /** `null` clears the due date or the start (and their zones with them). */

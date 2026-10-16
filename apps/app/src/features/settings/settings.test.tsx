@@ -316,4 +316,25 @@ describe("SettingsScreen", () => {
     await renderScreen(<SettingsScreen />, runtime);
     expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
   });
+
+  it("keeps waiting when Telegram confirmation was claimed before a local cancel", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174002";
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+          id,
+        }),
+        [`POST /api/account/confirmations/${id}/cancel`]: () => ({ status: "pending" }),
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe.confirm") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    expect(mockPendingConfirmation.current?.request.id).toBe(id);
+  });
 });

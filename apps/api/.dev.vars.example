@@ -1,0 +1,5 @@
+# Optional: copy to apps/api/.dev.vars and set all three for model-backed parsing.
+# Without them, Pace offers English and Russian rule-based previews.
+# LLM_BASE_URL=https://provider.example/v1
+# LLM_MODEL=reader-small
+# LLM_API_KEY=key-one,key-two

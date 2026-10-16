@@ -346,6 +346,37 @@ describe("TimeBar", () => {
     expect(field).toHaveDisplayValue("");
   });
 
+  it("discards a stale activity preview after editing the source text", async () => {
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => CSS_READ } });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    await fireEvent.changeText(field, "Пошел в ЦСС, 30мин");
+    expect(screen.queryByText("Start: ЦСС")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(activities(runtime)).toEqual([]);
+  });
+
+  it("ignores an assistant response for activity text edited while reading", async () => {
+    const answer = deferred<unknown>();
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/parse": async () => await answer.promise },
+    });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 30мин");
+    answer.resolve(CSS_READ);
+    await waitFor(() => {
+      expect(screen.queryByText(en("assistant.reading"))).toBeNull();
+    });
+    expect(screen.queryByText("Start: ЦСС")).toBeNull();
+    expect(activities(runtime)).toEqual([]);
+  });
+
   it("shows that the assistant is reading while no activity is written", async () => {
     const answer: { resolve: (value: unknown) => void } = { resolve: () => undefined };
     const runtime = await createTestRuntime({

@@ -39,7 +39,7 @@ const unavailable = async (
     now,
   );
   const rules = readByRules(request.text, request.domain, world);
-  if (request.defer !== true) {
+  if (retryAt === null || request.defer !== true) {
     return { ...rules, actions: [...rules.actions], retryAt, status: "unavailable" };
   }
   await store.enqueueParse(

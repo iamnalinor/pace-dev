@@ -271,15 +271,52 @@ The same rule applies when a previously successful channel is no longer configur
 - **Missed because.** Tests supplied a successful model answer and checked the resulting activity; they did not assert what the person sees while waiting or after an API failure. The rules tests had no short meal phrase or earlier automatic Other case.
 - **Rule.** Every assistant entry shows reading and either a reviewable result or an explicit refusal; fallback cards identify their rule source. Classify clear food phrases without rewriting the label and guard both network failure and unavailable provider responses. Sweep the task composer and follow-up path for silent loss.
 
+### 31. A new nested state field bypasses the RPC boundary
+- **Bug.** The new series state carried a template with opaque `overrides` values. `toRpcState` sanitized task overrides but copied series unchanged, so Durable Object RPC inferred `read()` and `apply()` as non-callable and could forward a non-serializable value.
+- **Missed because.** Series tests checked sync events, not the whole materialized state returned across RPC. The first full typecheck exposed `never` at unrelated readers.
+- **Rule.** When adding a slice to `CoreState`, inspect its nested `unknown` fields and map them to validated, serializable shapes at every RPC boundary. The sweep found task overrides already handled and series template overrides missing. Test both valid and invalid series overrides at `toRpcState`, plus a real Durable Object read after creating a series.
+
+### 32. A multi-event user action writes its first half before validating the rest
+- **Bug.** Moving an activity and linking it to a nonexistent task returned an error after the move event was already stored. A batch of assistant actions could also delete a target and then plan an update against the reducer's provisional state, which had not applied the revocation.
+- **Missed because.** The tests checked successful edits and single-action failures, but not the event log after a later step failed or the effect of corrections inside one batch.
+- **Rule.** Validate every event and reference before dispatching any part of one user action. For provisional assistant batches, track revocations explicitly. The sweep covered client action emission and core batch planning. Guard with tests that inspect the log after a refused activity edit and refuse update-after-delete batches for tasks and activities.
+
+### 33. A derived template reads the creation event after the entity was edited
+- **Bug.** Starting a recurring series from an edited task copied its original title, deadline and estimate from `task.created`, losing later changes.
+- **Missed because.** Series tests started from a freshly created task. They never edited the source task before turning it into a series.
+- **Rule.** A new derived object must read the current materialized entity, not a historical creation payload, unless the product explicitly asks for the original. The sweep checked series templates and other task-derived drafts; the regression edits every copied field before starting a series.
+
+### 34. A preview survives a change to the text it describes
+- **Bug.** Editing a task or activity input after an assistant preview left the old Approve card on screen; an in-flight response could also restore it.
+- **Missed because.** Tests approved the same text they had submitted and never edited it while the request was pending.
+- **Rule.** Invalidate both the visible preview and the in-flight request when its source changes. The sweep covered the Now composer and activity input; tests change text after a preview and during a delayed response.
+
+### 35. A confirmation reports an outcome without owning its state transition
+- **Bug.** Two concurrent Wipe requests could both remain pending. Cancel could report success after Confirm had claimed the request for processing, and Settings repeated that false success without checking the response. Expiry could also report `expired` after its conditional update lost to Confirm.
+- **Missed because.** Confirmation tests used one sequential request and checked only the happy path. No test overlapped requests or observed a conditional update losing a race; none passed a stale row to the expiry path.
+- **Rule.** Replace old requests and insert the new one in one database transaction. Report Cancel or Expired only when the conditional update affected a row; otherwise read the current status. Let the UI follow the returned state. The sweep covered web and bot cancellation, concurrent creation, expiry and the existing confirmation claim; integration and app regressions cover these races.
+
+### 36. A one-shot write is guarded only by React state
+- **Bug.** Two Approve presses before rerender each applied the same assistant action and created two tasks.
+- **Missed because.** Tests pressed Approve once, then awaited the result. React's `busy` state was never challenged before its next render.
+- **Rule.** A write that must run once from one preview needs a synchronous ref latch as well as disabled UI state. In a test, invoke the press twice inside one render batch and assert one recorded result. The sweep found the manual task create path already uses `isAddingRef`; both task and activity assistant approvals share the repaired hook.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
 
 | Date | Bug | Class | Swept? | Guard added |
 |---|---|---|---|---|
+| 2026-10-16 | Series template overrides bypassed the Durable Object RPC shape | 31 (new) | yes: searched all nested opaque state fields; task overrides already had a boundary conversion | API RPC-state unit test and series integration read |
+| 2026-10-16 | Activity edit partly wrote after a later validation failed; a batch could update a deleted target | 32 (new) | yes: client event emission and core assistant batch planning | activity log remains unchanged on refusal; task and activity delete-then-update batches refuse |
+| 2026-10-16 | A new recurring series copied fields from the task's creation event | 33 (new) | yes: inspected other task-derived drafts | client regression edits all copied fields before series creation |
+| 2026-10-16 | An assistant preview stayed actionable after its source text changed | 34 (new) | yes: both text entry points using action cards | app tests for composer and time bar, including an in-flight response |
+| 2026-10-16 | Concurrent account requests stayed active and cancellation claimed success after Confirm | 35 (new) | yes: web and bot cancel, creation and confirmation claim paths | workerd overlap/processing tests and Settings cancellation test |
+| 2026-10-16 | Expiry reported success after its conditional update lost to Confirm | 35 | yes: checked every conditional confirmation transition | workerd test passes a stale pending row after processing claimed it |
+| 2026-10-16 | Two quick assistant Approve presses created two tasks | 36 (new) | yes: manual task create already had a ref latch; task and activity assistant previews share the repaired hook | app test presses twice inside one render batch and finds one task |
 | 2026-10-16 | Activity task link could not be removed | 28 (new) | yes: inspected all `taskId` event kinds; the retro task rule now selects task and focus commands by kind | core validator and activity sheet link/unlink tests |
 | 2026-10-16 | Bot login forgot the nonce after a web reload | 29 (new) | yes: account Wipe/Delete Telegram confirmation had the same mounted-screen lifetime and now persists its opaque request | client resume poll, app remount, and web storage lifetime tests for both flows |
-| 2026-10-16 | «ем» stayed Other with no parsing feedback on production | 30 (new) | yes: activity preview, task composer and follow-up now show reading/fallback or a retryable error; the lexical rule takes priority over an earlier automatic Other | core meal rule, client transport fallback, app activity preview tests |
+| 2026-10-16 | «ем» stayed Other with no parsing feedback on production; the bot only queued text when no model answered | 30 (new) | yes: activity preview, task composer and bot now show a rule-based reading; the lexical meal rule takes priority over an earlier automatic Other; explicit API deferral remains available | core Russian/English meal and title rules, API rate-limit fallback, bot no-model preview and approval, app activity preview |
 | 2026-10-16 | Task deadline calendar stayed open after selecting a date or touching elsewhere | 27 (new) | yes: task due/start/final share `DatePanel`; Day's calendar and recurrence end picker already close after selection | composer tests for date selection and outside touch; web pointer dismissal to be checked in browser QA |
 | 2026-10-16 | Assistant saved a project that did not exist before approval | 25 (new) | yes: checked model conversion, rule fallback, approval of stale cards, task and activity aliases, and preset selection | core tests for unknown project name/ID on create and update, plus model and fallback readings |
 | 2026-10-16 | Assistant shortened «Написать челику» and «ДЗ по алгебре» | 26 (new) | yes: checked manual quick input, rule fallback, model conversion and shared bot/API readers; the same core functions serve all those entry paths | parser and model tests for both reported phrases, plus the existing multiline description tests |

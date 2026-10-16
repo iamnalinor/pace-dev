@@ -1,12 +1,16 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { endpoints, newId } from "@pace/core";
 
 import type { TelegramTransport } from "../src/shared/telegram-api.ts";
 
+import { expireConfirmation } from "../src/account/account-routes.ts";
 import { createApp } from "../src/app.ts";
+import { accountConfirmations } from "../src/shared/db/d1-schema.ts";
+import { d1 } from "../src/shared/db/d1.ts";
 import { answerOf, call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
 
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -72,6 +76,60 @@ const telegramUpdate = async (telegramId: number, data: string) =>
   });
 
 describe("Telegram account confirmations", () => {
+  it("keeps only one pending request of each kind when requests overlap", async () => {
+    const token = await loginAsDev("1001");
+    const [firstResponse, secondResponse] = await Promise.all([
+      request("/api/account/confirmations", { token, body: { action: "wipe" } }),
+      request("/api/account/confirmations", { token, body: { action: "wipe" } }),
+    ]);
+    const first = endpoints.account.createConfirmation.output.parse(await firstResponse.json());
+    const second = endpoints.account.createConfirmation.output.parse(await secondResponse.json());
+    const statuses = await Promise.all(
+      [first.id, second.id].map(
+        async (id) =>
+          endpoints.account.confirmationStatus.output.parse(
+            await (await request(`/api/account/confirmations/${id}`)).json(),
+          ).status,
+      ),
+    );
+    expect(new Set(statuses)).toEqual(new Set(["pending", "replaced"]));
+  });
+
+  it("does not report a processing confirmation as cancelled", async () => {
+    const token = await loginAsDev("1001");
+    const created = endpoints.account.createConfirmation.output.parse(
+      await (
+        await request("/api/account/confirmations", { token, body: { action: "wipe" } })
+      ).json(),
+    );
+    await d1(env.DB)
+      .update(accountConfirmations)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(accountConfirmations.id, created.id));
+    const stalePending = await d1(env.DB).query.accountConfirmations.findFirst({
+      where: eq(accountConfirmations.id, created.id),
+    });
+    expect(stalePending?.status).toBe("pending");
+    await d1(env.DB)
+      .update(accountConfirmations)
+      .set({ status: "processing" })
+      .where(eq(accountConfirmations.id, created.id));
+    if (stalePending === undefined) {
+      throw new Error("missing confirmation");
+    }
+    expect((await expireConfirmation(env.DB, stalePending)).status).toBe("processing");
+    const polling = endpoints.account.confirmationStatus.output.parse(
+      await (await request(`/api/account/confirmations/${created.id}`)).json(),
+    );
+    expect(polling.status).toBe("pending");
+    const cancelled = endpoints.account.cancelConfirmation.output.parse(
+      await (
+        await request(`/api/account/confirmations/${created.id}/cancel`, { token, method: "POST" })
+      ).json(),
+    );
+    expect(cancelled.status).toBe("pending");
+  });
+
   it("wipes only after the owner confirms, keeps sessions, and changes store id", async () => {
     sent.length = 0;
     const token = await loginAsDev("1001");

@@ -228,6 +228,7 @@ const useFlowState = ({
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.
       const isPaste = isPasted(text, next) && canAiRead(next);
+      pending.cancel();
       onText(next);
       if (isPaste) {
         pending.submit(next);

@@ -8,32 +8,19 @@ import {
   taskById,
 } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, fromStore, stamp } from "./deps.ts";
+import type { ActivityEntry, ActivityTarget } from "./activity-edit-types.ts";
 
-/** What the Day sheet edits: an existing block (move and rename) or a new past one. */
-export type ActivityTarget =
-  | {
-      readonly kind: "edit";
-      readonly activityId: string;
-      readonly label: string;
-      readonly category: ActivityCategory;
-      readonly expectMinutes?: null | number;
-      readonly taskId?: null | string;
-      readonly startAt: string;
-      /** `null` while it runs: only the start can move. */
-      readonly endAt: null | string;
-    }
-  | { readonly kind: "log"; readonly startAt: string; readonly endAt: string };
+import { editInputs, moveChange } from "./activity-edit-inputs.ts";
+import {
+  type ActionDeps,
+  type ActionError,
+  type ActionResult,
+  emit,
+  fromStore,
+  stamp,
+} from "./deps.ts";
 
-/** The sheet's fields once read: the end is `null` for a block still running. */
-export type ActivityEntry = {
-  readonly label: string;
-  readonly category: ActivityCategory;
-  readonly expectMinutes?: null | number;
-  readonly taskId?: null | string;
-  readonly startAt: string;
-  readonly endAt: null | string;
-};
+export type { ActivityEntry, ActivityTarget } from "./activity-edit-types.ts";
 
 export type PastActivity = {
   readonly label: string;
@@ -69,6 +56,10 @@ export type EditActions = {
 };
 
 const timeOf = (deps: ActionDeps) => deps.state.store.getState().time;
+const hasUnknownTask = (deps: ActionDeps, taskId: null | string | undefined): boolean =>
+  taskId !== null &&
+  taskId !== undefined &&
+  taskById(deps.state.store.getState().tasks, taskId) === undefined;
 
 /** After now: a block is the past, logged or moved; the future is not tracked yet. */
 const isAhead = (deps: ActionDeps, at: string | undefined): boolean =>
@@ -82,10 +73,7 @@ export const logPast = async (deps: ActionDeps, activity: PastActivity): ActionR
   if (isAhead(deps, activity.endAt)) {
     return err("retro/future");
   }
-  if (
-    activity.taskId !== undefined &&
-    taskById(deps.state.store.getState().tasks, activity.taskId) === undefined
-  ) {
+  if (hasUnknownTask(deps, activity.taskId)) {
     return err("task/unknown");
   }
   return await emit(deps, [
@@ -134,11 +122,7 @@ const corrections = (
     if (timeOf(deps).activities[activityId] === undefined) {
       return err("event/not-found");
     }
-    if (
-      change.taskId !== undefined &&
-      change.taskId !== null &&
-      taskById(deps.state.store.getState().tasks, change.taskId) === undefined
-    ) {
+    if (hasUnknownTask(deps, change.taskId)) {
       return err("task/unknown");
     }
     return await emit(deps, [
@@ -147,41 +131,49 @@ const corrections = (
   },
 });
 
-const moveChange = (
-  target: Extract<ActivityTarget, { kind: "edit" }>,
-  entry: ActivityEntry,
-): { readonly startAt: string; readonly endAt?: string } => ({
-  startAt: entry.startAt,
-  ...(entry.endAt !== null && target.endAt !== null && { endAt: entry.endAt }),
-});
+const movementError = (
+  deps: ActionDeps,
+  moved: ReturnType<typeof moveChange>,
+  endAt: null | string,
+): ActionError | null => {
+  if (isAhead(deps, moved.startAt) || isAhead(deps, moved.endAt)) {
+    return "retro/future";
+  }
+  return endAt !== null && Date.parse(endAt) <= Date.parse(moved.startAt)
+    ? "action/invalid-input"
+    : null;
+};
 
-const labelChange = (entry: ActivityEntry) => ({
-  category: entry.category,
-  label: activityLabel(entry.label),
-  ...(entry.expectMinutes !== undefined && { expectMinutes: entry.expectMinutes }),
-  ...(entry.taskId !== undefined && { taskId: entry.taskId }),
-});
-
-/** Moves the block if its boundaries changed, then renames it if its name or category did. */
+/** Validate both edits before writing either event. */
 const saveEdit = async (
   deps: ActionDeps,
   target: Extract<ActivityTarget, { kind: "edit" }>,
   entry: ActivityEntry,
 ): ActionResult => {
-  const edits = corrections(deps);
+  const activity = timeOf(deps).activities[target.activityId];
+  if (activity === undefined) {
+    return err("event/not-found");
+  }
   const isMoved =
     entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
-  const moved = isMoved
-    ? await edits.adjustActivity(target.activityId, moveChange(target, entry))
-    : ok([]);
-  if (!moved.ok) {
-    return moved;
+  const moved = moveChange(target, entry);
+  const moveError = isMoved ? movementError(deps, moved, moved.endAt ?? activity.endAt) : null;
+  if (moveError !== null) {
+    return err(moveError);
   }
   const isRenamed = shouldRelabel(target, entry);
-  const renamed = isRenamed
-    ? await edits.relabelActivity(target.activityId, labelChange(entry))
-    : ok([]);
-  return renamed.ok ? ok([...moved.value, ...renamed.value]) : renamed;
+  if (isRenamed && hasUnknownTask(deps, entry.taskId)) {
+    return err("task/unknown");
+  }
+  return await emit(
+    deps,
+    editInputs(deps, {
+      activityId: target.activityId,
+      entry,
+      moved: isMoved ? moved : null,
+      isRenamed,
+    }),
+  );
 };
 
 const shouldRelabel = (

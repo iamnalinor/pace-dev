@@ -245,6 +245,7 @@ export const enShell = {
   "bot.notLinked":
     "This Telegram account is not linked to Pace yet. Open Pace and log in with the bot first.",
   "bot.preview": "The assistant will create this task:",
+  "bot.rulesPreview": "AI is unavailable. This suggestion uses simple rules.",
   "bot.readAsTask": "I read this as a task. Choose what you meant.",
   "bot.readAsActivity": "I read this as an activity. Choose what you meant.",
   "bot.domainTask": "Task",
@@ -268,10 +269,6 @@ export const enShell = {
   "bot.savedToInbox": "Saved to Inbox.",
   "bot.cancelled": "Cancelled.",
   "bot.expired": "This preview has expired. Send the message again.",
-  "bot.unavailable":
-    "The assistant is out of requests until about {time}. I will read this then and write to you.",
-  "bot.unavailableSoon":
-    "The assistant is out of requests for now. I will read this as soon as it is back and write to you.",
   "parse.deferredDone": "Read your earlier note “{text}”: it is in Pace now.",
   "parse.deferredInbox": "Could not read your earlier note “{text}”, so it is in your Inbox.",
   "bot.notUnderstood": "I could not place this. Keep it in your Inbox?",

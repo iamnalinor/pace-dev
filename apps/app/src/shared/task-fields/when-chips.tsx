@@ -1,6 +1,6 @@
 import { View } from "react-native";
 
-import type { TaskFormValues } from "./task-fields.tsx";
+import type { TaskFormValues } from "./task-form-types.ts";
 
 import { DateChip } from "./date-field.tsx";
 import { EstimateChip } from "./estimate-field.tsx";

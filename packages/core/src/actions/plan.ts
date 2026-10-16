@@ -37,31 +37,73 @@ const afterInputs = (
   return afterInputs(coreReducer(state, event), rest, ctx);
 };
 
+/** Corrections are not folded into the provisional reducer state. */
+const deletedReference = (
+  action: ActionBody,
+  deletedTasks: ReadonlySet<string>,
+  deletedActivities: ReadonlySet<string>,
+): ActionError | null => {
+  if ("taskId" in action && deletedTasks.has(action.taskId)) {
+    return "action/unknown-task";
+  }
+  return "activityId" in action && deletedActivities.has(action.activityId)
+    ? "action/unknown-activity"
+    : null;
+};
+
 const planFrom = (
   state: CoreState,
   actions: readonly ActionBody[],
-  { ctx, index }: { readonly ctx: PlanContext; readonly index: number },
+  {
+    ctx,
+    deletedActivities,
+    deletedTasks,
+    index,
+  }: {
+    readonly ctx: PlanContext;
+    readonly deletedActivities: ReadonlySet<string>;
+    readonly deletedTasks: ReadonlySet<string>;
+    readonly index: number;
+  },
 ): Result<readonly EventInput[], BatchError> => {
   const [first, ...rest] = actions;
   if (first === undefined) {
     return ok([]);
   }
+  const deleted = deletedReference(first, deletedTasks, deletedActivities);
+  if (deleted !== null) {
+    return err({ error: deleted, index });
+  }
   const planned = planAction(state, first, ctx);
   if (!planned.ok) {
     return err({ error: planned.error, index });
   }
-  const after = planFrom(afterInputs(state, planned.value, ctx), rest, { ctx, index: index + 1 });
+  const after = planFrom(afterInputs(state, planned.value, ctx), rest, {
+    ctx,
+    deletedActivities:
+      first.kind === "activity.delete"
+        ? new Set([...deletedActivities, first.activityId])
+        : deletedActivities,
+    deletedTasks:
+      first.kind === "task.delete" ? new Set([...deletedTasks, first.taskId]) : deletedTasks,
+    index: index + 1,
+  });
   return after.ok ? ok([...planned.value, ...after.value]) : after;
 };
 
 /**
-Every action of an answer, planned in order over what the ones before write (two new tasks
-naming the same new project make it once); the first that cannot be planned refuses the batch.
-The state is folded with the reducer, which does not apply revocations: a later action still
-sees what an earlier one deletes (harmless, the materializer drops writes to a revoked task).
+Every action of an answer, planned in order over what the ones before write; the first that
+cannot be planned refuses the batch. Revocations are tracked separately because the reducer
+does not apply corrections to its provisional state.
 */
 export const planActions = (
   state: CoreState,
   actions: readonly ActionBody[],
   ctx: PlanContext,
-): Result<readonly EventInput[], BatchError> => planFrom(state, actions, { ctx, index: 0 });
+): Result<readonly EventInput[], BatchError> =>
+  planFrom(state, actions, {
+    ctx,
+    deletedActivities: new Set(),
+    deletedTasks: new Set(),
+    index: 0,
+  });

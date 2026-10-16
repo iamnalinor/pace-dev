@@ -245,6 +245,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "nav.newTask": "Новая задача",
   "bot.notLinked": "Этот Telegram ещё не связан с Pace. Откройте Pace и войдите через бота.",
   "bot.preview": "Ассистент создаст задачу:",
+  "bot.rulesPreview": "ИИ сейчас недоступен. Это предложение составлено по простым правилам.",
   "bot.readAsTask": "Я понял это как задачу. Выберите нужный вариант.",
   "bot.readAsActivity": "Я понял это как активность. Выберите нужный вариант.",
   "bot.domainTask": "Задача",
@@ -269,10 +270,6 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "bot.savedToInbox": "Сохранил во входящие.",
   "bot.cancelled": "Отменено.",
   "bot.expired": "Это предложение устарело. Отправьте сообщение ещё раз.",
-  "bot.unavailable":
-    "У ассистента закончились запросы примерно до {time}. Тогда я это разберу и напишу вам.",
-  "bot.unavailableSoon":
-    "У ассистента пока закончились запросы. Разберу это, как только он вернётся, и напишу вам.",
   "parse.deferredDone": "Разобрал вашу заметку «{text}»: она теперь в Pace.",
   "parse.deferredInbox": "Не смог разобрать заметку «{text}», поэтому она во входящих.",
   "bot.notUnderstood": "Не понял, куда это отнести. Оставить во входящих?",

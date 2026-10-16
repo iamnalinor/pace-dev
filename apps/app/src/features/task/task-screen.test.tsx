@@ -147,7 +147,7 @@ describe("TaskScreen — work", () => {
     const runtime = await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.editDescription") }));
     const input = screen.getByLabelText(en("edit.description"));
-    expect(input.props.value).toBe("p99 check fails ~1 in 5 runs on the shared runner.");
+    expect(input.props["value"]).toBe("p99 check fails ~1 in 5 runs on the shared runner.");
     await fireEvent.changeText(input, "Investigation notes pasted here");
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     await waitFor(() => {

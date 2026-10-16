@@ -1,22 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Text, type TextInput, View } from "react-native";
 
-import type { ComposerOption } from "@pace/client";
-
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
 import { Chip } from "#app/ui/chip.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import {
-  type DeadlinePolicy,
-  type Importance,
-  IMPORTANCE_COLORS,
-  ImportanceSchema,
-  presetLabel,
-  type SeriesSchedule,
-} from "@pace/core";
+import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 
-import { DatePanel, type Zoned } from "./date-field.tsx";
+import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
+
+import { DatePanel } from "./date-field.tsx";
 import { isDeadlineChoiceValid } from "./deadline-choice.ts";
 import { DeadlinePolicyField } from "./deadline-policy-field.tsx";
 import { EstimateOptions } from "./estimate-field.tsx";
@@ -26,29 +19,7 @@ import { TaskTextFields } from "./task-text-fields.tsx";
 import { useOutsidePress } from "./use-outside-press.ts";
 import { WhenChips } from "./when-chips.tsx";
 
-/** Everything a task form shows, as plain values: the composer's and the editor's alike. */
-export type TaskFormValues = {
-  readonly title: string;
-  readonly presetId: string;
-  readonly projectId: null | string;
-  /** A project to create on save (the assistant or a `#tag` named one that does not exist). */
-  readonly newProjectName: null | string;
-  readonly importance: Importance;
-  readonly start: Zoned;
-  readonly due: Zoned;
-  readonly estimateMinutes: null | number;
-  readonly deadlinePolicy: DeadlinePolicy;
-  readonly recurrence: null | SeriesSchedule;
-  readonly description: string;
-  readonly link: string;
-};
-
-export type TaskFormOptions = {
-  readonly presets: readonly ComposerOption[];
-  readonly projects: readonly ComposerOption[];
-  /** Each category's own estimate, shown when the task has none of its own. */
-  readonly estimates: Readonly<Record<string, number>>;
-};
+export type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 
 type Panel = "due" | "estimate" | "start" | null;
 

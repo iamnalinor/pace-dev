@@ -57,6 +57,7 @@ export const usePendingActions = (
   const [issue, setIssue] = useState<MessageKey | null>(null);
   const [busy, setBusy] = useState(false);
   const requestRef = useRef(0);
+  const isApprovingRef = useRef(false);
   const read = async (text: string, thread: Pending["thread"]): Promise<void> => {
     const current = ++requestRef.current;
     setBusy(true);
@@ -100,24 +101,28 @@ export const usePendingActions = (
       setBusy(false);
     },
     approve: async (): Promise<void> => {
-      if (pending === null || busy) {
+      if (pending === null || busy || isApprovingRef.current) {
         return;
       }
+      isApprovingRef.current = true;
       setBusy(true);
-      const result = await actions.applyActions(pending.actions);
-      const written = result.ok ? [...result.value] : [];
-      const isSuccess = await run(
-        Promise.resolve(result),
-        approvalFeedback({ actions, run, t, written }),
-      );
-      setBusy(false);
-      if (!isSuccess) {
-        return;
+      try {
+        const result = await actions.applyActions(pending.actions);
+        const written = result.ok ? [...result.value] : [];
+        const isSuccess = await run(
+          Promise.resolve(result),
+          approvalFeedback({ actions, run, t, written }),
+        );
+        if (!isSuccess) {
+          return;
+        }
+        setPending(null);
+        const created = written.findLast((event) => event.type === "task.created");
+        onApplied(created?.type === "task.created" ? created.payload.taskId : null);
+      } finally {
+        isApprovingRef.current = false;
+        setBusy(false);
       }
-
-      setPending(null);
-      const created = written.findLast((event) => event.type === "task.created");
-      onApplied(created?.type === "task.created" ? created.payload.taskId : null);
     },
   };
 };

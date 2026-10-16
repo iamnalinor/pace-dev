@@ -14,7 +14,7 @@ import {
   resolvePreset,
 } from "@pace/core";
 
-/** Groq's free tier allows 8k tokens a minute: the prompt stays well under half of it. */
+/** Keep context compact for endpoints with modest context and request budgets. */
 export const PROMPT_TOKEN_BUDGET = 3000;
 
 /** A rough count (4 characters a token) that is safe for budgeting. */

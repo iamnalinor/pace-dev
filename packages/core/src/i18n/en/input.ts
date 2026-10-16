@@ -119,7 +119,7 @@ export const enInput = {
   "form.addSubtask": "Add a subtask",
   "form.removeSubtask": "Remove {label}",
   "form.create": "Create",
-  "form.estimateDefault": "{duration} by category",
+  "form.estimateDefault": "Default ({duration})",
   "form.estimateTyped": "Other: 50, 2.5h",
   "composer.send": "Send to the assistant",
   "composer.form.suggested": "Suggested by the assistant",

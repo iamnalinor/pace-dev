@@ -15,6 +15,7 @@ import {
   INITIAL_CORE_STATE,
   materialize,
   newId,
+  parseEvent,
   type ParseResponse,
   type RequestDomain,
 } from "@pace/core";
@@ -54,7 +55,14 @@ const storeOf = async (token: string) => {
 const stateFor = async (token: string) => {
   const answer = await json("/api/sync/pull", { token });
   const pulled = endpoints.sync.pull.output.parse(answer);
-  return materialize(pulled.events, coreReducer, INITIAL_CORE_STATE);
+  const events = pulled.events.map((event) => {
+    const parsed = parseEvent(event);
+    if (!parsed.ok) {
+      throw new Error(`Invalid event in sync stream: ${parsed.error}`);
+    }
+    return parsed.value;
+  });
+  return materialize(events, coreReducer, INITIAL_CORE_STATE);
 };
 
 const minutesAgo = (minutes: number): string =>
@@ -308,6 +316,36 @@ describe("POST /api/parse: auto", () => {
 });
 
 describe("POST /api/parse: no model", () => {
+  it("offers a schema-valid rule action without a configured endpoint", async () => {
+    const token = await loginAsDev("1002");
+    const app = createApp({
+      fetch: async () => {
+        throw new Error("no network in tests");
+      },
+      parseProviders: () => [],
+      telegramFetch: async () => {
+        throw new Error("no network in tests");
+      },
+    });
+    const ctx = createExecutionContext();
+    const response = await app.fetch(
+      new Request("https://pace-api.test/api/parse", {
+        body: JSON.stringify({ defer: true, domain: "activity", text: "ем" }),
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        method: "POST",
+      }),
+      env,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    const answer = asAnswered(await readJson(response));
+    expect(answer).toMatchObject({
+      actions: [{ category: "food", kind: "activity.start", label: "ем" }],
+      retryAt: null,
+      status: "unavailable",
+    });
+  });
+
   it("says when to try again and proposes what the rules read, for either field", async () => {
     const token = await loginAsDev("1002");
     const task = await parseLimited(token, { text: "позвонить маме завтра" });
@@ -322,6 +360,14 @@ describe("POST /api/parse: no model", () => {
     ]);
     const activity = await parseLimited(token, { domain: "activity", text: "20 мин читал" });
     expect(activity.actions).toMatchObject([{ kind: "activity.log", label: "читал" }]);
+    const russianMeal = await parseLimited(token, { domain: "activity", text: "ем" });
+    expect(russianMeal.actions).toMatchObject([
+      { category: "food", kind: "activity.start", label: "ем" },
+    ]);
+    const englishMeal = await parseLimited(token, { domain: "activity", text: "eating" });
+    expect(englishMeal.actions).toMatchObject([
+      { category: "food", kind: "activity.start", label: "eating" },
+    ]);
     const auto = await parseLimited(token, {
       domain: "auto",
       text: "7:30 - 8:30 - ходил в военкомат.",

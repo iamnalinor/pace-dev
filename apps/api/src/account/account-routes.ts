@@ -33,15 +33,23 @@ const visibleStatus = (row: Confirmation): VisibleStatus => {
   return row.status === "processing" ? "pending" : row.status;
 };
 
-const expire = async (c: Context<AppEnv>, row: Confirmation): Promise<Confirmation> => {
+export const expireConfirmation = async (
+  binding: D1Database,
+  row: Confirmation,
+): Promise<Confirmation> => {
   if (row.status !== "pending" || row.expiresAt.getTime() > Date.now()) {
     return row;
   }
-  await d1(c.env.DB)
+  const claimed = await d1(binding)
     .update(accountConfirmations)
     .set({ status: "expired" })
-    .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")));
-  return { ...row, status: "expired" };
+    .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
+    .returning({ id: accountConfirmations.id });
+  return claimed.length > 0
+    ? { ...row, status: "expired" }
+    : ((await d1(binding).query.accountConfirmations.findFirst({
+        where: eq(accountConfirmations.id, row.id),
+      })) ?? row);
 };
 
 const confirmationOf = async (c: Context<AppEnv>, id: string): Promise<Confirmation | undefined> =>
@@ -66,29 +74,11 @@ const accountPrompt = (action: Confirmation["action"], language: "en" | "ru", id
   ],
 });
 
-const previousRequests = async (
-  c: Context<AppEnv>,
-  userId: string,
-  action: Confirmation["action"],
-): Promise<readonly Confirmation[]> =>
-  await d1(c.env.DB).query.accountConfirmations.findMany({
-    where: and(
-      eq(accountConfirmations.userId, userId),
-      eq(accountConfirmations.action, action),
-      eq(accountConfirmations.status, "pending"),
-    ),
-  });
-
 const replaceOlder = async (
-  c: Context<AppEnv>,
   target: TelegramTarget,
   input: { readonly previous: readonly Confirmation[]; readonly language: "en" | "ru" },
 ): Promise<void> => {
   for (const row of input.previous) {
-    await d1(c.env.DB)
-      .update(accountConfirmations)
-      .set({ status: "replaced" })
-      .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")));
     if (row.messageId !== null) {
       await editTelegramMessage(target, {
         chatId: row.telegramId,
@@ -105,36 +95,40 @@ const wasRequestDelivered = async (
   input: {
     readonly row: Confirmation;
     readonly language: "en" | "ru";
-    readonly previous: readonly Confirmation[];
   },
 ): Promise<boolean> => {
-  const { row, language, previous } = input;
+  const { row, language } = input;
   const messageId = await sendTelegramMessage(
     target,
     row.telegramId,
     accountPrompt(row.action, language, row.id),
   );
   if (messageId === null) {
-    await d1(c.env.DB).delete(accountConfirmations).where(eq(accountConfirmations.id, row.id));
     return false;
   }
-  await d1(c.env.DB)
+  const db = d1(c.env.DB);
+  const active = and(
+    eq(accountConfirmations.userId, row.userId),
+    eq(accountConfirmations.action, row.action),
+    eq(accountConfirmations.status, "pending"),
+  );
+  const replaced = db
     .update(accountConfirmations)
-    .set({ messageId })
-    .where(eq(accountConfirmations.id, row.id));
-  await replaceOlder(c, target, { previous, language });
+    .set({ status: "replaced" })
+    .where(active)
+    .returning();
+  const inserted = db.insert(accountConfirmations).values({ ...row, messageId });
+  const [previous] = await db.batch([replaced, inserted]);
+  await replaceOlder(target, { previous, language });
   return true;
 };
 
-const insertPending = async (
-  c: Context<AppEnv>,
-  input: {
-    readonly userId: string;
-    readonly telegramId: string;
-    readonly action: Confirmation["action"];
-    readonly sessionId: string;
-  },
-): Promise<Confirmation> => {
+const pendingConfirmation = (input: {
+  readonly userId: string;
+  readonly telegramId: string;
+  readonly action: Confirmation["action"];
+  readonly sessionId: string;
+}): Confirmation => {
   const now = new Date();
   const row: Confirmation = {
     id: crypto.randomUUID(),
@@ -147,7 +141,6 @@ const insertPending = async (
     sessionId: input.sessionId,
     messageId: null,
   };
-  await d1(c.env.DB).insert(accountConfirmations).values(row);
   return row;
 };
 
@@ -170,14 +163,13 @@ const requestConfirmation = async (
     return err({ status: 401 as const, code: "auth/unauthorized", message: "Session required" });
   }
   const language = await languageOf(c, user.id);
-  const previous = await previousRequests(c, user.id, action);
-  const row = await insertPending(c, {
+  const row = pendingConfirmation({
     userId: user.id,
     telegramId: user.telegramId,
     action,
     sessionId,
   });
-  if (!(await wasRequestDelivered(c, target, { row, language, previous }))) {
+  if (!(await wasRequestDelivered(c, target, { row, language }))) {
     return err({
       status: 409 as const,
       code: "account/no-telegram",
@@ -189,16 +181,28 @@ const requestConfirmation = async (
 
 type Answer = { readonly text: string; readonly isRefused?: true };
 
+/** Only one callback can move a still-pending confirmation to its next state. */
+const wasPendingClaimed = async (
+  c: Context<AppEnv>,
+  row: Confirmation,
+  status: "cancelled" | "processing",
+): Promise<boolean> => {
+  const claimed = await d1(c.env.DB)
+    .update(accountConfirmations)
+    .set({ status })
+    .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
+    .returning({ id: accountConfirmations.id });
+  return claimed.length > 0;
+};
+
 const cancelFromBot = async (
   c: Context<AppEnv>,
   row: Confirmation,
   language: "en" | "ru",
 ): Promise<Answer> => {
-  await d1(c.env.DB)
-    .update(accountConfirmations)
-    .set({ status: "cancelled" })
-    .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")));
-  return { text: t(language, "account.cancelled") };
+  return (await wasPendingClaimed(c, row, "cancelled"))
+    ? { text: t(language, "account.cancelled") }
+    : { text: t(language, "account.alreadyHandled"), isRefused: true };
 };
 
 const performConfirmedAction = async (c: Context<AppEnv>, row: Confirmation): Promise<void> => {
@@ -214,12 +218,7 @@ const confirmFromBot = async (
   row: Confirmation,
   language: "en" | "ru",
 ): Promise<Answer> => {
-  const claimed = await d1(c.env.DB)
-    .update(accountConfirmations)
-    .set({ status: "processing" })
-    .where(and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")))
-    .returning({ id: accountConfirmations.id });
-  if (claimed.length === 0) {
+  if (!(await wasPendingClaimed(c, row, "processing"))) {
     return { text: t(language, "account.alreadyHandled"), isRefused: true };
   }
   try {
@@ -254,7 +253,7 @@ export const answerAccountConfirmation = async (
   if (raw?.telegramId !== telegramId) {
     return { text: t("en", "account.notYours"), isRefused: true };
   }
-  const row = await expire(c, raw);
+  const row = await expireConfirmation(c.env.DB, raw);
   const language =
     row.status === "confirmed" && row.action === "delete" ? "en" : await languageOf(c, row.userId);
   if (row.status !== "pending") {
@@ -282,7 +281,7 @@ export const mountAccountRoutes = (app: Hono<AppEnv>, fetch: TelegramTransport):
           code: "account/unknown-confirmation",
           message: "Confirmation not found",
         })
-      : ok({ status: visibleStatus(await expire(c, row)) });
+      : ok({ status: visibleStatus(await expireConfirmation(c.env.DB, row)) });
   });
   mount(app, endpoints.account.cancelConfirmation, async ({ c, params }) => {
     const row = await confirmationOf(c, params.id);
@@ -293,15 +292,14 @@ export const mountAccountRoutes = (app: Hono<AppEnv>, fetch: TelegramTransport):
         message: "Confirmation not found",
       });
     }
-    const current = await expire(c, row);
+    const current = await expireConfirmation(c.env.DB, row);
     if (current.status === "pending") {
-      await d1(c.env.DB)
-        .update(accountConfirmations)
-        .set({ status: "cancelled" })
-        .where(
-          and(eq(accountConfirmations.id, row.id), eq(accountConfirmations.status, "pending")),
-        );
-      return ok({ status: "cancelled" as const });
+      const isClaimed = await wasPendingClaimed(c, row, "cancelled");
+      return ok({
+        status: isClaimed
+          ? ("cancelled" as const)
+          : visibleStatus((await confirmationOf(c, row.id)) ?? current),
+      });
     }
     return ok({ status: visibleStatus(current) });
   });

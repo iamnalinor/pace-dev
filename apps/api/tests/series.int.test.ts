@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { addDaysIn, newId, seriesInstanceId } from "@pace/core";
@@ -39,6 +40,9 @@ describe("recurring series sync", () => {
       { ...envelope, id: firstId, source: "system", type: "task.created", payload: template },
     ]);
     expect(answer.accepted).toHaveLength(2);
+    const me = await json<{ id: string }>("/api/me", { token });
+    const rpc = await env.USER_STORE.get(env.USER_STORE.idFromName(me.id)).read(now);
+    expect(rpc.state.series.byId[seriesId]?.template.title).toBe("Read");
     const pull = await json<{
       events: { type: string; payload: { seriesId?: string; startAt?: string } }[];
     }>("/api/sync/pull", { token });
