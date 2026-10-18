@@ -6,6 +6,9 @@ import type { Action, Event, MessageKey, ParseRequestBody } from "@pace/core";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 
+/** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
+const MAX_THREAD = 5;
+
 type Pending = {
   readonly text: string;
   readonly thread: NonNullable<ParseRequestBody["thread"]>;
@@ -44,6 +47,31 @@ const approvalFeedback = ({
         action: { label: t("common.undo"), onPress: undoWritten(written, actions, run) },
         success: t("assistant.approved"),
       };
+
+/**
+A correction of the shown actions, read with the whole thread. Five earlier turns are all a
+request carries: a sixth correction says so (as the bot does) instead of vanishing.
+*/
+const revise = (
+  pending: null | Pending,
+  text: string,
+  {
+    read,
+    setIssue,
+  }: {
+    readonly read: (text: string, thread: Pending["thread"]) => Promise<void>;
+    readonly setIssue: (issue: MessageKey) => void;
+  },
+): void => {
+  if (pending === null) {
+    return;
+  }
+  if (pending.thread.length >= MAX_THREAD) {
+    setIssue("assistant.tooManyCorrections");
+    return;
+  }
+  void read(text, [...pending.thread, { text: pending.text, actions: [...pending.actions] }]);
+};
 
 /** One conversation with the assistant; a correction replaces actions before any write. */
 export const usePendingActions = (
@@ -90,9 +118,7 @@ export const usePendingActions = (
       void read(text, []);
     },
     followup: (text: string): void => {
-      if (pending !== null && pending.thread.length < 5) {
-        void read(text, [...pending.thread, { text: pending.text, actions: [...pending.actions] }]);
-      }
+      revise(pending, text, { read, setIssue });
     },
     cancel: (): void => {
       requestRef.current += 1;

@@ -191,4 +191,5 @@ export const enInput = {
   "assistant.couldNotRead": "The assistant could not read this. Try again.",
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",
+  "assistant.tooManyCorrections": "That is five corrections. Approve or cancel, then start again.",
 } as const;

@@ -346,6 +346,30 @@ describe("TimeBar", () => {
     expect(field).toHaveDisplayValue("");
   });
 
+  it("says the thread is full on a sixth correction instead of dropping it", async () => {
+    const parse = jest.fn(() => CSS_READ);
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    for (let round = 1; round <= 5; round += 1) {
+      await fireEvent.changeText(
+        screen.getByLabelText(en("assistant.correct")),
+        `ещё ${String(round)}`,
+      );
+      await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+      await waitFor(() => {
+        expect(parse).toHaveBeenCalledTimes(round + 1);
+      });
+    }
+    await fireEvent.changeText(screen.getByLabelText(en("assistant.correct")), "ещё 6");
+    await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+    expect(await screen.findByText(en("assistant.tooManyCorrections"))).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(6);
+  });
+
   it("discards a stale activity preview after editing the source text", async () => {
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => CSS_READ } });
     await renderScreen(<TimeBar />, runtime);
