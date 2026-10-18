@@ -180,6 +180,21 @@ describe("parseProviders", () => {
     ).toEqual([]);
   });
 
+  it("rests a refused key for an hour instead of asking it first on every message", async () => {
+    const result = await runParse(
+      [
+        { model: fakeParseModel(() => ({ refusedWith: 401 })), name: "compatible" },
+        { model: fakeParseModel(echoParse), name: "compatible-2" },
+      ],
+      prompt,
+      { now: () => NOW },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      value: { limited: { compatible: "2026-10-06T13:00:00.000Z" }, provider: "compatible-2" },
+    });
+  });
+
   it("rotates to the second key of the same provider on a rate limit", async () => {
     const result = await runParse(
       [

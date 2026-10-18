@@ -36,6 +36,8 @@ export type ParseAnswer = Answer<ModelOutput>;
 type RunOptions = { readonly cooldowns?: Cooldowns; readonly now?: () => number };
 
 const DEFAULT_RETRY_MS = 60_000;
+/** A refused key (401/403) stays refused until someone changes it: rest it this long. */
+const REFUSED_KEY_MS = 60 * 60_000;
 
 type CallFailure = {
   readonly statusCode?: unknown;
@@ -45,10 +47,16 @@ type CallFailure = {
 const failureOf = (error: unknown): CallFailure =>
   typeof error === "object" && error !== null ? error : {};
 
-/** A 429 (or a provider's "busy"): another provider may still answer. */
+/**
+A 429 (or a provider's "busy"): another provider may still answer. A refused key (401/403)
+rests longer, so a rotated-out key is not asked first on every message (bug class 18).
+*/
 const retryAtOf = (error: unknown, now: number): null | string => {
   const { responseHeaders, statusCode } = failureOf(error);
   const status = Number(statusCode);
+  if (status === 401 || status === 403) {
+    return new Date(now + REFUSED_KEY_MS).toISOString();
+  }
   if (status !== 429 && status !== 503) {
     return null;
   }

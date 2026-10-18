@@ -25,6 +25,30 @@ export type Assistant = {
 
 const NOW_ROWS = 5;
 
+/** Previews a reply can still revise; older ones (their binding and preview) are dropped. */
+export const MAX_BOUND_PREVIEWS = 50;
+
+const BOUND_KEY = "bot:bound";
+
+type Binding = { readonly id: string; readonly messageId: number };
+
+/**
+Remembers which preview a chat message shows, keeping the latest `MAX_BOUND_PREVIEWS`: the
+memos have no expiry of their own, so an unanswered preview would otherwise stay forever.
+*/
+const bind = async (store: BotStoreApi, binding: Binding): Promise<void> => {
+  const bound = ((await store.peek(BOUND_KEY)) as readonly Binding[] | undefined) ?? [];
+  const kept = [...bound.filter((item) => item.messageId !== binding.messageId), binding];
+  const dropped = kept.slice(0, Math.max(0, kept.length - MAX_BOUND_PREVIEWS));
+  for (const old of dropped) {
+    await store.recall(`bot:message:${String(old.messageId)}`);
+    await store.recall(old.id);
+  }
+  await store.remember(`bot:message:${String(binding.messageId)}`, binding);
+  await store.remember("bot:latest", binding);
+  await store.remember(BOUND_KEY, kept.slice(dropped.length));
+};
+
 /** The answer a notification button's code stands for; `undefined` for any other button. */
 export const answerOfCode = (code: string): Answer | undefined =>
   (Object.entries(POOL_ACTIONS) as [Answer, string][]).find(([, value]) => value === code)?.[0];
@@ -89,10 +113,7 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
       if (userId === null) {
         return;
       }
-      const store = deps.storeOf(userId);
-      const binding = { id, messageId };
-      await store.remember(`bot:message:${String(messageId)}`, binding);
-      await store.remember("bot:latest", binding);
+      await bind(deps.storeOf(userId), { id, messageId });
     },
     choose: async (telegramId, data) =>
       await withUser(telegramId, async (turn) => {

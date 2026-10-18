@@ -15,8 +15,11 @@ import {
 
 import { DOMAIN_LINES } from "./prompt.ts";
 
-/** What a scripted model does with a message: answer it, or be rate limited. */
-export type FakeReply = ModelOutput | { readonly rateLimitedFor: number };
+/** What a scripted model does with a message: answer it, be rate limited, or refuse its key. */
+export type FakeReply =
+  | ModelOutput
+  | { readonly rateLimitedFor: number }
+  | { readonly refusedWith: 401 | 403 };
 
 const USAGE = {
   inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
@@ -52,6 +55,14 @@ export const fakeParseModel = (
     doGenerate: async ({ prompt }) => {
       await Promise.resolve();
       const answer = reply(messageOf(prompt), systemOf(prompt));
+      if ("refusedWith" in answer) {
+        throw new APICallError({
+          message: "Invalid API key",
+          requestBodyValues: {},
+          statusCode: answer.refusedWith,
+          url: "https://fake.llm/v1",
+        });
+      }
       if ("rateLimitedFor" in answer) {
         throw new APICallError({
           message: "Rate limit reached",
