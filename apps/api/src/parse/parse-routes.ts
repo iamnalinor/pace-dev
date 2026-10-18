@@ -49,6 +49,12 @@ const unavailable = async (
   return { ...rules, actions: [], retryAt, status: "queued" };
 };
 
+/** The answer with `proposals` beside `actions`, for apps installed before the rename. */
+const withLegacyName = (answer: ParseResponse): ParseResponse => ({
+  ...answer,
+  proposals: answer.actions,
+});
+
 export const mountParseRoutes = (
   app: Hono<AppEnv>,
   providersOf: (config: Config) => readonly ParseProvider[],
@@ -66,7 +72,9 @@ export const mountParseRoutes = (
     });
     await store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
     if (!read.ok) {
-      return ok(await unavailable(store, body, { now, retryAt: read.error.retryAt, state }));
+      return ok(
+        withLegacyName(await unavailable(store, body, { now, retryAt: read.error.retryAt, state })),
+      );
     }
     const { confidence, domain, output, actions, provider, questions, rejected } = read.value;
     // Readings while typing come every pause: only the ones the person acts on are logged.
@@ -84,14 +92,16 @@ export const mountParseRoutes = (
         now,
       );
     }
-    return ok({
-      confidence,
-      domain,
-      actions: [...actions],
-      provider,
-      ...(questions.length > 0 && { questions: [...questions] }),
-      status: "parsed" as const,
-    });
+    return ok(
+      withLegacyName({
+        confidence,
+        domain,
+        actions: [...actions],
+        provider,
+        ...(questions.length > 0 && { questions: [...questions] }),
+        status: "parsed" as const,
+      }),
+    );
   });
 
   mount(app, endpoints.parse.status, async ({ c }) => {

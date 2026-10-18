@@ -88,16 +88,15 @@ export const readMessage = async (
   }
   const output = answer.value.result;
   const read = domain === "auto" ? output.domain : domain;
-  const evidenceText =
-    options.thread === undefined
-      ? text
-      : [...options.thread.map((turn) => turn.text), text].join("\n");
+  const thread = options.thread ?? [];
   const { readings, rejected } = actionsFromModel(output, {
     context,
     ctx,
     domain: read,
+    evidence: [...thread.map((turn) => turn.text), text].join("\n"),
     state,
-    text: evidenceText,
+    // A revision is still of the first request: corrections only steer the model.
+    text: thread[0]?.text ?? text,
   });
   const world = summaryWorld(options);
   return {

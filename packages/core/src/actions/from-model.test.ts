@@ -112,6 +112,27 @@ describe("actionsFromModel: tasks", () => {
     });
   });
 
+  it("builds a revised create from the request, not from the correction lines", () => {
+    const output: ModelOutput = {
+      actions: [blankModelAction({ kind: "task.create", title: "Купить молоко" })],
+      confidence: 0.9,
+      domain: "task",
+      questions: [],
+    };
+    const { readings } = actionsFromModel(output, {
+      context,
+      ctx: ctx(),
+      domain: "task",
+      evidence: "Купить молоко\nнет, на пятницу",
+      state,
+      text: "Купить молоко",
+    });
+    expect(readings[0]?.body).toMatchObject({
+      kind: "task.create",
+      task: { description: null, sourceText: "Купить молоко", title: "Купить молоко" },
+    });
+  });
+
   it("does not create a project named by the model when it does not exist", () => {
     const { readings } = read("plan the Japan trip", [
       { project: "Japan", title: "plan the Japan trip" },

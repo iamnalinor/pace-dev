@@ -333,6 +333,27 @@ describe("the bot as an assistant", () => {
   });
 });
 
+describe("the bot's revised previews", () => {
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("keeps the request, not the correction, on To Inbox after a revision", async () => {
+    const token = await loginAsDev("1002");
+    await webhook(textUpdate("подумать о поездке"));
+    await chooseTaskPreview();
+    sent.length = 0;
+    await webhook(textUpdate("нет, на завтра"));
+    const toInbox = buttonData("To Inbox");
+    expect(toInbox).toMatch(/^i:/u);
+    sent.length = 0;
+    await webhook(callbackUpdate(toInbox));
+    expect(await pulledEvent(token, "task.created")).toMatchObject({
+      payload: { presetId: "inbox", title: "подумать о поездке" },
+    });
+  });
+});
+
 describe("notification buttons", () => {
   beforeEach(() => {
     sent.length = 0;

@@ -203,6 +203,39 @@ describe("POST /api/parse: tasks", () => {
     });
   });
 
+  it("still answers `proposals` for apps installed before the rename (bug class 13)", async () => {
+    const token = await loginAsDev("1001");
+    const parsed = await json<{ actions: unknown[]; proposals: unknown[] }>("/api/parse", {
+      body: { text: "купить кабель USB-C" },
+      token,
+    });
+    expect(parsed.actions).toHaveLength(1);
+    expect(parsed.proposals).toEqual(parsed.actions);
+    const limited = await json<{ actions: unknown[]; proposals: unknown[] }>("/api/parse", {
+      body: { text: "позвонить маме завтра" },
+      token: await loginAsDev("1002"),
+    });
+    expect(limited.proposals).toEqual(limited.actions);
+  });
+
+  it("revises a create from the request: the correction is neither its description nor its source", async () => {
+    const token = await loginAsDev("1001");
+    const first = await parse(token, "Купить молоко");
+    const revised = asAnswered(
+      await json("/api/parse", {
+        body: {
+          text: "нет, на пятницу",
+          thread: [{ actions: first.actions, text: "Купить молоко" }],
+        },
+        token,
+      }),
+    );
+    expect(only(revised)).toMatchObject({
+      kind: "task.create",
+      task: { description: null, sourceText: "Купить молоко" },
+    });
+  });
+
   it("reads a message into a new task, sure of the field it came from, and writes nothing", async () => {
     const token = await loginAsDev("1001");
     const answer = await parse(token, "купить кабель USB-C");

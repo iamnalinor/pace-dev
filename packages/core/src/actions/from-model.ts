@@ -42,8 +42,13 @@ export type ModelWorld = {
   readonly ctx: QueryContext;
   /** The lists the prompt showed: aliases map back through them. */
   readonly context: ActionContext;
-  /** The message, verbatim. */
+  /** The request the actions are built from, verbatim: the first message of a thread. */
   readonly text: string;
+  /**
+  Everything the person wrote in the thread, corrections included: what a field may quote.
+  Never the task's text: a correction is neither its description nor its source.
+  */
+  readonly evidence?: string;
   /** Only actions of this domain are kept. */
   readonly domain: ParseDomain;
 };
@@ -164,7 +169,7 @@ const isLeftOut = (outcome: Outcome): outcome is Extract<Outcome, { readonly rea
 
 /** One action: left out when of another domain or unchecked, else its action. */
 const outcomeOf = (action: ModelAction, index: number, world: ModelWorld): Outcome => {
-  const { context, ctx, state, text } = world;
+  const { context, ctx, state } = world;
   const at = { index, kind: action.kind };
   if (domainOf(action.kind) !== world.domain) {
     return { ...at, reason: "action/other-domain" };
@@ -173,7 +178,7 @@ const outcomeOf = (action: ModelAction, index: number, world: ModelWorld): Outco
   const verified = verifyAction(action, {
     context,
     projectNames,
-    source: text,
+    source: world.evidence ?? world.text,
     zone: accountTz(state, ctx),
   });
   if (!verified.ok) {

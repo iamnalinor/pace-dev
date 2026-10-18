@@ -45,6 +45,11 @@ const answer = {
   actions: z.array(ActionSchema),
   /** What the assistant asks about what stays ambiguous, in the interface language. */
   questions: z.array(AnsweredQuestionSchema).optional(),
+  /**
+  The same list under its old name, for apps installed before it was renamed, which require it.
+  The server sends it for a release or two; clients never read it.
+  */
+  proposals: z.array(ActionSchema).optional(),
 };
 
 /**

@@ -24,12 +24,21 @@ A preview waiting for its button: the text and, when it was understood, its acti
 planned again on Accept, so the events are stamped then and checked against the state then.
 */
 export type Pending = {
+  /** The latest message: the request, or the correction this preview answers. */
   readonly text: string;
+  /**
+  The request itself, the first message of the thread: what To Inbox keeps and what the
+  written task cites. Absent in previews remembered before it was added: then `text`.
+  */
+  readonly request?: string;
   readonly actions: null | readonly Action[];
   readonly domain: "activity" | "task";
   readonly thread: NonNullable<ParseRequestBody["thread"]>;
   readonly awaitingChoice: boolean;
 };
+
+/** The request a preview is about, also for one remembered before `request` was kept. */
+const requestOf = (pending: Pending): string => pending.request ?? pending.text;
 
 /** Callback data of the preview buttons: `<action>:<preview id>`. */
 export const PREVIEW_ACTIONS = {
@@ -120,11 +129,13 @@ const previewOf = async (
   turn: Turn,
   {
     text,
+    request = text,
     read,
     isRuleBased = false,
     thread = [],
   }: {
     readonly text: string;
+    readonly request?: string;
     readonly read: Reading & { readonly questions?: ModelRead["questions"] };
     readonly isRuleBased?: boolean;
     readonly thread?: NonNullable<ParseRequestBody["thread"]>;
@@ -133,13 +144,15 @@ const previewOf = async (
   const { state, store } = turn;
   const { language } = state.settings;
   const prefix = rulesPrefix(language, isRuleBased);
-  const canAccept = read.actions.length > 0 && planAll(turn, { actions: read.actions, text }).ok;
+  const canAccept =
+    read.actions.length > 0 && planAll(turn, { actions: read.actions, text: request }).ok;
   const id = newId();
   const isNeedsChoice = read.confidence < CLASSIFY_CONFIDENT;
   await store.remember(id, {
     actions: canAccept ? [...read.actions] : null,
     domain: read.domain,
     text,
+    request,
     thread,
     awaitingChoice: isNeedsChoice,
   } satisfies Pending);
@@ -192,6 +205,16 @@ export const preview = async (
   return await previewOf(turn, { text, read: read.value });
 };
 
+/** A remembered preview that was understood, so a correction can revise it. */
+const isRevisable = (
+  pending: Partial<Pending> | undefined,
+): pending is Partial<Pending> &
+  Pick<Pending, "domain" | "text"> & { readonly actions: readonly Action[] } =>
+  pending?.text !== undefined &&
+  pending.domain !== undefined &&
+  pending.actions !== undefined &&
+  pending.actions !== null;
+
 /** A new chat message revises a still pending answer, with its entire earlier thread. */
 export const followupPreview = async (
   turn: Turn,
@@ -199,12 +222,7 @@ export const followupPreview = async (
   { id, text }: { readonly id: string; readonly text: string },
 ): Promise<BotReply | null> => {
   const pending = (await turn.store.peek(id)) as Partial<Pending> | undefined;
-  if (
-    pending?.text === undefined ||
-    pending.domain === undefined ||
-    pending.actions === undefined ||
-    pending.actions === null
-  ) {
+  if (!isRevisable(pending)) {
     return null;
   }
   const thread = [...(pending.thread ?? []), { text: pending.text, actions: [...pending.actions] }];
@@ -227,7 +245,13 @@ export const followupPreview = async (
     [parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" })],
     turn.now,
   );
-  const reply = await previewOf(turn, { text, read: read.value, thread });
+  const reply = await previewOf(turn, {
+    text,
+    // The thread's first message is the request, in previews remembered before `request` too.
+    request: thread[0]?.text ?? text,
+    read: read.value,
+    thread,
+  });
   await turn.store.recall(id);
   return reply;
 };
@@ -257,20 +281,25 @@ const chooseDomain = async (
   });
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, turn.now);
   return read.ok
-    ? await previewOf(turn, { text: pending.text, read: read.value, thread: pending.thread })
+    ? await previewOf(turn, {
+        text: pending.text,
+        request: requestOf(pending),
+        read: read.value,
+        thread: pending.thread,
+      })
     : await unavailable(turn, { domain, retryAt: read.error.retryAt, text: pending.text });
 };
 
 const finishPreview = async (turn: Turn, pending: Pending, action: string): Promise<BotReply> => {
   const { language } = turn.state.settings;
   if (action === PREVIEW_ACTIONS.inbox && pending.domain === "task") {
-    const failure = await applyBodies(turn, [inboxBody(pending.text)]);
+    const failure = await applyBodies(turn, [inboxBody(requestOf(pending))]);
     return plain(failure ?? t(language, "bot.savedToInbox"));
   }
   if (action !== PREVIEW_ACTIONS.accept || pending.actions === null || pending.awaitingChoice) {
     return plain(t(language, "bot.expired"));
   }
-  const failure = await accept(turn, { actions: pending.actions, text: pending.text });
+  const failure = await accept(turn, { actions: pending.actions, text: requestOf(pending) });
   return plain(failure ?? t(language, "bot.done"));
 };
 
