@@ -203,7 +203,7 @@ const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
 };
 
 /**
-The time bar at the foot of Day (today): what runs (and what runs alongside), "What are you
+The time bar at the foot of Now: what runs (and what runs alongside), "What are you
 doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
 what it can start.
 */

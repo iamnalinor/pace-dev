@@ -455,6 +455,32 @@ describe("NowBoard", () => {
       ).toEqual([]);
     });
 
+    it("opens each bar button's picker from Now, and a pick starts it", async () => {
+      const runtime = await createTestRuntime();
+      await renderScreen(<Board />, runtime);
+      const bar = () => screen.getByLabelText(en("time.bar"));
+      await fireEvent.press(within(bar()).getByRole("button", { name: "Task" }));
+      expect(await screen.findByLabelText("Find a task")).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+      await fireEvent.press(within(bar()).getByRole("button", { name: "Calendar" }));
+      expect(
+        await screen.findByRole("button", { name: "Start a meeting without an event" }),
+      ).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+      await fireEvent.press(within(bar()).getByRole("button", { name: "Chores" }));
+      await fireEvent.press(await screen.findByRole("button", { name: "Dishes" }));
+      await waitFor(() => {
+        expect(within(bar()).getByRole("button", { name: "Chores, running" })).toBeOnTheScreen();
+      });
+      await fireEvent.press(within(bar()).getByRole("button", { name: "Rest" }));
+      await fireEvent.press(await screen.findByRole("button", { name: "Short break" }));
+      await waitFor(() => {
+        expect(within(bar()).getByRole("button", { name: "Rest, running" })).toBeOnTheScreen();
+      });
+      expect(within(bar()).getByText("Short break")).toBeOnTheScreen();
+      expect(runtime.state.store.getState().time.activities).not.toEqual({});
+    });
+
     it("keeps task rows in their native box with the time bar present", async () => {
       await renderScreen(<Board />, await walkSince(5));
       expect(screen.getByLabelText(en("time.bar"))).toBeOnTheScreen();
