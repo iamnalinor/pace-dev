@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 import type { AccountAction, AccountConfirmation, AccountConfirmationStatus } from "@pace/client";
@@ -38,7 +38,11 @@ type PollInput = {
   readonly onTerminal: (notice: Notice) => void;
 };
 
-/** Polls through the opaque ID, which remains readable after Delete revokes the session. */
+/**
+Polls through the opaque ID, which remains readable after Delete revokes the session. Only the
+server ends the wait: it expires the request itself, and this device's clock may run ahead
+while a Confirm tapped in time is still being carried out (bug class 35).
+*/
 const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void => {
   const { auth } = useAuth();
   const { syncNow } = useSync();
@@ -71,8 +75,8 @@ const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void =
         return;
       }
       const notice = result.ok ? terminalNotice(result.value) : null;
-      if (notice !== null || Date.now() >= Date.parse(request.expiresAt)) {
-        onTerminal(notice ?? "expired");
+      if (notice !== null) {
+        onTerminal(notice);
         return;
       }
       timer = setTimeout(() => {
@@ -91,17 +95,18 @@ const useConfirmationPoll = ({ action, onTerminal, request }: PollInput): void =
 
 const useDangerFlow = () => {
   const { auth } = useAuth();
-  const [restored] = useState(() => readPendingConfirmation(Date.now()));
+  const [restored] = useState(() => readPendingConfirmation());
   const [action, setAction] = useState<AccountAction | null>(restored?.action ?? null);
   const [request, setRequest] = useState<AccountConfirmation | null>(restored?.request ?? null);
   const [isBusy, setIsBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-  const onTerminal = (next: Notice): void => {
+  // Stable, so a re-render (each sync status change) does not restart the poll's timer.
+  const onTerminal = useCallback((next: Notice): void => {
     clearPendingConfirmation();
     setRequest(null);
     setAction(null);
     setNotice(next);
-  };
+  }, []);
   useConfirmationPoll({ action, request, onTerminal });
   const begin = async (): Promise<void> => {
     if (action === null) {

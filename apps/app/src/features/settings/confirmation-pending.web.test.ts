@@ -24,17 +24,23 @@ describe("pending account confirmation on the web", () => {
     request: { expiresAt: "2030-01-01T00:00:00.000Z", id: "opaque" },
   };
 
-  it("restores an unexpired request and forgets it on terminal status", () => {
+  it("restores a request and forgets it on terminal status", () => {
     savePendingConfirmation(pending);
-    expect(readPendingConfirmation(Date.parse("2029-12-31T00:00:00.000Z"))).toEqual(pending);
+    expect(readPendingConfirmation()).toEqual(pending);
     clearPendingConfirmation();
-    expect(readPendingConfirmation(Date.parse("2029-12-31T00:00:00.000Z"))).toBeNull();
+    expect(readPendingConfirmation()).toBeNull();
   });
 
-  it("discards expired and malformed requests", () => {
-    savePendingConfirmation(pending);
-    expect(readPendingConfirmation(Date.parse(pending.request.expiresAt))).toBeNull();
+  it("restores a request this clock thinks is over: the server says whether it is (bug class 35)", () => {
+    savePendingConfirmation({
+      ...pending,
+      request: { ...pending.request, expiresAt: "2000-01-01T00:00:00.000Z" },
+    });
+    expect(readPendingConfirmation()?.request.id).toBe("opaque");
+  });
+
+  it("discards a malformed request", () => {
     memory.set("pace.account-confirmation", "{");
-    expect(readPendingConfirmation(0)).toBeNull();
+    expect(readPendingConfirmation()).toBeNull();
   });
 });

@@ -6,7 +6,7 @@ export type PendingConfirmation = {
 };
 
 /** Native Settings stays mounted across the Telegram handoff; web has a storage sibling. */
-export const readPendingConfirmation = (_now: number): null | PendingConfirmation => null;
+export const readPendingConfirmation = (): null | PendingConfirmation => null;
 
 export const savePendingConfirmation = (_pending: PendingConfirmation): void => undefined;
 

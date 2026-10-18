@@ -5,33 +5,29 @@ const KEY = "pace.account-confirmation";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-const isLiveRequest = (value: unknown, now: number): value is PendingConfirmation["request"] => {
+/** Well-formed is enough: whether it is still live is the server's answer, not this clock's. */
+const isRequest = (value: unknown): value is PendingConfirmation["request"] => {
   if (!isRecord(value)) {
     return false;
   }
   const { expiresAt, id } = value;
-  return (
-    typeof id === "string" &&
-    id.length > 0 &&
-    typeof expiresAt === "string" &&
-    Date.parse(expiresAt) > now
-  );
+  return typeof id === "string" && id.length > 0 && typeof expiresAt === "string";
 };
 
-const isLivePending = (value: unknown, now: number): value is PendingConfirmation =>
+const isPending = (value: unknown): value is PendingConfirmation =>
   isRecord(value) &&
   (value["action"] === "wipe" || value["action"] === "delete") &&
-  isLiveRequest(value["request"], now);
+  isRequest(value["request"]);
 
 /** Keep the opaque request while the owner confirms in Telegram. */
-export const readPendingConfirmation = (now: number): null | PendingConfirmation => {
+export const readPendingConfirmation = (): null | PendingConfirmation => {
   try {
     const raw = sessionStorage.getItem(KEY);
     if (raw === null) {
       return null;
     }
     const parsed: unknown = JSON.parse(raw);
-    if (isLivePending(parsed, now)) {
+    if (isPending(parsed)) {
       return {
         action: parsed.action,
         request: { expiresAt: parsed.request.expiresAt, id: parsed.request.id },

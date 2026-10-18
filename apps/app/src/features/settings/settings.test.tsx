@@ -295,6 +295,38 @@ describe("SettingsScreen", () => {
     expect(created).toHaveBeenCalledTimes(1);
   });
 
+  it("follows the server, not this device's clock, past the request's expiry (bug class 35)", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174003";
+    // This device's clock runs ahead: the request already looks over here.
+    const statuses = ["pending", "confirmed"];
+    await renderScreen(
+      <SettingsScreen />,
+      await createTestRuntime({
+        routes: {
+          "POST /api/account/confirmations": () => ({
+            id,
+            expiresAt: new Date(Date.now() - 60_000).toISOString(),
+          }),
+          [`GET /api/account/confirmations/${id}`]: () => ({
+            status: statuses.shift() ?? "confirmed",
+          }),
+        },
+        world: "empty",
+      }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
+    );
+    await waitFor(
+      () => {
+        expect(router.replace).toHaveBeenCalledWith("/login");
+      },
+      { timeout: 7000 },
+    );
+    expect(screen.queryByText(en("settings.confirmation.expired"))).toBeNull();
+  }, 15_000);
+
   it("restores a pending Telegram confirmation after Settings remounts", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174001";
     const runtime = await createTestRuntime({
