@@ -262,6 +262,7 @@ export {
   type SeriesState,
 } from "./recurrence/series-reducer.ts";
 export {
+  isUntilBeforeStart,
   nextSeriesSlot,
   type SeriesSchedule,
   type SeriesSlot,

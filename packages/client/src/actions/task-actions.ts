@@ -197,7 +197,7 @@ const recurringCreated = async (
   }
   const payload = taskPayload(form, {
     projectId: project.projectId,
-    taskId: seriesInstanceId(seriesId, 0, 0),
+    taskId: seriesInstanceId(seriesId, "0", 0),
     start: { at: startAt, tz: startTz },
     seriesId,
   });

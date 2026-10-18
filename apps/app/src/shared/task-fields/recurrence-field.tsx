@@ -11,6 +11,15 @@ import { formatInZone, type SeriesSchedule } from "@pace/core";
 import type { Zoned } from "./date-field.tsx";
 
 type Change = (value: null | SeriesSchedule) => void;
+
+/** "Oct 31, 2026", "31 окт. 2026 г.": a calendar date, the same in every zone. */
+const untilText = (until: string, language: string): string =>
+  new Intl.DateTimeFormat(language, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(`${until}T00:00:00.000Z`));
 const KINDS = ["daily", "weekdays", "every_n_days", "weekly", "monthly"] as const;
 
 const withKind = (
@@ -115,7 +124,7 @@ const RepeatEndPicker = ({
           }}
           selected={value.until !== undefined}
         >
-          {value.until ?? t("form.repeat.endDate")}
+          {value.until === undefined ? t("form.repeat.endDate") : untilText(value.until, language)}
         </Chip>
       </View>
       {isOpen ? (

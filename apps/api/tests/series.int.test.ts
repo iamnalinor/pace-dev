@@ -11,7 +11,7 @@ describe("recurring series sync", () => {
     const now = new Date().toISOString();
     const startAt = addDaysIn(now, -1, "UTC");
     const seriesId = newId();
-    const firstId = seriesInstanceId(seriesId, 0, 0);
+    const firstId = seriesInstanceId(seriesId, "0", 0);
     const template = {
       taskId: firstId,
       title: "Read",

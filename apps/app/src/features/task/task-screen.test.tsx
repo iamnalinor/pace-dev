@@ -226,6 +226,65 @@ describe("TaskScreen — work", () => {
     });
   });
 
+  it("keeps Save off while the last repeat date is before the start, and writes nothing (bug class 32)", async () => {
+    const runtime = await trkScreen();
+    const eventsBefore = runtime.state.store.getState().events.length;
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.changeText(screen.getByLabelText(en("edit.taskTitle")), "Renamed");
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.endDate") }));
+    // The task starts on Monday, October 5: a last repeat on the 1st is before it.
+    await fireEvent.press(screen.getByRole("button", { name: "Thursday, October 1" }));
+    expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    expect(runtime.state.store.getState().events).toHaveLength(eventsBefore);
+    expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.title).not.toBe("Renamed");
+  });
+
+  it("keeps Save off when the due is cleared under a two-stage deadline", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    await runtime.actions.setOverrides(TRK_ID, {
+      deadlinePolicy: {
+        finalAt: "2026-10-20T18:00:00.000Z",
+        finalMode: "fixed",
+        finalTz: "UTC",
+        kind: "resubmission",
+        softDays: 2,
+      },
+    });
+    await renderScreen(<TaskScreen id={TRK_ID} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    expect(screen.getByRole("button", { name: en("common.save") })).toBeEnabled();
+    await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
+    await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
+    expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
+  });
+
+  it("shows the last repeat date in words, not as yyyy-MM-dd", async () => {
+    await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.endDate") }));
+    await fireEvent.press(screen.getByRole("button", { name: "Saturday, October 31" }));
+    expect(screen.queryByText("2026-10-31")).toBeNull();
+    expect(screen.getByRole("radio", { name: /Oct 31/u })).toBeOnTheScreen();
+  });
+
+  it("keeps the task it was ended from when Repeat is set to none", async () => {
+    const runtime = await trkScreen();
+    await runtime.actions.startSeriesForTask(TRK_ID, { kind: "daily" });
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.none") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      const seriesId = Object.keys(runtime.state.store.getState().series.byId)[0] ?? "";
+      expect(runtime.state.store.getState().series.byId[seriesId]).toMatchObject({
+        archived: true,
+        keepTaskId: TRK_ID,
+      });
+    });
+  });
+
   it("gives up from the header's ⊘: the close sheet opens on Cancelled · Skipped", async () => {
     await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.giveUp") }));

@@ -18,6 +18,13 @@ export type SeriesSchedule =
 
 export type SeriesSlot = { readonly index: number; readonly at: string };
 
+/** A last repeat date before the day the series starts: the form and the actions refuse it. */
+export const isUntilBeforeStart = (
+  schedule: SeriesSchedule,
+  start: { readonly at: string; readonly tz: string },
+): boolean =>
+  schedule.until !== undefined && schedule.until < formatInZone(start.at, start.tz, "yyyy-MM-dd");
+
 const toIso = (date: Date): string => new Date(date).toISOString();
 
 /** Index zero is the template's start; months are always counted from its original day. */

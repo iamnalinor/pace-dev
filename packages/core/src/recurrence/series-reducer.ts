@@ -6,7 +6,10 @@ export type Series = {
   readonly template: EventOf<"series.created">["payload"]["template"];
   readonly schedule: EventOf<"series.created">["payload"]["schedule"];
   readonly revision: number;
+  /** "0" for the schedule it was created with, else the id of the update that set this one. */
+  readonly revisionKey: string;
   readonly archived: boolean;
+  readonly keepTaskId: null | string;
   readonly createdAt: string;
 };
 
@@ -27,7 +30,9 @@ const created = (state: SeriesState, event: EventOf<"series.created">): SeriesSt
             schedule,
             template,
             revision: 0,
+            revisionKey: "0",
             archived: false,
+            keepTaskId: null,
             createdAt: event.occurredAt,
           },
         },
@@ -49,6 +54,7 @@ const updated = (state: SeriesState, event: EventOf<"series.updated">): SeriesSt
         schedule: event.payload.schedule,
         template: { ...event.payload.template, seriesRevision: revision },
         revision,
+        revisionKey: event.id,
       },
     },
   };
@@ -58,7 +64,12 @@ const archived = (state: SeriesState, event: EventOf<"series.archived">): Series
   const prior = seriesById(state, event.payload.seriesId);
   return prior === undefined || prior.archived
     ? state
-    : { byId: { ...state.byId, [prior.id]: { ...prior, archived: true } } };
+    : {
+        byId: {
+          ...state.byId,
+          [prior.id]: { ...prior, archived: true, keepTaskId: event.payload.keepTaskId ?? null },
+        },
+      };
 };
 
 export const seriesReducer: Reducer<SeriesState> = (state, event: Event): SeriesState => {

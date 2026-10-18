@@ -119,7 +119,11 @@ export const SeriesCreatedPayload = z.object({
   template: SeriesTemplateSchema,
   schedule: SeriesScheduleSchema,
 });
-export const SeriesArchivedPayload = z.object({ seriesId: z.string().min(1) });
+/** `keepTaskId`: the instance the series was ended from, which stays as an ordinary task. */
+export const SeriesArchivedPayload = z.object({
+  seriesId: z.string().min(1),
+  keepTaskId: z.string().min(1).optional(),
+});
 
 /** `null` clears the due date or the start (and their zones with them). */
 export const TaskUpdatedPayload = z

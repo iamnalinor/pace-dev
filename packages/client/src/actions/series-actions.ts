@@ -1,7 +1,7 @@
 import {
   err,
   type EventOf,
-  formatInZone,
+  isUntilBeforeStart,
   newId,
   seriesById,
   type SeriesSchedule,
@@ -12,7 +12,8 @@ import { type ActionDeps, type ActionResult, emit, stamp, taskOf } from "./deps.
 
 export type SeriesActions = {
   readonly updateSeries: (seriesId: string, schedule: SeriesSchedule) => ActionResult;
-  readonly archiveSeries: (seriesId: string) => ActionResult;
+  /** `keepTaskId`: the instance it was ended from, which stays as an ordinary task. */
+  readonly archiveSeries: (seriesId: string, keepTaskId?: string) => ActionResult;
   readonly startSeriesForTask: (taskId: string, schedule: SeriesSchedule) => ActionResult;
 };
 
@@ -55,7 +56,11 @@ const templateOf = (
 export const seriesActions = (deps: ActionDeps): SeriesActions => ({
   updateSeries: async (seriesId, schedule) => {
     const series = seriesById(deps.state.store.getState().series, seriesId);
-    if (series === undefined || series.archived) {
+    if (
+      series === undefined ||
+      series.archived ||
+      isUntilBeforeStart(schedule, { at: series.template.startAt, tz: series.template.startTz })
+    ) {
       return err("action/invalid-input");
     }
     return await emit(deps, [
@@ -65,11 +70,16 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
       }),
     ]);
   },
-  archiveSeries: async (seriesId) => {
+  archiveSeries: async (seriesId, keepTaskId) => {
     const series = seriesById(deps.state.store.getState().series, seriesId);
     return series === undefined || series.archived
       ? err("action/invalid-input")
-      : await emit(deps, [stamp(deps, { type: "series.archived", payload: { seriesId } })]);
+      : await emit(deps, [
+          stamp(deps, {
+            type: "series.archived",
+            payload: { seriesId, ...(keepTaskId !== undefined && { keepTaskId }) },
+          }),
+        ]);
   },
   startSeriesForTask: async (taskId, schedule) => {
     const task = taskOf(deps, taskId);
@@ -85,10 +95,7 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
     const seriesId = newId();
     const startAt = task.value.startAt ?? deps.clock.now();
     const startTz = task.value.startTz ?? deps.clock.deviceTz;
-    if (
-      schedule.until !== undefined &&
-      schedule.until < formatInZone(startAt, startTz, "yyyy-MM-dd")
-    ) {
+    if (isUntilBeforeStart(schedule, { at: startAt, tz: startTz })) {
       return err("action/invalid-input");
     }
     const template = templateOf(task.value, { seriesId, startAt, startTz });

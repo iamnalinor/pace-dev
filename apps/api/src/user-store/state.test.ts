@@ -9,6 +9,8 @@ const series = (id: string, overrides: Readonly<Record<string, unknown>>): Serie
   createdAt: "2026-10-16T08:00:00.000Z",
   id,
   revision: 0,
+  revisionKey: "0",
+  keepTaskId: null,
   schedule: { kind: "daily" },
   template: {
     fields: {},

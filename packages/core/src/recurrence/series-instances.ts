@@ -12,9 +12,32 @@ export type MissingSeriesInput = {
   readonly existingEventIds?: ReadonlySet<string> | undefined;
 };
 
-/** Stable across devices and never confused with the preset homework `hw:` ids. */
-export const seriesInstanceId = (seriesId: string, revision: number, index: number): string =>
-  `rep:${seriesId}:${revision}:${index}`;
+/**
+Stable across devices and never confused with the preset homework `hw:` ids. `revisionKey` is
+the series' `revisionKey`: an edit undone and made again starts fresh ids, not the old ones.
+*/
+export const seriesInstanceId = (seriesId: string, revisionKey: string, index: number): string =>
+  `rep:${seriesId}:${revisionKey}:${String(index)}`;
+
+/** More corrections of one instance for one schedule than History undo can make. */
+const MAX_ATTEMPTS = 16;
+
+/**
+The first of `base`, `base:1`, `base:2`… not in the log: the same log gives every device the
+same id, and a correction undone in History never blocks the next one with its old id. `null`
+past `MAX_ATTEMPTS`: a correction the materializer keeps ignoring is not written forever.
+*/
+const unusedId = (
+  base: string,
+  known: ReadonlySet<string> | undefined,
+  attempt = 0,
+): null | string => {
+  if (attempt >= MAX_ATTEMPTS) {
+    return null;
+  }
+  const id = attempt === 0 ? base : `${base}:${String(attempt)}`;
+  return known?.has(id) === true ? unusedId(base, known, attempt + 1) : id;
+};
 
 const tasksOf = (tasks: TasksState, seriesId: string): readonly Task[] =>
   Object.values(tasks.byId).filter((task) => task.seriesId === seriesId);
@@ -36,7 +59,7 @@ const createPayload = (series: Series, slot: SeriesSlot) => {
   );
   return {
     ...template,
-    taskId: seriesInstanceId(series.id, series.revision, slot.index),
+    taskId: seriesInstanceId(series.id, series.revisionKey, slot.index),
     seriesRevision: series.revision,
     startAt: slot.at,
     ...(template.dueAt !== undefined && {
@@ -46,7 +69,7 @@ const createPayload = (series: Series, slot: SeriesSlot) => {
 };
 
 const created = (series: Series, slot: SeriesSlot, now: string): EventInput => ({
-  id: seriesInstanceId(series.id, series.revision, slot.index),
+  id: seriesInstanceId(series.id, series.revisionKey, slot.index),
   type: "task.created",
   occurredAt: now,
   precision: "exact",
@@ -57,11 +80,11 @@ const created = (series: Series, slot: SeriesSlot, now: string): EventInput => (
 const updated = (
   series: Series,
   task: Task,
-  options: { readonly slot: null | SeriesSlot; readonly now: string },
+  options: { readonly id: string; readonly slot: null | SeriesSlot; readonly now: string },
 ): EventInput =>
   options.slot === null
     ? {
-        id: `rep:${series.id}:revoke:${series.revision}`,
+        id: options.id,
         type: "event.revoked",
         occurredAt: options.now,
         precision: "exact",
@@ -69,7 +92,7 @@ const updated = (
         payload: { targetId: task.createdEventId, reason: "series schedule ended" },
       }
     : {
-        id: `rep:${series.id}:amend:${series.revision}`,
+        id: options.id,
         type: "event.amended",
         occurredAt: options.now,
         precision: "exact",
@@ -92,7 +115,7 @@ const nextNotKnown = (
   if (slot === null) {
     return null;
   }
-  return known?.has(seriesInstanceId(series.id, series.revision, slot.index)) === true
+  return known?.has(seriesInstanceId(series.id, series.revisionKey, slot.index)) === true
     ? nextNotKnown(series, slot.at, known)
     : slot;
 };
@@ -103,7 +126,10 @@ const archivedEvents = (
   input: MissingSeriesInput,
 ): readonly EventInput[] => {
   const id = `rep:${series.id}:archive`;
-  return future === undefined || future.userModified || input.existingEventIds?.has(id) === true
+  return future === undefined ||
+    future.userModified ||
+    future.id === series.keepTaskId ||
+    input.existingEventIds?.has(id) === true
     ? []
     : [
         {
@@ -129,8 +155,11 @@ const revisedEvents = (
     after: input.now,
     zone: series.template.startTz,
   });
-  const event = updated(series, future, { slot, now: input.now });
-  return event.id !== undefined && input.existingEventIds?.has(event.id) === true ? [] : [event];
+  const id = unusedId(
+    `rep:${series.id}:${slot === null ? "revoke" : "amend"}:${series.revisionKey}`,
+    input.existingEventIds,
+  );
+  return id === null ? [] : [updated(series, future, { id, slot, now: input.now })];
 };
 
 const missingFor = (series: Series, input: MissingSeriesInput): readonly EventInput[] => {
