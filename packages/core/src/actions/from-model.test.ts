@@ -297,6 +297,18 @@ describe("actionsFromModel: activities", () => {
     });
   });
 
+  it("reads a meal as Food when the model can only say Other (the owner's «ем»)", () => {
+    for (const label of ["ем", "обедаю"]) {
+      const { readings } = activity(label, [{ category: "other", kind: "activity.start", label }]);
+      expect(readings[0]?.body).toMatchObject({ category: "food", label });
+    }
+    // A category the model is sure of stays.
+    const { readings } = activity("ем", [
+      { category: "rest", kind: "activity.start", label: "ем" },
+    ]);
+    expect(readings[0]?.body).toMatchObject({ category: "rest" });
+  });
+
   it("edits and deletes an activity by its alias", () => {
     const { readings } = activity("военкомат был до 12, а спортзал вчера удали", [
       {

@@ -56,7 +56,8 @@ const READERS: Readonly<Record<ActivityKind, (read: Read) => Converted>> = {
 
 /**
 An activity action: the label the model gave (else the typed words), the category it gave
-(else the one the label had before), the times it read on the account's clock.
+(else the rules' reading of the label: a meal, or what it was before), the times it read on
+the account's clock. "Other" is the model naming no category, so the rules may say more.
 */
 export const activityOf = (
   verified: VerifiedAction,
@@ -64,8 +65,9 @@ export const activityOf = (
 ): Converted => {
   const { action } = verified;
   const label = isGiven(action.label) ? action.label.trim() : typedActivity(world.text).label;
-  const category = isActivityCategory(action.category)
-    ? action.category
-    : categoryOfLabel(world.state.time, label);
+  const category =
+    isActivityCategory(action.category) && action.category !== "other"
+      ? action.category
+      : categoryOfLabel(world.state.time, label);
   return READERS[action.kind as ActivityKind]({ category, label, verified });
 };
