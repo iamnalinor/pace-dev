@@ -194,6 +194,23 @@ test("the bell counts what is unread, the feed answers and reads well", async ({
   await expectNoA11yViolations(page);
 });
 
+test("a switch takes keyboard focus visibly and is a 24 px target", async ({ page }) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  await loginViaApi(page);
+  await page.goto("/settings");
+  const toggle = page.getByRole("switch").first();
+  await expect(toggle).toBeVisible();
+  // The control people see is the switch's box, which the input fills.
+  const box = await toggle.boundingBox();
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+  await toggle.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(toggle).toBeFocused();
+  const outline = await toggle.evaluate((element) => getComputedStyle(element).outlineStyle);
+  expect(outline).not.toBe("none");
+});
+
 const SIZES = [
   { height: 844, name: "phone", width: 390 },
   { height: 800, name: "desktop", width: 1280 },
