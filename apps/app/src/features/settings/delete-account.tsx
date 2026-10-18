@@ -176,6 +176,7 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
         <SheetActions
           cancelLabel={t("common.cancel")}
           isBusy={flow.isBusy}
+          isDestructive
           onCancel={() => {
             flow.setAction(null);
           }}

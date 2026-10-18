@@ -295,6 +295,18 @@ describe("SettingsScreen", () => {
     expect(created).toHaveBeenCalledTimes(1);
   });
 
+  it("dresses Wipe and Delete as dangerous, and says both are confirmed in Telegram", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
+    const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
+    expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
+    expect(String(remove.props["className"])).toMatch(/border-warn/u);
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
+    expect(String(wipe.props["className"])).toMatch(/border-warn/u);
+  });
+
   it("follows the server, not this device's clock, past the request's expiry (bug class 35)", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174003";
     // This device's clock runs ahead: the request already looks over here.

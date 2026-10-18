@@ -7,24 +7,36 @@ import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { KEYBOARD, useHotkey } from "./use-hotkey.tsx";
 
-export type ButtonVariant = "ghost" | "primary" | "secondary";
+/** `danger`: a step that cannot be undone (wipe, delete): the warning colour, outlined. */
+export type ButtonVariant = "danger" | "ghost" | "primary" | "secondary";
 
 const CONTAINER: Readonly<Record<ButtonVariant, string>> = {
+  danger: "border-2 border-warn bg-surface",
   ghost: "bg-transparent",
   primary: "bg-accent",
   secondary: "border border-line bg-surface",
 };
 
 const LABEL: Readonly<Record<ButtonVariant, string>> = {
+  danger: "text-warn",
   ghost: "text-fg2",
   primary: "text-accentFg",
   secondary: "text-fg",
 };
 
 const HINT: Readonly<Record<ButtonVariant, string>> = {
+  danger: "text-warn",
   ghost: "text-muted",
   primary: "text-accentFg",
   secondary: "text-muted",
+};
+
+/** The icon in the label's colour. */
+const iconColor = (variant: ButtonVariant, palette: ReturnType<typeof useTheme>["palette"]) => {
+  if (variant === "primary") {
+    return palette.accentFg;
+  }
+  return variant === "danger" ? palette.warn : palette.fg;
 };
 
 /** The shortcut after the label, the way this computer names it; nothing without a keyboard. */
@@ -60,11 +72,7 @@ const Label = ({
   return (
     <>
       {Icon === undefined ? null : (
-        <Icon
-          color={variant === "primary" ? palette.accentFg : palette.fg}
-          size={18}
-          strokeWidth={1.75}
-        />
+        <Icon color={iconColor(variant, palette)} size={18} strokeWidth={1.75} />
       )}
       <Text className={cx("font-sans text-[15px] font-medium", LABEL[variant])}>{children}</Text>
       <KeyHint hotkey={hotkey} variant={variant} />

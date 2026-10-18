@@ -24,6 +24,15 @@ describe("pending bot login on the web", () => {
     expect(readPendingBotLogin(3000)).toEqual({ expiresAt: 5000, nonce: "abc" });
   });
 
+  it("keeps the bot link, so the waiting screen can open the bot again after a reload", () => {
+    savePendingBotLogin({
+      deepLink: "https://t.me/bot?start=login_abc",
+      expiresAt: 5000,
+      nonce: "abc",
+    });
+    expect(readPendingBotLogin(3000)?.deepLink).toBe("https://t.me/bot?start=login_abc");
+  });
+
   it("forgets expired, invalid and cancelled attempts", () => {
     savePendingBotLogin({ expiresAt: 5000, nonce: "abc" });
     expect(readPendingBotLogin(5000)).toBeNull();

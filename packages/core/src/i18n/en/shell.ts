@@ -35,6 +35,7 @@ export const enShell = {
   "login.telegram": "Continue with Telegram",
   "login.openBot": "Open {bot} in Telegram",
   "login.waiting": "Waiting for Telegram…",
+  "login.openBotAgain": "Open the bot again",
   "login.webFallback": "Log in on the web instead",
   "login.notAllowed": "This Telegram account is not on the list.",
   "login.openTelegram": "Open Telegram",
@@ -160,7 +161,7 @@ export const enShell = {
   "settings.deleteAccount": "Delete account",
   "settings.deleteAccount.warning":
     "This deletes the account for good: tasks, time, presets, the decision log and every connected app. It cannot be undone.",
-  "settings.deleteAccount.confirm": "Delete for good",
+  "settings.deleteAccount.confirm": "Delete — confirm in Telegram",
   "settings.danger": "Danger zone",
   "settings.wipe": "Wipe data",
   "settings.wipe.warning":

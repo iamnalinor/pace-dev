@@ -28,7 +28,11 @@ export const readPendingBotLogin = (now: number): null | PendingBotLogin => {
     }
     const parsed: unknown = JSON.parse(raw);
     if (isLivePending(parsed, now)) {
-      return { expiresAt: parsed.expiresAt, nonce: parsed.nonce };
+      return {
+        expiresAt: parsed.expiresAt,
+        nonce: parsed.nonce,
+        ...(typeof parsed.deepLink === "string" && { deepLink: parsed.deepLink }),
+      };
     }
   } catch {
     // Private browsers may refuse storage; login still works while this page stays open.

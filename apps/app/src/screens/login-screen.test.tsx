@@ -146,6 +146,13 @@ describe("LoginScreen", () => {
     expect(auth.resumeBotLogin).toHaveBeenCalledWith("n");
     expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
     expect(waitForToken).toHaveBeenCalledTimes(2);
+    // Back without pressing Start: the same link opens the bot again, no new login.
+    (openURL as jest.Mock).mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: "Open the bot again" }));
+    await waitFor(() => {
+      expect(openURL).toHaveBeenCalledWith("https://t.me/x");
+    });
+    expect(auth.startBotLogin).toHaveBeenCalledTimes(1);
   });
 
   it("explains a rejected Telegram account", async () => {

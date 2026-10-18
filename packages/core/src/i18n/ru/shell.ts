@@ -37,6 +37,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "login.telegram": "Войти через Telegram",
   "login.openBot": "Открыть {bot} в Telegram",
   "login.waiting": "Ждём ответа от Telegram…",
+  "login.openBotAgain": "Открыть бота снова",
   "login.webFallback": "Войти через браузер",
   "login.notAllowed": "Этого аккаунта Telegram нет в списке.",
   "login.openTelegram": "Открыть Telegram",
@@ -161,7 +162,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "settings.deleteAccount": "Удалить аккаунт",
   "settings.deleteAccount.warning":
     "Аккаунт удалится навсегда: задачи, время, пресеты, журнал решений и все подключённые приложения. Отменить это нельзя.",
-  "settings.deleteAccount.confirm": "Удалить навсегда",
+  "settings.deleteAccount.confirm": "Удалить — подтвердить в Telegram",
   "settings.danger": "Опасные действия",
   "settings.wipe": "Очистить данные",
   "settings.wipe.warning":

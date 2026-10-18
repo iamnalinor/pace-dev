@@ -30,6 +30,8 @@ export const useBotLogin = (): {
   readonly phase: BotLoginPhase;
   readonly start: () => Promise<void>;
   readonly reset: () => void;
+  /** Opens the bot again with the same link; `null` when there is no link to open. */
+  readonly reopen: (() => void) | null;
 } => {
   const { auth } = useAuth();
   const [pending] = useState(() => readPendingBotLogin(Date.now()));
@@ -40,6 +42,7 @@ export const useBotLogin = (): {
     pending === null ? undefined : auth.resumeBotLogin(pending.nonce),
   );
   const [expiresAt, setExpiresAt] = useState(pending?.expiresAt);
+  const [deepLink, setDeepLink] = useState(pending?.deepLink);
   const mountedRef = useRef(true);
 
   useEffect(
@@ -80,8 +83,13 @@ export const useBotLogin = (): {
     try {
       const created = await auth.startBotLogin(LOGIN_FROM);
       const deadline = Date.now() + POLL_TIMEOUT_MS;
-      savePendingBotLogin({ expiresAt: deadline, nonce: created.nonce });
+      savePendingBotLogin({
+        deepLink: created.deepLink,
+        expiresAt: deadline,
+        nonce: created.nonce,
+      });
       setExpiresAt(deadline);
+      setDeepLink(created.deepLink);
       setLogin(created);
       setPhase({ kind: "waiting" });
       await openTelegram(created.deepLink);
@@ -98,5 +106,11 @@ export const useBotLogin = (): {
     setPhase({ kind: "idle" });
   }, []);
 
-  return { phase, reset, start };
+  const reopen = useCallback(() => {
+    if (deepLink !== undefined) {
+      void openTelegram(deepLink);
+    }
+  }, [deepLink]);
+
+  return { phase, reopen: deepLink === undefined ? null : reopen, reset, start };
 };
