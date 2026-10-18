@@ -1,4 +1,4 @@
-import { addTask } from "./support/composer.ts";
+import { addTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -21,7 +21,7 @@ for (const size of SIZES) {
       await page.goto("/");
       const title = `water the plants ${size.name} ${unique()}`;
       await add(page, title);
-      const board = page.getByRole("list", { name: "Tasks" });
+      const board = nowTasks(page);
       await board.getByRole("checkbox", { name: `Mark ${title} done` }).click();
       await expect(board.getByText(title)).toHaveCount(0);
       // History asks before it writes the correction.
@@ -34,7 +34,7 @@ for (const size of SIZES) {
       await page.getByRole("dialog").getByRole("button", { name: "Undo event" }).click();
       await expect(page.getByText("Correction: revoked")).toBeVisible();
       await page.goto("/");
-      await expect(page.getByRole("list", { name: "Tasks" }).getByText(title)).toBeVisible();
+      await expect(nowTasks(page).getByText(title)).toBeVisible();
     });
 
     test("sends a line to Inbox and sorts it there", async ({ page }) => {
@@ -60,7 +60,7 @@ for (const size of SIZES) {
       await page.goto("/");
       const title = `call the dentist ${size.name} ${unique()}`;
       await add(page, title);
-      await page.getByRole("list", { name: "Tasks" }).getByText(title).click();
+      await nowTasks(page).getByText(title).click();
       await page.getByRole("button", { exact: true, name: "Edit details" }).click();
       const heading = page.getByRole("heading", { name: "Edit task" });
       await expect(heading).toBeVisible();

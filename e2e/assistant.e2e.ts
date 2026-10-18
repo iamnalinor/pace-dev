@@ -1,3 +1,4 @@
+import { nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -11,16 +12,12 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   // Enter: the assistant shows a reviewable action; the task is not written yet.
   await line.press("Enter");
   await expect(page.getByText("The assistant will create “разобрать почту”")).toBeVisible();
-  await expect(page.getByRole("list", { name: "Tasks" }).getByText("разобрать почту")).toHaveCount(
-    0,
-  );
+  await expect(nowTasks(page).getByText("разобрать почту")).toHaveCount(0);
   await expectNoA11yViolations(page);
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(line).toHaveValue("");
   await page.goto("/");
-  await expect(
-    page.getByRole("list", { name: "Tasks" }).getByText("разобрать почту"),
-  ).toBeVisible();
+  await expect(nowTasks(page).getByText("разобрать почту")).toBeVisible();
 
   await page.goto("/decisions");
   await expect(page.getByRole("heading", { name: "Assistant log" })).toBeVisible();

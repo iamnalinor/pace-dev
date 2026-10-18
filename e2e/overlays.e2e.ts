@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { addTask, formByHand, taskForm } from "./support/composer.ts";
+import { addTask, formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { CLIPPING_ANCESTOR, controlsUnder, expectStaysInside } from "./support/geometry.ts";
 import { loginViaApi } from "./support/login.ts";
@@ -40,7 +40,7 @@ const tap = async (page: Page, name: string): Promise<void> => {
 const raiseToast = async (page: Page, title: string): Promise<void> => {
   await page.goto("/");
   await addTask(page, title);
-  await page.getByRole("list", { name: "Tasks" }).getByText(title).click();
+  await nowTasks(page).getByText(title).click();
   await page.getByRole("button", { name: "Delete the task" }).click();
   await expect(page.getByRole("alert")).toBeVisible();
 };
@@ -71,7 +71,7 @@ for (const size of SIZES) {
       await loginViaApi(page);
       await page.goto("/");
       await addTask(page, `Sheet ${size.name}`);
-      await page.getByRole("list", { name: "Tasks" }).getByText(`Sheet ${size.name}`).click();
+      await nowTasks(page).getByText(`Sheet ${size.name}`).click();
       const edit = page.getByRole("button", { name: "Edit details" });
       // Its title and its foot (the buttons), at a phone's slide and a computer's dialog alike.
       for (const child of ['[role="heading"]', "> :last-child"]) {

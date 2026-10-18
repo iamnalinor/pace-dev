@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { addTask } from "./support/composer.ts";
+import { addTask, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
@@ -140,7 +140,7 @@ for (const size of SIZES) {
       await expect(timeBar(page).getByRole("button", { name: "Rest, running" })).toBeVisible();
       const running = timeBar(page);
       await expect(running.getByText("Walk")).toBeVisible();
-      const firstRow = page.getByRole("list", { name: "Tasks" }).getByRole("listitem").first();
+      const firstRow = nowTasks(page).getByRole("listitem").first();
       await expect(firstRow).toBeVisible();
       await shoot(page, `now-running-${size.name}`, (name) => info.outputPath(name));
       await expectNoA11yViolations(page);
@@ -189,7 +189,7 @@ for (const width of [1440, 1920]) {
     await loginViaApi(page);
     await page.goto("/");
     await addTask(page, `renew the passport ${String(width)}`);
-    const list = page.getByRole("list", { name: "Tasks" });
+    const list = nowTasks(page);
     const box = await boxOf(list);
     const row = await boxOf(list.getByRole("listitem").first());
     expect(box.width).toBeGreaterThan(480);
@@ -215,11 +215,15 @@ for (const size of SIZES) {
     await page.goto("/");
     // Deleting a task says so in a toast (with Undo); the bar is below it on Now.
     await addTask(page, `Toast ${size.name}`);
-    await page.getByRole("list", { name: "Tasks" }).getByText(`Toast ${size.name}`).click();
+    await nowTasks(page).getByText(`Toast ${size.name}`).click();
     await page.getByRole("button", { name: "Delete the task" }).click();
     const toast = page.getByRole("alert");
     await expect(toast).toBeVisible();
-    await page.goto("/");
+    // In the app, not a reload: a reload would drop the toast.
+    await page
+      .getByRole("link", { exact: true, name: "Now" })
+      .or(page.getByRole("tab", { exact: true, name: "Now" }))
+      .click();
     const bar = timeBar(page);
     await expect(bar).toBeVisible();
     await expect(toast).toBeVisible();
@@ -282,7 +286,7 @@ test.describe("the calendar's Attend or skip on Now, phone (390px)", () => {
     await page.reload();
     const prompt = page.getByRole("region", { name: "From your calendar" });
     await expect(prompt.getByText("Colloquium")).toBeVisible();
-    const firstRow = page.getByRole("list", { name: "Tasks" }).getByRole("listitem").first();
+    const firstRow = nowTasks(page).getByRole("listitem").first();
     await expect(firstRow).toBeVisible();
     await page.waitForFunction(() =>
       document.getAnimations().every((animation) => animation.playState !== "running"),

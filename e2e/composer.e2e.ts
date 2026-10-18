@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { addTask, formByHand, taskForm } from "./support/composer.ts";
+import { addTask, formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -49,7 +49,7 @@ for (const [width, height, size] of [
       for (const text of LINES.slice(1)) {
         await addTask(page, text);
       }
-      const board = page.getByRole("list", { name: "Tasks" });
+      const board = nowTasks(page);
       await expect(board.getByText("синк по дашборду")).toBeVisible();
       await expect(board.getByText("срочно позвонить в банк")).toBeVisible();
       await shoot(page, `now-${size}-${theme}`);
@@ -70,11 +70,11 @@ test("a pasted message shows actions and is written only on Approve", async ({ p
   // A fill is a paste: the assistant reads it at once and shows a reviewable action.
   await page.getByRole("textbox", { name: "New task" }).fill(message);
   await expect(page.getByText(`The assistant will create “${message}”`)).toBeVisible();
-  await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toHaveCount(0);
+  await expect(nowTasks(page).getByText(message)).toHaveCount(0);
   await expectNoA11yViolations(page);
   await page.getByRole("button", { name: "Approve" }).click();
   await page.goto("/");
-  await expect(page.getByRole("list", { name: "Tasks" }).getByText(message)).toBeVisible();
+  await expect(nowTasks(page).getByText(message)).toBeVisible();
 });
 
 test("a title typed into the empty form is added on Enter", async ({ page }) => {
@@ -90,7 +90,7 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await expect(title).toBeFocused();
   await page.keyboard.type("Pay the rent");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("list", { name: "Tasks" }).getByText("Pay the rent")).toBeVisible();
+  await expect(nowTasks(page).getByText("Pay the rent")).toBeVisible();
   await expect(page.getByText("Type something first.")).toHaveCount(0);
 });
 
@@ -154,7 +154,7 @@ test("on a computer the form opens in the right pane and closing it brings the t
   await page.setViewportSize({ height: 900, width: 1280 });
   await page.goto("/");
   await addTask(page, "Water the plants");
-  await page.getByRole("list", { name: "Tasks" }).getByText("Water the plants").click();
+  await nowTasks(page).getByText("Water the plants").click();
   const details = page.getByRole("button", { name: "Edit details" });
   await expect(details).toBeVisible();
   await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
@@ -208,9 +208,9 @@ test("on a computer the form swaps into the pane in place: its title inside the 
   await page.setViewportSize({ height: 900, width: 1280 });
   await page.goto("/");
   await addTask(page, "Water the plants");
-  await page.getByRole("list", { name: "Tasks" }).getByText("Water the plants").click();
+  await nowTasks(page).getByText("Water the plants").click();
   await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
-  const list = await page.getByRole("list", { name: "Tasks" }).boundingBox();
+  const list = await nowTasks(page).boundingBox();
   const sampling = samplePaneSwap(page);
   await page.getByRole("navigation").getByRole("button", { name: "New task" }).click();
   const samples = await sampling;
