@@ -58,6 +58,7 @@ const TypedStart = () => {
           }}
           onCancel={pending.cancel}
           onFollowup={pending.followup}
+          questions={pending.pending.questions}
           source={pending.pending.status}
         />
       )}

@@ -67,6 +67,7 @@ const LineBlock = ({
           }}
           onCancel={flow.pending.cancel}
           onFollowup={flow.pending.followup}
+          questions={flow.pending.pending.questions}
           source={flow.pending.pending.status}
         />
       )}

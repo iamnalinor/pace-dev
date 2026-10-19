@@ -6,6 +6,7 @@ export {
   type ContextTask,
   MAX_CONTEXT_TASKS,
 } from "./actions/context.ts";
+export { actionDetails, type DetailLine, detailText } from "./actions/details.ts";
 export {
   actionsFromModel,
   type ModelReading,

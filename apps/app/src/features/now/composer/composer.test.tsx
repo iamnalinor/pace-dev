@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { ParseField, TaskDraft } from "@pace/core";
@@ -142,6 +142,28 @@ describe("Composer", () => {
     await waitFor(() => {
       expect(created(runtime, "разобрать почту")).toBeDefined();
     });
+  });
+
+  it("shows what the new task gets before Approve, the guessed field and the assistant's question marked", async () => {
+    const withQuestion = {
+      ...PARSED,
+      questions: [
+        { field: "dueDate", options: ["Today", "Tomorrow"], question: "When is it due?" },
+      ],
+    };
+    await renderComposer(
+      await createTestRuntime({ routes: { "POST /api/parse": () => withQuestion } }),
+    );
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    const card = screen.getByLabelText("New task: разобрать почту");
+    expect(within(card).getByText("Category: Work")).toBeOnTheScreen();
+    expect(within(card).getByText("Importance: ASAP")).toBeOnTheScreen();
+    expect(within(card).getByText(`Estimate: 1h 30m ${en("action.doubtful")}`)).toBeOnTheScreen();
+    // The summary names the task already: no "Task:" line repeats it.
+    expect(within(card).queryByText(/^Task: /u)).toBeNull();
+    expect(screen.getByText("When is it due?")).toBeOnTheScreen();
   });
 
   it("discards a preview when its source line changes", async () => {

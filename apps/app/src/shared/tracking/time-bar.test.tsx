@@ -337,6 +337,9 @@ describe("TimeBar", () => {
     await fireEvent(field, "submitEditing");
     expect(activities(runtime)).toEqual([]);
     expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    // The 20 minutes and the category are there to check, not dropped.
+    expect(screen.getByText("Category: Sport")).toBeOnTheScreen();
+    expect(screen.getByText("Expect: ~20m")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => {
       expect(activities(runtime)).toEqual([

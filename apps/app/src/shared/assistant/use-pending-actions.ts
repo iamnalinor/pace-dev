@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
-import type { Actions } from "@pace/client";
-import type { Action, Event, MessageKey, ParseRequestBody } from "@pace/core";
+import type { Actions, Assistant } from "@pace/client";
+import type { Action, Event, MessageKey, ParseQuestion, ParseRequestBody } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -13,6 +13,8 @@ type Pending = {
   readonly text: string;
   readonly thread: NonNullable<ParseRequestBody["thread"]>;
   readonly actions: readonly Action[];
+  /** What the assistant asks about what stays unclear; answered by a correction. */
+  readonly questions: readonly ParseQuestion[];
   readonly status: "parsed" | "unavailable";
 };
 
@@ -46,6 +48,23 @@ const approvalFeedback = ({
     : {
         action: { label: t("common.undo"), onPress: undoWritten(written, actions, run) },
         success: t("assistant.approved"),
+      };
+
+/** An answer worth showing as a preview; `null` when there is nothing to approve. */
+const pendingOf = (
+  answer: Awaited<ReturnType<Assistant["propose"]>>,
+  request: Pick<Pending, "text" | "thread">,
+): null | Pending =>
+  answer === null ||
+  answer.status === "queued" ||
+  answer.actions.length === 0 ||
+  (request.thread.length > 0 && answer.status === "unavailable")
+    ? null
+    : {
+        ...request,
+        actions: answer.actions,
+        questions: answer.questions ?? [],
+        status: answer.status,
       };
 
 /**
@@ -98,15 +117,11 @@ export const usePendingActions = (
       return;
     }
 
-    if (
-      answer === null ||
-      answer.status === "queued" ||
-      answer.actions.length === 0 ||
-      (thread.length > 0 && answer.status === "unavailable")
-    ) {
+    const next = pendingOf(answer, { text, thread });
+    if (next === null) {
       setIssue(thread.length > 0 ? "assistant.couldNotRevise" : "assistant.couldNotRead");
     } else {
-      setPending({ actions: answer.actions, status: answer.status, text, thread });
+      setPending(next);
     }
     setBusy(false);
   };
