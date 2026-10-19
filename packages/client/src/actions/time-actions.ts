@@ -35,6 +35,8 @@ export type ActivityInput = {
   readonly taskId?: string | undefined;
   /** Omitted: learned from the label's past runs, else the category's default. */
   readonly expectMinutes?: null | number | undefined;
+  /** The button's built-in length, after a manual category setting and matching history. */
+  readonly builtinExpectMinutes?: number | undefined;
   /** The button (or its choice) it came from: a second tap on it stops it. */
   readonly buttonId?: string | undefined;
   /** Runs next to the main activity instead of replacing it. */
@@ -97,7 +99,12 @@ const startActivity = async (
   if (label === "") {
     return err("action/empty-text");
   }
-  const learned = defaultsFor(timeOf(deps), { category: input.category, label });
+  const settings = deps.state.store.getState().settings;
+  const learned = defaultsFor(
+    timeOf(deps),
+    { category: input.category, label },
+    { manual: settings.categoryEstimates, builtin: input.builtinExpectMinutes },
+  );
   const expectMinutes = positive(
     input.expectMinutes === undefined ? learned.expectMinutes : input.expectMinutes,
   );
@@ -154,7 +161,7 @@ const startChoice = async (
     alongside: options.alongside,
     buttonId: choiceId,
     category: found.choice.category,
-    expectMinutes: found.choice.expectMinutes,
+    builtinExpectMinutes: found.choice.expectMinutes,
     label: t(language, found.choice.labelKey),
   });
 };

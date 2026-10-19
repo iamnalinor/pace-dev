@@ -1,4 +1,4 @@
-import { addTask } from "./support/composer.ts";
+import { addTask, nowTasks } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { createDevSession, freshTelegramId, resetAccount } from "./support/login.ts";
 
@@ -31,7 +31,7 @@ test("a task added on one device shows on another in seconds, not on the next po
   const title = `buy stamps ${crypto.randomUUID().slice(0, 6)}`;
   await addTask(laptop, title);
   // The poll is every 30 s (5 min with the live channel up): seconds mean the push came live.
-  await expect(phone.getByRole("list", { name: "Tasks" }).getByText(title)).toBeVisible({
+  await expect(nowTasks(phone).getByText(title)).toBeVisible({
     timeout: 8000,
   });
   await laptop.context().close();

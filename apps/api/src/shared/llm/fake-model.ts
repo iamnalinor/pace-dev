@@ -15,8 +15,11 @@ import {
 
 import { DOMAIN_LINES } from "./prompt.ts";
 
-/** What a scripted model does with a message: answer it, or be rate limited. */
-export type FakeReply = ModelOutput | { readonly rateLimitedFor: number };
+/** What a scripted model does with a message: answer it, be rate limited, or refuse its key. */
+export type FakeReply =
+  | ModelOutput
+  | { readonly rateLimitedFor: number }
+  | { readonly refusedWith: 401 | 403 };
 
 const USAGE = {
   inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
@@ -52,6 +55,14 @@ export const fakeParseModel = (
     doGenerate: async ({ prompt }) => {
       await Promise.resolve();
       const answer = reply(messageOf(prompt), systemOf(prompt));
+      if ("refusedWith" in answer) {
+        throw new APICallError({
+          message: "Invalid API key",
+          requestBodyValues: {},
+          statusCode: answer.refusedWith,
+          url: "https://fake.llm/v1",
+        });
+      }
       if ("rateLimitedFor" in answer) {
         throw new APICallError({
           message: "Rate limit reached",
@@ -154,7 +165,7 @@ const list = (text: string): readonly string[] =>
 
 /**
 What the fake understands besides a plain message, so tests and e2e can ask for every kind of
-proposal: "delete task <title>", "close task <title>", "rename task <title> to <new>",
+action: "delete task <title>", "close task <title>", "rename task <title> to <new>",
 "add to <title>: a, b", "solved in <title>: 1, 2", "delete activity <label>",
 "rename activity <label> to <new>". Names match the lists in the prompt.
 */
@@ -285,7 +296,7 @@ const decided = (text: string, system: string): ModelOutput => {
 };
 
 /**
-The fake's reading: a command (see `COMMANDS`) as that proposal; otherwise, by the field the
+The fake's reading: a command (see `COMMANDS`) as that action; otherwise, by the field the
 prompt names, a new task titled with the message, or the activity its words and time span say.
 */
 export const echoReply = (text: string, system: string): ModelOutput => {

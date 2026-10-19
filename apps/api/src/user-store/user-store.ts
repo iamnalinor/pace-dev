@@ -276,6 +276,11 @@ export class UserStore extends PoolStore {
     return await log.takeMemo(this.ctx.storage, `memo:${key}`);
   }
 
+  /** Reads a pending bot action without consuming its approval button. */
+  async peek(key: string): Promise<JsonValue | undefined> {
+    return await this.ctx.storage.get<JsonValue>(`memo:${key}`);
+  }
+
   /**
   A phone's calendar over a range, replacing what that phone sent for it before, with the series
   it answers "every time" for (never announced as they start).

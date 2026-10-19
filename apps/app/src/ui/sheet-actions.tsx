@@ -11,6 +11,7 @@ twice as wide, as alert dialogs do.
 export const SheetActions = ({
   cancelLabel,
   isBusy = false,
+  isDestructive = false,
   isDisabled = false,
   onCancel,
   onPrimary,
@@ -18,6 +19,8 @@ export const SheetActions = ({
 }: {
   readonly cancelLabel?: string;
   readonly isBusy?: boolean;
+  /** The action cannot be undone: it wears the danger look, not the accent. */
+  readonly isDestructive?: boolean;
   readonly isDisabled?: boolean;
   readonly onCancel?: () => void;
   readonly onPrimary: () => void;
@@ -40,6 +43,7 @@ export const SheetActions = ({
           disabled={isDisabled}
           hotkey={isConfirmation ? undefined : HOTKEYS.primary}
           onPress={onPrimary}
+          variant={isDestructive ? "danger" : "primary"}
         >
           {primaryLabel}
         </Button>

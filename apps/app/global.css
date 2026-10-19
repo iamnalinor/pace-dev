@@ -47,6 +47,16 @@ textarea:focus {
 }
 
 /*
+A switch is an invisible checkbox laid over its track (react-native-web): the rule above would
+hide where the keyboard is, so a switch keeps a ring of its own.
+*/
+input[role="switch"]:focus-visible {
+  outline: 2px solid var(--pace-fg);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+/*
 Tailwind's preflight paints an empty field's own text in its gray while the placeholder shows,
 below the AA contrast; our fields color their placeholders themselves.
 */

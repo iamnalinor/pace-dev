@@ -11,7 +11,7 @@ import { formatDuration, typedActivity } from "@pace/core";
 /** The estimates offered at one tap; a typed one ("2.5h") stays as it was read. */
 const ESTIMATES: readonly number[] = [15, 30, 45, 60, 90, 120, 180, 240];
 
-/** "No estimate", or the category's: "1h by category". */
+/** "No estimate", or the category's value while this task has no override. */
 const useNoneText = (fallback: null | number): string => {
   const t = useT();
   const language = useLanguage();
@@ -98,14 +98,13 @@ export const EstimateOptions = ({
 }) => {
   const t = useT();
   const language = useLanguage();
-  const none = useNoneText(fallback);
   return (
     <View
       aria-label={t("composer.estimate")}
       className="flex-row flex-wrap gap-1.5 px-1"
       role="radiogroup"
     >
-      {ESTIMATES.map((option) => (
+      {ESTIMATES.filter((option) => minutes !== null || option !== fallback).map((option) => (
         <Chip
           key={option}
           onPress={() => {
@@ -116,14 +115,6 @@ export const EstimateOptions = ({
           {formatDuration(option, language)}
         </Chip>
       ))}
-      <Chip
-        onPress={() => {
-          onEstimate(null);
-        }}
-        selected={minutes === null}
-      >
-        {none}
-      </Chip>
       <TypedEstimate onEstimate={onEstimate} />
     </View>
   );

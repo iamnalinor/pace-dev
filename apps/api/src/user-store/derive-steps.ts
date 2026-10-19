@@ -1,4 +1,4 @@
-import { autoOutcomeEvents, missingInstanceEvents } from "@pace/core";
+import { autoOutcomeEvents, missingInstanceEvents, missingSeriesEvents } from "@pace/core";
 
 /**
 What the store derives at a moment, in order: the homework instances of the week, then the
@@ -7,6 +7,7 @@ instance an outcome just closed gets its next one ahead).
 */
 export const DERIVE_STEPS = [
   missingInstanceEvents,
+  missingSeriesEvents,
   autoOutcomeEvents,
   missingInstanceEvents,
 ] as const;

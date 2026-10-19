@@ -30,11 +30,9 @@ type SubtaskInput = EventOf<"task.subtasks.added">["payload"]["subtasks"][number
 
 type FieldsInput = EventOf<"task.created">["payload"]["fields"];
 
-const legacyLink = (ticket: string | undefined): null | string =>
-  ticket !== undefined && isHttpUrl(ticket) ? ticket : null;
-
 const toFields = (fields: FieldsInput): TaskFields => ({
-  link: fields.link ?? legacyLink(fields.ticket),
+  link:
+    fields.link ?? (fields.ticket !== undefined && isHttpUrl(fields.ticket) ? fields.ticket : null),
   submitVia: fields.submitVia ?? null,
 });
 
@@ -91,6 +89,9 @@ const fromCreated = (event: EventOf<"task.created">): Task => {
     createdEventId: event.id,
     title: payload.title,
     presetId: payload.presetId,
+    seriesId: payload.seriesId ?? null,
+    seriesRevision: payload.seriesRevision ?? null,
+    userModified: event.source !== "system",
     projectId: payload.projectId ?? null,
     ...importanceOf(payload, occurredAt),
     ...scheduleOf(payload),
@@ -328,7 +329,11 @@ const focused = (state: TasksState, event: EventOf<"activity.started">): TasksSt
   const task = taskId === undefined ? undefined : taskById(state, taskId);
   return task === undefined
     ? state
-    : put(state, { ...touched(task, event.occurredAt), lastEventAt: event.occurredAt });
+    : put(state, {
+        ...touched(task, event.occurredAt),
+        userModified: task.userModified || event.source !== "system",
+        lastEventAt: event.occurredAt,
+      });
 };
 
 /**
@@ -352,5 +357,8 @@ export const taskReducer: Reducer<TasksState> = (state, event) => {
     return state;
   }
   const next = applyTaskEvent(task, event);
-  return next === task ? state : put(state, { ...next, lastEventAt: event.occurredAt });
+  const isUserModified = task.userModified || event.source !== "system";
+  return next === task && isUserModified === task.userModified
+    ? state
+    : put(state, { ...next, userModified: isUserModified, lastEventAt: event.occurredAt });
 };

@@ -9,6 +9,7 @@ import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { problem } from "@pace/client/testing";
 import { addMinutesIso } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
@@ -75,7 +76,7 @@ beforeEach(() => {
 const CSS_READ = {
   confidence: 1,
   domain: "activity",
-  proposals: [
+  actions: [
     {
       category: "sport",
       expectMinutes: 20,
@@ -94,6 +95,25 @@ describe("TimeBar", () => {
     expect(barButtons()).toEqual(BUTTONS);
     expect(screen.queryByRole("switch")).toBeNull();
     expect(screen.queryByRole("button", { name: /More about/u })).toBeNull();
+  });
+
+  it("folds the field and the buttons on a phone while something runs, one tap away", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.startActivity(
+      { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
+      { at: addMinutesIso(NOW, -10) },
+    );
+    await renderScreen(<TimeBar />, runtime);
+    // What runs and its Stop stay; the rest folds into one line.
+    expect(screen.getByRole("button", { name: "Stop: Walk" })).toBeOnTheScreen();
+    expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
+    expect(screen.queryByRole("button", { name: "Chores" })).toBeNull();
+    const more = screen.getByRole("button", { name: en("time.startOther") });
+    expect(more).toBeCollapsed();
+    await fireEvent.press(more);
+    expect(barButtons()).toEqual(BUTTONS.map((name) => (name === "Rest" ? "Rest, running" : name)));
+    expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("time.startOther") })).toBeExpanded();
   });
 
   it("opens Rest's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {
@@ -324,7 +344,7 @@ describe("TimeBar", () => {
     expect(screen.queryByLabelText("Alongside what is running")).toBeNull();
   });
 
-  it("starts what is typed at once with its length, then takes the assistant's name for it", async () => {
+  it("reviews the assistant's activity before starting it", async () => {
     const runtime = await createTestRuntime({
       routes: {
         "POST /api/parse": () => CSS_READ,
@@ -334,6 +354,12 @@ describe("TimeBar", () => {
     const field = screen.getByLabelText("What are you doing?");
     await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
     await fireEvent(field, "submitEditing");
+    expect(activities(runtime)).toEqual([]);
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    // The 20 minutes and the category are there to check, not dropped.
+    expect(screen.getByText("Category: Sport")).toBeOnTheScreen();
+    expect(screen.getByText("Expect: ~20m")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => {
       expect(activities(runtime)).toEqual([
         expect.objectContaining({ category: "sport", expectMinutes: 20, label: "ЦСС" }),
@@ -342,7 +368,62 @@ describe("TimeBar", () => {
     expect(field).toHaveDisplayValue("");
   });
 
-  it("shows the typed words as a draft while the assistant reads them", async () => {
+  it("says the thread is full on a sixth correction instead of dropping it", async () => {
+    const parse = jest.fn(() => CSS_READ);
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    for (let round = 1; round <= 5; round += 1) {
+      await fireEvent.changeText(
+        screen.getByLabelText(en("assistant.correct")),
+        `ещё ${String(round)}`,
+      );
+      await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+      await waitFor(() => {
+        expect(parse).toHaveBeenCalledTimes(round + 1);
+      });
+    }
+    await fireEvent.changeText(screen.getByLabelText(en("assistant.correct")), "ещё 6");
+    await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+    expect(await screen.findByText(en("assistant.tooManyCorrections"))).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(6);
+  });
+
+  it("discards a stale activity preview after editing the source text", async () => {
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => CSS_READ } });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    await fireEvent.changeText(field, "Пошел в ЦСС, 30мин");
+    expect(screen.queryByText("Start: ЦСС")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(activities(runtime)).toEqual([]);
+  });
+
+  it("ignores an assistant response for activity text edited while reading", async () => {
+    const answer = deferred<unknown>();
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/parse": async () => await answer.promise },
+    });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 30мин");
+    answer.resolve(CSS_READ);
+    await waitFor(() => {
+      expect(screen.queryByText(en("assistant.reading"))).toBeNull();
+    });
+    expect(screen.queryByText("Start: ЦСС")).toBeNull();
+    expect(activities(runtime)).toEqual([]);
+  });
+
+  it("shows that the assistant is reading while no activity is written", async () => {
     const answer: { resolve: (value: unknown) => void } = { resolve: () => undefined };
     const runtime = await createTestRuntime({
       routes: {
@@ -356,15 +437,29 @@ describe("TimeBar", () => {
     const field = screen.getByLabelText("What are you doing?");
     await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
     await fireEvent(field, "submitEditing");
-    // Outlined, not a category's colored tag: it is still being read.
-    expect(
-      await screen.findByLabelText(en("time.draft", { label: "Пошел в ЦСС" })),
-    ).toBeOnTheScreen();
+    expect(activities(runtime)).toEqual([]);
+    expect(screen.getByText(en("assistant.reading"))).toBeOnTheScreen();
     answer.resolve(CSS_READ);
-    await waitFor(() => {
-      expect(screen.queryByLabelText(en("time.draft", { label: "Пошел в ЦСС" }))).toBeNull();
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.reading"))).toBeNull();
+    expect(activities(runtime)).toEqual([]);
+  });
+
+  it("explains a rule fallback and offers Food for «ем» when the request fails", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/parse": () => problem(503, "unavailable") },
     });
-    expect(screen.getByText("ЦСС")).toBeOnTheScreen();
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.changeText(screen.getByLabelText("What are you doing?"), "ем");
+    await fireEvent.press(screen.getByRole("button", { name: "Review assistant actions" }));
+    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    expect(activities(runtime)).toEqual([]);
+    await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => {
+      expect(activities(runtime)).toEqual([
+        expect.objectContaining({ category: "food", label: "ем" }),
+      ]);
+    });
   });
 
   it("is greyed without calendar access; a tap opens its picker, which says why and leads to the permissions", async () => {

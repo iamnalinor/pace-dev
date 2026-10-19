@@ -2,7 +2,10 @@ import {
   err,
   type Event,
   type EventInput,
+  newId,
   ok,
+  parseEvent,
+  type ActionError as PlannedActionError,
   type PresetError,
   type PresetValidationError,
   type ResolvedPreset,
@@ -36,6 +39,7 @@ export type ActionError =
   | "event/not-found"
   | "undo/nothing"
   | `dispatch/${string}`
+  | PlannedActionError
   | PresetError
   | PresetValidationError
   | ProjectNameError
@@ -100,6 +104,19 @@ current state before the first one is appended, so a rejected batch leaves no tr
 export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): ActionResult => {
   const snapshot = deps.state.store.getState();
   const now = deps.clock.now();
+  const malformed = inputs
+    .map((input) =>
+      parseEvent({
+        ...input,
+        deviceId: input.deviceId ?? "validation",
+        id: input.id ?? newId(),
+        recordedAt: input.recordedAt ?? now,
+      }),
+    )
+    .find((checked) => !checked.ok);
+  if (malformed !== undefined) {
+    return err(storeError(malformed.error));
+  }
   const rejected = inputs
     .map((input) => validateEventInput(snapshot, input, now))
     .find((checked) => !checked.ok);

@@ -1,7 +1,18 @@
-import { endpoints } from "@pace/core";
+import {
+  accountTz,
+  actionsByRules,
+  domainByRules,
+  endpoints,
+  type ParseRequestBody,
+  type ParseResponse,
+  RULES_CONFIDENCE,
+  withSummary,
+} from "@pace/core";
 
 import type { ActivityReading } from "./actions/time-actions.ts";
 import type { ApiClient } from "./api-client.ts";
+import type { Clock } from "./clock.ts";
+import type { AppStateHandle } from "./state.ts";
 
 import { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 
@@ -13,6 +24,12 @@ export type AiOutcome =
   | { readonly status: "unavailable"; readonly retryAt: null | string };
 
 export type Assistant = {
+  /** Reads a task or activity request into pending actions without writing them. */
+  readonly propose: (
+    text: string,
+    domain: ParseRequestBody["domain"],
+    thread?: ParseRequestBody["thread"],
+  ) => Promise<null | ParseResponse>;
   /**
   Sends the task line to `POST /api/parse` and turns the answer into composer edits; writes
   nothing. With `defer`, a line the assistant cannot read now is kept on the server and
@@ -30,7 +47,42 @@ export type Assistant = {
   readonly readActivity: (text: string) => Promise<ActivityReading | null>;
 };
 
-export const createAssistant = (deps: { readonly api: ApiClient }): Assistant => ({
+type AssistantDeps = {
+  readonly api: ApiClient;
+  readonly clock: Clock;
+  readonly state: AppStateHandle;
+};
+
+/** When transport fails, use the same local rules and public answer shape as the Worker. */
+const localReading = (
+  deps: AssistantDeps,
+  text: string,
+  domain: ParseRequestBody["domain"],
+): ParseResponse => {
+  const state = deps.state.store.getState();
+  const now = deps.clock.now();
+  const ctx = { deviceTz: deps.clock.deviceTz, now };
+  const read = domain === "auto" ? domainByRules(text, { ctx, state }) : domain;
+  const world = { language: state.settings.language, now, state, zone: accountTz(state, ctx) };
+  return {
+    actions: actionsByRules(text, read, { ctx, state }).map((body) => withSummary(body, [], world)),
+    confidence: domain === "auto" ? RULES_CONFIDENCE : 1,
+    domain: read,
+    retryAt: null,
+    status: "unavailable",
+  };
+};
+
+export const createAssistant = (deps: AssistantDeps): Assistant => ({
+  propose: async (text, domain, thread) => {
+    try {
+      return await deps.api.call(endpoints.parse.run, {
+        body: { text, domain, ...(thread !== undefined && { thread }) },
+      });
+    } catch {
+      return thread !== undefined && thread.length > 0 ? null : localReading(deps, text, domain);
+    }
+  },
   read: async (text, options = {}) => {
     try {
       const answer = await deps.api.call(endpoints.parse.run, {
@@ -53,7 +105,7 @@ export const createAssistant = (deps: { readonly api: ApiClient }): Assistant =>
       const answer = await deps.api.call(endpoints.parse.run, {
         body: { domain: "activity", text },
       });
-      const start = answer.proposals.find((proposal) => proposal.kind === "activity.start");
+      const start = answer.actions.find((action) => action.kind === "activity.start");
       return answer.status !== "parsed" || start?.kind !== "activity.start"
         ? null
         : {

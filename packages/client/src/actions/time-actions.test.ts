@@ -598,6 +598,27 @@ describe("time actions", () => {
       endAt: later(-50),
       label: "Seminar",
     });
+    const beforeRefusal = world.state.store.getState().log.length;
+    const refused = await world.actions.saveActivity(
+      {
+        activityId,
+        category: "work",
+        endAt: later(-50),
+        kind: "edit",
+        label: "Seminar",
+        startAt: later(-120),
+      },
+      {
+        category: "work",
+        endAt: later(-40),
+        label: "Seminar",
+        startAt: later(-120),
+        taskId: "missing-task",
+      },
+    );
+    expect(refused).toEqual({ error: "task/unknown", ok: false });
+    expect(world.state.store.getState().log).toHaveLength(beforeRefusal);
+    expect(world.state.store.getState().time.activities[activityId]?.endAt).toBe(later(-50));
     const unchanged = await world.actions.saveActivity(
       {
         activityId,

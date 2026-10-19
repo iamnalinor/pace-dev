@@ -1,4 +1,4 @@
-import type { ModelOutput, Proposal, Rejected } from "@pace/core";
+import type { Action, ModelOutput, Rejected } from "@pace/core";
 
 import type { DecisionEntry } from "../contract.ts";
 
@@ -7,23 +7,19 @@ export type ParseOutcome =
       readonly status: "parsed";
       readonly provider: string;
       readonly output: ModelOutput;
-      readonly proposals: readonly Proposal[];
+      readonly actions: readonly Action[];
       readonly rejected: readonly Rejected[];
     }
   | { readonly status: "unavailable"; readonly retryAt: null | string };
 
-const doubtsOf = (proposals: readonly Proposal[]): readonly string[] => [
-  ...new Set(proposals.flatMap((proposal) => proposal.doubtful ?? [])),
+const doubtsOf = (actions: readonly Action[]): readonly string[] => [
+  ...new Set(actions.flatMap((action) => action.doubtful ?? [])),
 ];
 
 const leftOut = (item: Rejected): string => `${item.kind} (${item.reason})`;
 
-const explain = (
-  provider: string,
-  proposals: readonly Proposal[],
-  rejected: readonly Rejected[],
-) => {
-  const doubts = doubtsOf(proposals);
+const explain = (provider: string, actions: readonly Action[], rejected: readonly Rejected[]) => {
+  const doubts = doubtsOf(actions);
   return [
     doubts.length === 0
       ? `Parsed by ${provider}; every field matched the text.`
@@ -45,18 +41,18 @@ export const parseDecision = (
 ): DecisionEntry =>
   outcome.status === "parsed"
     ? {
-        explanation: explain(outcome.provider, outcome.proposals, outcome.rejected),
+        explanation: explain(outcome.provider, outcome.actions, outcome.rejected),
         inputs: {
           channel,
-          doubtful: [...doubtsOf(outcome.proposals)],
+          doubtful: [...doubtsOf(outcome.actions)],
           output: outcome.output,
-          proposals: outcome.proposals.map((proposal) => proposal.summary),
+          actions: outcome.actions.map((action) => action.summary),
           rejected: outcome.rejected.map((item) => ({ ...item })),
           text,
         },
         kind: "parse",
         outcome: "parsed",
-        rule: `parse.${outcome.proposals[0]?.kind ?? "none"}`,
+        rule: `parse.${outcome.actions[0]?.kind ?? "none"}`,
         taskId: null,
       }
     : {

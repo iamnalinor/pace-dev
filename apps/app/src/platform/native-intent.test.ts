@@ -8,6 +8,10 @@ describe("mapSystemPath", () => {
     expect(mapSystemPath("https://pace.nalinor.dev/app/login")).toBe("/login");
   });
 
+  it("opens a task link from Telegram or a web notification inside the Android app", () => {
+    expect(mapSystemPath("https://pace.nalinor.dev/task/task-123")).toBe("/task/task-123");
+  });
+
   it("maps the bare /app link to the root", () => {
     expect(mapSystemPath("https://pace.nalinor.dev/app")).toBe("/");
     expect(mapSystemPath("https://pace.nalinor.dev/app/")).toBe("/");

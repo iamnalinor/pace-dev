@@ -39,9 +39,26 @@ jest.mock("expo-router", () => {
 const mockAuth = {
   adoptToken: jest.fn(),
   loginWithDev: jest.fn(),
+  resumeBotLogin: jest.fn(),
   startBotLogin: jest.fn(),
 };
 const mockStatus = { current: "signed-out" as "signed-in" | "signed-out" };
+const mockPending = {
+  current: null as null | { readonly nonce: string; readonly expiresAt: number },
+};
+
+jest.mock("./bot-login-pending.ts", () => ({
+  clearPendingBotLogin: () => {
+    mockPending.current = null;
+  },
+  readPendingBotLogin: (now: number) =>
+    mockPending.current !== null && mockPending.current.expiresAt > now
+      ? mockPending.current
+      : null,
+  savePendingBotLogin: (value: { readonly nonce: string; readonly expiresAt: number }) => {
+    mockPending.current = value;
+  },
+}));
 
 jest.mock("#app/app-state.tsx", () => ({
   useAuth: () => ({ auth: mockAuth, status: mockStatus.current, user: null }),
@@ -57,6 +74,7 @@ const auth = mockAuth as unknown as jest.Mocked<Auth> & typeof mockAuth;
 beforeEach(() => {
   jest.clearAllMocks();
   mockStatus.current = "signed-out";
+  mockPending.current = null;
 });
 
 const renderScreen = async (): Promise<Awaited<ReturnType<typeof render>>> =>
@@ -104,6 +122,37 @@ describe("LoginScreen", () => {
     });
     expect(screen.queryByText("Waiting for Telegram…")).toBeNull();
     expect(screen.getByTestId("redirect")).toHaveTextContent("/");
+  });
+
+  it("resumes the waiting bot login after a page remount", async () => {
+    const waitForToken = jest.fn(
+      async ({ signal }: { readonly signal?: AbortSignal }) =>
+        await new Promise<Awaited<ReturnType<BotLogin["waitForToken"]>>>((resolve) => {
+          signal?.addEventListener("abort", () => {
+            resolve({ error: "cancelled", ok: false });
+          });
+        }),
+    );
+    auth.startBotLogin.mockResolvedValue({ deepLink: "https://t.me/x", nonce: "n", waitForToken });
+    auth.resumeBotLogin.mockReturnValue({ nonce: "n", waitForToken });
+    const first = await renderScreen();
+    await fireEvent.press(screen.getByText("Open Telegram"));
+    await waitFor(() => {
+      expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
+    });
+    expect(mockPending.current?.nonce).toBe("n");
+    await first.unmount();
+    await renderScreen();
+    expect(auth.resumeBotLogin).toHaveBeenCalledWith("n");
+    expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
+    expect(waitForToken).toHaveBeenCalledTimes(2);
+    // Back without pressing Start: the same link opens the bot again, no new login.
+    (openURL as jest.Mock).mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: "Open the bot again" }));
+    await waitFor(() => {
+      expect(openURL).toHaveBeenCalledWith("https://t.me/x");
+    });
+    expect(auth.startBotLogin).toHaveBeenCalledTimes(1);
   });
 
   it("explains a rejected Telegram account", async () => {

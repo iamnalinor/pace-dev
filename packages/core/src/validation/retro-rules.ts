@@ -26,8 +26,9 @@ export const FUTURE_TOLERANCE_MINUTES = 5;
 
 type TaskInput = Extract<EventInput, { readonly payload: { readonly taskId: string } }>;
 
-/** Everything addressed to a task: `task.*` and the focus events. */
-const isTaskInput = (input: EventInput): input is TaskInput => "taskId" in input.payload;
+/** Commands addressed to a task; activity links carry `taskId` but have their own rules. */
+const isTaskInput = (input: EventInput): input is TaskInput =>
+  input.type.startsWith("task.") || input.type === "focus.started" || input.type === "focus.ended";
 
 /** Work on a closed task needs a reopen first; editing, closing again and reopening do not. */
 const REJECTED_WHEN_CLOSED: ReadonlySet<TaskInput["type"]> = new Set([

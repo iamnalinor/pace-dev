@@ -1,8 +1,8 @@
 import { z } from "zod";
 
+import { ParseDomainSchema } from "../../actions/kinds.ts";
+import { ActionSchema } from "../../actions/schema.ts";
 import { ParseQuestionSchema } from "../../parse/schema.ts";
-import { ParseDomainSchema } from "../../proposals/kinds.ts";
-import { ProposalSchema } from "../../proposals/schema.ts";
 
 /**
 The field a message was typed into: the task line, the activity line, or `auto` (the bot's one
@@ -12,9 +12,16 @@ export const REQUEST_DOMAINS = ["task", "activity", "auto"] as const;
 
 export type RequestDomain = (typeof REQUEST_DOMAINS)[number];
 
+const ThreadTurnSchema = z.strictObject({
+  text: z.string().trim().min(1).max(4000),
+  actions: z.array(ActionSchema).max(10),
+});
+
 export const ParseRequestSchema = z.strictObject({
   text: z.string().trim().min(1).max(4000),
   domain: z.enum(REQUEST_DOMAINS).default("task"),
+  /** Earlier requests and the actions shown for them; the latest text asks for a full revision. */
+  thread: z.array(ThreadTurnSchema).max(5).optional(),
   /** When no model can answer now: keep the text and read it (and write it) once one can. */
   defer: z.boolean().optional(),
   /** A reading while the person is still typing: answered, but kept out of the decision log. */
@@ -35,15 +42,20 @@ const answer = {
   /** How sure that reading is, 0..1: 1 when the field said so. */
   confidence: z.number().min(0).max(1),
   /** What to do, each with its summary; nothing is written until the person accepts one. */
-  proposals: z.array(ProposalSchema),
+  actions: z.array(ActionSchema),
   /** What the assistant asks about what stays ambiguous, in the interface language. */
   questions: z.array(AnsweredQuestionSchema).optional(),
+  /**
+  The same list under its old name, for apps installed before it was renamed, which require it.
+  The server sends it for a release or two; clients never read it.
+  */
+  proposals: z.array(ActionSchema).optional(),
 };
 
 /**
 Read by the client, so loose: keys a newer server adds are dropped, not refused.
-The assistant's proposals for a message, checked against it (`parsed`); or, when no model can
-answer right now, the rules' proposals and when one should be back (`unavailable`), or the news
+The assistant's actions for a message, checked against it (`parsed`); or, when no model can
+answer right now, the rules' actions and when one should be back (`unavailable`), or the news
 that the text waits to be read and written then (`queued`, asked with `defer`).
 */
 export const ParseResponseSchema = z.discriminatedUnion("status", [

@@ -28,12 +28,35 @@ describe("loadConfig", () => {
     expect(result.value.botInfo).toBeUndefined();
   });
 
-  it("reads several LLM keys, comma or newline separated, and none when unset", () => {
-    const result = loadConfig({ ...base, GEMINI_API_KEY: "g1", GROQ_API_KEY: "k1, k2\nk3" });
-    expect(result.ok && result.value.groqApiKeys).toEqual(["k1", "k2", "k3"]);
-    expect(result.ok && result.value.geminiApiKeys).toEqual(["g1"]);
+  it("reads a configurable compatible model and several keys, comma or newline separated", () => {
+    const result = loadConfig({
+      ...base,
+      LLM_API_KEY: "k1, k2\nk3",
+      LLM_BASE_URL: "https://models.example/v1",
+      LLM_MODEL: "reader-small",
+    });
+    expect(result.ok && result.value.llmApiKeys).toEqual(["k1", "k2", "k3"]);
+    expect(result.ok && result.value.llmBaseUrl).toBe("https://models.example/v1");
+    expect(result.ok && result.value.llmModel).toBe("reader-small");
     const unset = loadConfig(base);
-    expect(unset.ok && unset.value.groqApiKeys).toEqual([]);
+    expect(unset.ok && unset.value.llmApiKeys).toEqual([]);
+  });
+
+  it("rejects incomplete model configuration but works with no model configured", () => {
+    expect(loadConfig(base).ok).toBe(true);
+    expect(loadConfig({ ...base, LLM_API_KEY: "secret" }).ok).toBe(false);
+    expect(loadConfig({ ...base, LLM_BASE_URL: "https://models.example/v1" }).ok).toBe(false);
+    expect(
+      loadConfig({ ...base, LLM_BASE_URL: "http://localhost:3000/v1", LLM_MODEL: "local" }).ok,
+    ).toBe(false);
+    expect(
+      loadConfig({
+        ...base,
+        LLM_API_KEY: "secret",
+        LLM_BASE_URL: "not-a-url",
+        LLM_MODEL: "local",
+      }).ok,
+    ).toBe(false);
   });
 
   it("rejects an invalid web origin and an unknown environment", () => {

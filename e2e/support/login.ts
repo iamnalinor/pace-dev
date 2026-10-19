@@ -46,7 +46,7 @@ export const createDevSession = async (
 /** Deletes the account behind an id, so a reused server or an earlier run leaves nothing behind. */
 export const resetAccount = async (telegramId: string): Promise<void> => {
   const { token } = await createDevSession(telegramId);
-  const response = await fetch(`${API_URL}/api/me`, {
+  const response = await fetch(`${API_URL}/api/test/account`, {
     headers: { Authorization: `Bearer ${token}` },
     method: "DELETE",
   });

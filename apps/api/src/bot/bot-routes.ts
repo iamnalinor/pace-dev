@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 
 import { webhookCallback } from "grammy";
 
@@ -15,6 +15,11 @@ import { type BotDeps, createBot } from "./bot.ts";
 
 /** What the bot needs from the rest of the Worker; `app.ts` composes it with the auth feature. */
 export type BotRouteDeps = {
+  readonly confirmAccount: (
+    c: Context<AppEnv>,
+    telegramId: string,
+    data: string,
+  ) => Promise<{ readonly text: string; readonly isRefused?: true }>;
   readonly telegramFetch: TelegramTransport;
   readonly isAllowed: (telegramId: string, allowedIds: readonly string[]) => boolean;
   readonly bindLogin: (db: Db) => BotDeps["bindLogin"];
@@ -67,6 +72,7 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
         storeOf,
         userIdOf: async (telegramId) => await deps.userIdOf(db, telegramId),
       }),
+      confirmAccount: async (telegramId, data) => await deps.confirmAccount(c, telegramId, data),
       isAllowed: (telegramId) => deps.isAllowed(telegramId, config.allowedTelegramIds),
       token: config.telegramBotToken,
       webOrigin: config.webOrigin,

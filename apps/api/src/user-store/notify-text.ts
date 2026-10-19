@@ -93,7 +93,9 @@ const bodyOf = (notification: PoolNotification, zoned: Zoned): string => {
     }
     case "deadline_digest": {
       return [
-        t(language, "notify.digestTitle"),
+        notification.payload.tasks.length === 1
+          ? t(language, "notify.digestTitle")
+          : t(language, "notify.digestCount", { count: notification.payload.tasks.length }),
         ...notification.payload.tasks.map(
           (task) =>
             `• ${t(language, "notify.digestRow", {
@@ -156,6 +158,9 @@ export const phoneContent = (
       : body.replace(/^\S+\s/u, "");
   return {
     body: fitted(shown, (text) => encoder.encode(text).length <= PHONE_BODY_MAX_BYTES),
-    title: t(zoned.language, `notify.title.${notification.kind}`),
+    title:
+      notification.kind === "deadline_digest" && notification.payload.tasks.length > 1
+        ? t(zoned.language, "notify.digestCount", { count: notification.payload.tasks.length })
+        : t(zoned.language, `notify.title.${notification.kind}`),
   };
 };

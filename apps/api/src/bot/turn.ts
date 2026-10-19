@@ -3,13 +3,15 @@ import { type CoreState, type EventBody, type EventInput, t } from "@pace/core";
 import type { BotStoreApi } from "../shared/contract.ts";
 import type { OutgoingMessage } from "../shared/telegram-api.ts";
 
-import { clockIn } from "../shared/clock.ts";
-
 /**
 A reply with its inline keyboard. `isRefused`: a button's answer that did not go through; the
 message it came from stays as it was, buttons and all, to be tapped again.
 */
-export type BotReply = OutgoingMessage & { readonly isRefused?: true };
+export type BotReply = OutgoingMessage & {
+  readonly isRefused?: true;
+  readonly pendingId?: string;
+  readonly editMessageId?: number;
+};
 
 /** One bot update being handled: the user's store, their state and the instant. */
 export type Turn = {
@@ -24,10 +26,6 @@ export const plain = (text: string): BotReply => ({ buttons: [], text });
 
 /** The account zone; UTC until a device reported one. */
 export const zoneOf = (state: CoreState): string => state.settings.timezone ?? "UTC";
-
-/** `HH:MM` in the account zone and language. */
-export const timeOf = (iso: string, state: CoreState): string =>
-  clockIn(iso, state.settings.language, zoneOf(state));
 
 const stampAll = (bodies: readonly EventBody[], now: string): readonly EventInput[] =>
   bodies.map((body) => ({ ...body, occurredAt: now, precision: "exact", source: "bot" }));

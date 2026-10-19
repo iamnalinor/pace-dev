@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
@@ -12,6 +12,7 @@ import { CloseSheet } from "./close-sheet.tsx";
 import { ProjectSheet } from "./project-sheet.tsx";
 import { SourceText } from "./source-text.tsx";
 import { SubtaskChecklist } from "./subtask-checklist.tsx";
+import { TaskDescription } from "./task-description.tsx";
 import { TaskFooter } from "./task-footer.tsx";
 import { TaskHeader } from "./task-header.tsx";
 import { EditTaskSheet } from "./task-sheets.tsx";
@@ -33,9 +34,7 @@ const TaskBody = ({ view }: { readonly view: TaskViewModel }) => {
         view={view}
         {...(isSlider && { workLeftMinutes: workLeftAt(view, live.step) })}
       />
-      {view.description === null || view.description === "" ? null : (
-        <Text className="px-5 font-sans text-[14px] leading-5 text-fg2">{view.description}</Text>
-      )}
+      <TaskDescription view={view} />
       <WorkProgress live={live} view={view} />
       <SubtaskChecklist view={view} />
       <SourceText text={view.sourceText} />

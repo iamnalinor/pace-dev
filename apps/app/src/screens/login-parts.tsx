@@ -67,13 +67,25 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
   );
 };
 
-export const Waiting = ({ onCancel }: { readonly onCancel: () => void }) => {
+export const Waiting = ({
+  onCancel,
+  onReopen,
+}: {
+  readonly onCancel: () => void;
+  /** Back from Telegram without pressing Start: the same bot link again. */
+  readonly onReopen: (() => void) | null;
+}) => {
   const t = useT();
   return (
     <View className="items-center gap-3">
       <ActivityIndicator accessibilityLabel={t("login.waiting")} />
       <Text className="font-sans text-[15px] font-medium text-fg">{t("login.waiting")}</Text>
       <Text className="text-center font-sans text-[13px] text-muted">{t("login.botHint")}</Text>
+      {onReopen === null ? null : (
+        <Button onPress={onReopen} variant="secondary">
+          {t("login.openBotAgain")}
+        </Button>
+      )}
       <Button onPress={onCancel} variant="ghost">
         {t("common.cancel")}
       </Button>

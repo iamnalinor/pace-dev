@@ -14,10 +14,12 @@ it lines up with the block's words, past the time column; elsewhere (`isIndented
 at the edge.
 */
 export const WhereSatLine = ({
+  compact = false,
   isIndented = true,
   rows,
 }: {
   readonly rows: readonly SatRow[];
+  readonly compact?: boolean;
   readonly isIndented?: boolean;
 }) => {
   const t = useT();
@@ -25,9 +27,13 @@ export const WhereSatLine = ({
   const devices = Object.entries(Object.groupBy(rows, (row) => row.deviceName));
   return devices.map(([device, apps = []]) => (
     <Text
-      className={cx("pb-2 font-sans text-[12px] text-muted", isIndented && "pl-[116px]")}
+      className={cx(
+        "font-sans text-[12px] text-muted",
+        !compact && "pb-2",
+        isIndented && "pl-[116px]",
+      )}
       key={device}
-      numberOfLines={2}
+      numberOfLines={compact ? 1 : 2}
     >
       {t("day.sat", {
         apps: apps

@@ -37,7 +37,102 @@ const envelope = (event: Event) => ({
   source: event.source,
 });
 
+describe("approved assistant actions", () => {
+  it("plans against the live state and refuses an unknown task without writing", async () => {
+    const world = await setupActions();
+    const before = world.state.store.getState().log.length;
+    const refused = await world.actions.applyAction({ kind: "task.delete", taskId: "missing" });
+    expect(refused).toEqual({ ok: false, error: "action/unknown-task" });
+    expect(world.state.store.getState().log).toHaveLength(before);
+  });
+
+  it("applies a task close only after approval", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Review" }),
+    );
+    expect(created?.type).toBe("task.created");
+    if (created?.type !== "task.created") {
+      return;
+    }
+    const result = unwrap(
+      await world.actions.applyAction({
+        kind: "task.close",
+        outcome: "done",
+        taskId: created.payload.taskId,
+      }),
+    );
+    expect(result.some((event) => event.type === "task.closed")).toBe(true);
+  });
+});
+
 describe("createTask", () => {
+  it("starts a repeat series from the task's current fields", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({
+        description: "Old note",
+        dueAt: "2026-10-08T15:00:00.000Z",
+        estimateMinutes: 20,
+        presetId: "personal",
+        startAt: "2026-10-07T15:00:00.000Z",
+        title: "Original",
+      }),
+    );
+    if (created?.type !== "task.created") {
+      throw new Error("Expected task.created");
+    }
+    const taskId = created.payload.taskId;
+    unwrap(
+      await world.actions.updateTask(taskId, {
+        description: "Current note",
+        dueAt: "2026-10-09T15:00:00.000Z",
+        title: "Current title",
+      }),
+    );
+    unwrap(await world.actions.setEstimate(taskId, 45));
+    unwrap(await world.actions.setImportance(taskId, "asap"));
+
+    const events = unwrap(await world.actions.startSeriesForTask(taskId, { kind: "daily" }));
+    const series = events.find((event) => event.type === "series.created");
+    if (series?.type !== "series.created") {
+      throw new Error("Expected series.created");
+    }
+    expect(series.payload.template).toMatchObject({
+      description: "Current note",
+      dueAt: "2026-10-09T15:00:00.000Z",
+      estimateMinutes: 45,
+      importance: "asap",
+      title: "Current title",
+    });
+  });
+
+  it("creates a repeat series and an independent first task, then keeps one future instance", async () => {
+    const world = await setupActions();
+    const events = unwrap(
+      await world.actions.createTask({
+        presetId: "personal",
+        title: "Take medicine",
+        startAt: "2026-10-07T15:00:00.000Z",
+        recurrence: { kind: "daily" },
+      }),
+    );
+    expect(events.map((event) => event.type)).toEqual(["series.created", "task.created"]);
+    const series = events[0];
+    const first = events[1];
+    if (series?.type !== "series.created" || first?.type !== "task.created") {
+      return;
+    }
+    expect(first.payload.seriesId).toBe(series.payload.seriesId);
+    expect(first.source).toBe("system");
+    expect(first.payload.taskId).toMatch(/^rep:/u);
+    expect(taskOf(world, first.payload.taskId)?.userModified).toBe(false);
+    await world.actions.ensureInstances();
+    const generated = Object.values(world.state.store.getState().tasks.byId).filter(
+      (task) => task.seriesId === series.payload.seriesId,
+    );
+    expect(generated).toHaveLength(1);
+  });
   it("emits task.created with the client's envelope and fresh ids", async () => {
     const world = await setupActions();
     const events = unwrap(
@@ -708,6 +803,7 @@ describe("settings", () => {
     unwrap(await world.actions.setNightHours(true));
     unwrap(await world.actions.setNotificationChannel("deadline_digest", "web", true));
     expect(world.state.store.getState().settings).toEqual({
+      categoryEstimates: {},
       digestWindows: ["08:00", "20:00"],
       language: "ru",
       nightHours: true,
@@ -726,6 +822,22 @@ describe("settings", () => {
       error: expect.stringMatching(/^dispatch\//) as string,
       ok: false,
     });
+  });
+
+  it("stores a manual category estimate as an event and uses it after a specific estimate", async () => {
+    const world = await setupActions([]);
+    const [setting] = unwrap(await world.actions.setCategoryEstimate("hygiene", 22));
+    expect(setting?.type).toBe("settings.updated");
+    const [defaulted] = unwrap(
+      await world.actions.startActivity({ category: "hygiene", label: "Shower" }),
+    );
+    expect(defaulted?.type === "activity.started" && defaulted.payload.expectMinutes).toBe(22);
+    const [specific] = unwrap(
+      await world.actions.startActivity({ category: "hygiene", expectMinutes: 12, label: "Bath" }),
+    );
+    expect(specific?.type === "activity.started" && specific.payload.expectMinutes).toBe(12);
+    unwrap(await world.actions.setCategoryEstimate("hygiene", null));
+    expect(world.state.store.getState().settings.categoryEstimates).toEqual({});
   });
 });
 

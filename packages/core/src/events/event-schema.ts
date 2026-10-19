@@ -18,6 +18,8 @@ import {
   PresetUpdatedPayload,
   ProjectCreatedPayload,
   ProjectUpdatedPayload,
+  SeriesArchivedPayload,
+  SeriesCreatedPayload,
   SettingsUpdatedPayload,
   TaskClosedPayload,
   TaskCreatedPayload,
@@ -62,6 +64,9 @@ export const EVENT_TYPES = [
   "preset.updated",
   "preset.archived",
   "settings.updated",
+  "series.created",
+  "series.updated",
+  "series.archived",
   "focus.started",
   "focus.ended",
   "activity.started",
@@ -78,7 +83,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
 /** Deterministic ids for system events (`hw:<presetId>:<isoWeek>`, `auto:<taskId>:<kind>`). */
 // An auto outcome of a recurring instance nests ids ("auto:hw:<preset>:<week>:missed"), so
 // anything non-blank after the prefix is accepted; the reducers own the exact shape.
-const SYSTEM_ID = /^(?:hw|auto):\S+$/;
+const SYSTEM_ID = /^(?:hw|auto|rep):\S+$/;
 
 export const EventIdSchema = z.string().refine((value) => isUlid(value) || SYSTEM_ID.test(value), {
   message: "Expected a ULID or a deterministic system id",
@@ -123,6 +128,9 @@ export const EventSchema = z.discriminatedUnion("type", [
   event("preset.updated", PresetUpdatedPayload),
   event("preset.archived", PresetArchivedPayload),
   event("settings.updated", SettingsUpdatedPayload),
+  event("series.created", SeriesCreatedPayload),
+  event("series.updated", SeriesCreatedPayload),
+  event("series.archived", SeriesArchivedPayload),
   event("focus.started", FocusStartedPayload),
   event("focus.ended", FocusEndedPayload),
   event("activity.started", ActivityStartedPayload),

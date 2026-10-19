@@ -1,9 +1,10 @@
 import type { Hono } from "hono";
 
-import { endpoints, err, ok, type Result } from "@pace/core";
+import { endpoints, err, isUlid, ok, type Result } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
+import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
@@ -11,6 +12,7 @@ import { loginPayload } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { userStoreOf } from "../shared/user-store-of.ts";
 import { readBearer } from "./auth-middleware.ts";
+import { cachedAvatar, refreshAvatar } from "./avatar.ts";
 import { mountDeviceRoutes } from "./device-routes.ts";
 import { consumeNonce, createNonce } from "./nonce.ts";
 import { createSession, revokeSession } from "./sessions.ts";
@@ -36,12 +38,29 @@ const NONCE_NOT_FOUND: Problem = {
 const signIn = async (
   db: Db,
   config: Config,
-  input: { readonly profile: TelegramProfile; readonly label: string; readonly now: number },
+  input: {
+    readonly profile: TelegramProfile;
+    readonly label: string;
+    readonly now: number;
+    readonly apiOrigin: string;
+    readonly telegramFetch?: TelegramTransport;
+  },
 ): Promise<Result<Session, Problem>> => {
   if (!isAllowed(input.profile.telegramId, config.allowedTelegramIds)) {
     return err(NOT_ALLOWED);
   }
-  const user = await upsertTelegramUser(db, input.profile, input.now);
+  const stored = await upsertTelegramUser(db, { ...input.profile, photoUrl: undefined }, input.now);
+  const user =
+    config.telegramBotToken === undefined || input.telegramFetch === undefined
+      ? stored
+      : await refreshAvatar(db, stored, {
+          target: {
+            apiRoot: config.telegramApiRoot,
+            token: config.telegramBotToken,
+            fetch: input.telegramFetch,
+          },
+          apiOrigin: input.apiOrigin,
+        });
   const { token } = await createSession(db, {
     label: input.label,
     now: input.now,
@@ -50,55 +69,81 @@ const signIn = async (
   return ok({ token, user });
 };
 
-const telegramLogin: Handler<typeof endpoints.auth.telegram> = async ({ c, body }) => {
-  const config = c.get("config");
-  if (config.telegramBotToken === undefined) {
-    return err({
-      code: "auth/not-configured",
-      message: "Telegram login is not configured",
-      status: 503,
-    });
-  }
-  const now = Date.now();
-  const verified = await verifyTelegramLogin(body, config.telegramBotToken, Math.floor(now / 1000));
-  if (verified.ok) {
-    return await signIn(d1(c.env.DB), config, { label: "web", now, profile: verified.value });
-  }
-  switch (verified.error) {
-    case "auth/invalid-hash": {
-      return err({ code: verified.error, message: "Invalid Telegram signature", status: 401 });
-    }
-    case "auth/expired": {
+const telegramLogin =
+  (telegramFetch: TelegramTransport): Handler<typeof endpoints.auth.telegram> =>
+  async ({ c, body }) => {
+    const config = c.get("config");
+    if (config.telegramBotToken === undefined) {
       return err({
-        code: verified.error,
-        message: "Telegram login expired, try again",
-        status: 401,
+        code: "auth/not-configured",
+        message: "Telegram login is not configured",
+        status: 503,
       });
     }
-  }
-};
+    const now = Date.now();
+    const verified = await verifyTelegramLogin(
+      body,
+      config.telegramBotToken,
+      Math.floor(now / 1000),
+    );
+    if (verified.ok) {
+      return await signIn(d1(c.env.DB), config, {
+        label: "web",
+        now,
+        profile: verified.value,
+        apiOrigin: new URL(c.req.url).origin,
+        telegramFetch,
+      });
+    }
+    switch (verified.error) {
+      case "auth/invalid-hash": {
+        return err({ code: verified.error, message: "Invalid Telegram signature", status: 401 });
+      }
+      case "auth/expired": {
+        return err({
+          code: verified.error,
+          message: "Telegram login expired, try again",
+          status: 401,
+        });
+      }
+    }
+  };
 
-const pollNonce: Handler<typeof endpoints.auth.noncePoll> = async ({ c, params }) => {
-  const db = d1(c.env.DB);
-  const now = Date.now();
-  const state = await consumeNonce(db, params.nonce, now);
-  switch (state.status) {
-    case "not-found": {
-      return err(NONCE_NOT_FOUND);
-    }
-    case "pending": {
-      return ok({ status: "pending" as const });
-    }
-    case "ready": {
-      const user = await findUserById(db, state.userId);
-      if (user === null) {
+const pollNonce =
+  (telegramFetch: TelegramTransport): Handler<typeof endpoints.auth.noncePoll> =>
+  async ({ c, params }) => {
+    const db = d1(c.env.DB);
+    const now = Date.now();
+    const state = await consumeNonce(db, params.nonce, now);
+    switch (state.status) {
+      case "not-found": {
         return err(NONCE_NOT_FOUND);
       }
-      const { token } = await createSession(db, { label: "android", now, userId: user.id });
-      return ok({ status: "ready" as const, token, user });
+      case "pending": {
+        return ok({ status: "pending" as const });
+      }
+      case "ready": {
+        const stored = await findUserById(db, state.userId);
+        if (stored === null) {
+          return err(NONCE_NOT_FOUND);
+        }
+        const config = c.get("config");
+        const user =
+          config.telegramBotToken === undefined
+            ? stored
+            : await refreshAvatar(db, stored, {
+                target: {
+                  apiRoot: config.telegramApiRoot,
+                  token: config.telegramBotToken,
+                  fetch: telegramFetch,
+                },
+                apiOrigin: new URL(c.req.url).origin,
+              });
+        const { token } = await createSession(db, { label: "android", now, userId: user.id });
+        return ok({ status: "ready" as const, token, user });
+      }
     }
-  }
-};
+  };
 
 const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
   const config = c.get("config");
@@ -112,18 +157,23 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
     telegramId: body.telegramId,
     username: null,
   };
-  return await signIn(d1(c.env.DB), config, { label: "dev", now: Date.now(), profile });
+  return await signIn(d1(c.env.DB), config, {
+    label: "dev",
+    now: Date.now(),
+    profile,
+    apiOrigin: new URL(c.req.url).origin,
+  });
 };
 
-export const mountAuthRoutes = (app: Hono<AppEnv>): void => {
-  mount(app, endpoints.auth.telegram, telegramLogin);
+export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransport): void => {
+  mount(app, endpoints.auth.telegram, telegramLogin(telegramFetch));
   mount(app, endpoints.auth.nonceCreate, async ({ c, query }) => {
     const { nonce } = await createNonce(d1(c.env.DB), Date.now());
     const payload = loginPayload(nonce, query.from ?? "app");
     const deepLink = `https://t.me/${c.get("config").telegramBotUsername}?start=${payload}`;
     return ok({ deepLink, nonce });
   });
-  mount(app, endpoints.auth.noncePoll, pollNonce);
+  mount(app, endpoints.auth.noncePoll, pollNonce(telegramFetch));
   mount(app, endpoints.auth.logout, async ({ c }) => {
     const bearer = readBearer(c.req.header("Authorization"));
     if (bearer !== undefined) {
@@ -135,5 +185,18 @@ export const mountAuthRoutes = (app: Hono<AppEnv>): void => {
     ok({ ...requireUser(c), storeId: await userStoreOf(c).storeId() }),
   );
   mount(app, endpoints.auth.dev, devLogin);
+  // Binary image response: the JSON endpoint helper cannot serialize image bytes.
+  app.get("/api/avatars/:userId", async (c) => {
+    const userId = c.req.param("userId");
+    if (!isUlid(userId)) {
+      return await c.notFound();
+    }
+    const avatar = await cachedAvatar(d1(c.env.DB), userId);
+    return avatar === null
+      ? await c.notFound()
+      : new Response(new Uint8Array(avatar.bytes).buffer, {
+          headers: { "Content-Type": avatar.mime, "Cache-Control": "public, max-age=3600" },
+        });
+  });
   mountDeviceRoutes(app);
 };
