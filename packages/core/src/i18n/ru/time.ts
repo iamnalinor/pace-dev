@@ -16,6 +16,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "category.other": "Другое",
   "time.bar": "Время",
   "time.whatDoing": "Чем заняты?",
+  "time.startOther": "Начать другое",
   "time.draft": "{label}, ассистент разбирает",
   "time.start": "Начать",
   "time.stop": "Стоп",

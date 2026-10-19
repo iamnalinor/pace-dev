@@ -97,6 +97,25 @@ describe("TimeBar", () => {
     expect(screen.queryByRole("button", { name: /More about/u })).toBeNull();
   });
 
+  it("folds the field and the buttons on a phone while something runs, one tap away", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.startActivity(
+      { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
+      { at: addMinutesIso(NOW, -10) },
+    );
+    await renderScreen(<TimeBar />, runtime);
+    // What runs and its Stop stay; the rest folds into one line.
+    expect(screen.getByRole("button", { name: "Stop: Walk" })).toBeOnTheScreen();
+    expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
+    expect(screen.queryByRole("button", { name: "Chores" })).toBeNull();
+    const more = screen.getByRole("button", { name: en("time.startOther") });
+    expect(more).toBeCollapsed();
+    await fireEvent.press(more);
+    expect(barButtons()).toEqual(BUTTONS.map((name) => (name === "Rest" ? "Rest, running" : name)));
+    expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("time.startOther") })).toBeExpanded();
+  });
+
   it("opens Rest's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);

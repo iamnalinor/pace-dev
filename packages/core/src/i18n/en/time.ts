@@ -14,6 +14,7 @@ export const enTime = {
   "category.other": "Other",
   "time.bar": "Time",
   "time.whatDoing": "What are you doing?",
+  "time.startOther": "Start something else",
   "time.draft": "{label}, being read by the assistant",
   "time.start": "Start",
   "time.stop": "Stop",

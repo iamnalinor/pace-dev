@@ -1,4 +1,13 @@
-import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Coffee,
+  House,
+  type LucideIcon,
+  Play,
+  Timer,
+} from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -10,6 +19,7 @@ import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
 import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
 import { inkClass, OUTLINE } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { useIsWide } from "#app/ui/layout.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
@@ -203,10 +213,79 @@ const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
   };
 };
 
+/** The four buttons in their fixed places. */
+const BarButtons = ({
+  buttons,
+  calendarUnavailable,
+  onTap,
+}: {
+  readonly buttons: readonly TimeButtonView[];
+  readonly calendarUnavailable: string | undefined;
+  readonly onTap: (button: TimeButtonView) => void;
+}) => (
+  <View className="flex-row gap-2">
+    {buttons.map((button) => (
+      <BarButton
+        button={button}
+        key={button.id}
+        onTap={onTap}
+        // Running its own activity, it is on, whatever the calendar says.
+        unavailable={
+          button.kind === "calendar" && !button.isRunning ? calendarUnavailable : undefined
+        }
+      />
+    ))}
+  </View>
+);
+
+/**
+Whether the field and the buttons show: always on a wide window or with nothing running;
+folded when Now opens on something running on a phone. A start made in the open bar leaves
+it open, so nothing folds under the finger.
+*/
+const useFold = (isRunning: boolean) => {
+  const isWide = useIsWide();
+  const [isUnfolded, setIsUnfolded] = useState(!isRunning);
+  const isFoldable = !isWide && isRunning;
+  return {
+    isFoldable,
+    isShown: !isFoldable || isUnfolded,
+    isUnfolded,
+    toggle: (): void => {
+      setIsUnfolded((current) => !current);
+    },
+  };
+};
+
+/** The one line a phone's bar folds the field and the buttons into while something runs. */
+const FoldToggle = ({
+  isOpen,
+  onToggle,
+}: {
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+}) => {
+  const t = useT();
+  const { palette } = useTheme();
+  const Chevron = isOpen ? ChevronDown : ChevronUp;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: isOpen }}
+      className="min-h-11 flex-row items-center justify-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
+      onPress={onToggle}
+    >
+      <Text className="font-sans text-[13px] text-fg2">{t("time.startOther")}</Text>
+      <Chevron color={palette.fg2} size={16} />
+    </Pressable>
+  );
+};
+
 /**
 The time bar at the foot of Now: what runs (and what runs alongside), "What are you
 doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
-what it can start.
+what it can start. On a phone, opened on something running, the field and the buttons fold
+into one line under it, so the bar leaves room for the tasks; a tap unfolds them.
 */
 export const TimeBar = () => {
   const t = useT();
@@ -215,6 +294,7 @@ export const TimeBar = () => {
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
   const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
+  const fold = useFold(running !== null);
   return (
     <View
       accessibilityLabel={t("time.bar")}
@@ -224,20 +304,17 @@ export const TimeBar = () => {
       {[...(running === null ? [] : [running]), ...alongside].map((item) => (
         <RunningRow key={item.activityId} running={item} />
       ))}
-      <TypedStart />
-      <View className="flex-row gap-2">
-        {buttons.map((button) => (
-          <BarButton
-            button={button}
-            key={button.id}
+      {fold.isFoldable ? <FoldToggle isOpen={fold.isUnfolded} onToggle={fold.toggle} /> : null}
+      {fold.isShown ? (
+        <>
+          <TypedStart />
+          <BarButtons
+            buttons={buttons}
+            calendarUnavailable={calendar.unavailable}
             onTap={(pressed) => void open(pressed)}
-            // Running its own activity, it is on, whatever the calendar says.
-            unavailable={
-              button.kind === "calendar" && !button.isRunning ? calendar.unavailable : undefined
-            }
           />
-        ))}
-      </View>
+        </>
+      ) : null}
       {opened === null || openedButton === null ? null : (
         <ChoicesSheet
           button={openedButton}
