@@ -46,15 +46,59 @@ test("an assistant question is answered with one click, by keyboard too", async 
   await expect(tomorrow).toBeVisible();
   await expect(page.getByText("Is this for work or home?")).toBeVisible();
   await expect(
-    page.getByText("Approve keeps what is shown. Answer the questions to refine it."),
+    page.getByText(
+      "Approve keeps what is shown. To refine it, tap an answer or type one in the field below.",
+    ),
   ).toBeVisible();
   await expectNoA11yViolations(page);
   // Each option is a 44px target that the keyboard reaches and presses.
   expect((await tomorrow.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   await tomorrow.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("By when does this need to be done?")).toHaveCount(0);
+  // The answer stays in view instead of the question; the open one is still asked.
+  await expect(when).toHaveCount(0);
+  await expect(
+    page.getByLabel("Answered: By when does this need to be done? — Tomorrow"),
+  ).toBeVisible();
   await expect(page.getByText("Is this for work or home?")).toBeVisible();
   await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
   await expect(nowTasks(page).getByText("Съездить в банк")).toHaveCount(0);
+  // Escape with the caret in the line closes the card and keeps the text.
+  await line.focus();
+  await line.press("Escape");
+  await expect(page.getByText("The assistant will create “Съездить в банк”")).toHaveCount(0);
+  await expect(line).toHaveValue("#ask Съездить в банк");
+});
+
+// QA round 13 M2: a pasted message is read at once; Enter while it is read sends nothing more.
+test("a pasted message about a task goes to the assistant once", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const parses: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/api/parse")) {
+      parses.push(request.postData() ?? "");
+    }
+  });
+  const line = page.getByRole("textbox", { name: "New task" });
+  await line.fill("rename task Gamma to Delta");
+  await line.press("Enter");
+  // No task Gamma: the assistant says it found nothing, rather than asking to try again.
+  await expect(page.getByText(/^The assistant found nothing to do with this\./u)).toBeVisible();
+  // Both requests (when there were two) left before the answer that is shown came back.
+  expect(parses).toHaveLength(1);
+});
+
+// QA round 13 M4: in the time bar `#ask` asks how long, and an answer sets the length.
+test("the time bar's assistant asks how long, answered with one click", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const field = page.getByRole("textbox", { name: "What are you doing?" });
+  await field.fill("#ask Bar question");
+  await field.press("Enter");
+  const length = page.getByRole("group", { name: "How long will it take?" });
+  await length.getByRole("button", { name: "1h" }).click();
+  await expect(page.getByLabel("Answered: How long will it take? — 1h")).toBeVisible();
+  await expect(page.getByText("Expect: ~1h")).toBeVisible();
+  await expect(page.getByText("The assistant could not read this. Try again.")).toHaveCount(0);
 });

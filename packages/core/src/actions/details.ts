@@ -9,6 +9,7 @@ import { projectById } from "../model/project.ts";
 import { presetLabel } from "../presets/preset-label.ts";
 import { presetById } from "../presets/preset-reducer.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
+import { runningActivity } from "../tracking/timeline.ts";
 
 /** One field of an action as a reviewer reads it; `isDoubtful` when the model only guessed it. */
 export type DetailLine = {
@@ -18,7 +19,12 @@ export type DetailLine = {
   readonly isDoubtful: boolean;
 };
 
-type World = { readonly state: CoreState; readonly language: Language };
+type World = {
+  readonly state: CoreState;
+  readonly language: Language;
+  /** The instant the card is read at: a start then names the running activity it stops. */
+  readonly now?: string;
+};
 
 type Draft = {
   readonly field: null | ParseField;
@@ -84,7 +90,7 @@ const categoryDraft = (category: ActivityCategory, language: Language): Draft =>
 
 const startDrafts = (
   action: Extract<Action, { kind: "activity.start" }>,
-  { language }: World,
+  { language, now, state }: World,
 ): readonly Draft[] => [
   categoryDraft(action.category, language),
   {
@@ -94,6 +100,12 @@ const startDrafts = (
       action.expectMinutes === null || action.expectMinutes === undefined
         ? null
         : `~${formatDuration(action.expectMinutes, language)}`,
+  },
+  // A start takes over from the main activity running (one alongside goes on).
+  {
+    field: null,
+    key: "action.field.stops",
+    value: now === undefined ? null : (runningActivity(state.time, now)?.label ?? null),
   },
 ];
 

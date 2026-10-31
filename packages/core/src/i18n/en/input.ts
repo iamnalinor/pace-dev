@@ -187,6 +187,7 @@ export const enInput = {
   "action.field.importance": "Importance",
   "action.field.subtasks": "Subtasks",
   "action.field.expect": "Expect",
+  "action.field.stops": "Stops",
   "action.doubtful": "(check this)",
   "assistant.approve": "Approve",
   "assistant.review": "Review assistant actions",
@@ -201,5 +202,14 @@ export const enInput = {
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",
   "assistant.tooManyCorrections": "That is five corrections. Approve or cancel, then start again.",
-  "assistant.questionsHint": "Approve keeps what is shown. Answer the questions to refine it.",
+  "assistant.questionsHint": "Approve keeps what is shown. Tap an answer to refine it.",
+  "assistant.questionsHintType":
+    "Approve keeps what is shown. To refine it, type your answer in the field below.",
+  "assistant.questionsHintBoth":
+    "Approve keeps what is shown. To refine it, tap an answer or type one in the field below.",
+  "assistant.answered": "Answered: {question} — {option}",
+  "assistant.nothingToDo":
+    "The assistant found nothing to do with this. Rephrase it, or add it with New task.",
+  "assistant.nothingToStart":
+    "The assistant found nothing to start here. A task goes in the task line instead.",
 } as const;

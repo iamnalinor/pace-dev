@@ -80,6 +80,9 @@ const PARSED = parsed(
   ["estimateMinutes"],
 );
 
+/** The assistant's answer with its questions. */
+const withQuestions = (questions: readonly unknown[]) => ({ ...PARSED, questions });
+
 const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: string) =>
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
@@ -181,8 +184,8 @@ describe("Composer", () => {
     await fireEvent.changeText(line(), "срочно почта");
     await enter();
     const question = await screen.findByLabelText("When is it due?");
-    // Approve stays: the hint says it keeps the guesses and that an answer refines them.
-    expect(screen.getByText(en("assistant.questionsHint"))).toBeOnTheScreen();
+    // Approve stays: the hint says it keeps the guesses, and how to answer (tap, or type below).
+    expect(screen.getByText(en("assistant.questionsHintBoth"))).toBeOnTheScreen();
     expect(button("assistant.approve")).toBeEnabled();
     // A question without options is answered in the correction field: it has no buttons.
     expect(screen.getByText("Is this for work or home?")).toBeOnTheScreen();
@@ -199,9 +202,13 @@ describe("Composer", () => {
       text: "«When is it due?» — Tomorrow",
       thread: [{ actions: PARSED.actions, text: "срочно почта" }],
     });
-    // Pending: no second answer can start, and nothing was written.
+    // Pending: the chosen answer is marked, nothing else can be pressed, nothing was written.
     expect(within(question).getByRole("button", { name: "Today" })).toBeDisabled();
     expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeDisabled();
+    expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeSelected();
+    expect(within(question).getByRole("button", { name: "Today" })).not.toBeSelected();
+    expect(button("assistant.approve")).toBeDisabled();
+    expect(screen.getByLabelText(en("assistant.correct"))).toBeDisabled();
     expect(created(runtime, "разобрать почту")).toBeUndefined();
 
     await act(async () => {
@@ -211,8 +218,58 @@ describe("Composer", () => {
     await waitFor(() => {
       expect(screen.queryByLabelText("When is it due?")).toBeNull();
     });
-    expect(screen.queryByText(en("assistant.questionsHint"))).toBeNull();
+    expect(screen.queryByText(en("assistant.questionsHintBoth"))).toBeNull();
     expect(screen.getByText("New task: разобрать почту")).toBeOnTheScreen();
+    // The answer stays in view, so the person sees it was taken.
+    expect(
+      screen.getByLabelText(
+        en("assistant.answered", { option: "Tomorrow", question: "When is it due?" }),
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it("says how to answer: tap an option, or type below when a question has none", async () => {
+    const parse = jest.fn(() =>
+      withQuestions([{ field: "dueDate", options: ["Today"], question: "When is it due?" }]),
+    );
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText(en("assistant.questionsHint"))).toBeOnTheScreen();
+    parse.mockImplementation(() =>
+      withQuestions([{ field: "category", options: [], question: "Work or home?" }]),
+    );
+    await fireEvent.changeText(screen.getByLabelText(en("assistant.correct")), "срочно");
+    await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+    expect(await screen.findByText(en("assistant.questionsHintType"))).toBeOnTheScreen();
+  });
+
+  it("asks the assistant once for a pasted message, also when Enter follows while it reads (QA 13 M2)", async () => {
+    const { promise: answered, resolve } = Promise.withResolvers<unknown>();
+    const parse = jest.fn(async () => await answered);
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    // At once, as a paste: the assistant reads it without waiting for Enter.
+    await fireEvent.changeText(line(), "rename task Gamma to Delta");
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(1);
+    });
+    await enter();
+    await enter();
+    await act(async () => {
+      resolve(PARSED);
+      await answered;
+    });
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the assistant found nothing to do instead of asking to try again", async () => {
+    const nothing = { ...PARSED, actions: [] };
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => nothing } }));
+    await fireEvent.changeText(line(), "close task Nonexistent");
+    await enter();
+    expect(await screen.findByText(en("assistant.nothingToDo"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
   });
 
   it("shows no answer hint while the assistant asks nothing", async () => {

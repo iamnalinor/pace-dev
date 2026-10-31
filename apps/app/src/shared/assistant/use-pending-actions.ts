@@ -4,6 +4,7 @@ import type { Actions, Assistant } from "@pace/client";
 import type { Action, Event, MessageKey, ParseQuestion, ParseRequestBody } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
+import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 
 /** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
@@ -119,7 +120,7 @@ export const usePendingActions = (
 
     const next = pendingOf(answer, { text, thread });
     if (next === null) {
-      setIssue(thread.length > 0 ? "assistant.couldNotRevise" : "assistant.couldNotRead");
+      setIssue(readingIssue(answer, { domain, isRevision: thread.length > 0 }));
     } else {
       setPending(next);
     }

@@ -190,6 +190,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "action.field.importance": "Важность",
   "action.field.subtasks": "Подзадачи",
   "action.field.expect": "Ожидается",
+  "action.field.stops": "Остановит",
   "action.doubtful": "(проверьте)",
   "assistant.approve": "Подтвердить",
   "assistant.review": "Посмотреть действия ассистента",
@@ -206,5 +207,14 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "assistant.tooManyCorrections":
     "Это уже пять уточнений. Подтвердите или отмените и начните заново.",
   "assistant.questionsHint":
-    "«Подтвердить» сохранит всё как показано. Ответьте на вопросы, чтобы уточнить.",
+    "«Подтвердить» сохранит всё как показано. Нажмите ответ, чтобы уточнить.",
+  "assistant.questionsHintType":
+    "«Подтвердить» сохранит всё как показано. Чтобы уточнить, напишите ответ в поле ниже.",
+  "assistant.questionsHintBoth":
+    "«Подтвердить» сохранит всё как показано. Чтобы уточнить, нажмите ответ или напишите его в поле ниже.",
+  "assistant.answered": "Ответ: {question} — {option}",
+  "assistant.nothingToDo":
+    "Ассистент не нашёл, что здесь сделать. Переформулируйте или добавьте через «Новая задача».",
+  "assistant.nothingToStart":
+    "Ассистент не нашёл, что здесь начать. Задачу добавьте в строке задач.",
 };

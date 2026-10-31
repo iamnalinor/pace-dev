@@ -149,6 +149,30 @@ const resetAndClose =
     close();
   };
 
+/**
+Enter reviews an action or approves the preview already shown; a line too short to read opens
+the form. While the assistant reads (a paste is read at once, before any Enter) it waits: a
+second request would only repeat the first (QA round 13 M2).
+*/
+const enterOf =
+  (
+    pending: Pick<ReturnType<typeof usePendingActions>, "approve" | "busy" | "pending" | "submit">,
+    text: string,
+    openForm: () => void,
+  ) =>
+  (): void => {
+    if (pending.busy) {
+      return;
+    }
+    if (pending.pending !== null) {
+      void pending.approve();
+    } else if (canAiRead(text)) {
+      pending.submit(text);
+    } else {
+      openForm();
+    }
+  };
+
 /** The composer's state and moves: the text, the reading, the form, and what each key does. */
 const useFlowState = ({
   initialText,
@@ -186,16 +210,11 @@ const useFlowState = ({
     pending,
     answer: pending.followup,
     close,
-    /** Enter reviews an action or approves the preview already shown. */
-    enter: (): void => {
-      if (pending.pending !== null) {
-        void pending.approve();
-      } else if (canAiRead(text)) {
-        pending.submit(text);
-      } else {
-        setForm("by-hand");
-      }
-    },
+    /** Escape in the line: the assistant's card goes, the text stays. */
+    dismiss: pending.cancel,
+    enter: enterOf(pending, text, () => {
+      setForm("by-hand");
+    }),
     /** New task opens the manual form and dismisses any assistant preview. */
     expand: (): void => {
       if (form !== null) {

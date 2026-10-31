@@ -23,6 +23,8 @@ type LineFlow = {
   readonly lineFocus: number;
   readonly type: (next: string) => void;
   readonly enter: () => void;
+  /** Escape in the line: the assistant's card (or its reading) goes. */
+  readonly dismiss: () => void;
   readonly expand: () => void;
   readonly toInbox: () => Promise<void>;
 };
@@ -34,9 +36,16 @@ const MAX_INPUT_HEIGHT = 212;
 const heightOf = (content: number): number =>
   Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
 
-type KeyActions = { readonly enter: () => void; readonly toInbox: () => void };
+type KeyActions = {
+  readonly enter: () => void;
+  readonly toInbox: () => void;
+  readonly escape: () => void;
+};
 
-/** Enter reads the line, Alt+Enter sends it to the Inbox, Shift+Enter starts a new line. */
+/**
+Enter reads the line, Alt+Enter sends it to the Inbox, Shift+Enter starts a new line; Escape
+dismisses the assistant's card (the line owns its keys, so the card's own Escape never fires).
+*/
 const onEnter =
   (isEmpty: boolean, keys: KeyActions) =>
   (event: TextInputKeyPressEvent): void => {
@@ -44,6 +53,10 @@ const onEnter =
       altKey?: boolean;
       shiftKey?: boolean;
     };
+    if (native.key === "Escape") {
+      keys.escape();
+      return;
+    }
     if (isEmpty || native.key !== "Enter" || native.shiftKey === true) {
       return;
     }
@@ -163,6 +176,7 @@ const LineInput = ({
           },
           onKeyPress: onEnter(isEmpty, {
             enter: flow.enter,
+            escape: flow.dismiss,
             toInbox: () => void flow.toInbox(),
           }),
         }))}

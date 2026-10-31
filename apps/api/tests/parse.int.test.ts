@@ -337,6 +337,31 @@ describe("POST /api/parse: activities", () => {
     });
   });
 
+  it("asks how long an activity takes on `#ask` (the fake), and an answer sets it", async () => {
+    const token = await loginAsDev("1002");
+    const asked = await parse(token, "#ask Bar question", "activity");
+    expect(only(asked)).toMatchObject({ kind: "activity.start", label: "Bar question" });
+    expect(asked.questions).toEqual([
+      { field: "expectMinutes", options: ["20m", "1h", "2h"], question: "How long will it take?" },
+    ]);
+    const answered = asAnswered(
+      await json("/api/parse", {
+        body: {
+          domain: "activity",
+          text: "«How long will it take?» — 1h",
+          thread: [{ actions: asked.actions, text: "#ask Bar question" }],
+        },
+        token,
+      }),
+    );
+    expect(only(answered)).toMatchObject({
+      expectMinutes: 60,
+      kind: "activity.start",
+      label: "Bar question",
+    });
+    expect(answered.questions ?? []).toEqual([]);
+  });
+
   it("keeps only actions of the field the text came from", async () => {
     const token = await loginAsDev("1002");
     await seed(token, "Water the plants", "Garden");

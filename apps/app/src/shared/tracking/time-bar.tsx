@@ -42,12 +42,10 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
     onUse();
     if (pending.pending !== null) {
       void pending.approve();
-      return;
+      // Reading already: Enter again would only send the same request twice.
+    } else if (typed !== "" && !pending.busy) {
+      pending.submit(typed);
     }
-    if (typed === "") {
-      return;
-    }
-    pending.submit(typed);
   };
   return (
     <View className="gap-2">

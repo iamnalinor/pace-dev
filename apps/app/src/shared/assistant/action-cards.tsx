@@ -2,17 +2,14 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
+import { Questions } from "#app/shared/assistant/questions.tsx";
+import { useViewer } from "#app/shared/use-viewer.ts";
+import { KeyHint } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
-import {
-  type Action,
-  answerText,
-  detailText,
-  type ParseQuestion,
-  summaryDetails,
-} from "@pace/core";
+import { type Action, detailText, type ParseQuestion, summaryDetails } from "@pace/core";
 
 /**
 One action as it will be written: its summary, then what it sets (a new task's category, due,
@@ -20,8 +17,9 @@ estimate…; an activity's category and expected length), a field the model only
 */
 const ActionCard = ({ action }: { readonly action: Action }) => {
   const language = useLanguage();
+  const { now } = useViewer();
   const state = useAppState((current) => current);
-  const lines = summaryDetails(action, { language, state });
+  const lines = summaryDetails(action, { language, now, state });
   return (
     <View
       accessibilityLabel={action.summary}
@@ -74,7 +72,7 @@ const CorrectionRow = ({
     onFollowup(text);
   };
   return (
-    <View className="flex-row gap-2">
+    <View className={cx("flex-row gap-2", busy && "opacity-50")}>
       <TextInput
         accessibilityLabel={t("assistant.correct")}
         className="min-h-11 flex-1 rounded-lg border border-line bg-bg px-3 font-sans text-fg"
@@ -98,47 +96,47 @@ const CorrectionRow = ({
   );
 };
 
-/**
-One of the assistant's questions, its options under it as buttons: a tap sends that answer as
-a correction (the question quoted, so the model knows what it answers), the same path as a
-typed one. A question without options is answered by typing.
-*/
-const QuestionBlock = ({
+/** Approve (Enter) and Cancel (Esc), their keys shown with a keyboard, dimmed while busy. */
+const CardButtons = ({
   busy,
-  onFollowup,
-  question,
+  canApprove,
+  onApprove,
+  onCancel,
 }: {
   readonly busy: boolean;
-  readonly onFollowup: (text: string) => void;
-  readonly question: ParseQuestion;
+  readonly canApprove: boolean;
+  readonly onApprove: () => void;
+  readonly onCancel: () => void;
 }) => {
-  const text = (
-    <Text className="font-sans text-[13px] leading-5 text-question">{question.question}</Text>
-  );
-  if (question.options.length === 0) {
-    return text;
-  }
+  const t = useT();
   return (
-    <View accessibilityLabel={question.question} role="group">
-      {text}
-      <View className="flex-row flex-wrap gap-x-2">
-        {question.options.map((option) => (
-          <Pressable
-            accessibilityLabel={option}
-            accessibilityRole="button"
-            className={cx("h-11 justify-center active:opacity-80", busy && "opacity-50")}
-            disabled={busy}
-            key={option}
-            onPress={() => {
-              onFollowup(answerText(question.question, option));
-            }}
-          >
-            <View className="h-8 justify-center rounded-pill border border-line bg-bg px-3">
-              <Text className="font-sans text-[13px] text-fg">{option}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+    <View className="flex-row gap-2">
+      <Pressable
+        accessibilityLabel={t("assistant.approve")}
+        accessibilityRole="button"
+        className={cx(
+          "min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent px-3",
+          !canApprove && "opacity-50",
+        )}
+        disabled={!canApprove}
+        onPress={onApprove}
+      >
+        <Text className="font-sans font-medium text-accentFg">{t("assistant.approve")}</Text>
+        <KeyHint hotkey={HOTKEYS.enter} variant="primary" />
+      </Pressable>
+      <Pressable
+        accessibilityLabel={t("assistant.cancel")}
+        accessibilityRole="button"
+        className={cx(
+          "min-h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line px-3",
+          busy && "opacity-50",
+        )}
+        disabled={busy}
+        onPress={onCancel}
+      >
+        <Text className="font-sans text-fg">{t("assistant.cancel")}</Text>
+        <KeyHint hotkey={HOTKEYS.escape} variant="secondary" />
+      </Pressable>
     </View>
   );
 };
@@ -154,16 +152,14 @@ export const ActionCards = ({
   source,
 }: Props) => {
   const t = useT();
-  useHotkey(HOTKEYS.enter, () => {
-    if (!busy && actions.length > 0) {
+  const canApprove = !busy && actions.length > 0;
+  const approve = (): void => {
+    if (canApprove) {
       onApprove();
     }
-  });
-  useHotkey(HOTKEYS.primary, () => {
-    if (!busy && actions.length > 0) {
-      onApprove();
-    }
-  });
+  };
+  useHotkey(HOTKEYS.enter, approve);
+  useHotkey(HOTKEYS.primary, approve);
   useHotkey(HOTKEYS.escape, onCancel);
   return (
     <View className="gap-3 rounded-xl border border-line bg-surface p-3">
@@ -175,37 +171,13 @@ export const ActionCards = ({
       {actions.map((action, index) => (
         <ActionCard action={action} key={`${action.kind}:${String(index)}`} />
       ))}
-      {questions.map((question) => (
-        <QuestionBlock
-          busy={busy}
-          key={question.question}
-          onFollowup={onFollowup}
-          question={question}
-        />
-      ))}
-      {questions.length > 0 && actions.length > 0 ? (
-        <Text className="font-sans text-[13px] leading-5 text-muted">
-          {t("assistant.questionsHint")}
-        </Text>
-      ) : null}
-      <View className="flex-row gap-2">
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-11 flex-1 items-center justify-center rounded-lg bg-accent px-3"
-          disabled={busy || actions.length === 0}
-          onPress={onApprove}
-        >
-          <Text className="font-sans font-medium text-accentFg">{t("assistant.approve")}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-11 items-center justify-center rounded-lg border border-line px-3"
-          disabled={busy}
-          onPress={onCancel}
-        >
-          <Text className="font-sans text-fg">{t("assistant.cancel")}</Text>
-        </Pressable>
-      </View>
+      <Questions
+        busy={busy}
+        hasActions={actions.length > 0}
+        onFollowup={onFollowup}
+        questions={questions}
+      />
+      <CardButtons busy={busy} canApprove={canApprove} onApprove={onApprove} onCancel={onCancel} />
       <CorrectionRow busy={busy} onFollowup={onFollowup} />
     </View>
   );

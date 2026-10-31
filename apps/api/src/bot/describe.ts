@@ -36,10 +36,10 @@ const describeCreate = (
 };
 
 /** Anything but a new task: its summary, then what it sets (an activity's category…). */
-const describeOther = (action: Action, { language, state }: Extras): string =>
+const describeOther = (action: Action, { language, now, state }: Extras): string =>
   [
     action.summary,
-    ...summaryDetails(action, { language, state }).map((line) => detailText(line, language)),
+    ...summaryDetails(action, { language, now, state }).map((line) => detailText(line, language)),
   ].join("\n");
 
 /** Questions are numbered once more than one has options: their buttons carry the number. */
