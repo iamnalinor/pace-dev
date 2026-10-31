@@ -80,6 +80,7 @@ export const enBoard = {
   "repeat.monthlyLast": "Every month on the last day",
   "repeat.shortMonths": "{rule} (the last day in shorter months)",
   "repeat.until": "{rule}, until {date}",
+  "repeat.last": "{rule}, this one is the last",
   "task.tracked": "Tracked",
   "task.subtasks": "Subtasks",
   "task.subtasksSummary": "{solved} solved · {sent} sent",

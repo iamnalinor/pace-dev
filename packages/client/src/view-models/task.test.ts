@@ -204,6 +204,7 @@ describe("taskViewModel", () => {
     });
     // A weekly homework instance repeats on its preset's due weekday (Wednesday).
     expect(view(HW_ID, HW_VIEW_NOW).stats.repeat).toEqual({
+      isLast: false,
       kind: "weekly",
       until: null,
       weekday: 3,

@@ -10,7 +10,7 @@ import { instanceId, newId } from "../ids.ts";
 import { coreReducer, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
 import { materialize } from "../materialize/materializer.ts";
 import { taskFixture } from "../materialize/task-fixture.fake.ts";
-import { taskById } from "../model/task.ts";
+import { type Task, taskById } from "../model/task.ts";
 import {
   describeRepeatRule,
   type RepeatRule,
@@ -98,6 +98,17 @@ describe("describeRepeatRule", () => {
     expect(both({ kind: "weekly", weekday: 5, until: "2027-01-15" })).toEqual([
       "Every Friday, until Jan 15 2027",
       "Каждую пятницу, до 15 янв. 2027",
+    ]);
+  });
+
+  it("says when the instance is the series' last, instead of the last date", () => {
+    expect(both({ isLast: true, kind: "monthly", day: 30, until: "2026-11-30" })).toEqual([
+      "Every month on the 30th (the last day in shorter months), this one is the last",
+      "Каждый месяц, 30\u{2011}го числа (в коротких месяцах — в последний день), этот повтор последний",
+    ]);
+    expect(both({ isLast: true, kind: "daily", until: "2026-10-01" })).toEqual([
+      "Every day, this one is the last",
+      "Каждый день, этот повтор последний",
     ]);
   });
 
@@ -209,14 +220,26 @@ const seriesLog = (schedule: SeriesSchedule): readonly Event[] => [
   }),
 ];
 
+const AT_NOW = { deviceTz: MOSCOW, now: NOW };
+
+/** The rule of the series' first instance (with `patch` on the task) as of `now`. */
+const firstRule = (
+  log: readonly Event[],
+  { now = NOW, patch = {} }: { readonly now?: string; readonly patch?: Partial<Task> } = {},
+): "missing" | null | RepeatRule => {
+  const state = materialize(log, coreReducer, INITIAL_CORE_STATE);
+  const task = taskById(state.tasks, FIRST);
+  return task === undefined
+    ? "missing"
+    : taskRepeatRule(state, { ...task, ...patch }, { deviceTz: MOSCOW, now });
+};
+
 describe("taskRepeatRule", () => {
   it("reads a series instance's rule from its series, anchored on the template's due date", () => {
-    const state = materialize(seriesLog({ kind: "monthly" }), coreReducer, INITIAL_CORE_STATE);
-    const task = taskById(state.tasks, FIRST);
-    expect(task).toBeDefined();
-    expect(task === undefined ? null : taskRepeatRule(state, task)).toEqual({
+    expect(firstRule(seriesLog({ kind: "monthly" }))).toEqual({
       kind: "monthly",
       day: 31,
+      isLast: false,
       until: null,
     });
   });
@@ -237,11 +260,10 @@ describe("taskRepeatRule", () => {
         },
       }),
     ];
-    const state = materialize(edited, coreReducer, INITIAL_CORE_STATE);
-    const task = taskById(state.tasks, FIRST);
-    expect(task === undefined ? null : taskRepeatRule(state, task)).toEqual({
+    expect(firstRule(edited)).toEqual({
       kind: "weekly",
       weekday: 6,
+      isLast: false,
       until: "2026-12-31",
     });
     const ended = materialize(
@@ -259,13 +281,67 @@ describe("taskRepeatRule", () => {
       INITIAL_CORE_STATE,
     );
     const kept = taskById(ended.tasks, FIRST);
-    expect(kept === undefined ? "missing" : taskRepeatRule(ended, kept)).toBeNull();
+    expect(kept === undefined ? "missing" : taskRepeatRule(ended, kept, AT_NOW)).toBeNull();
+  });
+
+  it("stops once the last repeat date has passed, but still names the last instance ahead", () => {
+    // The first instance starts Oct 1 and is due Oct 31 23:59 in Moscow; no repeat after Oct 15.
+    const log = seriesLog({ kind: "monthly", until: "2026-10-15" });
+    expect(firstRule(log, { now: "2026-11-05T09:00:00.000Z" })).toBeNull();
+    // Due later today: the series ended, and this is its last instance.
+    expect(firstRule(log)).toEqual({ kind: "monthly", day: 31, isLast: true, until: "2026-10-15" });
+    // Before the last date, the instance that no repeat follows is the last one too.
+    expect(firstRule(log, { now: "2026-10-10T09:00:00.000Z" })).toMatchObject({ isLast: true });
+    expect(
+      firstRule(seriesLog({ kind: "monthly", until: "2026-11-15" }), {
+        now: "2026-10-10T09:00:00.000Z",
+      }),
+    ).toMatchObject({ isLast: false, until: "2026-11-15" });
+  });
+
+  it("reads the weekday and the day in the zone the Due line is shown in", () => {
+    // Due Oct 30 22:30 UTC: Saturday the 31st in Moscow, Friday the 30th in New York.
+    const log = [
+      envelope({
+        type: "series.created",
+        occurredAt: NOW,
+        precision: "exact",
+        source: "app",
+        payload: {
+          seriesId: SERIES_ID,
+          schedule: { kind: "weekly" },
+          template: { ...TEMPLATE, dueAt: "2026-10-30T22:30:00.000Z" },
+        },
+      }),
+      envelope({
+        type: "task.created",
+        occurredAt: NOW,
+        precision: "exact",
+        source: "app",
+        payload: { ...TEMPLATE, dueAt: "2026-10-30T22:30:00.000Z" },
+      }),
+    ];
+    expect(firstRule(log)).toMatchObject({ weekday: 6 });
+    // The instance's deadline moved to New York: its Due line reads Friday, and so does the rule.
+    expect(firstRule(log, { patch: { dueTz: "America/New_York" } })).toMatchObject({ weekday: 5 });
+    // A due without a zone is shown on the device's clock (New York here).
+    const state = materialize(log, coreReducer, INITIAL_CORE_STATE);
+    const task = taskById(state.tasks, FIRST);
+    expect(
+      task === undefined
+        ? "missing"
+        : taskRepeatRule(
+            state,
+            { ...task, dueTz: null },
+            { deviceTz: "America/New_York", now: NOW },
+          ),
+    ).toMatchObject({ weekday: 5 });
   });
 
   it("is null for a one-off task and for a series the state does not know", () => {
-    expect(taskRepeatRule(INITIAL_CORE_STATE, taskFixture({ id: "t1" }))).toBeNull();
+    expect(taskRepeatRule(INITIAL_CORE_STATE, taskFixture({ id: "t1" }), AT_NOW)).toBeNull();
     expect(
-      taskRepeatRule(INITIAL_CORE_STATE, taskFixture({ id: "t1", seriesId: "gone" })),
+      taskRepeatRule(INITIAL_CORE_STATE, taskFixture({ id: "t1", seriesId: "gone" }), AT_NOW),
     ).toBeNull();
   });
 
@@ -295,9 +371,23 @@ describe("taskRepeatRule", () => {
       coreReducer,
       INITIAL_CORE_STATE,
     );
-    const instance = taskFixture({ id: instanceId(presetId, "2026-W44"), presetId });
-    expect(taskRepeatRule(state, instance)).toEqual({ kind: "weekly", weekday: 4, until: null });
+    // Due Thursday Oct 29, 23:59 in Moscow.
+    const instance = taskFixture({
+      dueAt: "2026-10-29T20:59:00.000Z",
+      dueTz: MOSCOW,
+      id: instanceId(presetId, "2026-W44"),
+      presetId,
+    });
+    expect(taskRepeatRule(state, instance, AT_NOW)).toEqual({
+      isLast: false,
+      kind: "weekly",
+      weekday: 4,
+      until: null,
+    });
+    // Its Due line in New York (Thursday 22:30 UTC is already Friday in Moscow) reads Thursday.
+    const shifted = { ...instance, dueAt: "2026-10-29T22:30:00.000Z", dueTz: "America/New_York" };
+    expect(taskRepeatRule(state, shifted, AT_NOW)).toMatchObject({ weekday: 4 });
     // A task of the same preset that is not one of its weekly instances does not repeat.
-    expect(taskRepeatRule(state, taskFixture({ id: "t1", presetId }))).toBeNull();
+    expect(taskRepeatRule(state, taskFixture({ id: "t1", presetId }), AT_NOW)).toBeNull();
   });
 });

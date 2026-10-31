@@ -82,6 +82,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "repeat.monthlyLast": "Каждый месяц, в последний день",
   "repeat.shortMonths": "{rule} (в коротких месяцах — в последний день)",
   "repeat.until": "{rule}, до {date}",
+  "repeat.last": "{rule}, этот повтор последний",
   "task.tracked": "Затрачено",
   "task.subtasks": "Подзадачи",
   "task.subtasksSummary": "{solved} решено · {sent} отправлено",

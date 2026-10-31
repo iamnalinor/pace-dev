@@ -92,9 +92,16 @@ describe("TaskScreen — homework", () => {
   });
 });
 
-const rentScreen = async () => {
-  const runtime = await createTestRuntime();
-  await runtime.state.ingest(rentSeriesEvents());
+/** The rent instance's screen at `now`, its series repeating until `until` (no end by default). */
+const rentScreen = async ({
+  now,
+  until,
+}: {
+  readonly now?: string;
+  readonly until?: string;
+} = {}) => {
+  const runtime = await createTestRuntime(now === undefined ? {} : { now });
+  await runtime.state.ingest(rentSeriesEvents(until));
   await renderScreen(<TaskScreen id={RENT_ID} />, runtime);
   return runtime;
 };
@@ -122,6 +129,19 @@ describe("TaskScreen — repeats and the final deadline", () => {
     await trkScreen();
     expect(screen.queryByLabelText(en("task.repeats"))).toBeNull();
     expect(screen.queryByLabelText(en("task.finalDue"))).toBeNull();
+  });
+
+  it("calls the last instance of an ending series the last, and drops the line once it is behind", async () => {
+    // No repeat after Oct 15; the instance is due Oct 31.
+    await rentScreen({ now: "2026-10-20T12:00:00.000Z", until: "2026-10-15" });
+    expect(stat(en("task.repeats"))).toHaveAccessibilityValue({
+      text: "Every month on the last day, this one is the last",
+    });
+    await screen.unmount();
+    await rentScreen({ now: "2026-11-02T12:00:00.000Z", until: "2026-10-15" });
+    expect(screen.queryByLabelText(en("task.repeats"))).toBeNull();
+    // The second stage still runs: the final deadline stays.
+    expect(stat(en("task.finalDue"))).toBeOnTheScreen();
   });
 
   it("speaks Russian on a Russian device", async () => {

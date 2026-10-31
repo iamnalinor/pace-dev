@@ -432,12 +432,17 @@ const RENT_TEMPLATE: EventOf<"series.created">["payload"]["template"] = {
 
 /**
 Extra events for `artboardState`: a monthly series "Rent" due on the 31st with a final
-deadline a week later, and its first instance (on Now from October 1).
+deadline a week later, and its first instance (on Now from October 1). `until` is the series'
+last repeat date (none by default).
 */
-export const rentSeriesEvents = (): readonly Event[] => [
+export const rentSeriesEvents = (until?: string): readonly Event[] => [
   at(900, RENT_START, {
     type: "series.created",
-    payload: { seriesId: RENT_SERIES_ID, schedule: { kind: "monthly" }, template: RENT_TEMPLATE },
+    payload: {
+      seriesId: RENT_SERIES_ID,
+      schedule: until === undefined ? { kind: "monthly" } : { kind: "monthly", until },
+      template: RENT_TEMPLATE,
+    },
   }),
   at(901, RENT_START, { type: "task.created", payload: RENT_TEMPLATE }),
 ];

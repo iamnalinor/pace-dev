@@ -23,7 +23,7 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
-import { groupNowRows, type NowRow, nowViewModel } from "./now.ts";
+import { groupNowRows, type MetaPart, type NowRow, nowViewModel } from "./now.ts";
 
 const row = (rows: readonly NowRow[], id: string): NowRow => {
   const found = rows.find((entry) => entry.id === id);
@@ -145,9 +145,15 @@ describe("nowViewModel", () => {
   });
 });
 
-/** Now's rows at `now`, with the monthly rent series in the world. */
-const withRent = (now: string): readonly NowRow[] =>
-  nowViewModel(artboardState(now, rentSeriesEvents()), ctx(now)).rows;
+/** Now's rows at `now`, with the monthly rent series (repeating until `until`) in the world. */
+const withRent = (now: string, until?: string): readonly NowRow[] => {
+  const state = artboardState(now, rentSeriesEvents(until));
+  return nowViewModel(state, ctx(now)).rows;
+};
+
+/** The rent row's meta at `now` when the series repeats no later than Oct 15. */
+const endedRentMeta = (now: string): readonly MetaPart[] =>
+  row(withRent(now, "2026-10-15"), RENT_ID).meta;
 
 describe("nowViewModel on a repeating task", () => {
   it("marks an instance of a series right after its importance, and no one-off", () => {
@@ -157,6 +163,12 @@ describe("nowViewModel on a repeating task", () => {
       { kind: "repeats" },
     ]);
     expect(row(rows, TRK_ID).meta).not.toContainEqual({ kind: "repeats" });
+  });
+
+  it("drops the mark once the series' last repeat date and the instance are both behind", () => {
+    // No repeat after Oct 15: the instance due Oct 31 is the last, marked while it is ahead.
+    expect(endedRentMeta("2026-10-20T12:00:00.000Z")).toContainEqual({ kind: "repeats" });
+    expect(endedRentMeta("2026-11-02T12:00:00.000Z")).not.toContainEqual({ kind: "repeats" });
   });
 
   it("names the final deadline once the main due date has passed, until it passes too", () => {
