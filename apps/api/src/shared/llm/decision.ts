@@ -9,8 +9,8 @@ export type ParseOutcome =
       readonly output: ModelOutput;
       readonly actions: readonly Action[];
       readonly rejected: readonly Rejected[];
-      /** For a correction, the request it belongs to (the thread's first message). */
-      readonly request?: string | undefined;
+      /** For a correction, the earlier turns of its thread, the request first. */
+      readonly thread?: readonly string[] | undefined;
     }
   | { readonly status: "unavailable"; readonly retryAt: null | string };
 
@@ -32,11 +32,17 @@ const explain = (provider: string, actions: readonly Action[], rejected: readonl
   ].join(" ");
 };
 
+/** A correction's request (the thread's first message) and the turns between it and this one. */
+const threadOf = (text: string, thread: readonly string[] = []) => {
+  const [request, ...turns] = thread;
+  return request === undefined || request === text ? {} : { request, turns };
+};
+
 /**
 The decision-log entry of one LLM parse: the text, what the model answered, what was proposed
 and what was left out (an unknown alias, an unquoted delete), and what could not be verified.
-A correction names the `request` it belongs to (the thread's first message), so the log can show
-the conversation as one.
+A correction names the `request` it belongs to and the turns before it, so the log can show the
+conversation as one.
 */
 export const parseDecision = (
   text: string,
@@ -56,8 +62,7 @@ export const parseDecision = (
           provider: outcome.provider,
           rejected: outcome.rejected.map((item) => ({ ...item })),
           text,
-          ...(outcome.request !== undefined &&
-            outcome.request !== text && { request: outcome.request }),
+          ...threadOf(text, outcome.thread),
         },
         kind: "parse",
         outcome: "parsed",

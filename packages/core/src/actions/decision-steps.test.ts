@@ -102,6 +102,7 @@ describe("readDecisionInputs", () => {
         request: "buy a cable",
         steps: [{ ...step, kind: "task.create", subject: "Buy cable" }],
         text: "buy cable",
+        turns: ["«When?» — Today"],
       }),
     ).toEqual({
       doubtful: ["project", "subtasks"],
@@ -110,6 +111,7 @@ describe("readDecisionInputs", () => {
       steps: [{ ...step, kind: "task.create", subject: "Buy cable" }],
       summaries: ["The assistant will create “Buy cable”"],
       text: "buy cable",
+      turns: ["«When?» — Today"],
     });
   });
 
@@ -121,6 +123,7 @@ describe("readDecisionInputs", () => {
       steps: [],
       summaries: [],
       text: null,
+      turns: [],
     };
     expect(readDecisionInputs(null)).toEqual(empty);
     expect(readDecisionInputs("text")).toEqual(empty);

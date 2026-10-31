@@ -49,12 +49,12 @@ export const enDecisions = {
   "decisions.seen.activity.start": "“{subject}” was started after this",
   "decisions.seen.activity.log": "“{subject}” was logged after this",
   "decisions.outcome.shown": "Shown to you for approval",
+  "decisions.outcome.unanswered": "No answer — the card was closed or replaced",
   "decisions.outcome.rules": "Local rules suggested a reading instead",
   "decisions.outcome.applied": "Applied automatically once the assistant was back",
   "decisions.outcome.inbox": "The assistant could not read it later",
   "decisions.notFound": "Not in your text: {fields}",
   "decisions.via.model": "via {model}",
-  "decisions.via.assistant": "via the assistant (model not recorded)",
   "decisions.via.rules": "via local rules",
   "decisions.open": "Opens the task",
 } as const;

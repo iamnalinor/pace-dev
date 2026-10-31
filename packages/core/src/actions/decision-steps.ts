@@ -130,6 +130,8 @@ export type DecisionInputs = {
   readonly text: null | string;
   /** The request a correction belongs to (the thread's first message); `null` for a request. */
   readonly request: null | string;
+  /** The turns between the request and this one (answers, corrections), in order. */
+  readonly turns: readonly string[];
   /** The model that read it, or "rules"; absent in rows written before it was kept. */
   readonly provider: null | string;
   /** One per proposed action, `null` for one this client cannot read (a newer kind). */
@@ -143,6 +145,7 @@ export type DecisionInputs = {
 const DecisionInputsSchema = z.object({
   text: knownOrNull(z.string()),
   request: knownOrNull(z.string()),
+  turns: anyList(z.string()),
   provider: knownOrNull(z.string()),
   steps: listWithGaps(DecisionStepSchema),
   actions: anyList(z.string()),
@@ -156,6 +159,7 @@ const EMPTY: DecisionInputs = {
   steps: [],
   summaries: [],
   text: null,
+  turns: [],
 };
 
 /** A decision's `inputs` as the log reads them; anything unreadable reads as empty. */
@@ -164,8 +168,8 @@ export const readDecisionInputs = (inputs: unknown): DecisionInputs => {
   if (!parsed.success) {
     return EMPTY;
   }
-  const { actions, doubtful, provider, request, steps, text } = parsed.data;
-  return { doubtful, provider, request, steps, summaries: actions, text };
+  const { actions, doubtful, provider, request, steps, text, turns } = parsed.data;
+  return { doubtful, provider, request, steps, summaries: actions, text, turns };
 };
 
 /** At most this many readings are answered at once (`DecisionResolveSchema`). */

@@ -17,20 +17,31 @@ export const quoted = (summary: string): null | string => {
   return open === -1 || close < 1 ? null : rest.slice(0, close);
 };
 
+/** One turn after the request in words: a tapped answer as an answer, typing as typing. */
+const turnText = (text: string, language: Language): string => {
+  const answer = readAnswer(text);
+  return answer === null
+    ? t(language, "decisions.corrected", { text })
+    : t(language, "decisions.answered", { ...answer });
+};
+
 /**
-The request and what answered it: a correction's row names its request; a tapped answer reads
-as an answer to its question, never as quoted typing.
+The request and every turn after it, in order: a correction's row names its request and the
+turns before it; a tapped answer reads as an answer to its question, never as quoted typing.
+An older row without its request shows its own text as the request, or as an answer.
 */
 export const conversationOf = (
   inputs: DecisionInputs,
   language: Language,
-): { readonly followup: null | string; readonly request: null | string } => {
-  const { request, text } = inputs;
-  const answer = text === null ? null : readAnswer(text);
-  if (answer !== null) {
-    return { followup: t(language, "decisions.answered", { ...answer }), request };
+): { readonly followups: readonly string[]; readonly request: null | string } => {
+  const { request, text, turns } = inputs;
+  if (text === null) {
+    return { followups: [], request };
   }
-  return request === null || text === null
-    ? { followup: null, request: text }
-    : { followup: t(language, "decisions.corrected", { text }), request };
+  if (request !== null) {
+    return { followups: [...turns, text].map((turn) => turnText(turn, language)), request };
+  }
+  return readAnswer(text) === null
+    ? { followups: [], request: text }
+    : { followups: [turnText(text, language)], request: null };
 };
