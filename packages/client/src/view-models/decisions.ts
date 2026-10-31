@@ -17,6 +17,7 @@ import {
 import { existing, type Lookup, lookupOf, seenAfter, type World } from "./decision-lookup.ts";
 import { providerLabel } from "./decision-provider.ts";
 import { conversationOf, quoted } from "./decision-text.ts";
+import { isFolded } from "./decision-threads.ts";
 
 /** One row of the assistant log: what became of a message, in the reader's language. */
 export type DecisionView = {
@@ -26,8 +27,8 @@ export type DecisionView = {
   readonly lines: readonly string[];
   /** What the person typed, verbatim: the conversation's request. */
   readonly request: null | string;
-  /** The answer or correction this reading answered, in words: "You answered “When?”: Today". */
-  readonly followup: null | string;
+  /** Every answer or correction after the request, in order: "You answered “When?”: Today". */
+  readonly followups: readonly string[];
   /** What the person did with it, read by the rules, read later, or what the data shows since. */
   readonly outcome: null | string;
   /** The fields the model only guessed: "Not in your text: project, subtasks". */
@@ -161,13 +162,20 @@ const viaOf = (provider: null | string, language: Language): null | string => {
       return t(language, "decisions.via.model", { model: label.name });
     }
     case "assistant": {
-      return t(language, "decisions.via.assistant");
+      // An older row named no model: nothing worth a line.
+      return null;
     }
     case "rules": {
       return t(language, "decisions.via.rules");
     }
   }
 };
+
+/** A card stays open for a while; after that, a reading nobody answered was closed or replaced. */
+const OPEN_FOR_MS = 15 * 60_000;
+
+const isStillOpen = (at: string, now: string): boolean =>
+  Date.parse(now) - Date.parse(at) < OPEN_FOR_MS;
 
 /** What the person did, as recorded; a value a newer server added reads as not recorded. */
 const resolutionOf = (decision: Decision): DecisionResolution | null =>
@@ -195,26 +203,36 @@ const wordsOf = (
   return lines.length > 0 ? lines : [t(lookup.language, fallback)];
 };
 
+/** A reading the person answered: what they did, as recorded. */
+const answeredParts = (row: Row, resolution: DecisionResolution): Parts => {
+  const { decision, lookup, steps } = row;
+  const stepTasks = known(steps).map((step) => step.taskId);
+  const isApproved = resolution === "approved";
+  return {
+    lines: wordsOf(row, isApproved ? "done" : "offered", "decisions.nothing"),
+    note: null,
+    outcome: t(lookup.language, `decisions.resolved.${resolution}`),
+    taskId: existing(isApproved ? [decision.taskId, ...stepTasks] : stepTasks, lookup),
+  };
+};
+
 /** A reading shown for approval: what the person did, as recorded, or else what the data shows. */
 const readingParts = (row: Row): Parts => {
   const { decision, inputs, lookup, steps } = row;
-  const stepTasks = known(steps).map((step) => step.taskId);
   const resolution = resolutionOf(decision);
   if (resolution !== null) {
-    const isApproved = resolution === "approved";
-    return {
-      lines: wordsOf(row, isApproved ? "done" : "offered", "decisions.nothing"),
-      note: null,
-      outcome: t(lookup.language, `decisions.resolved.${resolution}`),
-      taskId: existing(isApproved ? [decision.taskId, ...stepTasks] : stepTasks, lookup),
-    };
+    return answeredParts(row, resolution);
   }
+  const stepTasks = known(steps).map((step) => step.taskId);
   const reading = { at: decision.at, text: inputs.request ?? inputs.text };
   const seen = seenAfter(known(steps), reading, { claimed: row.claimed, lookup });
   const isEmpty = steps.length === 0 && inputs.summaries.length === 0;
+  const unanswered = isStillOpen(decision.at, lookup.now)
+    ? "decisions.outcome.shown"
+    : "decisions.outcome.unanswered";
   const outcome =
     seen === null
-      ? t(lookup.language, "decisions.outcome.shown")
+      ? t(lookup.language, unanswered)
       : t(lookup.language, seen.key, { subject: seen.subject });
   return {
     lines: wordsOf(row, "offered", "decisions.nothing"),
@@ -295,7 +313,7 @@ const viewOf = (
         decision.outcome === "unavailable" ? null : viaOf(providerOf(decision, inputs), language),
     };
   }
-  const none = { followup: null, notFound: null, request: null, via: null };
+  const none = { followups: [], notFound: null, request: null, via: null };
   const notification =
     decision.kind === "notification" && Object.hasOwn(NOTIFICATIONS, decision.outcome)
       ? NOTIFICATIONS[decision.outcome]
@@ -322,7 +340,10 @@ export const decisionViews = (
   world: World,
 ): readonly DecisionView[] => {
   const lookup = lookupOf(world);
-  const shown = decisions.filter((decision) => decision.resolution !== "corrected");
+  const shown = decisions.filter(
+    (decision, index) =>
+      decision.resolution !== "corrected" && !isFolded(decision, decisions.slice(0, index)),
+  );
   const none: ReadonlySet<string> = new Set();
   const first = shown.map((decision) => viewOf(decision, { claimed: none, lookup }));
   return first.map((view, index) => {

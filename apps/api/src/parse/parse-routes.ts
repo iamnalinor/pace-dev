@@ -88,14 +88,14 @@ export const mountParseRoutes = (
     // Readings while typing come every pause: only the ones the person acts on are logged.
     const decisionId = body.draft === true ? undefined : newId();
     if (decisionId !== undefined) {
-      const request = body.thread?.[0]?.text;
+      const thread = body.thread?.map((turn) => turn.text);
       const entry = parseDecision(body.text, "api", {
         output,
         actions,
         provider,
         rejected,
-        request,
         status: "parsed",
+        thread,
       });
       await store.logDecisions([{ ...entry, id: decisionId }], now);
     }

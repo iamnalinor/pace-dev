@@ -287,6 +287,25 @@ describe("POST /api/parse: tasks", () => {
       token,
     });
     expect(draft.decisionId).toBeUndefined();
+    // A second correction: its decision keeps every earlier turn, in order.
+    const third = asAnswered(
+      await json("/api/parse", {
+        body: {
+          text: "«When?» — Today",
+          thread: [
+            { actions: first.actions, text: "разобрать почту" },
+            { actions: second.actions, text: "разобрать почту до обеда" },
+          ],
+        },
+        token,
+      }),
+    );
+    const turns = await answerOf(endpoints.decisions.list, "/api/decisions?q=When", { token });
+    expect(turns.decisions.find((row) => row.id === third.decisionId)?.inputs).toMatchObject({
+      request: "разобрать почту",
+      text: "«When?» — Today",
+      turns: ["разобрать почту до обеда"],
+    });
     const resolve = async (body: unknown) =>
       await answerOf(endpoints.decisions.resolve, "/api/decisions/resolve", { body, token });
     expect(
@@ -306,9 +325,9 @@ describe("POST /api/parse: tasks", () => {
         ],
       }),
     ).toEqual({ resolved: 0 });
-    const { decisions } = await answerOf(endpoints.decisions.list, "/api/decisions?q=почту", {
-      token,
-    });
+    const listed = await answerOf(endpoints.decisions.list, "/api/decisions?q=почту", { token });
+    // The second correction (never answered) aside: the two readings that were.
+    const decisions = listed.decisions.filter((row) => row.id !== third.decisionId);
     expect(decisions.map(({ id, resolution, taskId }) => ({ id, resolution, taskId }))).toEqual([
       { id: second.decisionId, resolution: "approved", taskId: "t-mail" },
       { id: first.decisionId, resolution: "corrected", taskId: null },
@@ -316,6 +335,7 @@ describe("POST /api/parse: tasks", () => {
     expect(decisions[0]?.inputs).toMatchObject({
       request: "разобрать почту",
       text: "разобрать почту до обеда",
+      turns: [],
     });
     expect(decisions[1]?.inputs).not.toHaveProperty("request");
     const refused = await call("/api/decisions/resolve", {

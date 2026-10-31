@@ -51,12 +51,12 @@ export const ruDecisions: { readonly [K in keyof typeof enDecisions]: string } =
   "decisions.seen.activity.start": "После этого запустили «{subject}»",
   "decisions.seen.activity.log": "После этого записали «{subject}»",
   "decisions.outcome.shown": "Показано вам на подтверждение",
+  "decisions.outcome.unanswered": "Без ответа — карточку закрыли или заменили",
   "decisions.outcome.rules": "Вместо него разбор предложили локальные правила",
   "decisions.outcome.applied": "Применено автоматически, когда ассистент вернулся",
   "decisions.outcome.inbox": "Позже ассистент не смог это прочитать",
   "decisions.notFound": "Не нашлось в вашем тексте: {fields}",
   "decisions.via.model": "через {model}",
-  "decisions.via.assistant": "через ассистента (модель не записана)",
   "decisions.via.rules": "по локальным правилам",
   "decisions.open": "Открывает задачу",
 };

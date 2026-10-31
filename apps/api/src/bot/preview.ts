@@ -174,8 +174,8 @@ const showRevision = async (
       actions,
       provider,
       rejected,
-      request: thread[0]?.text,
       status: "parsed",
+      thread: thread.map((turn) => turn.text),
     }),
   );
   return await previewOf(turn, {

@@ -86,9 +86,11 @@ describe("DecisionsScreen", () => {
     await renderScreen(<DecisionsScreen />, runtime);
     expect(await screen.findByText("Suggested a new task “Buy cable”")).toBeOnTheScreen();
     expect(screen.getByText("You wrote: “buy cable tomorrow”")).toBeOnTheScreen();
-    expect(screen.getAllByText("Shown to you for approval")).toHaveLength(2);
+    // Two hours before the app's clock and never answered: neither card is open any more.
+    expect(screen.getAllByText("No answer — the card was closed or replaced")).toHaveLength(2);
     expect(screen.getByText("Not in your text: project, subtasks")).toBeOnTheScreen();
-    expect(screen.getByText(/via the assistant \(model not recorded\)/u)).toBeOnTheScreen();
+    // An older row named no model: no line for it.
+    expect(screen.queryByText(/model not recorded|via the assistant/u)).toBeNull();
     expect(screen.getByText(/via gpt-5\.6-luna$/u)).toBeOnTheScreen();
     for (const raw of [/parse\.task/u, /compatible/u, /Parsed by/u, /#2/u]) {
       expect(screen.queryByText(raw)).toBeNull();
@@ -119,6 +121,7 @@ describe("DecisionsScreen", () => {
         ...reading.inputs,
         request: "buy cable tomorrow",
         text: "«By when does this need to be done?» — Tomorrow",
+        turns: ["urgent"],
       },
       resolution: "approved",
     };
@@ -128,11 +131,15 @@ describe("DecisionsScreen", () => {
     await renderScreen(<DecisionsScreen />, runtime);
     expect(await screen.findByText("Created task “Buy cable”")).toBeOnTheScreen();
     expect(screen.getAllByText("Created task “Buy cable”")).toHaveLength(1);
-    expect(screen.getByText("You wrote: “buy cable tomorrow”")).toBeOnTheScreen();
-    expect(
-      screen.getByText("You answered “By when does this need to be done?”: Tomorrow"),
-    ).toBeOnTheScreen();
-    expect(screen.getByText("You approved it")).toBeOnTheScreen();
+    // Every turn, in order: the request, the typed correction, the tapped answer.
+    const turns = [
+      "You wrote: “buy cable tomorrow”",
+      "Then you wrote: “urgent”",
+      "You answered “By when does this need to be done?”: Tomorrow",
+      "You approved it",
+    ];
+    const texts = screen.getAllByText(/./u).map((node): unknown => node.props["children"]);
+    expect(texts.filter((text) => turns.includes(text as string))).toEqual(turns);
     expect(screen.queryByText(/«/u)).toBeNull();
   });
 

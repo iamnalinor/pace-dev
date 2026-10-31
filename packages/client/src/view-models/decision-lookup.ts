@@ -18,12 +18,15 @@ started. Said as a fact, never as an approval. The state is indexed once for the
 export type World = {
   readonly state: Pick<CoreState, "tasks" | "time">;
   readonly language: Language;
+  /** When the log is read: a card shown a while ago is no longer open. */
+  readonly now: string;
 };
 
 /** The state indexed once for a whole log: tasks by source text and by title, activities by label. */
 export type Lookup = {
   readonly state: World["state"];
   readonly language: Language;
+  readonly now: string;
   readonly bySource: ReadonlyMap<string, readonly Task[]>;
   readonly byTitle: ReadonlyMap<string, readonly Task[]>;
   readonly byLabel: ReadonlyMap<string, readonly Activity[]>;
@@ -38,13 +41,14 @@ const groupBy = <T>(
   return Map.groupBy(keyed, (item) => keyOf(item) ?? "");
 };
 
-export const lookupOf = ({ language, state }: World): Lookup => {
+export const lookupOf = ({ language, now, state }: World): Lookup => {
   const tasks = Object.values(state.tasks.byId);
   return {
     byLabel: groupBy(Object.values(state.time.activities), (activity) => activity.label),
     bySource: groupBy(tasks, (task) => task.sourceText),
     byTitle: groupBy(tasks, (task) => task.title),
     language,
+    now,
     state,
   };
 };

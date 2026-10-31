@@ -41,7 +41,10 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
       {view.request === null ? null : (
         <Detail>{t("decisions.request", { text: view.request })}</Detail>
       )}
-      {view.followup === null ? null : <Detail>{view.followup}</Detail>}
+      {view.followups.map((followup, index) => (
+        // The turns of a conversation never reorder: their place is their identity.
+        <Detail key={`${String(index)}:${followup}`}>{followup}</Detail>
+      ))}
       {view.outcome === null ? null : <Detail>{view.outcome}</Detail>}
       {view.notFound === null ? null : <Detail tone="warn">{view.notFound}</Detail>}
       {view.note === null ? null : <Detail>{view.note}</Detail>}
@@ -100,13 +103,18 @@ export const DecisionsScreen = () => {
   const language = useLanguage();
   const tasks = useAppState((state) => state.tasks);
   const time = useAppState((state) => state.time);
+  const { now } = useViewer();
   // Worded once per load or store change, the state indexed once for every row.
   const views = useMemo(
     () =>
       loaded.status === "loaded"
-        ? decisionViews(loaded.decisions, { language, state: { tasks, time } })
+        ? decisionViews(loaded.decisions, {
+            language,
+            now,
+            state: { tasks, time },
+          })
         : [],
-    [language, loaded, tasks, time],
+    [language, loaded, now, tasks, time],
   );
   return (
     <PushedScreen title={t("decisions.title")}>

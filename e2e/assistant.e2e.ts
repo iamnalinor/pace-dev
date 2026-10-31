@@ -63,7 +63,12 @@ test("an assistant question is answered with one click, by keyboard too", async 
   await expect(page.getByText("Is this for work or home?")).toBeVisible();
   await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
   await expect(nowTasks(page).getByText("Съездить в банк")).toHaveCount(0);
-  // Approved after the answer: the log shows the conversation as one row with one outcome.
+  // A typed correction after the tap, then Approve: the log shows the conversation as one row,
+  // every turn in order, with one outcome.
+  const correct = page.getByRole("textbox", { name: "Correct the assistant…" });
+  await correct.fill("urgent");
+  await correct.press("Enter");
+  await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(line).toHaveValue("");
   await page.goto("/decisions");
@@ -73,6 +78,7 @@ test("an assistant question is answered with one click, by keyboard too", async 
   await expect(
     row.getByText("You answered “By when does this need to be done?”: Tomorrow"),
   ).toBeVisible();
+  await expect(row.getByText("Then you wrote: “urgent”")).toBeVisible();
   await expect(row.getByText("You approved it")).toBeVisible();
 });
 

@@ -60,13 +60,19 @@ const started = (occurredAt: string, label: string): Event =>
     type: "activity.started",
   });
 
-const logIn = (language: "en" | "ru", log: readonly Decision[], extra: readonly Event[] = []) =>
-  decisionViews(log, { language, state: artboardState(LATER, extra) });
+/** Soon after the readings: a card may still be open. */
+const SOON = "2026-10-06T10:05:00.000Z";
+
+const logIn = (
+  language: "en" | "ru",
+  log: readonly Decision[],
+  { extra = [], now = SOON }: { readonly extra?: readonly Event[]; readonly now?: string } = {},
+) => decisionViews(log, { language, now, state: artboardState(LATER, extra) });
 
 const viewIn =
   (language: "en" | "ru") =>
   (decision: Decision, extra: readonly Event[] = []): DecisionView => {
-    const [view] = decisionViews([decision], { language, state: artboardState(LATER, extra) });
+    const [view] = logIn(language, [decision], { extra });
     if (view === undefined) {
       throw new Error("no view");
     }
@@ -75,13 +81,20 @@ const viewIn =
 const en = viewIn("en");
 const ru = viewIn("ru");
 
+/** A thread approved after `turns`, its last turn `text`. */
+const thread = (turns: readonly string[], text: string): Decision => ({
+  ...cable,
+  inputs: { ...(cable.inputs as Record<string, unknown>), request: "#ask Taptwo", text, turns },
+  resolution: "approved",
+});
+
 describe("decisionView", () => {
   it("says what became of the message, as recorded, quotes it, and names what the text lacked", () => {
     const approved: Decision = { ...cable, resolution: "approved", taskId: CABLE_ID };
     const state = [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")];
     expect(en(approved, state)).toEqual({
       at: DECIDED,
-      followup: null,
+      followups: [],
       id: "d1",
       lines: ["Created task “Buy cable”"],
       note: null,
@@ -244,7 +257,7 @@ describe("decisionView", () => {
       lines: ["Suggested starting “Gym”"],
       notFound: null,
       request: "gym",
-      via: "via the assistant (model not recorded)",
+      via: null,
     });
     expect(en(legacy, [started("2026-10-06T10:00:30.000Z", "Gym")])).toMatchObject({
       lines: ["Suggested starting “Gym”"],
@@ -262,7 +275,7 @@ describe("decisionView", () => {
       ),
     ).toMatchObject({
       lines: ["Предложена задача «Купить кабель»", "Ассистент удалит «Старое»"],
-      via: "через ассистента (модель не записана)",
+      via: null,
     });
     // A summary without a quoted name is shown as it was written.
     expect(en(parsed({ actions: ["Something new"], text: "x" })).lines).toEqual(["Something new"]);
@@ -370,10 +383,9 @@ describe("decisionView", () => {
       created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home"),
     ]);
     const log = [cable, { ...cable, id: "d2", resolution: "cancelled" }];
-    expect(decisionViews(log, { language: "en", state }).map((view) => view.outcome)).toEqual([
-      "A task “Buy cable” was created after this",
-      "You dismissed it; nothing was done",
-    ]);
+    expect(
+      decisionViews(log, { language: "en", now: SOON, state }).map((view) => view.outcome),
+    ).toEqual(["A task “Buy cable” was created after this", "You dismissed it; nothing was done"]);
   });
 
   it("shows a conversation as one row: the request, the last answer, one outcome", () => {
@@ -390,35 +402,35 @@ describe("decisionView", () => {
       taskId: CABLE_ID,
     };
     const extra = [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")];
-    expect(logIn("en", [answered, first], extra)).toEqual([
+    expect(logIn("en", [answered, first], { extra })).toEqual([
       expect.objectContaining({
-        followup: "You answered “By when does this need to be done?”: Tomorrow",
+        followups: ["You answered “By when does this need to be done?”: Tomorrow"],
         id: "d2",
         lines: ["Created task “Buy cable”"],
         outcome: "You approved it",
         request: "buy cable tomorrow #home",
       }),
     ]);
-    expect(logIn("ru", [answered])[0]?.followup).toBe(
+    expect(logIn("ru", [answered])[0]?.followups).toEqual([
       "Вы ответили на «By when does this need to be done?»: Tomorrow",
-    );
+    ]);
     const typed: Decision = {
       ...answered,
       inputs: { ...(answered.inputs as Record<string, unknown>), text: "urgent" },
     };
-    expect(logIn("en", [typed])[0]?.followup).toBe("Then you wrote: “urgent”");
+    expect(logIn("en", [typed])[0]?.followups).toEqual(["Then you wrote: “urgent”"]);
     // An older row holds only the answer's text: shown as an answer, with no request.
     const older: Decision = {
       ...cable,
       inputs: { ...(cable.inputs as Record<string, unknown>), text: "«When?» — Today" },
     };
-    expect(en(older)).toMatchObject({ followup: "You answered “When?”: Today", request: null });
+    expect(en(older)).toMatchObject({ followups: ["You answered “When?”: Today"], request: null });
   });
 
   it("claims a task for one reading only when nothing was recorded", () => {
     const newer = { ...cable, at: "2026-10-06T10:00:10.000Z", id: "d2" };
     const extra = [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")];
-    expect(logIn("en", [newer, cable], extra).map((view) => view.outcome)).toEqual([
+    expect(logIn("en", [newer, cable], { extra }).map((view) => view.outcome)).toEqual([
       "A task “Buy cable” was created after this",
       "Shown to you for approval",
     ]);
@@ -446,5 +458,49 @@ describe("decisionView", () => {
     expect(en({ ...rename, resolution: null }).lines).toEqual([
       "Suggested renaming “Old books” to “New”",
     ]);
+  });
+
+  it("shows every turn of a conversation in order, tapped and typed", () => {
+    expect(en(thread(["«When?» — Today"], "work")).followups).toEqual([
+      "You answered “When?”: Today",
+      "Then you wrote: “work”",
+    ]);
+    expect(en(thread(["work"], "«When?» — Tomorrow")).followups).toEqual([
+      "Then you wrote: “work”",
+      "You answered “When?”: Tomorrow",
+    ]);
+  });
+
+  it("folds a thread nobody answered into its last reading, said neutrally once time passed", () => {
+    const first = { ...cable, at: DECIDED, id: "d1" };
+    const corrected: Decision = {
+      ...cable,
+      at: "2026-10-06T10:01:00.000Z",
+      id: "d2",
+      inputs: {
+        ...(cable.inputs as Record<string, unknown>),
+        request: "buy cable tomorrow #home",
+        text: "urgent",
+        turns: [],
+      },
+    };
+    // The same request typed again an hour later is another conversation.
+    const again = { ...cable, at: "2026-10-06T08:00:00.000Z", id: "d0" };
+    expect(logIn("en", [corrected, first, again]).map((view) => view.id)).toEqual(["d2", "d0"]);
+    expect(logIn("en", [corrected])[0]?.outcome).toBe("Shown to you for approval");
+    const later = logIn("en", [corrected], { now: "2026-10-06T11:00:00.000Z" })[0];
+    expect(later?.outcome).toBe("No answer — the card was closed or replaced");
+    expect(logIn("ru", [corrected], { now: "2026-10-06T11:00:00.000Z" })[0]?.outcome).toBe(
+      "Без ответа — карточку закрыли или заменили",
+    );
+  });
+
+  it("names the model only when it was recorded", () => {
+    const legacy = parsed(
+      { text: "x" },
+      { explanation: "Parsed by compatible; every field matched the text." },
+    );
+    expect(en(legacy).via).toBeNull();
+    expect(en(parsed({ provider: "rules", text: "x" })).via).toBe("via local rules");
   });
 });
