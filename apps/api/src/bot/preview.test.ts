@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { blankModelAction, type EventInput, type ModelOutput } from "@pace/core";
 import { artboardState, NOW, REPLY_ID } from "@pace/core/testing";
 
-import type { BotStoreApi, JsonValue } from "../shared/contract.ts";
+import type { BotStoreApi, DecisionAnswer, DecisionEntry, JsonValue } from "../shared/contract.ts";
 import type { BotReply, Turn } from "./turn.ts";
 
 import { echoReply, fakeParseModel } from "../shared/llm/fake-model.ts";
@@ -14,6 +14,8 @@ import { choosePreview, preview } from "./preview.ts";
 const memoryStore = () => {
   const kept = new Map<string, JsonValue>();
   const written: (readonly EventInput[])[] = [];
+  const logged: DecisionEntry[] = [];
+  const resolved: DecisionAnswer[] = [];
   const store = {
     apply: async (inputs: readonly EventInput[]) => {
       await Promise.resolve();
@@ -24,8 +26,9 @@ const memoryStore = () => {
       await Promise.resolve();
     },
     llmCooldowns: async () => ({}),
-    logDecisions: async () => {
+    logDecisions: async (entries: readonly DecisionEntry[]) => {
       await Promise.resolve();
+      logged.push(...entries);
     },
     noteLlmLimits: async () => {
       await Promise.resolve();
@@ -40,8 +43,13 @@ const memoryStore = () => {
       await Promise.resolve();
       kept.set(key, value);
     },
+    resolveDecisions: async (answers: readonly DecisionAnswer[]) => {
+      await Promise.resolve();
+      resolved.push(...answers);
+      return answers.length;
+    },
   } as unknown as BotStoreApi;
-  return { kept, store, written };
+  return { kept, logged, resolved, store, written };
 };
 
 const LATER = "2026-10-06T12:30:00.000Z";
@@ -235,5 +243,53 @@ describe("the bot's answers to the assistant's questions", () => {
     expect(read).toHaveLength(asked);
     // The real preview is still there to answer or approve.
     expect(kept.has(id)).toBe(true);
+  });
+});
+
+const providers = () => askingModel().providers;
+
+describe("what the bot tells the decision log", () => {
+  it("records an Accept on the reading's decision, with the task it created", async () => {
+    const { logged, resolved, store, written } = memoryStore();
+    const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+    const shown = await preview(turn, providers(), "Съездить в банк");
+    const decisionId = logged[0]?.id;
+    expect(decisionId).toBeDefined();
+    await choosePreview(turn, providers(), {
+      action: PREVIEW_ACTIONS.accept,
+      id: shown.pendingId ?? "",
+    });
+    const created = written[0]?.find((input) => input.type === "task.created");
+    expect(created?.type === "task.created" && created.payload.taskId).toBeTruthy();
+    expect(resolved).toEqual([
+      {
+        id: decisionId,
+        resolution: "approved",
+        taskId: created?.type === "task.created" ? created.payload.taskId : "",
+      },
+    ]);
+  });
+
+  it("records Cancel and To Inbox, and a corrected reading as corrected", async () => {
+    for (const [action, resolution] of [
+      [PREVIEW_ACTIONS.cancel, "cancelled"],
+      [PREVIEW_ACTIONS.inbox, "inbox"],
+    ] as const) {
+      const { logged, resolved, store } = memoryStore();
+      const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+      const shown = await preview(turn, providers(), "Съездить в банк");
+      const revised = await choosePreview(turn, providers(), {
+        action: `${PREVIEW_ACTIONS.answer}01`,
+        id: shown.pendingId ?? "",
+      });
+      await choosePreview(turn, providers(), { action, id: revised.pendingId ?? "" });
+      expect(logged).toHaveLength(2);
+      // The answer's reading names the request it belongs to, so the log shows one conversation.
+      expect(logged[1]?.inputs).toMatchObject({ request: "Съездить в банк" });
+      expect(resolved).toEqual([
+        { id: logged[0]?.id, resolution: "corrected" },
+        { id: logged[1]?.id, resolution },
+      ]);
+    }
   });
 });

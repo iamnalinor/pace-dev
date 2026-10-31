@@ -86,7 +86,8 @@ const mountPushRoutes = (app: Hono<AppEnv>): void => {
 
 /**
 The notification pool (list, read, answer), how this device gets pushes, and the decision log
-(`GET /api/decisions`, the assistant's log).
+(`GET /api/decisions`, the assistant's log, and `POST /api/decisions/resolve`, what the person
+did with each reading).
 */
 export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
   mountPushRoutes(app);
@@ -124,5 +125,9 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
 
   mount(app, endpoints.decisions.list, async ({ c, query }) =>
     ok({ decisions: [...(await userStoreOf(c).decisions(query))] }),
+  );
+
+  mount(app, endpoints.decisions.resolve, async ({ body, c }) =>
+    ok({ resolved: await userStoreOf(c).resolveDecisions(body.decisions) }),
   );
 };

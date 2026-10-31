@@ -69,6 +69,8 @@ export const decisions = sqliteTable(
     inputs: text().notNull(),
     outcome: text().notNull(),
     explanation: text().notNull(),
+    /** What the person did with an assistant reading (`DECISION_RESOLUTIONS`); `null` until then. */
+    resolution: text(),
   },
   (table) => [index("decisions_task_idx").on(table.taskId), index("decisions_at_idx").on(table.at)],
 );

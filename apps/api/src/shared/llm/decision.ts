@@ -9,6 +9,8 @@ export type ParseOutcome =
       readonly output: ModelOutput;
       readonly actions: readonly Action[];
       readonly rejected: readonly Rejected[];
+      /** For a correction, the request it belongs to (the thread's first message). */
+      readonly request?: string | undefined;
     }
   | { readonly status: "unavailable"; readonly retryAt: null | string };
 
@@ -33,6 +35,8 @@ const explain = (provider: string, actions: readonly Action[], rejected: readonl
 /**
 The decision-log entry of one LLM parse: the text, what the model answered, what was proposed
 and what was left out (an unknown alias, an unquoted delete), and what could not be verified.
+A correction names the `request` it belongs to (the thread's first message), so the log can show
+the conversation as one.
 */
 export const parseDecision = (
   text: string,
@@ -52,6 +56,8 @@ export const parseDecision = (
           provider: outcome.provider,
           rejected: outcome.rejected.map((item) => ({ ...item })),
           text,
+          ...(outcome.request !== undefined &&
+            outcome.request !== text && { request: outcome.request }),
         },
         kind: "parse",
         outcome: "parsed",
@@ -59,7 +65,7 @@ export const parseDecision = (
         taskId: null,
       }
     : {
-        explanation: "No model could answer (rate limits); the text was not parsed.",
+        explanation: "No model answered (limits, errors or time); the text was not parsed.",
         inputs: { channel, retryAt: outcome.retryAt, text },
         kind: "parse",
         outcome: "unavailable",

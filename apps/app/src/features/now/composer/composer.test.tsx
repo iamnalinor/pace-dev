@@ -358,6 +358,63 @@ describe("Composer", () => {
     expect(screen.queryByText("New task: разобрать почту")).toBeNull();
   });
 
+  it("tells the assistant log what became of a reading: approved with its task, or dismissed", async () => {
+    const resolved: unknown[] = [];
+    let count = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/decisions/resolve": ({ body }) => {
+          resolved.push(body);
+          return { resolved: 1 };
+        },
+        "POST /api/parse": () => {
+          count += 1;
+          return { ...PARSED, decisionId: `d${String(count)}` };
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    // A correction replaces the reading: the first one counts as corrected.
+    await fireEvent.changeText(screen.getByLabelText(en("assistant.correct")), "на завтра");
+    await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+    await waitFor(() => {
+      expect(count).toBe(2);
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: en("assistant.approve") }));
+    await waitFor(() => {
+      expect(resolved).toHaveLength(1);
+    });
+    expect(resolved[0]).toEqual({
+      decisions: [
+        { id: "d1", resolution: "corrected" },
+        { id: "d2", resolution: "approved", taskId: created(runtime, "разобрать почту")?.id },
+      ],
+    });
+
+    // A second reading, dismissed: Cancel says so, once.
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    await fireEvent.press(await screen.findByRole("button", { name: en("assistant.cancel") }));
+    await fireEvent.changeText(line(), "срочно почта!");
+    await waitFor(() => {
+      expect(resolved).toHaveLength(2);
+    });
+    expect(resolved[1]).toEqual({ decisions: [{ id: "d3", resolution: "cancelled" }] });
+
+    // A third, kept in the Inbox instead: the preview goes, and the log hears it.
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    await fireEvent.press(button("composer.toInbox"));
+    await waitFor(() => {
+      expect(resolved).toHaveLength(3);
+    });
+    expect(resolved[2]).toEqual({ decisions: [{ id: "d4", resolution: "inbox" }] });
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
+  });
+
   it("offers a rule-based task preview when the assistant cannot be reached", async () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);

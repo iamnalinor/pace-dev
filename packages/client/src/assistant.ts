@@ -1,10 +1,12 @@
 import {
   accountTz,
   actionsByRules,
+  type DecisionResolution,
   domainByRules,
   endpoints,
   type ParseRequestBody,
   type ParseResponse,
+  resolutionsOf,
   RULES_CONFIDENCE,
   withSummary,
 } from "@pace/core";
@@ -45,6 +47,16 @@ export type Assistant = {
   than starting it (the activity keeps its words).
   */
   readonly readActivity: (text: string) => Promise<ActivityReading | null>;
+  /**
+  Tells the assistant log what became of a conversation's readings (`decisionIds`, the last
+  the one acted on): approved (with the task it created), dismissed, or kept in the Inbox.
+  Best effort: an answer lost offline leaves the rows undecided, and the log says less.
+  */
+  readonly resolve: (
+    decisionIds: readonly string[],
+    resolution: DecisionResolution,
+    taskId?: null | string,
+  ) => Promise<void>;
 };
 
 type AssistantDeps = {
@@ -98,6 +110,17 @@ export const createAssistant = (deps: AssistantDeps): Assistant => ({
         : { retryAt: answer.retryAt, status: answer.status };
     } catch {
       return { status: "failed" };
+    }
+  },
+  resolve: async (decisionIds, resolution, taskId = null) => {
+    const answers = resolutionsOf(decisionIds, resolution, taskId);
+    if (answers.length === 0) {
+      return;
+    }
+    try {
+      await deps.api.call(endpoints.decisions.resolve, { body: { decisions: [...answers] } });
+    } catch {
+      // The log is a record for the person, not a step of the action: nothing to undo.
     }
   },
   readActivity: async (text) => {

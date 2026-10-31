@@ -50,6 +50,11 @@ const answer = {
   The server sends it for a release or two; clients never read it.
   */
   proposals: z.array(ActionSchema).optional(),
+  /**
+  The decision-log row of this reading, absent when none was written (a draft): what the
+  client names when it says what became of it (`POST /api/decisions/resolve`).
+  */
+  decisionId: z.string().optional(),
 };
 
 /**

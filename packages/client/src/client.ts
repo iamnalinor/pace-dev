@@ -110,7 +110,7 @@ export {
   type DayTotal,
   trackedDates,
 } from "./view-models/day.ts";
-export { type DecisionView, decisionView } from "./view-models/decisions.ts";
+export { type DecisionView, decisionViews } from "./view-models/decisions.ts";
 export {
   agentCommand,
   agentLogsCommand,

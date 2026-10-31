@@ -1,15 +1,13 @@
 import { ChevronRight } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-
-import type { Decision } from "@pace/core";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { type DecisionView, decisionView } from "@pace/client";
+import { type DecisionView, decisionViews } from "@pace/client";
 import { useDecisions } from "@pace/client/react";
 
 import { PushedScreen } from "./pushed-screen.tsx";
@@ -43,6 +41,7 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
       {view.request === null ? null : (
         <Detail>{t("decisions.request", { text: view.request })}</Detail>
       )}
+      {view.followup === null ? null : <Detail>{view.followup}</Detail>}
       {view.outcome === null ? null : <Detail>{view.outcome}</Detail>}
       {view.notFound === null ? null : <Detail tone="warn">{view.notFound}</Detail>}
       {view.note === null ? null : <Detail>{view.note}</Detail>}
@@ -52,13 +51,10 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
 };
 
 /** One message and what became of it; a row about a task opens that task. */
-const DecisionRow = ({ decision }: { readonly decision: Decision }) => {
+const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
   const t = useT();
-  const language = useLanguage();
-  const state = useAppState((current) => current);
   const openTask = useOpenTask();
   const { palette } = useTheme();
-  const view = decisionView(decision, { language, state });
   const { taskId } = view;
   return taskId === null ? (
     <View className="gap-0.5 border-t border-line py-2.5">
@@ -81,6 +77,9 @@ const DecisionRow = ({ decision }: { readonly decision: Decision }) => {
   );
 };
 
+/** How long typing in the search pauses before the log is searched. */
+const SEARCH_PAUSE_MS = 350;
+
 /** Every automatic decision (assistant readings, older notification decisions), searchable. */
 export const DecisionsScreen = () => {
   const t = useT();
@@ -88,7 +87,27 @@ export const DecisionsScreen = () => {
   const { palette } = useTheme();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  // It searches while typing, once the typing pauses; Enter searches at once.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(query);
+    }, SEARCH_PAUSE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [query]);
   const loaded = useDecisions(api, search);
+  const language = useLanguage();
+  const tasks = useAppState((state) => state.tasks);
+  const time = useAppState((state) => state.time);
+  // Worded once per load or store change, the state indexed once for every row.
+  const views = useMemo(
+    () =>
+      loaded.status === "loaded"
+        ? decisionViews(loaded.decisions, { language, state: { tasks, time } })
+        : [],
+    [language, loaded, tasks, time],
+  );
   return (
     <PushedScreen title={t("decisions.title")}>
       <View className="px-4 pb-3">
@@ -109,14 +128,16 @@ export const DecisionsScreen = () => {
         {loaded.status === "failed" ? (
           <Text className="font-sans text-[13px] text-muted">{t("decisions.failed")}</Text>
         ) : null}
-        {loaded.status === "loaded" && loaded.decisions.length === 0 ? (
-          <Text className="font-sans text-[13px] text-muted">{t("decisions.empty")}</Text>
+        {loaded.status === "loaded" && views.length === 0 ? (
+          <Text className="font-sans text-[13px] text-muted">
+            {search.trim() === ""
+              ? t("decisions.empty")
+              : t("decisions.noMatch", { query: search.trim() })}
+          </Text>
         ) : null}
-        {loaded.status === "loaded"
-          ? loaded.decisions.map((decision) => (
-              <DecisionRow decision={decision} key={decision.id} />
-            ))
-          : null}
+        {views.map((view) => (
+          <DecisionRow key={view.id} view={view} />
+        ))}
       </View>
     </PushedScreen>
   );

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ParseQuestion } from "./schema.ts";
 
 import { ParseRequestSchema } from "../api/schemas/parse.ts";
-import { answerAt, answerText } from "./answer.ts";
+import { answerAt, answerText, readAnswer } from "./answer.ts";
 
 const QUESTIONS: readonly ParseQuestion[] = [
   {
@@ -63,5 +63,17 @@ describe("answerAt", () => {
       error: "answer/unknown",
       ok: false,
     });
+  });
+
+  it("reads a tapped answer back into its question and option; anything else is not one", () => {
+    const text = answerText("By when does this need to be done?", "Tomorrow");
+    expect(readAnswer(text)).toEqual({
+      option: "Tomorrow",
+      question: "By when does this need to be done?",
+    });
+    expect(readAnswer("на завтра")).toBeNull();
+    expect(readAnswer("«Цитата» без ответа")).toBeNull();
+    expect(readAnswer("«» — x")).toBeNull();
+    expect(readAnswer("«Q» — ")).toBeNull();
   });
 });

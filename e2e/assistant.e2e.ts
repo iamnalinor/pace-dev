@@ -63,7 +63,27 @@ test("an assistant question is answered with one click, by keyboard too", async 
   await expect(page.getByText("Is this for work or home?")).toBeVisible();
   await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
   await expect(nowTasks(page).getByText("Съездить в банк")).toHaveCount(0);
-  // Escape with the caret in the line closes the card and keeps the text.
+  // Approved after the answer: the log shows the conversation as one row with one outcome.
+  await page.getByRole("button", { name: "Approve" }).click();
+  await expect(line).toHaveValue("");
+  await page.goto("/decisions");
+  const row = page.getByRole("button", { name: /Created task “Съездить в банк”/u });
+  await expect(row).toHaveCount(1);
+  await expect(row.getByText("You wrote: “#ask Съездить в банк”")).toBeVisible();
+  await expect(
+    row.getByText("You answered “By when does this need to be done?”: Tomorrow"),
+  ).toBeVisible();
+  await expect(row.getByText("You approved it")).toBeVisible();
+});
+
+// QA round 13 L2: Escape with the caret in the line closes the card and keeps the text.
+test("Escape in the line closes the assistant's card and keeps the text", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const line = page.getByRole("textbox", { name: "New task" });
+  await line.pressSequentially("#ask Съездить в банк");
+  await line.press("Enter");
+  await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
   await line.focus();
   await line.press("Escape");
   await expect(page.getByText("The assistant will create “Съездить в банк”")).toHaveCount(0);
