@@ -3,6 +3,7 @@ import {
   type CoreState,
   type DeadlinePolicy,
   extractLink,
+  finalDeadlineOf,
   type Importance,
   linkHost,
   type Outcome,
@@ -12,11 +13,13 @@ import {
   progressOf,
   type ProjectColorName,
   type QueryContext,
+  type RepeatRule,
   type Result,
   type Submission,
   type SubmitPreview,
   type Task,
   taskOutcome,
+  taskRepeatRule,
   type TaskStatus,
   type TaskView,
   taskView,
@@ -105,6 +108,10 @@ export type TaskViewModel = {
     readonly trackedMinutes: number;
     readonly estimateMinutes: number;
     readonly deadlinePolicy: DeadlinePolicy;
+    /** The hard end of a two-stage deadline and its zone; `null` without a second stage. */
+    readonly finalDue: null | { readonly at: string; readonly tz: string };
+    /** How the task repeats (to put in words with `describeRepeatRule`); `null` for a one-off. */
+    readonly repeat: null | RepeatRule;
   };
   readonly progress: {
     readonly mode: ProgressMode;
@@ -163,7 +170,7 @@ const overrideSheet = (state: CoreState, view: TaskView): OverrideSheet => {
   };
 };
 
-const stats = (view: TaskView): TaskViewModel["stats"] => ({
+const stats = (state: CoreState, view: TaskView): TaskViewModel["stats"] => ({
   dueAt: view.task.dueAt,
   dueTz: view.task.dueTz,
   dueZoneDiffers: view.dueZoneDiffers,
@@ -173,6 +180,8 @@ const stats = (view: TaskView): TaskViewModel["stats"] => ({
   trackedMinutes: view.trackedMinutes,
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
   deadlinePolicy: view.preset.deadlinePolicy,
+  finalDue: finalDeadlineOf(view.task, view.preset),
+  repeat: taskRepeatRule(state, view.task),
 });
 
 const subtaskRows = (task: Task): readonly SubtaskRow[] =>
@@ -222,7 +231,7 @@ export const taskViewModel = (
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
       tags: tags(view, taskOutcome(task, preset)),
-      stats: stats(view),
+      stats: stats(state, view),
       progress: {
         mode: preset.progressMode,
         value: progressOf(task, preset.progressMode),

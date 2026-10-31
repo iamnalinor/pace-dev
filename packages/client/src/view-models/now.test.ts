@@ -12,6 +12,10 @@ import {
   HW_DUE,
   HW_ID,
   MOSCOW,
+  NOW,
+  RENT_FINAL,
+  RENT_ID,
+  rentSeriesEvents,
   REPLY_ID,
   TRK_DUE,
   TRK_ID,
@@ -56,6 +60,8 @@ describe("nowViewModel", () => {
     const hw = row(board.rows, HW_ID);
     expect(hw.meta).toEqual([
       { importance: "normal", kind: "importance" },
+      // A weekly homework instance.
+      { kind: "repeats" },
       { at: HW_DUE, kind: "due", relative: "tomorrow", tz: MOSCOW, zoneDiffers: false },
       { kind: "left", minutes: minutesBetween(ctx().now, HW_DUE) },
       { kind: "solved", solved: 4, total: 7 },
@@ -95,6 +101,7 @@ describe("nowViewModel", () => {
     const calc = row(board.rows, CALC_HW5_ID);
     expect(calc.meta).toEqual([
       { importance: "normal", kind: "importance" },
+      { kind: "repeats" },
       { isSoft: false, kind: "late", minutes: 15 * 60 + 1 },
       { count: 2, kind: "subtasks-left" },
     ]);
@@ -135,5 +142,31 @@ describe("nowViewModel", () => {
     expect(board.projects).toEqual([]);
     const empty = nowViewModel({ ...state, tasks: { ...state.tasks, byId: {} } }, ctx());
     expect(empty.projects).toEqual([]);
+  });
+});
+
+/** Now's rows at `now`, with the monthly rent series in the world. */
+const withRent = (now: string): readonly NowRow[] =>
+  nowViewModel(artboardState(now, rentSeriesEvents()), ctx(now)).rows;
+
+describe("nowViewModel on a repeating task", () => {
+  it("marks an instance of a series right after its importance, and no one-off", () => {
+    const rows = withRent(NOW);
+    expect(row(rows, RENT_ID).meta.slice(0, 2)).toEqual([
+      { importance: "normal", kind: "importance" },
+      { kind: "repeats" },
+    ]);
+    expect(row(rows, TRK_ID).meta).not.toContainEqual({ kind: "repeats" });
+  });
+
+  it("names the final deadline once the main due date has passed, until it passes too", () => {
+    expect(row(withRent(NOW), RENT_ID).meta).not.toContainEqual(
+      expect.objectContaining({ kind: "final" }),
+    );
+    const late = row(withRent("2026-11-02T12:00:00.000Z"), RENT_ID).meta;
+    expect(late).toContainEqual(expect.objectContaining({ isSoft: true, kind: "late" }));
+    expect(late).toContainEqual({ at: RENT_FINAL, kind: "final", tz: MOSCOW });
+    const missed = withRent("2026-11-08T12:00:00.000Z").find((entry) => entry.id === RENT_ID);
+    expect(missed?.meta ?? []).not.toContainEqual(expect.objectContaining({ kind: "final" }));
   });
 });

@@ -62,6 +62,8 @@ the test suites).
 >   named the OS's way (⌘ on a Mac, Ctrl elsewhere) and shown on the buttons.
 > - **State you can see**: neighbouring tags in different colours when they mean different things
 >   (no two grays side by side), a draft looks like a draft, a value follows the finger live.
+>   Every value a form sets is readable without reopening the form (a task's repeat and final
+>   deadline on its screen, a repeat mark on its rows).
 > - **Feedback and motion**: a structural change (a form unfolding, a row leaving) is animated,
 >   never a jump; a saved value never snaps back for a moment.
 > - **Copy**: plain words that say what happened and what to do («A new version is ready ·

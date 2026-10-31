@@ -31,3 +31,35 @@ export const pluralCategory = (language: Language, count: number): PluralCategor
     }
   }
 };
+
+export type OrdinalCategory = "few" | "one" | "other" | "two";
+
+const ENGLISH_ORDINALS: Readonly<Record<number, OrdinalCategory>> = {
+  1: "one",
+  2: "two",
+  3: "few",
+};
+
+/** English ordinals: 1st, 2nd, 3rd, 4th; 11th–13th; 21st, 22nd, 23rd… */
+const englishOrdinal = (count: number): OrdinalCategory => {
+  const tens = count % 100;
+  return tens >= 11 && tens <= 13 ? "other" : (ENGLISH_ORDINALS[count % 10] ?? "other");
+};
+
+/**
+CLDR ordinal categories (`1st`, `2nd`), written out for the same reason as `pluralCategory`.
+Russian ordinals have one category: the catalog's form agrees by itself (`5-го`).
+*/
+export const ordinalCategory = (language: Language, count: number): OrdinalCategory => {
+  if (!Number.isSafeInteger(count) || count < 0) {
+    return "other";
+  }
+  switch (language) {
+    case "en": {
+      return englishOrdinal(count);
+    }
+    case "ru": {
+      return "other";
+    }
+  }
+};

@@ -34,7 +34,7 @@ describe("projectViewModel", () => {
       stats: { late: 2, onTime: { done: 9, total: 11 }, open: 2 },
     });
     expect(algebra.open.map((entry) => entry.id)).toEqual([HW_ID]);
-    expect(algebra.open[0]?.meta[1]).toMatchObject({ kind: "due", relative: "tomorrow" });
+    expect(algebra.open[0]?.meta[2]).toMatchObject({ kind: "due", relative: "tomorrow" });
     expect(algebra.future.map((entry) => entry.id)).toEqual([GRADE_ID]);
     expect(algebra.done).toHaveLength(DONE_SHEETS);
     expect(algebra.done[0]).toMatchObject({

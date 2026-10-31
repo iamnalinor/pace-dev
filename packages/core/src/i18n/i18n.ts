@@ -119,10 +119,20 @@ export const formatRelativeDay = (
   const days = Math.round(
     minutesBetween(startOfDayIn(nowIso, zone), startOfDayIn(atIso, zone)) / MINUTES_PER_DAY,
   );
-  const named = RELATIVE_DAYS[language][days + 1];
-  if (named !== undefined) {
-    return named;
-  }
+  return (
+    RELATIVE_DAYS[language][days + 1] ?? formatShortDate(atIso, nowIso, { language, tz: zone })
+  );
+};
+
+/**
+The date alone, as `formatRelativeDay` prints a day it does not name: "Oct 13", "13 окт.",
+with the year when it is not the year of `nowIso`. Days are the zone's calendar days.
+*/
+export const formatShortDate = (
+  atIso: string,
+  nowIso: string,
+  { language, tz: zone }: RelativeDayContext,
+): string => {
   const date = new Date(atIso);
   const isSameYear =
     new Intl.DateTimeFormat("en", { timeZone: zone, year: "numeric" }).format(date) ===

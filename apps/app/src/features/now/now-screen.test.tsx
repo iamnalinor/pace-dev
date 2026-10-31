@@ -14,7 +14,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
 import { addMinutesIso, calendarEventKey } from "@pace/core";
-import { HW_ID, NOW } from "@pace/core/testing";
+import { HW_ID, NOW, rentSeriesEvents } from "@pace/core/testing";
 
 import { ComposerProvider } from "./composer/composer-flow.tsx";
 import { NowBoard } from "./now-screen.tsx";
@@ -145,6 +145,21 @@ describe("NowBoard", () => {
     expect(screen.getByText("Due Oct 9 18:00 UTC (your time 21:00)")).toBeOnTheScreen();
     expect(screen.getAllByText("Algebra").length).toBeGreaterThan(0);
     expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+  });
+
+  it("marks the rows of repeating tasks, and the final deadline once the main one passed", async () => {
+    const late = "2026-11-02T12:00:00.000Z";
+    const runtime = await createTestRuntime({ now: late });
+    await runtime.state.ingest(rentSeriesEvents());
+    await renderScreen(<Board />, runtime);
+    const title = en("now.withDeadline");
+    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
+    const repeats = en("meta.repeats");
+    const rent = screen.getByRole("link", { name: /^Rent/u });
+    expect(within(rent).getByRole("image", { name: repeats })).toBeOnTheScreen();
+    expect(within(rent).getByText(/late · final deadline Nov 7 23:59/u)).toBeOnTheScreen();
+    const books = screen.getByRole("link", { name: /^Return library books/u });
+    expect(within(books).queryByRole("image", { name: repeats })).toBeNull();
   });
 
   it("opens a task from its row, and has no Inbox counter of its own (that is in the navigation)", async () => {
