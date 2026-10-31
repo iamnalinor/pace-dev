@@ -47,7 +47,14 @@ jobs:
       # Two advisories have no patched release yet and sit in dev-only tooling (metro/jest/
       # tailwind 3 → micromatch → braces; @expo/cli → node-forge); nothing of them ships to
       # the Worker or the app bundle. Drop the ignores once upstream publishes fixes.
-      - run: bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm --ignore GHSA-86w9-cpqp-85rv
+      # GHSA-mrhx-c7xc-m3w5 (zod): the workspaces run the fixed 4.6.6; only @expo/cli (zod 3)
+      # and @cloudflare/vitest-plugin (4.4.3, pinned) keep old copies, at build and test time.
+      # GHSA-qr28-fpjm-wq7f (decode-uri-component): expo-router's query-string 7 requires it
+      # from CommonJS and the fix (0.5.1) is ESM-only; the worst case is a slow tab on a crafted
+      # link to the person's own app. Drop both once expo-router and the plugin move on.
+      - run: >-
+          bun audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm --ignore GHSA-86w9-cpqp-85rv
+          --ignore GHSA-mrhx-c7xc-m3w5 --ignore GHSA-qr28-fpjm-wq7f
       - run: bun test:unit
       # Jest's Babel transforms of React Native and Expo are the slow part of the app tests;
       # they are content-hashed, so the newest main cache is always safe to start from.
