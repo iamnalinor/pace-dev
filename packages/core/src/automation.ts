@@ -7,6 +7,12 @@ export {
   MAX_CONTEXT_TASKS,
 } from "./actions/context.ts";
 export {
+  type DecisionInputs,
+  type DecisionStep,
+  decisionStepOf,
+  readDecisionInputs,
+} from "./actions/decision-steps.ts";
+export {
   actionDetails,
   type DetailLine,
   detailText,

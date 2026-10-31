@@ -44,6 +44,24 @@ const PATCH_FIELDS: readonly (readonly [keyof TaskPatch, ParseField])[] = [
   ["subtasks", "subtasks"],
 ];
 
+const ACTIVITY_FIELDS: readonly (readonly [
+  keyof Extract<ActionBody, { kind: "activity.update" }>["patch"],
+  ParseField,
+])[] = [
+  ["start", "start"],
+  ["end", "end"],
+  ["label", "label"],
+  ["category", "category"],
+];
+
+/** The fields an edit changes, in the order a summary names them (repeats possible). */
+export const changedFields = (
+  body: Extract<ActionBody, { kind: "activity.update" | "task.update" }>,
+): readonly ParseField[] =>
+  body.kind === "task.update"
+    ? PATCH_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(([, field]) => field)
+    : ACTIVITY_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(([, field]) => field);
+
 /** The names of the fields a patch changes, each once, in the person's language. */
 const fieldsOf = (keys: readonly ParseField[], language: Language): string =>
   [...new Set(keys)].map((field) => t(language, `parseField.${field}`)).join(", ");
@@ -77,11 +95,8 @@ const taskSummary = (
       return t(language, "action.task.create", { title: body.task.title });
     }
     case "task.update": {
-      const keys = PATCH_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(
-        ([, field]) => field,
-      );
       return t(language, "action.task.update", {
-        fields: fieldsOf(keys, language),
+        fields: fieldsOf(changedFields(body), language),
         title: taskTitle(state, body.taskId),
       });
     }
@@ -109,16 +124,6 @@ const taskSummary = (
   }
 };
 
-const ACTIVITY_FIELDS: readonly (readonly [
-  keyof Extract<ActionBody, { kind: "activity.update" }>["patch"],
-  ParseField,
-])[] = [
-  ["start", "start"],
-  ["end", "end"],
-  ["label", "label"],
-  ["category", "category"],
-];
-
 const startSummary = (body: Extract<ActionBody, { kind: "activity.start" }>, world: World) =>
   body.startAt === undefined
     ? t(world.language, "action.activity.start", { label: body.label })
@@ -144,11 +149,8 @@ const activitySummary = (
       });
     }
     case "activity.update": {
-      const keys = ACTIVITY_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(
-        ([, field]) => field,
-      );
       return t(language, "action.activity.update", {
-        fields: fieldsOf(keys, language),
+        fields: fieldsOf(changedFields(body), language),
         label: state.time.activities[body.activityId]?.label ?? body.activityId,
       });
     }

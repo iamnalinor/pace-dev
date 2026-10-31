@@ -1,4 +1,5 @@
 import { enBoard } from "./en/board.ts";
+import { enDecisions } from "./en/decisions.ts";
 import { enDevices } from "./en/devices.ts";
 import { enInput } from "./en/input.ts";
 import { enLibrary } from "./en/library.ts";
@@ -15,4 +16,5 @@ export const en = {
   ...enLibrary,
   ...enTime,
   ...enNotify,
+  ...enDecisions,
 } as const;

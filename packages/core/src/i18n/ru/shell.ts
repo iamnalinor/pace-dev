@@ -273,14 +273,4 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "bot.questionNumbered": "Вопрос {number}: {question}",
   "bot.answerHint":
     "Нажмите ответ ниже или ответьте уточнением. «Подтвердить» сохранит всё как показано.",
-  "decisions.title": "Журнал ассистента",
-  "decisions.search": "Поиск по решениям",
-  "decisions.empty": "Решений пока нет.",
-  "decisions.failed": "Не удалось загрузить журнал решений.",
-  "decisions.kind.notification": "Уведомление",
-  "decisions.kind.parse": "Ассистент",
-  "decisions.outcome.sent": "отправлено",
-  "decisions.outcome.suppressed": "придержано",
-  "decisions.outcome.parsed": "разобрано",
-  "decisions.outcome.unavailable": "недоступен",
 };

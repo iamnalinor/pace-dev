@@ -255,7 +255,16 @@ describe("POST /api/parse: tasks", () => {
       "/api/decisions?q=USB-C",
       { token },
     );
-    expect(decisions[0]).toMatchObject({ outcome: "parsed", rule: "parse.task.create" });
+    expect(decisions[0]).toMatchObject({
+      // What the log needs to say in words what became of the message, and who read it.
+      inputs: {
+        provider: "fake",
+        steps: [{ kind: "task.create", subject: "купить кабель USB-C", taskId: null }],
+        text: "купить кабель USB-C",
+      },
+      outcome: "parsed",
+      rule: "parse.task.create",
+    });
   });
 
   it("proposes edits, a close, a delete and subtasks of an existing task by its id", async () => {
@@ -426,17 +435,21 @@ describe("POST /api/parse: no model", () => {
     await stub.noteLlmLimits({ fake: "2000-01-01T00:00:00.000Z" }, new Date().toISOString());
     const later = Date.now() + 60_000;
     await stub.drainParses(new Date(later).toISOString());
-    const pulled = await json<{ events: { type: string; payload: { title?: string } }[] }>(
-      "/api/sync/pull",
-      { token },
-    );
+    const pulled = await json<{
+      events: { type: string; payload: { taskId?: string; title?: string } }[];
+    }>("/api/sync/pull", { token });
     const created = pulled.events.find((event) => event.payload.title === "позвонить в банк");
     expect(created?.type).toBe("task.created");
     const { decisions } = await json<{ decisions: { rule: string; outcome: string }[] }>(
       "/api/decisions?q=позвонить",
       { token },
     );
-    expect(decisions[0]).toMatchObject({ outcome: "applied", rule: "parse.deferred" });
+    expect(decisions[0]).toMatchObject({
+      inputs: { steps: [{ kind: "task.create", subject: "позвонить в банк" }] },
+      outcome: "applied",
+      rule: "parse.deferred",
+      taskId: created?.payload.taskId,
+    });
     // The alarm armed when it was queued finds nothing left: no second copy.
     await runDurableObjectAlarm(stub);
     const again = await json<{ events: { type: string; payload: { title?: string } }[] }>(
