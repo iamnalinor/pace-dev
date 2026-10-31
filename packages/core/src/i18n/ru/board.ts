@@ -31,6 +31,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "meta.ageNew": "только что",
   "meta.repeats": "Повторяется",
   "meta.final": "окончательный срок {when}",
+  "meta.final-passed": "окончательный срок прошёл {when}",
   "meta.subtasksLeft.one": "осталась {count} подзадача",
   "meta.subtasksLeft.few": "осталось {count} подзадачи",
   "meta.subtasksLeft.many": "осталось {count} подзадач",

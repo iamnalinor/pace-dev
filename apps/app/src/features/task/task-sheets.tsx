@@ -10,8 +10,15 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { taskFormOptions, type TaskPatch, type TaskViewModel } from "@pace/client";
-import { isUntilBeforeStart, type SeriesSchedule } from "@pace/core";
+import {
+  type AppState,
+  type RepeatChangeProblem,
+  repeatChangeProblem,
+  taskFormOptions,
+  type TaskPatch,
+  type TaskViewModel,
+} from "@pace/client";
+import { activeSeriesOf, type SeriesSchedule } from "@pace/core";
 
 /** The task as the form shows it: its own values (an estimate it never set reads as none). */
 const valuesOf = (
@@ -47,16 +54,6 @@ const deadlineStatus = (before: TaskFormValues, after: TaskFormValues) => {
     valid: !isChanged || isDeadlineChoiceValid(after.deadlinePolicy, after.due),
   };
 };
-
-/**
-Every refusal a save's later steps could meet, checked before its first write (bug class 32):
-the actions refuse the same last repeat date through the same predicate.
-*/
-const isRecurrenceValid = (
-  values: TaskFormValues,
-  fallback: { readonly at: string; readonly tz: string },
-): boolean =>
-  values.recurrence === null || !isUntilBeforeStart(values.recurrence, values.start ?? fallback);
 
 /** A changed date as the patch writes it: the new time with its zone, or `null` to clear. */
 const timePatch = (
@@ -100,6 +97,50 @@ type SaveInput = {
   /** Subtasks taken off in the sheet. */
   readonly removed: readonly string[];
   readonly seriesId: null | string;
+};
+
+/**
+The series the task still repeats in, and its schedule. An ended series repeats nothing: the
+editor shows "Does not repeat" and a new choice starts a new series (QA 13 H1).
+*/
+const liveSeriesOf = (state: AppState, taskId: string) => {
+  const series = activeSeriesOf(state.series, state.tasks.byId[taskId]?.seriesId ?? null);
+  return { recurrence: series?.schedule ?? null, seriesId: series?.id ?? null };
+};
+
+/**
+Every refusal the save's series step could meet, checked before its first write (bug class 32)
+by the predicate the series actions refuse through; nothing when the repeat is unchanged.
+*/
+const repeatProblemOf = (
+  state: AppState,
+  input: {
+    readonly before: TaskFormValues;
+    readonly values: TaskFormValues;
+    readonly taskId: string;
+    readonly fallback: { readonly at: string; readonly tz: string };
+  },
+): null | RepeatChangeProblem => {
+  const { before, fallback, taskId, values } = input;
+  return JSON.stringify(values.recurrence) === JSON.stringify(before.recurrence)
+    ? null
+    : repeatChangeProblem(state, {
+        due: values.due,
+        schedule: values.recurrence,
+        start: values.start ?? fallback,
+        taskId,
+      });
+};
+
+/** `repeatProblemOf` for the open editor, over the live state and the viewer's clock. */
+const useRepeatProblem = (
+  taskId: string,
+  before: TaskFormValues,
+  values: TaskFormValues,
+): null | RepeatChangeProblem => {
+  const state = useAppState((current) => current);
+  const { deviceTz, now } = useViewer();
+  return repeatProblemOf(state, { before, fallback: { at: now, tz: deviceTz }, taskId, values });
 };
 
 /** New and removed subtasks while the editor is open. */
@@ -191,15 +232,15 @@ export const EditTaskSheet = ({
   const t = useT();
   const { actions } = usePace();
   const run = useRunAction();
-  const { deviceTz, now } = useViewer();
+  const { deviceTz } = useViewer();
   const state = useAppState((current) => current);
-  const seriesId = state.tasks.byId[view.id]?.seriesId ?? null;
-  const recurrence = seriesId === null ? null : (state.series.byId[seriesId]?.schedule ?? null);
+  const { recurrence, seriesId } = liveSeriesOf(state, view.id);
   const options = useMemo(() => taskFormOptions(state), [state]);
   const before = useMemo(() => valuesOf(view, deviceTz, recurrence), [view, deviceTz, recurrence]);
   const [values, setValues] = useState(before);
   const { added, removed, setAdded, setRemoved, setSubtaskDraft, subtaskDraft } = useSubtaskEdits();
   const deadline = deadlineStatus(before, values);
+  const repeatProblem = useRepeatProblem(view.id, before, values);
   const save = async (): Promise<void> => {
     const steps = saveSteps({
       actions,
@@ -219,11 +260,7 @@ export const EditTaskSheet = ({
       closeLabel={t("common.close")}
       footer={
         <SheetActions
-          isDisabled={
-            values.title.trim() === "" ||
-            !deadline.valid ||
-            !isRecurrenceValid(values, { at: now, tz: deviceTz })
-          }
+          isDisabled={values.title.trim() === "" || !deadline.valid || repeatProblem !== null}
           onPrimary={() => {
             void save();
           }}
@@ -239,6 +276,7 @@ export const EditTaskSheet = ({
           setValues((current) => ({ ...current, ...patch }));
         }}
         options={options}
+        repeatProblem={repeatProblem}
         showDeadlineIssue={deadline.changed}
         values={values}
       />

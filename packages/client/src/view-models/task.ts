@@ -96,6 +96,12 @@ export type TaskViewModel = {
     readonly name: string;
     readonly color: null | ProjectColorName;
   };
+  /** The task's category (preset) and its colour: the tag its rows carry without a project. */
+  readonly category: {
+    readonly id: string;
+    readonly name: string;
+    readonly color: ProjectColorName;
+  };
   readonly tags: readonly TaskTag[];
   readonly stats: {
     readonly dueAt: null | string;
@@ -230,6 +236,11 @@ export const taskViewModel = (
       sourceText: originalMessage(task.sourceText, task.title),
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
+      category: {
+        color: preset.color,
+        id: task.presetId,
+        name: presetById(state.presets, task.presetId)?.name ?? task.presetId,
+      },
       tags: tags(view, taskOutcome(task, preset)),
       stats: stats(state, view, ctx),
       progress: {

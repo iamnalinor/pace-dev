@@ -29,6 +29,7 @@ export const enBoard = {
   "meta.ageNew": "just added",
   "meta.repeats": "Repeats",
   "meta.final": "final deadline {when}",
+  "meta.final-passed": "final deadline passed {when}",
   "meta.subtasksLeft.one": "{count} subtask left",
   "meta.subtasksLeft.few": "{count} subtasks left",
   "meta.subtasksLeft.many": "{count} subtasks left",

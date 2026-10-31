@@ -200,6 +200,7 @@ export {
   projectsViewModel,
 } from "./view-models/projects.ts";
 export { type DueRelative, relativeDay } from "./view-models/relative-day.ts";
+export { type RepeatChangeProblem, repeatChangeProblem } from "./view-models/repeat-change.ts";
 export {
   reviewDecisions,
   type ReviewRow,

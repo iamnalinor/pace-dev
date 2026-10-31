@@ -120,6 +120,12 @@ describe("TaskScreen — repeats and the final deadline", () => {
     expect(stat(en("task.finalDue"))).toHaveAccessibilityValue({ text: "Nov 7 23:59" });
   });
 
+  it("names the task's category among its tags, as its row does (QA 13 L9)", async () => {
+    await rentScreen();
+    // Rent has no project: before this the screen named no category at all.
+    expect(screen.getByText(en("preset.base.personal"))).toBeOnTheScreen();
+  });
+
   it("names a homework week by its due weekday, and neither line on a one-off task", async () => {
     await hwScreen();
     expect(stat(en("task.repeats"))).toHaveAccessibilityValue({ text: "Every Wednesday" });
@@ -300,6 +306,8 @@ describe("TaskScreen — work", () => {
     // The task starts on Monday, October 5: a last repeat on the 1st is before it.
     await fireEvent.press(screen.getByRole("button", { name: "Thursday, October 1" }));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
+    // The refusal is named next to the field it is about.
+    expect(screen.getByText(en("form.repeat.untilBeforeStart"))).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     expect(runtime.state.store.getState().events).toHaveLength(eventsBefore);
     expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.title).not.toBe("Renamed");
@@ -322,6 +330,36 @@ describe("TaskScreen — work", () => {
     await fireEvent.press(screen.getByRole("radio", { name: /^Due: /u }));
     await fireEvent.press(screen.getByRole("button", { name: en("composer.clear") }));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
+  });
+
+  it("will not repeat a task whose deadline is before its start, and says so at Repeat (QA 13 L7)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-01T18:00:00.000Z",
+      presetId: "personal",
+      startAt: "2026-10-05T09:00:00.000Z",
+      title: "Late already",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
+    expect(screen.getByText(en("form.repeat.dueBeforeStart"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
+  });
+
+  it("opens the final date's calendar under its label, and keeps quiet while it is open (QA 13 L8)", async () => {
+    await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.deadlineTwoStage") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.finalOnDate") }));
+    expect(screen.getByText(en("form.final"))).toBeOnTheScreen();
+    expect(screen.getByText(en("form.finalTime"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("form.deadlineInvalid"))).toBeNull();
+    // Closed without a date: now the form says what is missing.
+    await fireEvent.press(screen.getByRole("radio", { name: /^Final deadline: /u }));
+    expect(screen.getByText(en("form.deadlineInvalid"))).toBeOnTheScreen();
   });
 
   it("shows the last repeat date in words, not as yyyy-MM-dd", async () => {
@@ -347,6 +385,45 @@ describe("TaskScreen — work", () => {
         keepTaskId: TRK_ID,
       });
     });
+  });
+
+  it("repeats again after the repeat was stopped: a new series, with the final deadline (QA 13 H1)", async () => {
+    const runtime = await trkScreen();
+    const series = () => Object.values(runtime.state.store.getState().series.byId);
+    const edit = async () => {
+      await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    };
+    const save = async () => {
+      await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    };
+    await edit();
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.weekly") }));
+    await save();
+    await waitFor(() => {
+      expect(series()).toHaveLength(1);
+    });
+    await edit();
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.none") }));
+    await save();
+    await waitFor(() => {
+      expect(series()[0]?.archived).toBe(true);
+    });
+    expect(screen.queryByLabelText(en("task.repeats"))).toBeNull();
+    // The editor agrees with the screen: the task no longer repeats.
+    await edit();
+    expect(screen.getByRole("radio", { name: en("form.repeat.none") })).toBeChecked();
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.weekdays") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.deadlineTwoStage") }));
+    await save();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: en("common.save") })).toBeNull();
+    });
+    const active = series().find((entry) => !entry.archived);
+    expect(active?.schedule).toEqual({ kind: "weekdays" });
+    expect(active?.template.overrides).toMatchObject({ deadlinePolicy: { kind: "resubmission" } });
+    expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.seriesId).toBe(active?.id);
+    expect(stat(en("task.repeats"))).toHaveAccessibilityValue({ text: "Every weekday (Mon–Fri)" });
+    expect(stat(en("task.finalDue"))).toBeOnTheScreen();
   });
 
   it("gives up from the header's ⊘: the close sheet opens on Cancelled · Skipped", async () => {

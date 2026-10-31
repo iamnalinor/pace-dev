@@ -5,7 +5,7 @@ import type { MetaPart } from "./now.ts";
 /** Meta parts whose text needs no zone or color: everything but the dates and the importance. */
 export type PlainMetaPart = Exclude<
   MetaPart,
-  { readonly kind: "due" | "final" | "importance" | "starts" }
+  { readonly kind: "due" | "final" | "final-passed" | "importance" | "starts" }
 >;
 
 /** "6d 12h left", "15h late", "2 subtasks left", "4/7 solved" … */

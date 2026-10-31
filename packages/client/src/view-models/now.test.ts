@@ -4,6 +4,7 @@ import { minutesBetween } from "@pace/core";
 import {
   ALGEBRA_ID,
   artboardState,
+  at,
   BOOKS_ID,
   CALC_HW5_DUE,
   CALC_HW5_ID,
@@ -155,6 +156,30 @@ const withRent = (now: string, until?: string): readonly NowRow[] => {
 const endedRentMeta = (now: string): readonly MetaPart[] =>
   row(withRent(now, "2026-10-15"), RENT_ID).meta;
 
+describe("nowViewModel on a task that has not started yet", () => {
+  it("names its past deadline instead of calling it late (QA 13 L7)", () => {
+    const early = at(950, "2026-10-01T09:00:00.000Z", {
+      type: "task.created",
+      payload: {
+        dueAt: "2026-10-03T20:59:00.000Z",
+        dueTz: MOSCOW,
+        fields: {},
+        presetId: "personal",
+        startAt: "2026-10-07T09:00:00.000Z",
+        startTz: MOSCOW,
+        subtasks: [],
+        taskId: "t-early",
+        title: "Starts tomorrow",
+      },
+    });
+    const board = nowViewModel(artboardState(NOW, [early]), ctx());
+    const meta = row(board.future, "t-early").meta;
+    expect(meta).toContainEqual(expect.objectContaining({ kind: "due" }));
+    expect(meta).not.toContainEqual(expect.objectContaining({ kind: "late" }));
+    expect(meta).not.toContainEqual(expect.objectContaining({ kind: "left" }));
+  });
+});
+
 describe("nowViewModel on a repeating task", () => {
   it("marks an instance of a series right after its importance, and no one-off", () => {
     const rows = withRent(NOW);
@@ -180,5 +205,7 @@ describe("nowViewModel on a repeating task", () => {
     expect(late).toContainEqual({ at: RENT_FINAL, kind: "final", tz: MOSCOW });
     const missed = withRent("2026-11-08T12:00:00.000Z").find((entry) => entry.id === RENT_ID);
     expect(missed?.meta ?? []).not.toContainEqual(expect.objectContaining({ kind: "final" }));
+    // Past both: the row says the final deadline went by too (QA 13 L10).
+    expect(missed?.meta ?? []).toContainEqual({ at: RENT_FINAL, kind: "final-passed", tz: MOSCOW });
   });
 });

@@ -212,4 +212,8 @@ describe("taskViewModel", () => {
     const trk = view(TRK_ID, TRK_NOW).stats;
     expect(trk).toMatchObject({ finalDue: null, repeat: null });
   });
+
+  it("names the task's category with its colour, as its row does (QA 13 L9)", () => {
+    expect(view(TRK_ID, TRK_NOW).category).toEqual({ color: "violet", id: "work", name: "Work" });
+  });
 });
