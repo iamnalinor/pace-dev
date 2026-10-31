@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, lte } from "drizzle-orm";
 
 import { err, ok, type Result } from "@pace/core";
 
@@ -38,7 +38,9 @@ export const createNonce = async (
 ): Promise<{ readonly nonce: string; readonly expiresAt: number }> => {
   const nonce = randomBase64Url(24);
   const expiresAt = input.now + NONCE_TTL_MS;
-  await db.insert(loginNonces).values({
+  // Nonces are minted by anyone and nothing else removes them: each mint clears the expired ones.
+  const expired = db.delete(loginNonces).where(lte(loginNonces.expiresAt, new Date(input.now)));
+  const minted = db.insert(loginNonces).values({
     nonce,
     createdAt: new Date(input.now),
     expiresAt: new Date(expiresAt),
@@ -47,6 +49,7 @@ export const createNonce = async (
     deviceName: input.deviceName ?? null,
     deviceId: input.deviceId ?? null,
   });
+  await db.batch([expired, minted]);
   return { nonce, expiresAt };
 };
 

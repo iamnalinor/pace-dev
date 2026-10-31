@@ -15,4 +15,20 @@ ALTER TABLE `sessions` ADD `ip` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `country` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `city` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `device_id` text;--> statement-breakpoint
+-- Before `label` goes, existing sessions get their kind and a readable name from it: an agent's
+-- label was the computer's typed name; the server wrote `web` (widget), `android` (bot login) and `dev`.
+UPDATE `sessions` SET
+	`kind` = CASE
+		WHEN `scope` = 'usage:write' THEN 'agent'
+		WHEN `label` = 'dev' THEN 'dev'
+		WHEN `label` = 'android' THEN 'app'
+		ELSE 'browser'
+	END,
+	`name` = CASE
+		WHEN `scope` = 'usage:write' THEN coalesce(`label`, '')
+		WHEN `label` = 'dev' THEN 'Dev login'
+		WHEN `label` = 'android' THEN 'Android'
+		WHEN `label` = 'web' THEN 'Browser'
+		ELSE coalesce(`label`, '')
+	END;--> statement-breakpoint
 ALTER TABLE `sessions` DROP COLUMN `label`;

@@ -105,4 +105,17 @@ describe("login nonces", () => {
       .first<{ session_id: null | string }>();
     expect(row?.session_id).toBe("session-1");
   });
+
+  it("clears expired nonces when a new one is minted, and keeps live ones", async () => {
+    const db = d1(env.DB);
+    const isStored = async (nonce: string): Promise<boolean> =>
+      (await env.DB.prepare("select nonce from login_nonces where nonce = ?")
+        .bind(nonce)
+        .first()) !== null;
+    const expired = await createNonce(db, fromWeb);
+    const live = await createNonce(db, { ...fromWeb, now: NOW + MINUTE });
+    await createNonce(db, { ...fromWeb, now: NOW + 5 * MINUTE });
+    expect(await isStored(expired.nonce)).toBe(false);
+    expect(await isStored(live.nonce)).toBe(true);
+  });
 });

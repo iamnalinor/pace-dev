@@ -308,6 +308,17 @@ describe("sessions record their kind, a readable name and where they signed in f
     expect(agent?.id).toBe(created.id);
   });
 
+  it("stores at most 512 characters of the User-Agent an anonymous nonce request sends", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=web", {
+      method: "POST",
+      ...from("1.2.3.4", "x".repeat(5000)),
+    });
+    const row = await env.DB.prepare("select user_agent from login_nonces where nonce = ?")
+      .bind(nonce)
+      .first<{ user_agent: string }>();
+    expect(row?.user_agent).toBe("x".repeat(512));
+  });
+
   it("refuses a nonce request body with fields it does not know", async () => {
     const response = await call("/api/auth/nonce?from=app", { body: { extra: 1 } });
     expect(response.status).toBe(422);

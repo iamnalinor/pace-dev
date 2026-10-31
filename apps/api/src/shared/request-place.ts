@@ -9,6 +9,12 @@ export type RequestPlace = {
 /** A request nothing is known about: an agent's token made in Settings, a test without headers. */
 export const UNKNOWN_PLACE: RequestPlace = { city: null, country: null, ip: null, userAgent: null };
 
+/**
+The most of a User-Agent kept: the client sets it freely and an anonymous nonce request stores
+it, so its size is bounded; real browsers send well under this.
+*/
+const USER_AGENT_MAX = 512;
+
 const text = (value: unknown): null | string =>
   typeof value === "string" && value !== "" ? value : null;
 
@@ -23,6 +29,6 @@ export const requestPlace = (request: Request): RequestPlace => {
     city: text(cf["city"]),
     country: text(cf["country"]),
     ip: text(request.headers.get("CF-Connecting-IP")),
-    userAgent: text(request.headers.get("User-Agent")),
+    userAgent: text(request.headers.get("User-Agent"))?.slice(0, USER_AGENT_MAX) ?? null,
   };
 };

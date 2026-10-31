@@ -28,4 +28,11 @@ describe("requestPlace", () => {
       userAgent: null,
     });
   });
+
+  it("keeps at most 512 characters of a User-Agent: anyone may send one, it is stored", () => {
+    const request = new Request("https://pace-api.test/api/auth/nonce", {
+      headers: { "User-Agent": "x".repeat(5000) },
+    });
+    expect(requestPlace(request).userAgent).toBe("x".repeat(512));
+  });
 });

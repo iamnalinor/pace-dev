@@ -162,7 +162,8 @@ secrets with zod once per request and stores the result on the context.
   as SHA-256 of the bot token, verifies HMAC-SHA-256 with a constant-time compare and
   rejects `auth_date` older than five minutes.
 - **Android** (and the web through the bot): `POST /api/auth/nonce?from=app|web` → `{ nonce,
-  deepLink }` (24 random bytes, base64url, 5-minute TTL, stored in D1 `login_nonces`). The app
+  deepLink }` (24 random bytes, base64url, 5-minute TTL, stored in D1 `login_nonces`; each mint
+  clears the expired rows, and the stored User-Agent is capped at 512 characters). The app
   sends an optional strict body `{ deviceName, deviceId }` (its phone model and install id); the
   web sends none. The nonce row keeps `from`, that request's place and the named device, so the
   session it opens is named and placed by the request that started the login, not by the poll.
