@@ -6,6 +6,7 @@ import type { AppEnv } from "../shared/app-env.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { mount, type Problem } from "../shared/mount.ts";
+import { isOutdatedClient, outdatedClient } from "../shared/protocol.ts";
 import { socketUser, tokenFromProtocols } from "../shared/socket-auth.ts";
 
 /** Why a push was refused, as the client sees it (one entry per error code). */
@@ -25,12 +26,16 @@ const userStore = (c: Context<AppEnv>) =>
 The live channel (`GET /api/sync/live`, a WebSocket): the user's store says `changed` as soon
 as the log grows from anywhere but the listening device, so a client pulls at once instead
 of polling. Not an `endpoint()`: an upgrade is not a JSON call. The bearer comes in the
-subprotocols, since a browser cannot set headers on a socket.
+subprotocols and the app's protocol in the `protocol` query, since a browser cannot set headers
+on a socket.
 */
 const mountLiveRoute = (app: Hono<AppEnv>): void => {
   app.get("/api/sync/live", async (c) => {
     if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") {
       return c.json({ code: "upgrade-required", message: "Open this as a WebSocket" }, 426);
+    }
+    if (isOutdatedClient(c.req.query("protocol"))) {
+      return outdatedClient(c);
     }
     const user = await socketUser(
       c.env,

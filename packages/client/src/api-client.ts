@@ -1,4 +1,11 @@
-import { buildPath, type EndpointInput, type EndpointOutput, type EndpointShape } from "@pace/core";
+import {
+  buildPath,
+  type EndpointInput,
+  type EndpointOutput,
+  type EndpointShape,
+  PROTOCOL,
+  PROTOCOL_HEADER,
+} from "@pace/core";
 
 /** An HTTP error from the API, with the machine-readable `code` when the server sent one. */
 export class ApiError extends Error {
@@ -54,7 +61,8 @@ const withQuery = (path: string, query: Readonly<Record<string, string>> | undef
 
 /**
 Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
-token is read on every request so a login or logout takes effect immediately.
+token is read on every request so a login or logout takes effect immediately; every request
+also says which protocol this build speaks (`X-Pace-Protocol`).
 */
 export const createApiClient = (options: {
   readonly baseUrl: string;
@@ -72,7 +80,12 @@ export const createApiClient = (options: {
         query?: Record<string, string>;
       };
       const credential = options.token();
-      const headers: Record<string, string> = { Accept: "application/json" };
+      // The protocol rides on every call: a server too new for this app refuses it (426
+      // `client/outdated`), which surfaces as an ApiError like any other refusal.
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        [PROTOCOL_HEADER]: String(PROTOCOL),
+      };
       if (credential !== undefined) {
         headers["Authorization"] = `Bearer ${credential}`;
       }

@@ -62,6 +62,8 @@ const EnvSchema = z.object({
   TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
   BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
   LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
+  API_ORIGIN: z.url().optional(),
+  PACE_VERSION: z.string().optional(),
 });
 
 /** One OpenAI-compatible endpoint: its models are tried in order, each with every key. */
@@ -159,6 +161,16 @@ export type Config = {
   readonly llmSkipped: readonly string[];
   /** `fake` answers from inside the Worker (tests, e2e); `auto` uses the providers with a key. */
   readonly llmProvider: "auto" | "fake";
+  /** The Worker's own origin when configured; `undefined` = the origin requests arrive at. */
+  readonly apiOrigin: string | undefined;
+  /** The build this Worker runs (a release tag or a commit, set at deploy); `dev` otherwise. */
+  readonly version: string;
+};
+
+/** An unset or blank version is a build no deploy named. */
+const versionOf = (value: string | undefined): string => {
+  const version = value?.trim() ?? "";
+  return version === "" ? "dev" : version;
 };
 
 /**
@@ -186,5 +198,7 @@ export const loadConfig = (env: object): Result<Config, string> => {
     llmEndpoints: llm.endpoints,
     llmSkipped: llm.skipped,
     llmProvider: value.LLM_PROVIDER,
+    apiOrigin: value.API_ORIGIN,
+    version: versionOf(value.PACE_VERSION),
   });
 };

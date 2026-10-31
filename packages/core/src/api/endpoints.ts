@@ -31,6 +31,7 @@ import {
   UsageOutputSchema,
   UsageUploadSchema,
 } from "./schemas/cloud.ts";
+import { InstanceSchema } from "./schemas/instance.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
 import { CalendarSkipSchema } from "./schemas/notify.ts";
 import {
@@ -57,6 +58,16 @@ export const endpoints = {
     method: "GET",
     output: z.object({ status: z.literal("ok") }),
     path: "/api/health",
+  }),
+  /**
+  What this server is and which app protocol it serves: public, so the app can check a server
+  before signing in, and never refused for an old protocol, so an outdated app learns why.
+  */
+  instance: endpoint({
+    auth: false,
+    method: "GET",
+    output: InstanceSchema,
+    path: "/api/instance",
   }),
   me: endpoint({
     auth: true,

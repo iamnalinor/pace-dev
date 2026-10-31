@@ -60,12 +60,13 @@ const fakeSockets = (): {
 };
 
 describe("liveUrl", () => {
-  it("turns the API's address into the socket's, with the device", () => {
+  it("turns the API's address into the socket's, with the device and the app's protocol", () => {
+    expect(liveUrl("https://a.dev", "d1")).toBe("wss://a.dev/api/sync/live?device=d1&protocol=1");
     expect(liveUrl("https://api.pace.test", "dev 1")).toBe(
-      "wss://api.pace.test/api/sync/live?device=dev%201",
+      "wss://api.pace.test/api/sync/live?device=dev%201&protocol=1",
     );
     expect(liveUrl("http://localhost:8787/", "d")).toBe(
-      "ws://localhost:8787/api/sync/live?device=d",
+      "ws://localhost:8787/api/sync/live?device=d&protocol=1",
     );
   });
 });

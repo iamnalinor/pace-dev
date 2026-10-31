@@ -2,7 +2,7 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 
-import { endpoints, ok } from "@pace/core";
+import { endpoints, MIN_CLIENT_PROTOCOL, ok, PROTOCOL, PROTOCOL_HEADER } from "@pace/core";
 
 import type { AppEnv } from "./shared/app-env.ts";
 import type { ParseProvider } from "./shared/llm/llm.ts";
@@ -21,6 +21,8 @@ import { type Config, loadConfig } from "./shared/config.ts";
 import { parseProviders } from "./shared/llm/providers.ts";
 import { createLogger } from "./shared/logger.ts";
 import { mount } from "./shared/mount.ts";
+import { refuseOutdatedClients } from "./shared/protocol.ts";
+import { pushConfigOf, pushMethodsOf } from "./shared/push/registry.ts";
 import { telegramFetch, type TelegramTransport } from "./shared/telegram-api.ts";
 import { mountSyncRoutes } from "./sync/sync-routes.ts";
 
@@ -47,16 +49,53 @@ const PLATFORM_DEPS: AppDeps = {
   telegramFetch,
 };
 
+/**
+The calls an app too old for this server may still make: what the server is (so the app can say
+why it is refused) and whether it is up.
+*/
+const SERVED_TO_ANY_PROTOCOL: ReadonlySet<string> = new Set([
+  endpoints.health.path,
+  endpoints.instance.path,
+]);
+
+/**
+The calls anyone may make: whether the server is up, and `GET /api/instance` (the server's
+identity, protocol and what it can do, read from config).
+*/
+const mountPublicRoutes = (app: Hono<AppEnv>, deps: AppDeps): void => {
+  mount(app, endpoints.health, () => ok({ status: "ok" as const }));
+  mount(app, endpoints.instance, async ({ c }) => {
+    const config = c.get("config");
+    const push = await pushMethodsOf(c.env.DB, pushConfigOf(c.env), Date.now());
+    return ok({
+      apiOrigin: config.apiOrigin ?? new URL(c.req.url).origin,
+      botUsername: config.telegramBotUsername,
+      features: {
+        // The skipped slots were already logged by the calls that use the models; not again here.
+        assistant: deps.parseProviders({ ...config, llmSkipped: [] }).length > 0,
+        push: push.pushMethods.includes("fcm"),
+      },
+      loginMethods: ["telegram-widget" as const, "telegram-deeplink" as const],
+      minClientProtocol: MIN_CLIENT_PROTOCOL,
+      name: "Pace",
+      protocol: PROTOCOL,
+      version: config.version,
+      webOrigin: config.webOrigin,
+    });
+  });
+};
+
 export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
   const app = new Hono<AppEnv>();
   app.use(
     "/api/*",
     cors({
-      allowHeaders: ["Authorization", "Content-Type"],
+      allowHeaders: ["Authorization", "Content-Type", PROTOCOL_HEADER],
       maxAge: 86_400,
       origin: (origin, c: Context<AppEnv>) =>
         isAllowedOrigin(origin, c.env.WEB_ORIGIN) ? origin : "",
     }),
+    refuseOutdatedClients(SERVED_TO_ANY_PROTOCOL),
   );
   app.onError((thrown, c) => {
     if (thrown instanceof HTTPException) {
@@ -79,7 +118,7 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
     await next();
   });
 
-  mount(app, endpoints.health, () => ok({ status: "ok" as const }));
+  mountPublicRoutes(app, deps);
   mountAuthRoutes(app, deps.telegramFetch);
   mountAccountRoutes(app, deps.telegramFetch);
   mountBotRoutes(app, {

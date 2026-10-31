@@ -29,6 +29,11 @@ declare global {
       push is off and every other channel still works.
       */
       FIREBASE_SERVICE_ACCOUNT?: string;
+      /**
+      The build the Worker runs, shown by `GET /api/instance`: the deploy sets the release tag or
+      the commit (`wrangler deploy --var PACE_VERSION:…`); unset reads as `dev`.
+      */
+      PACE_VERSION?: string;
       /** Override of the Telegram API origin (tests point it at a mocked host). */
       TELEGRAM_API_ROOT?: string;
       /**

@@ -9,6 +9,7 @@ export {
   type HttpMethod,
 } from "./api/endpoint.ts";
 export { endpointList, endpoints } from "./api/endpoints.ts";
+export * from "./api/protocol.ts";
 export {
   AccountDeletedSchema,
   AuthSessionSchema,
@@ -29,6 +30,7 @@ export {
   type Device,
   type UsageRow,
 } from "./api/schemas/cloud.ts";
+export * from "./api/schemas/instance.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,

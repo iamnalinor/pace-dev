@@ -1,5 +1,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
+import { PROTOCOL } from "@pace/core";
+
 type SocketEvent = "close" | "message" | "open";
 
 /** The part of a WebSocket the channel uses (the browser's and React Native's both fit). */
@@ -37,11 +39,14 @@ const PING_MS = 45_000;
 const RETRY_MIN_MS = 1000;
 const RETRY_MAX_MS = 60_000;
 
-/** The socket's address next to the API's: `https` becomes `wss`, the device rides along. */
+/**
+The socket's address next to the API's: `https` becomes `wss`; the device and this build's
+protocol ride along in the query, since a socket cannot carry the `X-Pace-Protocol` header.
+*/
 export const liveUrl = (baseUrl: string, deviceId: string): string => {
   const url = new URL("/api/sync/live", baseUrl);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  return `${url.href}?device=${encodeURIComponent(deviceId)}`;
+  return `${url.href}?device=${encodeURIComponent(deviceId)}&protocol=${String(PROTOCOL)}`;
 };
 
 /** The platform's WebSocket; `undefined` where there is none (a test runner), and nothing opens. */

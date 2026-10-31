@@ -14,6 +14,12 @@ const TELEGRAM_CIDRS = "149.154.160.0/20,91.108.4.0/22";
 // eslint-disable-next-line sonarjs/no-hardcoded-ip -- a typo fixture: the prefix length is out of range
 const BAD_CIDR = "149.154.160.0/33";
 
+/** The config `base` plus `env` gives; `undefined` when it does not load. */
+const configured = (env: object) => {
+  const result = loadConfig({ ...base, ...env });
+  return result.ok ? result.value : undefined;
+};
+
 describe("loadConfig", () => {
   it("parses the csv whitelist and defaults the optional values", () => {
     const result = loadConfig(base);
@@ -107,6 +113,19 @@ describe("loadConfig", () => {
   it("rejects an invalid web origin and an unknown environment", () => {
     expect(loadConfig({ ...base, WEB_ORIGIN: "pace.test" }).ok).toBe(false);
     expect(loadConfig({ ...base, ENVIRONMENT: "staging" }).ok).toBe(false);
+  });
+
+  it("names the build from PACE_VERSION, `dev` when unset or blank", () => {
+    expect(configured({})?.version).toBe("dev");
+    expect(configured({ PACE_VERSION: " " })?.version).toBe("dev");
+    expect(configured({ PACE_VERSION: "v1.2.0\n" })?.version).toBe("v1.2.0");
+  });
+
+  it("reads API_ORIGIN when set and leaves it to the request otherwise", () => {
+    expect(configured({})?.apiOrigin).toBeUndefined();
+    expect(configured({ API_ORIGIN: "https://api.pace.test" })?.apiOrigin).toBe(
+      "https://api.pace.test",
+    );
   });
 
   it("parses BOT_INFO as JSON when present", () => {
