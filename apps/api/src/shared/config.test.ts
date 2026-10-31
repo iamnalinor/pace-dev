@@ -28,33 +28,68 @@ describe("loadConfig", () => {
     expect(result.value.botInfo).toBeUndefined();
   });
 
-  it("reads a configurable compatible model and several keys, comma or newline separated", () => {
+  it("reads numbered LLM endpoints in priority order; a slot may list several models and keys", () => {
     const result = loadConfig({
       ...base,
-      LLM_API_KEY: "k1, k2\nk3",
-      LLM_BASE_URL: "https://models.example/v1",
-      LLM_MODEL: "reader-small",
+      LLM_API_KEY_1: "k1, k2\nk3",
+      LLM_API_KEY_10: "late",
+      LLM_API_KEY_2: "g",
+      LLM_BASE_URL_1: "https://models.example/v1",
+      LLM_BASE_URL_10: "https://late.example/v1",
+      LLM_BASE_URL_2: "https://gemini.example/v1beta/openai",
+      LLM_MODEL_1: "luna, sol",
+      LLM_MODEL_10: "slow",
+      LLM_MODEL_2: "gemini-flash-latest",
     });
-    expect(result.ok && result.value.llmApiKeys).toEqual(["k1", "k2", "k3"]);
-    expect(result.ok && result.value.llmBaseUrl).toBe("https://models.example/v1");
-    expect(result.ok && result.value.llmModel).toBe("reader-small");
+    expect(result.ok && result.value.llmEndpoints).toEqual([
+      {
+        apiKeys: ["k1", "k2", "k3"],
+        baseUrl: "https://models.example/v1",
+        models: ["luna", "sol"],
+        slot: 1,
+      },
+      {
+        apiKeys: ["g"],
+        baseUrl: "https://gemini.example/v1beta/openai",
+        models: ["gemini-flash-latest"],
+        slot: 2,
+      },
+      { apiKeys: ["late"], baseUrl: "https://late.example/v1", models: ["slow"], slot: 10 },
+    ]);
     const unset = loadConfig(base);
-    expect(unset.ok && unset.value.llmApiKeys).toEqual([]);
+    expect(unset.ok && unset.value.llmEndpoints).toEqual([]);
   });
 
-  it("rejects incomplete model configuration but works with no model configured", () => {
-    expect(loadConfig(base).ok).toBe(true);
-    expect(loadConfig({ ...base, LLM_API_KEY: "secret" }).ok).toBe(false);
-    expect(loadConfig({ ...base, LLM_BASE_URL: "https://models.example/v1" }).ok).toBe(false);
+  it("ignores the old unnumbered LLM_* names", () => {
+    const result = loadConfig({
+      ...base,
+      LLM_API_KEY: "k",
+      LLM_BASE_URL: "https://models.example/v1",
+      LLM_MODEL: "luna",
+    });
+    expect(result.ok && result.value.llmEndpoints).toEqual([]);
+  });
+
+  it("names the variable an incomplete or invalid LLM slot misses", () => {
+    expect(loadConfig({ ...base, LLM_API_KEY_1: "secret" })).toEqual({
+      error: "config: LLM_BASE_URL_1: LLM_BASE_URL_1, LLM_API_KEY_1 and LLM_MODEL_1 go together",
+      ok: false,
+    });
     expect(
-      loadConfig({ ...base, LLM_BASE_URL: "http://localhost:3000/v1", LLM_MODEL: "local" }).ok,
-    ).toBe(false);
+      loadConfig({ ...base, LLM_BASE_URL_2: "https://models.example/v1", LLM_MODEL_2: "m" }),
+    ).toEqual({
+      error: "config: LLM_API_KEY_2: LLM_BASE_URL_2, LLM_API_KEY_2 and LLM_MODEL_2 go together",
+      ok: false,
+    });
+    expect(
+      loadConfig({ ...base, LLM_API_KEY_1: "k", LLM_BASE_URL_1: "not-a-url", LLM_MODEL_1: "m" }),
+    ).toEqual({ error: "config: LLM_BASE_URL_1: must be an HTTP URL", ok: false });
     expect(
       loadConfig({
         ...base,
-        LLM_API_KEY: "secret",
-        LLM_BASE_URL: "not-a-url",
-        LLM_MODEL: "local",
+        LLM_API_KEY_1: " , ",
+        LLM_BASE_URL_1: "https://m.example",
+        LLM_MODEL_1: "m",
       }).ok,
     ).toBe(false);
   });
