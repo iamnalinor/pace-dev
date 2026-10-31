@@ -94,7 +94,10 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.closedToast": "{title} · {outcome}",
   "form.startNow": "Начало сейчас",
   "form.deadlinePolicy": "Тип срока",
-  "form.deadlineInvalid": "Укажите основной срок и более поздний окончательный срок.",
+  "form.deadlineNoDue": "Укажите основной срок: окончательный идёт после него.",
+  "form.finalAfterDue": "Выберите окончательный срок после основного ({due}).",
+  "form.finalDaysInvalid": "Укажите, через сколько дней после основного срока (от 1).",
+  "form.dueBeforeStartNote": "Срок раньше начала — проверьте даты.",
   "form.deadlineHard": "Жёсткий срок",
   "form.deadlineTwoStage": "Основной и окончательный сроки",
   "form.deadlineSoftHint": "Основной срок — мягкая цель. Окончательный срок — жёсткий.",
@@ -115,7 +118,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "form.repeat.noEnd": "Без даты окончания",
   "form.repeat.endDate": "Дата последнего повтора",
   "form.repeat.untilBeforeStart": "Дата последнего повтора раньше начала задачи.",
-  "form.repeat.dueBeforeStart": "Срок раньше начала: каждый повтор начинался бы с опозданием.",
+  "form.repeat.dueBeforeStart":
+    "Срок раньше начала: каждый повтор начинался бы с опозданием. Выберите срок позже или начало раньше.",
   "form.repeat.duePassed":
     "Срок уже прошёл: повтор не может начаться с опозданием. Выберите срок позже.",
   "form.newTask": "Новая задача",

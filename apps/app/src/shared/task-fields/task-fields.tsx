@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, type TextInput, View } from "react-native";
+import { type TextInput, View } from "react-native";
 
 import type { RepeatChangeProblem } from "@pace/client";
 
@@ -12,11 +12,9 @@ import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 
 import { DatePanel } from "./date-field.tsx";
-import { isDeadlineChoiceValid } from "./deadline-choice.ts";
-import { DeadlinePolicyField } from "./deadline-policy-field.tsx";
+import { DeadlineAndRepeat, DueBeforeStartNote } from "./deadline-and-repeat.tsx";
 import { EstimateOptions } from "./estimate-field.tsx";
 import { OptionRow } from "./option-row.tsx";
-import { RecurrenceField } from "./recurrence-field.tsx";
 import { TaskTextFields } from "./task-text-fields.tsx";
 import { useOutsidePress } from "./use-outside-press.ts";
 import { WhenChips } from "./when-chips.tsx";
@@ -159,53 +157,6 @@ const ChoiceFields = ({
 };
 
 /**
-The deadline type with what is wrong with it right under it (not while its final date is still
-being picked), then the repeat with its own refusal under it.
-*/
-const DeadlineAndRepeat = ({
-  isFinalOpen,
-  onChange,
-  onFinalOpenChange,
-  repeatProblem,
-  showDeadlineIssue,
-  values,
-}: {
-  readonly values: TaskFormValues;
-  readonly onChange: (patch: Partial<TaskFormValues>) => void;
-  readonly isFinalOpen: boolean;
-  readonly onFinalOpenChange: (isOpen: boolean) => void;
-  readonly showDeadlineIssue: boolean;
-  readonly repeatProblem: null | RepeatChangeProblem;
-}) => {
-  const t = useT();
-  const isDeadlineIssue =
-    showDeadlineIssue && !isFinalOpen && !isDeadlineChoiceValid(values.deadlinePolicy, values.due);
-  return (
-    <>
-      <DeadlinePolicyField
-        isFinalOpen={isFinalOpen}
-        onChange={(deadlinePolicy) => {
-          onChange({ deadlinePolicy });
-        }}
-        onFinalOpenChange={onFinalOpenChange}
-        value={values.deadlinePolicy}
-      />
-      {isDeadlineIssue ? (
-        <Text className="font-sans text-[12px] text-warn">{t("form.deadlineInvalid")}</Text>
-      ) : null}
-      <RecurrenceField
-        onChange={(recurrence) => {
-          onChange({ recurrence });
-        }}
-        problem={repeatProblem}
-        start={values.start}
-        value={values.recurrence}
-      />
-    </>
-  );
-};
-
-/**
 The fields of a task, labelled one by one: title, category, importance, project, start, due,
 estimate, description and link. The composer's form and the task editor both draw it.
 */
@@ -214,6 +165,7 @@ export const TaskFields = ({
   onChange,
   onSubmit,
   options,
+  isStartChosen,
   repeatProblem = null,
   showDeadlineIssue = false,
   values,
@@ -228,6 +180,9 @@ export const TaskFields = ({
   readonly showDeadlineIssue?: boolean;
   /** Why the repeat choice could not be saved (the editor checks it before any write). */
   readonly repeatProblem?: null | RepeatChangeProblem;
+  /** The start is the person's (the editor shows an automatic one too): only then is a
+  deadline before it worth a note. */
+  readonly isStartChosen?: boolean;
 }) => {
   const t = useT();
   const titleRef = useRef<TextInput>(null);
@@ -270,6 +225,7 @@ export const TaskFields = ({
         setPanel={setPanel}
         values={values}
       />
+      <DueBeforeStartNote isStartChosen={isStartChosen} values={values} />
       <DeadlineAndRepeat
         isFinalOpen={isFinalOpen}
         onChange={onChange}

@@ -2,17 +2,35 @@ import type { DeadlinePolicy } from "@pace/core";
 
 import type { Zoned } from "./date-field.tsx";
 
-/** A second stage always has a main due date and a later hard endpoint. */
-export const isDeadlineChoiceValid = (policy: DeadlinePolicy, due: Zoned): boolean => {
+/** What a two-stage deadline still lacks: a main due date, a final date after it, a day count. */
+export type DeadlineChoiceProblem =
+  | "deadline/days"
+  | "deadline/final-after-due"
+  | "deadline/no-due";
+
+/**
+A second stage always has a main due date and a later hard endpoint. The form's message and
+whether Save is on both come from this one answer.
+*/
+export const deadlineChoiceProblem = (
+  policy: DeadlinePolicy,
+  due: Zoned,
+): DeadlineChoiceProblem | null => {
   if (policy.kind === "hard") {
-    return true;
+    return null;
   }
   if (due === null) {
-    return false;
+    return "deadline/no-due";
   }
-  return policy.finalMode === "offset"
-    ? Number.isSafeInteger(policy.softDays) && policy.softDays > 0
-    : policy.finalAt !== null &&
-        policy.finalTz !== null &&
-        Date.parse(policy.finalAt) > Date.parse(due.at);
+  if (policy.finalMode === "offset") {
+    return Number.isSafeInteger(policy.softDays) && policy.softDays > 0 ? null : "deadline/days";
+  }
+  return policy.finalAt !== null &&
+    policy.finalTz !== null &&
+    Date.parse(policy.finalAt) > Date.parse(due.at)
+    ? null
+    : "deadline/final-after-due";
 };
+
+export const isDeadlineChoiceValid = (policy: DeadlinePolicy, due: Zoned): boolean =>
+  deadlineChoiceProblem(policy, due) === null;

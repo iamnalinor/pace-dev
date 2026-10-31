@@ -12,6 +12,8 @@ import { formatInZone, type SeriesSchedule } from "@pace/core";
 
 import type { Zoned } from "./date-field.tsx";
 
+import { FormAlert } from "./form-alert.tsx";
+
 type Change = (value: null | SeriesSchedule) => void;
 
 /** "Oct 31, 2026", "31 окт. 2026 г.": a calendar date, the same in every zone. */
@@ -173,7 +175,7 @@ export const RecurrenceField = ({
       <RepeatKindPicker onChange={onChange} value={value} />
       {value === null ? null : <RepeatEndPicker onChange={onChange} start={start} value={value} />}
       {problem === null || problem === "repeat/task-unknown" ? null : (
-        <Text className="font-sans text-[12px] text-warn">{t(PROBLEM_TEXT[problem])}</Text>
+        <FormAlert>{t(PROBLEM_TEXT[problem])}</FormAlert>
       )}
     </View>
   );

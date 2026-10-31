@@ -190,10 +190,14 @@ describe("nowViewModel on a repeating task", () => {
     expect(row(rows, TRK_ID).meta).not.toContainEqual({ kind: "repeats" });
   });
 
-  it("drops the mark once the series' last repeat date and the instance are both behind", () => {
-    // No repeat after Oct 15: the instance due Oct 31 is the last, marked while it is ahead.
-    expect(endedRentMeta("2026-10-20T12:00:00.000Z")).toContainEqual({ kind: "repeats" });
+  it("leaves the mark off the last instance, as its screen calls it the last (QA 14 L9)", () => {
+    // No repeat after Oct 15: the instance due Oct 31 is the last one, ahead or behind.
+    expect(endedRentMeta("2026-10-10T12:00:00.000Z")).not.toContainEqual({ kind: "repeats" });
+    expect(endedRentMeta("2026-10-20T12:00:00.000Z")).not.toContainEqual({ kind: "repeats" });
     expect(endedRentMeta("2026-11-02T12:00:00.000Z")).not.toContainEqual({ kind: "repeats" });
+    // One the series repeats after keeps it.
+    const later = withRent("2026-10-10T12:00:00.000Z", "2026-11-15");
+    expect(row(later, RENT_ID).meta).toContainEqual({ kind: "repeats" });
   });
 
   it("names the final deadline once the main due date has passed, until it passes too", () => {

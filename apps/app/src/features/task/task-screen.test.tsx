@@ -345,8 +345,44 @@ describe("TaskScreen — work", () => {
     await renderScreen(<TaskScreen id={taskId} />, runtime);
     await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
     await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
-    expect(screen.getByText(en("form.repeat.dueBeforeStart"))).toBeOnTheScreen();
+    // The start was chosen: the message names it, and is announced (QA 14 L5).
+    expect(screen.getByRole("alert")).toHaveTextContent(en("form.repeat.dueBeforeStart"));
     expect(screen.getByRole("button", { name: en("common.save") })).toBeDisabled();
+  });
+
+  it("tells a task with no start of its own that its deadline passed, not about a start (QA 14 L3)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-01T18:00:00.000Z",
+      presetId: "personal",
+      title: "Both past",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
+    expect(screen.getByRole("alert")).toHaveTextContent(en("form.repeat.duePassed"));
+    expect(screen.queryByText(en("form.repeat.dueBeforeStart"))).toBeNull();
+    // A one-off late task is fine: no note about a start nobody chose (QA 14 L7).
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.none") }));
+    expect(screen.queryByText(en("form.dueBeforeStartNote"))).toBeNull();
+  });
+
+  it("notes, without blocking, a plain task whose chosen start is after its deadline (QA 14 L7)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: TRK_NOW });
+    const result = await runtime.actions.createTask({
+      dueAt: "2026-10-12T18:00:00.000Z",
+      presetId: "personal",
+      startAt: "2026-10-14T09:00:00.000Z",
+      title: "Starts after due",
+    });
+    const created = result.ok ? result.value[0] : undefined;
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("task.edit") }));
+    expect(screen.getByText(en("form.dueBeforeStartNote"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("common.save") })).toBeEnabled();
   });
 
   it("opens the final date's calendar under its label, and keeps quiet while it is open (QA 13 L8)", async () => {
@@ -356,10 +392,13 @@ describe("TaskScreen — work", () => {
     await fireEvent.press(screen.getByRole("radio", { name: en("form.finalOnDate") }));
     expect(screen.getByText(en("form.final"))).toBeOnTheScreen();
     expect(screen.getByText(en("form.finalTime"))).toBeOnTheScreen();
-    expect(screen.queryByText(en("form.deadlineInvalid"))).toBeNull();
-    // Closed without a date: now the form says what is missing.
+    expect(screen.queryByRole("alert")).toBeNull();
+    // Closed without a date: now the form says what is missing, with the main due date it knows
+    // (QA 14 L4), and announces it.
     await fireEvent.press(screen.getByRole("radio", { name: /^Final deadline: /u }));
-    expect(screen.getByText(en("form.deadlineInvalid"))).toBeOnTheScreen();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      en("form.finalAfterDue", { due: "tomorrow 18:00" }),
+    );
   });
 
   it("shows the last repeat date in words, not as yyyy-MM-dd", async () => {
