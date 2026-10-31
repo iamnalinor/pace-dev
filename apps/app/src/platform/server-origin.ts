@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 import { useStore } from "zustand";
 
 import type { PaceRuntime } from "../runtime.ts";
@@ -25,12 +26,37 @@ export const useServerOrigin = (isNeeded: boolean): null | string => {
   return isRead ? origin : null;
 };
 
-/**
-Asks the runtime's server what it is and whether it fits this app (on start and each sign-in),
-into `serverStore`; the versions screen and the login refusal read it from there.
-*/
-export const checkServer = (runtime: Pick<PaceRuntime, "baseUrl" | "checkInstance">): void => {
+/** Asks the runtime's server what it is and whether it fits this app, into `serverStore`. */
+const checkServer = (runtime: Pick<PaceRuntime, "baseUrl" | "checkInstance">): void => {
   void (async () => {
     applyInstanceCheck(runtime.baseUrl, await runtime.checkInstance());
   })();
+};
+
+/**
+Keeps `serverStore` current for the runtime's server: asked on start, on every sign-in and
+sign-out, and on every return to the app (the server may have been updated meanwhile, or what
+stood in the way has cleared, so a held person gets back in). The versions screen and the login
+refusal read it from there.
+*/
+export const watchServer = (
+  runtime: Pick<PaceRuntime, "auth" | "baseUrl" | "checkInstance">,
+): (() => void) => {
+  if (runtime.auth.store.getState().status !== "loading") {
+    checkServer(runtime);
+  }
+  const stopAuth = runtime.auth.store.subscribe((current, previous) => {
+    if (current.status !== previous.status && current.status !== "loading") {
+      checkServer(runtime);
+    }
+  });
+  const returns = AppState.addEventListener("change", (next) => {
+    if (next === "active") {
+      checkServer(runtime);
+    }
+  });
+  return () => {
+    stopAuth();
+    returns.remove();
+  };
 };

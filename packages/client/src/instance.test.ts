@@ -25,15 +25,29 @@ describe("checkInstance", () => {
     expect(result).toEqual({ error: "not-pace", ok: false });
   });
 
-  it("calls an answer that is not an instance not a Pace one", async () => {
-    const html = serverAnswering(() => new Response("<html>hello</html>", { status: 200 }));
-    expect(await checkInstance("https://example.dev", html)).toEqual({
-      error: "not-pace",
-      ok: false,
-    });
+  it("calls a JSON answer that is not an instance not a Pace one", async () => {
     const other = serverAnswering(() => ({ hello: "world" }));
     expect(await checkInstance("https://example.dev", other)).toEqual({
       error: "not-pace",
+      ok: false,
+    });
+  });
+
+  // Only a 404 says the route is missing; anything else in the way (a rate limit, a firewall's
+  // challenge, a proxy asking to sign in, a captive portal's page) is the network, not the server.
+  it.each([
+    ["a rate limit (429)", () => problem(429, "rate-limited")],
+    ["a firewall challenge (403)", () => new Response("<html>challenge</html>", { status: 403 })],
+    ["a proxy asking to sign in (401)", () => problem(401, "unauthorized")],
+    ["a proxy asking to sign in (407)", () => new Response("", { status: 407 })],
+    ["a timeout (408)", () => new Response("", { status: 408 })],
+    [
+      "a captive portal's page (200 HTML)",
+      () => new Response("<html>Wi-Fi login</html>", { status: 200 }),
+    ],
+  ] as const)("calls %s unreachable, not another server", async (_, answer) => {
+    expect(await checkInstance("https://pace.example.dev", serverAnswering(answer))).toEqual({
+      error: "unreachable",
       ok: false,
     });
   });

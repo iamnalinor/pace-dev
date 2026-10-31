@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import { openAuthSessionAsync } from "expo-web-browser";
+import { AppState } from "react-native";
 
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
@@ -42,6 +43,9 @@ const theirInstance = {
 
 beforeEach(() => {
   jest.restoreAllMocks();
+  // Only this test's runtime listens for returns to the app.
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- clearing the jest mock, never calling it
+  jest.mocked(AppState.addEventListener).mockClear();
   secureStore.values.delete("pace.server");
   secureStore.values.delete("pace.session");
   serverStore.setState({ instance: null, origin: API_BASE_URL, reason: null, status: "unknown" });
@@ -244,18 +248,52 @@ describe("Versions that do not fit", () => {
     );
   });
 
-  it("blocks nothing when the server cannot be reached", async () => {
-    const instance = jest.fn(() => {
-      throw new TypeError("Network request failed");
-    });
+  it.each([
+    [
+      "is offline",
+      () => {
+        throw new TypeError("Network request failed");
+      },
+    ],
+    ["rate-limits the check (429)", () => problem(429, "rate-limited")],
+    ["sits behind a firewall challenge (403)", () => new Response("<html>", { status: 403 })],
+    [
+      "is hidden by a captive portal (200 HTML)",
+      () => new Response("<html>Wi-Fi login</html>", { status: 200 }),
+    ],
+  ] as const)("blocks nothing when the server %s", async (_, answer) => {
+    const instance = jest.fn(answer);
     await renderSignedIn({ "GET /api/instance": instance });
     await waitFor(() => {
       expect(instance).toHaveBeenCalled();
     });
     await act(async () => {
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(serverStore.getState().status).toBe("unknown");
     expect(screen.queryByText("Server and app versions don't match")).toBeNull();
+  });
+
+  it("asks again on return to the app, and lets the person in once the versions fit", async () => {
+    const answer = { current: { ...fakeInstance, minClientProtocol: 2, protocol: 2 } };
+    await renderSignedIn({ "GET /api/instance": () => answer.current });
+    await expectOnlyLogOut("Update the app to keep using this server.");
+
+    // The server was rolled back (or the app updated) while the app was in the background.
+    answer.current = { ...fakeInstance };
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- inspecting the jest mock, never calling it
+    const changes = jest.mocked(AppState.addEventListener).mock.calls;
+    await act(async () => {
+      for (const [type, listener] of changes) {
+        if (type === "change") {
+          listener("active");
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Server and app versions don't match")).toBeNull();
+    });
+    expect(serverStore.getState().status).toBe("ok");
   });
 });

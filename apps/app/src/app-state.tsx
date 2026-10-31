@@ -29,7 +29,7 @@ import {
 } from "./platform/notifications.ts";
 import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { startPushTask } from "./platform/push-task.ts";
-import { checkServer, useServerOrigin } from "./platform/server-origin.ts";
+import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { isForSession } from "./platform/session-fingerprint.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
@@ -187,10 +187,6 @@ const runSyncLoop = (
   let activeSession = runtime.api.currentSessionToken();
   const stopLanguageSync = followSyncedLanguage(runtime, onLanguageReady);
   const follow = (status: AuthState["status"]): void => {
-    // Whether the server fits this app: asked on start and on every sign-in and sign-out.
-    if (status !== "loading") {
-      checkServer(runtime);
-    }
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
       void bootstrap(runtime);
@@ -246,7 +242,9 @@ const runSyncLoop = (
     })();
   });
   const stopNotices = followPhoneNotices(runtime);
+  const stopServerChecks = watchServer(runtime);
   return () => {
+    stopServerChecks();
     unsubscribe();
     subscription.remove();
     stopNotices();

@@ -7,15 +7,17 @@ export type InstanceError = "client-outdated" | "not-pace" | "server-outdated" |
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
-/** A refusal the server worded (4xx) means it is there but no Pace; a 5xx is a Pace that is down. */
+/**
+Only two answers say the server is not a Pace this app can read: no route (404) and a JSON answer
+that is not an instance. Anything else in the way (a 5xx, a rate limit, a firewall's challenge, a
+proxy asking to sign in, a captive portal's web page, no network) is the path to the server, which
+may well be a fitting Pace: it must never read as a version mismatch.
+*/
 const failureOf = (error: unknown): InstanceError => {
   if (error instanceof ApiError) {
-    return error.status >= 500 ? "unreachable" : "not-pace";
+    return error.status === 404 ? "not-pace" : "unreachable";
   }
-  // An answer that is not JSON (a web page) or not an instance (zod) comes from another server.
-  return error instanceof SyntaxError || (error instanceof Error && error.name === "ZodError")
-    ? "not-pace"
-    : "unreachable";
+  return error instanceof Error && error.name === "ZodError" ? "not-pace" : "unreachable";
 };
 
 /**
