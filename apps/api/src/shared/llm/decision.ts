@@ -1,4 +1,4 @@
-import type { Action, ModelOutput, Rejected } from "@pace/core";
+import { type Action, decisionStepOf, type ModelOutput, type Rejected } from "@pace/core";
 
 import type { DecisionEntry } from "../contract.ts";
 
@@ -47,6 +47,9 @@ export const parseDecision = (
           doubtful: [...doubtsOf(outcome.actions)],
           output: outcome.output,
           actions: outcome.actions.map((action) => action.summary),
+          // What the log words in the reader's language, matches to an approval and opens.
+          steps: outcome.actions.map((action) => decisionStepOf(action)),
+          provider: outcome.provider,
           rejected: outcome.rejected.map((item) => ({ ...item })),
           text,
         },

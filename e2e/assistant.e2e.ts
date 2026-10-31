@@ -21,6 +21,14 @@ test("the assistant reads a line, the task is added, the decision is logged", as
 
   await page.goto("/decisions");
   await expect(page.getByRole("heading", { name: "Assistant log" })).toBeVisible();
-  await expect(page.getByText("parse.task.create")).toBeVisible();
+  // The log says in words what became of the message, quotes it, and opens the task it created.
+  const row = page.getByRole("button", { name: "Created task “разобрать почту”" });
+  await expect(row).toBeVisible();
+  await expect(row.getByText("You wrote: “разобрать почту”")).toBeVisible();
+  await expect(row.getByText("You approved it")).toBeVisible();
+  await expect(page.getByText("parse.task.create")).toHaveCount(0);
+  await expect(page.getByText(/fake|compatible/u)).toHaveCount(0);
   await expectNoA11yViolations(page);
+  await row.click();
+  await expect(page).toHaveURL(/\/task\//u);
 });
