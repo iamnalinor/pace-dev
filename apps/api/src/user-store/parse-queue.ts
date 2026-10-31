@@ -269,6 +269,7 @@ const createdSteps = (written: readonly EventInput[]): readonly DecisionStep[] =
       closeOutcome: null,
       fields: [],
       kind: "task.create",
+      renamedTo: null,
       startAt: null,
       subject: input.payload.title,
       taskId: input.payload.taskId,

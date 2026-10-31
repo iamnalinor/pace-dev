@@ -62,6 +62,8 @@ export const DecisionStepSchema = z.object({
   closeOutcome: knownOrNull(z.enum(CLOSE_OUTCOMES)),
   /** When a started or logged activity begins; `null` for a start that means "now". */
   startAt: knownOrNull(z.string()),
+  /** The new title or label an edit gives. */
+  renamedTo: knownOrNull(z.string()),
 });
 
 export type DecisionStep = z.output<typeof DecisionStepSchema>;
@@ -70,6 +72,7 @@ const NONE = {
   activityId: null,
   closeOutcome: null,
   fields: [],
+  renamedTo: null,
   startAt: null,
   subject: null,
   taskId: null,
@@ -82,7 +85,8 @@ const taskStep = (body: Extract<ActionBody, { kind: `task.${string}` }>): Decisi
     }
     case "task.update": {
       const fields = [...new Set(changedFields(body))];
-      return { ...NONE, fields, kind: body.kind, taskId: body.taskId };
+      const renamedTo = body.patch.title ?? null;
+      return { ...NONE, fields, kind: body.kind, renamedTo, taskId: body.taskId };
     }
     case "task.close": {
       return { ...NONE, closeOutcome: body.outcome, kind: body.kind, taskId: body.taskId };
@@ -105,7 +109,8 @@ const activityStep = (body: Extract<ActionBody, { kind: `activity.${string}` }>)
     }
     case "activity.update": {
       const fields = [...new Set(changedFields(body))];
-      return { ...NONE, activityId: body.activityId, fields, kind: body.kind };
+      const renamedTo = body.patch.label ?? null;
+      return { ...NONE, activityId: body.activityId, fields, kind: body.kind, renamedTo };
     }
     case "activity.delete": {
       return { ...NONE, activityId: body.activityId, kind: body.kind };
@@ -121,8 +126,10 @@ export const decisionStepOf = (body: ActionBody): DecisionStep =>
 
 /** What a parse decision's `inputs` holds, read from whatever a row of any age stored. */
 export type DecisionInputs = {
-  /** The message the person typed, verbatim. */
+  /** The message the person typed, verbatim: the request, or a correction of it. */
   readonly text: null | string;
+  /** The request a correction belongs to (the thread's first message); `null` for a request. */
+  readonly request: null | string;
   /** The model that read it, or "rules"; absent in rows written before it was kept. */
   readonly provider: null | string;
   /** One per proposed action, `null` for one this client cannot read (a newer kind). */
@@ -135,6 +142,7 @@ export type DecisionInputs = {
 
 const DecisionInputsSchema = z.object({
   text: knownOrNull(z.string()),
+  request: knownOrNull(z.string()),
   provider: knownOrNull(z.string()),
   steps: listWithGaps(DecisionStepSchema),
   actions: anyList(z.string()),
@@ -144,6 +152,7 @@ const DecisionInputsSchema = z.object({
 const EMPTY: DecisionInputs = {
   doubtful: [],
   provider: null,
+  request: null,
   steps: [],
   summaries: [],
   text: null,
@@ -155,8 +164,8 @@ export const readDecisionInputs = (inputs: unknown): DecisionInputs => {
   if (!parsed.success) {
     return EMPTY;
   }
-  const { actions, doubtful, provider, steps, text } = parsed.data;
-  return { doubtful, provider, steps, summaries: actions, text };
+  const { actions, doubtful, provider, request, steps, text } = parsed.data;
+  return { doubtful, provider, request, steps, summaries: actions, text };
 };
 
 /** At most this many readings are answered at once (`DecisionResolveSchema`). */

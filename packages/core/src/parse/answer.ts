@@ -25,3 +25,22 @@ export const answerAt = (
     ? err("answer/unknown")
     : ok(answerText(question.question, option));
 };
+
+const OPEN = "«";
+const SEPARATOR = "» — ";
+
+/**
+A tapped answer read back from its text (`answerText`), so a log can show it as an answer to
+its question instead of as typed words; `null` for anything else.
+*/
+export const readAnswer = (
+  text: string,
+): null | { readonly question: string; readonly option: string } => {
+  const at = text.indexOf(SEPARATOR);
+  if (at === -1 || !text.startsWith(OPEN)) {
+    return null;
+  }
+  const question = text.slice(OPEN.length, at).trim();
+  const option = text.slice(at + SEPARATOR.length).trim();
+  return question === "" || option === "" ? null : { option, question };
+};

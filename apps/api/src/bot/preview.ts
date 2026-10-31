@@ -1,12 +1,4 @@
-import {
-  type Action,
-  CLASSIFY_CONFIDENT,
-  type Language,
-  newId,
-  type ParseQuestion,
-  type ParseRequestBody,
-  t,
-} from "@pace/core";
+import { CLASSIFY_CONFIDENT, type Language, newId, type ParseRequestBody, t } from "@pace/core";
 
 import type { ParseProvider } from "../shared/llm/llm.ts";
 
@@ -23,42 +15,15 @@ import {
   questionsOf,
 } from "./preview-buttons.ts";
 import { logReading, tellLog } from "./preview-log.ts";
+import { isRevisable, type Pending, requestOf } from "./preview-pending.ts";
 import { accept, planAll } from "./preview-write.ts";
 import { applyBodies, type BotReply, plain, type Turn } from "./turn.ts";
 
-/**
-A preview waiting for its button: the text and, when it was understood, its actions. They are
-planned again on Accept, so the events are stamped then and checked against the state then.
-*/
-export type Pending = {
-  /** The latest message: the request, or the correction this preview answers. */
-  readonly text: string;
-  /**
-  The request itself, the first message of the thread: what To Inbox keeps and what the
-  written task cites. Absent in previews remembered before it was added: then `text`.
-  */
-  readonly request?: string;
-  readonly actions: null | readonly Action[];
-  readonly domain: "activity" | "task";
-  readonly thread: NonNullable<ParseRequestBody["thread"]>;
-  readonly awaitingChoice: boolean;
-  /** The assistant's questions, which option buttons point at by index. Absent in older ones. */
-  readonly questions?: readonly ParseQuestion[];
-  /**
-  The decision-log rows of the thread's readings, the last for this preview: a button tells the
-  log what became of them. Absent in previews remembered before it was kept.
-  */
-  readonly decisionIds?: readonly string[];
-};
-
-/** The request a preview is about, also for one remembered before `request` was kept. */
 /**
 How long the bot waits for the assistant: grammY answers Telegram's webhook within 10 s, and a
 late answer makes Telegram send the update again (a second preview or revision).
 */
 const BOT_READ_DEADLINE_MS = 7000;
-
-const requestOf = (pending: Pending): string => pending.request ?? pending.text;
 
 /** No model answers: the bot still lets the person inspect and approve a rule-based action. */
 const unavailable = async (
@@ -186,16 +151,6 @@ export const preview = async (
   return await previewOf(turn, { decisionIds: [id], text, read: read.value });
 };
 
-/** A remembered preview that was understood, so a correction can revise it. */
-const isRevisable = (
-  pending: Partial<Pending> | undefined,
-): pending is Partial<Pending> &
-  Pick<Pending, "domain" | "text"> & { readonly actions: readonly Action[] } =>
-  pending?.text !== undefined &&
-  pending.domain !== undefined &&
-  pending.actions !== undefined &&
-  pending.actions !== null;
-
 /** A revision read: logged, then shown as the preview that replaces the one it revised. */
 const showRevision = async (
   turn: Turn,
@@ -214,7 +169,14 @@ const showRevision = async (
   const { output, actions, provider, rejected } = read;
   const id = await logReading(
     turn,
-    parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" }),
+    parseDecision(text, "bot", {
+      output,
+      actions,
+      provider,
+      rejected,
+      request: thread[0]?.text,
+      status: "parsed",
+    }),
   );
   return await previewOf(turn, {
     decisionIds: [...decisionIds, id],

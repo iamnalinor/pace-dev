@@ -70,10 +70,13 @@ describe("DecisionsScreen", () => {
     await renderScreen(<DecisionsScreen />, runtime);
     expect(await screen.findByText("Notification held back")).toBeOnTheScreen();
     expect(screen.getByText("A digest window.")).toBeOnTheScreen();
+    // It searches while typing (no Enter needed), and says when nothing matches.
     const search = screen.getByLabelText(en("decisions.search"));
     await fireEvent.changeText(search, "nothing");
-    await fireEvent(search, "submitEditing");
-    expect(await screen.findByText(en("decisions.empty"))).toBeOnTheScreen();
+    expect(
+      await screen.findByText(en("decisions.noMatch", { query: "nothing" })),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(en("decisions.empty"))).toBeNull();
   });
 
   it("says what the assistant did with each message, in words, with what was typed", async () => {
@@ -85,7 +88,7 @@ describe("DecisionsScreen", () => {
     expect(screen.getByText("You wrote: “buy cable tomorrow”")).toBeOnTheScreen();
     expect(screen.getAllByText("Shown to you for approval")).toHaveLength(2);
     expect(screen.getByText("Not in your text: project, subtasks")).toBeOnTheScreen();
-    expect(screen.getByText(/via the assistant model/u)).toBeOnTheScreen();
+    expect(screen.getByText(/via the assistant \(model not recorded\)/u)).toBeOnTheScreen();
     expect(screen.getByText(/via gpt-5\.6-luna$/u)).toBeOnTheScreen();
     for (const raw of [/parse\.task/u, /compatible/u, /Parsed by/u, /#2/u]) {
       expect(screen.queryByText(raw)).toBeNull();
@@ -97,6 +100,40 @@ describe("DecisionsScreen", () => {
     await fireEvent.press(books);
     expect(router.push).toHaveBeenCalledWith(`/task/${BOOKS_ID}`);
     expect(screen.queryByRole("button", { name: /Buy cable/u })).toBeNull();
+  });
+
+  it("says the log is empty only when nothing is searched", async () => {
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/decisions": () => ({ decisions: [] }) },
+    });
+    await renderScreen(<DecisionsScreen />, runtime);
+    expect(await screen.findByText(en("decisions.empty"))).toBeOnTheScreen();
+  });
+
+  it("shows a conversation as one row: the request, the answer tapped, one outcome", async () => {
+    const corrected = { ...reading, id: "d5", resolution: "corrected" };
+    const answered = {
+      ...reading,
+      id: "d6",
+      inputs: {
+        ...reading.inputs,
+        request: "buy cable tomorrow",
+        text: "«By when does this need to be done?» — Tomorrow",
+      },
+      resolution: "approved",
+    };
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/decisions": () => ({ decisions: [answered, corrected] }) },
+    });
+    await renderScreen(<DecisionsScreen />, runtime);
+    expect(await screen.findByText("Created task “Buy cable”")).toBeOnTheScreen();
+    expect(screen.getAllByText("Created task “Buy cable”")).toHaveLength(1);
+    expect(screen.getByText("You wrote: “buy cable tomorrow”")).toBeOnTheScreen();
+    expect(
+      screen.getByText("You answered “By when does this need to be done?”: Tomorrow"),
+    ).toBeOnTheScreen();
+    expect(screen.getByText("You approved it")).toBeOnTheScreen();
+    expect(screen.queryByText(/«/u)).toBeNull();
   });
 
   it("says what the person did with a reading when the log was told", async () => {

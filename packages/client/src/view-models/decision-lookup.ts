@@ -131,13 +131,18 @@ const LOOKS: Readonly<Record<ActionKind, Look>> = {
   "task.update": nothingSeen,
 };
 
-/** The first thing the data shows after an unrecorded reading, over its steps. */
+/**
+The first thing the data shows after an unrecorded reading, over its steps; a task a newer row
+already accounts for (`claimed`) is not this reading's too.
+*/
 export const seenAfter = (
   steps: readonly DecisionStep[],
   reading: Reading,
-  lookup: Lookup,
+  { claimed, lookup }: { readonly lookup: Lookup; readonly claimed: ReadonlySet<string> },
 ): null | Seen =>
-  steps.map((step) => LOOKS[step.kind](step, reading, lookup)).find((found) => found !== null) ??
+  steps
+    .map((step) => LOOKS[step.kind](step, reading, lookup))
+    .find((found) => found !== null && (found.taskId === null || !claimed.has(found.taskId))) ??
   null;
 
 /** The first of `ids` that is still a task. */

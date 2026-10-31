@@ -200,7 +200,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "assistant.reading": "Ассистент разбирает текст…",
   "assistant.rulesUsed":
     "Ассистент недоступен. Это разбор по правилам; проверьте действия перед подтверждением.",
-  "assistant.couldNotRead": "Не удалось разобрать текст. Попробуйте ещё раз.",
+  "assistant.couldNotRead": "Ассистент не нашёл в тексте, что сделать.",
   "assistant.couldNotRevise":
     "Не удалось уточнить действия. Предыдущий вариант сохранён на экране.",
   "assistant.tooManyCorrections":

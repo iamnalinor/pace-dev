@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
@@ -41,6 +41,7 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
       {view.request === null ? null : (
         <Detail>{t("decisions.request", { text: view.request })}</Detail>
       )}
+      {view.followup === null ? null : <Detail>{view.followup}</Detail>}
       {view.outcome === null ? null : <Detail>{view.outcome}</Detail>}
       {view.notFound === null ? null : <Detail tone="warn">{view.notFound}</Detail>}
       {view.note === null ? null : <Detail>{view.note}</Detail>}
@@ -76,6 +77,9 @@ const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
   );
 };
 
+/** How long typing in the search pauses before the log is searched. */
+const SEARCH_PAUSE_MS = 350;
+
 /** Every automatic decision (assistant readings, older notification decisions), searchable. */
 export const DecisionsScreen = () => {
   const t = useT();
@@ -83,6 +87,15 @@ export const DecisionsScreen = () => {
   const { palette } = useTheme();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  // It searches while typing, once the typing pauses; Enter searches at once.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(query);
+    }, SEARCH_PAUSE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [query]);
   const loaded = useDecisions(api, search);
   const language = useLanguage();
   const tasks = useAppState((state) => state.tasks);
@@ -115,8 +128,12 @@ export const DecisionsScreen = () => {
         {loaded.status === "failed" ? (
           <Text className="font-sans text-[13px] text-muted">{t("decisions.failed")}</Text>
         ) : null}
-        {loaded.status === "loaded" && loaded.decisions.length === 0 ? (
-          <Text className="font-sans text-[13px] text-muted">{t("decisions.empty")}</Text>
+        {loaded.status === "loaded" && views.length === 0 ? (
+          <Text className="font-sans text-[13px] text-muted">
+            {search.trim() === ""
+              ? t("decisions.empty")
+              : t("decisions.noMatch", { query: search.trim() })}
+          </Text>
         ) : null}
         {views.map((view) => (
           <DecisionRow key={view.id} view={view} />

@@ -270,7 +270,16 @@ describe("POST /api/parse: tasks", () => {
   it("names the decision of a reading, and records what the person did with it, once", async () => {
     const token = await loginAsDev("1001");
     const first = await parse(token, "разобрать почту");
-    const second = await parse(token, "разобрать почту до обеда");
+    // A correction of it: its decision keeps the request it belongs to.
+    const second = asAnswered(
+      await json("/api/parse", {
+        body: {
+          text: "разобрать почту до обеда",
+          thread: [{ actions: first.actions, text: "разобрать почту" }],
+        },
+        token,
+      }),
+    );
     expect(first.decisionId).toMatch(/^[0-9A-Z]{26}$/u);
     // A reading while typing is not logged, so it names no decision.
     const draft = await json<ParseResponse>("/api/parse", {
@@ -304,6 +313,11 @@ describe("POST /api/parse: tasks", () => {
       { id: second.decisionId, resolution: "approved", taskId: "t-mail" },
       { id: first.decisionId, resolution: "corrected", taskId: null },
     ]);
+    expect(decisions[0]?.inputs).toMatchObject({
+      request: "разобрать почту",
+      text: "разобрать почту до обеда",
+    });
+    expect(decisions[1]?.inputs).not.toHaveProperty("request");
     const refused = await call("/api/decisions/resolve", {
       body: { decisions: [{ id: "x", resolution: "maybe" }] },
       token,

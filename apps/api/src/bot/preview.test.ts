@@ -284,6 +284,8 @@ describe("what the bot tells the decision log", () => {
       });
       await choosePreview(turn, providers(), { action, id: revised.pendingId ?? "" });
       expect(logged).toHaveLength(2);
+      // The answer's reading names the request it belongs to, so the log shows one conversation.
+      expect(logged[1]?.inputs).toMatchObject({ request: "Съездить в банк" });
       expect(resolved).toEqual([
         { id: logged[0]?.id, resolution: "corrected" },
         { id: logged[1]?.id, resolution },

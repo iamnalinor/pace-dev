@@ -22,6 +22,7 @@ const step = {
   closeOutcome: null,
   fields: [],
   startAt: null,
+  renamedTo: null,
   subject: null,
   taskId: null,
 };
@@ -39,7 +40,13 @@ describe("decisionStepOf", () => {
         patch: { due: { at: "2026-10-31T20:59:00.000Z", tz: "Europe/Moscow" }, title: "X" },
         taskId: "t1",
       }),
-    ).toEqual({ ...step, fields: ["title", "dueDate"], kind: "task.update", taskId: "t1" });
+    ).toEqual({
+      ...step,
+      fields: ["title", "dueDate"],
+      kind: "task.update",
+      renamedTo: "X",
+      taskId: "t1",
+    });
     expect(decisionStepOf({ kind: "task.close", outcome: "cancelled", taskId: "t1" })).toEqual({
       ...step,
       closeOutcome: "cancelled",
@@ -70,7 +77,13 @@ describe("decisionStepOf", () => {
     ).toMatchObject({ startAt: "2026-10-31T07:30:00.000Z", subject: "Walk" });
     expect(
       decisionStepOf({ activityId: "a1", kind: "activity.update", patch: { label: "Run" } }),
-    ).toEqual({ ...step, activityId: "a1", fields: ["label"], kind: "activity.update" });
+    ).toEqual({
+      ...step,
+      activityId: "a1",
+      fields: ["label"],
+      kind: "activity.update",
+      renamedTo: "Run",
+    });
     expect(decisionStepOf({ activityId: "a1", kind: "activity.delete" })).toEqual({
       ...step,
       activityId: "a1",
@@ -86,12 +99,14 @@ describe("readDecisionInputs", () => {
         actions: ["The assistant will create “Buy cable”"],
         doubtful: ["project", "subtasks"],
         provider: "gpt-5.6-luna",
+        request: "buy a cable",
         steps: [{ ...step, kind: "task.create", subject: "Buy cable" }],
         text: "buy cable",
       }),
     ).toEqual({
       doubtful: ["project", "subtasks"],
       provider: "gpt-5.6-luna",
+      request: "buy a cable",
       steps: [{ ...step, kind: "task.create", subject: "Buy cable" }],
       summaries: ["The assistant will create “Buy cable”"],
       text: "buy cable",
@@ -99,7 +114,14 @@ describe("readDecisionInputs", () => {
   });
 
   it("reads anything else as empty, dropping what this client has no word for", () => {
-    const empty = { doubtful: [], provider: null, steps: [], summaries: [], text: null };
+    const empty = {
+      doubtful: [],
+      provider: null,
+      request: null,
+      steps: [],
+      summaries: [],
+      text: null,
+    };
     expect(readDecisionInputs(null)).toEqual(empty);
     expect(readDecisionInputs("text")).toEqual(empty);
     expect(readDecisionInputs({})).toEqual(empty);

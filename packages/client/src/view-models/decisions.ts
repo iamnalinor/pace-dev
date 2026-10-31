@@ -16,6 +16,7 @@ import {
 
 import { existing, type Lookup, lookupOf, seenAfter, type World } from "./decision-lookup.ts";
 import { providerLabel } from "./decision-provider.ts";
+import { conversationOf, quoted } from "./decision-text.ts";
 
 /** One row of the assistant log: what became of a message, in the reader's language. */
 export type DecisionView = {
@@ -23,8 +24,10 @@ export type DecisionView = {
   readonly at: string;
   /** What was done (or offered), one line per action; the first is the row's title. */
   readonly lines: readonly string[];
-  /** What the person typed, verbatim. */
+  /** What the person typed, verbatim: the conversation's request. */
   readonly request: null | string;
+  /** The answer or correction this reading answered, in words: "You answered “When?”: Today". */
+  readonly followup: null | string;
   /** What the person did with it, read by the rules, read later, or what the data shows since. */
   readonly outcome: null | string;
   /** The fields the model only guessed: "Not in your text: project, subtasks". */
@@ -35,23 +38,6 @@ export type DecisionView = {
   readonly note: null | string;
   /** A task the row opens: the one created, or the one the action was about. */
   readonly taskId: null | string;
-};
-
-const OPENING = ["“", "«"];
-const CLOSING = ["”", "»"];
-
-/** The first of `marks` in `text`, or -1. */
-const firstOf = (text: string, marks: readonly string[]): number => {
-  const found = marks.map((mark) => text.indexOf(mark)).filter((index) => index !== -1);
-  return found.length === 0 ? -1 : Math.min(...found);
-};
-
-/** The quoted name in a summary ("The assistant will start “Gym”" → Gym), for older rows. */
-const quoted = (summary: string): null | string => {
-  const open = firstOf(summary, OPENING);
-  const rest = summary.slice(open + 1);
-  const close = firstOf(rest, CLOSING);
-  return open === -1 || close < 1 ? null : rest.slice(0, close);
 };
 
 const KINDS: ReadonlySet<string> = new Set<string>(ACTION_KINDS);
@@ -76,6 +62,7 @@ const stepsOf = (decision: Decision, inputs: DecisionInputs): Steps => {
           closeOutcome: null,
           fields: [],
           kind: kind as ActionKind,
+          renamedTo: null,
           startAt: null,
           subject,
           taskId: null,
@@ -87,8 +74,10 @@ const stepsOf = (decision: Decision, inputs: DecisionInputs): Steps => {
 const known = (steps: Steps): readonly DecisionStep[] =>
   steps.filter((step): step is DecisionStep => step !== null);
 
-const subjectOf = (step: DecisionStep, { state }: Lookup): string =>
+/** What a step is about as it was named when read (its summary quotes it), else as it is now. */
+const subjectOf = (step: DecisionStep, { state }: Lookup, summary = ""): string =>
   step.subject ??
+  quoted(summary) ??
   (step.taskId === null ? undefined : taskById(state.tasks, step.taskId)?.title) ??
   (step.activityId === null ? undefined : state.time.activities[step.activityId]?.label) ??
   "…";
@@ -96,11 +85,36 @@ const subjectOf = (step: DecisionStep, { state }: Lookup): string =>
 const fieldList = (fields: readonly ParseField[], language: Language): string =>
   [...new Set(fields)].map((field) => t(language, `parseField.${field}`)).join(", ");
 
+const isOnly = (step: DecisionStep, field: ParseField): boolean =>
+  step.fields.length > 0 && step.fields.every((changed) => changed === field);
+
+/** Which sentence says a step: a rename and a moved deadline have their own. */
+const sentenceOf = (step: DecisionStep) => {
+  if (step.renamedTo !== null && step.kind === "task.update" && isOnly(step, "title")) {
+    return "task.rename";
+  }
+  if (step.renamedTo !== null && step.kind === "activity.update" && isOnly(step, "label")) {
+    return "activity.rename";
+  }
+  return step.kind === "task.update" && isOnly(step, "dueDate") ? "task.due" : step.kind;
+};
+
 /**
 A step in words; `null` when the step lacks what its sentence names (an older row's edit
 without its fields, a close without its outcome), so the stored summary is shown instead.
 */
-const stepText = (step: DecisionStep, tense: "done" | "offered", lookup: Lookup): null | string => {
+const stepText = (
+  step: DecisionStep,
+  {
+    lookup,
+    summary,
+    tense,
+  }: {
+    readonly lookup: Lookup;
+    readonly summary: string | undefined;
+    readonly tense: "done" | "offered";
+  },
+): null | string => {
   const { language } = lookup;
   const isEdit = step.kind === "task.update" || step.kind === "activity.update";
   if (
@@ -109,15 +123,12 @@ const stepText = (step: DecisionStep, tense: "done" | "offered", lookup: Lookup)
   ) {
     return null;
   }
-  const kind =
-    step.kind === "task.update" && step.fields.every((f) => f === "dueDate")
-      ? "task.due"
-      : step.kind;
-  const key: MessageKey = `decisions.${tense}.${kind}`;
+  const key: MessageKey = `decisions.${tense}.${sentenceOf(step)}`;
   return t(language, key, {
     fields: fieldList(step.fields, language),
     outcome: step.closeOutcome === null ? "" : t(language, `outcome.${step.closeOutcome}`),
-    subject: subjectOf(step, lookup),
+    subject: subjectOf(step, lookup, summary),
+    to: step.renamedTo ?? "",
   });
 };
 
@@ -130,8 +141,9 @@ const linesOf = (
   const count = Math.max(steps.length, inputs.summaries.length);
   return Array.from({ length: count }, (_, index) => {
     const step = steps[index] ?? null;
-    const text = step === null ? null : stepText(step, tense, lookup);
-    return text ?? inputs.summaries[index] ?? "";
+    const summary = inputs.summaries[index];
+    const text = step === null ? null : stepText(step, { lookup, summary, tense });
+    return text ?? summary ?? "";
   }).filter((line) => line !== "");
 };
 
@@ -170,6 +182,8 @@ type Row = {
   readonly inputs: DecisionInputs;
   readonly steps: Steps;
   readonly lookup: Lookup;
+  /** Tasks newer rows already account for. */
+  readonly claimed: ReadonlySet<string>;
 };
 
 const wordsOf = (
@@ -195,7 +209,8 @@ const readingParts = (row: Row): Parts => {
       taskId: existing(isApproved ? [decision.taskId, ...stepTasks] : stepTasks, lookup),
     };
   }
-  const seen = seenAfter(known(steps), { at: decision.at, text: inputs.text }, lookup);
+  const reading = { at: decision.at, text: inputs.request ?? inputs.text };
+  const seen = seenAfter(known(steps), reading, { claimed: row.claimed, lookup });
   const isEmpty = steps.length === 0 && inputs.summaries.length === 0;
   const outcome =
     seen === null
@@ -260,24 +275,27 @@ const NOTIFICATIONS: Readonly<Record<string, MessageKey>> = {
   suppressed: "decisions.notificationHeld",
 };
 
-const viewOf = (decision: Decision, lookup: Lookup): DecisionView => {
+const viewOf = (
+  decision: Decision,
+  { claimed, lookup }: { readonly lookup: Lookup; readonly claimed: ReadonlySet<string> },
+): DecisionView => {
   const { language } = lookup;
   const base = { at: decision.at, id: decision.id };
   if (decision.kind === "parse") {
     const inputs = readDecisionInputs(decision.inputs);
     return {
       ...base,
-      ...parseParts({ decision, inputs, lookup, steps: stepsOf(decision, inputs) }),
+      ...parseParts({ claimed, decision, inputs, lookup, steps: stepsOf(decision, inputs) }),
+      ...conversationOf(inputs, language),
       notFound:
         inputs.doubtful.length === 0
           ? null
           : t(language, "decisions.notFound", { fields: fieldList(inputs.doubtful, language) }),
-      request: inputs.text,
       via:
         decision.outcome === "unavailable" ? null : viaOf(providerOf(decision, inputs), language),
     };
   }
-  const none = { notFound: null, request: null, via: null };
+  const none = { followup: null, notFound: null, request: null, via: null };
   const notification =
     decision.kind === "notification" && Object.hasOwn(NOTIFICATIONS, decision.outcome)
       ? NOTIFICATIONS[decision.outcome]
@@ -294,11 +312,28 @@ const viewOf = (decision: Decision, lookup: Lookup): DecisionView => {
       };
 };
 
-/** The whole log as it shows, the state indexed once for every row. */
+/**
+The whole log as it shows, newest first, the state indexed once for every row. A reading the
+person corrected is folded into the conversation's last row, which tells its outcome; a task is
+accounted for by the newest row that sees it.
+*/
 export const decisionViews = (
   decisions: readonly Decision[],
   world: World,
 ): readonly DecisionView[] => {
   const lookup = lookupOf(world);
-  return decisions.map((decision) => viewOf(decision, lookup));
+  const shown = decisions.filter((decision) => decision.resolution !== "corrected");
+  const none: ReadonlySet<string> = new Set();
+  const first = shown.map((decision) => viewOf(decision, { claimed: none, lookup }));
+  return first.map((view, index) => {
+    const claimed = new Set(first.slice(0, index).map((newer) => newer.taskId));
+    const decision = shown[index];
+    // A task a newer row already opens is not this row's too: worded again without it.
+    return decision === undefined || view.taskId === null || !claimed.has(view.taskId)
+      ? view
+      : viewOf(decision, {
+          claimed: new Set([...claimed].filter((id): id is string => id !== null)),
+          lookup,
+        });
+  });
 };

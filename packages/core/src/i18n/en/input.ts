@@ -197,7 +197,7 @@ export const enInput = {
   "assistant.reading": "The assistant is reading…",
   "assistant.rulesUsed":
     "Assistant unavailable. These actions come from local rules; check them before approving.",
-  "assistant.couldNotRead": "The assistant could not read this. Try again.",
+  "assistant.couldNotRead": "The assistant found nothing to do in this text.",
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",
   "assistant.tooManyCorrections": "That is five corrections. Approve or cancel, then start again.",
