@@ -5,7 +5,7 @@ import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
-import { type Action, actionDetails, detailText, type ParseQuestion } from "@pace/core";
+import { type Action, detailText, type ParseQuestion, summaryDetails } from "@pace/core";
 
 /**
 One action as it will be written: its summary, then what it sets (a new task's category, due,
@@ -14,8 +14,7 @@ estimate…; an activity's category and expected length), a field the model only
 const ActionCard = ({ action }: { readonly action: Action }) => {
   const language = useLanguage();
   const state = useAppState((current) => current);
-  // The summary names a new task already.
-  const lines = actionDetails(action, { language, state }).filter((line) => line.field !== "title");
+  const lines = summaryDetails(action, { language, state });
   return (
     <View
       accessibilityLabel={action.summary}

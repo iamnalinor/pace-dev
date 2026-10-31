@@ -240,22 +240,26 @@ const BarButtons = ({
 
 /**
 Whether the field and the buttons show: always on a wide window or with nothing running;
-folded when Now opens on something running on a phone. A start made in the open bar leaves
-it open, so nothing folds under the finger.
+folded when Now opens on something running on a phone, until a tap unfolds them or that
+activity stops. Folding follows the activity it was made for, so a start made in the open bar
+never folds it under the finger.
 */
-const useFold = (isRunning: boolean) => {
+const useFold = (runningId: null | string) => {
   const isWide = useIsWide();
-  const [isUnfolded, setIsUnfolded] = useState(!isRunning);
-  const isFoldable = !isWide && isRunning;
+  const [foldedFor, setFoldedFor] = useState(runningId);
+  const isFoldable = !isWide && runningId !== null;
+  const isUnfolded = foldedFor === null || foldedFor !== runningId;
   return {
     isFoldable,
     isShown: !isFoldable || isUnfolded,
     isUnfolded,
     toggle: (): void => {
-      setIsUnfolded((current) => !current);
+      setFoldedFor(isUnfolded ? runningId : null);
     },
   };
 };
+
+const HIDDEN = { display: "none" } as const;
 
 /** The one line a phone's bar folds the field and the buttons into while something runs. */
 const FoldToggle = ({
@@ -294,7 +298,7 @@ export const TimeBar = () => {
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
   const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
-  const fold = useFold(running !== null);
+  const fold = useFold(running?.activityId ?? null);
   return (
     <View
       accessibilityLabel={t("time.bar")}
@@ -305,16 +309,15 @@ export const TimeBar = () => {
         <RunningRow key={item.activityId} running={item} />
       ))}
       {fold.isFoldable ? <FoldToggle isOpen={fold.isUnfolded} onToggle={fold.toggle} /> : null}
-      {fold.isShown ? (
-        <>
-          <TypedStart />
-          <BarButtons
-            buttons={buttons}
-            calendarUnavailable={calendar.unavailable}
-            onTap={(pressed) => void open(pressed)}
-          />
-        </>
-      ) : null}
+      {/* Folded, the field stays mounted (hidden) so what was typed waits for the next unfold. */}
+      <View className="gap-2" style={fold.isShown ? undefined : HIDDEN}>
+        <TypedStart />
+        <BarButtons
+          buttons={buttons}
+          calendarUnavailable={calendar.unavailable}
+          onTap={(pressed) => void open(pressed)}
+        />
+      </View>
       {opened === null || openedButton === null ? null : (
         <ChoicesSheet
           button={openedButton}

@@ -125,6 +125,13 @@ export const actionDetails = (action: Action, world: World): readonly DetailLine
     }));
 };
 
+/**
+The lines shown under an action's summary: what it sets, without the title the summary
+already names, unless the model only guessed that title.
+*/
+export const summaryDetails = (action: Action, world: World): readonly DetailLine[] =>
+  actionDetails(action, world).filter((line) => line.field !== "title" || line.isDoubtful);
+
 /** "Due: Wed, Oct 7, 15:00 (check this)": one line as the card and the bot show it. */
 export const detailText = (line: DetailLine, language: Language): string => {
   const text = `${line.label}: ${line.value}`;

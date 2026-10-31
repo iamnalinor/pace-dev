@@ -116,6 +116,40 @@ describe("TimeBar", () => {
     expect(screen.getByRole("button", { name: en("time.startOther") })).toBeExpanded();
   });
 
+  it("stays open after the activity it folded on stops and something else starts", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.startActivity(
+      { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
+      { at: addMinutesIso(NOW, -10) },
+    );
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: "Stop: Walk" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Rest" }));
+    await fireEvent.press(within(await picker("Rest")).getByRole("button", { name: "Workout" }));
+    await waitFor(() => {
+      expect(running(runtime)).toHaveLength(1);
+    });
+    // Nothing folds under the finger: the field and the buttons are still there.
+    expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Chores" })).toBeOnTheScreen();
+  });
+
+  it("keeps the typed text when the bar folds and unfolds", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.startActivity(
+      { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
+      { at: addMinutesIso(NOW, -10) },
+    );
+    await renderScreen(<TimeBar />, runtime);
+    const toggle = screen.getByRole("button", { name: en("time.startOther") });
+    await fireEvent.press(toggle);
+    await fireEvent.changeText(screen.getByLabelText(en("time.whatDoing")), "Reading");
+    await fireEvent.press(toggle);
+    expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
+    await fireEvent.press(toggle);
+    expect(screen.getByLabelText(en("time.whatDoing"))).toHaveDisplayValue("Reading");
+  });
+
   it("opens Rest's picker on a tap: six ways to rest; a pick starts it, a tap again offers Stop", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<TimeBar />, runtime);

@@ -5,6 +5,7 @@ import {
   detailText,
   type Language,
   openInstanceOf,
+  summaryDetails,
   t,
 } from "@pace/core";
 
@@ -33,9 +34,16 @@ const describeCreate = (
   return [header, ...lines].join("\n");
 };
 
+/** Anything but a new task: its summary, then what it sets (an activity's category…). */
+const describeOther = (action: Action, { language, state }: Extras): string =>
+  [
+    action.summary,
+    ...summaryDetails(action, { language, state }).map((line) => detailText(line, language)),
+  ].join("\n");
+
 /**
 The preview message: a new task as its fields (doubtful ones marked), anything else by its
-summary, then the assistant's questions.
+summary and what it sets, as the app's cards show it, then the assistant's questions.
 */
 export const describeActions = (
   actions: readonly Action[],
@@ -44,7 +52,7 @@ export const describeActions = (
   const { language, questions } = extras;
   const asked = questions.map((question) => t(language, "bot.question", { question }));
   const described = actions.map((action) =>
-    action.kind === "task.create" ? describeCreate(action, extras) : action.summary,
+    action.kind === "task.create" ? describeCreate(action, extras) : describeOther(action, extras),
   );
   return [...described, ...asked].join("\n");
 };
