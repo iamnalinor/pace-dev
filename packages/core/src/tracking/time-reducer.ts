@@ -57,7 +57,7 @@ const logged = (state: TimeState, event: EventOf<"activity.logged">): TimeState 
         buttonId: null,
         category: payload.category,
         endAt: payload.endAt,
-        expectMinutes: null,
+        expectMinutes: payload.expectMinutes ?? null,
         id: payload.activityId,
         isAlongside: false,
         originEventId: event.id,

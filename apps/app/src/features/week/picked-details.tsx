@@ -15,10 +15,9 @@ import { Linking, ScrollView, Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
+import { ActivityApps } from "#app/shared/activity-usage.tsx";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { useWhereSat } from "#app/shared/use-where-sat.ts";
-import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
 import { Button } from "#app/ui/button.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
@@ -197,16 +196,13 @@ const BlockFacts = ({
   const t = useT();
   const { language } = useViewer();
   const openTask = useOpenTask();
-  const sat = useWhereSat(week.weekStart, week.weekEnd);
   const { taskId } = block;
   return (
     <View className="gap-1">
       <Text className="font-sans text-[14px] text-fg">
         {[t(`category.${block.category}`), formatDuration(block.minutes, language)].join(" · ")}
       </Text>
-      <WhereSatLine isIndented={false} rows={sat(block.startAt, block.endAt)} />
-      {/* Slot: "the apps used during this activity" (a follow-up, on Week and Day) goes here,
-      after where the block's time sat on the devices and before its task. */}
+      <ActivityApps endAt={block.endAt} startAt={block.startAt} zone={week.zone} />
       {taskId === null ? null : (
         <Button
           onPress={() => {

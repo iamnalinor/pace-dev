@@ -74,6 +74,20 @@ describe("validateEventInput: pass-through", () => {
       expect(errorOf(input)).toBe("ok");
     }
   });
+
+  it("does not treat an activity's optional task link as a task command", () => {
+    const unlinked = at(24, AT, {
+      type: "activity.labelled",
+      payload: { activityId: "a1", taskId: null },
+    });
+    const linked = at(25, AT, {
+      type: "activity.labelled",
+      payload: { activityId: "a1", taskId: HW_ID },
+    });
+    for (const input of [unlinked, linked]) {
+      expect(errorOf(input)).toBe("ok");
+    }
+  });
 });
 
 describe("validateEventInput: retro/future", () => {

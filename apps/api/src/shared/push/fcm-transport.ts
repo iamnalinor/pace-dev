@@ -1,11 +1,8 @@
-import { ANSWERS } from "@pace/core";
+import { ANSWERS, notificationPath } from "@pace/core";
 
 import type { DeviceAddress, PushTransport, SendOutcome } from "./transport.ts";
 
 import { type FcmTarget, sendFcm } from "../fcm.ts";
-
-/** Where a tap on a notification opens the app. */
-const urlOf = (kind: string): string => (kind === "deadline_digest" ? "/" : "/notifications");
 
 const dismissFcm = async (
   target: FcmTarget,
@@ -57,7 +54,7 @@ export const fcmTransport = (target: FcmTarget): PushTransport => ({
         sessionHash: to.sessionHash,
         tag: notification.id,
         type: "notification",
-        url: urlOf(notification.kind),
+        url: notificationPath(notification),
         ...(ANSWERS[notification.kind].length > 0 && { categoryId: notification.kind }),
       },
       token: to.endpoint,

@@ -208,8 +208,9 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `GROQ_API_KEY` | secret | deploy, llm-regression | LLM provider; one or more keys separated by commas (or one per line): a key that hits its rate limit rests while the next one answers |
-| `GEMINI_API_KEY` | secret | deploy, llm-regression | fallback LLM provider; one or more keys separated by commas (or one per line), rotated the same way |
+| `LLM_BASE_URL` | variable | deploy, llm-regression | optional OpenAI-compatible API prefix, including its `/v1` path; set together with model and key |
+| `LLM_MODEL` | variable | deploy, llm-regression | model identifier accepted by that endpoint |
+| `LLM_API_KEY` | secret | deploy, llm-regression | one or more keys separated by commas or newlines; a rate-limited key rests while the next one answers |
 | `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
 | `GOOGLE_SERVICES_JSON` | secret | release | the Firebase `google-services.json` (raw JSON) for push through FCM; absent → the APK has no Google push and phones poll |
@@ -218,7 +219,10 @@ Secrets and variables read by the workflows:
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
 Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME`,
-`TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`.
+`TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`. The optional LLM
+URL and model come from GitHub variables; deploy stores all three LLM settings together and
+removes them together when unset. For local Worker development, copy
+`apps/api/.dev.vars.example` to `apps/api/.dev.vars` and fill in the three values.
 
 ## Android release
 
@@ -434,14 +438,18 @@ the setup per client, the tools table, the scopes, the consent flow and local te
 
 ## LLM providers
 
-Free text ("дз 7 по алгебре 1, 3, 5а до среды 23:59") is read by an LLM through the Vercel
-AI SDK: **Groq** (`openai/gpt-oss-120b`, strict JSON schema) first, **Gemini**
-(`gemini-flash-latest`) when Groq is rate limited, and a **fake** provider
-(`LLM_PROVIDER=fake`) in tests and the e2e Worker. Keys come from the `GROQ_API_KEY` and
-`GEMINI_API_KEY` secrets; a provider without a key is skipped, and with none the assistant
-reports itself unavailable. The prompt (categories, projects, up to 40 open tasks and today's
-and yesterday's activities under short aliases such as `t3` and `a2`, never their ids, now,
-zone) stays under 3k tokens, the free tier's per-minute budget.
+Free text ("дз 7 по алгебре 1, 3, 5а до среды 23:59") can be read by any
+OpenAI-compatible model through the AI SDK. Set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`
+together in the Worker environment; the base URL is the API prefix (usually ending in `/v1`).
+For example, Groq is one possible endpoint. `LLM_API_KEY` accepts multiple comma- or
+newline-separated keys; each has its own rate-limit cooldown. Tests and the e2e Worker use an
+in-process fake (`LLM_PROVIDER=fake`). If no model is configured or all keys are unavailable,
+the API and bot offer rule-based previews in English and Russian: tasks preserve their entered
+title, typed time spans create or log activities, and common meal words such as “ем” and
+“eating” select Food. The bot asks whether ambiguous text is a task or an activity before
+offering Approve. The prompt (categories, projects, up to 40 open tasks and today's and
+yesterday's activities under short aliases such as `t3` and `a2`, never their ids, now, zone)
+stays under 3k tokens.
 
 The LLM never rewrites your text: the line is stored verbatim, every extracted string must
 be a literal quote of it, and numbers and dates need a quote as evidence — anything else
@@ -455,21 +463,19 @@ comes back marked "check this". Where it is used:
   must name real minutes. With `auto` it also says whether the text is about a task or an
   activity and how sure it is (below `CLASSIFY_CONFIDENT` = 0.8 the bot asks). Without a
   model the rules propose a new task, or the activity a typed span names ("7:30 - 8:30 -
-  ходил в военкомат" is logged). The composer's **Read with AI** (web and app) fills the
+  ходил в военкомат" is logged). The composer's assistant preview (web and app) fills the
   same chips the rule-based reading does; questions show as one-tap answers.
 - The bot's previews (above).
 - `GET /api/decisions` and the **Decision log** page (Settings), plus the MCP tool
   `search_decisions`: every parse and every notification sent or held back, with the rule,
   its inputs and a one-line explanation.
 
-**When the free tier runs out**: a provider's rate limit is remembered (from its
+**When the endpoint runs out of requests**: a key's rate limit is remembered (from its
 `retry-after`) and skipped until then, so the next calls go straight to the one still
 answering; `GET /api/llm/status` says whether the assistant can read now and when it is back.
-With every provider out, the composer offers **Read it when it's back**: the line is kept in
-your Durable Object and read at that time, then written as read (History can undo it: new
-tasks, problems added or solved, a task closed) or put in the Inbox if it cannot be placed,
-asks for an edit or a delete, or is still unread a day later. The bot does the same with any
-message and writes back once it has read it.
+With every key out, `POST /api/parse` still returns a rule-based preview; clients may explicitly
+request deferred reading. A deferred result links to each task it created. The bot offers an
+immediate rule-based preview instead of silently queuing an unapproved message.
 
 ## License
 

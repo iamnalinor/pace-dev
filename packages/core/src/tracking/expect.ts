@@ -49,7 +49,7 @@ const median = (values: readonly number[]): number => {
 export type Defaults = {
   readonly expectMinutes: null | number;
   /** Where the Expect came from, for the "why" line. */
-  readonly source: "category" | "history";
+  readonly source: "category" | "history" | "manual";
   readonly samples: number;
 };
 
@@ -60,6 +60,10 @@ What a new activity should expect: the median of the label's past finished runs 
 export const defaultsFor = (
   time: TimeState,
   { category, label }: { readonly label: string; readonly category: ActivityCategory },
+  options: {
+    readonly manual?: Readonly<Partial<Record<ActivityCategory, number>>>;
+    readonly builtin?: null | number | undefined;
+  } = {},
 ): Defaults => {
   const key = label.trim().toLowerCase();
   const durations = Object.values(time.activities)
@@ -69,11 +73,17 @@ export const defaultsFor = (
         (Date.parse(activity.endAt ?? activity.startAt) - Date.parse(activity.startAt)) / 60_000,
     )
     .filter((minutes) => minutes > 0);
-  return durations.length >= MEDIAN_SAMPLES
-    ? {
-        expectMinutes: Math.round(median(durations)),
-        samples: durations.length,
-        source: "history",
-      }
-    : { expectMinutes: CATEGORY_EXPECT[category], samples: durations.length, source: "category" };
+  const set = options.manual?.[category];
+  if (set !== undefined) {
+    return { expectMinutes: set, samples: durations.length, source: "manual" };
+  }
+  if (durations.length >= MEDIAN_SAMPLES) {
+    return {
+      expectMinutes: Math.round(median(durations)),
+      samples: durations.length,
+      source: "history",
+    };
+  }
+  const builtin = options.builtin === undefined ? CATEGORY_EXPECT[category] : options.builtin;
+  return { expectMinutes: builtin, samples: durations.length, source: "category" };
 };

@@ -19,6 +19,7 @@ import { useOwnerName, useT } from "../app-state.tsx";
 import { requestNewTask } from "../shared/new-task-request.ts";
 import { NotificationBell } from "../shared/notifications/notification-bell.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
+import { UserAvatar } from "../shared/user-avatar.tsx";
 import { KeyHint } from "./button.tsx";
 import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
@@ -164,6 +165,7 @@ export const Sidebar = () => {
       <View className="mb-3 flex-row items-center gap-2 px-2">
         <PaceMark size={22} />
         <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
+        {owner === null ? null : <UserAvatar size={24} />}
         <Text
           className="min-w-0 flex-1 text-right font-sans text-[13px] text-muted"
           numberOfLines={1}

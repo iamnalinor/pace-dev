@@ -12,8 +12,7 @@
     "db:check": "bun scripts/check-migrations.ts"
   },
   "dependencies": {
-    "@ai-sdk/google": "4.0.90",
-    "@ai-sdk/groq": "4.0.57",
+    "@ai-sdk/openai-compatible": "3.0.70",
     "@cloudflare/workers-oauth-provider": "1.2.2",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@pace/core": "workspace:*",

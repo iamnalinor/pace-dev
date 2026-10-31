@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ParseResponse, Proposal, TaskDraft } from "@pace/core";
+import type { Action, ParseResponse, TaskDraft } from "@pace/core";
 
 import { ALGEBRA_ID, artboardState, BOOKS_ID, ctx, MOSCOW } from "@pace/core/testing";
 
@@ -26,18 +26,18 @@ const draft = (overrides: Partial<TaskDraft>): TaskDraft => ({
 });
 
 const parsed = (
-  proposals: readonly Proposal[],
+  actions: readonly Action[],
   questions?: Extract<ParseResponse, { status: "parsed" }>["questions"],
 ): Extract<ParseResponse, { status: "parsed" }> => ({
   confidence: 1,
   domain: "task",
-  proposals: [...proposals],
+  actions: [...actions],
   provider: "fake",
   ...(questions !== undefined && { questions }),
   status: "parsed",
 });
 
-const create = (task: Partial<TaskDraft>, doubtful?: Proposal["doubtful"]): Proposal => ({
+const create = (task: Partial<TaskDraft>, doubtful?: Action["doubtful"]): Action => ({
   kind: "task.create",
   summary: "New task",
   task: draft(task),
@@ -90,13 +90,13 @@ describe("aiReading", () => {
     ).toBe("Дача");
   });
 
-  it("leaves the chips to the rules when nothing new is proposed, and passes the proposals on", () => {
-    const deletion: Proposal = { kind: "task.delete", summary: "Delete", taskId: BOOKS_ID };
+  it("leaves the chips to the rules when nothing new is proposed, and passes the actions on", () => {
+    const deletion: Action = { kind: "task.delete", summary: "Delete", taskId: BOOKS_ID };
     const reading = aiReading(parsed([deletion]));
     expect(reading).toMatchObject({
       doubtful: [],
       edits: {},
-      proposals: [deletion],
+      actions: [deletion],
       questions: [],
     });
   });

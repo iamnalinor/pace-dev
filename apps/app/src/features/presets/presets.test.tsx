@@ -33,11 +33,11 @@ describe("PresetsList", () => {
     });
   });
 
-  it("starts a new preset from the chosen parent and seeds the examples once", async () => {
+  it("opens a new preset from the parent picked, with no extra button, and seeds the examples once", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetsList />, runtime);
+    expect(screen.queryByRole("button", { name: en("presets.new") })).toBeNull();
     await fireEvent.press(screen.getByRole("radio", { name: "Work" }));
-    await fireEvent.press(screen.getByRole("button", { name: en("presets.new") }));
     expect(router.push).toHaveBeenCalledWith({
       params: { from: "work", id: "new" },
       pathname: "/presets/[id]",

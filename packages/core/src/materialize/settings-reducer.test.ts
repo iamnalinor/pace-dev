@@ -28,6 +28,7 @@ describe("DEFAULT_SETTINGS", () => {
   it("is English, zone-less, with the spec's digest windows and quiet hours, nights hidden", () => {
     expect(DEFAULT_SETTINGS).toEqual({
       digestWindows: ["09:00", "14:00", "21:00"],
+      categoryEstimates: {},
       language: "en",
       nightHours: false,
       notificationChannels: DEFAULT_NOTIFICATION_CHANNELS,
@@ -58,6 +59,7 @@ describe("settingsReducer", () => {
     ];
     expect(materialize(events, settingsReducer, DEFAULT_SETTINGS)).toEqual({
       digestWindows: ["10:00"],
+      categoryEstimates: {},
       language: "ru",
       nightHours: false,
       notificationChannels: DEFAULT_NOTIFICATION_CHANNELS,
@@ -88,6 +90,16 @@ describe("settingsReducer", () => {
     expect(materialize(events, settingsReducer, DEFAULT_SETTINGS).quietHours).toEqual({
       from: "22:00",
       to: "07:00",
+    });
+  });
+
+  it("patches one category estimate and clears it without touching another", () => {
+    const events = [
+      updated(A, 1, { categoryEstimates: { commute: 35, hygiene: 20 } }),
+      updated(B, 2, { categoryEstimates: { commute: null } }),
+    ];
+    expect(materialize(events, settingsReducer, DEFAULT_SETTINGS).categoryEstimates).toEqual({
+      hygiene: 20,
     });
   });
 

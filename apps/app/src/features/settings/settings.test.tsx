@@ -9,11 +9,29 @@ import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
 
+const mockPendingConfirmation = {
+  current: null as null | {
+    readonly action: "delete" | "wipe";
+    readonly request: { readonly id: string; readonly expiresAt: string };
+  },
+};
+
+jest.mock("./confirmation-pending.ts", () => ({
+  clearPendingConfirmation: () => {
+    mockPendingConfirmation.current = null;
+  },
+  readPendingConfirmation: () => mockPendingConfirmation.current,
+  savePendingConfirmation: (pending: typeof mockPendingConfirmation.current) => {
+    mockPendingConfirmation.current = pending;
+  },
+}));
+
 /** Settings' switch for Week's night hours. */
 const nightHours = () => screen.getByRole("switch", { name: en("settings.nightHours") });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPendingConfirmation.current = null;
 });
 
 type Rendered = NonNullable<typeof screen.root>;
@@ -246,20 +264,121 @@ describe("SettingsScreen", () => {
     });
   });
 
-  it("deletes the account after a second confirmation and goes to the login card", async () => {
-    const deleted = jest.fn(() => ({ deleted: true }));
+  it("waits for Telegram before deleting and can poll after the session disappears", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174000";
+    const created = jest.fn(() => ({
+      id,
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    }));
     await renderScreen(
       <SettingsScreen />,
-      await createTestRuntime({ routes: { "DELETE /api/me": deleted }, world: "empty" }),
+      await createTestRuntime({
+        routes: {
+          "POST /api/account/confirmations": created,
+          [`GET /api/account/confirmations/${id}`]: () => ({ status: "confirmed" }),
+        },
+        world: "empty",
+      }),
     );
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
-    expect(deleted).not.toHaveBeenCalled();
+    expect(created).not.toHaveBeenCalled();
     await fireEvent.press(
       screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
     );
-    await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith("/login");
+    expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    await waitFor(
+      () => {
+        expect(router.replace).toHaveBeenCalledWith("/login");
+      },
+      { timeout: 4000 },
+    );
+    expect(created).toHaveBeenCalledTimes(1);
+  });
+
+  it("dresses Wipe and Delete as dangerous, and says both are confirmed in Telegram", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
+    const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
+    expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
+    expect(String(remove.props["className"])).toMatch(/border-warn/u);
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
+    expect(String(wipe.props["className"])).toMatch(/border-warn/u);
+  });
+
+  it("follows the server, not this device's clock, past the request's expiry (bug class 35)", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174003";
+    // This device's clock runs ahead: the request already looks over here.
+    const statuses = ["pending", "confirmed"];
+    await renderScreen(
+      <SettingsScreen />,
+      await createTestRuntime({
+        routes: {
+          "POST /api/account/confirmations": () => ({
+            id,
+            expiresAt: new Date(Date.now() - 60_000).toISOString(),
+          }),
+          [`GET /api/account/confirmations/${id}`]: () => ({
+            status: statuses.shift() ?? "confirmed",
+          }),
+        },
+        world: "empty",
+      }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
+    await fireEvent.press(
+      screen.getByRole("button", { name: en("settings.deleteAccount.confirm") }),
+    );
+    await waitFor(
+      () => {
+        expect(router.replace).toHaveBeenCalledWith("/login");
+      },
+      { timeout: 7000 },
+    );
+    expect(screen.queryByText(en("settings.confirmation.expired"))).toBeNull();
+  }, 15_000);
+
+  it("restores a pending Telegram confirmation after Settings remounts", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174001";
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+          id,
+        }),
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+      },
+      world: "empty",
     });
-    expect(deleted).toHaveBeenCalledTimes(1);
+    const first = await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe.confirm") }));
+    expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    expect(mockPendingConfirmation.current?.action).toBe("wipe");
+    await first.unmount();
+    await renderScreen(<SettingsScreen />, runtime);
+    expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+  });
+
+  it("keeps waiting when Telegram confirmation was claimed before a local cancel", async () => {
+    const id = "123e4567-e89b-42d3-a456-426614174002";
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/account/confirmations": () => ({
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+          id,
+        }),
+        [`POST /api/account/confirmations/${id}/cancel`]: () => ({ status: "pending" }),
+        [`GET /api/account/confirmations/${id}`]: () => ({ status: "pending" }),
+      },
+      world: "empty",
+    });
+    await renderScreen(<SettingsScreen />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe.confirm") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    expect(screen.getByText(en("settings.confirmation.waiting"))).toBeOnTheScreen();
+    expect(mockPendingConfirmation.current?.request.id).toBe(id);
   });
 });

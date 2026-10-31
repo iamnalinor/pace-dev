@@ -50,7 +50,7 @@ export const LoginScreen = () => {
         <Text className="text-center font-sans text-[14px] text-muted">{t("login.subtitle")}</Text>
       </View>
       {isWaiting ? (
-        <Waiting onCancel={bot.reset} />
+        <Waiting onCancel={bot.reset} onReopen={bot.reopen} />
       ) : (
         <View className="gap-3">
           <Button busy={bot.phase.kind === "starting"} onPress={() => void bot.start()}>

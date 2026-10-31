@@ -72,11 +72,9 @@ describe("DayScreen", () => {
     const back = () => screen.queryByRole("button", { name: "Back to today" });
     expect(back()).toBeNull();
     // The header is the arrows and the day picker alone: Week is reached from the navigation,
-    // and the only Calendar is the time bar's.
+    // and the time bar with its Calendar is on Now.
     expect(screen.queryByRole("button", { name: "Week" })).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Calendar" })).toEqual([
-      within(screen.getByLabelText("Time")).getByRole("button", { name: "Calendar" }),
-    ]);
+    expect(screen.queryByRole("button", { name: "Calendar" })).toBeNull();
     expect(screen.getByRole("button", { name: "Next day" })).toBeDisabled();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
@@ -92,47 +90,14 @@ describe("DayScreen", () => {
     expect(back()).toBeOnTheScreen();
   });
 
-  it("has the time bar at its foot on today only: Calendar, Task, Chores and Rest, no «⋯»", async () => {
+  it("has no time bar on any day: it lives on Now", async () => {
     await renderScreen(<DayScreen />, await createTestRuntime());
-    const bar = screen.getByLabelText("Time");
-    expect(
-      ["Calendar", "Task", "Chores", "Rest"].map(
-        (name) => within(bar).getByRole("button", { name }).props["accessibilityLabel"] as unknown,
-      ),
-    ).toEqual(["Calendar", "Task", "Chores", "Rest"]);
-    expect(screen.queryByRole("button", { name: /More about/u })).toBeNull();
+    expect(screen.queryByLabelText("Time")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Previous day" }));
     await waitFor(() => {
-      expect(screen.queryByLabelText("Time")).toBeNull();
+      expect(screen.getByText("Monday · Oct 5")).toBeOnTheScreen();
     });
-    await fireEvent.press(screen.getByRole("button", { name: "Back to today" }));
-    expect(await screen.findByLabelText("Time")).toBeOnTheScreen();
-  });
-
-  it("opens each bar button's picker from Day on a phone, and a pick lands in the timeline", async () => {
-    const runtime = await createTestRuntime();
-    await renderScreen(<DayScreen />, runtime);
-    const bar = () => screen.getByLabelText("Time");
-    await fireEvent.press(within(bar()).getByRole("button", { name: "Task" }));
-    expect(await screen.findByLabelText("Find a task")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
-    await fireEvent.press(within(bar()).getByRole("button", { name: "Calendar" }));
-    expect(
-      await screen.findByRole("button", { name: "Start a meeting without an event" }),
-    ).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
-    await fireEvent.press(within(bar()).getByRole("button", { name: "Chores" }));
-    await fireEvent.press(await screen.findByRole("button", { name: "Dishes" }));
-    await waitFor(() => {
-      expect(within(bar()).getByRole("button", { name: "Chores, running" })).toBeOnTheScreen();
-    });
-    await fireEvent.press(within(bar()).getByRole("button", { name: "Rest" }));
-    await fireEvent.press(await screen.findByRole("button", { name: "Short break" }));
-    await waitFor(() => {
-      expect(within(bar()).getByRole("button", { name: "Rest, running" })).toBeOnTheScreen();
-    });
-    expect(screen.getAllByText("Short break").length).toBeGreaterThan(0);
-    expect(runtime.state.store.getState().time.activities).not.toEqual({});
+    expect(screen.queryByLabelText("Time")).toBeNull();
   });
 
   it("links a block's task on a line of its own, not inside the row's button", async () => {

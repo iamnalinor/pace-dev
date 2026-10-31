@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PROPOSAL_KINDS } from "../../proposals/kinds.ts";
-import { proposalsByRules } from "../../proposals/rules.ts";
+import { ACTION_KINDS } from "../../actions/kinds.ts";
+import { actionsByRules } from "../../actions/rules.ts";
 import { artboardState, ctx } from "../../queries/fixture.fake.ts";
 import { REGRESSION_CASES } from "./cases.fake.ts";
 
@@ -12,7 +12,7 @@ describe("the LLM regression set", () => {
     for (const item of REGRESSION_CASES) {
       expect(item.text.trim()).not.toBe("");
       expect(item.expect.kinds.length).toBeGreaterThan(0);
-      expect(item.expect.kinds.every((kind) => PROPOSAL_KINDS.includes(kind))).toBe(true);
+      expect(item.expect.kinds.every((kind) => ACTION_KINDS.includes(kind))).toBe(true);
     }
   });
 
@@ -35,11 +35,11 @@ describe("the LLM regression set", () => {
     const spans = REGRESSION_CASES.filter((item) => item.name.startsWith("log: a past span"));
     expect(spans).toHaveLength(1);
     for (const span of spans) {
-      const [proposal] = proposalsByRules(span.text, "activity", {
+      const [action] = actionsByRules(span.text, "activity", {
         ctx: ctx(span.now),
         state: artboardState(span.now),
       });
-      expect(proposal).toMatchObject({ kind: "activity.log", ...span.expect.first });
+      expect(action).toMatchObject({ kind: "activity.log", ...span.expect.first });
     }
   });
 });

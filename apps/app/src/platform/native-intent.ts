@@ -16,5 +16,6 @@ export const mapSystemPath = (path: string): string => {
     const rest = path.slice(APP_LINK_PREFIX.length);
     return rest === "" || rest === "/" ? "/" : rest;
   }
-  return path;
+  const taskPrefix = "https://pace.nalinor.dev/task/";
+  return path.startsWith(taskPrefix) ? path.slice("https://pace.nalinor.dev".length) : path;
 };

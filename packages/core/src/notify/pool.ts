@@ -78,6 +78,23 @@ export type NewNotification = {
   [K in NotificationKind]: { readonly kind: K; readonly payload: PayloadOf[K] };
 }[NotificationKind];
 
+/** Opening one deadline goes to its task; a digest of several goes to Now. */
+export const notificationPath = (notification: NewNotification): string => {
+  switch (notification.kind) {
+    case "deadline_digest": {
+      const [only] = notification.payload.tasks;
+      return only !== undefined && notification.payload.tasks.length === 1
+        ? `/task/${encodeURIComponent(only.taskId)}`
+        : "/";
+    }
+    case "login":
+    case "event_start":
+    case "activity_overrun": {
+      return "/notifications";
+    }
+  }
+};
+
 /**
 How a notification was settled: an answer (attended, skipped, still going, stopped), seen and
 put away (`read`), or left until it no longer mattered (`expired`).

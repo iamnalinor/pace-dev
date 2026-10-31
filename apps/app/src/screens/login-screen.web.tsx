@@ -112,7 +112,7 @@ export const LoginScreen = () => {
           </Text>
         </View>
         {isWaiting ? (
-          <Waiting onCancel={bot.reset} />
+          <Waiting onCancel={bot.reset} onReopen={bot.reopen} />
         ) : (
           <LoginOptions bot={bot} onTelegram={onTelegram} />
         )}

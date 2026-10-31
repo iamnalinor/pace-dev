@@ -1,14 +1,15 @@
 import {
   accountTz,
+  type Action,
+  actionContext,
+  actionsByRules,
+  actionsFromModel,
   type CoreState,
   domainByRules,
   type ModelOutput,
   type ParseDomain,
   type ParseQuestion,
-  type Proposal,
-  proposalContext,
-  proposalsByRules,
-  proposalsFromModel,
+  type ParseRequestBody,
   type QueryContext,
   type Rejected,
   type RequestDomain,
@@ -20,11 +21,11 @@ import {
 import { type Cooldowns, type LlmError, type ParseProvider, runParse } from "./llm.ts";
 import { buildParsePrompt } from "./prompt.ts";
 
-/** What a message is about and what to do with it, each proposal with its summary. */
+/** What a message is about and what to do with it, each action with its summary. */
 export type Reading = {
   readonly domain: ParseDomain;
   readonly confidence: number;
-  readonly proposals: readonly Proposal[];
+  readonly actions: readonly Action[];
 };
 
 /** The model's reading, checked against the message and the lists it was shown. */
@@ -55,7 +56,7 @@ const summaryWorld = (world: World) => ({
 /**
 Reads a message with the first model that answers: the prompt shows the open tasks and recent
 activities under aliases, the answer is mapped back through them and checked against the text,
-and each proposal gets its summary. Nothing is written.
+and each action gets its summary. Nothing is written.
 */
 export const readMessage = async (
   providers: readonly ParseProvider[],
@@ -64,17 +65,19 @@ export const readMessage = async (
     readonly domain: RequestDomain;
     readonly cooldowns: Cooldowns;
     readonly clock?: () => number;
+    readonly thread?: ParseRequestBody["thread"];
   },
 ): Promise<Result<ModelRead, LlmError>> => {
   const { cooldowns, domain, state } = options;
   const ctx = ctxOf(options);
-  const context = proposalContext(state, ctx);
+  const context = actionContext(state, ctx);
   const prompt = buildParsePrompt(text, {
     context,
     ctx,
     domain,
     language: state.settings.language,
     state,
+    ...(options.thread !== undefined && { thread: options.thread }),
   });
   const answer = await runParse(providers, prompt, {
     cooldowns,
@@ -85,12 +88,15 @@ export const readMessage = async (
   }
   const output = answer.value.result;
   const read = domain === "auto" ? output.domain : domain;
-  const { readings, rejected } = proposalsFromModel(output, {
+  const thread = options.thread ?? [];
+  const { readings, rejected } = actionsFromModel(output, {
     context,
     ctx,
     domain: read,
+    evidence: [...thread.map((turn) => turn.text), text].join("\n"),
     state,
-    text,
+    // A revision is still of the first request: corrections only steer the model.
+    text: thread[0]?.text ?? text,
   });
   const world = summaryWorld(options);
   return {
@@ -100,7 +106,7 @@ export const readMessage = async (
       domain: read,
       limited: answer.value.limited,
       output,
-      proposals: readings.map((reading) => withSummary(reading.body, reading.doubtful, world)),
+      actions: readings.map((reading) => withSummary(reading.body, reading.doubtful, world)),
       provider: answer.value.provider,
       questions: output.questions,
       rejected,
@@ -119,7 +125,7 @@ export const readByRules = (text: string, domain: RequestDomain, world: World): 
   return {
     confidence: domain === "auto" ? RULES_CONFIDENCE : 1,
     domain: read,
-    proposals: proposalsByRules(text, read, { ctx, state: world.state }).map((body) =>
+    actions: actionsByRules(text, read, { ctx, state: world.state }).map((body) =>
       withSummary(body, [], summary),
     ),
   };

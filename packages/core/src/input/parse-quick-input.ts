@@ -2,7 +2,7 @@ import type { CoreState } from "../materialize/core-state.ts";
 import type { Importance } from "../model/preset.ts";
 
 import { extractLink } from "../links.ts";
-import { presetChain, resolvePreset } from "../presets/resolve-preset.ts";
+import { resolvePreset } from "../presets/resolve-preset.ts";
 import { accountTz, type QueryContext } from "../queries/context.ts";
 import { suggestFor } from "../queries/suggest.ts";
 import { findDate } from "./quick-date.ts";
@@ -17,7 +17,7 @@ import {
   type QuickSubtask,
   withDayPreposition,
 } from "./quick-fields.ts";
-import { findFirst, type Found, mask, type QuickSpan, titleOf, toSpan } from "./quick-spans.ts";
+import { type Found, mask, type QuickSpan, titleOf, toSpan } from "./quick-spans.ts";
 
 /**
 The single entry point's rule-based reading of what the user typed (the LLM parse of
@@ -49,17 +49,6 @@ const linkSpansOf = (text: string, link: null | string): readonly QuickSpan[] =>
   return link === null || start < 0 ? [] : [{ end: start + link.length, kind: "link", start }];
 };
 
-/** A leading "hw"/"дз" names the category, not the task, unless a number follows ("дз 7"). */
-const HOMEWORK_TAG = /^ ?(?:hw|дз)(?![\p{L}\p{N}])(?! ?№? ?\d)/giu;
-
-/** The leading tag when the chosen preset is Homework or a course under it. */
-const presetTagOf = (state: CoreState, text: string, presetId: string): readonly Found[] => {
-  const chain = presetChain(state.presets, presetId);
-  return chain.ok && chain.value[0]?.id === "hw"
-    ? optional(findFirst(text, HOMEWORK_TAG, "preset"))
-    : [];
-};
-
 const optional = (found: Found | undefined): readonly Found[] =>
   found === undefined ? [] : [found];
 
@@ -67,7 +56,7 @@ const inOrder = (links: readonly QuickSpan[], found: readonly Found[]): readonly
   [...links, ...found.map((item) => toSpan(item))].toSorted((a, b) => a.start - b.start);
 
 /** A title is at most this long; a longer line is cut at a word. */
-const MAX_TITLE = 100;
+const MAX_TITLE = 200;
 
 const capTitle = (title: string): string => {
   if (title.length <= MAX_TITLE) {
@@ -133,7 +122,6 @@ export const parseQuickInput = (text: string, state: CoreState, ctx: QueryContex
   const hasProblems = preset.ok && preset.value.submission === "per_subtask";
   const problems = hasProblems ? problemsOf(words) : { spans: [], subtasks: [] };
   const spans = inOrder(linkSpans, [
-    ...presetTagOf(state, words, suggestion.presetId),
     ...dated.spans,
     ...estimate.spans,
     ...named.spans,

@@ -88,8 +88,42 @@ export const TaskCreatedPayload = z
     sourceText: z.string().optional(),
     fields: TaskFieldsSchema.default({}),
     overrides: OpaqueRecordSchema.optional(),
+    /** A generated repeat belongs to its series but remains an independent task. */
+    seriesId: z.string().min(1).optional(),
+    seriesRevision: z.int().min(0).optional(),
   })
   .superRefine(zonePaired);
+
+const SeriesScheduleBase = { until: z.iso.date().optional() };
+export const SeriesScheduleSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("daily"), ...SeriesScheduleBase }),
+  z.object({ kind: z.literal("weekdays"), ...SeriesScheduleBase }),
+  z.object({
+    kind: z.literal("every_n_days"),
+    days: z.int().min(1).max(3650),
+    ...SeriesScheduleBase,
+  }),
+  z.object({ kind: z.literal("weekly"), ...SeriesScheduleBase }),
+  z.object({ kind: z.literal("monthly"), ...SeriesScheduleBase }),
+]);
+
+const SeriesTemplateSchema = TaskCreatedPayload.safeExtend({
+  startAt: InstantSchema,
+  startTz: TimeZoneSchema,
+  seriesId: z.string().min(1),
+  seriesRevision: z.int().min(0),
+});
+
+export const SeriesCreatedPayload = z.object({
+  seriesId: z.string().min(1),
+  template: SeriesTemplateSchema,
+  schedule: SeriesScheduleSchema,
+});
+/** `keepTaskId`: the instance the series was ended from, which stays as an ordinary task. */
+export const SeriesArchivedPayload = z.object({
+  seriesId: z.string().min(1),
+  keepTaskId: z.string().min(1).optional(),
+});
 
 /** `null` clears the due date or the start (and their zones with them). */
 export const TaskUpdatedPayload = z
@@ -185,23 +219,6 @@ const ChannelSwitchesPatch = z.strictObject({
   web: z.boolean().optional(),
 });
 
-export const SettingsUpdatedPayload = z.object({
-  language: z.enum(["en", "ru"]).optional(),
-  timezone: TimeZoneSchema.optional(),
-  digestWindows: z.array(ClockSchema).optional(),
-  quietHours: z.object({ from: ClockSchema, to: ClockSchema }).optional(),
-  nightHours: z.boolean().optional(),
-  /** Per kind of notification (`NOTIFICATION_KINDS`), the channel switches that change. */
-  notificationChannels: z
-    .strictObject({
-      login: ChannelSwitchesPatch.optional(),
-      deadline_digest: ChannelSwitchesPatch.optional(),
-      event_start: ChannelSwitchesPatch.optional(),
-      activity_overrun: ChannelSwitchesPatch.optional(),
-    })
-    .optional(),
-});
-
 /** What an activity is about: one of a fixed set, so totals and defaults can group it. */
 export const ACTIVITY_CATEGORIES = [
   "work",
@@ -217,6 +234,35 @@ export const ACTIVITY_CATEGORIES = [
   "sleep",
   "other",
 ] as const;
+
+export const SettingsUpdatedPayload = z.object({
+  language: z.enum(["en", "ru"]).optional(),
+  timezone: TimeZoneSchema.optional(),
+  digestWindows: z.array(ClockSchema).optional(),
+  quietHours: z.object({ from: ClockSchema, to: ClockSchema }).optional(),
+  nightHours: z.boolean().optional(),
+  /** A manual Expect for each named activity category; null clears one choice. */
+  categoryEstimates: z
+    .partialRecord(
+      z.enum(ACTIVITY_CATEGORIES),
+      z
+        .number()
+        .int()
+        .positive()
+        .max(24 * 60)
+        .nullable(),
+    )
+    .optional(),
+  /** Per kind of notification (`NOTIFICATION_KINDS`), the channel switches that change. */
+  notificationChannels: z
+    .strictObject({
+      login: ChannelSwitchesPatch.optional(),
+      deadline_digest: ChannelSwitchesPatch.optional(),
+      event_start: ChannelSwitchesPatch.optional(),
+      activity_overrun: ChannelSwitchesPatch.optional(),
+    })
+    .optional(),
+});
 
 /** "errands" was merged into "chores": old events still parse and read as chores. */
 export const ActivityCategorySchema = z
@@ -258,6 +304,7 @@ export const ActivityLoggedPayload = z
     ...activityFields,
     startAt: InstantSchema,
     endAt: InstantSchema,
+    expectMinutes: minutes.optional(),
   })
   .refine((value) => value.endAt > value.startAt, { message: "endAt must be after startAt" });
 export const ActivityAdjustedPayload = z.object({

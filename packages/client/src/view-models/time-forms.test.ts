@@ -13,19 +13,35 @@ describe("time forms", () => {
           activityId: "a1",
           category: "food",
           endAt: null,
+          expectMinutes: 25,
           kind: "edit",
           label: "Lunch",
           startAt: "2026-10-06T12:30:00.000Z",
+          taskId: "t1",
         },
         clock,
       ),
-    ).toEqual({ category: "food", from: "12:30", label: "Lunch", to: "" });
+    ).toEqual({
+      category: "food",
+      expectMinutes: 25,
+      from: "12:30",
+      label: "Lunch",
+      taskId: "t1",
+      to: "",
+    });
     expect(
       activityFormOf(
         { endAt: "2026-10-06T10:00:00.000Z", kind: "log", startAt: "2026-10-06T09:00:00.000Z" },
         clock,
       ),
-    ).toEqual({ category: "other", from: "09:00", label: "", to: "10:00" });
+    ).toEqual({
+      category: "other",
+      expectMinutes: null,
+      from: "09:00",
+      label: "",
+      taskId: null,
+      to: "10:00",
+    });
   });
 });
 

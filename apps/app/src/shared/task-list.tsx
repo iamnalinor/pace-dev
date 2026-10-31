@@ -24,11 +24,13 @@ const keeping = (
 
 /** A list of task rows: tap to open, the check to close. */
 export const TaskRows = ({
+  animateLayout = true,
   checked = false,
   label,
   rows,
   withTag = true,
 }: {
+  readonly animateLayout?: boolean;
   /** Closed tasks: checked rows that open the task (reopen is there). */
   readonly checked?: boolean;
   readonly label: string;
@@ -71,7 +73,7 @@ export const TaskRows = ({
             key={row.id}
             // The dust is the exit of a checked row; the fade would only bring it back for a moment.
             {...(!dissolving.has(row.id) && { exiting: ROW_EXIT })}
-            layout={ROW_LAYOUT}
+            {...(animateLayout && { layout: ROW_LAYOUT })}
             role="listitem"
           >
             <TaskRow

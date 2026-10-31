@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
@@ -39,19 +40,28 @@ On a wide window the picked task opens next to the list, as on the old web app, 
 the task form: while it is open the pane holds it, and closing it (or adding the task) brings
 the picked task back. Picking a task while the form is open folds the draft back into the line.
 */
-const NowSplit = ({ isComposerFocused }: { readonly isComposerFocused: boolean }) => {
+const NowSplit = ({
+  isComposerFocused,
+  onPick,
+  picked,
+}: {
+  readonly isComposerFocused: boolean;
+  readonly picked: null | Picked;
+  readonly onPick: (picked: null | Picked) => void;
+}) => {
   const flow = useComposerFlow();
-  const [picked, setPicked] = useState<null | Picked>(null);
   // The check's submit sheet opens once: the form taking the pane over has used it up, so
   // the task coming back after the form does not open the sheet again by itself.
-  if (flow.form !== null && picked?.close === true) {
-    setPicked({ ...picked, close: false });
-  }
+  useEffect(() => {
+    if (flow.form !== null && picked?.close === true) {
+      onPick({ ...picked, close: false });
+    }
+  }, [flow.form, onPick, picked]);
   return (
     <TaskOpenerProvider
       open={(id, options) => {
         flow.hide();
-        setPicked({ close: options?.close === true, id });
+        onPick({ close: options?.close === true, id });
       }}
       selectedId={flow.form === null ? (picked?.id ?? null) : null}
     >
@@ -63,7 +73,7 @@ const NowSplit = ({ isComposerFocused }: { readonly isComposerFocused: boolean }
           {flow.form === null ? (
             <PickedTask
               onClose={() => {
-                setPicked(null);
+                onPick(null);
               }}
               picked={picked}
             />
@@ -81,17 +91,26 @@ Now on a phone; on a wide window the list with the picked task (or the task form
 `composeText` is a share (or New task, when empty) arriving on /add.
 */
 export const NowScreen = ({ composeText }: { readonly composeText?: string | undefined }) => {
+  const router = useRouter();
   const isWide = useIsWide();
+  const [picked, setPicked] = useState<null | Picked>(null);
   const isComposerFocused = composeText !== undefined;
   return (
     <ComposerProvider
       initialText={composeText}
       isFormInPane={isWide}
       key={composeText ?? ""}
+      onCreatedTask={(taskId) => {
+        if (isWide) {
+          setPicked({ close: false, id: taskId });
+        } else {
+          router.push(`/task/${taskId}`);
+        }
+      }}
       opensForm={composeText === ""}
     >
       {isWide ? (
-        <NowSplit isComposerFocused={isComposerFocused} />
+        <NowSplit isComposerFocused={isComposerFocused} onPick={setPicked} picked={picked} />
       ) : (
         <NowBoard isComposerFocused={isComposerFocused} />
       )}

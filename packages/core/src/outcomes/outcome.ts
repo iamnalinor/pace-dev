@@ -5,7 +5,7 @@ import type { PresetsState } from "../presets/preset-reducer.ts";
 import { autoOutcomeId, type AutoOutcomeKind } from "../ids.ts";
 import { isOpen, type Subtask, type Task, type TasksState } from "../model/task.ts";
 import { taskPreset } from "../presets/resolve-preset.ts";
-import { addMinutesIso } from "../time.ts";
+import { addDaysIn, addMinutesIso } from "../time.ts";
 
 /** The spec's outcome table; `done` vs `done_late` is derived from instants, never chosen. */
 export type Outcome = "cancelled" | "cancelled_missed" | "done" | "done_late" | "skipped";
@@ -27,7 +27,12 @@ export const deadlineOf = (task: Task, preset: ResolvedPreset): Deadline => {
       return { dueAt: task.dueAt, finalAt: task.dueAt };
     }
     case "resubmission": {
-      return { dueAt: task.dueAt, finalAt: preset.deadlinePolicy.finalAt };
+      const { finalAt, finalMode, softDays } = preset.deadlinePolicy;
+      const offset =
+        finalMode === "offset" && task.dueAt !== null
+          ? addDaysIn(task.dueAt, softDays, task.dueTz ?? "UTC")
+          : null;
+      return { dueAt: task.dueAt, finalAt: finalAt ?? offset };
     }
   }
 };

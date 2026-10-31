@@ -61,14 +61,19 @@ const hourHeight = (): unknown =>
   (screen.getByText("08").props as { style?: { height?: number } }).style?.height;
 
 describe("WeekScreen", () => {
-  it("lays the week's tracked time and calendar on one grid; a block tells where its time went", async () => {
+  it("lays the week's tracked time and calendar on one grid; a block lists the apps used during it", async () => {
     await renderScreen(<WeekScreen />, await world());
     expect(
       await screen.findByRole("button", { name: "From the calendar: Seminar" }),
     ).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: /^Lecture notes, / }));
     expect(await screen.findByText("Study · 1h")).toBeOnTheScreen();
-    expect(screen.getByText("Laptop: code 40m")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Apps during this" })).toBeOnTheScreen();
+    expect(await screen.findByText("code")).toBeOnTheScreen();
+    expect(screen.getByText("Laptop")).toBeOnTheScreen();
+    expect(screen.getByText("40m")).toBeOnTheScreen();
+    // One place for it: the old "where it sat" line is gone from the details.
+    expect(screen.queryByText("Laptop: code 40m")).toBeNull();
   });
 
   it("opens an event's details in a sheet: calendar, place, call, notes and people", async () => {

@@ -1,34 +1,30 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createGroq } from "@ai-sdk/groq";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 import type { Config } from "../config.ts";
 import type { ParseProvider } from "./llm.ts";
 
 import { echoReply, fakeParseModel } from "./fake-model.ts";
 
-/** `groq`, `groq-2`, …: one name per key, so each key's rate limit is remembered on its own. */
-const keyName = (provider: string, index: number): string =>
-  index === 0 ? provider : `${provider}-${String(index + 1)}`;
+/** One name per key keeps rate limits independent while trying keys in order. */
+const keyName = (index: number): string =>
+  index === 0 ? "compatible" : `compatible-${String(index + 1)}`;
 
-/**
-Groq first (fast, strict JSON schema), Gemini as the fallback; one provider per key, so a key
-that hits its rate limit rests while the next one answers.
-*/
+/** The configured OpenAI-compatible endpoint; an incomplete endpoint is rejected by loadConfig. */
 export const parseProviders = (
-  config: Pick<Config, "geminiApiKeys" | "groqApiKeys" | "llmProvider">,
+  config: Pick<Config, "llmApiKeys" | "llmBaseUrl" | "llmModel" | "llmProvider">,
 ): readonly ParseProvider[] => {
   if (config.llmProvider === "fake") {
     return [{ model: fakeParseModel(echoReply), name: "fake" }];
   }
-  return [
-    ...config.groqApiKeys.map((apiKey, index) => ({
-      model: createGroq({ apiKey })("openai/gpt-oss-120b"),
-      name: keyName("groq", index),
-      providerOptions: { groq: { reasoningFormat: "hidden", structuredOutputs: true } },
-    })),
-    ...config.geminiApiKeys.map((apiKey, index) => ({
-      model: createGoogleGenerativeAI({ apiKey })("gemini-flash-latest"),
-      name: keyName("gemini", index),
-    })),
-  ];
+  if (config.llmBaseUrl === "" || config.llmModel === "") {
+    return [];
+  }
+  return config.llmApiKeys.map((apiKey, index) => ({
+    model: createOpenAICompatible({
+      apiKey,
+      baseURL: config.llmBaseUrl,
+      name: keyName(index),
+    })(config.llmModel),
+    name: keyName(index),
+  }));
 };

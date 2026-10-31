@@ -51,21 +51,44 @@ const cidrList = (text: string, ctx: z.RefinementCtx): readonly string[] => {
   return entries;
 };
 
-const EnvSchema = z.object({
-  ENVIRONMENT: z.enum(["development", "test", "production"]),
-  ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
-  TELEGRAM_BOT_USERNAME: z.string().min(1),
-  WEB_ORIGIN: z.url(),
-  TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
-  TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
-  TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
-  TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
-  BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
-  // Several keys (comma or newline separated) are rotated: a key that hits its limit rests.
-  GROQ_API_KEY: z.string().default("").transform(csv),
-  GEMINI_API_KEY: z.string().default("").transform(csv),
-  LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
-});
+const EnvSchema = z
+  .object({
+    ENVIRONMENT: z.enum(["development", "test", "production"]),
+    ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
+    TELEGRAM_BOT_USERNAME: z.string().min(1),
+    WEB_ORIGIN: z.url(),
+    TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+    TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
+    TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
+    TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
+    BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
+    // Several keys (comma or newline separated) are rotated: a key that hits its limit rests.
+    LLM_API_KEY: z.string().default("").transform(csv),
+    LLM_BASE_URL: z.string().default(""),
+    LLM_MODEL: z.string().default(""),
+    LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
+  })
+  .superRefine((value, ctx) => {
+    const configured = [
+      value.LLM_API_KEY.length > 0,
+      value.LLM_BASE_URL !== "",
+      value.LLM_MODEL !== "",
+    ];
+    if (configured.some(Boolean) && !configured.every(Boolean)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["LLM_API_KEY"],
+        message: "LLM_API_KEY, LLM_BASE_URL and LLM_MODEL must be set together",
+      });
+    }
+    if (value.LLM_BASE_URL === "") {
+      return;
+    }
+    const url = URL.canParse(value.LLM_BASE_URL) ? new URL(value.LLM_BASE_URL) : null;
+    if (url === null || !["http:", "https:"].includes(url.protocol)) {
+      ctx.addIssue({ code: "custom", path: ["LLM_BASE_URL"], message: "must be an HTTP URL" });
+    }
+  });
 
 export type Config = {
   readonly environment: "development" | "production" | "test";
@@ -78,9 +101,10 @@ export type Config = {
   readonly telegramWebhookAllowedCidrs: readonly string[];
   readonly telegramApiRoot: string;
   readonly botInfo: undefined | UserFromGetMe;
-  /** Every key of the provider, tried in turn; empty without one. */
-  readonly groqApiKeys: readonly string[];
-  readonly geminiApiKeys: readonly string[];
+  /** Every key of the compatible endpoint, tried in turn; empty without one. */
+  readonly llmApiKeys: readonly string[];
+  readonly llmBaseUrl: string;
+  readonly llmModel: string;
   /** `fake` answers from inside the Worker (tests, e2e); `auto` uses the providers with a key. */
   readonly llmProvider: "auto" | "fake";
 };
@@ -103,8 +127,9 @@ export const loadConfig = (env: object): Result<Config, string> => {
     telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
     telegramApiRoot: value.TELEGRAM_API_ROOT,
     botInfo: value.BOT_INFO,
-    groqApiKeys: value.GROQ_API_KEY,
-    geminiApiKeys: value.GEMINI_API_KEY,
+    llmApiKeys: value.LLM_API_KEY,
+    llmBaseUrl: value.LLM_BASE_URL,
+    llmModel: value.LLM_MODEL,
     llmProvider: value.LLM_PROVIDER,
   });
 };

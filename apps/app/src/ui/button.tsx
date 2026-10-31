@@ -7,24 +7,36 @@ import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { KEYBOARD, useHotkey } from "./use-hotkey.tsx";
 
-export type ButtonVariant = "ghost" | "primary" | "secondary";
+/** `danger`: a step that cannot be undone (wipe, delete): the warning colour, outlined. */
+export type ButtonVariant = "danger" | "ghost" | "primary" | "secondary";
 
 const CONTAINER: Readonly<Record<ButtonVariant, string>> = {
+  danger: "border-2 border-warn bg-surface",
   ghost: "bg-transparent",
   primary: "bg-accent",
   secondary: "border border-line bg-surface",
 };
 
 const LABEL: Readonly<Record<ButtonVariant, string>> = {
+  danger: "text-warn",
   ghost: "text-fg2",
   primary: "text-accentFg",
   secondary: "text-fg",
 };
 
 const HINT: Readonly<Record<ButtonVariant, string>> = {
+  danger: "text-warn",
   ghost: "text-muted",
   primary: "text-accentFg",
   secondary: "text-muted",
+};
+
+/** The icon in the label's colour. */
+const iconColor = (variant: ButtonVariant, palette: ReturnType<typeof useTheme>["palette"]) => {
+  if (variant === "primary") {
+    return palette.accentFg;
+  }
+  return variant === "danger" ? palette.warn : palette.fg;
 };
 
 /** The shortcut after the label, the way this computer names it; nothing without a keyboard. */
@@ -60,13 +72,11 @@ const Label = ({
   return (
     <>
       {Icon === undefined ? null : (
-        <Icon
-          color={variant === "primary" ? palette.accentFg : palette.fg}
-          size={18}
-          strokeWidth={1.75}
-        />
+        <Icon color={iconColor(variant, palette)} size={18} strokeWidth={1.75} />
       )}
-      <Text className={cx("font-sans text-[15px] font-medium", LABEL[variant])}>{children}</Text>
+      <Text className={cx("shrink text-center font-sans text-[15px] font-medium", LABEL[variant])}>
+        {children}
+      </Text>
       <KeyHint hotkey={hotkey} variant={variant} />
     </>
   );
@@ -85,7 +95,7 @@ const useButtonHotkey = (
 };
 
 /**
-A 48px-tall pill-ish button, optionally with an icon before the label; `busy` swaps the label
+A pill-ish button at least 48px tall (a label that wraps makes it taller), optionally with an icon before the label; `busy` swaps the label
 for a spinner and blocks presses. With a `hotkey` and a keyboard, the shortcut shows after the
 label and presses the button (unless `hotkeyMode` is "hint": a field handles the key itself).
 */
@@ -124,7 +134,7 @@ export const Button = ({
       aria-busy={busy}
       aria-disabled={isBlocked}
       className={cx(
-        "h-12 flex-row items-center justify-center gap-2 rounded-md px-4 active:opacity-80",
+        "min-h-12 flex-row items-center justify-center gap-2 rounded-md px-4 py-2 active:opacity-80",
         CONTAINER[variant],
         isBlocked && "opacity-50",
       )}

@@ -1,3 +1,58 @@
+export {
+  type ActionContext,
+  actionContext,
+  CONTEXT_TITLE_CHARS,
+  type ContextActivity,
+  type ContextTask,
+  MAX_CONTEXT_TASKS,
+} from "./actions/context.ts";
+export {
+  actionDetails,
+  type DetailLine,
+  detailText,
+  summaryDetails,
+} from "./actions/details.ts";
+export {
+  actionsFromModel,
+  type ModelReading,
+  type ModelWorld,
+  type ReadingRejection,
+  type Rejected,
+} from "./actions/from-model.ts";
+export {
+  ACTION_KINDS,
+  type ActionKind,
+  CLASSIFY_CONFIDENT,
+  domainOf,
+  PARSE_DOMAINS,
+  type ParseDomain,
+} from "./actions/kinds.ts";
+export {
+  type ActionError,
+  type BatchError,
+  planAction,
+  planActions,
+  type PlanContext,
+} from "./actions/plan.ts";
+export {
+  actionsByRules,
+  categoryOfLabel,
+  domainByRules,
+  draftOfInput,
+  RULES_CONFIDENCE,
+} from "./actions/rules.ts";
+export {
+  type Action,
+  type ActionBody,
+  type ActionBodyOf,
+  ActionBodySchema,
+  ActionSchema,
+  type ActivityPatch,
+  type SubtaskDraft,
+  type TaskDraft,
+  type TaskPatch,
+} from "./actions/schema.ts";
+export { summarize, withSummary } from "./actions/summary.ts";
 export type { Decision } from "./api/schemas/notify.ts";
 export {
   type ParseRequest,
@@ -17,7 +72,7 @@ export {
   openInstancesOf,
   quickInputBodies,
 } from "./input/compose.ts";
-/** The assistant layer of @pace/core: the LLM parse (schema, checks), its proposals, and the notifier. */
+/** The assistant layer of @pace/core: the LLM parse (schema, checks), its actions, and the notifier. */
 export {
   DEFAULT_NOTIFICATION_CHANNELS,
   isChannelOn,
@@ -50,6 +105,7 @@ export {
   type LiveNotice,
   LiveNoticeSchema,
   type NewNotification,
+  notificationPath,
   NotificationSchema,
   PAYLOAD_SCHEMAS,
   type PayloadOf,
@@ -70,52 +126,3 @@ export {
   type ParseQuestion,
 } from "./parse/schema.ts";
 export { type ActionRejection, readWallClock, verifyAction } from "./parse/verify.ts";
-export {
-  CONTEXT_TITLE_CHARS,
-  type ContextActivity,
-  type ContextTask,
-  MAX_CONTEXT_TASKS,
-  type ProposalContext,
-  proposalContext,
-} from "./proposals/context.ts";
-export {
-  type ModelReading,
-  type ModelWorld,
-  proposalsFromModel,
-  type ReadingRejection,
-  type Rejected,
-} from "./proposals/from-model.ts";
-export {
-  CLASSIFY_CONFIDENT,
-  domainOf,
-  PARSE_DOMAINS,
-  type ParseDomain,
-  PROPOSAL_KINDS,
-  type ProposalKind,
-} from "./proposals/kinds.ts";
-export {
-  type BatchError,
-  type PlanContext,
-  planProposal,
-  planProposals,
-  type ProposalError,
-} from "./proposals/plan.ts";
-export {
-  categoryOfLabel,
-  domainByRules,
-  draftOfInput,
-  proposalsByRules,
-  RULES_CONFIDENCE,
-} from "./proposals/rules.ts";
-export {
-  type ActivityPatch,
-  type Proposal,
-  type ProposalBody,
-  type ProposalBodyOf,
-  ProposalBodySchema,
-  ProposalSchema,
-  type SubtaskDraft,
-  type TaskDraft,
-  type TaskPatch,
-} from "./proposals/schema.ts";
-export { summarize, withSummary } from "./proposals/summary.ts";

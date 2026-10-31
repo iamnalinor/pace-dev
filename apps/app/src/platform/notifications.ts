@@ -14,6 +14,7 @@ import {
   type Language,
   LANGUAGES,
   type NotificationKind,
+  notificationPath,
   t,
 } from "@pace/core";
 
@@ -152,10 +153,6 @@ export const setupNotificationCategories = async (language: Language): Promise<v
   }
 };
 
-/** Where a tap on a notification of `kind` opens the app. */
-const urlOf = (kind: NotificationKind): string =>
-  kind === "deadline_digest" ? "/" : "/notifications";
-
 /**
 Shows a notification of the pool as a system notification, under the pool id: shown again (a
 retried delivery), it replaces itself instead of stacking.
@@ -166,6 +163,7 @@ export const showPoolNotification = async (notice: {
   readonly title: string;
   readonly body: string;
   readonly sessionHash: string;
+  readonly url?: string;
 }): Promise<void> => {
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -174,7 +172,7 @@ export const showPoolNotification = async (notice: {
         kind: notice.kind,
         notificationId: notice.id,
         sessionHash: notice.sessionHash,
-        url: urlOf(notice.kind),
+        url: notice.url ?? "/notifications",
       },
       title: notice.title,
       ...(ANSWERS[notice.kind].length > 0 && { categoryIdentifier: notice.kind }),
@@ -284,6 +282,7 @@ const didApplyPollEntries = async ({
         body: entry.body,
         id: entry.notificationId,
         kind: entry.notification.kind,
+        url: notificationPath(entry.notification),
         sessionHash: await sessionHashOf(session),
         title: entry.title,
       });

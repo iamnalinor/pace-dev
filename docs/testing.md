@@ -82,7 +82,7 @@ role and state the way a screen reader sees it: chips and segments are `radio`s
    single-page app by `scripts/serve-web.ts` (port 4173).
 
 Every test starts on an account of its own: `loginViaApi` (`e2e/support/login.ts`) takes the
-next id of the worker's whitelisted block and deletes that account first (`DELETE /api/me`),
+next id of the worker's whitelisted block and deletes that account first (`DELETE /api/test/account`),
 so parallel tests, `--repeat-each` and reruns against a reused server never share state.
 
 ### Every screen, on real-looking data
@@ -126,5 +126,5 @@ The cases are in `packages/core/src/parse/regression/cases.fake.ts`: a message, 
 typed into (`task`, `activity` or `auto`), the instant over the artboard world, and the
 proposals expected (kinds in order, fields of the first, the domain and how sure for `auto`).
 `cases.test.ts` keeps them well-formed in `bun test:unit`. The runner (`run.ts`) is still to
-come: `bun test:llm` will run them against Groq and Gemini and write `docs/llm.md`.
-`llm-regression.yml` already exists for it (on demand, with the provider secrets).
+come: `bun test:llm` will run them against the configured OpenAI-compatible endpoint and write
+`docs/llm.md`. `llm-regression.yml` is on demand and reads the same endpoint variables.

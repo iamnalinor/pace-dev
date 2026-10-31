@@ -14,10 +14,30 @@ import { TimeInput } from "#app/ui/time-input.tsx";
 export type Zoned = null | { readonly at: string; readonly tz: string };
 
 /** Which date a field holds: the deadline, or the start. */
-export type DateKind = "due" | "start";
+export type DateKind = "due" | "final" | "start";
 
 /** A due typed without a time ends the day; a start without one begins it. */
-const DEFAULT_TIME: Readonly<Record<DateKind, string>> = { due: "23:59", start: "09:00" };
+const DEFAULT_TIME: Readonly<Record<DateKind, string>> = {
+  due: "23:59",
+  final: "23:59",
+  start: "09:00",
+};
+
+const dateLabel = (kind: DateKind): "composer.due" | "edit.start" | "form.final" => {
+  if (kind === "start") {
+    return "edit.start";
+  }
+  return kind === "final" ? "form.final" : "composer.due";
+};
+
+const emptyDateLabel = (
+  kind: DateKind,
+): "composer.noDue" | "form.finalNotSet" | "form.startNow" => {
+  if (kind === "start") {
+    return "form.startNow";
+  }
+  return kind === "final" ? "form.finalNotSet" : "composer.noDue";
+};
 
 /** The date's chip: its exact date and time ("Oct 13 23:59"), or what an unset one means. */
 export const DateChip = ({
@@ -34,12 +54,12 @@ export const DateChip = ({
   const t = useT();
   const viewer = useViewer();
   const { palette } = useTheme();
-  const unset = t(kind === "due" ? "composer.noDue" : "form.startNow");
+  const unset = t(emptyDateLabel(kind));
   const text = value === null ? unset : zonedText({ ...value, mode: "due" }, viewer);
   const Icon = kind === "due" ? CalendarDays : Play;
   return (
     <Chip
-      label={`${t(kind === "due" ? "composer.due" : "edit.start")}: ${text}`}
+      label={`${t(dateLabel(kind))}: ${text}`}
       leading={<Icon color={palette.fg2} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
@@ -84,16 +104,19 @@ export const DatePanel = ({
         language={viewer.language}
         onPick={(date) => {
           set(date, time);
+          onClose();
         }}
         selected={shown.date}
         today={today}
       />
       <View className="flex-row items-center gap-2">
-        <Text className="font-sans text-[13px] text-muted">{t("composer.dueTime")}</Text>
+        <Text className="font-sans text-[13px] text-muted">
+          {t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
+        </Text>
         <TimeInput
           className="w-24"
           key={time}
-          label={t("composer.dueTime")}
+          label={t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
           onTime={(next) => {
             set(shown.date ?? today, next);
           }}

@@ -8,6 +8,11 @@ import {
   presetReducer,
   type PresetsState,
 } from "../presets/preset-reducer.ts";
+import {
+  INITIAL_SERIES_STATE,
+  seriesReducer,
+  type SeriesState,
+} from "../recurrence/series-reducer.ts";
 import { INITIAL_TIME_STATE, type TimeState } from "../tracking/model.ts";
 import { timeReducer } from "../tracking/time-reducer.ts";
 import { projectReducer } from "./project-reducer.ts";
@@ -24,6 +29,7 @@ export type CoreState = {
   readonly presets: PresetsState;
   readonly settings: Settings;
   readonly time: TimeState;
+  readonly series: SeriesState;
 };
 
 export const INITIAL_CORE_STATE: CoreState = {
@@ -32,6 +38,7 @@ export const INITIAL_CORE_STATE: CoreState = {
   presets: INITIAL_PRESETS_STATE,
   settings: DEFAULT_SETTINGS,
   time: INITIAL_TIME_STATE,
+  series: INITIAL_SERIES_STATE,
 };
 
 /** One event touches at most one slice; the untouched slices (and the whole state) keep their references. */
@@ -42,12 +49,14 @@ export const coreReducer: Reducer<CoreState> = (state, event) => {
     presets: presetReducer(state.presets, event),
     settings: settingsReducer(state.settings, event),
     time: timeReducer(state.time, event),
+    series: seriesReducer(state.series, event),
   };
   const isSame =
     next.tasks === state.tasks &&
     next.projects === state.projects &&
     next.presets === state.presets &&
     next.settings === state.settings &&
-    next.time === state.time;
+    next.time === state.time &&
+    next.series === state.series;
   return isSame ? state : next;
 };

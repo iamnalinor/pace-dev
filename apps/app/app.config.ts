@@ -96,6 +96,12 @@ const config: ExpoConfig = {
         category: ["BROWSABLE", "DEFAULT"],
         data: [{ host: "pace.nalinor.dev", pathPrefix: "/app", scheme: "https" }],
       },
+      {
+        action: "VIEW",
+        autoVerify: true,
+        category: ["BROWSABLE", "DEFAULT"],
+        data: [{ host: "pace.nalinor.dev", pathPrefix: "/task/", scheme: "https" }],
+      },
     ],
   },
   plugins: [

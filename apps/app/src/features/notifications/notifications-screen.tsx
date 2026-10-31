@@ -60,7 +60,11 @@ const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned
     case "deadline_digest": {
       return (
         <View className="gap-1">
-          <Line>{t("notifications.digestTitle")}</Line>
+          <Line>
+            {item.payload.tasks.length === 1
+              ? t("notifications.digestTitle")
+              : t("notify.digestCount", { count: item.payload.tasks.length })}
+          </Line>
           {item.payload.tasks.map((task) => (
             <Pressable
               accessibilityRole="link"
@@ -79,6 +83,19 @@ const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned
               </Text>
             </Pressable>
           ))}
+          {item.payload.tasks.length > 1 ? (
+            <Pressable
+              accessibilityRole="link"
+              className="min-h-11 justify-center"
+              onPress={() => {
+                router.push("/");
+              }}
+            >
+              <Text className="font-sans text-[13px] text-accentQuietText underline">
+                {t("notifications.openNow")}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       );
     }
