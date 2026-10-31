@@ -8,24 +8,28 @@ import { fakeInstance } from "@pace/client/testing";
 import { DevicesScreen } from "./devices-screen.tsx";
 
 const laptop = {
-  connectedAt: Date.parse("2026-10-01T10:00:00.000Z"),
+  city: null,
+  country: null,
+  createdAt: Date.parse("2026-10-01T10:00:00.000Z"),
+  current: false,
   id: "01LAPTOP",
-  kind: "computer",
-  lastActivityAt: "2026-10-06T11:55:00.000Z",
+  ip: null,
+  kind: "agent",
+  lastDataAt: "2026-10-06T11:55:00.000Z",
   lastSeenAt: Date.parse("2026-10-06T11:55:00.000Z"),
   name: "Linux Mint",
 };
 
 describe("Settings → Devices", () => {
   it("lists what sends usage with its last data, and disconnects a computer after asking", async () => {
-    const devices = [laptop];
+    const sessions = [laptop];
     const runtime = await createTestRuntime({
       routes: {
-        "DELETE /api/devices/01LAPTOP": () => {
-          devices.pop();
+        "DELETE /api/sessions/01LAPTOP": () => {
+          sessions.pop();
           return { ok: true };
         },
-        "GET /api/devices": () => ({ devices }),
+        "GET /api/sessions": () => ({ sessions }),
       },
     });
     await renderScreen(<DevicesScreen />, runtime);
@@ -51,8 +55,8 @@ describe("Settings → Devices", () => {
           apiOrigin: serverApi,
           webOrigin: serverWeb,
         }),
-        "GET /api/devices": () => ({ devices: [] }),
-        "POST /api/devices": ({ body }) => ({
+        "GET /api/sessions": () => ({ sessions: [] }),
+        "POST /api/sessions/agents": ({ body }) => ({
           id: "01NEW",
           name: (body as { name: string }).name,
           token: "tok_secret",

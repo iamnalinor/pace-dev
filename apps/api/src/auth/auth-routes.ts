@@ -14,8 +14,8 @@ import { requestPlace, type RequestPlace } from "../shared/request-place.ts";
 import { userStoreOf } from "../shared/user-store-of.ts";
 import { readBearer } from "./auth-middleware.ts";
 import { cachedAvatar, refreshAvatar } from "./avatar.ts";
-import { mountDeviceRoutes } from "./device-routes.ts";
 import { consumeNonce, createNonce, type NonceLogin, recordNonceSession } from "./nonce.ts";
+import { mountSessionRoutes } from "./session-routes.ts";
 import { createSession, revokeSession, type SessionKind } from "./sessions.ts";
 import { verifyTelegramLogin } from "./telegram-widget.ts";
 import { clientName } from "./user-agent.ts";
@@ -237,5 +237,5 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
           headers: { "Content-Type": avatar.mime, "Cache-Control": "public, max-age=3600" },
         });
   });
-  mountDeviceRoutes(app);
+  mountSessionRoutes(app);
 };

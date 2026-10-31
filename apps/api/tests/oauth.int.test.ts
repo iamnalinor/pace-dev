@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { endpoints, OAUTH_SCOPES } from "@pace/core";
+import { OAUTH_SCOPES } from "@pace/core";
 
-import { call, json, loginAsDev, readJson } from "./helpers.ts";
+import { call, json, readJson } from "./helpers.ts";
 import {
   API_ORIGIN,
   authorizeQuery,
@@ -16,7 +16,6 @@ import {
   pkce,
   REDIRECT_URI,
   registerClient,
-  revokeGrant,
   tokenRequest,
 } from "./oauth-flow.ts";
 
@@ -254,42 +253,5 @@ describe("authorization", () => {
     expect(redirect.searchParams.get("error")).toBe("access_denied");
     expect(redirect.searchParams.get("state")).toBe("s-deny");
     expect(redirect.searchParams.get("code")).toBeNull();
-  });
-});
-
-describe("grants", () => {
-  it("needs a session bearer to list and to revoke", async () => {
-    expect(endpoints.oauth.grants.list.auth).toBe(true);
-    expect(endpoints.oauth.grants.revoke.auth).toBe(true);
-    expect((await call("/api/oauth/grants")).status).toBe(401);
-    expect((await revokeGrant("g1")).status).toBe(401);
-    expect((await revokeGrant("g1", "nope")).status).toBe(401);
-  });
-
-  it("lists the person's grants with the client name and revoking one kills its token", async () => {
-    // Telegram id 1002 is used by this test alone: KV is shared by the whole file.
-    const { tokens } = await obtainToken({ devTelegramId: "1002" });
-    const session = await loginAsDev("1002");
-    const listed = await json<{ grants: Metadata[] }>("/api/oauth/grants", { token: session });
-    expect(listed.grants).toHaveLength(1);
-    const [grant] = listed.grants;
-    expect(grant).toMatchObject({
-      clientName: "Test MCP client",
-      logoUri: null,
-      scopes: ["tasks:read"],
-    });
-    expect(grant?.["createdAt"]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-
-    const other = await loginAsDev("1001");
-    const othersGrants = await json<{ grants: Metadata[] }>("/api/oauth/grants", { token: other });
-    expect(othersGrants.grants.map((item) => item["id"])).not.toContain(grant?.["id"]);
-
-    const revoked = await revokeGrant(String(grant?.["id"]), session);
-    expect(revoked.status).toBe(200);
-    expect(await readJson<{ ok: boolean }>(revoked)).toEqual({ ok: true });
-    expect((await mcpCall(tokens.access_token, "initialize")).status).toBe(401);
-    expect(await json<{ grants: Metadata[] }>("/api/oauth/grants", { token: session })).toEqual({
-      grants: [],
-    });
   });
 });

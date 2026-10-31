@@ -27,7 +27,6 @@ export {
 export {
   CALENDAR_LIMITS,
   type CalendarEvent,
-  type Device,
   type UsageRow,
 } from "./api/schemas/cloud.ts";
 export * from "./api/schemas/instance.ts";
@@ -45,15 +44,12 @@ export {
   OAuthClientInfoSchema,
   OAuthCompleteBodySchema,
   OAuthDenyBodySchema,
-  type OAuthGrant,
-  OAuthGrantRevokedSchema,
-  OAuthGrantSchema,
-  OAuthGrantsSchema,
   OAuthRedirectSchema,
   type OAuthScope,
   OAuthScopeSchema,
   requestedScopes,
 } from "./api/schemas/oauth.ts";
+export { type Session, SessionSchema, SessionsOutputSchema } from "./api/schemas/sessions.ts";
 export {
   STORE_CHANGED,
   StoreIdSchema,

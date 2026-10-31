@@ -21,12 +21,16 @@ const CLIENT = {
 
 const GRANTS = [
   {
-    clientId: "c1",
-    clientName: "Claude",
-    createdAt: "2026-10-01T10:00:00.000Z",
-    expiresAt: null,
-    id: "g1",
-    logoUri: null,
+    city: null,
+    country: null,
+    createdAt: Date.parse("2026-10-01T10:00:00.000Z"),
+    current: false,
+    id: "mcp:g1",
+    ip: null,
+    kind: "mcp",
+    lastDataAt: null,
+    lastSeenAt: null,
+    name: "Claude",
     scopes: ["tasks:read", "tasks:write"],
   },
 ];
@@ -98,8 +102,8 @@ describe("ConnectedApps", () => {
   it("lists the grants and revokes one after a confirmation", async () => {
     const runtime = await createTestRuntime({
       routes: {
-        "DELETE /api/oauth/grants/g1": () => ({ ok: true }),
-        "GET /api/oauth/grants": () => ({ grants: GRANTS }),
+        "DELETE /api/sessions/mcp%3Ag1": () => ({ ok: true }),
+        "GET /api/sessions": () => ({ sessions: GRANTS }),
       },
     });
     await renderScreen(<ConnectedApps />, runtime);
@@ -112,8 +116,8 @@ describe("ConnectedApps", () => {
   it("says so when the list cannot load or a revoke fails", async () => {
     const runtime = await createTestRuntime({
       routes: {
-        "DELETE /api/oauth/grants/g1": () => problem(500, "server/error"),
-        "GET /api/oauth/grants": () => ({ grants: GRANTS }),
+        "DELETE /api/sessions/mcp%3Ag1": () => problem(500, "server/error"),
+        "GET /api/sessions": () => ({ sessions: GRANTS }),
       },
     });
     await renderScreen(<ConnectedApps />, runtime);

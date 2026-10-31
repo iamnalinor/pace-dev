@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { knownValue, knownValues } from "../tolerant.ts";
-
 // What a client sends is strict (a key the server does not know is refused); what the server
 // answers is not (a client parsing it drops keys a newer server added): adding a field to an
 // answer must never break an older client.
@@ -77,25 +75,6 @@ export type UsageRow = z.output<typeof UsageRowSchema>;
 export const UsageOutputSchema = z.object({ sessions: z.array(UsageRowSchema) });
 
 export const StoredSchema = z.object({ stored: z.number().int().nonnegative() });
-
-/**
-A device that sends its app usage: a computer connected with its own token (it may only
-upload), or a phone signed in to the app. `lastActivityAt` is the end of the newest session
-it sent; a computer's `connectedAt` and `lastSeenAt` come from its token.
-*/
-export const DeviceSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  /** A kind a newer server added reads as a phone: shown, with nothing to disconnect. */
-  kind: knownValue(["computer", "phone"], "phone"),
-  connectedAt: z.number().nullable(),
-  lastSeenAt: z.number().nullable(),
-  lastActivityAt: z.iso.datetime().nullable(),
-});
-
-export type Device = z.output<typeof DeviceSchema>;
-
-export const DevicesOutputSchema = z.object({ devices: knownValues(DeviceSchema) });
 
 export const DeviceCreateSchema = z.strictObject({ name: z.string().trim().min(1).max(80) });
 

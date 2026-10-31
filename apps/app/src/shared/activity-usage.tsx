@@ -5,7 +5,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { appsDuring, type AppTime, screenTime } from "@pace/client";
-import { useDevices, useUsage } from "@pace/client/react";
+import { useSessions, useUsage } from "@pace/client/react";
 import { addDaysIn, formatDuration } from "@pace/core";
 
 const TOP_APPS = 8;
@@ -60,14 +60,14 @@ export const ActivityApps = ({
   const { now } = useViewer();
   const end = endAt ?? now;
   const usage = useUsage(api, startAt, end);
-  const { phase } = useDevices(api);
+  const { sessions } = useSessions(api);
   const apps = appsDuring(usage, { startAt, endAt: end });
-  const stale =
-    phase.kind === "ready"
-      ? phase.devices.filter(
-          (device) => device.lastActivityAt === null || device.lastActivityAt < end,
-        )
-      : [];
+  // The computers, and the phones that have sent usage, behind on this stretch.
+  const stale = sessions.filter((session) =>
+    session.lastDataAt === null
+      ? session.kind === "agent"
+      : (session.kind === "app" || session.kind === "agent") && session.lastDataAt < end,
+  );
   return (
     <View className="gap-2 border-t border-line pt-4">
       <Text accessibilityRole="header" className="font-sans text-[14px] font-semibold text-fg">
@@ -78,13 +78,13 @@ export const ActivityApps = ({
       ) : (
         <AppList apps={apps} />
       )}
-      {stale.map((device) => (
-        <Text className="font-sans text-[11px] text-muted" key={device.id}>
-          {device.lastActivityAt === null
-            ? t("day.noDeviceData", { device: device.name })
+      {stale.map((session) => (
+        <Text className="font-sans text-[11px] text-muted" key={session.id}>
+          {session.lastDataAt === null
+            ? t("day.noDeviceData", { device: session.name })
             : t("day.dataUpTo", {
-                device: device.name,
-                time: clockTime(device.lastActivityAt, zone),
+                device: session.name,
+                time: clockTime(session.lastDataAt, zone),
               })}
         </Text>
       ))}

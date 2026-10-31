@@ -1,11 +1,10 @@
-/** The OAuth consent page and the connected apps list, as hooks over the API client. */
+/** The OAuth consent page as a hook over the API client. */
 import { useEffect, useState } from "react";
 
 import {
   endpoints,
   type MessageKey,
   type OAuthClientInfo,
-  type OAuthGrant,
   type OAuthScope,
   type TelegramLogin,
 } from "@pace/core";
@@ -142,62 +141,6 @@ export const useConsent = (
       setScopes((current) =>
         current.includes(scope) ? current.filter((item) => item !== scope) : [...current, scope],
       );
-    },
-  };
-};
-
-export type GrantsPhase =
-  | { readonly kind: "failed" }
-  | { readonly kind: "loading" }
-  | { readonly kind: "ready"; readonly grants: readonly OAuthGrant[] };
-
-export type Grants = {
-  readonly phase: GrantsPhase;
-  /** Set when the last revoke did not go through. */
-  readonly hasRevokeFailed: boolean;
-  readonly revoke: (grant: OAuthGrant) => Promise<void>;
-};
-
-/** The MCP clients holding a grant on this account; a revoke drops the row once the server agrees. */
-export const useGrants = (api: ApiClient): Grants => {
-  const [phase, setPhase] = useState<GrantsPhase>({ kind: "loading" });
-  const [hasRevokeFailed, setHasRevokeFailed] = useState(false);
-
-  useEffect(() => {
-    // Aborted on unmount, so a late answer never updates a section that is gone.
-    const lifetime = new AbortController();
-    void (async () => {
-      try {
-        const { grants } = await api.call(endpoints.oauth.grants.list, {});
-        if (!lifetime.signal.aborted) {
-          setPhase({ grants, kind: "ready" });
-        }
-      } catch {
-        if (!lifetime.signal.aborted) {
-          setPhase({ kind: "failed" });
-        }
-      }
-    })();
-    return () => {
-      lifetime.abort();
-    };
-  }, [api]);
-
-  return {
-    hasRevokeFailed,
-    phase,
-    revoke: async (grant) => {
-      setHasRevokeFailed(false);
-      try {
-        await api.call(endpoints.oauth.grants.revoke, { params: { id: grant.id } });
-        setPhase((current) =>
-          current.kind === "ready"
-            ? { ...current, grants: current.grants.filter((item) => item.id !== grant.id) }
-            : current,
-        );
-      } catch {
-        setHasRevokeFailed(true);
-      }
     },
   };
 };

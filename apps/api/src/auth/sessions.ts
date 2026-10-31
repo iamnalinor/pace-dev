@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { ulid } from "ulidx";
 
 import type { Db } from "../shared/db/d1.ts";
@@ -53,6 +53,17 @@ export type SessionAccess = {
 };
 
 const isScope = (value: null | string): value is SessionScope => value === "usage:write";
+
+/**
+The device a session's usage is filed under: the one it was opened for (a phone's install id),
+else an agent's own session id; a full sign-in without a device sends under whatever device its
+request names, so none is known here.
+*/
+const usageDeviceOf = (row: {
+  readonly sessionId: string;
+  readonly scope: null | string;
+  readonly deviceId: null | string;
+}): null | string => row.deviceId ?? (isScope(row.scope) ? row.sessionId : null);
 
 /** Mints a bearer token (32 random bytes); only its SHA-256 is stored. */
 export const createSession = async (
@@ -120,36 +131,56 @@ export const findSession = async (
   }
   const scope = isScope(row.scope) ? row.scope : null;
   return {
-    device: scope === null ? null : { id: row.deviceId ?? row.sessionId, name: row.name },
+    device: scope === null ? null : { id: usageDeviceOf(row) ?? row.sessionId, name: row.name },
     scope,
     sessionId: row.sessionId,
     user: row.user,
   };
 };
 
-/** A device connected with its own token: its name and when it was last heard from. */
-export type DeviceSession = {
+/** One of the person's sessions as Settings lists it. */
+export type ListedSession = {
   readonly id: string;
+  readonly kind: SessionKind;
   readonly name: string;
+  readonly ip: null | string;
+  readonly country: null | string;
+  readonly city: null | string;
   readonly createdAt: number;
   readonly lastSeenAt: number;
+  /** The device its usage is filed under; null when it sends none. */
+  readonly usageDevice: null | string;
 };
 
-/** The person's device tokens, newest first. */
-export const listDeviceSessions = async (
+const SESSION_KINDS: ReadonlySet<string> = new Set<SessionKind>(["agent", "app", "browser", "dev"]);
+
+const isSessionKind = (value: string): value is SessionKind => SESSION_KINDS.has(value);
+
+/** A stored kind; a row from before kinds were stored (or a newer one) reads as a browser. */
+const kindOf = (value: string): SessionKind => (isSessionKind(value) ? value : "browser");
+
+/** The person's live sessions, the most recently seen first. */
+export const listSessions = async (
   db: Db,
   userId: string,
-): Promise<readonly DeviceSession[]> => {
+  now: number,
+): Promise<readonly ListedSession[]> => {
+  const notExpired = gt(sessions.expiresAt, new Date(now));
   const rows = await db
     .select()
     .from(sessions)
-    .where(and(eq(sessions.userId, userId), isNotNull(sessions.scope)))
-    .orderBy(desc(sessions.createdAt));
+    .where(and(eq(sessions.userId, userId), notExpired))
+    .orderBy(desc(sessions.lastSeenAt));
   return rows.map((row) => ({
+    city: row.city,
+    country: row.country,
     createdAt: row.createdAt.getTime(),
     id: row.id,
+    ip: row.ip,
+    kind: kindOf(row.kind),
     lastSeenAt: row.lastSeenAt.getTime(),
     name: row.name,
+    usageDevice: usageDeviceOf({ ...row, sessionId: row.id }),
   }));
 };
 

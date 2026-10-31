@@ -11,6 +11,8 @@ export const enDevices = {
   "devices.lastActivity": "Last data {duration} ago",
   "devices.justNow": "Last data just now",
   "devices.nothingYet": "Nothing sent yet",
+  "devices.lastDataAt": "Last data {time}",
+  "devices.thisDevice": "This device",
   "devices.connected": "Connected {date}",
   "devices.disconnect": "Disconnect",
   "devices.disconnectConfirm": "Disconnect {name}? Its token stops working at once.",

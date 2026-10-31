@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
-import { useGrants } from "@pace/client/react";
+import { useSessions } from "@pace/client/react";
 
 import { GrantRow } from "./grant-row.tsx";
 
@@ -9,30 +10,37 @@ import { GrantRow } from "./grant-row.tsx";
 export const ConnectedApps = () => {
   const t = useT();
   const { api } = usePace();
-  const { hasRevokeFailed, phase, revoke } = useGrants(api);
+  const { revoke, sessions, status } = useSessions(api);
+  const [hasRevokeFailed, setHasRevokeFailed] = useState(false);
+  const grants = sessions.filter((session) => session.kind === "mcp");
   return (
     <View className="gap-3">
       <Text className="font-sans text-[13px] text-muted">{t("connectedApps.hint")}</Text>
-      {phase.kind === "loading" ? (
+      {status === "loading" ? (
         <Text className="font-sans text-[14px] text-muted">{t("connectedApps.loading")}</Text>
       ) : null}
-      {phase.kind === "failed" ? (
+      {status === "error" ? (
         <Text className="font-sans text-[14px] text-warn">{t("connectedApps.failed")}</Text>
       ) : null}
-      {phase.kind === "ready" && phase.grants.length === 0 ? (
+      {status === "ready" && grants.length === 0 ? (
         <Text className="font-sans text-[14px] text-muted">{t("connectedApps.empty")}</Text>
       ) : null}
-      {phase.kind === "ready"
-        ? phase.grants.map((grant) => (
-            <GrantRow
-              grant={grant}
-              key={grant.id}
-              onRevoke={() => {
-                void revoke(grant);
-              }}
-            />
-          ))
-        : null}
+      {grants.map((grant) => (
+        <GrantRow
+          grant={grant}
+          key={grant.id}
+          onRevoke={() => {
+            void (async () => {
+              try {
+                await revoke(grant.id);
+                setHasRevokeFailed(false);
+              } catch {
+                setHasRevokeFailed(true);
+              }
+            })();
+          }}
+        />
+      ))}
       {hasRevokeFailed ? (
         <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
           {t("connectedApps.revokeFailed")}

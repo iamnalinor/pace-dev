@@ -100,9 +100,9 @@ describe("usage and device tokens", () => {
     ]);
   });
 
-  it("gives a computer a token that can only upload its usage, until it is revoked", async () => {
+  it("gives a computer a token that can only upload its usage", async () => {
     const token = await loginAsDev("1002");
-    const device = await answerOf(endpoints.devices.create, "/api/devices", {
+    const device = await answerOf(endpoints.sessions.createAgent, "/api/sessions/agents", {
       body: { name: "Linux Mint" },
       token,
     });
@@ -118,29 +118,10 @@ describe("usage and device tokens", () => {
     expect(sent.status).toBe(200);
     expect((await call(`/api/usage?${RANGE}`, { token: device.token })).status).toBe(403);
     expect((await call("/api/sync/pull", { token: device.token })).status).toBe(403);
-    expect((await call("/api/devices", { token: device.token })).status).toBe(403);
-
-    // The phone signed in to the app sends under its own id: listed too, newest activity first.
-    await json("/api/usage/sessions", {
-      body: { ...upload("2026-10-06T10:45:00.000Z"), deviceName: "Pixel" },
-      token,
-    });
-    const { devices } = await answerOf(endpoints.devices.list, "/api/devices", { token });
-    expect(devices).toEqual([
-      expect.objectContaining({
-        kind: "phone",
-        lastActivityAt: "2026-10-06T10:45:00.000Z",
-        name: "Pixel",
-      }),
-      expect.objectContaining({
-        id: device.id,
-        kind: "computer",
-        lastActivityAt: "2026-10-06T09:30:00.000Z",
-        name: "Linux Mint",
-      }),
-    ]);
-    expect((await call(`/api/devices/${device.id}`, { method: "DELETE", token })).status).toBe(200);
-    expect((await call("/api/usage/sessions", { body, token: device.token })).status).toBe(401);
-    expect((await call(`/api/devices/${device.id}`, { method: "DELETE", token })).status).toBe(404);
+    expect((await call("/api/sessions", { token: device.token })).status).toBe(403);
+    const { sessions } = await answerOf(endpoints.usage.list, `/api/usage?${RANGE}`, { token });
+    expect(sessions).toContainEqual(
+      expect.objectContaining({ app: "firefox", deviceId: device.id, deviceName: "Linux Mint" }),
+    );
   });
 });

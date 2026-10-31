@@ -218,6 +218,12 @@ export {
   type ScreenTime,
 } from "./view-models/screen-time.ts";
 export {
+  LAST_DATA_EXACT_AFTER_HOURS,
+  type SessionRow,
+  sessionRows,
+  type SessionRowsContext,
+} from "./view-models/sessions.ts";
+export {
   type OverrideSheet,
   type PrimaryAction,
   type SubtaskRow,

@@ -77,24 +77,38 @@ describe("what the server answers", () => {
     expect(endpoints.calendar.list.output.parse(answer)).toEqual({ events: [calendarEvent] });
   });
 
-  it("reads a device of a kind a newer server added as a phone, keeping the list", () => {
-    const device = {
-      connectedAt: null,
-      id: "d-1",
-      lastActivityAt: null,
+  it("reads a session of a kind a newer server added as a browser, dropping an unreadable one", () => {
+    const entry = {
+      city: null,
+      country: null,
+      createdAt: 1_760_000_000_000,
+      current: false,
+      id: "s-1",
+      ip: null,
+      lastDataAt: null,
       lastSeenAt: null,
       name: "Watch",
     };
     const answer = {
-      devices: [
-        { ...device, kind: "watch" },
-        { ...device, kind: "computer" },
+      sessions: [
+        { ...entry, kind: "watch" },
+        { ...entry, id: "mcp:g-1", kind: "mcp", scopes: ["tasks:read"] },
+        { ...entry, createdAt: "yesterday", kind: "agent" },
       ],
     };
-    expect(endpoints.devices.list.output.parse(answer).devices.map((d) => d.kind)).toEqual([
-      "phone",
-      "computer",
+    const { sessions } = endpoints.sessions.list.output.parse(answer);
+    expect(sessions.map((item) => [item.id, item.kind, item.scopes])).toEqual([
+      ["s-1", "browser", undefined],
+      ["mcp:g-1", "mcp", ["tasks:read"]],
     ]);
+  });
+
+  it("serves the sessions under /api/sessions and has no device or grant lists any more", () => {
+    expect(endpoints.sessions.revoke.path).toBe("/api/sessions/:id");
+    expect(endpoints.sessions.createAgent.path).toBe("/api/sessions/agents");
+    const paths = endpointList.map((definition) => definition.path);
+    expect(paths.filter((path) => path.startsWith("/api/devices"))).toEqual([]);
+    expect(paths.filter((path) => path.startsWith("/api/oauth/grants"))).toEqual([]);
   });
 
   it("pulls events of a precision or source a newer server added, and drops an unreadable one", () => {

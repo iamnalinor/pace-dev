@@ -299,7 +299,7 @@ describe("sessions record their kind, a readable name and where they signed in f
 
   it("an agent made in Settings is an agent session with the typed name and only usage:write", async () => {
     const owner = await loginAsDev("1001");
-    const created = await json<{ id: string; token: string }>("/api/devices", {
+    const created = await json<{ id: string; token: string }>("/api/sessions/agents", {
       body: { name: "Work laptop" },
       token: owner,
     });

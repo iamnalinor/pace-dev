@@ -1,7 +1,6 @@
 import type { Hono } from "hono";
 
-import { authorizationErrorRedirect, type GrantSummary } from "@cloudflare/workers-oauth-provider";
-import { z } from "zod";
+import { authorizationErrorRedirect } from "@cloudflare/workers-oauth-provider";
 
 import {
   endpoints,
@@ -9,26 +8,18 @@ import {
   grantedScopes,
   type GrantScopesError,
   type OAuthClientInfo,
-  type OAuthGrant,
   ok,
   requestedScopes,
 } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
+import type { GrantMetadata } from "../shared/oauth-grants.ts";
 
-import { requireUser } from "../shared/current-user.ts";
 import { d1 } from "../shared/db/d1.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { oauthHelpers } from "../shared/oauth-helpers.ts";
 import { resolveTelegramIdentity } from "../shared/telegram-identity.ts";
 import { loadConsent, parseAuthorization } from "./consent.ts";
-
-/** What consent stores on the grant: shown in "Connected apps" without a client lookup. */
-const GrantMetadataSchema = z.object({
-  label: z.string().optional(),
-  logoUri: z.string().optional(),
-  telegramId: z.string().optional(),
-});
 
 const SCOPE_PROBLEMS: Readonly<Record<GrantScopesError, Problem>> = {
   "oauth/no-scopes": {
@@ -80,8 +71,13 @@ const complete: Handler<typeof endpoints.oauth.complete> = async ({ c, body }) =
     return identity;
   }
   const user = identity.value;
+  const metadata: GrantMetadata = {
+    label: details.clientName,
+    logoUri: details.logoUri,
+    telegramId: user.telegramId,
+  };
   const { redirectTo } = await oauthHelpers(c).completeAuthorization({
-    metadata: { label: details.clientName, logoUri: details.logoUri, telegramId: user.telegramId },
+    metadata,
     props: { telegramId: user.telegramId, userId: user.id },
     request,
     scope: [...scopes.value],
@@ -95,21 +91,6 @@ const deny: Handler<typeof endpoints.oauth.deny> = async ({ c, body }) => {
   return consent.ok
     ? ok({ redirectTo: authorizationErrorRedirect(consent.value.request, "access_denied") })
     : consent;
-};
-
-const toGrant = (summary: GrantSummary): OAuthGrant => {
-  const metadata = GrantMetadataSchema.safeParse(summary.metadata);
-  const stored = metadata.success ? metadata.data : {};
-  return {
-    id: summary.id,
-    clientId: summary.clientId,
-    clientName: stored.label ?? summary.clientId,
-    logoUri: stored.logoUri ?? null,
-    scopes: [...summary.scope],
-    createdAt: new Date(summary.createdAt * 1000).toISOString(),
-    expiresAt:
-      summary.expiresAt === undefined ? null : new Date(summary.expiresAt * 1000).toISOString(),
-  };
 };
 
 export const mountOAuthRoutes = (app: Hono<AppEnv>): Hono<AppEnv> => {
@@ -131,15 +112,5 @@ export const mountOAuthRoutes = (app: Hono<AppEnv>): Hono<AppEnv> => {
   mount(app, endpoints.oauth.clientInfo, clientInfo);
   mount(app, endpoints.oauth.complete, complete);
   mount(app, endpoints.oauth.deny, deny);
-
-  mount(app, endpoints.oauth.grants.list, async ({ c }) => {
-    const { items } = await oauthHelpers(c).listUserGrants(requireUser(c).id, { limit: 100 });
-    return ok({ grants: items.map((item) => toGrant(item)) });
-  });
-
-  mount(app, endpoints.oauth.grants.revoke, async ({ c, params }) => {
-    await oauthHelpers(c).revokeGrant(params.id, requireUser(c).id);
-    return ok({ ok: true as const });
-  });
   return app;
 };

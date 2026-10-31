@@ -6,7 +6,16 @@ import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { type Device, formatDuration, minutesBetween } from "@pace/core";
+import { formatDuration, minutesBetween } from "@pace/core";
+
+/** What sends usage, as the Devices screen lists it (Task 6 moves it into Settings). */
+export type ListedDevice = {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "computer" | "phone";
+  readonly connectedAt: null | number;
+  readonly lastActivityAt: null | string;
+};
 
 /** "Last data 5m ago", "Last data just now" or "Nothing sent yet". */
 const useActivityText = (lastActivityAt: null | string): string => {
@@ -26,7 +35,7 @@ export const DeviceRow = ({
   device,
   onDisconnect,
 }: {
-  readonly device: Device;
+  readonly device: ListedDevice;
   readonly onDisconnect: () => void;
 }) => {
   const t = useT();

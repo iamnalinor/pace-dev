@@ -13,6 +13,8 @@ export const ruDevices: { readonly [K in keyof typeof enDevices]: string } = {
   "devices.lastActivity": "Данные {duration} назад",
   "devices.justNow": "Данные только что",
   "devices.nothingYet": "Ещё ничего не прислал",
+  "devices.lastDataAt": "Данные {time}",
+  "devices.thisDevice": "Это устройство",
   "devices.connected": "Подключён {date}",
   "devices.disconnect": "Отключить",
   "devices.disconnectConfirm": "Отключить «{name}»? Его токен сразу перестанет работать.",

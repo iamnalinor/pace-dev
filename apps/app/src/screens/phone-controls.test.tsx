@@ -33,8 +33,8 @@ const onArtboard = (ui: ReactElement) => async () => {
 const devices = async () => {
   const runtime = await createTestRuntime({
     routes: {
-      "GET /api/devices": () => ({ devices: [] }),
-      "POST /api/devices": () => ({ id: "01NEW", name: "My computer", token: "tok" }),
+      "GET /api/sessions": () => ({ sessions: [] }),
+      "POST /api/sessions/agents": () => ({ id: "01NEW", name: "My computer", token: "tok" }),
     },
   });
   await runtime.auth.adoptToken("session-devices");

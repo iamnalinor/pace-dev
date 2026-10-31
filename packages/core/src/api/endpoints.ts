@@ -25,7 +25,6 @@ import {
   CalendarSyncSchema,
   DeviceCreatedSchema,
   DeviceCreateSchema,
-  DevicesOutputSchema,
   DoneSchema,
   RangeQuerySchema,
   StoredSchema,
@@ -40,11 +39,10 @@ import {
   OAuthClientInfoSchema,
   OAuthCompleteBodySchema,
   OAuthDenyBodySchema,
-  OAuthGrantRevokedSchema,
-  OAuthGrantsSchema,
   OAuthRedirectSchema,
 } from "./schemas/oauth.ts";
 import { LlmStatusSchema, ParseRequestSchema, ParseResponseSchema } from "./schemas/parse.ts";
+import { SessionsOutputSchema } from "./schemas/sessions.ts";
 import {
   SyncPullOutputSchema,
   SyncPullQuerySchema,
@@ -199,7 +197,7 @@ export const endpoints = {
       query: LinkPreviewQuerySchema,
     }),
   },
-  /** The MCP consent flow (web consent page ↔ Worker) and the "Connected apps" grants. */
+  /** The MCP consent flow (web consent page ↔ Worker); grants are listed with the sessions. */
   oauth: {
     /** What to show on the consent page for an authorization request (`authQuery` = its query string). */
     clientInfo: endpoint({
@@ -225,22 +223,6 @@ export const endpoints = {
       output: OAuthRedirectSchema,
       path: "/api/oauth/deny",
     }),
-    grants: {
-      list: endpoint({
-        auth: true,
-        method: "GET",
-        output: OAuthGrantsSchema,
-        path: "/api/oauth/grants",
-      }),
-      /** Revoking a grant invalidates its access and refresh tokens at once. */
-      revoke: endpoint({
-        auth: true,
-        method: "DELETE",
-        output: OAuthGrantRevokedSchema,
-        params: z.object({ id: z.string().min(1).max(128) }),
-        path: "/api/oauth/grants/:id",
-      }),
-    },
   },
   calendar: {
     /** A phone's calendar over a range, replacing what that phone sent for it before. */
@@ -295,28 +277,35 @@ export const endpoints = {
       query: RangeQuerySchema,
     }),
   },
-  devices: {
-    /** The computers connected with a token of their own. */
+  /**
+  Settings → Devices and sessions: every way into the account (browsers, the app, computers'
+  agents, MCP apps), each revocable.
+  */
+  sessions: {
     list: endpoint({
       auth: true,
       method: "GET",
-      output: DevicesOutputSchema,
-      path: "/api/devices",
+      output: SessionsOutputSchema,
+      path: "/api/sessions",
     }),
-    /** Connects a computer: a token that can only upload its usage, shown once. */
-    create: endpoint({
-      auth: true,
-      body: DeviceCreateSchema,
-      method: "POST",
-      output: DeviceCreatedSchema,
-      path: "/api/devices",
-    }),
+    /**
+    Ends a session (its token stops working at once) or, for an `mcp:` id, revokes the grant with
+    its tokens. The current session may end itself: that is logging out.
+    */
     revoke: endpoint({
       auth: true,
       method: "DELETE",
       output: DoneSchema,
-      params: z.object({ id: z.string().min(1).max(64) }),
-      path: "/api/devices/:id",
+      params: z.object({ id: z.string().min(1).max(128) }),
+      path: "/api/sessions/:id",
+    }),
+    /** Connects a computer: an agent token that can only upload its usage, shown once. */
+    createAgent: endpoint({
+      auth: true,
+      body: DeviceCreateSchema,
+      method: "POST",
+      output: DeviceCreatedSchema,
+      path: "/api/sessions/agents",
     }),
   },
 } as const;

@@ -80,19 +80,3 @@ export const OAuthDenyBodySchema = z.object({ authQuery: AuthQuerySchema });
 
 /** Where the browser goes next: back to the client with a code or an error. */
 export const OAuthRedirectSchema = z.object({ redirectTo: z.string().min(1) });
-
-export const OAuthGrantSchema = z.object({
-  id: z.string(),
-  clientId: z.string(),
-  clientName: z.string(),
-  logoUri: z.string().nullable(),
-  scopes: z.array(z.string()),
-  createdAt: z.iso.datetime(),
-  expiresAt: z.iso.datetime().nullable(),
-});
-
-export type OAuthGrant = z.output<typeof OAuthGrantSchema>;
-
-export const OAuthGrantsSchema = z.object({ grants: z.array(OAuthGrantSchema) });
-
-export const OAuthGrantRevokedSchema = z.object({ ok: z.literal(true) });

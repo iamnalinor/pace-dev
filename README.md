@@ -297,7 +297,7 @@ phone's calendar* is enabled for the current login. A new login starts with this
 turning it off deletes that login's cloud copy. The phone also sends the apps it had in front,
 names and times only. A computer
 runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
-*Settings → Devices → Add a computer* gives one install line per system (see
+*Settings → Devices and sessions → Add a computer* gives one install line per system (see
 [docs/desktop.md](docs/desktop.md)). Day and Week show where the
 time of each block went; MCP has `get_calendar`, `get_usage` and `get_week`.
 

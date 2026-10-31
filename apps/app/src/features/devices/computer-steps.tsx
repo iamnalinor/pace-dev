@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import type { NewDevice } from "@pace/client/react";
+import type { NewAgent } from "@pace/client/react";
 
 import { useT } from "#app/app-state.tsx";
 import { browserComputerOs } from "#app/platform/computer-os.ts";
@@ -43,7 +43,7 @@ export const ComputerSteps = ({
   device,
   onDone,
 }: {
-  readonly device: NewDevice;
+  readonly device: NewAgent;
   readonly onDone: () => void;
 }) => {
   const t = useT();

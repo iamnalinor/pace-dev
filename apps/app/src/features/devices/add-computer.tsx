@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 
-import type { NewDevice } from "@pace/client/react";
+import type { NewAgent } from "@pace/client/react";
 
 import { useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
@@ -18,20 +18,24 @@ export const AddComputer = ({
   create,
   onClose,
 }: {
-  readonly create: (name: string) => Promise<NewDevice | null>;
+  readonly create: (name: string) => Promise<NewAgent>;
   readonly onClose: () => void;
 }) => {
   const t = useT();
   const [name, setName] = useState(() => t("devices.defaultName"));
-  const [created, setCreated] = useState<NewDevice | null>(null);
+  const [created, setCreated] = useState<NewAgent | null>(null);
   const [hasFailed, setHasFailed] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const submit = async (): Promise<void> => {
     setIsBusy(true);
-    const device = await create(name.trim() === "" ? t("devices.defaultName") : name.trim());
-    setIsBusy(false);
-    setHasFailed(device === null);
-    setCreated(device);
+    try {
+      setCreated(await create(name.trim() === "" ? t("devices.defaultName") : name.trim()));
+      setHasFailed(false);
+    } catch {
+      setHasFailed(true);
+    } finally {
+      setIsBusy(false);
+    }
   };
   return (
     <Sheet closeLabel={t("common.close")} onClose={onClose} title={t("devices.add")} visible>
