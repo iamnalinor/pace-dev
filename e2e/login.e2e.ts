@@ -139,3 +139,25 @@ test("a signed-out deep link to a signed-in screen lands on the login screen", a
     await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
   }
 });
+
+test("a server older than the app holds a signed-in person at the versions screen, with only Log out", async ({
+  page,
+}) => {
+  // A server from before /api/instance answers it 404: older than this app supports.
+  await page.route("**/api/instance", async (route) => {
+    await route.fulfill({ json: { code: "not-found", message: "Not found" }, status: 404 });
+  });
+  await loginViaApi(page);
+  await page.goto("/settings");
+  await expect(
+    page.getByRole("heading", { name: "Server and app versions don't match" }),
+  ).toBeVisible();
+  await expect(page.getByText(/Update the server/u)).toBeVisible();
+  // Nothing of the app around it: no navigation, no Change server, one way out.
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await expect(page.getByText(/Change/u)).toHaveCount(0);
+  await expectNoA11yViolations(page);
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page).toHaveURL(/\/login$/u);
+  await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+});

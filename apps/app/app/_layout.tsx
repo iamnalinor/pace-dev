@@ -9,6 +9,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PaceProvider, useAuth } from "#app/app-state.tsx";
 import { isBarePath, RouteGate } from "#app/auth/route-gate.tsx";
+import { IncompatibleGate, useIsServerBlocked } from "#app/features/server/incompatible-screen.tsx";
 import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
@@ -25,12 +26,16 @@ import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 import { TooltipHost } from "#app/ui/tooltip.tsx";
 
-/** On a wide window the sidebar stays beside every signed-in screen, pushed ones included. */
+/**
+On a wide window the sidebar stays beside every signed-in screen, pushed ones included; not
+beside the versions screen, which leaves only Log out.
+*/
 const useHasSidebar = (): boolean => {
   const isWide = useIsWide();
   const path = usePathname();
   const { status } = useAuth();
-  return isWide && status === "signed-in" && !isBarePath(path);
+  const isBlocked = useIsServerBlocked();
+  return isWide && status === "signed-in" && !isBlocked && !isBarePath(path);
 };
 
 /** Keeps what a crash file says about the app current; apart, so syncs do not redraw the Stack. */
@@ -53,7 +58,13 @@ const Navigator = () => {
         {hasSidebar ? <Sidebar /> : null}
         <View className="flex-1">
           <Stack
-            layout={({ children }) => <RouteGate path={path}>{children}</RouteGate>}
+            // A signed-in app its server does not fit sees the versions screen instead of any
+            // route; the navigator stays mounted, so logging out lands on the login screen.
+            layout={({ children }) => (
+              <IncompatibleGate>
+                <RouteGate path={path}>{children}</RouteGate>
+              </IncompatibleGate>
+            )}
             screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
             screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
           >

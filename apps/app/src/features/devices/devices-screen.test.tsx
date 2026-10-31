@@ -1,8 +1,9 @@
-import { fireEvent, screen, within } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
-import { API_BASE_URL, WEB_ORIGIN } from "#app/platform/api-base.ts";
+import { serverStore } from "#app/platform/server-store.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { fakeInstance } from "@pace/client/testing";
 
 import { DevicesScreen } from "./devices-screen.tsx";
 
@@ -40,8 +41,16 @@ describe("Settings → Devices", () => {
   });
 
   it("adds a computer: install commands omit the separately displayed token", async () => {
+    // The commands name the current server's API and web app, as it reports them.
+    const serverApi = "https://pace-api.example.dev";
+    const serverWeb = "https://pace.example.dev";
     const runtime = await createTestRuntime({
       routes: {
+        "GET /api/instance": () => ({
+          ...fakeInstance,
+          apiOrigin: serverApi,
+          webOrigin: serverWeb,
+        }),
         "GET /api/devices": () => ({ devices: [] }),
         "POST /api/devices": ({ body }) => ({
           id: "01NEW",
@@ -51,6 +60,9 @@ describe("Settings → Devices", () => {
       },
     });
     await renderScreen(<DevicesScreen />, runtime);
+    await waitFor(() => {
+      expect(serverStore.getState().instance?.apiOrigin).toBe(serverApi);
+    });
     await fireEvent.press(await screen.findByRole("button", { name: "Add a computer" }));
     await fireEvent.changeText(screen.getByLabelText("Name"), "Work laptop");
     await fireEvent.press(screen.getByRole("button", { name: "Create the token" }));
@@ -61,10 +73,10 @@ describe("Settings → Devices", () => {
     expect(screen.getByText(/open PowerShell/u)).toBeOnTheScreen();
     const windowsLine = screen.getByText(/winget install -e --id Python\.Python\.3\.12/u);
     expect(windowsLine).toHaveTextContent(
-      `Invoke-WebRequest -UseBasicParsing ${WEB_ORIGIN}/pace_agent.py`,
+      `Invoke-WebRequest -UseBasicParsing ${serverWeb}/pace_agent.py`,
       { exact: false },
     );
-    expect(windowsLine).toHaveTextContent(`install --api ${API_BASE_URL} --name 'Work laptop'`, {
+    expect(windowsLine).toHaveTextContent(`install --api ${serverApi} --name 'Work laptop'`, {
       exact: false,
     });
     expect(windowsLine).not.toHaveTextContent("tok_secret");
@@ -83,7 +95,7 @@ describe("Settings → Devices", () => {
     expect(screen.getByText(/GNOME on Wayland/u)).toBeOnTheScreen();
     expect(
       screen.getByText(
-        `curl -fsSL ${WEB_ORIGIN}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${API_BASE_URL} --name 'Work laptop'`,
+        `curl -fsSL ${serverWeb}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${serverApi} --name 'Work laptop'`,
       ),
     ).toBeOnTheScreen();
     expect(screen.queryByText(/winget/u)).toBeNull();

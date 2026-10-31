@@ -4,7 +4,6 @@ import * as TaskManager from "expo-task-manager";
 import { type ApiClient, createApiClient } from "@pace/client";
 import { endpoints, isAnswer, NOTIFICATION_KINDS, type NotificationKind } from "@pace/core";
 
-import { API_BASE_URL } from "./api-base.ts";
 import { notificationIdOf } from "./notification-id.ts";
 import {
   answerFromButton,
@@ -14,19 +13,28 @@ import {
 } from "./notifications.ts";
 import { rememberPushDismissal, wasPushDismissed } from "./push-dismissed.ts";
 import { createSecureSessionStore } from "./secure-session.ts";
+import { readServer } from "./server.ts";
 import { isForSession } from "./session-fingerprint.ts";
 
 /** The task Android runs for a push (Firebase data message) and for an answer button tapped. */
 export const PUSH_TASK = "pace.push";
 
-/** The API as the signed-in phone, from the stored session (`null` when signed out). */
+/** The stored session's token, read for the stored server (another server's token reads as none). */
+const storedToken = async (): Promise<null | string> =>
+  await createSecureSessionStore(await readServer()).get();
+
+/**
+The API as the signed-in phone (`null` when signed out): the stored server and the token stored
+for it, read together, so a background answer never goes to a server the token is not for.
+*/
 const backgroundApi = async (): Promise<ApiClient | null> => {
-  const token = await createSecureSessionStore().get();
-  return token === null ? null : createApiClient({ baseUrl: API_BASE_URL, token: () => token });
+  const baseUrl = await readServer();
+  const token = await createSecureSessionStore(baseUrl).get();
+  return token === null ? null : createApiClient({ baseUrl, token: () => token });
 };
 
 const currentToken = async (api: ApiClient | null | undefined): Promise<null | string> =>
-  api === undefined ? await createSecureSessionStore().get() : (api?.currentSessionToken() ?? null);
+  api === undefined ? await storedToken() : (api?.currentSessionToken() ?? null);
 
 type Payload = {
   readonly actionIdentifier?: unknown;

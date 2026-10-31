@@ -275,6 +275,7 @@ export {
   reviewItems,
   type ReviewKind,
 } from "./review/to-sort.ts";
+export { normalizeServerUrl, type ServerUrlError } from "./server-url.ts";
 export * from "./time-tracking.ts";
 export {
   addDaysIn,

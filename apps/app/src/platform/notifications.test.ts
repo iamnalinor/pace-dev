@@ -592,6 +592,36 @@ describe("the push task", () => {
     });
   });
 
+  it("answers in the background on the stored server, only with the token stored for it", async () => {
+    const store = SecureStore as unknown as FakeSecureStore;
+    const server = "https://pace.example.dev";
+    store.values.set("pace.server", server);
+    store.values.set("pace.session", JSON.stringify({ origin: server, token: SESSION_TOKEN }));
+    const fetcher = createFakeFetch({
+      "POST /api/notifications/n-2/resolve": () => ({ notification: { ...login, id: "n-2" } }),
+    });
+    const sent = jest.spyOn(globalThis, "fetch").mockImplementation(fetcher.fetch as typeof fetch);
+    const tap = {
+      actionIdentifier: "attended",
+      notification: {
+        request: { content: { data: { notificationId: "n-2", sessionHash: SESSION_HASH } } },
+      },
+    };
+    await handlePushTask(tap);
+    const [url, init] = sent.mock.calls[0] ?? [];
+    expect(url).toBe(`${server}/api/notifications/n-2/resolve`);
+    expect(new Headers(init?.headers).get("Authorization")).toBe(`Bearer ${SESSION_TOKEN}`);
+    sent.mockClear();
+    // The same token stored for another server is no session here: nothing is sent anywhere.
+    store.values.set(
+      "pace.session",
+      JSON.stringify({ origin: "https://other.example.dev", token: SESSION_TOKEN }),
+    );
+    await handlePushTask(tap);
+    expect(sent).not.toHaveBeenCalled();
+    sent.mockRestore();
+  });
+
   it("keeps the notification, saying the answer did not go through, so it can be tapped again", async () => {
     await setupNotificationCategories("en");
     const { api } = apiWith({

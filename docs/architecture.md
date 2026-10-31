@@ -18,7 +18,7 @@ apps/api (Worker) ────────────────────�
 
 `apps/app` builds for Android (`expo run:android`, the release APK) and for the web
 (`bun run build`: `expo export --platform web`, then a Workbox service worker). The web
-build differs in three ways, all in `metro.config.js`:
+build differs in four ways, all through `metro.config.js`:
 
 - **Stand-ins** for phone-only modules (`expo-notifications`, `expo-calendar`,
   `expo-task-manager`, `expo-background-task`, `expo-secure-store`, `expo-share-intent`) live in
@@ -27,6 +27,11 @@ build differs in three ways, all in `metro.config.js`:
 - **`.web.tsx` siblings**: when `x.web.ts(x)` exists next to `x.ts(x)`, the web build uses it
   (the IndexedDB event store, the Telegram Login Widget, the OAuth consent page, the Excel
   export, the update banner). A `.web` file never imports its own base file.
+- **The server**: the phone talks to the server the person chose (`src/platform/server.ts`,
+  Change server on the login screen; the build's `EXPO_PUBLIC_API_URL` by default). The web
+  build always talks to its own deployment (`server.web.ts`): the API's CORS admits only its
+  `WEB_ORIGIN`. Whatever needs the server's API, web app or bot reads `useServerInfo()` (UI) or
+  `readServer()` (background), never the build constants in `api-base.ts`.
 - **Layout**: from 1024 px the tabs become a sidebar and Now shows the picked task beside the
   list (`src/ui/layout.ts`, `src/screens/now-screen.tsx`).
 
@@ -167,6 +172,14 @@ secrets with zod once per request and stores the result on the context.
   read it with `requireUser(c)`. The fuller session list and login notices belong to a
   later stage; this release does not expose them.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
+- **Which server**: the app stores its token with the origin of the server that issued it
+  (`pace.session` = `{ origin, token }`); a store for another server reads it as signed out, and
+  switching servers deletes it and the local log, so a token never reaches another server. On
+  start and on each sign-in and sign-out the app reads `GET /api/instance` (public) and checks the
+  protocols (`compatibility` in core). A server too old for the app (or one without the route), or
+  a `426 client/outdated` on any call, holds a signed-in app at "Server and app versions don't
+  match" with only Log out, and refuses a sign-in on the login screen. An unreachable server
+  blocks nothing. See [self-hosting.md](self-hosting.md).
 
 D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`,
 `push_subscriptions` (each session's one push method) and `broken_push_methods`. They are

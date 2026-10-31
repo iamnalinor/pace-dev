@@ -169,7 +169,16 @@ account may sign in.
   `ENVIRONMENT` is not `production`.
 
 Deployments for other people: edit `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME` and
-`WEB_ORIGIN` in `wrangler.jsonc`, create your own bot (below) and set its token as a secret.
+`WEB_ORIGIN` in `wrangler.jsonc`, create your own bot (below) and set its token as a secret
+([docs/self-hosting.md](docs/self-hosting.md) walks through it).
+
+## Run your own server
+
+Anyone can run Pace on their own Cloudflare account and use the released Android app with it,
+without building anything: deploy the Worker, then on the app's login screen press **Change**
+next to "Server: …" and enter your API's address. The app checks the server (`GET /api/instance`:
+name, version, bot, protocol) before it switches, and refuses a server whose version does not fit.
+Step by step, and what works without Google push: [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Deployment
 

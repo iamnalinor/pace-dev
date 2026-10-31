@@ -29,6 +29,7 @@ import {
 } from "./platform/notifications.ts";
 import { uploadPhoneData } from "./platform/phone-upload.ts";
 import { startPushTask } from "./platform/push-task.ts";
+import { checkServer, useServerOrigin } from "./platform/server-origin.ts";
 import { isForSession } from "./platform/session-fingerprint.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
@@ -186,6 +187,10 @@ const runSyncLoop = (
   let activeSession = runtime.api.currentSessionToken();
   const stopLanguageSync = followSyncedLanguage(runtime, onLanguageReady);
   const follow = (status: AuthState["status"]): void => {
+    // Whether the server fits this app: asked on start and on every sign-in and sign-out.
+    if (status !== "loading") {
+      checkServer(runtime);
+    }
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
       void bootstrap(runtime);
@@ -253,8 +258,8 @@ const runSyncLoop = (
 };
 
 /**
-Wires auth → API → app state → sync for the whole app. Renders a blank view until the
-platform adapters are ready (the splash screen is still up), then the children.
+Wires auth → API → app state → sync for the whole app, for the chosen server. Renders a blank
+view until the platform adapters are ready (the splash screen is still up), then the children.
 */
 export const PaceProvider = ({
   children,
@@ -265,14 +270,15 @@ export const PaceProvider = ({
 }) => {
   const [runtime, setRuntime] = useState<null | PaceRuntime>(provided ?? null);
   const [languageReadyToken, setLanguageReadyToken] = useState<null | string>(null);
+  const origin = useServerOrigin(provided === undefined);
 
   useEffect(() => {
-    if (provided !== undefined) {
+    if (provided !== undefined || origin === null) {
       return;
     }
     const lifetime = new AbortController();
     void (async () => {
-      const created = await createRuntime();
+      const created = await createRuntime({ baseUrl: origin });
       if (!lifetime.signal.aborted) {
         setRuntime(created);
       }
@@ -280,7 +286,7 @@ export const PaceProvider = ({
     return () => {
       lifetime.abort();
     };
-  }, [provided]);
+  }, [provided, origin]);
 
   useEffect(
     () => (runtime === null ? undefined : runSyncLoop(runtime, setLanguageReadyToken)),

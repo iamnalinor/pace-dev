@@ -4,8 +4,8 @@ import { Text, View } from "react-native";
 import type { NewDevice } from "@pace/client/react";
 
 import { useT } from "#app/app-state.tsx";
-import { API_BASE_URL, WEB_ORIGIN } from "#app/platform/api-base.ts";
 import { browserComputerOs } from "#app/platform/computer-os.ts";
+import { useServerInfo } from "#app/platform/server-store.ts";
 import { SHARE_LABEL_KEY, shareText } from "#app/platform/share-text.ts";
 import { Button } from "#app/ui/button.tsx";
 import { agentCommand, agentLogsCommand, type ComputerOs, LINUX_PACKAGES } from "@pace/client";
@@ -50,7 +50,8 @@ export const ComputerSteps = ({
   const [os, setOs] = useState<ComputerOs>(() => browserComputerOs() ?? "windows");
   const [isShared, setIsShared] = useState(false);
   const [isTokenShared, setIsTokenShared] = useState(false);
-  const command = agentCommand({ apiBase: API_BASE_URL, device, os, webOrigin: WEB_ORIGIN });
+  const { apiOrigin, webOrigin } = useServerInfo();
+  const command = agentCommand({ apiBase: apiOrigin, device, os, webOrigin });
   return (
     <View className="gap-3">
       <OsPicker
