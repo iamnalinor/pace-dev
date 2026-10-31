@@ -80,7 +80,7 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           maxLength={200}
           onChangeText={(next) => {
             onUse();
-            pending.cancel();
+            pending.discard();
             setText(next);
           }}
           onSubmitEditing={start}

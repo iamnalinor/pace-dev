@@ -132,7 +132,7 @@ the route exists).
 | `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
 | `bun run test` | the four above, in that order |
 | `bun test:mutation` | Stryker on core (slow; on demand in CI) |
-| `bun test:llm` | LLM parsing regression set (stage 2; the runner does not exist yet) |
+| `bun test:llm` | one real read through every configured LLM endpoint (`apps/api/scripts/llm-smoke.ts`), run after any change to a provider, its config or the schema; the full parsing regression runner does not exist yet |
 | `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |
 | `bun db:check` | fails when a schema changed without a migration (part of `bun lint`) |
 | `bun run build` | production build of the web app (`apps/app/dist`, with the service worker) |
@@ -196,7 +196,7 @@ the workflow do it.
 | `deploy.yml` | after a green CI on `main`, or manual | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
 | `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk`, sends the APK to the owner in Telegram when `TELEGRAM_RELEASE_CHAT_ID` is set |
 | `mutation.yml` | manual | Stryker on core and web |
-| `llm-regression.yml` | manual | `bun test:llm` with real providers (stage 2) |
+| `llm-regression.yml` | manual | `bun test:llm` against the `LLM_*_N` endpoints set in GitHub |
 
 Secrets and variables read by the workflows:
 

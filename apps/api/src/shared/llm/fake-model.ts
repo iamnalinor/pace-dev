@@ -49,6 +49,8 @@ type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" 
 export type FakeModelOptions = {
   /** How long the model "thinks" before its first token (or its error), in ms. */
   readonly firstTokenAfterMs?: number;
+  /** Sends the start of its answer, then the stream breaks (a provider dropping mid-answer). */
+  readonly breaksMidStream?: boolean;
 };
 
 /**
@@ -58,7 +60,7 @@ the answer as one text part after `firstTokenAfterMs`, and honours an abort whil
 */
 export const fakeParseModel = (
   reply: (text: string, system: string) => FakeReply,
-  { firstTokenAfterMs = 0 }: FakeModelOptions = {},
+  { breaksMidStream = false, firstTokenAfterMs = 0 }: FakeModelOptions = {},
 ): LanguageModel => {
   /** The scripted answer as JSON text, after the wait; a scripted failure is thrown. */
   const answerTo = async ({
@@ -90,6 +92,12 @@ export const fakeParseModel = (
           start: (controller) => {
             controller.enqueue({ type: "stream-start", warnings: [] });
             controller.enqueue({ id: "0", type: "text-start" });
+            if (breaksMidStream) {
+              controller.enqueue({ delta: text.slice(0, 10), id: "0", type: "text-delta" });
+              controller.enqueue({ error: new Error("connection reset"), type: "error" });
+              controller.close();
+              return;
+            }
             controller.enqueue({ delta: text, id: "0", type: "text-delta" });
             controller.enqueue({ id: "0", type: "text-end" });
             controller.enqueue({ finishReason: FINISH, type: "finish", usage: USAGE });

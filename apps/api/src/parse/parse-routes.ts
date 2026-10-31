@@ -18,6 +18,9 @@ import { availability, type ParseProvider } from "../shared/llm/llm.ts";
 import { readByRules, readMessage } from "../shared/llm/read.ts";
 import { mount } from "../shared/mount.ts";
 
+/** How long the app's read may take in all, however many providers are tried. */
+const APP_READ_DEADLINE_MS = 20_000;
+
 /**
 `POST /api/parse`: the user's state (categories, projects, open tasks, recent activities)
 frames the prompt; the answer comes back as actions checked against the text. Nothing is
@@ -68,6 +71,8 @@ export const mountParseRoutes = (
     const { state } = await store.read(now);
     const read = await readMessage(providersOf(c.get("config")), body.text, {
       cooldowns: await store.llmCooldowns(now),
+      // A person waits on a spinner: past this the rules answer instead.
+      deadlineMs: APP_READ_DEADLINE_MS,
       domain: body.domain,
       now,
       state,

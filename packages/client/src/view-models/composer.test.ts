@@ -37,7 +37,14 @@ describe("composerModel", () => {
   it("cannot be added as a series that the actions would refuse, and says why (QA 13 L7)", () => {
     // Now is Oct 6 15:00 in Moscow; a daily series due Oct 1 would start every repeat late.
     const past = { due: { at: "2026-10-01T20:59:00.000Z", tz: MOSCOW } };
+    // No start was chosen (it starts now): the deadline has passed, not "is before the start".
     expect(model("pay", { ...past, recurrence: { kind: "daily" } })).toMatchObject({
+      canAdd: false,
+      repeatProblem: "repeat/due-passed",
+    });
+    // A start chosen after the deadline: that start is named.
+    const start = { at: "2026-10-03T07:00:00.000Z", tz: MOSCOW };
+    expect(model("pay", { ...past, recurrence: { kind: "daily" }, start })).toMatchObject({
       canAdd: false,
       repeatProblem: "repeat/due-before-start",
     });

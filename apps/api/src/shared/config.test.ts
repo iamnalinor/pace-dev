@@ -83,28 +83,25 @@ describe("loadConfig", () => {
     expect(result.ok && result.value.llmEndpoints).toEqual([]);
   });
 
-  it("names the variable an incomplete or invalid LLM slot misses", () => {
-    expect(loadConfig({ ...base, LLM_API_KEY_1: "secret" })).toEqual({
-      error: "config: LLM_BASE_URL_1: LLM_BASE_URL_1, LLM_API_KEY_1 and LLM_MODEL_1 go together",
-      ok: false,
-    });
+  it("skips a broken LLM slot with the reason, keeping the others and the rest of the config", () => {
+    const good = { LLM_API_KEY_3: "k", LLM_BASE_URL_3: "https://ok.example/v1", LLM_MODEL_3: "m" };
+    const skipped = (env: object) => {
+      const result = loadConfig({ ...base, ...good, ...env });
+      expect(result.ok && result.value.llmEndpoints.map((endpoint) => endpoint.slot)).toEqual([3]);
+      return result.ok ? result.value.llmSkipped : [];
+    };
+    expect(skipped({ LLM_API_KEY_1: "secret" })).toEqual([
+      "LLM_BASE_URL_1: LLM_BASE_URL_1, LLM_API_KEY_1 and LLM_MODEL_1 go together",
+    ]);
+    expect(skipped({ LLM_BASE_URL_2: "https://models.example/v1", LLM_MODEL_2: "m" })).toEqual([
+      "LLM_API_KEY_2: LLM_BASE_URL_2, LLM_API_KEY_2 and LLM_MODEL_2 go together",
+    ]);
+    expect(skipped({ LLM_API_KEY_1: "k", LLM_BASE_URL_1: "not-a-url", LLM_MODEL_1: "m" })).toEqual([
+      "LLM_BASE_URL_1: must be an HTTP URL",
+    ]);
     expect(
-      loadConfig({ ...base, LLM_BASE_URL_2: "https://models.example/v1", LLM_MODEL_2: "m" }),
-    ).toEqual({
-      error: "config: LLM_API_KEY_2: LLM_BASE_URL_2, LLM_API_KEY_2 and LLM_MODEL_2 go together",
-      ok: false,
-    });
-    expect(
-      loadConfig({ ...base, LLM_API_KEY_1: "k", LLM_BASE_URL_1: "not-a-url", LLM_MODEL_1: "m" }),
-    ).toEqual({ error: "config: LLM_BASE_URL_1: must be an HTTP URL", ok: false });
-    expect(
-      loadConfig({
-        ...base,
-        LLM_API_KEY_1: " , ",
-        LLM_BASE_URL_1: "https://m.example",
-        LLM_MODEL_1: "m",
-      }).ok,
-    ).toBe(false);
+      skipped({ LLM_API_KEY_1: " , ", LLM_BASE_URL_1: "https://m.example", LLM_MODEL_1: "m" }),
+    ).toHaveLength(1);
   });
 
   it("rejects an invalid web origin and an unknown environment", () => {

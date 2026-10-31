@@ -3,7 +3,10 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { Config } from "../config.ts";
 import type { ParseProvider } from "./llm.ts";
 
+import { createLogger } from "../logger.ts";
 import { echoReply, fakeParseModel } from "./fake-model.ts";
+
+const log = createLogger("info");
 
 /** `luna`, then `luna#2` for the same model again (another key or endpoint): names stay apart. */
 const uniqueName = (seen: Map<string, number>, model: string): string => {
@@ -19,10 +22,14 @@ Structured outputs are on everywhere: without them an OpenAI-compatible endpoint
 JSON schema and the answer rarely fits it (the cause of "Assistant unavailable", bug class 40).
 */
 export const parseProviders = (
-  config: Pick<Config, "llmEndpoints" | "llmProvider">,
+  config: Partial<Pick<Config, "llmSkipped">> & Pick<Config, "llmEndpoints" | "llmProvider">,
 ): readonly ParseProvider[] => {
   if (config.llmProvider === "fake") {
     return [{ model: fakeParseModel(echoReply), name: "fake" }];
+  }
+  const skipped = config.llmSkipped ?? [];
+  for (const reason of skipped) {
+    log.warn("llm: slot skipped", { why: reason });
   }
   const seen = new Map<string, number>();
   return config.llmEndpoints.flatMap((endpoint) =>

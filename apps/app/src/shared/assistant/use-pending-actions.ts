@@ -231,8 +231,11 @@ export const usePendingActions = (
     }
     setBusy(false);
   };
-  const drop = (resolution: "cancelled" | "inbox"): void => {
-    tellLog(assistant, pending, { resolution });
+  /** The preview goes; the log hears the outcome when the person chose one (not on an edit). */
+  const drop = (resolution: "cancelled" | "inbox" | null): void => {
+    if (resolution !== null) {
+      tellLog(assistant, pending, { resolution });
+    }
     requestRef.current += 1;
     firstRead.clear();
     setPending(null);
@@ -255,9 +258,16 @@ export const usePendingActions = (
     keptInInbox: (): void => {
       drop("inbox");
     },
-    /** Dismissed (Cancel, Escape, or the line changed under it): the log is told once. */
+    /** Dismissed by the person (Cancel, Escape): the log is told once, and that answer stands. */
     cancel: (): void => {
       drop("cancelled");
+    },
+    /**
+    The line changed under the preview, or went to the manual form: the preview goes without an
+    answer to the log, which would otherwise record "dismissed" for good over a one-letter edit.
+    */
+    discard: (): void => {
+      drop(null);
     },
     approve: useApprove({ busy, onApplied, pending, setBusy, setPending }),
   };

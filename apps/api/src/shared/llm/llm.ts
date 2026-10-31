@@ -20,6 +20,8 @@ import { createLogger } from "../logger.ts";
 import { hedgedRace, type Lost, type Won } from "./race.ts";
 import { clampToJsonSchema, lenientJsonSchema } from "./schema-fit.ts";
 
+const log = createLogger("info");
+
 /** One model the parser may use, tried in order. */
 export type ParseProvider = {
   readonly name: string;
@@ -123,7 +125,11 @@ const modelSchema = <T>(schema: z.ZodType<T>): Schema<T> => {
   const strict = zodSchema(schema).jsonSchema;
   return jsonSchema<T>(async () => lenientJsonSchema(await strict) as JSONSchema7, {
     validate: async (value) => {
-      const parsed = schema.safeParse(clampToJsonSchema(value, await strict));
+      const clamped = clampToJsonSchema(value, await strict);
+      if (JSON.stringify(clamped) !== JSON.stringify(value)) {
+        log.info("llm: answer cut to the schema's limits");
+      }
+      const parsed = schema.safeParse(clamped);
       return parsed.success
         ? { success: true, value: parsed.data }
         : { error: parsed.error, success: false };
@@ -199,8 +205,6 @@ const askOne = async <T>(args: AskArgs<T>): Promise<Result<T, Failure>> => {
     return err(failureFrom(error, now));
   }
 };
-
-const log = createLogger("info");
 
 /** What a read ran into: the providers it may ask, the limits met, the soonest one back. */
 class ReadOutcome {

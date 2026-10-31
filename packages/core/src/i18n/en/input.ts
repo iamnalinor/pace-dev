@@ -114,6 +114,8 @@ export const enInput = {
   "form.repeat.endDate": "Last repeat date",
   "form.repeat.untilBeforeStart": "The last repeat date is before the task starts.",
   "form.repeat.dueBeforeStart": "The deadline is before the start: every repeat would begin late.",
+  "form.repeat.duePassed":
+    "The deadline has already passed: a repeat cannot start late. Pick a later deadline.",
   "form.newTask": "New task",
   "form.addTo": "Add to",
   "form.ownTask": "A task of its own",

@@ -116,6 +116,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "form.repeat.endDate": "Дата последнего повтора",
   "form.repeat.untilBeforeStart": "Дата последнего повтора раньше начала задачи.",
   "form.repeat.dueBeforeStart": "Срок раньше начала: каждый повтор начинался бы с опозданием.",
+  "form.repeat.duePassed":
+    "Срок уже прошёл: повтор не может начаться с опозданием. Выберите срок позже.",
   "form.newTask": "Новая задача",
   "form.addTo": "Добавить в",
   "form.ownTask": "Отдельная задача",

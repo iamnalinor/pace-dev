@@ -185,6 +185,18 @@ describe("runParse hedging", () => {
     expect(Date.now() - started).toBeLessThan(1000);
   });
 
+  it("asks the next provider when one breaks off after its first token", async () => {
+    const result = await runParse(
+      [
+        { model: fakeParseModel(echoParse, { breaksMidStream: true }), name: "first" },
+        { model: slow(0), name: "second" },
+      ],
+      prompt,
+      { hedgeAfterMs: 60_000 },
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "second" } });
+  });
+
   it("keeps hedging down the list until one answers", async () => {
     const result = await runParse(
       [

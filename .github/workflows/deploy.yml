@@ -98,7 +98,8 @@ jobs:
       # The LLM endpoints, in priority order: LLM_BASE_URL_N, LLM_API_KEY_N and LLM_MODEL_N for
       # any N, each a GitHub secret or variable (keys belong in secrets). A slot may list several
       # models and keys, comma separated; slot 1 is asked first. This step only runs jq over all
-      # secrets and keeps the LLM_*_N ones in a file, so no other tool sees the rest.
+      # secrets and keeps the LLM_*_N ones in a file, so no other tool sees the rest. Keep it so:
+      # nothing but jq may run in this step.
       - name: Collect LLM endpoints
         env:
           GITHUB_SECRETS: ${{ toJSON(secrets) }}
@@ -115,7 +116,8 @@ jobs:
       # Every LLM_*_N found is pushed to the Worker; numbered slots GitHub no longer has and the
       # names the Worker no longer reads (unnumbered LLM_*, GROQ_API_KEY, GEMINI_API_KEY) are
       # removed. With none in GitHub nothing is touched (endpoints set with `wrangler secret put`
-      # stay), and a Worker left without any slot gets a warning: its assistant reads by rules.
+      # stay). A Worker holding only the old names fails the deploy: it would silently lose its
+      # assistant. A Worker with no LLM at all (a fork) gets a warning: it reads by rules.
       - name: Secrets LLM endpoints
         working-directory: apps/api
         run: |
@@ -130,17 +132,26 @@ jobs:
             echo "::error::Set LLM_BASE_URL_N, LLM_API_KEY_N and LLM_MODEL_N together (slot ${INCOMPLETE//$'\n'/, })"
             exit 1
           fi
+          # A base URL without its scheme would be skipped by the Worker: say so here instead.
+          BAD_URL="$(jq -r 'to_entries[] | select((.key | startswith("LLM_BASE_URL_")) and (.value | test("^https?://") | not)) | .key' <<<"$WANTED")"
+          if [ -n "$BAD_URL" ]; then
+            echo "::error::${BAD_URL//$'\n'/, } must start with https:// (or http://)"
+            exit 1
+          fi
           CURRENT="$(bunx wrangler secret list --format json | jq '[.[].name]')"
+          LEGACY='["LLM_API_KEY","LLM_BASE_URL","LLM_MODEL","GROQ_API_KEY","GEMINI_API_KEY"]'
           if [ "$(jq 'length' <<<"$WANTED")" -eq 0 ]; then
-            if [ "$(jq --arg re "$SLOT" '[.[] | select(test($re))] | length' <<<"$CURRENT")" -eq 0 ]; then
-              echo "::warning::No LLM_*_N in GitHub or on the Worker: the assistant reads by rules only"
-            else
+            if [ "$(jq --arg re "$SLOT" '[.[] | select(test($re))] | length' <<<"$CURRENT")" -gt 0 ]; then
               echo "No LLM_*_N in GitHub: the Worker keeps the LLM endpoints it has"
+            elif [ "$(jq --argjson legacy "$LEGACY" '[.[] | . as $n | select($legacy | index($n))] | length' <<<"$CURRENT")" -gt 0 ]; then
+              echo "::error::The Worker has only the old LLM secrets, which it no longer reads. Set LLM_BASE_URL_N, LLM_API_KEY_N and LLM_MODEL_N (README, LLM providers) and deploy again."
+              exit 1
+            else
+              echo "::warning::No LLM_*_N in GitHub or on the Worker: the assistant reads by rules only"
             fi
             exit 0
           fi
           echo "LLM slots from GitHub: $(jq -r '[keys[] | capture("_(?<n>[0-9]+)$").n | tonumber] | unique | map(tostring) | join(", ")' <<<"$WANTED")"
-          LEGACY='["LLM_API_KEY","LLM_BASE_URL","LLM_MODEL","GROQ_API_KEY","GEMINI_API_KEY"]'
           DROP="$(jq --arg re "$SLOT" --argjson w "$WANTED" --argjson legacy "$LEGACY" \
             '[.[] | . as $n | select((test($re) and ($w | has($n) | not)) or ($legacy | index($n)))]' <<<"$CURRENT")"
           jq -n --argjson w "$WANTED" --argjson drop "$DROP" '$w + ($drop | map({(.): null}) | add // {})' \

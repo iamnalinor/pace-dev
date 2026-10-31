@@ -155,6 +155,7 @@ describe("createTask", () => {
     expect(
       repeatChangeProblem(world.state.store.getState(), {
         due: { at: form.dueAt },
+        now: { at: form.startAt, tz: "UTC" },
         schedule: { kind: "daily" },
         start: { at: form.startAt, tz: "UTC" },
         taskId: null,

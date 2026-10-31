@@ -149,6 +149,7 @@ const RepeatEndPicker = ({
 
 const PROBLEM_TEXT = {
   "repeat/due-before-start": "form.repeat.dueBeforeStart",
+  "repeat/due-passed": "form.repeat.duePassed",
   "repeat/until-before-start": "form.repeat.untilBeforeStart",
 } as const;
 

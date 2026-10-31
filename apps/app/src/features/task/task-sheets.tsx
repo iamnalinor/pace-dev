@@ -126,8 +126,9 @@ const repeatProblemOf = (
     ? null
     : repeatChangeProblem(state, {
         due: values.due,
+        now: fallback,
         schedule: values.recurrence,
-        start: values.start ?? fallback,
+        start: values.start,
         taskId,
       });
 };

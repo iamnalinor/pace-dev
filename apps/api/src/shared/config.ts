@@ -121,19 +121,25 @@ const llmEndpointOf = (
 
 /**
 The numbered LLM slots: `LLM_BASE_URL_N`, `LLM_API_KEY_N` and `LLM_MODEL_N` set together, any N,
-lowest first. A slot may list several models and keys (comma or newline separated).
+lowest first. A slot may list several models and keys (comma or newline separated). A broken
+slot is skipped with a reason, never failing the config: the assistant is optional, and a typo
+in one slot must not take the whole API down.
 */
-const llmEndpointsOf = (env: object): Result<readonly LlmEndpoint[], readonly [string, string]> => {
+const llmEndpointsOf = (
+  env: object,
+): { readonly endpoints: readonly LlmEndpoint[]; readonly skipped: readonly string[] } => {
   const endpoints: LlmEndpoint[] = [];
+  const skipped: string[] = [];
   const slots = [...llmSlotsOf(env)].toSorted(([a], [b]) => a - b);
   for (const [slot, parts] of slots) {
     const endpoint = llmEndpointOf(slot, parts);
-    if (!endpoint.ok) {
-      return endpoint;
+    if (endpoint.ok) {
+      endpoints.push(endpoint.value);
+    } else {
+      skipped.push(`${endpoint.error[0]}: ${endpoint.error[1]}`);
     }
-    endpoints.push(endpoint.value);
   }
-  return ok(endpoints);
+  return { endpoints, skipped };
 };
 
 export type Config = {
@@ -149,11 +155,16 @@ export type Config = {
   readonly botInfo: undefined | UserFromGetMe;
   /** The LLM endpoints in priority order; empty = no model, the rules read messages. */
   readonly llmEndpoints: readonly LlmEndpoint[];
+  /** Why each broken LLM slot was left out (`LLM_BASE_URL_2: must be an HTTP URL`). */
+  readonly llmSkipped: readonly string[];
   /** `fake` answers from inside the Worker (tests, e2e); `auto` uses the providers with a key. */
   readonly llmProvider: "auto" | "fake";
 };
 
-/** Reads and validates the Worker's vars and secrets; a failure names the offending variable. */
+/**
+Reads and validates the Worker's vars and secrets; a failure names the offending variable. A
+broken LLM slot is left out and named in `llmSkipped` instead.
+*/
 export const loadConfig = (env: object): Result<Config, string> => {
   const parsed = EnvSchema.safeParse(env);
   if (!parsed.success) {
@@ -162,9 +173,6 @@ export const loadConfig = (env: object): Result<Config, string> => {
   }
   const value = parsed.data;
   const llm = llmEndpointsOf(env);
-  if (!llm.ok) {
-    return err(`config: ${llm.error[0]}: ${llm.error[1]}`);
-  }
   return ok({
     environment: value.ENVIRONMENT,
     allowedTelegramIds: value.ALLOWED_TELEGRAM_IDS,
@@ -175,7 +183,8 @@ export const loadConfig = (env: object): Result<Config, string> => {
     telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
     telegramApiRoot: value.TELEGRAM_API_ROOT,
     botInfo: value.BOT_INFO,
-    llmEndpoints: llm.value,
+    llmEndpoints: llm.endpoints,
+    llmSkipped: llm.skipped,
     llmProvider: value.LLM_PROVIDER,
   });
 };

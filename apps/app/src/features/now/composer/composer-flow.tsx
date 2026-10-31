@@ -232,12 +232,12 @@ const useFlowState = ({
     enter: enterOf(pending, text, () => {
       setForm("by-hand");
     }),
-    /** New task opens the manual form and dismisses any assistant preview. */
+    /** New task opens the manual form; the assistant's preview goes (the person may still add it). */
     expand: (): void => {
       if (form !== null) {
         return;
       }
-      pending.cancel();
+      pending.discard();
       if (ai.state.status === "read") {
         onText(text);
       }
@@ -260,7 +260,7 @@ const useFlowState = ({
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.
       const isPaste = isPasted(text, next) && canAiRead(next);
-      pending.cancel();
+      pending.discard();
       onText(next);
       if (isPaste) {
         pending.submit(next);

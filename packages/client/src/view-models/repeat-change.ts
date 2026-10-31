@@ -8,8 +8,12 @@ import {
   taskById,
 } from "@pace/core";
 
-/** Why a repeat choice is refused: a series that cannot start so, or no such task. */
-export type RepeatChangeProblem = "repeat/task-unknown" | SeriesStartProblem;
+/**
+Why a repeat choice is refused: a series that cannot start so, or no such task.
+`repeat/due-passed` is `repeat/due-before-start` for a task whose start nobody chose (it starts
+now): the person is told the deadline has passed, not about a start they never set.
+*/
+export type RepeatChangeProblem = "repeat/due-passed" | "repeat/task-unknown" | SeriesStartProblem;
 
 /**
 Whether a repeat choice would go through, decided before anything is written (bug class 32) by
@@ -22,7 +26,9 @@ export const repeatChangeProblem = (
   input: {
     readonly taskId: null | string;
     readonly schedule: null | SeriesSchedule;
-    readonly start: { readonly at: string; readonly tz: string };
+    /** The start chosen, or `null`: the series then starts `now`. */
+    readonly start: null | { readonly at: string; readonly tz: string };
+    readonly now: { readonly at: string; readonly tz: string };
     readonly due: null | { readonly at: string };
   },
 ): null | RepeatChangeProblem => {
@@ -35,7 +41,13 @@ export const repeatChangeProblem = (
   }
   const series = task === null ? undefined : activeSeriesOf(state.series, task.seriesId);
   if (series === undefined) {
-    return seriesStartProblem(input.schedule, { due: input.due, start: input.start });
+    const problem = seriesStartProblem(input.schedule, {
+      due: input.due,
+      start: input.start ?? input.now,
+    });
+    return problem === "repeat/due-before-start" && input.start === null
+      ? "repeat/due-passed"
+      : problem;
   }
   const start = { at: series.template.startAt, tz: series.template.startTz };
   return isUntilBeforeStart(input.schedule, start) ? "repeat/until-before-start" : null;

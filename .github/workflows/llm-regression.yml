@@ -1,7 +1,8 @@
 name: LLM regression
 
-# Runs the natural-language parsing regression suite against the configured LLM endpoints
-# and publishes the refreshed docs/llm.md. On demand: it costs API calls and minutes.
+# Runs one real read through every configured LLM endpoint (apps/api/scripts/llm-smoke.ts) until
+# the full parsing regression runner exists, which will publish a refreshed docs/llm.md.
+# On demand: it costs API calls and minutes.
 on:
   # On demand only: a weekly schedule cost more minutes than the private repo can spare.
   workflow_dispatch:

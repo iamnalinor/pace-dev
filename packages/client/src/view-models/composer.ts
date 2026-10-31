@@ -267,8 +267,9 @@ const composerRepeatProblem = (
     ? null
     : repeatChangeProblem(state, {
         due: input.due,
+        now: { at: input.ctx.now, tz: input.ctx.deviceTz },
         schedule: input.recurrence,
-        start: input.start ?? { at: input.ctx.now, tz: input.ctx.deviceTz },
+        start: input.start,
         taskId: null,
       });
 

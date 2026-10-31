@@ -428,6 +428,14 @@ describe("Composer", () => {
       ],
     });
 
+    // An edit of the line drops the preview without telling the log anything.
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    await fireEvent.changeText(line(), "срочно почта.");
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
+    expect(resolved).toHaveLength(1);
+
     // A second reading, dismissed: Cancel says so, once.
     await fireEvent.changeText(line(), "срочно почта");
     await enter();
@@ -436,7 +444,7 @@ describe("Composer", () => {
     await waitFor(() => {
       expect(resolved).toHaveLength(2);
     });
-    expect(resolved[1]).toEqual({ decisions: [{ id: "d3", resolution: "cancelled" }] });
+    expect(resolved[1]).toEqual({ decisions: [{ id: "d4", resolution: "cancelled" }] });
 
     // A third, kept in the Inbox instead: the preview goes, and the log hears it.
     await enter();
@@ -445,7 +453,7 @@ describe("Composer", () => {
     await waitFor(() => {
       expect(resolved).toHaveLength(3);
     });
-    expect(resolved[2]).toEqual({ decisions: [{ id: "d4", resolution: "inbox" }] });
+    expect(resolved[2]).toEqual({ decisions: [{ id: "d5", resolution: "inbox" }] });
     expect(screen.queryByText("New task: разобрать почту")).toBeNull();
   });
 
