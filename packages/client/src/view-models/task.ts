@@ -170,7 +170,7 @@ const overrideSheet = (state: CoreState, view: TaskView): OverrideSheet => {
   };
 };
 
-const stats = (state: CoreState, view: TaskView): TaskViewModel["stats"] => ({
+const stats = (state: CoreState, view: TaskView, ctx: QueryContext): TaskViewModel["stats"] => ({
   dueAt: view.task.dueAt,
   dueTz: view.task.dueTz,
   dueZoneDiffers: view.dueZoneDiffers,
@@ -181,7 +181,7 @@ const stats = (state: CoreState, view: TaskView): TaskViewModel["stats"] => ({
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
   deadlinePolicy: view.preset.deadlinePolicy,
   finalDue: finalDeadlineOf(view.task, view.preset),
-  repeat: taskRepeatRule(state, view.task),
+  repeat: taskRepeatRule(state, view.task, ctx),
 });
 
 const subtaskRows = (task: Task): readonly SubtaskRow[] =>
@@ -231,7 +231,7 @@ export const taskViewModel = (
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
       tags: tags(view, taskOutcome(task, preset)),
-      stats: stats(state, view),
+      stats: stats(state, view, ctx),
       progress: {
         mode: preset.progressMode,
         value: progressOf(task, preset.progressMode),

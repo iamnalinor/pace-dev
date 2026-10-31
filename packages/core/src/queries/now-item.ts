@@ -66,7 +66,7 @@ export const nowItem = (
     dueTz: task.dueTz,
     lateMinutes,
     isLate: lateMinutes !== null,
-    repeat: taskRepeatRule(state, task),
+    repeat: taskRepeatRule(state, task, ctx),
   });
 };
 
