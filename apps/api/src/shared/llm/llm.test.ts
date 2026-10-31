@@ -4,9 +4,11 @@ import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from
 import { artboardState, at, ctx } from "@pace/core/testing";
 
 import { echoParse, fakeParseModel } from "./fake-model.ts";
-import { availability, lenientJsonSchema, runParse } from "./llm.ts";
+import { availability, runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
 import { parseProviders } from "./providers.ts";
+import { hedgedRace } from "./race.ts";
+import { clampToJsonSchema, lenientJsonSchema } from "./schema-fit.ts";
 
 const NOW = Date.parse("2026-10-06T12:00:00.000Z");
 
@@ -277,6 +279,49 @@ describe("runParse limits", () => {
     expect(result).toMatchObject({ error: { code: "llm/unavailable" }, ok: false });
   });
 
+  it("ends the whole read at its deadline, however many providers are still thinking", async () => {
+    const started = Date.now();
+    const result = await runParse(
+      [
+        { model: slow(5000), name: "first" },
+        { model: slow(5000), name: "second" },
+      ],
+      prompt,
+      { deadlineMs: 80, hedgeAfterMs: 20 },
+    );
+    expect(result).toMatchObject({ error: { code: "llm/unavailable" }, ok: false });
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("does not call a text hopeless while a resting provider could still read it", async () => {
+    const result = await runParse(
+      [
+        { model: garbage(), name: "first" },
+        { model: slow(0), name: "resting" },
+      ],
+      prompt,
+      { cooldowns: { resting: "2026-10-06T12:05:00.000Z" }, now: () => NOW },
+    );
+    expect(result).toMatchObject({
+      error: { code: "llm/unavailable", retryAt: "2026-10-06T12:05:00.000Z" },
+      ok: false,
+    });
+  });
+
+  it("keeps an answer whose lists run past their limits, cut to them", async () => {
+    const chatty = fakeParseModel(() => ({
+      ...echoParse("x"),
+      questions: [
+        { field: "dueDate", options: ["a", "b", "c", "d", "e", "f", "g", ""], question: "When?" },
+      ],
+    }));
+    const result = await runParse([{ model: chatty, name: "chatty" }], prompt);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { result: { questions: [{ options: ["a", "b", "c", "d", "e", "f"] }] } },
+    });
+  });
+
   it("shows the model the schema without length limits, which some endpoints refuse", () => {
     expect(
       lenientJsonSchema({
@@ -290,6 +335,55 @@ describe("runParse limits", () => {
       properties: { maxLength: { type: "string" }, tags: { items: { type: "string" } } },
       type: "object",
     });
+  });
+});
+
+describe("clampToJsonSchema", () => {
+  it("cuts strings and lists to their limits and drops items shorter than allowed", () => {
+    const schema = {
+      properties: {
+        items: {
+          items: {
+            properties: { label: { minLength: 1, type: "string" } },
+            type: "object",
+          },
+          maxItems: 2,
+          type: "array",
+        },
+        note: { anyOf: [{ maxLength: 3, type: "string" }, { type: "null" }] },
+      },
+      type: "object",
+    };
+    expect(
+      clampToJsonSchema(
+        {
+          extra: 1,
+          items: [{ label: "" }, { label: "a" }, { label: "b" }, { label: "c" }],
+          note: "long",
+        },
+        schema,
+      ),
+    ).toEqual({ extra: 1, items: [{ label: "a" }, { label: "b" }], note: "lon" });
+    expect(clampToJsonSchema({ note: null }, schema)).toEqual({ note: null });
+  });
+});
+
+describe("hedgedRace", () => {
+  it("counts an attempt that throws as failed instead of hanging", async () => {
+    const result = await hedgedRace(
+      [
+        async () => {
+          await Promise.resolve();
+          throw new Error("boom");
+        },
+        async () => {
+          await Promise.resolve();
+          return { ok: true as const, value: "second" };
+        },
+      ],
+      { giveUpAfterMs: 1000, hedgeAfterMs: 1000, onFailure: () => undefined },
+    );
+    expect(result).toEqual({ ok: true, value: { index: 1, value: "second" } });
   });
 });
 

@@ -27,7 +27,7 @@ jobs:
           GITHUB_VARS: ${{ toJSON(vars) }}
         run: |
           jq -nr --argjson s "$GITHUB_SECRETS" --argjson v "$GITHUB_VARS" \
-            '($v + $s) | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[0-9]+$"))
+            '($v + $s) | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_(0|[1-9][0-9]*)$"))
              | "\(.key)=\(.value | gsub("[\\r\\n]+"; ","))"' > "$RUNNER_TEMP/llm.env"
           # A key list joined from several lines is a new string: mask it like the secret.
           while IFS='=' read -r _ value; do echo "::add-mask::$value"; done < "$RUNNER_TEMP/llm.env"

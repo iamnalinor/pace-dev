@@ -73,7 +73,8 @@ export type LlmEndpoint = {
   readonly models: readonly string[];
 };
 
-const LLM_VAR = /^LLM_(API_KEY|BASE_URL|MODEL)_(\d+)$/u;
+// `_1`, `_2`, …: a leading zero (`_01`) is not a slot number, so it cannot merge with `_1`.
+const LLM_VAR = /^LLM_(API_KEY|BASE_URL|MODEL)_(0|[1-9]\d*)$/u;
 const LLM_PARTS = ["BASE_URL", "API_KEY", "MODEL"] as const;
 
 const isHttpUrl = (text: string): boolean =>
@@ -86,7 +87,8 @@ const llmSlotsOf = (env: object): ReadonlyMap<number, SlotParts> => {
   const slots = new Map<number, SlotParts>();
   for (const [name, value] of Object.entries(env)) {
     const match = LLM_VAR.exec(name);
-    if (match === null || typeof value !== "string") {
+    // An empty value counts as unset (`LLM_BASE_URL_1=` in a .dev.vars).
+    if (match === null || typeof value !== "string" || value.trim() === "") {
       continue;
     }
     const slot = Number(match[2]);

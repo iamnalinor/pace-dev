@@ -60,6 +60,19 @@ describe("loadConfig", () => {
     expect(unset.ok && unset.value.llmEndpoints).toEqual([]);
   });
 
+  it("treats empty values as unset and a leading zero as no slot", () => {
+    const result = loadConfig({
+      ...base,
+      LLM_API_KEY_01: "k",
+      LLM_API_KEY_1: "",
+      LLM_BASE_URL_01: "https://models.example/v1",
+      LLM_BASE_URL_1: " ",
+      LLM_MODEL_01: "luna",
+      LLM_MODEL_1: "",
+    });
+    expect(result.ok && result.value.llmEndpoints).toEqual([]);
+  });
+
   it("ignores the old unnumbered LLM_* names", () => {
     const result = loadConfig({
       ...base,

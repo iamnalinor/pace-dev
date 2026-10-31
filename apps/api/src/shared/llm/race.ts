@@ -12,7 +12,12 @@ export type RaceOptions<F> = {
   /** One attempt is cancelled after this long in all. */
   readonly giveUpAfterMs: number;
   readonly onFailure: (index: number, failure: F) => void;
+  /** The whole race ends lost after this long (a webhook must answer in time); none by default. */
+  readonly deadlineMs?: number;
 };
+
+/** Why a race was lost: every attempt failed, or the deadline came first. */
+export type Lost = "deadline" | "failed";
 
 /** The winner: its position in the list and its answer. */
 export type Won<T> = { readonly index: number; readonly value: T };
@@ -29,19 +34,28 @@ class HedgedRace<T, F> {
 
   private readonly attempts: readonly Attempt<T, F>[];
   private readonly options: RaceOptions<F>;
-  private readonly resolve: (result: Result<Won<T>, null>) => void;
+  private readonly resolve: (result: Result<Won<T>, Lost>) => void;
 
   constructor(
     attempts: readonly Attempt<T, F>[],
     options: RaceOptions<F>,
-    resolve: (result: Result<Won<T>, null>) => void,
+    resolve: (result: Result<Won<T>, Lost>) => void,
   ) {
     this.attempts = attempts;
     this.options = options;
     this.resolve = resolve;
+    if (options.deadlineMs === undefined) {
+      return;
+    }
+    const deadline = setTimeout(() => {
+      this.finish(err("deadline"));
+    }, options.deadlineMs);
+    this.cleanups.push(() => {
+      clearTimeout(deadline);
+    });
   }
 
-  private finish(result: Result<Won<T>, null>): void {
+  private finish(result: Result<Won<T>, Lost>): void {
     if (this.isDone) {
       return;
     }
@@ -54,19 +68,21 @@ class HedgedRace<T, F> {
 
   private finishIfAllFailed(): void {
     if (this.running === 0 && this.launched >= this.attempts.length) {
-      this.finish(err(null));
+      this.finish(err("failed"));
     }
   }
 
-  private settle(index: number, answer: Result<T, F>, link: Link): void {
+  private settle(index: number, answer: null | Result<T, F>, link: Link): void {
     if (this.isDone) {
       return;
     }
-    if (answer.ok) {
+    if (answer?.ok === true) {
       this.finish(ok({ index, value: answer.value }));
       return;
     }
-    this.options.onFailure(index, answer.error);
+    if (answer !== null) {
+      this.options.onFailure(index, answer.error);
+    }
     if (link.isHandedOff) {
       this.finishIfAllFailed();
     } else {
@@ -124,7 +140,13 @@ class HedgedRace<T, F> {
     const timers = this.startTimers(controller, link);
     const run = async (): Promise<void> => {
       // The first token stops the hedge only; the give-up timer still bounds the whole answer.
-      const answer = await attempt({ onFirstToken: timers.stopHedge, signal: controller.signal });
+      // An attempt should return its failure; one that throws still counts as failed.
+      let answer: null | Result<T, F>;
+      try {
+        answer = await attempt({ onFirstToken: timers.stopHedge, signal: controller.signal });
+      } catch {
+        answer = null;
+      }
       this.running -= 1;
       timers.stopAll();
       this.settle(index, answer, link);
@@ -136,12 +158,12 @@ class HedgedRace<T, F> {
 /**
 A hedged race: the first attempt starts; when one fails, or has not started answering within
 `hedgeAfterMs`, the next starts alongside it, and so on down the list. The first success wins
-and cancels the rest; `err(null)` when every attempt failed.
+and cancels the rest; lost when every attempt failed or `deadlineMs` passed first.
 */
 export const hedgedRace = async <T, F>(
   attempts: readonly Attempt<T, F>[],
   options: RaceOptions<F>,
-): Promise<Result<Won<T>, null>> =>
+): Promise<Result<Won<T>, Lost>> =>
   await new Promise((resolve) => {
     new HedgedRace(attempts, options, resolve).launchNext();
   });

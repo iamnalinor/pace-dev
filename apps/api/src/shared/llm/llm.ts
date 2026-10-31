@@ -17,7 +17,8 @@ import { err, type ModelOutput, ModelOutputSchema, ok, type Result } from "@pace
 import type { ParsePrompt } from "./prompt.ts";
 
 import { createLogger } from "../logger.ts";
-import { hedgedRace } from "./race.ts";
+import { hedgedRace, type Lost, type Won } from "./race.ts";
+import { clampToJsonSchema, lenientJsonSchema } from "./schema-fit.ts";
 
 /** One model the parser may use, tried in order. */
 export type ParseProvider = {
@@ -53,6 +54,8 @@ type RunOptions = {
   readonly hedgeAfterMs?: number;
   /** How long one provider may take in all before it counts as failed. */
   readonly giveUpAfterMs?: number;
+  /** The whole read gives up after this long (the bot answers Telegram within 10 s). */
+  readonly deadlineMs?: number;
 };
 
 /** Time to first token after which the next provider is asked in parallel. */
@@ -112,33 +115,21 @@ export const availability = (
   return { available: isAvailable, retryAt: isAvailable ? null : (cooling.at(0) ?? null) };
 };
 
-/** Length limits some endpoints refuse (Gemini's OpenAI layer answers 400); zod checks them after. */
-const LENIENT_DROPS: ReadonlySet<string> = new Set(["maxItems", "maxLength", "minLength"]);
-
-/** A JSON schema without the numeric length limits, everything else kept. */
-export const lenientJsonSchema = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item: unknown) => lenientJsonSchema(item));
-  }
-  return typeof value !== "object" || value === null
-    ? value
-    : Object.fromEntries(
-        Object.entries(value)
-          .filter(([key, item]) => !(typeof item === "number" && LENIENT_DROPS.has(key)))
-          .map(([key, item]) => [key, lenientJsonSchema(item)]),
-      );
-};
-
-/** What the model is shown (the lenient schema) and what its answer must pass (all of `schema`). */
-const modelSchema = <T>(schema: z.ZodType<T>): Schema<T> =>
-  jsonSchema<T>(async () => lenientJsonSchema(await zodSchema(schema).jsonSchema) as JSONSchema7, {
-    validate: (value) => {
-      const parsed = schema.safeParse(value);
+/**
+What the model is shown (the schema without length limits) and what its answer must pass: clamped
+to the limits, then all of `schema`.
+*/
+const modelSchema = <T>(schema: z.ZodType<T>): Schema<T> => {
+  const strict = zodSchema(schema).jsonSchema;
+  return jsonSchema<T>(async () => lenientJsonSchema(await strict) as JSONSchema7, {
+    validate: async (value) => {
+      const parsed = schema.safeParse(clampToJsonSchema(value, await strict));
       return parsed.success
         ? { success: true, value: parsed.data }
         : { error: parsed.error, success: false };
     },
   });
+};
 
 /** Stream parts that mean the model has started answering. */
 const FIRST_TOKEN_PARTS: ReadonlySet<string> = new Set([
@@ -211,6 +202,55 @@ const askOne = async <T>(args: AskArgs<T>): Promise<Result<T, Failure>> => {
 
 const log = createLogger("info");
 
+/** What a read ran into: the providers it may ask, the limits met, the soonest one back. */
+class ReadOutcome {
+  readonly ready: readonly ParseProvider[];
+  readonly limited: Record<string, string> = {};
+  retryAt: null | string = null;
+  /** Every failure so far was an answer out of shape (and no provider was resting). */
+  isEveryAnswerInvalid: boolean;
+
+  /** The providers not resting at `now`; the resting ones only say when they are back. */
+  constructor(providers: readonly ParseProvider[], cooldowns: Cooldowns, now: string) {
+    const isResting = (provider: ParseProvider): boolean => (cooldowns[provider.name] ?? "") > now;
+    this.ready = providers.filter((provider) => !isResting(provider));
+    for (const provider of providers) {
+      if (isResting(provider)) {
+        this.retryAt = earliest(this.retryAt, cooldowns[provider.name] ?? null);
+      }
+    }
+    // A provider resting now may read it later: then no text is hopeless.
+    this.isEveryAnswerInvalid = this.ready.length === providers.length && this.ready.length > 0;
+  }
+
+  /** A failed provider: logged, and a rate limit remembered with when it is back. */
+  noteFailure(index: number, failure: Failure): void {
+    const name = this.ready[index]?.name ?? "?";
+    log.warn("llm: provider failed", { kind: failure.kind, provider: name, why: failure.message });
+    if (failure.kind !== "failed") {
+      return;
+    }
+    this.isEveryAnswerInvalid = false;
+    if (failure.retryAt === null) {
+      return;
+    }
+
+    this.limited[name] = failure.retryAt;
+    this.retryAt = earliest(this.retryAt, failure.retryAt);
+  }
+
+  /** The race's result as the read's answer. */
+  answerOf<T>(won: Result<Won<T>, Lost>): Result<Answer<T>, LlmError> {
+    const { limited, retryAt } = this;
+    if (won.ok) {
+      const provider = this.ready[won.value.index]?.name ?? "?";
+      return ok({ limited, provider, result: won.value.value });
+    }
+    const isHopeless = this.isEveryAnswerInvalid && won.error === "failed";
+    return err({ code: isHopeless ? "llm/invalid-output" : "llm/unavailable", limited, retryAt });
+  }
+}
+
 /**
 Asks the providers for an answer of `schema`'s shape, in priority order but hedged: the next
 provider is asked as well when the current one fails, or has not started answering (first
@@ -225,57 +265,23 @@ export const runStructured = async <T>(
   options: RunOptions & { readonly schema: z.ZodType<T> },
 ): Promise<Result<Answer<T>, LlmError>> => {
   const { cooldowns = {}, now = Date.now, schema } = options;
-  const limited: Record<string, string> = {};
-  const startedAt = new Date(now()).toISOString();
-  let retryAt: null | string = null;
-  const ready = providers.filter((provider) => {
-    const cooling = cooldowns[provider.name];
-    const isCooling = cooling !== undefined && cooling > startedAt;
-    if (isCooling) {
-      retryAt = earliest(retryAt, cooling);
-    }
-    return !isCooling;
-  });
-  let isEveryAnswerInvalid = ready.length > 0;
+  const outcome = new ReadOutcome(providers, cooldowns, new Date(now()).toISOString());
   const won = await hedgedRace(
-    ready.map(
+    outcome.ready.map(
       (provider) =>
         async ({ onFirstToken, signal }: { onFirstToken: () => void; signal: AbortSignal }) =>
           await askOne({ now, onFirstToken, prompt, provider, schema, signal }),
     ),
     {
-      giveUpAfterMs: options.giveUpAfterMs ?? GIVE_UP_AFTER_MS,
-      hedgeAfterMs: options.hedgeAfterMs ?? HEDGE_AFTER_MS,
+      giveUpAfterMs: GIVE_UP_AFTER_MS,
+      hedgeAfterMs: HEDGE_AFTER_MS,
+      ...options,
       onFailure: (index, failure: Failure) => {
-        const name = ready[index]?.name ?? "?";
-        log.warn("llm: provider failed", {
-          kind: failure.kind,
-          provider: name,
-          why: failure.message,
-        });
-        if (failure.kind !== "failed") {
-          return;
-        }
-
-        isEveryAnswerInvalid = false;
-        if (failure.retryAt === null) {
-          return;
-        }
-
-        limited[name] = failure.retryAt;
-        retryAt = earliest(retryAt, failure.retryAt);
+        outcome.noteFailure(index, failure);
       },
     },
   );
-  if (won.ok) {
-    const provider = ready[won.value.index]?.name ?? "?";
-    return ok({ limited, provider, result: won.value.value });
-  }
-  return err({
-    code: isEveryAnswerInvalid ? "llm/invalid-output" : "llm/unavailable",
-    limited,
-    retryAt,
-  });
+  return outcome.answerOf(won);
 };
 
 /** The parse: free text read into actions on tasks and activities. */

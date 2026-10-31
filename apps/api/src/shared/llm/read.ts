@@ -66,6 +66,8 @@ export const readMessage = async (
     readonly cooldowns: Cooldowns;
     readonly clock?: () => number;
     readonly thread?: ParseRequestBody["thread"];
+    /** The whole read gives up after this long; see `runStructured`. */
+    readonly deadlineMs?: number;
   },
 ): Promise<Result<ModelRead, LlmError>> => {
   const { cooldowns, domain, state } = options;
@@ -81,6 +83,7 @@ export const readMessage = async (
   });
   const answer = await runParse(providers, prompt, {
     cooldowns,
+    ...(options.deadlineMs !== undefined && { deadlineMs: options.deadlineMs }),
     ...(options.clock !== undefined && { now: options.clock }),
   });
   if (!answer.ok) {

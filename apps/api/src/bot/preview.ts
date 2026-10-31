@@ -49,6 +49,12 @@ export type Pending = {
 };
 
 /** The request a preview is about, also for one remembered before `request` was kept. */
+/**
+How long the bot waits for the assistant: grammY answers Telegram's webhook within 10 s, and a
+late answer makes Telegram send the update again (a second preview or revision).
+*/
+const BOT_READ_DEADLINE_MS = 7000;
+
 const requestOf = (pending: Pending): string => pending.request ?? pending.text;
 
 /** No model answers: the bot still lets the person inspect and approve a rule-based action. */
@@ -170,6 +176,7 @@ export const preview = async (
   const { now, state } = turn;
   const read = await readMessage(providers, text, {
     cooldowns: await turn.store.llmCooldowns(now),
+    deadlineMs: BOT_READ_DEADLINE_MS,
     domain: "auto",
     now,
     state,
@@ -196,6 +203,33 @@ const isRevisable = (
   pending.actions !== undefined &&
   pending.actions !== null;
 
+/** A revision read: logged, then shown as the preview that replaces the one it revised. */
+const showRevision = async (
+  turn: Turn,
+  {
+    read,
+    text,
+    thread,
+  }: {
+    readonly read: ModelRead;
+    readonly text: string;
+    readonly thread: NonNullable<ParseRequestBody["thread"]>;
+  },
+): Promise<BotReply> => {
+  const { output, actions, provider, rejected } = read;
+  await turn.store.logDecisions(
+    [parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" })],
+    turn.now,
+  );
+  return await previewOf(turn, {
+    text,
+    // The thread's first message is the request, in previews remembered before `request` too.
+    request: thread[0]?.text ?? text,
+    read,
+    thread,
+  });
+};
+
 /** A new chat message revises a still pending answer, with its entire earlier thread. */
 export const followupPreview = async (
   turn: Turn,
@@ -212,6 +246,7 @@ export const followupPreview = async (
   }
   const read = await readMessage(providers, text, {
     cooldowns: await turn.store.llmCooldowns(turn.now),
+    deadlineMs: BOT_READ_DEADLINE_MS,
     domain: pending.domain,
     now: turn.now,
     state: turn.state,
@@ -221,20 +256,10 @@ export const followupPreview = async (
   if (!read.ok) {
     return plain(t(turn.state.settings.language, "bot.correctionUnavailable"));
   }
-  const { output, actions, provider, rejected } = read.value;
-  await turn.store.logDecisions(
-    [parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" })],
-    turn.now,
-  );
-  const reply = await previewOf(turn, {
-    text,
-    // The thread's first message is the request, in previews remembered before `request` too.
-    request: thread[0]?.text ?? text,
-    read: read.value,
-    thread,
-  });
-  await turn.store.recall(id);
-  return reply;
+  // Taken now, after the read: an Approve or another answer pressed meanwhile already took it.
+  return (await turn.store.recall(id)) === undefined
+    ? plain(t(turn.state.settings.language, "bot.expired"))
+    : await showRevision(turn, { read: read.value, text, thread });
 };
 
 /** Accept: the actions planned now, over the state now, and written; `null` once done. */
@@ -256,6 +281,7 @@ const chooseDomain = async (
 ): Promise<BotReply> => {
   const read = await readMessage(providers, pending.text, {
     cooldowns: await turn.store.llmCooldowns(turn.now),
+    deadlineMs: BOT_READ_DEADLINE_MS,
     domain,
     now: turn.now,
     state: turn.state,

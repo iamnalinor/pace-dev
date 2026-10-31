@@ -191,6 +191,28 @@ describe("the bot's answers to the assistant's questions", () => {
     });
   });
 
+  it("drops a revision when Approve took the preview while it was being read", async () => {
+    const { kept, store, written } = memoryStore();
+    const { providers } = askingModel();
+    const slow = [{ model: fakeParseModel(twoAsked, { firstTokenAfterMs: 50 }), name: "slow" }];
+    const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+    const shown = await preview(turn, providers, "Съездить в банк");
+    const id = shown.pendingId ?? "";
+    const revising = choosePreview(turn, slow, { action: `${PREVIEW_ACTIONS.answer}01`, id });
+    // Approve lands while the revision waits for the model.
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await choosePreview(turn, providers, { action: PREVIEW_ACTIONS.accept, id });
+    const revised = await revising;
+    expect(written).toHaveLength(1);
+    expect(revised.pendingId).toBeUndefined();
+    expect(revised.isRefused).toBe(true);
+    expect(revised.text).toBe("This preview has expired. Send the message again.");
+    // No preview is left behind: only the bot's message bindings remain.
+    for (const key of kept.keys()) {
+      expect(key).toMatch(/^bot:/u);
+    }
+  });
+
   it("answers a stale or forged press with a toast, asks nothing and keeps the message", async () => {
     const { kept, store } = memoryStore();
     const { providers, read } = askingModel();
