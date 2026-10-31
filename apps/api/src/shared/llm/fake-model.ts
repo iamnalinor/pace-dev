@@ -6,6 +6,7 @@ import {
   type ModelAction,
   type ModelOutput,
   type ParseDomain,
+  type ParseQuestion,
   REQUEST_DOMAINS,
   type RequestDomain,
   typedActivity,
@@ -295,11 +296,44 @@ const decided = (text: string, system: string): ModelOutput => {
     : answer("activity", SURE, [echoActivity(text, system)]);
 };
 
+const ASK = /^#ask (.+)$/iu;
+
+/** What the fake asks of an `#ask` task: one question with options, one without. */
+const ASK_QUESTIONS: readonly ParseQuestion[] = [
+  {
+    field: "dueDate",
+    options: ["Today", "Tomorrow"],
+    question: "By when does this need to be done?",
+  },
+  { field: "category", options: [], question: "Is this for work or home?" },
+];
+
 /**
-The fake's reading: a command (see `COMMANDS`) as that action; otherwise, by the field the
-prompt names, a new task titled with the message, or the activity its words and time span say.
+`#ask <title>`: a new task and the questions a real model asks of an unclear one, so tests and
+e2e can answer them. In a thread that began with `#ask`, the task again, asking only what the
+latest message did not quote (an answer quotes its question).
+*/
+const askReply = (text: string, system: string): ModelOutput | undefined => {
+  const request = /^1\. Owner: (.+)$/mu.exec(system)?.[1] ?? text;
+  const title = ASK.exec(request.trim())?.[1];
+  return title === undefined
+    ? undefined
+    : {
+        ...answer("task", 1, [echoTask(title)]),
+        questions: ASK_QUESTIONS.filter((question) => !text.includes(question.question)),
+      };
+};
+
+/**
+The fake's reading: `#ask` (see `askReply`), a command (see `COMMANDS`) as that action;
+otherwise, by the field the prompt names, a new task titled with the message, or the activity
+its words and time span say.
 */
 export const echoReply = (text: string, system: string): ModelOutput => {
+  const asked = askReply(text, system);
+  if (asked !== undefined) {
+    return asked;
+  }
   const domain = domainOfPrompt(system);
   const command = commandOf(text, system);
   if (command !== undefined) {

@@ -114,6 +114,7 @@ export {
   type Resolution,
   RESOLUTIONS,
 } from "./notify/pool.ts";
+export { answerAt, answerText } from "./parse/answer.ts";
 export { isQuotedFrom, normalizeForEvidence } from "./parse/normalize.ts";
 export {
   blankModelAction,

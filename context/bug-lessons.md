@@ -316,6 +316,19 @@ The same rule applies when a previously successful channel is no longer configur
 - **Missed because.** The fixtures had a screen-on only where a person used the phone. No fixture had notification wakes, a sparse evening or a wake-up longer than the blip limit, and nothing was checked against a real week of the owner's phone use.
 - **Rule.** A platform event is what the platform did, not what the person did: a screen lit is not a pickup, a resumed activity of the alarm is not use, a delivered notification is not a read. Decide which event really means the person acted (here the lock screen going away, an app in front, Pace opening) and test with the noise the platform adds (notification wakes, a sparse evening, a long night wake-up). Tune a guess against the owner's real data (production `usage_sessions` plus confirmed sleep blocks), not only against invented nights, and keep a property that a day of frequent use never yields one.
 
+### 40. A producer's field carried end to end and used nowhere
+- **Bug.** The model answers each question with up to six `options`; the schema checked them, the API passed
+  them on, and neither the app's cards nor the bot showed them. A question could only be answered by typing a
+  correction, Approve gave no hint that it ignores open questions, and the composer's older reading chips sent
+  the bare option ("Tomorrow") without the question it answered (QA round 11 M1).
+- **Missed because.** Tests asserted the question's text and stopped there: no test asked what each field of
+  the answer is for, and the fixtures' options were never looked at. Schema and contract tests prove a field
+  arrives, not that anyone reads it.
+- **Rule.** Every field a producer (the model, a server answer) sends has a named consumer, or it is dropped
+  from the contract. A field meant for the person (options, a hint, a field label) has a UI test on each
+  surface that shows it (app and bot) that acts on it, not only renders it. An answer the person gives to a
+  question goes as one shared text (`answerText` in `@pace/core`), so every surface sends the same correction.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -410,3 +423,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-31 | QA round 11 M3: a monthly series due three months ahead skipped February (Jan 31 → Mar 2): the deadline moved by the days the start moved, not by the schedule | 9 | yes: the series' deadline was the only date moved by a borrowed day count; it now moves by `seriesSlotAt` from its own day (short months clamped). The final deadline of a resubmission policy stays fixed by design | series test: made Oct 31, due Jan 31, monthly → next due Feb 28 |
 | 2026-10-31 | QA round 11 M5: the Russian Wipe/Delete confirm label wrapped to three lines and spilled out of the 48 px button | 5 | yes: `Button` had a fixed height; it now has a minimum height and grows with a wrapped, centred label (every button) | QA round 12 checks RU at 390 px (layout is not visible to unit tests) |
 | 2026-10-31 | QA round 11 M6: Task's picker listed a series' instances as identical rows | 2 | yes: the picker drew rows with no meta while Now's rows show the deadline; it now uses the same meta | time-bar test: two "Rent" tasks with different deadlines read differently |
+| 2026-10-31 | QA round 11 M1: the assistant's question options were shown nowhere (app cards, bot); Approve gave no hint it ignores open questions | 40 (new) | yes: the questions' other consumers (the bot's text, the composer's older reading chips, which sent the bare option without its question); `question.field` is still shown only through the question's own words | core `answerText`/`answerAt` tests; composer and time-bar option-tap tests (pending state included); bot preview and webhook tests for option buttons, index-only callback data under 64 bytes and stale presses; e2e `#ask` answered by keyboard with axe; QA's every-way-in table |

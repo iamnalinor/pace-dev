@@ -150,9 +150,10 @@ const attachAssistant = (
       return;
     }
     const reply = await assistant.choose(String(ctx.from.id), data);
-    if (reply.isRefused === true) {
+    if (reply.isRefused === true || reply.isToast === true) {
       // Refused: the message keeps its buttons to try again; the reason shows as an alert.
-      await ctx.answerCallbackQuery({ show_alert: true, text: reply.text });
+      // A stale press: the message stays too, and a toast says why nothing happened.
+      await ctx.answerCallbackQuery({ show_alert: reply.isRefused === true, text: reply.text });
       return;
     }
     await ctx.answerCallbackQuery();

@@ -210,7 +210,9 @@ type Keyboard = { inline_keyboard: { text: string; callback_data: string }[][] }
 const buttonData = (label: string): string => {
   const preview = sent.findLast((call) => ["sendMessage", "editMessageText"].includes(call.method));
   const keyboard = preview?.body["reply_markup"] as Keyboard | undefined;
-  return keyboard?.inline_keyboard[0]?.find((button) => button.text === label)?.callback_data ?? "";
+  return (
+    keyboard?.inline_keyboard.flat().find((button) => button.text === label)?.callback_data ?? ""
+  );
 };
 
 /** Plain free text is intentionally ambiguous until the owner chooses its domain. */
@@ -351,6 +353,61 @@ describe("the bot's revised previews", () => {
     expect(await pulledEvent(token, "task.created")).toMatchObject({
       payload: { presetId: "inbox", title: "подумать о поездке" },
     });
+  });
+});
+
+describe("answering the assistant's questions from the chat", () => {
+  beforeEach(() => {
+    sent.length = 0;
+  });
+
+  it("revises the preview in place with the pressed option; the old button then only toasts", async () => {
+    await loginAsDev("1002");
+    // The fake model asks when (Today / Tomorrow) and whether it is for work or home.
+    await webhook(textUpdate("#ask Съездить в банк"));
+    const asked = String(sent.find((call) => call.method === "sendMessage")?.body["text"]);
+    expect(asked).toContain("Question: By when does this need to be done?");
+    expect(asked).toContain("Question: Is this for work or home?");
+    const tomorrow = buttonData("Tomorrow");
+    expect(tomorrow).toMatch(/^q01:/u);
+    expect(new TextEncoder().encode(tomorrow).length).toBeLessThanOrEqual(64);
+
+    sent.length = 0;
+    await webhook(callbackUpdate(tomorrow));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    const revised = String(sent[1]?.body["text"]);
+    // The answered question is gone, the open one stays; the task is still to approve.
+    expect(revised).not.toContain("By when does this need to be done?");
+    expect(revised).toContain("Question: Is this for work or home?");
+    expect(revised).toContain("Съездить в банк");
+    expect(buttonData("Approve")).toMatch(/^a:/u);
+    expect(buttonData("Tomorrow")).toBe("");
+
+    sent.length = 0;
+    await webhook(callbackUpdate(tomorrow));
+    expect(sent).toEqual([
+      {
+        body: expect.objectContaining({
+          show_alert: false,
+          text: "This preview has expired. Send the message again.",
+        }) as unknown,
+        method: "answerCallbackQuery",
+      },
+    ]);
+  });
+
+  it("toasts a press that points at no option of the preview, and leaves the message", async () => {
+    await loginAsDev("1002");
+    await webhook(textUpdate("#ask Съездить в банк"));
+    const id = buttonData("Approve").slice(2);
+    expect(id).not.toBe("");
+    sent.length = 0;
+    await webhook(callbackUpdate(`q15:${id}`));
+    expect(sent.map((call) => call.method)).toEqual(["answerCallbackQuery"]);
+    expect(buttonData("Approve")).toBe("");
+    // The preview itself is still there to approve.
+    await webhook(callbackUpdate(`a:${id}`));
+    expect(sent.at(-1)?.body).toMatchObject({ text: "Done ✓" });
   });
 });
 

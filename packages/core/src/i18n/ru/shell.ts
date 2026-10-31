@@ -270,6 +270,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "bot.nowEmpty": "Сейчас делать нечего.",
   "bot.nowTitle": "Сейчас:",
   "bot.question": "Вопрос: {question}",
+  "bot.questionNumbered": "Вопрос {number}: {question}",
+  "bot.answerHint":
+    "Нажмите ответ ниже или ответьте уточнением. «Подтвердить» сохранит всё как показано.",
   "decisions.title": "Журнал ассистента",
   "decisions.search": "Поиск по решениям",
   "decisions.empty": "Решений пока нет.",

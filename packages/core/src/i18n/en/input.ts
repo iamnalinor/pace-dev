@@ -201,4 +201,5 @@ export const enInput = {
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",
   "assistant.tooManyCorrections": "That is five corrections. Approve or cancel, then start again.",
+  "assistant.questionsHint": "Approve keeps what is shown. Answer the questions to refine it.",
 } as const;

@@ -5,6 +5,7 @@ import {
   type EventInput,
   type Language,
   newId,
+  type ParseQuestion,
   type ParseRequestBody,
   planActions,
   type Result,
@@ -17,6 +18,14 @@ import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
 import { type ModelRead, readByRules, type Reading, readMessage } from "../shared/llm/read.ts";
 import { describeActions } from "./describe.ts";
+import {
+  answerIndexes,
+  answerPreview,
+  buttonsFor,
+  domainButtons,
+  PREVIEW_ACTIONS,
+  questionsOf,
+} from "./preview-buttons.ts";
 import { applyBodies, applyInputs, type BotReply, plain, type Turn, zoneOf } from "./turn.ts";
 
 /**
@@ -35,35 +44,12 @@ export type Pending = {
   readonly domain: "activity" | "task";
   readonly thread: NonNullable<ParseRequestBody["thread"]>;
   readonly awaitingChoice: boolean;
+  /** The assistant's questions, which option buttons point at by index. Absent in older ones. */
+  readonly questions?: readonly ParseQuestion[];
 };
 
 /** The request a preview is about, also for one remembered before `request` was kept. */
 const requestOf = (pending: Pending): string => pending.request ?? pending.text;
-
-/** Callback data of the preview buttons: `<action>:<preview id>`. */
-export const PREVIEW_ACTIONS = {
-  accept: "a",
-  activity: "v",
-  cancel: "c",
-  inbox: "i",
-  task: "t",
-} as const;
-
-const buttonsFor = (
-  id: string,
-  language: Language,
-  { canAccept, canInbox }: { readonly canAccept: boolean; readonly canInbox: boolean },
-): BotReply["buttons"] => [
-  [
-    ...(canAccept
-      ? [{ data: `${PREVIEW_ACTIONS.accept}:${id}`, label: t(language, "bot.accept") }]
-      : []),
-    ...(canInbox
-      ? [{ data: `${PREVIEW_ACTIONS.inbox}:${id}`, label: t(language, "bot.toInbox") }]
-      : []),
-    { data: `${PREVIEW_ACTIONS.cancel}:${id}`, label: t(language, "bot.cancel") },
-  ],
-];
 
 /** No model answers: the bot still lets the person inspect and approve a rule-based action. */
 const unavailable = async (
@@ -92,14 +78,6 @@ const unavailable = async (
 const rulesPrefix = (language: Language, isRuleBased: boolean): string =>
   isRuleBased ? `${t(language, "bot.rulesPreview")}\n\n` : "";
 
-const domainButtons = (id: string, language: Language): BotReply["buttons"] => [
-  [
-    { data: `${PREVIEW_ACTIONS.task}:${id}`, label: t(language, "bot.domainTask") },
-    { data: `${PREVIEW_ACTIONS.activity}:${id}`, label: t(language, "bot.domainActivity") },
-    { data: `${PREVIEW_ACTIONS.cancel}:${id}`, label: t(language, "bot.cancel") },
-  ],
-];
-
 const actionText = (
   turn: Turn,
   read: Reading & { readonly questions?: ModelRead["questions"] },
@@ -107,7 +85,7 @@ const actionText = (
   describeActions(read.actions, {
     language: turn.state.settings.language,
     now: turn.now,
-    questions: (read.questions ?? []).map((question) => question.question),
+    questions: questionsOf(read),
     state: turn.state,
   });
 
@@ -148,6 +126,7 @@ const previewOf = async (
     read.actions.length > 0 && planAll(turn, { actions: read.actions, text: request }).ok;
   const id = newId();
   const isNeedsChoice = read.confidence < CLASSIFY_CONFIDENT;
+  const questions = questionsOf(read);
   await store.remember(id, {
     actions: canAccept ? [...read.actions] : null,
     domain: read.domain,
@@ -155,6 +134,7 @@ const previewOf = async (
     request,
     thread,
     awaitingChoice: isNeedsChoice,
+    questions: [...questions],
   } satisfies Pending);
   if (isNeedsChoice) {
     return {
@@ -174,6 +154,7 @@ const previewOf = async (
     buttons: buttonsFor(id, language, {
       canAccept: true,
       canInbox: read.domain === "task" && read.actions.some((item) => item.kind === "task.create"),
+      questions,
     }),
     pendingId: id,
     text: prefix + actionText(turn, read),
@@ -310,6 +291,11 @@ export const choosePreview = async (
   { action, id }: { readonly action: string; readonly id: string },
 ): Promise<BotReply> => {
   const { language } = turn.state.settings;
+  const at = answerIndexes(action);
+  if (at !== undefined) {
+    const revise = async (text: string) => await followupPreview(turn, providers, { id, text });
+    return await answerPreview(turn, { at, id }, revise);
+  }
   const pending = (await turn.store.recall(id)) as Partial<Pending> | undefined;
   // A preview kept before this shape (or none at all) cannot be written any more.
   if (pending?.text === undefined || pending.actions === undefined) {
