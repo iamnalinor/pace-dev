@@ -41,7 +41,7 @@ jobs:
           LLM_API_KEY_5: ${{ secrets.LLM_API_KEY_5 || vars.LLM_API_KEY_5 }}
           LLM_MODEL_5: ${{ secrets.LLM_MODEL_5 || vars.LLM_MODEL_5 }}
         run: |
-          jq -nr 'env | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[0-9]+$"))
+          jq -nr 'env | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[1-5]$"))
              | select(.value != "") | "\(.key)=\(.value | gsub("[\\r\\n]+"; ","))"' > "$RUNNER_TEMP/llm.env"
           # A key list joined from several lines is a new string: mask it like the secret.
           while IFS='=' read -r _ value; do echo "::add-mask::$value"; done < "$RUNNER_TEMP/llm.env"

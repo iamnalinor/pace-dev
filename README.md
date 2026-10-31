@@ -220,8 +220,8 @@ Worker secrets are pushed with `wrangler secret put` only when the GitHub secret
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
 Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME`,
 `TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`. Deploy pushes every
-`LLM_*_N` (N = 1–5) it finds among the GitHub secrets and variables, removes numbered slots GitHub no
-longer has, and leaves the Worker's LLM settings alone when GitHub has none (so endpoints set
+`LLM_*_N` (N = 1–5) it finds among the GitHub secrets and variables, removes slots 1–5 GitHub no
+longer has (a slot of 6 or more set on the Worker stays), and leaves the Worker's LLM settings alone when GitHub has none (so endpoints set
 with `wrangler secret put` survive). For local Worker development, copy
 `apps/api/.dev.vars.example` to `apps/api/.dev.vars` and fill in a slot.
 

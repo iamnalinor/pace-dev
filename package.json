@@ -29,11 +29,12 @@
   "scripts": {
     "dev": "bun run --cwd apps/api dev",
     "build": "bun run --cwd apps/app build:web",
-    "lint": "bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run db:check",
+    "lint": "bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run lint:workflows && bun run db:check",
     "lint:format": "biome format --write .",
     "lint:eslint": "bun scripts/eslint-all.ts --fix",
     "lint:knip": "knip --no-progress",
     "lint:dup": "jscpd",
+    "lint:workflows": "bun scripts/check-workflows.ts",
     "lint:arch": "depcruise apps packages e2e --config .dependency-cruiser.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/client && tsc -p apps/api && tsc -p apps/app && tsc -p e2e",
     "test": "bun run test:unit && bun run test:api && bun run test:app && bun run test:e2e",

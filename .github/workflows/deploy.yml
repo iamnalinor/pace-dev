@@ -118,11 +118,11 @@ jobs:
           LLM_API_KEY_5: ${{ secrets.LLM_API_KEY_5 || vars.LLM_API_KEY_5 }}
           LLM_MODEL_5: ${{ secrets.LLM_MODEL_5 || vars.LLM_MODEL_5 }}
         run: |
-          jq -n 'env | with_entries(select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[0-9]+$"))
+          jq -n 'env | with_entries(select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[1-5]$"))
                | .value |= gsub("^\\s+|\\s+$"; "")) | with_entries(select(.value != ""))' \
             > "$RUNNER_TEMP/llm.json"
-          # A trimmed key is a new string: mask it like the secret it came from.
-          jq -r 'to_entries[] | select(.key | startswith("LLM_API_KEY_")) | .value' "$RUNNER_TEMP/llm.json" \
+          # A trimmed value is a new string: mask it like the secret it may have come from.
+          jq -r 'to_entries[] | .value' "$RUNNER_TEMP/llm.json" \
             | while IFS= read -r value; do echo "::add-mask::$value"; done
 
       # Every LLM_*_N found is pushed to the Worker; numbered slots GitHub no longer has and the
@@ -135,7 +135,8 @@ jobs:
         run: |
           WANTED="$(cat "$RUNNER_TEMP/llm.json")"
           rm -f "$RUNNER_TEMP/llm.json"
-          SLOT='^LLM_(BASE_URL|API_KEY|MODEL)_(0|[1-9][0-9]*)$'
+          # The slots GitHub manages: a Worker-only slot (6 and up, `wrangler secret put`) stays.
+          SLOT='^LLM_(BASE_URL|API_KEY|MODEL)_[1-5]$'
           # Every slot needs all three names, or the Worker would refuse its config.
           INCOMPLETE="$(jq -r '[keys[] | capture("_(?<n>[0-9]+)$").n] | unique[] as $n
             | select([("LLM_BASE_URL_" + $n), ("LLM_API_KEY_" + $n), ("LLM_MODEL_" + $n)]
