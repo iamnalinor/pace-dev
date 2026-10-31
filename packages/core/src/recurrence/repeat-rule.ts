@@ -10,7 +10,7 @@ import { presetById } from "../presets/preset-reducer.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
 import { formatInZone, wallClockInstant } from "../time.ts";
 import { instanceWeekOf } from "./hw-instances.ts";
-import { type Series, seriesById } from "./series-reducer.ts";
+import { activeSeriesOf, type Series } from "./series-reducer.ts";
 import { nextSeriesSlot, type SeriesSchedule } from "./series.ts";
 
 /**
@@ -84,8 +84,8 @@ const seriesRule = (
   task: Task,
   ctx: QueryContext,
 ): null | RepeatRule => {
-  const series = task.seriesId === null ? undefined : seriesById(state.series, task.seriesId);
-  if (series === undefined || series.archived) {
+  const series = activeSeriesOf(state.series, task.seriesId);
+  if (series === undefined) {
     return null;
   }
   const { schedule, template } = series;

@@ -194,6 +194,7 @@ const FormFields = ({
           onChange={change}
           onSubmit={onAdd}
           options={options}
+          repeatProblem={model.repeatProblem}
           showDeadlineIssue={model.isDeadlineOwn}
           values={values}
         />

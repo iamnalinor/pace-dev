@@ -11,6 +11,7 @@ import {
   describeRepeatRule,
   formatDuration,
   IMPORTANCE_COLORS,
+  presetLabel,
   type ProjectColorName,
   STATUS_COLORS,
 } from "@pace/core";
@@ -69,11 +70,26 @@ const Stat = ({
   </View>
 );
 
-/** Importance and status in their colours, submission and outcome neutral, as small tags. */
-const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
+/**
+The category in its colour (as the task's rows show it), importance and status in theirs,
+submission and outcome neutral, as small tags.
+*/
+const TaskTags = ({
+  category,
+  tags,
+}: {
+  readonly category: TaskViewModel["category"];
+  readonly tags: TaskViewModel["tags"];
+}) => {
   const t = useT();
+  const { language } = useViewer();
   return (
     <View className="flex-row flex-wrap gap-1.5">
+      <View className={cx("rounded-sm px-2 py-1", washClass(category.color))}>
+        <Text className={cx("font-sans text-[11px] font-medium", inkClass(category.color))}>
+          {presetLabel(category, language)}
+        </Text>
+      </View>
       {tags.map((tag) => {
         const color = tagColor(tag);
         return (
@@ -169,7 +185,7 @@ export const TaskSummary = ({
             {view.link.url} ↗
           </Text>
         )}
-        <TaskTags tags={view.tags} />
+        <TaskTags category={view.category} tags={view.tags} />
       </View>
       <View className="gap-3 rounded-xl border border-line bg-surface p-3.5">
         <View className="flex-row gap-3">

@@ -1,4 +1,4 @@
-import { CalendarDays, Play } from "lucide-react-native";
+import { CalendarClock, CalendarDays, Play } from "lucide-react-native";
 import { Text, View } from "react-native";
 
 import { useSettings, useT } from "#app/app-state.tsx";
@@ -39,6 +39,9 @@ const emptyDateLabel = (
   return kind === "final" ? "form.finalNotSet" : "composer.noDue";
 };
 
+/** A start plays from then; a due and a final deadline are dates on the calendar. */
+const DATE_ICONS = { due: CalendarDays, final: CalendarClock, start: Play } as const;
+
 /** The date's chip: its exact date and time ("Oct 13 23:59"), or what an unset one means. */
 export const DateChip = ({
   isOpen,
@@ -56,7 +59,7 @@ export const DateChip = ({
   const { palette } = useTheme();
   const unset = t(emptyDateLabel(kind));
   const text = value === null ? unset : zonedText({ ...value, mode: "due" }, viewer);
-  const Icon = kind === "due" ? CalendarDays : Play;
+  const Icon = DATE_ICONS[kind];
   return (
     <Chip
       label={`${t(dateLabel(kind))}: ${text}`}

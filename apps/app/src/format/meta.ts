@@ -27,7 +27,7 @@ const partText = (part: MetaPart, viewer: Viewer): string => {
 };
 
 const toneOf = (part: MetaPart): MetaTone => {
-  if (part.kind === "late") {
+  if (part.kind === "late" || part.kind === "final-passed") {
     return "warn";
   }
   return part.kind === "importance" && part.importance !== "nice_to_have" ? "strong" : "plain";

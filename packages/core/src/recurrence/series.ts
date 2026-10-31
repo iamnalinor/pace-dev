@@ -25,6 +25,32 @@ export const isUntilBeforeStart = (
 ): boolean =>
   schedule.until !== undefined && schedule.until < formatInZone(start.at, start.tz, "yyyy-MM-dd");
 
+/** Why a new series cannot start as chosen; the form, the composer and the actions all ask this. */
+export type SeriesStartProblem = "repeat/due-before-start" | "repeat/until-before-start";
+
+/**
+A series starting at `start`: its last repeat date must not be before the start's day, and its
+deadline not before the start, or every instance would begin late (QA 13 L7). A past deadline
+on a one-off task stays allowed: that is a task already late, written down.
+*/
+export const seriesStartProblem = (
+  schedule: SeriesSchedule,
+  {
+    due,
+    start,
+  }: {
+    readonly due: null | { readonly at: string };
+    readonly start: { readonly at: string; readonly tz: string };
+  },
+): null | SeriesStartProblem => {
+  if (isUntilBeforeStart(schedule, start)) {
+    return "repeat/until-before-start";
+  }
+  return due !== null && Date.parse(due.at) < Date.parse(start.at)
+    ? "repeat/due-before-start"
+    : null;
+};
+
 const toIso = (date: Date): string => new Date(date).toISOString();
 
 /** Index zero is the template's start; months are always counted from its original day. */

@@ -112,6 +112,8 @@ export const enInput = {
   "form.repeat.days": "Repeat every (days)",
   "form.repeat.noEnd": "No end date",
   "form.repeat.endDate": "Last repeat date",
+  "form.repeat.untilBeforeStart": "The last repeat date is before the task starts.",
+  "form.repeat.dueBeforeStart": "The deadline is before the start: every repeat would begin late.",
   "form.newTask": "New task",
   "form.addTo": "Add to",
   "form.ownTask": "A task of its own",

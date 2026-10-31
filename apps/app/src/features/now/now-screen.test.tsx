@@ -162,6 +162,17 @@ describe("NowBoard", () => {
     expect(within(books).queryByRole("image", { name: repeats })).toBeNull();
   });
 
+  it("says on a row past both deadlines that the final one went by too (QA 13 L10)", async () => {
+    const runtime = await createTestRuntime({ now: "2026-11-10T12:00:00.000Z" });
+    await runtime.state.ingest(rentSeriesEvents());
+    await renderScreen(<Board />, runtime);
+    const title = en("now.withDeadline");
+    await fireEvent.press(screen.getByRole("button", { name: en("now.expandGroup", { title }) }));
+    const rent = screen.getByRole("link", { name: /^Rent/u });
+    expect(within(rent).getByText("9d late")).toBeOnTheScreen();
+    expect(within(rent).getByText("final deadline passed Nov 7 23:59")).toBeOnTheScreen();
+  });
+
   it("opens a task from its row, and has no Inbox counter of its own (that is in the navigation)", async () => {
     await renderScreen(<Board />, await createTestRuntime());
     expect(screen.queryByRole("button", { name: /^Inbox/ })).toBeNull();

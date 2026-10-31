@@ -257,6 +257,7 @@ export {
   seriesInstanceId,
 } from "./recurrence/series-instances.ts";
 export {
+  activeSeriesOf,
   INITIAL_SERIES_STATE,
   type Series,
   seriesById,

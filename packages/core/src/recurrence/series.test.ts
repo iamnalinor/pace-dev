@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { nextSeriesSlot, seriesSlotAt } from "./series.ts";
+import { nextSeriesSlot, seriesSlotAt, seriesStartProblem } from "./series.ts";
+
+describe("seriesStartProblem", () => {
+  const start = { at: "2026-10-31T16:00:00.000Z", tz: "Europe/Berlin" };
+
+  it("refuses a last repeat date before the start's day and a deadline before the start", () => {
+    expect(seriesStartProblem({ kind: "monthly" }, { due: null, start })).toBeNull();
+    expect(
+      seriesStartProblem({ kind: "daily", until: "2026-10-31" }, { due: null, start }),
+    ).toBeNull();
+    expect(seriesStartProblem({ kind: "daily", until: "2026-10-30" }, { due: null, start })).toBe(
+      "repeat/until-before-start",
+    );
+    // QA 13 L7: due Oct 20, starting now (Oct 31): every instance would begin late.
+    const past = { at: "2026-10-20T21:59:00.000Z", tz: "Europe/Berlin" };
+    expect(seriesStartProblem({ kind: "daily" }, { due: past, start })).toBe(
+      "repeat/due-before-start",
+    );
+    expect(seriesStartProblem({ kind: "daily" }, { due: start, start })).toBeNull();
+  });
+});
 
 const MONTHLY = { kind: "monthly" as const };
 const ZONE = "Europe/Berlin";
