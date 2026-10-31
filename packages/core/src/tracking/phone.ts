@@ -1,4 +1,4 @@
-import { formatInZone, minutesBetween } from "../time.ts";
+import { formatInZone, minutesBetween, wallClockInstant } from "../time.ts";
 
 /**
 What the phone reports about itself, already translated from Android's usage events: the
@@ -7,18 +7,25 @@ the phone; only what the person confirms (a sleep block) becomes an event.
 */
 export type PhoneEvent = {
   readonly at: string;
-  readonly kind: "app-start" | "app-stop" | "screen-off" | "screen-on";
+  /** `unlock`: the lock screen went away (or Pace came to the front): someone is using the phone. */
+  readonly kind: "app-start" | "app-stop" | "screen-off" | "screen-on" | "unlock";
   /** The app's package name for app events. */
   readonly app?: string;
 };
 
 export type Interval = { readonly startAt: string; readonly endAt: string };
 
-/** At least this long with the screen off, at night, counts as sleep. */
+/** At least this long asleep, at night, counts as sleep. */
 export const SLEEP_MIN_MINUTES = 180;
-/** A glance this short (the time, a message) does not end the night: it is a wake-up. */
-export const WAKE_BLIP_MINUTES = 5;
-/** Local hours a sleep stretch must touch: 21:00 to 12:00 the next day. */
+/** Uses of the phone with less than this between them are one spell awake, never sleep. */
+export const REST_MIN_MINUTES = 45;
+/** A spell awake this short in the small hours is a wake-up inside the night... */
+export const WAKE_UP_MAX_MINUTES = 30;
+/** ...when the phone is left alone at least this long after it (back to sleep). */
+export const BACK_TO_SLEEP_MINUTES = 90;
+/** Wake-ups start after midnight and before this local hour; later ones are the morning. */
+const WAKE_UP_UNTIL_HOUR = 7;
+/** Local hours a sleep must start or end in: 21:00 to 12:00 the next day. */
 const NIGHT_FROM_HOUR = 21;
 const NIGHT_UNTIL_HOUR = 12;
 
@@ -40,57 +47,113 @@ export const screenOnIntervals = (
     .map(({ event, next }) => ({ endAt: next?.at ?? now, startAt: event.at }));
 };
 
-/** The screen-off stretches between two screen-on spells (a stretch still running is unknown). */
-const offStretches = (on: readonly Interval[]): readonly Interval[] =>
-  on.slice(1).map((interval, index) => ({
-    endAt: interval.startAt,
-    startAt: on[index]?.endAt ?? interval.startAt,
-  }));
-
-type Night = Interval & { readonly wakeUps: number };
-
-/** Joins stretches split by a short glance at the screen; each glance counts as a wake-up. */
-const mergeGlances = (stretches: readonly Interval[]): readonly Night[] =>
-  // eslint-disable-next-line unicorn/no-array-reduce -- each stretch either extends the night before it or starts a new one
-  stretches.reduce<readonly Night[]>((nights, stretch) => {
-    const last = nights.at(-1);
-    return last !== undefined && minutesBetween(last.endAt, stretch.startAt) <= WAKE_BLIP_MINUTES
-      ? [
-          ...nights.slice(0, -1),
-          { endAt: stretch.endAt, startAt: last.startAt, wakeUps: last.wakeUps + 1 },
-        ]
-      : [...nights, { ...stretch, wakeUps: 0 }];
-  }, []);
-
 const hourIn = (atIso: string, zone: string): number => Number(formatInZone(atIso, zone, "H"));
 
 const isNightHour = (hour: number): boolean => hour >= NIGHT_FROM_HOUR || hour < NIGHT_UNTIL_HOUR;
 
-/** Touches the night when it starts or ends in it, or is long enough to span it. */
+/** Starts or ends in the night, or is long enough to span it. */
 const isAtNight = (stretch: Interval, zone: string): boolean =>
   isNightHour(hourIn(stretch.startAt, zone)) ||
   isNightHour(hourIn(stretch.endAt, zone)) ||
   minutesBetween(stretch.startAt, stretch.endAt) >= (NIGHT_FROM_HOUR - NIGHT_UNTIL_HOUR) * 60;
 
 export type SleepCandidate = Interval & {
+  /** Asleep: the span without the wake-ups. */
   readonly minutes: number;
-  /** Short glances at the screen during the night. */
+  /** Spells awake with the phone during the night. */
   readonly wakeUps: number;
 };
 
 /**
-The night's sleep as the screen tells it: the longest stretch with the screen off of at
-least three hours that touches the night, short glances merged. `null` without one.
+When someone was using the phone: unlocked until the screen went off, or an app in front.
+A screen lit by a notification, or only to see the time, is not use.
+*/
+const useIntervals = (events: readonly PhoneEvent[], now: string): readonly Interval[] => {
+  const sorted = byTime(events);
+  const unlocked = sorted
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => event.kind === "unlock")
+    .map(({ event, index }) => ({
+      endAt: sorted.slice(index + 1).find((later) => later.kind === "screen-off")?.at ?? now,
+      startAt: event.at,
+    }));
+  return [...unlocked, ...foregroundIntervals(events, now)].toSorted((a, b) =>
+    a.startAt.localeCompare(b.startAt),
+  );
+};
+
+/** The later of two instants (ISO strings compare in time order; `Math.max` would read them as NaN). */
+const laterOf = (a: string, b: string): string => (a.localeCompare(b) > 0 ? a : b);
+
+/** Uses with less than `REST_MIN_MINUTES` between them, joined into spells awake. */
+const awakeSpells = (uses: readonly Interval[]): readonly Interval[] =>
+  // eslint-disable-next-line unicorn/no-array-reduce -- each use either extends the spell before it or starts a new one
+  uses.reduce<readonly Interval[]>((spells, use) => {
+    const last = spells.at(-1);
+    return last !== undefined && minutesBetween(last.endAt, use.startAt) < REST_MIN_MINUTES
+      ? [...spells.slice(0, -1), { endAt: laterOf(use.endAt, last.endAt), startAt: last.startAt }]
+      : [...spells, use];
+  }, []);
+
+/** A night does not start before 21:00: a phone put away at 19:52 says nothing about 20:30. */
+const bedtimeFloor = (atIso: string, zone: string): string => {
+  const hour = hourIn(atIso, zone);
+  return hour >= NIGHT_UNTIL_HOUR && hour < NIGHT_FROM_HOUR
+    ? wallClockInstant(formatInZone(atIso, zone, "yyyy-MM-dd"), `${NIGHT_FROM_HOUR}:00`, zone)
+    : atIso;
+};
+
+/** A short spell awake in the small hours, followed by a long rest: woke up, went back to sleep. */
+const isWakeUp = (spell: Interval, restAfter: Interval, zone: string): boolean =>
+  minutesBetween(spell.startAt, spell.endAt) <= WAKE_UP_MAX_MINUTES &&
+  hourIn(spell.startAt, zone) < WAKE_UP_UNTIL_HOUR &&
+  minutesBetween(restAfter.startAt, restAfter.endAt) >= BACK_TO_SLEEP_MINUTES;
+
+type Night = Interval & { readonly awake: number; readonly wakeUps: number };
+
+/**
+The night's sleep as the phone's use tells it: the rests between spells awake (at least
+`REST_MIN_MINUTES` without using the phone), joined across short wake-ups in the small hours;
+the longest one of three hours or more that touches the night. `null` without one, and while
+the phone has not been used since (a rest still running is not judged).
 */
 export const detectSleep = (
   events: readonly PhoneEvent[],
   { now, zone }: { readonly now: string; readonly zone: string },
-): null | SleepCandidate =>
-  mergeGlances(offStretches(screenOnIntervals(events, now)))
-    .map((night) => ({ ...night, minutes: minutesBetween(night.startAt, night.endAt) }))
-    .filter((night) => night.minutes >= SLEEP_MIN_MINUTES && isAtNight(night, zone))
-    .toSorted((a, b) => b.minutes - a.minutes)
-    .at(0) ?? null;
+): null | SleepCandidate => {
+  const spells = awakeSpells(useIntervals(events, now));
+  // eslint-disable-next-line unicorn/no-array-reduce -- each rest either extends the night before it across a wake-up or starts a new one
+  const nights = spells.slice(1).reduce<readonly Night[]>((joined, next, index) => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- index < spells.length - 1
+    const before = spells[index]!;
+    const rest = { endAt: next.startAt, startAt: before.endAt };
+    const last = joined.at(-1);
+    return last?.endAt === before.startAt && isWakeUp(before, rest, zone)
+      ? [
+          ...joined.slice(0, -1),
+          {
+            awake: last.awake + minutesBetween(before.startAt, before.endAt),
+            endAt: rest.endAt,
+            startAt: last.startAt,
+            wakeUps: last.wakeUps + 1,
+          },
+        ]
+      : [...joined, { ...rest, awake: 0, startAt: bedtimeFloor(rest.startAt, zone), wakeUps: 0 }];
+  }, []);
+  return (
+    nights
+      .filter((night) => night.startAt < night.endAt)
+      .map(({ awake, endAt, startAt, wakeUps }) => ({
+        endAt,
+        minutes: minutesBetween(startAt, endAt) - awake,
+        startAt,
+        wakeUps,
+      }))
+      .filter((night) => night.minutes >= SLEEP_MIN_MINUTES && isAtNight(night, zone))
+      .toSorted((a, b) => b.minutes - a.minutes)
+      .at(0) ?? null
+  );
+};
 
 export type AppMinutes = { readonly app: string; readonly minutes: number };
 
@@ -101,7 +164,9 @@ const isAppStart = (event: PhoneEvent): event is AppStart =>
 
 /** What ends an app's foreground spell: another app, the screen going off, or its own stop. */
 const isEndOf = (app: string, later: PhoneEvent): boolean =>
-  later.kind === "app-stop" ? later.app === app : later.kind !== "screen-on";
+  later.kind === "app-stop"
+    ? later.app === app
+    : later.kind === "app-start" || later.kind === "screen-off";
 
 /** Each app's time in the foreground: from its start to the next start, its stop or screen-off. */
 const foregroundIntervals = (
@@ -155,16 +220,26 @@ export const appUsage = (
     .toSorted((a, b) => b.minutes - a.minutes);
 };
 
-/** Screen-offs this short (a pocket, a timeout) do not end a phone session. */
+/** Breaks in use this short (a pocket, a timeout) do not end a phone session. */
 const SESSION_GAP_MINUTES = 2;
 
+/** Uses that overlap or touch, joined; by start. */
+const joinedUses = (events: readonly PhoneEvent[], now: string): readonly Interval[] =>
+  // eslint-disable-next-line unicorn/no-array-reduce -- each use either extends the one before it or starts a new one
+  useIntervals(events, now).reduce<readonly Interval[]>((joined, use) => {
+    const last = joined.at(-1);
+    return last !== undefined && use.startAt <= last.endAt
+      ? [...joined.slice(0, -1), { endAt: laterOf(use.endAt, last.endAt), startAt: last.startAt }]
+      : [...joined, use];
+  }, []);
+
 /**
-When the phone was picked up for the session still going on at `now`: screen-on spells
-joined across short screen-offs. `null` while the screen is off. An activity that ran past
-its Expect probably ended about then.
+When the phone was picked up for the session still going on at `now`: uses joined across
+short breaks. `null` while nobody uses it. An activity that ran past its Expect probably
+ended about then.
 */
 export const phonePickupAt = (events: readonly PhoneEvent[], now: string): null | string => {
-  const spells = screenOnIntervals(events, now);
+  const spells = joinedUses(events, now);
   const last = spells.at(-1);
   if (last?.endAt !== now) {
     return null;

@@ -19,13 +19,16 @@ const utcAt = (clock: string): string => `2026-10-06T${clock}.000Z`;
 
 const utc = (iso: string): number => Date.parse(`2026-10-${iso}:00.000Z`);
 
-/** A night in Moscow (UTC+3): screen off 23:50, a glance at 03:10, up at 07:40, Telegram at noon. */
+/** A night in Moscow (UTC+3): phone put away 23:50, used at 03:10, up at 07:40, Telegram at noon. */
 const mockEvents = [
   { className: null, eventType: 15, packageName: "android", timestamp: utc("05T19:00") },
+  { className: null, eventType: 18, packageName: "android", timestamp: utc("05T19:00") },
   { className: null, eventType: 16, packageName: "android", timestamp: utc("05T20:50") },
   { className: null, eventType: 15, packageName: "android", timestamp: utc("06T00:10") },
+  { className: null, eventType: 18, packageName: "android", timestamp: utc("06T00:10") },
   { className: null, eventType: 16, packageName: "android", timestamp: utc("06T00:14") },
   { className: null, eventType: 15, packageName: "android", timestamp: utc("06T04:40") },
+  { className: null, eventType: 18, packageName: "android", timestamp: utc("06T04:40") },
   { className: null, eventType: 16, packageName: "android", timestamp: utc("06T04:50") },
   { className: null, eventType: 15, packageName: "android", timestamp: utc("06T09:00") },
   {
@@ -106,7 +109,7 @@ describe("Day with the phone's data", () => {
     });
     await renderScreen(<DayScreen />, runtime);
 
-    expect(await screen.findByText("Slept 23:50–07:40 · 7h 50m · woke up 1×")).toBeOnTheScreen();
+    expect(await screen.findByText("Slept 23:50–07:40 · 7h 46m · woke up 1×")).toBeOnTheScreen();
     // Where the time went on the phone, with no penalty for it.
     expect(await screen.findByText("Phone 20m: Telegram 20m")).toBeOnTheScreen();
     const seminar = await screen.findByText("Seminar");
@@ -256,12 +259,10 @@ describe("Day with the phone's data", () => {
 
   it("offers to end an overrun activity when the phone was picked up", async () => {
     // Lunch from 14:00 Moscow (Expect 30m); the phone came out at 14:40 and is still in hand.
-    mockEvents.push({
-      className: null,
-      eventType: 15,
-      packageName: "android",
-      timestamp: utc("06T11:40"),
-    });
+    mockEvents.push(
+      { className: null, eventType: 15, packageName: "android", timestamp: utc("06T11:40") },
+      { className: null, eventType: 18, packageName: "android", timestamp: utc("06T11:40") },
+    );
     const runtime = await createTestRuntime();
     await runtime.actions.startActivity(
       { category: "food", expectMinutes: 30, label: "Lunch" },

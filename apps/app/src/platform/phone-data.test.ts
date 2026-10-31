@@ -8,7 +8,7 @@ const event = (eventType: number, packageName: string, timestamp: number) => ({
 });
 
 describe("toPhoneEvents", () => {
-  it("keeps screen and app foreground events, drops the launcher, the system bars and Pace", () => {
+  it("keeps screen and app foreground events, drops the launcher and the system bars", () => {
     const at = Date.parse("2026-10-06T07:00:00.000Z");
     expect(
       toPhoneEvents([
@@ -24,8 +24,28 @@ describe("toPhoneEvents", () => {
     ).toEqual([
       { at: "2026-10-06T07:00:00.000Z", kind: "screen-on" },
       { app: "org.telegram.messenger", at: "2026-10-06T07:00:01.000Z", kind: "app-start" },
+      { at: "2026-10-06T07:00:04.000Z", kind: "unlock" },
       { app: "org.telegram.messenger", at: "2026-10-06T07:01:00.000Z", kind: "app-stop" },
       { at: "2026-10-06T07:02:00.000Z", kind: "screen-off" },
+    ]);
+  });
+
+  it("reads the lock screen going away, and Pace coming to the front, as an unlock", () => {
+    const at = Date.parse("2026-10-06T07:00:00.000Z");
+    expect(
+      toPhoneEvents([
+        event(15, "android", at),
+        event(17, "android", at + 500),
+        event(18, "android", at + 1000),
+        event(1, "dev.nalinor.pace", at + 2000),
+        event(2, "dev.nalinor.pace", at + 3000),
+        event(16, "android", at + 4000),
+      ]),
+    ).toEqual([
+      { at: "2026-10-06T07:00:00.000Z", kind: "screen-on" },
+      { at: "2026-10-06T07:00:01.000Z", kind: "unlock" },
+      { at: "2026-10-06T07:00:02.000Z", kind: "unlock" },
+      { at: "2026-10-06T07:00:04.000Z", kind: "screen-off" },
     ]);
   });
 });

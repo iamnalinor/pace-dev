@@ -8,11 +8,18 @@ const EVENT_KIND: Readonly<Record<number, PhoneEvent["kind"]>> = {
   2: "app-stop", // ACTIVITY_PAUSED
   15: "screen-on", // SCREEN_INTERACTIVE
   16: "screen-off", // SCREEN_NON_INTERACTIVE
+  18: "unlock", // KEYGUARD_HIDDEN
 };
+
+const PACE = "dev.nalinor.pace";
 
 /** The home screen, the system bars and Pace itself are not "using the phone" for anything. */
 const isBackground = (packageName: string): boolean =>
-  /launcher|systemui|^dev\.nalinor\.pace$/u.test(packageName);
+  /launcher|systemui/u.test(packageName) || packageName === PACE;
+
+/** Pace in front means someone has the phone unlocked, also on a phone without a lock screen. */
+const isPaceOpened = (event: UsageEvent): boolean =>
+  event.eventType === 1 && event.packageName === PACE;
 
 /** Android usage events as Pace's phone events, oldest first. */
 export const toPhoneEvents = (events: readonly UsageEvent[]): readonly PhoneEvent[] =>
@@ -23,7 +30,10 @@ export const toPhoneEvents = (events: readonly UsageEvent[]): readonly PhoneEven
         return [];
       }
       const at = new Date(event.timestamp).toISOString();
-      if (kind === "screen-on" || kind === "screen-off") {
+      if (isPaceOpened(event)) {
+        return [{ at, kind: "unlock" }];
+      }
+      if (!kind.startsWith("app-")) {
         return [{ at, kind }];
       }
       return isBackground(event.packageName) ? [] : [{ app: event.packageName, at, kind }];
