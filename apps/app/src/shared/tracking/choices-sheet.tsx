@@ -48,7 +48,8 @@ const ButtonChoices = ({ button, close, options, start }: ListProps) => {
 };
 
 /**
-The open tasks in Now's order, narrowed by the search above; a pick starts Focus on it, as the
+The open tasks in Now's order with their deadlines (instances of a series share a title),
+narrowed by the search above; a pick starts Focus on it, as the
 task's own Focus button does. The task in focus already is checked and only closes the picker.
 */
 const TaskChoices = ({
@@ -83,7 +84,7 @@ const TaskChoices = ({
             start(actions.focusTask(row.id, options));
           }}
         >
-          <MetaLine parts={[]} tag={row} />
+          <MetaLine parts={row.meta} tag={row} />
         </ChoiceItem>
       ))}
     </ChoiceList>

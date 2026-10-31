@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Calendar from "expo-calendar";
 
 import type { PaceRuntime } from "#app/runtime.ts";
@@ -116,6 +116,22 @@ describe("TimeBar", () => {
     expect(screen.getByRole("button", { name: en("time.startOther") })).toBeExpanded();
   });
 
+  it("folds when something starts while Now is open and the bar is left alone (a late load, the bot)", async () => {
+    const runtime = await createTestRuntime();
+    await renderScreen(<TimeBar />, runtime);
+    expect(screen.getByLabelText(en("time.whatDoing"))).toBeOnTheScreen();
+    await act(async () => {
+      await runtime.actions.startActivity(
+        { buttonId: "rest:walk", category: "rest", expectMinutes: 30, label: "Walk" },
+        { at: addMinutesIso(NOW, -10) },
+      );
+    });
+    expect(await screen.findByRole("button", { name: "Stop: Walk" })).toBeOnTheScreen();
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("time.whatDoing"))).toBeNull();
+    });
+  });
+
   it("stays open after the activity it folded on stops and something else starts", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.startActivity(
@@ -193,6 +209,29 @@ describe("TimeBar", () => {
     await waitFor(() => {
       expect(running(runtime)).toEqual(["Getting ready"]);
     });
+  });
+
+  it("tells same-named tasks apart in Task's picker by their deadline", async () => {
+    const runtime = await createTestRuntime();
+    for (const days of [2, 30]) {
+      await runtime.actions.createTask({
+        dueAt: addMinutesIso(NOW, days * 24 * 60),
+        dueTz: "UTC",
+        presetId: "personal",
+        title: "Rent",
+      });
+    }
+    await renderScreen(<TimeBar />, runtime);
+    await fireEvent.press(screen.getByRole("button", { name: "Task" }));
+    const rents = within(await picker("Task")).getAllByRole("button", { name: "Rent" });
+    expect(rents).toHaveLength(2);
+    const texts = rents.map((row) =>
+      within(row)
+        .queryAllByText(/./u)
+        .map((node) => String(node.props["children"]))
+        .join(" "),
+    );
+    expect(new Set(texts).size).toBe(2);
   });
 
   it("lists open tasks in Task's picker, narrows them as typed, and starts Focus on the one picked", async () => {

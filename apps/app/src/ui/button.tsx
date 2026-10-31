@@ -74,7 +74,9 @@ const Label = ({
       {Icon === undefined ? null : (
         <Icon color={iconColor(variant, palette)} size={18} strokeWidth={1.75} />
       )}
-      <Text className={cx("font-sans text-[15px] font-medium", LABEL[variant])}>{children}</Text>
+      <Text className={cx("shrink text-center font-sans text-[15px] font-medium", LABEL[variant])}>
+        {children}
+      </Text>
       <KeyHint hotkey={hotkey} variant={variant} />
     </>
   );
@@ -93,7 +95,7 @@ const useButtonHotkey = (
 };
 
 /**
-A 48px-tall pill-ish button, optionally with an icon before the label; `busy` swaps the label
+A pill-ish button at least 48px tall (a label that wraps makes it taller), optionally with an icon before the label; `busy` swaps the label
 for a spinner and blocks presses. With a `hotkey` and a keyboard, the shortcut shows after the
 label and presses the button (unless `hotkeyMode` is "hint": a field handles the key itself).
 */
@@ -132,7 +134,7 @@ export const Button = ({
       aria-busy={busy}
       aria-disabled={isBlocked}
       className={cx(
-        "h-12 flex-row items-center justify-center gap-2 rounded-md px-4 active:opacity-80",
+        "min-h-12 flex-row items-center justify-center gap-2 rounded-md px-4 py-2 active:opacity-80",
         CONTAINER[variant],
         isBlocked && "opacity-50",
       )}

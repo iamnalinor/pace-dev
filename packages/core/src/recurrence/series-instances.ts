@@ -2,8 +2,7 @@ import type { EventInput } from "../events/event-schema.ts";
 import type { Task, TasksState } from "../model/task.ts";
 import type { Series, SeriesState } from "./series-reducer.ts";
 
-import { addDaysIn, formatInZone } from "../time.ts";
-import { nextSeriesSlot, type SeriesSlot } from "./series.ts";
+import { nextSeriesSlot, type SeriesSlot, seriesSlotAt } from "./series.ts";
 
 export type MissingSeriesInput = {
   readonly tasks: TasksState;
@@ -49,21 +48,23 @@ const latestTime = (tasks: readonly Task[], now: string): string =>
     .toSorted((a, b) => a.localeCompare(b))
     .at(-1) ?? now;
 
+/**
+An instance: the template moved to the slot. The deadline moves by the schedule itself, not
+by the days the start moved: a monthly task due Jan 31 is next due Feb 28 (months count from
+its own day), whatever the gap between its start and its deadline.
+*/
 const createPayload = (series: Series, slot: SeriesSlot) => {
   const { template } = series;
-  const anchorDate = formatInZone(template.startAt, template.startTz, "yyyy-MM-dd");
-  const slotDate = formatInZone(slot.at, template.startTz, "yyyy-MM-dd");
-  const days = Math.round(
-    (Date.parse(`${slotDate}T00:00:00.000Z`) - Date.parse(`${anchorDate}T00:00:00.000Z`)) /
-      86_400_000,
-  );
   return {
     ...template,
     taskId: seriesInstanceId(series.id, series.revisionKey, slot.index),
     seriesRevision: series.revision,
     startAt: slot.at,
     ...(template.dueAt !== undefined && {
-      dueAt: addDaysIn(template.dueAt, days, template.startTz),
+      dueAt: seriesSlotAt(template.dueAt, series.schedule, {
+        index: slot.index,
+        zone: template.dueTz ?? template.startTz,
+      }),
     }),
   };
 };

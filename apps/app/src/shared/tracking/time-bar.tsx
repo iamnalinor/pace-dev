@@ -1,13 +1,4 @@
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronUp,
-  Coffee,
-  House,
-  type LucideIcon,
-  Play,
-  Timer,
-} from "lucide-react-native";
+import { CalendarDays, Coffee, House, type LucideIcon, Play, Timer } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -19,7 +10,6 @@ import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
 import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
 import { inkClass, OUTLINE } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { useIsWide } from "#app/ui/layout.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 
@@ -27,6 +17,7 @@ import type { CalendarToday } from "./calendar-today.ts";
 
 import { ChoicesSheet } from "./choices-sheet.tsx";
 import { RunningRow } from "./running-row.tsx";
+import { FoldToggle, HIDDEN, useFold } from "./time-bar-fold.tsx";
 import { useCalendarButton } from "./use-calendar-button.ts";
 
 const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
@@ -39,7 +30,7 @@ const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
 /**
 "What are you doing?" first reads actions; the owner approves before anything is written.
 */
-const TypedStart = () => {
+const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
   const t = useT();
   const { palette } = useTheme();
   const [text, setText] = useState("");
@@ -48,6 +39,7 @@ const TypedStart = () => {
   });
   const typed = text.trim();
   const start = (): void => {
+    onUse();
     if (pending.pending !== null) {
       void pending.approve();
       return;
@@ -64,6 +56,7 @@ const TypedStart = () => {
           actions={pending.pending.actions}
           busy={pending.busy}
           onApprove={() => {
+            onUse();
             void pending.approve();
           }}
           onCancel={pending.cancel}
@@ -88,6 +81,7 @@ const TypedStart = () => {
           className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
           maxLength={200}
           onChangeText={(next) => {
+            onUse();
             pending.cancel();
             setText(next);
           }}
@@ -239,53 +233,6 @@ const BarButtons = ({
 );
 
 /**
-Whether the field and the buttons show: always on a wide window or with nothing running;
-folded when Now opens on something running on a phone, until a tap unfolds them or that
-activity stops. Folding follows the activity it was made for, so a start made in the open bar
-never folds it under the finger.
-*/
-const useFold = (runningId: null | string) => {
-  const isWide = useIsWide();
-  const [foldedFor, setFoldedFor] = useState(runningId);
-  const isFoldable = !isWide && runningId !== null;
-  const isUnfolded = foldedFor === null || foldedFor !== runningId;
-  return {
-    isFoldable,
-    isShown: !isFoldable || isUnfolded,
-    isUnfolded,
-    toggle: (): void => {
-      setFoldedFor(isUnfolded ? runningId : null);
-    },
-  };
-};
-
-const HIDDEN = { display: "none" } as const;
-
-/** The one line a phone's bar folds the field and the buttons into while something runs. */
-const FoldToggle = ({
-  isOpen,
-  onToggle,
-}: {
-  readonly isOpen: boolean;
-  readonly onToggle: () => void;
-}) => {
-  const t = useT();
-  const { palette } = useTheme();
-  const Chevron = isOpen ? ChevronDown : ChevronUp;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ expanded: isOpen }}
-      className="min-h-11 flex-row items-center justify-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
-      onPress={onToggle}
-    >
-      <Text className="font-sans text-[13px] text-fg2">{t("time.startOther")}</Text>
-      <Chevron color={palette.fg2} size={16} />
-    </Pressable>
-  );
-};
-
-/**
 The time bar at the foot of Now: what runs (and what runs alongside), "What are you
 doing?", and four buttons that never move — Calendar, Task, Chores and Rest — each opening
 what it can start. On a phone, opened on something running, the field and the buttons fold
@@ -298,7 +245,11 @@ export const TimeBar = () => {
   const calendar = useCalendarButton();
   const { close, open, opened } = usePicker(calendar.forPicker);
   const openedButton = buttons.find((button) => button.id === opened?.id) ?? null;
-  const fold = useFold(running?.activityId ?? null);
+  const lastUseRef = useRef(0);
+  const markUse = (): void => {
+    lastUseRef.current = Date.now();
+  };
+  const fold = useFold(running?.activityId ?? null, { isPicking: opened !== null, lastUseRef });
   return (
     <View
       accessibilityLabel={t("time.bar")}
@@ -311,11 +262,14 @@ export const TimeBar = () => {
       {fold.isFoldable ? <FoldToggle isOpen={fold.isUnfolded} onToggle={fold.toggle} /> : null}
       {/* Folded, the field stays mounted (hidden) so what was typed waits for the next unfold. */}
       <View className="gap-2" style={fold.isShown ? undefined : HIDDEN}>
-        <TypedStart />
+        <TypedStart onUse={markUse} />
         <BarButtons
           buttons={buttons}
           calendarUnavailable={calendar.unavailable}
-          onTap={(pressed) => void open(pressed)}
+          onTap={(pressed) => {
+            markUse();
+            void open(pressed);
+          }}
         />
       </View>
       {opened === null || openedButton === null ? null : (
@@ -323,7 +277,11 @@ export const TimeBar = () => {
           button={openedButton}
           calendar={opened.calendar}
           canGoAlongside={running !== null && !openedButton.isRunning}
-          onClose={close}
+          onClose={() => {
+            // A start picked here is the bar's own: closing must not fold it.
+            markUse();
+            close();
+          }}
         />
       )}
     </View>

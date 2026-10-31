@@ -119,6 +119,30 @@ describe("recurring task instances", () => {
     });
   });
 
+  it("moves a far deadline by the schedule's own months, short months clamped", () => {
+    // Made Oct 31, due Jan 31 three months later, every month (Moscow).
+    const monthly = envelope({
+      ...seriesCreated,
+      payload: {
+        ...seriesCreated.payload,
+        schedule: { kind: "monthly" },
+        template: {
+          ...seriesCreated.payload.template,
+          dueAt: "2027-01-31T20:59:00.000Z",
+          dueTz: "Europe/Moscow",
+          overrides: {},
+          startAt: "2026-10-31T12:27:00.000Z",
+          startTz: "Europe/Moscow",
+        },
+      },
+    });
+    const first = firstEventOf(derive([monthly], "2026-10-31T12:00:00.000Z"));
+    const second = derive([monthly, first], "2026-10-31T12:28:00.000Z");
+    expect(second[0]).toMatchObject({
+      payload: { dueAt: "2027-02-28T20:59:00.000Z", startAt: "2026-11-30T12:27:00.000Z" },
+    });
+  });
+
   it("revises an untouched future instance while leaving a manually edited one alone", () => {
     const first = firstEventOf(derive([seriesCreated], AT));
     if (first.type !== "task.created") {
