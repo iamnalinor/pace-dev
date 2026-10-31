@@ -81,6 +81,37 @@ describe("summarize", () => {
     );
   });
 
+  it("says what a rename makes of the name, as the log does (QA round 14 M1)", () => {
+    expect(en({ kind: "task.update", patch: { title: "Return them" }, taskId: BOOKS_ID })).toBe(
+      "The assistant will rename “Return library books” to “Return them”",
+    );
+    expect(ru({ kind: "task.update", patch: { title: "Вернуть" }, taskId: BOOKS_ID })).toBe(
+      "Ассистент переименует «Return library books» в «Вернуть»",
+    );
+    expect(en({ activityId: "a-1", kind: "activity.update", patch: { label: "Deep work" } })).toBe(
+      "The assistant will rename “Work” to “Deep work”",
+    );
+    expect(ru({ activityId: "a-1", kind: "activity.update", patch: { label: "Учёба" } })).toBe(
+      "Ассистент переименует «Work» в «Учёба»",
+    );
+  });
+
+  it("deletes a running activity as running since its start, not a half-open range", () => {
+    const running = artboardState(NOW, [
+      at(900, "2026-10-06T06:00:00.000Z", {
+        payload: { activityId: "a-run", category: "rest", label: "Walk" },
+        type: "activity.started",
+      }),
+    ]);
+    const world = { now: NOW, state: running, zone: MOSCOW };
+    expect(
+      summarize({ activityId: "a-run", kind: "activity.delete" }, { ...world, language: "en" }),
+    ).toBe("The assistant will delete “Walk”, running since 09:00");
+    expect(
+      summarize({ activityId: "a-run", kind: "activity.delete" }, { ...world, language: "ru" }),
+    ).toBe("Ассистент удалит «Walk», идёт с 09:00");
+  });
+
   it("names a new task by its title, and marks doubtful fields on the answer", () => {
     const body: ActionBody = {
       kind: "task.create",

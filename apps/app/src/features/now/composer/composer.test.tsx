@@ -439,7 +439,7 @@ describe("Composer", () => {
     // A second reading, dismissed: Cancel says so, once.
     await fireEvent.changeText(line(), "срочно почта");
     await enter();
-    await fireEvent.press(await screen.findByRole("button", { name: en("assistant.cancel") }));
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.cancel") }));
     await fireEvent.changeText(line(), "срочно почта!");
     await waitFor(() => {
       expect(resolved).toHaveLength(2);

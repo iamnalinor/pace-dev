@@ -34,6 +34,7 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
   const t = useT();
   const { palette } = useTheme();
   const [text, setText] = useState("");
+  const fieldRef = useRef<TextInput>(null);
   const pending = usePendingActions("activity", () => {
     setText("");
   });
@@ -57,7 +58,11 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
             onUse();
             void pending.approve();
           }}
-          onCancel={pending.cancel}
+          onCancel={() => {
+            // The card goes; the cursor goes back to the field that opened it.
+            pending.cancel();
+            fieldRef.current?.focus();
+          }}
           onFollowup={pending.followup}
           questions={pending.pending.questions}
           source={pending.pending.status}
@@ -86,6 +91,7 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           onSubmitEditing={start}
           placeholder={t("time.whatDoing")}
           placeholderTextColor={palette.muted}
+          ref={fieldRef}
           returnKeyType="go"
           value={text}
         />

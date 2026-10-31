@@ -119,6 +119,10 @@ const useFormState = (initialForm: FormOrigin | null) => {
       setForm(null);
     },
     lineFocus,
+    /** The cursor back in the line (the card it opened was dismissed). */
+    refocus: (): void => {
+      setLineFocus((count) => count + 1);
+    },
     setForm,
   };
 };
@@ -212,7 +216,7 @@ const useFlowState = ({
     edits: withSubtaskDraft(edits, model, draft.subtaskDraft),
     text,
   });
-  const { close, form, hide, lineFocus, setForm } = useFormState(initialForm);
+  const { close, form, hide, lineFocus, refocus, setForm } = useFormState(initialForm);
   const done = resetAndClose(reset, close);
   const pending = usePendingActions("task", (createdTaskId) => {
     done();
@@ -227,8 +231,11 @@ const useFlowState = ({
     pending,
     answer: pending.followup,
     close,
-    /** Escape in the line: the assistant's card goes, the text stays. */
-    dismiss: pending.cancel,
+    /** Escape or Cancel: the assistant's card goes, the text stays, the cursor back in the line. */
+    dismiss: (): void => {
+      pending.cancel();
+      refocus();
+    },
     enter: enterOf(pending, text, () => {
       setForm("by-hand");
     }),

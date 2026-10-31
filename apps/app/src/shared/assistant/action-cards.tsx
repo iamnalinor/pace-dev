@@ -125,7 +125,7 @@ const CardButtons = ({
         <KeyHint hotkey={HOTKEYS.enter} variant="primary" />
       </Pressable>
       <Pressable
-        accessibilityLabel={t("assistant.cancel")}
+        accessibilityLabel={t("common.cancel")}
         accessibilityRole="button"
         className={cx(
           "min-h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line px-3",
@@ -134,7 +134,7 @@ const CardButtons = ({
         disabled={busy}
         onPress={onCancel}
       >
-        <Text className="font-sans text-fg">{t("assistant.cancel")}</Text>
+        <Text className="font-sans text-fg">{t("common.cancel")}</Text>
         <KeyHint hotkey={HOTKEYS.escape} variant="secondary" />
       </Pressable>
     </View>

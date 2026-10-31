@@ -122,3 +122,32 @@ test("the time bar's assistant asks how long, answered with one click", async ({
   await expect(page.getByText("Expect: ~1h")).toBeVisible();
   await expect(page.getByText("The assistant could not read this. Try again.")).toHaveCount(0);
 });
+
+// QA round 14 L8: Escape in the correction field closes the card and puts the caret back in
+// the line, so the next keystroke goes somewhere.
+test("Escape in the correction field returns the caret to the line", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const line = page.getByRole("textbox", { name: "New task" });
+  await line.pressSequentially("#ask Съездить в банк");
+  await line.press("Enter");
+  const correction = page.getByRole("textbox", { name: "Correct the assistant…" });
+  await correction.click();
+  await correction.press("Escape");
+  await expect(page.getByText("The assistant will create “Съездить в банк”")).toHaveCount(0);
+  await expect(line).toBeFocused();
+});
+
+// QA round 14 M1: a rename card says what the name becomes, as the log does.
+test("a rename card says the new name", async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto("/");
+  const line = page.getByRole("textbox", { name: "New task" });
+  await line.pressSequentially("Aone");
+  await line.press("Enter");
+  await page.getByRole("button", { name: "Approve" }).click();
+  await page.goto("/");
+  await line.pressSequentially("rename task Aone to Atwo");
+  await line.press("Enter");
+  await expect(page.getByText("The assistant will rename “Aone” to “Atwo”")).toBeVisible();
+});

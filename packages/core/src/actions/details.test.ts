@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { Action } from "./schema.ts";
 
 import { at } from "../materialize/task-fixture.fake.ts";
-import { artboardState, NOW } from "../queries/fixture.fake.ts";
+import { artboardState, BOOKS_ID, NOW } from "../queries/fixture.fake.ts";
 import { addMinutesIso } from "../time.ts";
-import { actionDetails, summaryDetails } from "./details.ts";
+import { actionDetails, detailText, summaryDetails } from "./details.ts";
 
 const state = artboardState(NOW);
 const world = { language: "en" as const, state };
@@ -94,9 +94,60 @@ describe("actionDetails", () => {
     ).toEqual(["Category"]);
   });
 
+  it("says what an edit makes of each field it changes (QA round 14 M1)", () => {
+    const edit: Action = {
+      kind: "task.update",
+      patch: {
+        due: { at: "2026-10-07T15:00:00.000Z", tz: "UTC" },
+        estimateMinutes: 45,
+        importance: "asap",
+        projectId: null,
+        title: "Return them",
+      },
+      summary: "x",
+      taskId: BOOKS_ID,
+    };
+    expect(actionDetails(edit, world).map((line) => detailText(line, "en"))).toEqual([
+      "New title: Return them",
+      "Due: Wed, Oct 7, 15:00",
+      "Estimate: 45m",
+      "Importance: ASAP",
+      "Project: none",
+    ]);
+    expect(
+      actionDetails(
+        { kind: "task.update", patch: { due: null }, summary: "x", taskId: BOOKS_ID },
+        { language: "ru", state },
+      ).map((line) => detailText(line, "ru")),
+    ).toEqual(["Срок: нет"]);
+  });
+
+  it("says what an activity edit makes of its times, name and category", () => {
+    expect(
+      actionDetails(
+        {
+          activityId: "a-1",
+          kind: "activity.update",
+          patch: { category: "sport", end: "2026-10-06T07:30:00.000Z", label: "Gym" },
+          summary: "x",
+        },
+        { ...world, now: NOW },
+      ).map((line) => detailText(line, "en")),
+    ).toEqual(["End: 10:30", "Name: Gym", "Category: Sport"]);
+  });
+
   it("says nothing more for an action its summary already describes", () => {
     expect(actionDetails({ kind: "task.delete", summary: "x", taskId: "t" }, world)).toEqual([]);
   });
+});
+
+const labels = (action: Action) => summaryDetails(action, world).map((line) => line.label);
+
+const rename = (patch: Extract<Action, { kind: "task.update" }>["patch"]): Action => ({
+  kind: "task.update",
+  patch,
+  summary: "x",
+  taskId: BOOKS_ID,
 });
 
 describe("summaryDetails", () => {
@@ -108,5 +159,16 @@ describe("summaryDetails", () => {
       isDoubtful: true,
       value: "молоко",
     });
+  });
+
+  it("leaves out the new name of a rename, which its summary says, and keeps it otherwise", () => {
+    expect(labels(rename({ title: "Return them" }))).toEqual([]);
+    expect(labels(rename({ estimateMinutes: 45, title: "Return them" }))).toEqual([
+      "New title",
+      "Estimate",
+    ]);
+    expect(
+      labels({ activityId: "a-1", kind: "activity.update", patch: { label: "Gym" }, summary: "x" }),
+    ).toEqual([]);
   });
 });
