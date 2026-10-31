@@ -7,8 +7,11 @@ the phone; only what the person confirms (a sleep block) becomes an event.
 */
 export type PhoneEvent = {
   readonly at: string;
-  /** `unlock`: the lock screen went away (or Pace came to the front): someone is using the phone. */
-  readonly kind: "app-start" | "app-stop" | "screen-off" | "screen-on" | "unlock";
+  /**
+  `unlock`: the lock screen went away (or Pace came to the front): someone is using the phone.
+  `lock`: the lock screen came back; an app shown over it (an alarm, a call) is not use.
+  */
+  readonly kind: "app-start" | "app-stop" | "lock" | "screen-off" | "screen-on" | "unlock";
   /** The app's package name for app events. */
   readonly app?: string;
 };
@@ -25,9 +28,11 @@ export const WAKE_UP_MAX_MINUTES = 30;
 export const BACK_TO_SLEEP_MINUTES = 90;
 /** Wake-ups start after midnight and before this local hour; later ones are the morning. */
 const WAKE_UP_UNTIL_HOUR = 7;
-/** Local hours a sleep must start or end in: 21:00 to 12:00 the next day. */
-const NIGHT_FROM_HOUR = 21;
+/** Noon: a rest that starts after it and before bedtime starts at bedtime instead. */
 const NIGHT_UNTIL_HOUR = 12;
+/** Local hours a sleep starts in: 21:00 to 05:00 (a morning with the phone in a bag is not sleep). */
+const BEDTIME_FROM_HOUR = 21;
+const BEDTIME_UNTIL_HOUR = 5;
 
 const byTime = (events: readonly PhoneEvent[]): readonly PhoneEvent[] =>
   events.toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
@@ -49,13 +54,10 @@ export const screenOnIntervals = (
 
 const hourIn = (atIso: string, zone: string): number => Number(formatInZone(atIso, zone, "H"));
 
-const isNightHour = (hour: number): boolean => hour >= NIGHT_FROM_HOUR || hour < NIGHT_UNTIL_HOUR;
-
-/** Starts or ends in the night, or is long enough to span it. */
-const isAtNight = (stretch: Interval, zone: string): boolean =>
-  isNightHour(hourIn(stretch.startAt, zone)) ||
-  isNightHour(hourIn(stretch.endAt, zone)) ||
-  minutesBetween(stretch.startAt, stretch.endAt) >= (NIGHT_FROM_HOUR - NIGHT_UNTIL_HOUR) * 60;
+const isBedtime = (atIso: string, zone: string): boolean => {
+  const hour = hourIn(atIso, zone);
+  return hour >= BEDTIME_FROM_HOUR || hour < BEDTIME_UNTIL_HOUR;
+};
 
 export type SleepCandidate = Interval & {
   /** Asleep: the span without the wake-ups. */
@@ -64,9 +66,40 @@ export type SleepCandidate = Interval & {
   readonly wakeUps: number;
 };
 
+/** Lock-screen state at `atIso`: the last lock or unlock before it says (unlocked when unknown). */
+const isLockedAt = (sorted: readonly PhoneEvent[], atIso: string): boolean =>
+  sorted.findLast(
+    (event) => event.at <= atIso && (event.kind === "lock" || event.kind === "unlock"),
+  )?.kind === "lock";
+
 /**
-When someone was using the phone: unlocked until the screen went off, or an app in front.
-A screen lit by a notification, or only to see the time, is not use.
+Where a spell in front ends: at the screen going off. When the next thing written is the screen
+coming on (or the lock screen) instead, the screen-off was lost (the phone died): the spell is
+only known to have started, so it ends where it began rather than spanning the gap.
+*/
+const spellEnd = ({
+  index,
+  isEnd,
+  now,
+  sorted,
+}: {
+  readonly sorted: readonly PhoneEvent[];
+  readonly index: number;
+  readonly isEnd: (later: PhoneEvent) => boolean;
+  readonly now: string;
+}): string => {
+  const start = sorted[index]?.at ?? now;
+  const end = sorted.slice(index + 1).find((later) => isEnd(later) || later.kind === "screen-on");
+  if (end === undefined) {
+    return now;
+  }
+  return end.kind === "screen-on" ? start : end.at;
+};
+
+/**
+When someone was using the phone: unlocked until the screen went off, or an app in front
+while the lock screen was away. A screen lit by a notification, an alarm or a call shown over
+the lock screen, or a look at the time, is not use.
 */
 const useIntervals = (events: readonly PhoneEvent[], now: string): readonly Interval[] => {
   const sorted = byTime(events);
@@ -74,12 +107,18 @@ const useIntervals = (events: readonly PhoneEvent[], now: string): readonly Inte
     .map((event, index) => ({ event, index }))
     .filter(({ event }) => event.kind === "unlock")
     .map(({ event, index }) => ({
-      endAt: sorted.slice(index + 1).find((later) => later.kind === "screen-off")?.at ?? now,
+      endAt: spellEnd({
+        index,
+        isEnd: (later) => later.kind === "screen-off" || later.kind === "lock",
+        now,
+        sorted,
+      }),
       startAt: event.at,
     }));
-  return [...unlocked, ...foregroundIntervals(events, now)].toSorted((a, b) =>
-    a.startAt.localeCompare(b.startAt),
+  const inFront = foregroundIntervals(events, now).filter(
+    (interval) => !isLockedAt(sorted, interval.startAt),
   );
+  return [...unlocked, ...inFront].toSorted((a, b) => a.startAt.localeCompare(b.startAt));
 };
 
 /** The later of two instants (ISO strings compare in time order; `Math.max` would read them as NaN). */
@@ -98,8 +137,8 @@ const awakeSpells = (uses: readonly Interval[]): readonly Interval[] =>
 /** A night does not start before 21:00: a phone put away at 19:52 says nothing about 20:30. */
 const bedtimeFloor = (atIso: string, zone: string): string => {
   const hour = hourIn(atIso, zone);
-  return hour >= NIGHT_UNTIL_HOUR && hour < NIGHT_FROM_HOUR
-    ? wallClockInstant(formatInZone(atIso, zone, "yyyy-MM-dd"), `${NIGHT_FROM_HOUR}:00`, zone)
+  return hour >= NIGHT_UNTIL_HOUR && hour < BEDTIME_FROM_HOUR
+    ? wallClockInstant(formatInZone(atIso, zone, "yyyy-MM-dd"), `${BEDTIME_FROM_HOUR}:00`, zone)
     : atIso;
 };
 
@@ -149,7 +188,7 @@ export const detectSleep = (
         startAt,
         wakeUps,
       }))
-      .filter((night) => night.minutes >= SLEEP_MIN_MINUTES && isAtNight(night, zone))
+      .filter((night) => night.minutes >= SLEEP_MIN_MINUTES && isBedtime(night.startAt, zone))
       .toSorted((a, b) => b.minutes - a.minutes)
       .at(0) ?? null
   );
@@ -177,10 +216,11 @@ const foregroundIntervals = (
   return sorted
     .map((event, index) => ({ event, index }))
     .filter((entry): entry is { event: AppStart; index: number } => isAppStart(entry.event))
-    .map(({ event, index }) => {
-      const end = sorted.slice(index + 1).find((later) => isEndOf(event.app, later));
-      return { app: event.app, endAt: end?.at ?? now, startAt: event.at };
-    });
+    .map(({ event, index }) => ({
+      app: event.app,
+      endAt: spellEnd({ index, isEnd: (later) => isEndOf(event.app, later), now, sorted }),
+      startAt: event.at,
+    }));
 };
 
 /** Each app's spells in front (a minute or longer), by start; one still open ends at `now`. */

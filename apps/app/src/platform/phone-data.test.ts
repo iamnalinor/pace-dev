@@ -30,7 +30,14 @@ describe("toPhoneEvents", () => {
     ]);
   });
 
-  it("reads the lock screen going away, and Pace coming to the front, as an unlock", () => {
+  it("reads a shutdown as the screen going off, so a use never spans a dead phone", () => {
+    const at = Date.parse("2026-10-06T07:00:00.000Z");
+    expect(toPhoneEvents([event(26, "android", at)])).toEqual([
+      { at: "2026-10-06T07:00:00.000Z", kind: "screen-off" },
+    ]);
+  });
+
+  it("reads the lock screen coming and going, and Pace coming to the front as an unlock", () => {
     const at = Date.parse("2026-10-06T07:00:00.000Z");
     expect(
       toPhoneEvents([
@@ -43,6 +50,7 @@ describe("toPhoneEvents", () => {
       ]),
     ).toEqual([
       { at: "2026-10-06T07:00:00.000Z", kind: "screen-on" },
+      { at: "2026-10-06T07:00:00.500Z", kind: "lock" },
       { at: "2026-10-06T07:00:01.000Z", kind: "unlock" },
       { at: "2026-10-06T07:00:02.000Z", kind: "unlock" },
       { at: "2026-10-06T07:00:04.000Z", kind: "screen-off" },

@@ -21,6 +21,7 @@ const msk = (day: 7 | 8, hhmm: string): string => {
 const on = (at: string): PhoneEvent => ({ at, kind: "screen-on" });
 const off = (at: string): PhoneEvent => ({ at, kind: "screen-off" });
 const unlock = (at: string): PhoneEvent => ({ at, kind: "unlock" });
+const lock = (at: string): PhoneEvent => ({ at, kind: "lock" });
 const app = (kind: "app-start" | "app-stop", at: string, name: string): PhoneEvent => ({
   app: name,
   at,
@@ -187,6 +188,47 @@ describe("sleep detection", () => {
       minutes: 490,
       startAt: msk(7, "23:20"),
       wakeUps: 0,
+    });
+  });
+
+  it("does not stretch a use over the night when its screen-off was never written", () => {
+    // Unlocked at 23:30; the screen-off was lost (the phone died); back on at 07:40.
+    const lost = [
+      on(msk(7, "23:30")),
+      unlock(msk(7, "23:30")),
+      ...used(msk(8, "07:40"), msk(8, "07:45")),
+    ];
+    expect(sleepOf(lost, msk(8, "08:00"))).toMatchObject({
+      endAt: msk(8, "07:40"),
+      startAt: msk(7, "23:30"),
+    });
+  });
+
+  it("does not take an alarm or a call over the lock screen for use", () => {
+    const alarm = [
+      ...used(msk(7, "23:00"), msk(7, "23:30")),
+      lock(msk(7, "23:30")),
+      { app: "com.google.android.deskclock", at: msk(8, "07:00"), kind: "app-start" as const },
+      off(msk(8, "07:02")),
+      ...used(msk(8, "08:30"), msk(8, "08:40")),
+    ];
+    expect(sleepOf(alarm, msk(8, "09:00"))).toMatchObject({
+      endAt: msk(8, "08:30"),
+      wakeUps: 0,
+    });
+  });
+
+  it("prefers the night to a morning with the phone left in a bag", () => {
+    const morning = [
+      ...used(msk(7, "23:00"), msk(7, "23:30")),
+      // A long wake-up splits the night in two.
+      ...used(msk(8, "03:00"), msk(8, "03:40")),
+      ...used(msk(8, "06:30"), msk(8, "08:00")),
+      ...used(msk(8, "11:45"), msk(8, "11:50")),
+    ];
+    expect(sleepOf(morning, msk(8, "12:00"))).toMatchObject({
+      endAt: msk(8, "03:00"),
+      startAt: msk(7, "23:30"),
     });
   });
 

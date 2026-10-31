@@ -8,7 +8,10 @@ const EVENT_KIND: Readonly<Record<number, PhoneEvent["kind"]>> = {
   2: "app-stop", // ACTIVITY_PAUSED
   15: "screen-on", // SCREEN_INTERACTIVE
   16: "screen-off", // SCREEN_NON_INTERACTIVE
+  17: "lock", // KEYGUARD_SHOWN
   18: "unlock", // KEYGUARD_HIDDEN
+  // The screen goes dark with the phone; a screen-off lost to a shutdown would stretch a use.
+  26: "screen-off", // DEVICE_SHUTDOWN
 };
 
 const PACE = "dev.nalinor.pace";
