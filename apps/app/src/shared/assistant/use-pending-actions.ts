@@ -134,21 +134,85 @@ const tellLog = (
   return taskId;
 };
 
+/**
+The text of a first reading in flight, or already read to nothing: asking again would only repeat
+it (a paste is read at once, and the Enter after it may come during or after that reading; QA
+round 13 M2). A ref, not state: both can land before a render. Any edit clears it.
+*/
+const useFirstRead = () => {
+  const textRef = useRef<null | string>(null);
+  return {
+    clear: (): void => {
+      textRef.current = null;
+    },
+    /** Kept only for a reading that found nothing: a preview is approved, a failure retried. */
+    ended: (text: string, thread: Thread, isNothing: boolean): void => {
+      textRef.current = isNothing && thread.length === 0 ? text : null;
+    },
+    isRepeat: (text: string): boolean => textRef.current === text,
+    started: (text: string, thread: Thread): void => {
+      textRef.current = thread.length === 0 ? text : null;
+    },
+  };
+};
+
+/** Approve: the actions written once (a second press waits), then the log told what they made. */
+const useApprove = ({
+  busy,
+  onApplied,
+  pending,
+  setBusy,
+  setPending,
+}: {
+  readonly busy: boolean;
+  readonly onApplied: (createdTaskId: null | string) => void;
+  readonly pending: null | Pending;
+  readonly setBusy: (isBusy: boolean) => void;
+  readonly setPending: (pending: null | Pending) => void;
+}) => {
+  const { actions, assistant } = usePace();
+  const t = useT();
+  const run = useRunAction();
+  const isApprovingRef = useRef(false);
+  return async (): Promise<void> => {
+    if (pending === null || busy || isApprovingRef.current) {
+      return;
+    }
+    isApprovingRef.current = true;
+    setBusy(true);
+    try {
+      const result = await actions.applyActions(pending.actions);
+      const written = result.ok ? [...result.value] : [];
+      const isSuccess = await run(
+        Promise.resolve(result),
+        approvalFeedback({ actions, run, t, written }),
+      );
+      if (!isSuccess) {
+        return;
+      }
+      setPending(null);
+      onApplied(tellLog(assistant, pending, { resolution: "approved", written }));
+    } finally {
+      isApprovingRef.current = false;
+      setBusy(false);
+    }
+  };
+};
+
 /** One conversation with the assistant; a correction replaces actions before any write. */
 export const usePendingActions = (
   domain: "activity" | "task",
   onApplied: (createdTaskId: null | string) => void,
 ) => {
-  const { actions, assistant } = usePace();
-  const t = useT();
-  const run = useRunAction();
+  const { assistant } = usePace();
   const [pending, setPending] = useState<null | Pending>(null);
   const [issue, setIssue] = useState<MessageKey | null>(null);
   const [busy, setBusy] = useState(false);
   const requestRef = useRef(0);
-  const isApprovingRef = useRef(false);
+  const firstRead = useFirstRead();
   const read = async (text: string, thread: Thread, decisionIds: Ids = []): Promise<void> => {
     const current = ++requestRef.current;
+    firstRead.started(text, thread);
     setBusy(true);
     setIssue(null);
     if (thread.length === 0) {
@@ -158,8 +222,8 @@ export const usePendingActions = (
     if (current !== requestRef.current) {
       return;
     }
-
     const next = pendingOf(answer, { decisionIds, text, thread });
+    firstRead.ended(text, thread, next === null && answer?.status === "parsed");
     if (next === null) {
       setIssue(readingIssue(answer, { domain, isRevision: thread.length > 0 }));
     } else {
@@ -170,6 +234,7 @@ export const usePendingActions = (
   const drop = (resolution: "cancelled" | "inbox"): void => {
     tellLog(assistant, pending, { resolution });
     requestRef.current += 1;
+    firstRead.clear();
     setPending(null);
     setIssue(null);
     setBusy(false);
@@ -179,7 +244,9 @@ export const usePendingActions = (
     issue,
     pending,
     submit: (text: string): void => {
-      void read(text, []);
+      if (!firstRead.isRepeat(text)) {
+        void read(text, []);
+      }
     },
     followup: (text: string): void => {
       revise(pending, text, { read, setIssue });
@@ -192,28 +259,6 @@ export const usePendingActions = (
     cancel: (): void => {
       drop("cancelled");
     },
-    approve: async (): Promise<void> => {
-      if (pending === null || busy || isApprovingRef.current) {
-        return;
-      }
-      isApprovingRef.current = true;
-      setBusy(true);
-      try {
-        const result = await actions.applyActions(pending.actions);
-        const written = result.ok ? [...result.value] : [];
-        const isSuccess = await run(
-          Promise.resolve(result),
-          approvalFeedback({ actions, run, t, written }),
-        );
-        if (!isSuccess) {
-          return;
-        }
-        setPending(null);
-        onApplied(tellLog(assistant, pending, { resolution: "approved", written }));
-      } finally {
-        isApprovingRef.current = false;
-        setBusy(false);
-      }
-    },
+    approve: useApprove({ busy, onApplied, pending, setBusy, setPending }),
   };
 };

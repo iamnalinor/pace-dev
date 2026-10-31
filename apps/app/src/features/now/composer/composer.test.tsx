@@ -263,6 +263,40 @@ describe("Composer", () => {
     expect(parse).toHaveBeenCalledTimes(1);
   });
 
+  it("asks once when Enter comes before the paste's reading has re-rendered", async () => {
+    const { promise: answered, resolve } = Promise.withResolvers<unknown>();
+    const parse = jest.fn(async () => await answered);
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    // A browser's fill and Enter land in one tick: no render between them.
+    await act(async () => {
+      void fireEvent.changeText(line(), "rename task Gamma to Delta");
+      void fireEvent(line(), "submitEditing");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      resolve(PARSED);
+      await answered;
+    });
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask again on Enter when the pasted line was already read to nothing", async () => {
+    const parse = jest.fn(() => ({ ...PARSED, actions: [] }));
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    await fireEvent.changeText(line(), "rename task Gamma to Delta");
+    expect(await screen.findByText(en("assistant.nothingToDo"))).toBeOnTheScreen();
+    await enter();
+    expect(screen.getByText(en("assistant.nothingToDo"))).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+    // An edit is a new line: Enter reads it.
+    await fireEvent.changeText(line(), "rename task Gamma to Delta!");
+    await enter();
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("says the assistant found nothing to do instead of asking to try again", async () => {
     const nothing = { ...PARSED, actions: [] };
     await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => nothing } }));
