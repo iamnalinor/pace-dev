@@ -166,6 +166,63 @@ describe("Composer", () => {
     expect(screen.getByText("When is it due?")).toBeOnTheScreen();
   });
 
+  it("answers the assistant's question with one tap: the option goes as a correction with the thread", async () => {
+    const asking = {
+      ...PARSED,
+      questions: [
+        { field: "dueDate", options: ["Today", "Tomorrow"], question: "When is it due?" },
+        { field: "category", options: [], question: "Is this for work or home?" },
+      ],
+    };
+    const { promise: revised, resolve: revise } = Promise.withResolvers<unknown>();
+    const parse = jest.fn<unknown, [{ readonly body: unknown }]>(() => asking);
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    const question = await screen.findByLabelText("When is it due?");
+    // Approve stays: the hint says it keeps the guesses and that an answer refines them.
+    expect(screen.getByText(en("assistant.questionsHint"))).toBeOnTheScreen();
+    expect(button("assistant.approve")).toBeEnabled();
+    // A question without options is answered in the correction field: it has no buttons.
+    expect(screen.getByText("Is this for work or home?")).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Is this for work or home?")).toBeNull();
+    expect(screen.getByLabelText(en("assistant.correct"))).toBeOnTheScreen();
+
+    parse.mockImplementation(async () => await revised);
+    await fireEvent.press(within(question).getByRole("button", { name: "Tomorrow" }));
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+    expect(parse.mock.calls[1]?.[0].body).toMatchObject({
+      domain: "task",
+      text: "«When is it due?» — Tomorrow",
+      thread: [{ actions: PARSED.actions, text: "срочно почта" }],
+    });
+    // Pending: no second answer can start, and nothing was written.
+    expect(within(question).getByRole("button", { name: "Today" })).toBeDisabled();
+    expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeDisabled();
+    expect(created(runtime, "разобрать почту")).toBeUndefined();
+
+    await act(async () => {
+      revise(PARSED);
+      await revised;
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText("When is it due?")).toBeNull();
+    });
+    expect(screen.queryByText(en("assistant.questionsHint"))).toBeNull();
+    expect(screen.getByText("New task: разобрать почту")).toBeOnTheScreen();
+  });
+
+  it("shows no answer hint while the assistant asks nothing", async () => {
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.questionsHint"))).toBeNull();
+  });
+
   it("discards a preview when its source line changes", async () => {
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
     await renderComposer(runtime);

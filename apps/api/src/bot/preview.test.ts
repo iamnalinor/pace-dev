@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { EventInput } from "@pace/core";
-
+import { blankModelAction, type EventInput, type ModelOutput } from "@pace/core";
 import { artboardState, NOW, REPLY_ID } from "@pace/core/testing";
 
 import type { BotStoreApi, JsonValue } from "../shared/contract.ts";
-import type { Turn } from "./turn.ts";
+import type { BotReply, Turn } from "./turn.ts";
 
 import { echoReply, fakeParseModel } from "../shared/llm/fake-model.ts";
-import { choosePreview, preview, PREVIEW_ACTIONS } from "./preview.ts";
+import { PREVIEW_ACTIONS } from "./preview-buttons.ts";
+import { choosePreview, preview } from "./preview.ts";
 
 /** A store in memory: what the bot remembers, and every batch it writes. */
 const memoryStore = () => {
@@ -30,13 +30,18 @@ const memoryStore = () => {
     noteLlmLimits: async () => {
       await Promise.resolve();
     },
-    recall: async (key: string) => kept.get(key),
+    peek: async (key: string) => kept.get(key),
+    recall: async (key: string) => {
+      const value = kept.get(key);
+      kept.delete(key);
+      return value;
+    },
     remember: async (key: string, value: JsonValue) => {
       await Promise.resolve();
       kept.set(key, value);
     },
   } as unknown as BotStoreApi;
-  return { store, written };
+  return { kept, store, written };
 };
 
 const LATER = "2026-10-06T12:30:00.000Z";
@@ -69,5 +74,144 @@ describe("the bot's preview", () => {
         }),
       ],
     ]);
+  });
+});
+
+/** A model that asks two questions about a new task, the first with options; it notes what it read. */
+const askingModel = () => {
+  const read: { readonly text: string; readonly system: string }[] = [];
+  const reply = (text: string, system: string): ModelOutput => {
+    read.push({ system, text });
+    return {
+      actions: [blankModelAction({ kind: "task.create", title: "Съездить в банк" })],
+      confidence: 1,
+      domain: "task",
+      questions: [
+        {
+          field: "dueDate",
+          options: ["Today", "Tomorrow"],
+          question: "By when does this need to be done?",
+        },
+        { field: "category", options: [], question: "Is this for work or home?" },
+      ],
+    };
+  };
+  return { providers: [{ model: fakeParseModel(reply), name: "fake" }], read };
+};
+
+/** Every button of a reply with callback data: its label and data. */
+const buttonsOf = (reply: BotReply) =>
+  reply.buttons
+    .flat()
+    .filter((button) => "data" in button)
+    .map((button) => ({ data: button.data, label: button.label }));
+
+/** Two questions with options: the second's buttons must say which question they answer. */
+const twoAsked = (): ModelOutput => ({
+  actions: [blankModelAction({ kind: "task.create", title: "Съездить в банк" })],
+  confidence: 1,
+  domain: "task",
+  questions: [
+    { field: "dueDate", options: ["Today"], question: "When?" },
+    { field: "category", options: ["Work", "Home"], question: "Work or home?" },
+  ],
+});
+
+describe("the bot's answers to the assistant's questions", () => {
+  it("offers a question's options as buttons that point at them by index, never by text", async () => {
+    const { kept, store } = memoryStore();
+    const { providers } = askingModel();
+    const shown = await preview(
+      { now: NOW, state: artboardState(NOW), store },
+      providers,
+      "Съездить в банк",
+    );
+    const id = shown.pendingId ?? "";
+    const buttons = buttonsOf(shown);
+    expect(buttons.map((button) => button.label)).toEqual([
+      "Today",
+      "Tomorrow",
+      "Approve",
+      "To Inbox",
+      "Cancel",
+    ]);
+    expect(buttons.slice(0, 2).map((button) => button.data)).toEqual([
+      `${PREVIEW_ACTIONS.answer}00:${id}`,
+      `${PREVIEW_ACTIONS.answer}01:${id}`,
+    ]);
+    for (const button of buttons) {
+      expect(new TextEncoder().encode(button.data).length).toBeLessThanOrEqual(64);
+    }
+    expect(shown.text).toContain("Question: By when does this need to be done?");
+    expect(shown.text).toContain("Question: Is this for work or home?");
+    expect(shown.text).toContain("Tap an answer below or reply with a correction.");
+    // The questions are kept with the preview, so a press can be checked against them.
+    expect(kept.get(id)).toMatchObject({
+      questions: [{ options: ["Today", "Tomorrow"] }, { options: [] }],
+    });
+  });
+
+  it("numbers the questions and their buttons when more than one has options", async () => {
+    const { store } = memoryStore();
+    const shown = await preview(
+      { now: NOW, state: artboardState(NOW), store },
+      [{ model: fakeParseModel(twoAsked), name: "fake" }],
+      "Съездить в банк",
+    );
+    expect(shown.text).toContain("Question 1: When?");
+    expect(shown.text).toContain("Question 2: Work or home?");
+    expect(
+      buttonsOf(shown)
+        .map((button) => button.label)
+        .slice(0, 3),
+    ).toEqual(["1. Today", "2. Work", "2. Home"]);
+  });
+
+  it("sends a pressed option as the same correction a typed reply makes, the question quoted", async () => {
+    const { kept, store } = memoryStore();
+    const { providers, read } = askingModel();
+    const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+    const shown = await preview(turn, providers, "Съездить в банк");
+    const id = shown.pendingId ?? "";
+    const revised = await choosePreview(turn, providers, {
+      action: `${PREVIEW_ACTIONS.answer}01`,
+      id,
+    });
+    expect(read.at(-1)?.text).toBe("«By when does this need to be done?» — Tomorrow");
+    expect(read.at(-1)?.system).toContain("1. Owner: Съездить в банк");
+    // A new preview replaces the answered one, which is gone.
+    expect(revised.pendingId).toBeDefined();
+    expect(revised.pendingId).not.toBe(id);
+    expect(revised.isRefused).toBeUndefined();
+    expect(kept.has(id)).toBe(false);
+    expect(kept.get(revised.pendingId ?? "")).toMatchObject({
+      request: "Съездить в банк",
+      text: "«By when does this need to be done?» — Tomorrow",
+      thread: [{ text: "Съездить в банк" }],
+    });
+  });
+
+  it("answers a stale or forged press with a toast, asks nothing and keeps the message", async () => {
+    const { kept, store } = memoryStore();
+    const { providers, read } = askingModel();
+    const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+    const shown = await preview(turn, providers, "Съездить в банк");
+    const id = shown.pendingId ?? "";
+    const asked = read.length;
+    for (const press of [
+      { action: `${PREVIEW_ACTIONS.answer}02`, id },
+      { action: `${PREVIEW_ACTIONS.answer}10`, id },
+      { action: `${PREVIEW_ACTIONS.answer}90`, id },
+      { action: `${PREVIEW_ACTIONS.answer}00`, id: "01JUNKNOWNPREVIEW000000000" },
+    ]) {
+      expect(await choosePreview(turn, providers, press)).toEqual({
+        buttons: [],
+        isToast: true,
+        text: "This preview has expired. Send the message again.",
+      });
+    }
+    expect(read).toHaveLength(asked);
+    // The real preview is still there to answer or approve.
+    expect(kept.has(id)).toBe(true);
   });
 });

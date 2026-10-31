@@ -5,6 +5,7 @@ import {
   detailText,
   type Language,
   openInstanceOf,
+  type ParseQuestion,
   summaryDetails,
   t,
 } from "@pace/core";
@@ -41,18 +42,37 @@ const describeOther = (action: Action, { language, state }: Extras): string =>
     ...summaryDetails(action, { language, state }).map((line) => detailText(line, language)),
   ].join("\n");
 
+/** Questions are numbered once more than one has options: their buttons carry the number. */
+export const isNumbered = (questions: readonly ParseQuestion[]): boolean =>
+  questions.filter((question) => question.options.length > 0).length > 1;
+
+/** The assistant's questions, numbered when needed, and how to answer them if they have options. */
+const describeQuestions = (
+  questions: readonly ParseQuestion[],
+  language: Language,
+): readonly string[] => {
+  const isNumberedList = isNumbered(questions);
+  const asked = questions.map(({ question }, index) =>
+    isNumberedList
+      ? t(language, "bot.questionNumbered", { number: String(index + 1), question })
+      : t(language, "bot.question", { question }),
+  );
+  return questions.some((question) => question.options.length > 0)
+    ? [...asked, t(language, "bot.answerHint")]
+    : asked;
+};
+
 /**
 The preview message: a new task as its fields (doubtful ones marked), anything else by its
 summary and what it sets, as the app's cards show it, then the assistant's questions.
 */
 export const describeActions = (
   actions: readonly Action[],
-  extras: Extras & { readonly questions: readonly string[] },
+  extras: Extras & { readonly questions: readonly ParseQuestion[] },
 ): string => {
   const { language, questions } = extras;
-  const asked = questions.map((question) => t(language, "bot.question", { question }));
   const described = actions.map((action) =>
     action.kind === "task.create" ? describeCreate(action, extras) : describeOther(action, extras),
   );
-  return [...described, ...asked].join("\n");
+  return [...described, ...describeQuestions(questions, language)].join("\n");
 };

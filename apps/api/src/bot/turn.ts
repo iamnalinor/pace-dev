@@ -9,6 +9,11 @@ message it came from stays as it was, buttons and all, to be tapped again.
 */
 export type BotReply = OutgoingMessage & {
   readonly isRefused?: true;
+  /**
+  A button's answer told as a brief toast, the message left as it was: a press of a button
+  whose preview is gone, or that points at nothing in it.
+  */
+  readonly isToast?: true;
   readonly pendingId?: string;
   readonly editMessageId?: number;
 };

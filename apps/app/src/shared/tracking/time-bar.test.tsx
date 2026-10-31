@@ -441,6 +441,31 @@ describe("TimeBar", () => {
     expect(field).toHaveDisplayValue("");
   });
 
+  it("answers the assistant's question about an activity with one tap", async () => {
+    const parse = jest.fn<unknown, [{ readonly body: unknown }]>(() => ({
+      ...CSS_READ,
+      questions: [
+        { field: "expectMinutes", options: ["20m", "1h"], question: "How long will it take?" },
+      ],
+    }));
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС");
+    await fireEvent(field, "submitEditing");
+    const question = await screen.findByLabelText("How long will it take?");
+    await fireEvent.press(within(question).getByRole("button", { name: "1h" }));
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+    expect(parse.mock.calls[1]?.[0].body).toMatchObject({
+      domain: "activity",
+      text: "«How long will it take?» — 1h",
+      thread: [{ actions: CSS_READ.actions, text: "Пошел в ЦСС" }],
+    });
+    expect(activities(runtime)).toEqual([]);
+  });
+
   it("says the thread is full on a sixth correction instead of dropping it", async () => {
     const parse = jest.fn(() => CSS_READ);
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });

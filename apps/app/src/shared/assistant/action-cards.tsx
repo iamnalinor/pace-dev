@@ -2,10 +2,17 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
-import { type Action, detailText, type ParseQuestion, summaryDetails } from "@pace/core";
+import {
+  type Action,
+  answerText,
+  detailText,
+  type ParseQuestion,
+  summaryDetails,
+} from "@pace/core";
 
 /**
 One action as it will be written: its summary, then what it sets (a new task's category, due,
@@ -40,7 +47,7 @@ type Props = {
   readonly onApprove: () => void;
   readonly onCancel: () => void;
   readonly onFollowup: (text: string) => void;
-  /** The assistant's questions about what stays unclear: a correction answers them. */
+  /** The assistant's questions about what stays unclear: an option or a correction answers them. */
   readonly questions?: readonly ParseQuestion[];
   readonly source?: "parsed" | "unavailable";
 };
@@ -91,6 +98,51 @@ const CorrectionRow = ({
   );
 };
 
+/**
+One of the assistant's questions, its options under it as buttons: a tap sends that answer as
+a correction (the question quoted, so the model knows what it answers), the same path as a
+typed one. A question without options is answered by typing.
+*/
+const QuestionBlock = ({
+  busy,
+  onFollowup,
+  question,
+}: {
+  readonly busy: boolean;
+  readonly onFollowup: (text: string) => void;
+  readonly question: ParseQuestion;
+}) => {
+  const text = (
+    <Text className="font-sans text-[13px] leading-5 text-question">{question.question}</Text>
+  );
+  if (question.options.length === 0) {
+    return text;
+  }
+  return (
+    <View accessibilityLabel={question.question} role="group">
+      {text}
+      <View className="flex-row flex-wrap gap-x-2">
+        {question.options.map((option) => (
+          <Pressable
+            accessibilityLabel={option}
+            accessibilityRole="button"
+            className={cx("h-11 justify-center active:opacity-80", busy && "opacity-50")}
+            disabled={busy}
+            key={option}
+            onPress={() => {
+              onFollowup(answerText(question.question, option));
+            }}
+          >
+            <View className="h-8 justify-center rounded-pill border border-line bg-bg px-3">
+              <Text className="font-sans text-[13px] text-fg">{option}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 /** An answer stays pending until the person approves its full current set of actions. */
 export const ActionCards = ({
   actions,
@@ -124,10 +176,18 @@ export const ActionCards = ({
         <ActionCard action={action} key={`${action.kind}:${String(index)}`} />
       ))}
       {questions.map((question) => (
-        <Text className="font-sans text-[13px] leading-5 text-question" key={question.question}>
-          {question.question}
-        </Text>
+        <QuestionBlock
+          busy={busy}
+          key={question.question}
+          onFollowup={onFollowup}
+          question={question}
+        />
       ))}
+      {questions.length > 0 && actions.length > 0 ? (
+        <Text className="font-sans text-[13px] leading-5 text-muted">
+          {t("assistant.questionsHint")}
+        </Text>
+      ) : null}
       <View className="flex-row gap-2">
         <Pressable
           accessibilityRole="button"

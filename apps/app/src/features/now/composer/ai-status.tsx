@@ -6,10 +6,11 @@ import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Chip } from "#app/ui/chip.tsx";
+import { answerText } from "@pace/core";
 
 type Props = {
   readonly state: AiState;
-  /** An answer to one of the assistant's questions goes into the line. */
+  /** An answer to one of the assistant's questions, its question quoted, goes as a correction. */
   readonly onAnswer: (answer: string) => void;
   /** "Read it when it's back": the server keeps the line and adds it once it can read it. */
   readonly onLater: () => void;
@@ -51,7 +52,7 @@ const Reading = ({
               <Chip
                 key={option}
                 onPress={() => {
-                  onAnswer(option);
+                  onAnswer(answerText(question.question, option));
                 }}
                 selected={false}
               >

@@ -320,6 +320,18 @@ The same rule applies when a previously successful channel is no longer configur
 - **Bug.** After PR 2 replaced the Groq provider with a generic OpenAI-compatible one, production showed "Assistant unavailable" on every message (owner, 2026-10-31). The compatible provider sends a JSON schema only when told the endpoint supports structured outputs; without the flag it asked for bare JSON, the model's answer did not fit the schema, and the failure was folded into "every provider is out" with nothing in the logs. The key was fine. Gemini's OpenAI layer then refused the schema itself (400) over its length limits.
 - **Missed because.** Every test ran the in-process fake, which answers in shape whatever the request says; nothing checked what goes over the wire, and nothing called the real endpoint before release (the regression runner does not exist). The error path dropped the cause, so even production gave no hint.
 - **Rule.** For every external integration, test the request it sends for the capability we rely on (a stubbed `fetch` that inspects the body: schema present, streaming on), not only the parsing of a happy answer. Log each failure with its status and the start of the body. After changing a provider, its config or its schema, run the real endpoints once (all configured slots) before the release, and write the result in the PR.
+### 41. A producer's field carried end to end and used nowhere
+- **Bug.** The model answers each question with up to six `options`; the schema checked them, the API passed
+  them on, and neither the app's cards nor the bot showed them. A question could only be answered by typing a
+  correction, Approve gave no hint that it ignores open questions, and the composer's older reading chips sent
+  the bare option ("Tomorrow") without the question it answered (QA round 11 M1).
+- **Missed because.** Tests asserted the question's text and stopped there: no test asked what each field of
+  the answer is for, and the fixtures' options were never looked at. Schema and contract tests prove a field
+  arrives, not that anyone reads it.
+- **Rule.** Every field a producer (the model, a server answer) sends has a named consumer, or it is dropped
+  from the contract. A field meant for the person (options, a hint, a field label) has a UI test on each
+  surface that shows it (app and bot) that acts on it, not only renders it. An answer the person gives to a
+  question goes as one shared text (`answerText` in `@pace/core`), so every surface sends the same correction.
 
 ## Log
 
@@ -416,3 +428,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-10-31 | QA round 11 M5: the Russian Wipe/Delete confirm label wrapped to three lines and spilled out of the 48 px button | 5 | yes: `Button` had a fixed height; it now has a minimum height and grows with a wrapped, centred label (every button) | QA round 12 checks RU at 390 px (layout is not visible to unit tests) |
 | 2026-10-31 | QA round 11 M6: Task's picker listed a series' instances as identical rows | 2 | yes: the picker drew rows with no meta while Now's rows show the deadline; it now uses the same meta | time-bar test: two "Rent" tasks with different deadlines read differently |
 | 2026-10-31 | "Assistant unavailable" in production for every message: the OpenAI-compatible provider was created without `supportsStructuredOutputs`, so Groq got no JSON schema and its answers failed the check; Gemini's OpenAI layer refused the schema's length limits (400) | 40 (new) | yes: `providers.ts` is the only place models are created (the LLM layer was rewritten into numbered slots raced with a 5 s first-token hedge); `runStructured` was the only call path and swallowed causes, now every failure is logged with status and body; the model is shown the schema without length limits while zod still checks them | llm tests: a stubbed `fetch` sees `response_format: json_schema` and `stream: true` (fails without the flag), providers report structured outputs; real-endpoint run of all slots before release noted in the PR |
+| 2026-10-31 | QA round 11 M1: the assistant's question options were shown nowhere (app cards, bot); Approve gave no hint it ignores open questions | 41 (new) | yes: the questions' other consumers (the bot's text, the composer's older reading chips, which sent the bare option without its question); `question.field` is still shown only through the question's own words | core `answerText`/`answerAt` tests; composer and time-bar option-tap tests (pending state included); bot preview and webhook tests for option buttons, index-only callback data under 64 bytes and stale presses; e2e `#ask` answered by keyboard with axe; QA's every-way-in table |

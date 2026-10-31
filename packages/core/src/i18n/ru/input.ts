@@ -205,4 +205,6 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
     "Не удалось уточнить действия. Предыдущий вариант сохранён на экране.",
   "assistant.tooManyCorrections":
     "Это уже пять уточнений. Подтвердите или отмените и начните заново.",
+  "assistant.questionsHint":
+    "«Подтвердить» сохранит всё как показано. Ответьте на вопросы, чтобы уточнить.",
 };

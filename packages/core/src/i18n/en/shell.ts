@@ -269,6 +269,8 @@ export const enShell = {
   "bot.nowEmpty": "Nothing to do right now.",
   "bot.nowTitle": "Now:",
   "bot.question": "Question: {question}",
+  "bot.questionNumbered": "Question {number}: {question}",
+  "bot.answerHint": "Tap an answer below or reply with a correction. Approve keeps what is shown.",
   "decisions.title": "Assistant log",
   "decisions.search": "Search decisions",
   "decisions.empty": "No decisions yet.",
