@@ -96,21 +96,33 @@ jobs:
         run: if [ -n "$WEBHOOK_SECRET" ]; then printf '%s' "$WEBHOOK_SECRET" | bunx wrangler secret put TELEGRAM_WEBHOOK_SECRET; fi
 
       # The LLM endpoints, in priority order: LLM_BASE_URL_N, LLM_API_KEY_N and LLM_MODEL_N for
-      # any N, each a GitHub secret or variable (keys belong in secrets). A slot may list several
-      # models and keys, comma separated; slot 1 is asked first. This step only runs jq over all
-      # secrets and keeps the LLM_*_N ones in a file, so no other tool sees the rest. Keep it so:
-      # nothing but jq may run in this step.
+      # N = 1..5, each a GitHub secret or variable (keys belong in secrets). A slot may list
+      # several models and keys, comma separated; slot 1 is asked first. Each name is spelled
+      # out: a workflow reading all secrets at once (`toJSON(secrets)`) is held by GitHub for
+      # approval and never runs. More slots: add their names here and in llm-regression.yml.
       - name: Collect LLM endpoints
         env:
-          GITHUB_SECRETS: ${{ toJSON(secrets) }}
-          GITHUB_VARS: ${{ toJSON(vars) }}
+          LLM_BASE_URL_1: ${{ secrets.LLM_BASE_URL_1 || vars.LLM_BASE_URL_1 }}
+          LLM_API_KEY_1: ${{ secrets.LLM_API_KEY_1 || vars.LLM_API_KEY_1 }}
+          LLM_MODEL_1: ${{ secrets.LLM_MODEL_1 || vars.LLM_MODEL_1 }}
+          LLM_BASE_URL_2: ${{ secrets.LLM_BASE_URL_2 || vars.LLM_BASE_URL_2 }}
+          LLM_API_KEY_2: ${{ secrets.LLM_API_KEY_2 || vars.LLM_API_KEY_2 }}
+          LLM_MODEL_2: ${{ secrets.LLM_MODEL_2 || vars.LLM_MODEL_2 }}
+          LLM_BASE_URL_3: ${{ secrets.LLM_BASE_URL_3 || vars.LLM_BASE_URL_3 }}
+          LLM_API_KEY_3: ${{ secrets.LLM_API_KEY_3 || vars.LLM_API_KEY_3 }}
+          LLM_MODEL_3: ${{ secrets.LLM_MODEL_3 || vars.LLM_MODEL_3 }}
+          LLM_BASE_URL_4: ${{ secrets.LLM_BASE_URL_4 || vars.LLM_BASE_URL_4 }}
+          LLM_API_KEY_4: ${{ secrets.LLM_API_KEY_4 || vars.LLM_API_KEY_4 }}
+          LLM_MODEL_4: ${{ secrets.LLM_MODEL_4 || vars.LLM_MODEL_4 }}
+          LLM_BASE_URL_5: ${{ secrets.LLM_BASE_URL_5 || vars.LLM_BASE_URL_5 }}
+          LLM_API_KEY_5: ${{ secrets.LLM_API_KEY_5 || vars.LLM_API_KEY_5 }}
+          LLM_MODEL_5: ${{ secrets.LLM_MODEL_5 || vars.LLM_MODEL_5 }}
         run: |
-          jq -n --argjson s "$GITHUB_SECRETS" --argjson v "$GITHUB_VARS" \
-            '($v + $s) | with_entries(select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_(0|[1-9][0-9]*)$"))
+          jq -n 'env | with_entries(select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[0-9]+$"))
                | .value |= gsub("^\\s+|\\s+$"; "")) | with_entries(select(.value != ""))' \
             > "$RUNNER_TEMP/llm.json"
-          # A trimmed secret is a new string: mask it like the secret it came from.
-          jq -r --argjson s "$GITHUB_SECRETS" 'to_entries[] | select(.key | in($s)) | .value' "$RUNNER_TEMP/llm.json" \
+          # A trimmed key is a new string: mask it like the secret it came from.
+          jq -r 'to_entries[] | select(.key | startswith("LLM_API_KEY_")) | .value' "$RUNNER_TEMP/llm.json" \
             | while IFS= read -r value; do echo "::add-mask::$value"; done
 
       # Every LLM_*_N found is pushed to the Worker; numbered slots GitHub no longer has and the

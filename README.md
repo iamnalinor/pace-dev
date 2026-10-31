@@ -208,7 +208,7 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `LLM_BASE_URL_N` | variable (secret also accepted) | deploy, llm-regression | OpenAI-compatible API prefix of LLM slot N (any number, 1 is asked first), including its `/v1` path; set together with `LLM_API_KEY_N` and `LLM_MODEL_N` |
+| `LLM_BASE_URL_N` | variable (secret also accepted) | deploy, llm-regression | OpenAI-compatible API prefix of LLM slot N (1–5 from GitHub, any N set on the Worker directly; 1 is asked first), including its `/v1` path; set together with `LLM_API_KEY_N` and `LLM_MODEL_N` |
 | `LLM_MODEL_N` | variable (secret also accepted) | deploy, llm-regression | one or more model identifiers of slot N, comma separated, each its own priority |
 | `LLM_API_KEY_N` | secret | deploy, llm-regression | one or more keys of slot N, comma or newline separated; a rate-limited key rests while the next one answers |
 | `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
@@ -220,7 +220,7 @@ Worker secrets are pushed with `wrangler secret put` only when the GitHub secret
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
 Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME`,
 `TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`. Deploy pushes every
-`LLM_*_N` it finds among the GitHub secrets and variables, removes numbered slots GitHub no
+`LLM_*_N` (N = 1–5) it finds among the GitHub secrets and variables, removes numbered slots GitHub no
 longer has, and leaves the Worker's LLM settings alone when GitHub has none (so endpoints set
 with `wrangler secret put` survive). For local Worker development, copy
 `apps/api/.dev.vars.example` to `apps/api/.dev.vars` and fill in a slot.

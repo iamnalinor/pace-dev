@@ -21,15 +21,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      # Every LLM_BASE_URL_N / LLM_API_KEY_N / LLM_MODEL_N secret or variable, as in deploy.yml.
+      # LLM_BASE_URL_N / LLM_API_KEY_N / LLM_MODEL_N for N = 1..5, as in deploy.yml (spelled out:
+      # `toJSON(secrets)` makes GitHub hold the run for approval).
       - name: LLM endpoints
         env:
-          GITHUB_SECRETS: ${{ toJSON(secrets) }}
-          GITHUB_VARS: ${{ toJSON(vars) }}
+          LLM_BASE_URL_1: ${{ secrets.LLM_BASE_URL_1 || vars.LLM_BASE_URL_1 }}
+          LLM_API_KEY_1: ${{ secrets.LLM_API_KEY_1 || vars.LLM_API_KEY_1 }}
+          LLM_MODEL_1: ${{ secrets.LLM_MODEL_1 || vars.LLM_MODEL_1 }}
+          LLM_BASE_URL_2: ${{ secrets.LLM_BASE_URL_2 || vars.LLM_BASE_URL_2 }}
+          LLM_API_KEY_2: ${{ secrets.LLM_API_KEY_2 || vars.LLM_API_KEY_2 }}
+          LLM_MODEL_2: ${{ secrets.LLM_MODEL_2 || vars.LLM_MODEL_2 }}
+          LLM_BASE_URL_3: ${{ secrets.LLM_BASE_URL_3 || vars.LLM_BASE_URL_3 }}
+          LLM_API_KEY_3: ${{ secrets.LLM_API_KEY_3 || vars.LLM_API_KEY_3 }}
+          LLM_MODEL_3: ${{ secrets.LLM_MODEL_3 || vars.LLM_MODEL_3 }}
+          LLM_BASE_URL_4: ${{ secrets.LLM_BASE_URL_4 || vars.LLM_BASE_URL_4 }}
+          LLM_API_KEY_4: ${{ secrets.LLM_API_KEY_4 || vars.LLM_API_KEY_4 }}
+          LLM_MODEL_4: ${{ secrets.LLM_MODEL_4 || vars.LLM_MODEL_4 }}
+          LLM_BASE_URL_5: ${{ secrets.LLM_BASE_URL_5 || vars.LLM_BASE_URL_5 }}
+          LLM_API_KEY_5: ${{ secrets.LLM_API_KEY_5 || vars.LLM_API_KEY_5 }}
+          LLM_MODEL_5: ${{ secrets.LLM_MODEL_5 || vars.LLM_MODEL_5 }}
         run: |
-          jq -nr --argjson s "$GITHUB_SECRETS" --argjson v "$GITHUB_VARS" \
-            '($v + $s) | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_(0|[1-9][0-9]*)$"))
-             | "\(.key)=\(.value | gsub("[\\r\\n]+"; ","))"' > "$RUNNER_TEMP/llm.env"
+          jq -nr 'env | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_[0-9]+$"))
+             | select(.value != "") | "\(.key)=\(.value | gsub("[\\r\\n]+"; ","))"' > "$RUNNER_TEMP/llm.env"
           # A key list joined from several lines is a new string: mask it like the secret.
           while IFS='=' read -r _ value; do echo "::add-mask::$value"; done < "$RUNNER_TEMP/llm.env"
           cat "$RUNNER_TEMP/llm.env" >> "$GITHUB_ENV"
