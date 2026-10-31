@@ -56,7 +56,7 @@ const inOrder = (links: readonly QuickSpan[], found: readonly Found[]): readonly
   [...links, ...found.map((item) => toSpan(item))].toSorted((a, b) => a.start - b.start);
 
 /** A title is at most this long; a longer line is cut at a word. */
-const MAX_TITLE = 100;
+const MAX_TITLE = 200;
 
 const capTitle = (title: string): string => {
   if (title.length <= MAX_TITLE) {

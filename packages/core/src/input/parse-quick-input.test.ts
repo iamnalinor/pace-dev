@@ -152,10 +152,16 @@ describe("parseQuickInput", () => {
     });
   });
 
-  it("cuts a long one-line title at a word, at most 100 characters, the whole line kept below", () => {
+  it("keeps a title up to 200 characters whole", () => {
     const line = `${"очень ".repeat(30)}длинная задача`;
+    expect(line.length).toBeGreaterThan(100);
+    expect(parse(line)).toMatchObject({ description: null, title: line });
+  });
+
+  it("cuts a longer one-line title at a word, at most 200 characters, the whole line kept below", () => {
+    const line = `${"очень ".repeat(40)}длинная задача`;
     const { description, title } = parse(line);
-    expect(title.length).toBeLessThanOrEqual(100);
+    expect(title.length).toBeLessThanOrEqual(200);
     expect(title.endsWith("…")).toBe(true);
     expect(description).toBe(line);
     expect(parse(`${line}\nвторая строка`).description).toBe(`${line}\nвторая строка`);
