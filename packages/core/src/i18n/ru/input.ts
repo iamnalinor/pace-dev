@@ -94,7 +94,10 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.closedToast": "{title} · {outcome}",
   "form.startNow": "Начало сейчас",
   "form.deadlinePolicy": "Тип срока",
-  "form.deadlineInvalid": "Укажите основной срок и более поздний окончательный срок.",
+  "form.deadlineNoDue": "Укажите основной срок: окончательный идёт после него.",
+  "form.finalAfterDue": "Выберите окончательный срок после основного ({due}).",
+  "form.finalDaysInvalid": "Укажите, через сколько дней после основного срока (от 1).",
+  "form.dueBeforeStartNote": "Срок раньше начала — проверьте даты.",
   "form.deadlineHard": "Жёсткий срок",
   "form.deadlineTwoStage": "Основной и окончательный сроки",
   "form.deadlineSoftHint": "Основной срок — мягкая цель. Окончательный срок — жёсткий.",
@@ -114,6 +117,11 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "form.repeat.days": "Интервал в днях",
   "form.repeat.noEnd": "Без даты окончания",
   "form.repeat.endDate": "Дата последнего повтора",
+  "form.repeat.untilBeforeStart": "Дата последнего повтора раньше начала задачи.",
+  "form.repeat.dueBeforeStart":
+    "Срок раньше начала: каждый повтор начинался бы с опозданием. Выберите срок позже или начало раньше.",
+  "form.repeat.duePassed":
+    "Срок уже прошёл: повтор не может начаться с опозданием. Выберите срок позже.",
   "form.newTask": "Новая задача",
   "form.addTo": "Добавить в",
   "form.ownTask": "Отдельная задача",
@@ -173,6 +181,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "parseField.link": "ссылка",
   "action.task.create": "Ассистент создаст «{title}»",
   "action.task.update": "Ассистент изменит «{title}»: {fields}",
+  "action.task.rename": "Ассистент переименует «{title}» в «{newTitle}»",
   "action.task.delete": "Ассистент удалит «{title}»",
   "action.task.close": "Ассистент закроет «{title}»: {outcome}",
   "action.task.addSubtasks": "Ассистент добавит в «{title}»: {subtasks}",
@@ -181,7 +190,9 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "action.activity.startSince": "Ассистент начнёт «{label}» с {start}",
   "action.activity.log": "Ассистент запишет «{label}», {start}–{end}",
   "action.activity.update": "Ассистент изменит «{label}»: {fields}",
+  "action.activity.rename": "Ассистент переименует «{label}» в «{newLabel}»",
   "action.activity.delete": "Ассистент удалит «{label}», {start}–{end}",
+  "action.activity.deleteRunning": "Ассистент удалит «{label}», идёт с {start}",
   "action.field.title": "Задача",
   "action.field.category": "Категория",
   "action.field.project": "Проект",
@@ -190,11 +201,18 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "action.field.importance": "Важность",
   "action.field.subtasks": "Подзадачи",
   "action.field.expect": "Ожидается",
+  "action.field.stops": "Остановит",
+  "action.field.newTitle": "Новое название",
+  "action.field.name": "Название",
+  "action.field.start": "Начало",
+  "action.field.end": "Конец",
+  "action.field.link": "Ссылка",
+  "action.field.description": "Описание",
+  "action.value.none": "нет",
   "action.doubtful": "(проверьте)",
   "assistant.approve": "Подтвердить",
   "assistant.review": "Посмотреть действия ассистента",
   "assistant.approved": "Готово",
-  "assistant.cancel": "Отменить",
   "assistant.correct": "Уточнить для ассистента…",
   "assistant.sendCorrection": "Отправить уточнение",
   "assistant.reading": "Ассистент разбирает текст…",
@@ -205,4 +223,15 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
     "Не удалось уточнить действия. Предыдущий вариант сохранён на экране.",
   "assistant.tooManyCorrections":
     "Это уже пять уточнений. Подтвердите или отмените и начните заново.",
+  "assistant.questionsHint":
+    "«Подтвердить» сохранит всё как показано. Нажмите ответ, чтобы уточнить.",
+  "assistant.questionsHintType":
+    "«Подтвердить» сохранит всё как показано. Чтобы уточнить, напишите ответ в поле ниже.",
+  "assistant.questionsHintBoth":
+    "«Подтвердить» сохранит всё как показано. Чтобы уточнить, нажмите ответ или напишите его в поле ниже.",
+  "assistant.answered": "Ответ: {question} — {option}",
+  "assistant.nothingToDo":
+    "Ассистент не нашёл, что здесь сделать. Переформулируйте или добавьте через «Новая задача».",
+  "assistant.nothingToStart":
+    "Ассистент не нашёл, что здесь начать. Задачу добавьте в строке задач.",
 };

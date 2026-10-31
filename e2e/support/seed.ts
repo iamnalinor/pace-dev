@@ -50,6 +50,7 @@ const SEEDED_TYPES = [
   "preset.updated",
   "preset.archived",
   "settings.updated",
+  "series.created",
   "focus.started",
   "focus.ended",
   "activity.started",
@@ -73,12 +74,17 @@ export type LivedIn = {
   readonly algebraId: string;
   readonly openTaskId: string;
   readonly doneTaskId: string;
+  /** An instance of a monthly series with a two-stage deadline. */
+  readonly repeatingTaskId: string;
 };
 
 const iso = (at: number): string => new Date(at).toISOString();
 
 /** The log, oldest first. `now` is the moment the sweep runs. */
-const events = (now: number, ids: LivedIn & { readonly workId: string }): readonly Seeded[] => {
+const events = (
+  now: number,
+  ids: Omit<LivedIn, "repeatingTaskId"> & { readonly workId: string },
+): readonly Seeded[] => {
   const { algebraId, doneTaskId, openTaskId, workId } = ids;
   const report = ulid(now - 3 * DAY + 1);
   const future = ulid(now - 3 * DAY + 2);
@@ -296,6 +302,44 @@ const events = (now: number, ids: LivedIn & { readonly workId: string }): readon
   ];
 };
 
+/** A monthly series with a two-stage deadline and its first instance: the repeat line and mark. */
+const SERIES_ID = "seeded-rent";
+const REPEATING_TASK_ID = `rep:${SERIES_ID}:0:0`;
+
+const rentSeries = (now: number): readonly Seeded[] => {
+  const seriesId = SERIES_ID;
+  const template = {
+    dueAt: iso(now + 10 * DAY),
+    dueTz: ZONE,
+    fields: {},
+    overrides: {
+      deadlinePolicy: {
+        finalAt: null,
+        finalMode: "offset",
+        finalTz: null,
+        kind: "resubmission",
+        softDays: 7,
+      },
+    },
+    presetId: "personal",
+    seriesId,
+    seriesRevision: 0,
+    startAt: iso(now - 4 * DAY),
+    startTz: ZONE,
+    subtasks: [],
+    taskId: REPEATING_TASK_ID,
+    title: "Квартплата",
+  };
+  return [
+    {
+      at: now - 4 * DAY + 30,
+      payload: { schedule: { kind: "monthly" }, seriesId, template },
+      type: "series.created",
+    },
+    { at: now - 4 * DAY + 31, payload: template, type: "task.created" },
+  ];
+};
+
 /**
 `POST /api/sync/push` as a client sends it: a pull first confirms the store, and the push
 names it (the server refuses a push for any other store).
@@ -323,7 +367,8 @@ export const seedLivedIn = async (token: string): Promise<LivedIn> => {
     openTaskId: ulid(now - 5 * DAY + 2),
     workId: ulid(now - 5 * DAY + 3),
   };
-  const log = events(now, ids);
+  const log = [...events(now, ids), ...rentSeries(now)];
+  const seeded = { ...ids, repeatingTaskId: REPEATING_TASK_ID };
   expect(new Set(log.map((event) => event.type))).toEqual(new Set(SEEDED_TYPES));
   const envelopes = log.map((event) => ({
     deviceId: "e2e-seed",
@@ -339,5 +384,5 @@ export const seedLivedIn = async (token: string): Promise<LivedIn> => {
   expect(response.ok).toBe(true);
   const result = (await response.json()) as { rejected: readonly unknown[] };
   expect(result.rejected).toEqual([]);
-  return ids;
+  return seeded;
 };

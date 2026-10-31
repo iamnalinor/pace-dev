@@ -3,6 +3,7 @@ import {
   type CoreState,
   type DeadlinePolicy,
   extractLink,
+  finalDeadlineOf,
   type Importance,
   linkHost,
   type Outcome,
@@ -12,11 +13,13 @@ import {
   progressOf,
   type ProjectColorName,
   type QueryContext,
+  type RepeatRule,
   type Result,
   type Submission,
   type SubmitPreview,
   type Task,
   taskOutcome,
+  taskRepeatRule,
   type TaskStatus,
   type TaskView,
   taskView,
@@ -93,6 +96,12 @@ export type TaskViewModel = {
     readonly name: string;
     readonly color: null | ProjectColorName;
   };
+  /** The task's category (preset) and its colour: the tag its rows carry without a project. */
+  readonly category: {
+    readonly id: string;
+    readonly name: string;
+    readonly color: ProjectColorName;
+  };
   readonly tags: readonly TaskTag[];
   readonly stats: {
     readonly dueAt: null | string;
@@ -105,6 +114,10 @@ export type TaskViewModel = {
     readonly trackedMinutes: number;
     readonly estimateMinutes: number;
     readonly deadlinePolicy: DeadlinePolicy;
+    /** The hard end of a two-stage deadline and its zone; `null` without a second stage. */
+    readonly finalDue: null | { readonly at: string; readonly tz: string };
+    /** How the task repeats (to put in words with `describeRepeatRule`); `null` for a one-off. */
+    readonly repeat: null | RepeatRule;
   };
   readonly progress: {
     readonly mode: ProgressMode;
@@ -163,7 +176,7 @@ const overrideSheet = (state: CoreState, view: TaskView): OverrideSheet => {
   };
 };
 
-const stats = (view: TaskView): TaskViewModel["stats"] => ({
+const stats = (state: CoreState, view: TaskView, ctx: QueryContext): TaskViewModel["stats"] => ({
   dueAt: view.task.dueAt,
   dueTz: view.task.dueTz,
   dueZoneDiffers: view.dueZoneDiffers,
@@ -173,6 +186,8 @@ const stats = (view: TaskView): TaskViewModel["stats"] => ({
   trackedMinutes: view.trackedMinutes,
   estimateMinutes: view.task.estimateMinutes ?? view.preset.defaultEstimateMinutes,
   deadlinePolicy: view.preset.deadlinePolicy,
+  finalDue: finalDeadlineOf(view.task, view.preset),
+  repeat: taskRepeatRule(state, view.task, ctx),
 });
 
 const subtaskRows = (task: Task): readonly SubtaskRow[] =>
@@ -221,8 +236,13 @@ export const taskViewModel = (
       sourceText: originalMessage(task.sourceText, task.title),
       project:
         project === null ? null : { id: project.id, name: project.name, color: project.color },
+      category: {
+        color: preset.color,
+        id: task.presetId,
+        name: presetById(state.presets, task.presetId)?.name ?? task.presetId,
+      },
       tags: tags(view, taskOutcome(task, preset)),
-      stats: stats(view),
+      stats: stats(state, view, ctx),
       progress: {
         mode: preset.progressMode,
         value: progressOf(task, preset.progressMode),

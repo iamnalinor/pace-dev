@@ -65,7 +65,7 @@ const LineBlock = ({
           onApprove={() => {
             void flow.pending.approve();
           }}
-          onCancel={flow.pending.cancel}
+          onCancel={flow.dismiss}
           onFollowup={flow.pending.followup}
           questions={flow.pending.pending.questions}
           source={flow.pending.pending.status}

@@ -8,8 +8,10 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { inkClass, washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import {
+  describeRepeatRule,
   formatDuration,
   IMPORTANCE_COLORS,
+  presetLabel,
   type ProjectColorName,
   STATUS_COLORS,
 } from "@pace/core";
@@ -68,11 +70,26 @@ const Stat = ({
   </View>
 );
 
-/** Importance and status in their colours, submission and outcome neutral, as small tags. */
-const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
+/**
+The category in its colour (as the task's rows show it), importance and status in theirs,
+submission and outcome neutral, as small tags.
+*/
+const TaskTags = ({
+  category,
+  tags,
+}: {
+  readonly category: TaskViewModel["category"];
+  readonly tags: TaskViewModel["tags"];
+}) => {
   const t = useT();
+  const { language } = useViewer();
   return (
     <View className="flex-row flex-wrap gap-1.5">
+      <View className={cx("rounded-sm px-2 py-1", washClass(category.color))}>
+        <Text className={cx("font-sans text-[11px] font-medium", inkClass(category.color))}>
+          {presetLabel(category, language)}
+        </Text>
+      </View>
       {tags.map((tag) => {
         const color = tagColor(tag);
         return (
@@ -98,7 +115,37 @@ const TaskTags = ({ tags }: { readonly tags: TaskViewModel["tags"] }) => {
   );
 };
 
-/** Title, link and tags; the stats card: start, due, work left, tracked. */
+/**
+How the task repeats and the hard end of a two-stage deadline, the latter under Due; the row is
+left out for a one-off task with one deadline.
+*/
+const RepeatAndFinal = ({ stats }: { readonly stats: TaskViewModel["stats"] }) => {
+  const t = useT();
+  const viewer = useViewer();
+  const { finalDue, repeat } = stats;
+  if (repeat === null && finalDue === null) {
+    return null;
+  }
+  return (
+    <View className="flex-row gap-3">
+      {repeat === null ? (
+        <View className="flex-1" />
+      ) : (
+        <Stat
+          label={t("task.repeats")}
+          value={describeRepeatRule(repeat, { ...viewer, tz: viewer.deviceTz })}
+        />
+      )}
+      {finalDue === null ? (
+        <View className="flex-1" />
+      ) : (
+        <Stat label={t("task.finalDue")} value={zonedText({ ...finalDue, mode: "due" }, viewer)} />
+      )}
+    </View>
+  );
+};
+
+/** Title, link and tags; the stats card: start, due, repeat, final deadline, work left, tracked. */
 export const TaskSummary = ({
   view,
   workLeftMinutes = view.stats.workLeftMinutes,
@@ -138,13 +185,14 @@ export const TaskSummary = ({
             {view.link.url} ↗
           </Text>
         )}
-        <TaskTags tags={view.tags} />
+        <TaskTags category={view.category} tags={view.tags} />
       </View>
       <View className="gap-3 rounded-xl border border-line bg-surface p-3.5">
         <View className="flex-row gap-3">
           <Stat label={t("task.start")} value={start} />
           <Stat label={t("task.due")} value={due} />
         </View>
+        <RepeatAndFinal stats={stats} />
         <View className="flex-row gap-3">
           <Stat
             label={t("task.workLeft")}

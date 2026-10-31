@@ -26,6 +26,13 @@ const placeholders = (text: string): readonly string[] =>
 
 const byName = (a: string, b: string): number => a.localeCompare(b);
 
+/** Keys that read `english` in English but not like `key` in Russian. */
+const sameAs = (english: string, key: MessageKey) =>
+  Object.entries(en)
+    .filter(([, text]) => text === english)
+    .map(([other]) => [other, (ru as Readonly<Record<string, string>>)[other]])
+    .filter(([, text]) => text !== ru[key]);
+
 describe("catalogs", () => {
   it("have the same keys in en and ru", () => {
     expect(Object.keys(ru).toSorted(byName)).toEqual(Object.keys(en).toSorted(byName));
@@ -41,6 +48,15 @@ describe("catalogs", () => {
         .map((name) => `${key}:{${name}}`),
     );
     expect(missing).toEqual([]);
+  });
+
+  it("say Cancel and Undo with two words, the same two everywhere (QA round 14 M2)", () => {
+    for (const language of LANGUAGES) {
+      expect(t(language, "common.cancel")).not.toBe(t(language, "common.undo"));
+    }
+    // Every button that reads "Cancel" (or "Undo") in English reads the same in Russian.
+    expect(sameAs("Cancel", "common.cancel")).toEqual([]);
+    expect(sameAs("Undo", "common.undo")).toEqual([]);
   });
 
   it("have no empty messages", () => {

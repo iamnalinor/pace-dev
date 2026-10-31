@@ -2,6 +2,10 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
+import { Questions } from "#app/shared/assistant/questions.tsx";
+import { useViewer } from "#app/shared/use-viewer.ts";
+import { KeyHint } from "#app/ui/button.tsx";
+import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { useHotkey } from "#app/ui/use-hotkey.tsx";
@@ -13,8 +17,9 @@ estimate…; an activity's category and expected length), a field the model only
 */
 const ActionCard = ({ action }: { readonly action: Action }) => {
   const language = useLanguage();
+  const { now } = useViewer();
   const state = useAppState((current) => current);
-  const lines = summaryDetails(action, { language, state });
+  const lines = summaryDetails(action, { language, now, state });
   return (
     <View
       accessibilityLabel={action.summary}
@@ -40,7 +45,7 @@ type Props = {
   readonly onApprove: () => void;
   readonly onCancel: () => void;
   readonly onFollowup: (text: string) => void;
-  /** The assistant's questions about what stays unclear: a correction answers them. */
+  /** The assistant's questions about what stays unclear: an option or a correction answers them. */
   readonly questions?: readonly ParseQuestion[];
   readonly source?: "parsed" | "unavailable";
 };
@@ -67,7 +72,7 @@ const CorrectionRow = ({
     onFollowup(text);
   };
   return (
-    <View className="flex-row gap-2">
+    <View className={cx("flex-row gap-2", busy && "opacity-50")}>
       <TextInput
         accessibilityLabel={t("assistant.correct")}
         className="min-h-11 flex-1 rounded-lg border border-line bg-bg px-3 font-sans text-fg"
@@ -91,6 +96,51 @@ const CorrectionRow = ({
   );
 };
 
+/** Approve (Enter) and Cancel (Esc), their keys shown with a keyboard, dimmed while busy. */
+const CardButtons = ({
+  busy,
+  canApprove,
+  onApprove,
+  onCancel,
+}: {
+  readonly busy: boolean;
+  readonly canApprove: boolean;
+  readonly onApprove: () => void;
+  readonly onCancel: () => void;
+}) => {
+  const t = useT();
+  return (
+    <View className="flex-row gap-2">
+      <Pressable
+        accessibilityLabel={t("assistant.approve")}
+        accessibilityRole="button"
+        className={cx(
+          "min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent px-3",
+          !canApprove && "opacity-50",
+        )}
+        disabled={!canApprove}
+        onPress={onApprove}
+      >
+        <Text className="font-sans font-medium text-accentFg">{t("assistant.approve")}</Text>
+        <KeyHint hotkey={HOTKEYS.enter} variant="primary" />
+      </Pressable>
+      <Pressable
+        accessibilityLabel={t("common.cancel")}
+        accessibilityRole="button"
+        className={cx(
+          "min-h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line px-3",
+          busy && "opacity-50",
+        )}
+        disabled={busy}
+        onPress={onCancel}
+      >
+        <Text className="font-sans text-fg">{t("common.cancel")}</Text>
+        <KeyHint hotkey={HOTKEYS.escape} variant="secondary" />
+      </Pressable>
+    </View>
+  );
+};
+
 /** An answer stays pending until the person approves its full current set of actions. */
 export const ActionCards = ({
   actions,
@@ -102,16 +152,14 @@ export const ActionCards = ({
   source,
 }: Props) => {
   const t = useT();
-  useHotkey(HOTKEYS.enter, () => {
-    if (!busy && actions.length > 0) {
+  const canApprove = !busy && actions.length > 0;
+  const approve = (): void => {
+    if (canApprove) {
       onApprove();
     }
-  });
-  useHotkey(HOTKEYS.primary, () => {
-    if (!busy && actions.length > 0) {
-      onApprove();
-    }
-  });
+  };
+  useHotkey(HOTKEYS.enter, approve);
+  useHotkey(HOTKEYS.primary, approve);
   useHotkey(HOTKEYS.escape, onCancel);
   return (
     <View className="gap-3 rounded-xl border border-line bg-surface p-3">
@@ -123,29 +171,13 @@ export const ActionCards = ({
       {actions.map((action, index) => (
         <ActionCard action={action} key={`${action.kind}:${String(index)}`} />
       ))}
-      {questions.map((question) => (
-        <Text className="font-sans text-[13px] leading-5 text-question" key={question.question}>
-          {question.question}
-        </Text>
-      ))}
-      <View className="flex-row gap-2">
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-11 flex-1 items-center justify-center rounded-lg bg-accent px-3"
-          disabled={busy || actions.length === 0}
-          onPress={onApprove}
-        >
-          <Text className="font-sans font-medium text-accentFg">{t("assistant.approve")}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-11 items-center justify-center rounded-lg border border-line px-3"
-          disabled={busy}
-          onPress={onCancel}
-        >
-          <Text className="font-sans text-fg">{t("assistant.cancel")}</Text>
-        </Pressable>
-      </View>
+      <Questions
+        busy={busy}
+        hasActions={actions.length > 0}
+        onFollowup={onFollowup}
+        questions={questions}
+      />
+      <CardButtons busy={busy} canApprove={canApprove} onApprove={onApprove} onCancel={onCancel} />
       <CorrectionRow busy={busy} onFollowup={onFollowup} />
     </View>
   );

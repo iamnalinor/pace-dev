@@ -132,7 +132,7 @@ the route exists).
 | `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
 | `bun run test` | the four above, in that order |
 | `bun test:mutation` | Stryker on core (slow; on demand in CI) |
-| `bun test:llm` | LLM parsing regression set (stage 2; the runner does not exist yet) |
+| `bun test:llm` | one real read through every configured LLM endpoint (`apps/api/scripts/llm-smoke.ts`), run after any change to a provider, its config or the schema; the full parsing regression runner does not exist yet |
 | `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |
 | `bun db:check` | fails when a schema changed without a migration (part of `bun lint`) |
 | `bun run build` | production build of the web app (`apps/app/dist`, with the service worker) |
@@ -196,7 +196,7 @@ the workflow do it.
 | `deploy.yml` | after a green CI on `main`, or manual | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
 | `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk`, sends the APK to the owner in Telegram when `TELEGRAM_RELEASE_CHAT_ID` is set |
 | `mutation.yml` | manual | Stryker on core and web |
-| `llm-regression.yml` | manual | `bun test:llm` with real providers (stage 2) |
+| `llm-regression.yml` | manual | `bun test:llm` against the `LLM_*_N` endpoints set in GitHub |
 
 Secrets and variables read by the workflows:
 
@@ -208,9 +208,9 @@ Secrets and variables read by the workflows:
 | `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
 | `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
 | `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `LLM_BASE_URL` | variable | deploy, llm-regression | optional OpenAI-compatible API prefix, including its `/v1` path; set together with model and key |
-| `LLM_MODEL` | variable | deploy, llm-regression | model identifier accepted by that endpoint |
-| `LLM_API_KEY` | secret | deploy, llm-regression | one or more keys separated by commas or newlines; a rate-limited key rests while the next one answers |
+| `LLM_BASE_URL_N` | variable (secret also accepted) | deploy, llm-regression | OpenAI-compatible API prefix of LLM slot N (any number, 1 is asked first), including its `/v1` path; set together with `LLM_API_KEY_N` and `LLM_MODEL_N` |
+| `LLM_MODEL_N` | variable (secret also accepted) | deploy, llm-regression | one or more model identifiers of slot N, comma separated, each its own priority |
+| `LLM_API_KEY_N` | secret | deploy, llm-regression | one or more keys of slot N, comma or newline separated; a rate-limited key rests while the next one answers |
 | `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
 | `GOOGLE_SERVICES_JSON` | secret | release | the Firebase `google-services.json` (raw JSON) for push through FCM; absent → the APK has no Google push and phones poll |
@@ -219,10 +219,11 @@ Secrets and variables read by the workflows:
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
 Non-secret configuration (`ENVIRONMENT`, `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME`,
-`TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`. The optional LLM
-URL and model come from GitHub variables; deploy stores all three LLM settings together and
-removes them together when unset. For local Worker development, copy
-`apps/api/.dev.vars.example` to `apps/api/.dev.vars` and fill in the three values.
+`TELEGRAM_WEBHOOK_ALLOWED_CIDRS`, `WEB_ORIGIN`) lives in `wrangler.jsonc`. Deploy pushes every
+`LLM_*_N` it finds among the GitHub secrets and variables, removes numbered slots GitHub no
+longer has, and leaves the Worker's LLM settings alone when GitHub has none (so endpoints set
+with `wrangler secret put` survive). For local Worker development, copy
+`apps/api/.dev.vars.example` to `apps/api/.dev.vars` and fill in a slot.
 
 ## Android release
 
@@ -439,11 +440,19 @@ the setup per client, the tools table, the scopes, the consent flow and local te
 ## LLM providers
 
 Free text ("дз 7 по алгебре 1, 3, 5а до среды 23:59") can be read by any
-OpenAI-compatible model through the AI SDK. Set `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY`
-together in the Worker environment; the base URL is the API prefix (usually ending in `/v1`).
-For example, Groq is one possible endpoint. `LLM_API_KEY` accepts multiple comma- or
-newline-separated keys; each has its own rate-limit cooldown. Tests and the e2e Worker use an
-in-process fake (`LLM_PROVIDER=fake`). If no model is configured or all keys are unavailable,
+OpenAI-compatible model with JSON-schema output, through the AI SDK. Endpoints are numbered
+slots in the Worker environment: `LLM_BASE_URL_N`, `LLM_API_KEY_N` and `LLM_MODEL_N` together,
+for any N; the base URL is the API prefix (usually ending in `/v1`). A slot may list several
+models (each its own priority, in order) and several keys (each with its own rate-limit
+cooldown). The production order is the main gateway's two models, then Gemini
+(`https://generativelanguage.googleapis.com/v1beta/openai`, `gemini-flash-latest`), then Groq
+(`https://api.groq.com/openai/v1`, `openai/gpt-oss-120b`).
+
+The models are raced, not queued: the first is asked; when it fails, or has not sent its first
+token within 5 seconds, the next one is asked as well, and so on down the list; the first valid
+answer wins and the rest are cancelled. Each failure is logged (`llm: provider failed`, with the model and the reason) in the
+Worker's logs. Tests and the e2e Worker use an in-process fake (`LLM_PROVIDER=fake`). If no
+model is configured or all are unavailable,
 the API and bot offer rule-based previews in English and Russian: tasks preserve their entered
 title, typed time spans create or log activities, and common meal words such as “ем” and
 “eating” select Food. The bot asks whether ambiguous text is a task or an activity before
@@ -470,7 +479,7 @@ comes back marked "check this". Where it is used:
   `search_decisions`: every parse and every notification sent or held back, with the rule,
   its inputs and a one-line explanation.
 
-**When the endpoint runs out of requests**: a key's rate limit is remembered (from its
+**When the endpoints run out of requests**: a key's rate limit is remembered (from its
 `retry-after`) and skipped until then, so the next calls go straight to the one still
 answering; `GET /api/llm/status` says whether the assistant can read now and when it is back.
 With every key out, `POST /api/parse` still returns a rule-based preview; clients may explicitly

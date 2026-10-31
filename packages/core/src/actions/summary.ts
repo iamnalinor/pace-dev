@@ -44,6 +44,39 @@ const PATCH_FIELDS: readonly (readonly [keyof TaskPatch, ParseField])[] = [
   ["subtasks", "subtasks"],
 ];
 
+const ACTIVITY_FIELDS: readonly (readonly [
+  keyof Extract<ActionBody, { kind: "activity.update" }>["patch"],
+  ParseField,
+])[] = [
+  ["start", "start"],
+  ["end", "end"],
+  ["label", "label"],
+  ["category", "category"],
+];
+
+/** The fields an edit changes, in the order a summary names them (repeats possible). */
+export const changedFields = (
+  body: Extract<ActionBody, { kind: "activity.update" | "task.update" }>,
+): readonly ParseField[] =>
+  body.kind === "task.update"
+    ? PATCH_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(([, field]) => field)
+    : ACTIVITY_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(([, field]) => field);
+
+/**
+The new name of an edit that changes nothing but the name (a task's title, an activity's
+label): its summary says "rename … to …" and needs no detail line; `null` for any other edit.
+*/
+export const renameOf = (body: ActionBody): null | string => {
+  if (body.kind !== "task.update" && body.kind !== "activity.update") {
+    return null;
+  }
+  const fields = new Set(changedFields(body));
+  if (fields.size !== 1) {
+    return null;
+  }
+  return body.kind === "task.update" ? (body.patch.title ?? null) : (body.patch.label ?? null);
+};
+
 /** The names of the fields a patch changes, each once, in the person's language. */
 const fieldsOf = (keys: readonly ParseField[], language: Language): string =>
   [...new Set(keys)].map((field) => t(language, `parseField.${field}`)).join(", ");
@@ -77,11 +110,15 @@ const taskSummary = (
       return t(language, "action.task.create", { title: body.task.title });
     }
     case "task.update": {
-      const keys = PATCH_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(
-        ([, field]) => field,
-      );
+      const renamed = renameOf(body);
+      if (renamed !== null) {
+        return t(language, "action.task.rename", {
+          newTitle: renamed,
+          title: taskTitle(state, body.taskId),
+        });
+      }
       return t(language, "action.task.update", {
-        fields: fieldsOf(keys, language),
+        fields: fieldsOf(changedFields(body), language),
         title: taskTitle(state, body.taskId),
       });
     }
@@ -109,16 +146,6 @@ const taskSummary = (
   }
 };
 
-const ACTIVITY_FIELDS: readonly (readonly [
-  keyof Extract<ActionBody, { kind: "activity.update" }>["patch"],
-  ParseField,
-])[] = [
-  ["start", "start"],
-  ["end", "end"],
-  ["label", "label"],
-  ["category", "category"],
-];
-
 const startSummary = (body: Extract<ActionBody, { kind: "activity.start" }>, world: World) =>
   body.startAt === undefined
     ? t(world.language, "action.activity.start", { label: body.label })
@@ -126,6 +153,18 @@ const startSummary = (body: Extract<ActionBody, { kind: "activity.start" }>, wor
         label: body.label,
         start: clockOf(body.startAt, world),
       });
+
+/** A block by its span; one still running by its start ("running since 22:27"). */
+const deleteSummary = (body: Extract<ActionBody, { kind: "activity.delete" }>, world: World) => {
+  const activity = world.state.time.activities[body.activityId];
+  const label = activity?.label ?? body.activityId;
+  return activity?.endAt === null && !activity.isLogged
+    ? t(world.language, "action.activity.deleteRunning", {
+        label,
+        start: clockOf(activity.startAt, world),
+      })
+    : t(world.language, "action.activity.delete", { ...spanOf(activity, world), label });
+};
 
 const activitySummary = (
   body: Extract<ActionBody, { kind: `activity.${string}` }>,
@@ -144,20 +183,17 @@ const activitySummary = (
       });
     }
     case "activity.update": {
-      const keys = ACTIVITY_FIELDS.filter(([key]) => body.patch[key] !== undefined).map(
-        ([, field]) => field,
-      );
-      return t(language, "action.activity.update", {
-        fields: fieldsOf(keys, language),
-        label: state.time.activities[body.activityId]?.label ?? body.activityId,
-      });
+      const label = state.time.activities[body.activityId]?.label ?? body.activityId;
+      const renamed = renameOf(body);
+      return renamed === null
+        ? t(language, "action.activity.update", {
+            fields: fieldsOf(changedFields(body), language),
+            label,
+          })
+        : t(language, "action.activity.rename", { label, newLabel: renamed });
     }
     case "activity.delete": {
-      const activity = state.time.activities[body.activityId];
-      return t(language, "action.activity.delete", {
-        ...spanOf(activity, world),
-        label: activity?.label ?? body.activityId,
-      });
+      return deleteSummary(body, world);
     }
   }
 };

@@ -9,6 +9,9 @@ import { projectById } from "../model/project.ts";
 import { presetLabel } from "../presets/preset-label.ts";
 import { presetById } from "../presets/preset-reducer.ts";
 import { resolvePreset } from "../presets/resolve-preset.ts";
+import { runningActivity } from "../tracking/timeline.ts";
+import { activityEditDrafts, dueTextOf, taskEditDrafts } from "./details-edit.ts";
+import { renameOf } from "./summary.ts";
 
 /** One field of an action as a reviewer reads it; `isDoubtful` when the model only guessed it. */
 export type DetailLine = {
@@ -18,7 +21,12 @@ export type DetailLine = {
   readonly isDoubtful: boolean;
 };
 
-type World = { readonly state: CoreState; readonly language: Language };
+type World = {
+  readonly state: CoreState;
+  readonly language: Language;
+  /** The instant the card is read at: a start then names the running activity it stops. */
+  readonly now?: string;
+};
 
 type Draft = {
   readonly field: null | ParseField;
@@ -27,17 +35,7 @@ type Draft = {
 };
 
 const dueText = (task: TaskDraft, language: Language): null | string =>
-  task.dueAt === null || task.dueTz === null
-    ? null
-    : new Intl.DateTimeFormat(language, {
-        day: "numeric",
-        hour: "2-digit",
-        hourCycle: "h23",
-        minute: "2-digit",
-        month: "short",
-        timeZone: task.dueTz,
-        weekday: "short",
-      }).format(new Date(task.dueAt));
+  task.dueAt === null || task.dueTz === null ? null : dueTextOf(task.dueAt, task.dueTz, language);
 
 /** The importance the task gets: its own, else its category's default. */
 const importanceOf = (task: TaskDraft, state: CoreState) => {
@@ -84,7 +82,7 @@ const categoryDraft = (category: ActivityCategory, language: Language): Draft =>
 
 const startDrafts = (
   action: Extract<Action, { kind: "activity.start" }>,
-  { language }: World,
+  { language, now, state }: World,
 ): readonly Draft[] => [
   categoryDraft(action.category, language),
   {
@@ -95,15 +93,27 @@ const startDrafts = (
         ? null
         : `~${formatDuration(action.expectMinutes, language)}`,
   },
+  // A start takes over from the main activity running (one alongside goes on).
+  {
+    field: null,
+    key: "action.field.stops",
+    value: now === undefined ? null : (runningActivity(state.time, now)?.label ?? null),
+  },
 ];
 
-/** Edits, closes and deletes say all there is in their summary: they list nothing. */
+/** Edits list what they make of each field; closes and deletes say all in their summary. */
 const draftsOf = (action: Action, world: World): readonly Draft[] => {
   if (action.kind === "task.create") {
     return createDrafts(action.task, world);
   }
+  if (action.kind === "task.update") {
+    return taskEditDrafts(action, world);
+  }
   if (action.kind === "activity.start") {
     return startDrafts(action, world);
+  }
+  if (action.kind === "activity.update") {
+    return activityEditDrafts(action, world);
   }
   return action.kind === "activity.log" ? [categoryDraft(action.category, world.language)] : [];
 };
@@ -125,12 +135,22 @@ export const actionDetails = (action: Action, world: World): readonly DetailLine
     }));
 };
 
+/** The name the summary says already: a new task's title, a rename's new name. */
+const isNamedBySummary = (action: Action, line: DetailLine): boolean => {
+  if (line.isDoubtful) {
+    return false;
+  }
+  return action.kind === "task.create"
+    ? line.field === "title"
+    : renameOf(action) !== null && (line.field === "title" || line.field === "label");
+};
+
 /**
-The lines shown under an action's summary: what it sets, without the title the summary
-already names, unless the model only guessed that title.
+The lines shown under an action's summary: what it sets, without the name the summary already
+says (a new task's title, a rename's new name), unless the model only guessed it.
 */
 export const summaryDetails = (action: Action, world: World): readonly DetailLine[] =>
-  actionDetails(action, world).filter((line) => line.field !== "title" || line.isDoubtful);
+  actionDetails(action, world).filter((line) => !isNamedBySummary(action, line));
 
 /** "Due: Wed, Oct 7, 15:00 (check this)": one line as the card and the bot show it. */
 export const detailText = (line: DetailLine, language: Language): string => {

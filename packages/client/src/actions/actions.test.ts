@@ -23,6 +23,7 @@ import {
   WORK_ID,
 } from "@pace/core/testing";
 
+import { repeatChangeProblem } from "../view-models/repeat-change.ts";
 import { ESTIMATE_BUCKET_MINUTES } from "./estimate-hints.ts";
 import { setupActions, unwrap } from "./fixture.fake.ts";
 
@@ -105,6 +106,69 @@ describe("createTask", () => {
       importance: "asap",
       title: "Current title",
     });
+  });
+
+  it("starts a new series for a task whose series was ended, and none while one runs (QA 13 H1)", async () => {
+    const world = await setupActions();
+    const events = unwrap(
+      await world.actions.createTask({
+        presetId: "personal",
+        recurrence: { kind: "weekly" },
+        startAt: "2026-10-07T15:00:00.000Z",
+        title: "Ser",
+      }),
+    );
+    const first = events.find((event) => event.type === "task.created");
+    if (first?.type !== "task.created" || first.payload.seriesId === undefined) {
+      throw new Error("Expected the first instance");
+    }
+    const { seriesId, taskId } = first.payload;
+    expect(await world.actions.startSeriesForTask(taskId, { kind: "daily" })).toMatchObject({
+      ok: false,
+    });
+    unwrap(await world.actions.archiveSeries(seriesId, taskId));
+    const restarted = unwrap(await world.actions.startSeriesForTask(taskId, { kind: "daily" }));
+    const created = restarted.find((event) => event.type === "series.created");
+    if (created?.type !== "series.created") {
+      throw new Error("Expected series.created");
+    }
+    expect(created.payload.seriesId).not.toBe(seriesId);
+    expect(taskOf(world, taskId)?.seriesId).toBe(created.payload.seriesId);
+    expect(world.state.store.getState().series.byId[created.payload.seriesId]?.schedule).toEqual({
+      kind: "daily",
+    });
+  });
+
+  it("refuses a series whose deadline is before its start, as the form does (QA 13 L7)", async () => {
+    const world = await setupActions();
+    const form = {
+      dueAt: "2026-10-01T15:00:00.000Z",
+      presetId: "personal",
+      startAt: "2026-10-07T15:00:00.000Z",
+      title: "Late from birth",
+    };
+    const before = world.state.store.getState().events.length;
+    expect(
+      await world.actions.createTask({ ...form, recurrence: { kind: "daily" } }),
+    ).toMatchObject({ ok: false });
+    expect(world.state.store.getState().events).toHaveLength(before);
+    expect(
+      repeatChangeProblem(world.state.store.getState(), {
+        due: { at: form.dueAt },
+        now: { at: form.startAt, tz: "UTC" },
+        schedule: { kind: "daily" },
+        start: { at: form.startAt, tz: "UTC" },
+        taskId: null,
+      }),
+    ).toBe("repeat/due-before-start");
+    // A one-off task already late is written down as it is.
+    const [created] = unwrap(await world.actions.createTask(form));
+    if (created?.type !== "task.created") {
+      throw new Error("Expected task.created");
+    }
+    expect(
+      await world.actions.startSeriesForTask(created.payload.taskId, { kind: "daily" }),
+    ).toMatchObject({ ok: false });
   });
 
   it("creates a repeat series and an independent first task, then keeps one future instance", async () => {

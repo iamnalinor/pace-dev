@@ -1,12 +1,12 @@
 import {
   type DeadlinePolicy,
   err,
-  formatInZone,
   type Importance,
   newId,
   type Result,
   seriesInstanceId,
   type SeriesSchedule,
+  seriesStartProblem,
 } from "@pace/core";
 
 import {
@@ -189,10 +189,8 @@ const recurringCreated = async (
   const seriesId = newId();
   const startAt = form.startAt ?? deps.clock.now();
   const startTz = form.startTz ?? deps.clock.deviceTz;
-  if (
-    form.recurrence.until !== undefined &&
-    form.recurrence.until < formatInZone(startAt, startTz, "yyyy-MM-dd")
-  ) {
+  const due = form.dueAt === undefined ? null : { at: form.dueAt };
+  if (seriesStartProblem(form.recurrence, { due, start: { at: startAt, tz: startTz } }) !== null) {
     return err("action/invalid-input");
   }
   const payload = taskPayload(form, {

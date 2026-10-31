@@ -62,6 +62,8 @@ the test suites).
 >   named the OS's way (⌘ on a Mac, Ctrl elsewhere) and shown on the buttons.
 > - **State you can see**: neighbouring tags in different colours when they mean different things
 >   (no two grays side by side), a draft looks like a draft, a value follows the finger live.
+>   Every value a form sets is readable without reopening the form (a task's repeat and final
+>   deadline on its screen, a repeat mark on its rows).
 > - **Feedback and motion**: a structural change (a form unfolding, a row leaving) is animated,
 >   never a jump; a saved value never snaps back for a moment.
 > - **Copy**: plain words that say what happened and what to do («A new version is ready ·
@@ -96,6 +98,7 @@ and submits from each; a new way in gets a row and a test that submits from it.
 | Close / submit sheet | the row's check on Now; the task screen's Done / Submit; "Close as…" (Cancelled · Skipped); a pill; a typed date and time | `close-sheet.test.tsx`, `close-times.test.ts` |
 | Day's activity sheet | a block (edit); a gap's Log; Log past; a time ahead of now or into the next block | `activity-sheet.test.tsx`, `day-screen.test.tsx` |
 | Time bar | each button's picker (Calendar, Task, Chores, Rest); the typed field + Enter or ▶; Alongside; a re-pick of what runs; Stop | `time-bar.test.tsx`, `e2e/time.e2e.ts` |
+| Assistant preview (composer, time bar, Telegram) | Approve (button, Enter); a typed correction; a tap on a question's option (`#ask <title>`: in the task line the fake model asks one question with options and one without, in the time bar "How long?"); Approve while questions are open; Escape in the line; a paste followed by Enter (one request); text with nothing to do or start; a stale option button in Telegram | `composer.test.tsx`, `time-bar.test.tsx`, `preview.test.ts`, `bot.int.test.ts`, `e2e/assistant.e2e.ts` |
 | Calendar event | Now's offer (Attend, Skip); Day's row (Attended, Skip, Every time); the Calendar picker; the feed; Telegram; a phone notification's button | `now-screen.test.tsx`, `day-phone.test.tsx`, `notify.int.test.ts`, `bot.int.test.ts`, `notifications.test.ts` (the phone buttons) |
 | Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
 | Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |

@@ -44,6 +44,7 @@ const FixedDate = ({
   readonly onOpenChange: (isOpen: boolean) => void;
   readonly value: Resubmission;
 }) => {
+  const t = useT();
   const wrapperRef = useRef<View>(null);
   useOutsidePress(wrapperRef, isOpen, () => {
     onOpenChange(false);
@@ -57,6 +58,7 @@ const FixedDate = ({
       }}
       ref={wrapperRef}
     >
+      <Text className="font-sans text-[12px] text-muted">{t("form.final")}</Text>
       <DateChip
         isOpen={isOpen}
         kind="final"
@@ -126,6 +128,10 @@ const TwoStageFields = ({
         <Chip
           onPress={() => {
             onChange({ ...value, finalMode: "fixed" });
+            // No date yet: its calendar opens, so the choice is not left half made.
+            if (value.finalAt === null) {
+              onFinalOpenChange(true);
+            }
           }}
           selected={mode === "fixed"}
         >

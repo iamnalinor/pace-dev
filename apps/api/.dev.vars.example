@@ -1,5 +1,19 @@
-# Optional: copy to apps/api/.dev.vars and set all three for model-backed parsing.
-# Without them, Pace offers English and Russian rule-based previews.
-# LLM_BASE_URL=https://provider.example/v1
-# LLM_MODEL=reader-small
-# LLM_API_KEY=key-one,key-two
+# Optional: copy to apps/api/.dev.vars for model-backed parsing. Without any slot, Pace offers
+# English and Russian rule-based previews.
+#
+# Numbered slots, asked in order: LLM_BASE_URL_N, LLM_API_KEY_N and LLM_MODEL_N go together, any N.
+# A slot may list several models (each its own priority) and several keys (comma separated).
+# A model that has not started answering within 5 s, or fails, gets the next one asked in parallel;
+# the first valid answer wins. Every endpoint must be OpenAI-compatible with JSON-schema output.
+#
+# LLM_BASE_URL_1=https://provider.example/v1
+# LLM_API_KEY_1=key-one,key-two
+# LLM_MODEL_1=reader-large,reader-small
+#
+# LLM_BASE_URL_2=https://generativelanguage.googleapis.com/v1beta/openai
+# LLM_API_KEY_2=gemini-key
+# LLM_MODEL_2=gemini-flash-latest
+#
+# LLM_BASE_URL_3=https://api.groq.com/openai/v1
+# LLM_API_KEY_3=groq-key
+# LLM_MODEL_3=openai/gpt-oss-120b

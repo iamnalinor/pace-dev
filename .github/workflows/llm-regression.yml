@@ -1,7 +1,8 @@
 name: LLM regression
 
-# Runs the natural-language parsing regression suite against the configured compatible model
-# and publishes the refreshed docs/llm.md. On demand: it costs API calls and minutes.
+# Runs one real read through every configured LLM endpoint (apps/api/scripts/llm-smoke.ts) until
+# the full parsing regression runner exists, which will publish a refreshed docs/llm.md.
+# On demand: it costs API calls and minutes.
 on:
   # On demand only: a weekly schedule cost more minutes than the private repo can spare.
   workflow_dispatch:
@@ -11,18 +12,27 @@ permissions:
 
 jobs:
   llm:
-    name: Parse regression (configured model)
+    name: Parse regression (configured models)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: false
     env:
       CI: 1
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
-      LLM_MODEL: ${{ vars.LLM_MODEL }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+      # Every LLM_BASE_URL_N / LLM_API_KEY_N / LLM_MODEL_N secret or variable, as in deploy.yml.
+      - name: LLM endpoints
+        env:
+          GITHUB_SECRETS: ${{ toJSON(secrets) }}
+          GITHUB_VARS: ${{ toJSON(vars) }}
+        run: |
+          jq -nr --argjson s "$GITHUB_SECRETS" --argjson v "$GITHUB_VARS" \
+            '($v + $s) | to_entries[] | select(.key | test("^LLM_(BASE_URL|API_KEY|MODEL)_(0|[1-9][0-9]*)$"))
+             | "\(.key)=\(.value | gsub("[\\r\\n]+"; ","))"' > "$RUNNER_TEMP/llm.env"
+          # A key list joined from several lines is a new string: mask it like the secret.
+          while IFS='=' read -r _ value; do echo "::add-mask::$value"; done < "$RUNNER_TEMP/llm.env"
+          cat "$RUNNER_TEMP/llm.env" >> "$GITHUB_ENV"
       - run: bun test:llm
       - uses: actions/upload-artifact@v7
         if: always()

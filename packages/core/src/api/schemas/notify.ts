@@ -131,6 +131,14 @@ export const DecisionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+/**
+What the person did with an assistant reading: approved it, dismissed it, kept the text in the
+Inbox, or corrected it (a later reading of the same conversation took its place).
+*/
+export const DECISION_RESOLUTIONS = ["approved", "cancelled", "inbox", "corrected"] as const;
+
+export type DecisionResolution = (typeof DECISION_RESOLUTIONS)[number];
+
 /** One automatic decision with what it was based on, newest first. */
 export const DecisionSchema = z.object({
   id: z.string(),
@@ -141,7 +149,26 @@ export const DecisionSchema = z.object({
   inputs: z.unknown(),
   outcome: z.string(),
   explanation: z.string(),
+  /** What the person did with it; `null` while undecided, absent from older servers. */
+  resolution: z.string().nullable().optional(),
 });
+
+/** What the person did with one reading. */
+const DecisionAnswerSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  resolution: z.enum(DECISION_RESOLUTIONS),
+  /** The task an approval created, which the log row then opens. */
+  taskId: z.string().min(1).max(64).optional(),
+});
+
+/** The first answer for a decision wins; a later one for the same row is ignored. */
+export const DecisionResolveSchema = z.strictObject({
+  decisions: z.array(DecisionAnswerSchema).min(1).max(10),
+});
+
+export type DecisionResolveBody = z.output<typeof DecisionResolveSchema>;
+
+export const DecisionResolvedSchema = z.object({ resolved: z.number().int().min(0) });
 
 export const DecisionsOutputSchema = z.object({
   decisions: z.array(DecisionSchema),

@@ -3,6 +3,7 @@ import {
   type ActionKind,
   addMinutesIso,
   type CoreState,
+  type DecisionStep,
   type EventBody,
   type EventInput,
   newId,
@@ -256,16 +257,41 @@ const tell = async (
   });
 };
 
-const decisionOf = (item: QueuedParse, isDone: boolean): DecisionEntry => ({
-  explanation: isDone
-    ? "Read later, as asked when the assistant was out of requests."
-    : "Could not be read later; kept in the Inbox.",
-  inputs: { channel: item.channel, enqueuedAt: item.enqueuedAt, text: item.text },
-  kind: "parse",
-  outcome: isDone ? "applied" : "inbox",
-  rule: "parse.deferred",
-  taskId: null,
-});
+/** The tasks a text read later wrote, as the decision log keeps its steps. */
+const createdSteps = (written: readonly EventInput[]): readonly DecisionStep[] =>
+  written
+    .filter(
+      (input): input is Extract<EventInput, { readonly type: "task.created" }> =>
+        input.type === "task.created",
+    )
+    .map((input) => ({
+      activityId: null,
+      closeOutcome: null,
+      fields: [],
+      kind: "task.create",
+      renamedTo: null,
+      startAt: null,
+      subject: input.payload.title,
+      taskId: input.payload.taskId,
+    }));
+
+/** What became of a text read later: what it created (a row that opens the task), or the Inbox. */
+const decisionOf = (
+  item: QueuedParse,
+  { isDone, written }: { readonly isDone: boolean; readonly written: readonly EventInput[] },
+): DecisionEntry => {
+  const steps = isDone ? createdSteps(written) : [];
+  return {
+    explanation: isDone
+      ? "Read later, as asked when the assistant was out of requests."
+      : "Could not be read later; kept in the Inbox.",
+    inputs: { channel: item.channel, enqueuedAt: item.enqueuedAt, steps, text: item.text },
+    kind: "parse",
+    outcome: isDone ? "applied" : "inbox",
+    rule: "parse.deferred",
+    taskId: steps[0]?.taskId ?? null,
+  };
+};
 
 /** Writes what a drained text became; a reading that cannot be written falls back to the Inbox. */
 const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" }>) => {
@@ -274,7 +300,10 @@ const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" 
   if (!isDone && drained.kind === "done") {
     await write(deps, toInbox(drained.item, deps.now).inputs);
   }
-  await deps.store.logDecisions([decisionOf(drained.item, isDone)], deps.now);
+  await deps.store.logDecisions(
+    [decisionOf(drained.item, { isDone, written: drained.inputs })],
+    deps.now,
+  );
   await tell(deps, isDone, drained);
 };
 

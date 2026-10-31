@@ -1,10 +1,11 @@
 import {
+  activeSeriesOf,
   err,
   type EventOf,
   isUntilBeforeStart,
   newId,
-  seriesById,
   type SeriesSchedule,
+  seriesStartProblem,
   type Task,
 } from "@pace/core";
 
@@ -55,10 +56,9 @@ const templateOf = (
 
 export const seriesActions = (deps: ActionDeps): SeriesActions => ({
   updateSeries: async (seriesId, schedule) => {
-    const series = seriesById(deps.state.store.getState().series, seriesId);
+    const series = activeSeriesOf(deps.state.store.getState().series, seriesId);
     if (
       series === undefined ||
-      series.archived ||
       isUntilBeforeStart(schedule, { at: series.template.startAt, tz: series.template.startTz })
     ) {
       return err("action/invalid-input");
@@ -71,8 +71,8 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
     ]);
   },
   archiveSeries: async (seriesId, keepTaskId) => {
-    const series = seriesById(deps.state.store.getState().series, seriesId);
-    return series === undefined || series.archived
+    const series = activeSeriesOf(deps.state.store.getState().series, seriesId);
+    return series === undefined
       ? err("action/invalid-input")
       : await emit(deps, [
           stamp(deps, {
@@ -83,7 +83,11 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
   },
   startSeriesForTask: async (taskId, schedule) => {
     const task = taskOf(deps, taskId);
-    if (!task.ok || task.value.seriesId !== null) {
+    // A task whose series ended starts a new one; a task in a running series cannot.
+    if (
+      !task.ok ||
+      activeSeriesOf(deps.state.store.getState().series, task.value.seriesId) !== undefined
+    ) {
       return err("action/invalid-input");
     }
     const created = deps.state.store
@@ -95,7 +99,8 @@ export const seriesActions = (deps: ActionDeps): SeriesActions => ({
     const seriesId = newId();
     const startAt = task.value.startAt ?? deps.clock.now();
     const startTz = task.value.startTz ?? deps.clock.deviceTz;
-    if (isUntilBeforeStart(schedule, { at: startAt, tz: startTz })) {
+    const due = task.value.dueAt === null ? null : { at: task.value.dueAt };
+    if (seriesStartProblem(schedule, { due, start: { at: startAt, tz: startTz } }) !== null) {
       return err("action/invalid-input");
     }
     const template = templateOf(task.value, { seriesId, startAt, startTz });

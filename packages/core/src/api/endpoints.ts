@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { decisionEndpoints } from "./decision-endpoints.ts";
 import { endpoint, type EndpointShape } from "./endpoint.ts";
 import { notificationEndpoints } from "./notification-endpoints.ts";
 import {
@@ -31,11 +32,7 @@ import {
   UsageUploadSchema,
 } from "./schemas/cloud.ts";
 import { LinkPreviewQuerySchema, LinkPreviewSchema } from "./schemas/links.ts";
-import {
-  CalendarSkipSchema,
-  DecisionsOutputSchema,
-  DecisionsQuerySchema,
-} from "./schemas/notify.ts";
+import { CalendarSkipSchema } from "./schemas/notify.ts";
 import {
   OAuthClientInfoQuerySchema,
   OAuthClientInfoSchema,
@@ -177,16 +174,7 @@ export const endpoints = {
     }),
   },
   notifications: notificationEndpoints,
-  decisions: {
-    /** The decision log (notifications sent or held back, and why), newest first. */
-    list: endpoint({
-      auth: true,
-      method: "GET",
-      output: DecisionsOutputSchema,
-      path: "/api/decisions",
-      query: DecisionsQuerySchema,
-    }),
-  },
+  decisions: decisionEndpoints,
   links: {
     /** Title and icon of a web page, for the link chip on a task (cached by the Worker). */
     preview: endpoint({

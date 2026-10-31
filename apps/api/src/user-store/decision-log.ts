@@ -1,10 +1,11 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { and, desc, eq, gte, like, lte, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, lte, or, type SQL } from "drizzle-orm";
 
 import { newId } from "@pace/core";
 
 import type {
+  DecisionAnswer,
   DecisionEntry,
   DecisionQuery,
   DecisionRecord,
@@ -45,7 +46,7 @@ export const insertDecisions = async (
     await db.insert(schema.decisions).values({
       ...decision,
       at: now,
-      id: newId(),
+      id: decision.id ?? newId(),
       inputs: JSON.stringify(decision.inputs),
     });
   }
@@ -63,4 +64,28 @@ export const listDecisions = async (
     .orderBy(desc(schema.decisions.at))
     .limit(query.limit);
   return rows.map((row) => toDecision(row));
+};
+
+/**
+Records what the person did with readings: the first answer for a decision stands, so a late
+Cancel cannot undo an approval. An approval names the task it created, which the row then opens.
+Answers the number of rows changed.
+*/
+export const resolveDecisions = async (
+  db: Db,
+  answers: readonly DecisionAnswer[],
+): Promise<number> => {
+  let changed = 0;
+  for (const answer of answers) {
+    const rows = await db
+      .update(schema.decisions)
+      .set({
+        resolution: answer.resolution,
+        ...(answer.taskId !== undefined && { taskId: answer.taskId }),
+      })
+      .where(and(eq(schema.decisions.id, answer.id), isNull(schema.decisions.resolution)))
+      .returning({ id: schema.decisions.id });
+    changed += rows.length;
+  }
+  return changed;
 };

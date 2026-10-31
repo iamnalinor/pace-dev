@@ -59,11 +59,24 @@ build history) is in [context/](context/README.md).
 ## Plugins and working method
 
 Use these when the session has them (`/plugin` → Anthropic Directory); without them, follow
-the same methods by hand:
+the same methods by hand. **Superpowers and everything-claude-code come first wherever they
+apply**: before doing a step by hand, check whether one of their skills, commands or agents
+covers it, and use it.
+- **Every significant change is reviewed** before it is pushed for merge: a new feature, a bug
+  fix, a refactor, a dependency or config change, a migration. The review runs through
+  `superpowers:requesting-code-review`, using its reviewer template with the plan or
+  requirements and the git range, not a hand-written prompt. Work through the findings with
+  `receiving-code-review`. A review by a generic agent does not count.
+- **Domain work goes to the matching specialist agent** (everything-claude-code's agents:
+  security, database, TypeScript/React, build errors, e2e, docs; the plugin's own agents for
+  UX and design). Use a general-purpose agent only when no specialist fits, and give every
+  agent a full brief: the goal, the files, the rules, what is already ruled out.
 - **Superpowers** (obra/superpowers): `brainstorming` and `writing-plans` before larger work,
   `test-driven-development`, `systematic-debugging` for every bug (root cause before a fix),
   `verification-before-completion` (run the checks, show the output, then claim done),
   `requesting-code-review` / `receiving-code-review`, `dispatching-parallel-agents`.
+- **everything-claude-code** (affaan-m/everything-claude-code): its specialist agents and
+  commands for planning, TDD, code review, security review, build fixes and e2e, as above.
 - **ux-superpowers**: `user-journey`, `jobs-to-be-done` and `ux-validate` for a new flow or
   screen: walk the owner's scenarios (`context/feedback-*.md`) end to end before and after.
 - **Design** (Anthropic): `design-critique`, `accessibility-review` and `ux-copy` on screenshots

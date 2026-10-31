@@ -7,6 +7,13 @@ export {
   MAX_CONTEXT_TASKS,
 } from "./actions/context.ts";
 export {
+  type DecisionInputs,
+  type DecisionStep,
+  decisionStepOf,
+  readDecisionInputs,
+  resolutionsOf,
+} from "./actions/decision-steps.ts";
+export {
   actionDetails,
   type DetailLine,
   detailText,
@@ -53,7 +60,12 @@ export {
   type TaskPatch,
 } from "./actions/schema.ts";
 export { summarize, withSummary } from "./actions/summary.ts";
-export type { Decision } from "./api/schemas/notify.ts";
+export {
+  type Decision,
+  DECISION_RESOLUTIONS,
+  type DecisionResolution,
+  type DecisionResolveBody,
+} from "./api/schemas/notify.ts";
 export {
   type ParseRequest,
   type ParseRequestBody,
@@ -114,6 +126,7 @@ export {
   type Resolution,
   RESOLUTIONS,
 } from "./notify/pool.ts";
+export { answerAt, answerText, readAnswer } from "./parse/answer.ts";
 export { isQuotedFrom, normalizeForEvidence } from "./parse/normalize.ts";
 export {
   blankModelAction,

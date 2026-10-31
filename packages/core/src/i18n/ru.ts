@@ -1,6 +1,7 @@
 import type { en } from "./en.ts";
 
 import { ruBoard } from "./ru/board.ts";
+import { ruDecisions } from "./ru/decisions.ts";
 import { ruDevices } from "./ru/devices.ts";
 import { ruInput } from "./ru/input.ts";
 import { ruLibrary } from "./ru/library.ts";
@@ -17,4 +18,5 @@ export const ru: { readonly [K in keyof typeof en]: string } = {
   ...ruLibrary,
   ...ruTime,
   ...ruNotify,
+  ...ruDecisions,
 };

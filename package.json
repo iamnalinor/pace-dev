@@ -41,7 +41,7 @@
     "test:api": "bun run --cwd apps/api test",
     "test:app": "bun run --cwd apps/app test",
     "test:e2e": "playwright test",
-    "test:llm": "bun run --cwd packages/core test:llm",
+    "test:llm": "bun run --cwd apps/api llm:smoke",
     "test:mutation": "bun run --cwd packages/core test:mutation",
     "db:generate": "bun run --cwd apps/api db:generate",
     "db:check": "bun run --cwd apps/api db:check",

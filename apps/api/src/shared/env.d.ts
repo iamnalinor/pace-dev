@@ -17,12 +17,11 @@ declare global {
       TELEGRAM_WEBHOOK_ALLOWED_CIDRS?: string;
       /** JSON of `getMe`, stored at deploy time so the bot never calls Telegram on cold start. */
       BOT_INFO?: string;
-      /** Comma- or newline-separated keys for the configured compatible model. */
-      LLM_API_KEY?: string;
-      /** The OpenAI-compatible API prefix, for example an endpoint ending in /v1. */
-      LLM_BASE_URL?: string;
-      /** Model identifier understood by that endpoint. */
-      LLM_MODEL?: string;
+      /*
+      The LLM endpoints are numbered slots, read by shared/config.ts from the env object:
+      LLM_BASE_URL_N (OpenAI-compatible API prefix), LLM_API_KEY_N (keys, comma or newline
+      separated) and LLM_MODEL_N (models, comma separated), for any N; slot 1 is asked first.
+      */
       /** `fake` keeps the LLM inside the Worker (tests, e2e). */
       LLM_PROVIDER?: string;
       /**

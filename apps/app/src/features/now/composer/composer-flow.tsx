@@ -84,6 +84,24 @@ const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void)
   };
 };
 
+/** To Inbox: the line is kept as a note; a preview of it goes, and the assistant log hears so. */
+const useToInbox = (
+  text: string,
+  pending: Pick<ReturnType<typeof usePendingActions>, "keptInInbox">,
+  done: () => void,
+) => {
+  const { actions } = usePace();
+  const run = useRunAction();
+  return async (): Promise<void> => {
+    if (!(await run(actions.captureInbox(text)))) {
+      return;
+    }
+
+    pending.keptInInbox();
+    done();
+  };
+};
+
 /** The form's place and the line's cursor: open, closed, and where the cursor goes back to. */
 const useFormState = (initialForm: FormOrigin | null) => {
   const [form, setForm] = useState<FormOrigin | null>(initialForm);
@@ -101,6 +119,10 @@ const useFormState = (initialForm: FormOrigin | null) => {
       setForm(null);
     },
     lineFocus,
+    /** The cursor back in the line (the card it opened was dismissed). */
+    refocus: (): void => {
+      setLineFocus((count) => count + 1);
+    },
     setForm,
   };
 };
@@ -149,6 +171,30 @@ const resetAndClose =
     close();
   };
 
+/**
+Enter reviews an action or approves the preview already shown; a line too short to read opens
+the form. While the assistant reads (a paste is read at once, before any Enter) it waits: a
+second request would only repeat the first (QA round 13 M2).
+*/
+const enterOf =
+  (
+    pending: Pick<ReturnType<typeof usePendingActions>, "approve" | "busy" | "pending" | "submit">,
+    text: string,
+    openForm: () => void,
+  ) =>
+  (): void => {
+    if (pending.busy) {
+      return;
+    }
+    if (pending.pending !== null) {
+      void pending.approve();
+    } else if (canAiRead(text)) {
+      pending.submit(text);
+    } else {
+      openForm();
+    }
+  };
+
 /** The composer's state and moves: the text, the reading, the form, and what each key does. */
 const useFlowState = ({
   initialText,
@@ -161,8 +207,7 @@ const useFlowState = ({
   readonly isFormInPane: boolean;
   readonly onCreatedTask: (taskId: string) => void;
 }) => {
-  const { actions, assistant, hooks } = usePace();
-  const run = useRunAction();
+  const { assistant, hooks } = usePace();
   const draft = useDraft(initialText, assistant);
   const { ai, edits, onReading, onText, reset, setEdits, text } = draft;
   const model = hooks.useComposer({ edits, text });
@@ -171,7 +216,7 @@ const useFlowState = ({
     edits: withSubtaskDraft(edits, model, draft.subtaskDraft),
     text,
   });
-  const { close, form, hide, lineFocus, setForm } = useFormState(initialForm);
+  const { close, form, hide, lineFocus, refocus, setForm } = useFormState(initialForm);
   const done = resetAndClose(reset, close);
   const pending = usePendingActions("task", (createdTaskId) => {
     done();
@@ -186,22 +231,20 @@ const useFlowState = ({
     pending,
     answer: pending.followup,
     close,
-    /** Enter reviews an action or approves the preview already shown. */
-    enter: (): void => {
-      if (pending.pending !== null) {
-        void pending.approve();
-      } else if (canAiRead(text)) {
-        pending.submit(text);
-      } else {
-        setForm("by-hand");
-      }
+    /** Escape or Cancel: the assistant's card goes, the text stays, the cursor back in the line. */
+    dismiss: (): void => {
+      pending.cancel();
+      refocus();
     },
-    /** New task opens the manual form and dismisses any assistant preview. */
+    enter: enterOf(pending, text, () => {
+      setForm("by-hand");
+    }),
+    /** New task opens the manual form; the assistant's preview goes (the person may still add it). */
     expand: (): void => {
       if (form !== null) {
         return;
       }
-      pending.cancel();
+      pending.discard();
       if (ai.state.status === "read") {
         onText(text);
       }
@@ -219,16 +262,12 @@ const useFlowState = ({
     setSubtaskDraft: draft.setSubtaskDraft,
     subtaskDraft: draft.subtaskDraft,
     text,
-    toInbox: async (): Promise<void> => {
-      if (await run(actions.captureInbox(text))) {
-        done();
-      }
-    },
+    toInbox: useToInbox(text, pending, done),
     /** A paste is read at once; typing never is. */
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.
       const isPaste = isPasted(text, next) && canAiRead(next);
-      pending.cancel();
+      pending.discard();
       onText(next);
       if (isPaste) {
         pending.submit(next);

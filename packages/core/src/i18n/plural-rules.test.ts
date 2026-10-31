@@ -2,7 +2,7 @@ import * as fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LANGUAGES, plural } from "./i18n.ts";
-import { pluralCategory } from "./plural-rules.ts";
+import { ordinalCategory, pluralCategory } from "./plural-rules.ts";
 
 // Hermes on Android has no Intl.PluralRules; the rules are written out and must agree with it.
 describe("pluralCategory", () => {
@@ -22,6 +22,20 @@ describe("pluralCategory", () => {
     const rules = new Intl.PluralRules(language);
     for (const count of [0.5, 1.5, 2.25, 21.5]) {
       expect(pluralCategory(language, count)).toBe(rules.select(count));
+    }
+  });
+});
+
+describe("ordinalCategory", () => {
+  it.each(LANGUAGES)("agrees with the ordinal Intl.PluralRules in %s", (language) => {
+    const rules = new Intl.PluralRules(language, { type: "ordinal" });
+    fc.assert(
+      fc.property(fc.integer({ max: 1_000_000, min: 0 }), (count) => {
+        expect(ordinalCategory(language, count)).toBe(rules.select(count));
+      }),
+    );
+    for (const count of [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31, 101, 111, 112, 113]) {
+      expect(ordinalCategory(language, count)).toBe(rules.select(count));
     }
   });
 });

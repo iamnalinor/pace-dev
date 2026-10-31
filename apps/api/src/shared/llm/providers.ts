@@ -3,28 +3,49 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { Config } from "../config.ts";
 import type { ParseProvider } from "./llm.ts";
 
+import { createLogger } from "../logger.ts";
 import { echoReply, fakeParseModel } from "./fake-model.ts";
 
-/** One name per key keeps rate limits independent while trying keys in order. */
-const keyName = (index: number): string =>
-  index === 0 ? "compatible" : `compatible-${String(index + 1)}`;
+const log = createLogger("info");
 
-/** The configured OpenAI-compatible endpoint; an incomplete endpoint is rejected by loadConfig. */
+/** `luna`, then `luna#2` for the same model again (another key or endpoint): names stay apart. */
+const uniqueName = (seen: Map<string, number>, model: string): string => {
+  const count = (seen.get(model) ?? 0) + 1;
+  seen.set(model, count);
+  return count === 1 ? model : `${model}#${String(count)}`;
+};
+
+/**
+Every model of every configured endpoint, in priority order: slot by slot, model by model, and
+each key of a slot on its own (a key that hits its limit rests while the next one answers).
+Structured outputs are on everywhere: without them an OpenAI-compatible endpoint is sent no
+JSON schema and the answer rarely fits it (the cause of "Assistant unavailable", bug class 40).
+*/
 export const parseProviders = (
-  config: Pick<Config, "llmApiKeys" | "llmBaseUrl" | "llmModel" | "llmProvider">,
+  config: Partial<Pick<Config, "llmSkipped">> & Pick<Config, "llmEndpoints" | "llmProvider">,
 ): readonly ParseProvider[] => {
   if (config.llmProvider === "fake") {
     return [{ model: fakeParseModel(echoReply), name: "fake" }];
   }
-  if (config.llmBaseUrl === "" || config.llmModel === "") {
-    return [];
+  const skipped = config.llmSkipped ?? [];
+  for (const reason of skipped) {
+    log.warn("llm: slot skipped", { why: reason });
   }
-  return config.llmApiKeys.map((apiKey, index) => ({
-    model: createOpenAICompatible({
-      apiKey,
-      baseURL: config.llmBaseUrl,
-      name: keyName(index),
-    })(config.llmModel),
-    name: keyName(index),
-  }));
+  const seen = new Map<string, number>();
+  return config.llmEndpoints.flatMap((endpoint) =>
+    endpoint.models.flatMap((modelId) =>
+      endpoint.apiKeys.map((apiKey) => {
+        const name = uniqueName(seen, modelId);
+        return {
+          model: createOpenAICompatible({
+            apiKey,
+            baseURL: endpoint.baseUrl,
+            name: `llm-${String(endpoint.slot)}`,
+            supportsStructuredOutputs: true,
+          })(modelId),
+          name,
+        };
+      }),
+    ),
+  );
 };

@@ -20,6 +20,8 @@ import {
 
 import type { TaskLink } from "./task.ts";
 
+import { type RepeatChangeProblem, repeatChangeProblem } from "./repeat-change.ts";
+
 /**
 What the user changed by tapping a chip; each wins over what the text says. `null` clears
 a field the text filled (no project, no due, no estimate, no link).
@@ -81,6 +83,8 @@ export type ComposerModel = {
   readonly estimateMinutes: null | number;
   readonly deadlinePolicy: DeadlinePolicy;
   readonly recurrence: null | SeriesSchedule;
+  /** Why the chosen repeat would be refused (Create stays off and the field says so). */
+  readonly repeatProblem: null | RepeatChangeProblem;
   readonly isDeadlineOwn: boolean;
   readonly link: null | TaskLink;
   readonly subtasks: readonly QuickSubtask[];
@@ -233,14 +237,41 @@ export const requiresAiFirst = (text: string): boolean => {
   return trimmed.length >= LONG_TEXT_CHARS || trimmed.includes("\n");
 };
 
-/** A title says something, or the text goes to a week's homework, which needs none of its own. */
-const canAddOf = (title: string, target: ComposerTarget): boolean =>
-  title.trim() !== "" || target.kind === "instance";
+/**
+A title says something, or the text goes to a week's homework, which needs none of its own; and
+no repeat the actions would refuse.
+*/
+const canAddOf = (
+  title: string,
+  target: ComposerTarget,
+  repeatProblem: null | RepeatChangeProblem,
+): boolean => (title.trim() !== "" || target.kind === "instance") && repeatProblem === null;
 
 const deadlineChoice = (state: CoreState, presetId: string, edits: ComposerEdits): DeadlinePolicy =>
   edits.deadlinePolicy ?? defaultDeadlineOf(state, presetId);
 
 const recurrenceChoice = (edits: ComposerEdits): null | SeriesSchedule => edits.recurrence ?? null;
+
+/** A week's homework takes no repeat of its own; a new task starts its series as it is made. */
+const composerRepeatProblem = (
+  state: CoreState,
+  input: {
+    readonly ctx: QueryContext;
+    readonly due: ComposerModel["due"];
+    readonly recurrence: null | SeriesSchedule;
+    readonly start: ComposerModel["start"];
+    readonly target: ComposerTarget;
+  },
+): null | RepeatChangeProblem =>
+  input.target.kind === "instance"
+    ? null
+    : repeatChangeProblem(state, {
+        due: input.due,
+        now: { at: input.ctx.now, tz: input.ctx.deviceTz },
+        schedule: input.recurrence,
+        start: input.start,
+        taskId: null,
+      });
 
 export const composerModel = (
   state: CoreState,
@@ -258,15 +289,19 @@ export const composerModel = (
   const due = dueOf(parsed, edits);
   const target = targetOf(state, presetId, { due, now: ctx.now, picked: edits.targetTaskId });
   const title = edits.title ?? parsed.title;
+  const recurrence = recurrenceChoice(edits);
+  const start = edits.start ?? null;
+  const repeatProblem = composerRepeatProblem(state, { ctx, due, recurrence, start, target });
   return {
-    canAdd: canAddOf(title, target),
+    canAdd: canAddOf(title, target, repeatProblem),
     defaultImportance,
     description: edits.description ?? null,
     deadlinePolicy: deadlineChoice(state, presetId, edits),
-    recurrence: recurrenceChoice(edits),
+    recurrence,
+    repeatProblem,
     isDeadlineOwn: edits.deadlinePolicy !== undefined,
     due,
-    start: edits.start ?? null,
+    start,
     estimateMinutes: pick(edits.estimateMinutes, parsed.estimateMinutes),
     importance: edits.importance ?? textImportance ?? defaultImportance,
     link: linkOf(parsed, edits),

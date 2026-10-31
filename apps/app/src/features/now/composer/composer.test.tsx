@@ -80,6 +80,9 @@ const PARSED = parsed(
   ["estimateMinutes"],
 );
 
+/** The assistant's answer with its questions. */
+const withQuestions = (questions: readonly unknown[]) => ({ ...PARSED, questions });
+
 const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: string) =>
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
@@ -166,6 +169,151 @@ describe("Composer", () => {
     expect(screen.getByText("When is it due?")).toBeOnTheScreen();
   });
 
+  it("answers the assistant's question with one tap: the option goes as a correction with the thread", async () => {
+    const asking = {
+      ...PARSED,
+      questions: [
+        { field: "dueDate", options: ["Today", "Tomorrow"], question: "When is it due?" },
+        { field: "category", options: [], question: "Is this for work or home?" },
+      ],
+    };
+    const { promise: revised, resolve: revise } = Promise.withResolvers<unknown>();
+    const parse = jest.fn<unknown, [{ readonly body: unknown }]>(() => asking);
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    const question = await screen.findByLabelText("When is it due?");
+    // Approve stays: the hint says it keeps the guesses, and how to answer (tap, or type below).
+    expect(screen.getByText(en("assistant.questionsHintBoth"))).toBeOnTheScreen();
+    expect(button("assistant.approve")).toBeEnabled();
+    // A question without options is answered in the correction field: it has no buttons.
+    expect(screen.getByText("Is this for work or home?")).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Is this for work or home?")).toBeNull();
+    expect(screen.getByLabelText(en("assistant.correct"))).toBeOnTheScreen();
+
+    parse.mockImplementation(async () => await revised);
+    await fireEvent.press(within(question).getByRole("button", { name: "Tomorrow" }));
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+    expect(parse.mock.calls[1]?.[0].body).toMatchObject({
+      domain: "task",
+      text: "«When is it due?» — Tomorrow",
+      thread: [{ actions: PARSED.actions, text: "срочно почта" }],
+    });
+    // Pending: the chosen answer is marked, nothing else can be pressed, nothing was written.
+    expect(within(question).getByRole("button", { name: "Today" })).toBeDisabled();
+    expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeDisabled();
+    expect(within(question).getByRole("button", { name: "Tomorrow" })).toBeSelected();
+    expect(within(question).getByRole("button", { name: "Today" })).not.toBeSelected();
+    expect(button("assistant.approve")).toBeDisabled();
+    expect(screen.getByLabelText(en("assistant.correct"))).toBeDisabled();
+    expect(created(runtime, "разобрать почту")).toBeUndefined();
+
+    await act(async () => {
+      revise(PARSED);
+      await revised;
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText("When is it due?")).toBeNull();
+    });
+    expect(screen.queryByText(en("assistant.questionsHintBoth"))).toBeNull();
+    expect(screen.getByText("New task: разобрать почту")).toBeOnTheScreen();
+    // The answer stays in view, so the person sees it was taken.
+    expect(
+      screen.getByLabelText(
+        en("assistant.answered", { option: "Tomorrow", question: "When is it due?" }),
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it("says how to answer: tap an option, or type below when a question has none", async () => {
+    const parse = jest.fn(() =>
+      withQuestions([{ field: "dueDate", options: ["Today"], question: "When is it due?" }]),
+    );
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText(en("assistant.questionsHint"))).toBeOnTheScreen();
+    parse.mockImplementation(() =>
+      withQuestions([{ field: "category", options: [], question: "Work or home?" }]),
+    );
+    await fireEvent.changeText(screen.getByLabelText(en("assistant.correct")), "срочно");
+    await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+    expect(await screen.findByText(en("assistant.questionsHintType"))).toBeOnTheScreen();
+  });
+
+  it("asks the assistant once for a pasted message, also when Enter follows while it reads (QA 13 M2)", async () => {
+    const { promise: answered, resolve } = Promise.withResolvers<unknown>();
+    const parse = jest.fn(async () => await answered);
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    // At once, as a paste: the assistant reads it without waiting for Enter.
+    await fireEvent.changeText(line(), "rename task Gamma to Delta");
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(1);
+    });
+    await enter();
+    await enter();
+    await act(async () => {
+      resolve(PARSED);
+      await answered;
+    });
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks once when Enter comes before the paste's reading has re-rendered", async () => {
+    const { promise: answered, resolve } = Promise.withResolvers<unknown>();
+    const parse = jest.fn(async () => await answered);
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    // A browser's fill and Enter land in one tick: no render between them.
+    await act(async () => {
+      void fireEvent.changeText(line(), "rename task Gamma to Delta");
+      void fireEvent(line(), "submitEditing");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      resolve(PARSED);
+      await answered;
+    });
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask again on Enter when the pasted line was already read to nothing", async () => {
+    const parse = jest.fn(() => ({ ...PARSED, actions: [] }));
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+    await fireEvent.changeText(line(), "rename task Gamma to Delta");
+    expect(await screen.findByText(en("assistant.nothingToDo"))).toBeOnTheScreen();
+    await enter();
+    expect(screen.getByText(en("assistant.nothingToDo"))).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+    // An edit is a new line: Enter reads it.
+    await fireEvent.changeText(line(), "rename task Gamma to Delta!");
+    await enter();
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("says the assistant found nothing to do instead of asking to try again", async () => {
+    const nothing = { ...PARSED, actions: [] };
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => nothing } }));
+    await fireEvent.changeText(line(), "close task Nonexistent");
+    await enter();
+    expect(await screen.findByText(en("assistant.nothingToDo"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+  });
+
+  it("shows no answer hint while the assistant asks nothing", async () => {
+    await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.questionsHint"))).toBeNull();
+  });
+
   it("discards a preview when its source line changes", async () => {
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } });
     await renderComposer(runtime);
@@ -241,6 +389,71 @@ describe("Composer", () => {
     });
     // Back to an empty line for the next one.
     expect(line()).toHaveDisplayValue("");
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
+  });
+
+  it("tells the assistant log what became of a reading: approved with its task, or dismissed", async () => {
+    const resolved: unknown[] = [];
+    let count = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/decisions/resolve": ({ body }) => {
+          resolved.push(body);
+          return { resolved: 1 };
+        },
+        "POST /api/parse": () => {
+          count += 1;
+          return { ...PARSED, decisionId: `d${String(count)}` };
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    // A correction replaces the reading: the first one counts as corrected.
+    await fireEvent.changeText(screen.getByLabelText(en("assistant.correct")), "на завтра");
+    await fireEvent(screen.getByLabelText(en("assistant.correct")), "submitEditing");
+    await waitFor(() => {
+      expect(count).toBe(2);
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: en("assistant.approve") }));
+    await waitFor(() => {
+      expect(resolved).toHaveLength(1);
+    });
+    expect(resolved[0]).toEqual({
+      decisions: [
+        { id: "d1", resolution: "corrected" },
+        { id: "d2", resolution: "approved", taskId: created(runtime, "разобрать почту")?.id },
+      ],
+    });
+
+    // An edit of the line drops the preview without telling the log anything.
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    await fireEvent.changeText(line(), "срочно почта.");
+    expect(screen.queryByText("New task: разобрать почту")).toBeNull();
+    expect(resolved).toHaveLength(1);
+
+    // A second reading, dismissed: Cancel says so, once.
+    await fireEvent.changeText(line(), "срочно почта");
+    await enter();
+    await fireEvent.press(await screen.findByRole("button", { name: en("common.cancel") }));
+    await fireEvent.changeText(line(), "срочно почта!");
+    await waitFor(() => {
+      expect(resolved).toHaveLength(2);
+    });
+    expect(resolved[1]).toEqual({ decisions: [{ id: "d4", resolution: "cancelled" }] });
+
+    // A third, kept in the Inbox instead: the preview goes, and the log hears it.
+    await enter();
+    expect(await screen.findByText("New task: разобрать почту")).toBeOnTheScreen();
+    await fireEvent.press(button("composer.toInbox"));
+    await waitFor(() => {
+      expect(resolved).toHaveLength(3);
+    });
+    expect(resolved[2]).toEqual({ decisions: [{ id: "d5", resolution: "inbox" }] });
     expect(screen.queryByText("New task: разобрать почту")).toBeNull();
   });
 

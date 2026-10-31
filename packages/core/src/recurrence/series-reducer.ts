@@ -19,6 +19,16 @@ export const INITIAL_SERIES_STATE: SeriesState = { byId: {} };
 export const seriesById = (state: SeriesState, id: string): Series | undefined =>
   Object.hasOwn(state.byId, id) ? state.byId[id] : undefined;
 
+/**
+The series a task still belongs to: an ended series stays in the state (its instances keep
+its id) but repeats nothing, so it counts as none. The task screen, its editor and the
+series actions read membership only through this.
+*/
+export const activeSeriesOf = (state: SeriesState, seriesId: null | string): Series | undefined => {
+  const series = seriesId === null ? undefined : seriesById(state, seriesId);
+  return series?.archived === false ? series : undefined;
+};
+
 const created = (state: SeriesState, event: EventOf<"series.created">): SeriesState => {
   const { seriesId, schedule, template } = event.payload;
   return seriesById(state, seriesId) === undefined

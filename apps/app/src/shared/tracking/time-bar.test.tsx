@@ -441,6 +441,63 @@ describe("TimeBar", () => {
     expect(field).toHaveDisplayValue("");
   });
 
+  it("answers the assistant's question about an activity with one tap", async () => {
+    const parse = jest.fn<unknown, [{ readonly body: unknown }]>(() => ({
+      ...CSS_READ,
+      questions: [
+        { field: "expectMinutes", options: ["20m", "1h"], question: "How long will it take?" },
+      ],
+    }));
+    const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });
+    await renderScreen(<TimeBar />, runtime);
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС");
+    await fireEvent(field, "submitEditing");
+    const question = await screen.findByLabelText("How long will it take?");
+    await fireEvent.press(within(question).getByRole("button", { name: "1h" }));
+    await waitFor(() => {
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+    expect(parse.mock.calls[1]?.[0].body).toMatchObject({
+      domain: "activity",
+      text: "«How long will it take?» — 1h",
+      thread: [{ actions: CSS_READ.actions, text: "Пошел в ЦСС" }],
+    });
+    expect(activities(runtime)).toEqual([]);
+  });
+
+  it("asks the assistant once when Enter is pressed again while it reads (QA 13 M2)", async () => {
+    const answer = deferred<unknown>();
+    const parse = jest.fn(async () => await answer.promise);
+    await renderScreen(
+      <TimeBar />,
+      await createTestRuntime({ routes: { "POST /api/parse": parse } }),
+    );
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "Пошел в ЦСС, 20мин");
+    await fireEvent(field, "submitEditing");
+    await fireEvent(field, "submitEditing");
+    await act(async () => {
+      answer.resolve(CSS_READ);
+      await answer.promise;
+    });
+    expect(await screen.findByText("Start: ЦСС")).toBeOnTheScreen();
+    expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it("says what to do with text that holds nothing to start, not to try again (QA 13 M4)", async () => {
+    const nothing = { ...CSS_READ, actions: [] };
+    await renderScreen(
+      <TimeBar />,
+      await createTestRuntime({ routes: { "POST /api/parse": () => nothing } }),
+    );
+    const field = screen.getByLabelText("What are you doing?");
+    await fireEvent.changeText(field, "delete task Water the plants");
+    await fireEvent(field, "submitEditing");
+    expect(await screen.findByText(en("assistant.nothingToStart"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.couldNotRead"))).toBeNull();
+  });
+
   it("says the thread is full on a sixth correction instead of dropping it", async () => {
     const parse = jest.fn(() => CSS_READ);
     const runtime = await createTestRuntime({ routes: { "POST /api/parse": parse } });

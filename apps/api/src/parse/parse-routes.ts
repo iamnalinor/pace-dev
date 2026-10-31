@@ -3,6 +3,7 @@ import type { Context, Hono } from "hono";
 import {
   type CoreState,
   endpoints,
+  newId,
   ok,
   type ParseRequestBody,
   type ParseResponse,
@@ -16,6 +17,9 @@ import { parseDecision } from "../shared/llm/decision.ts";
 import { availability, type ParseProvider } from "../shared/llm/llm.ts";
 import { readByRules, readMessage } from "../shared/llm/read.ts";
 import { mount } from "../shared/mount.ts";
+
+/** How long the app's read may take in all, however many providers are tried. */
+const APP_READ_DEADLINE_MS = 20_000;
 
 /**
 `POST /api/parse`: the user's state (categories, projects, open tasks, recent activities)
@@ -34,13 +38,15 @@ const unavailable = async (
   world: { readonly state: CoreState; readonly now: string; readonly retryAt: null | string },
 ): Promise<ParseResponse> => {
   const { now, retryAt } = world;
+  const decisionId = newId();
   await store.logDecisions(
-    [parseDecision(request.text, "api", { retryAt, status: "unavailable" })],
+    [{ ...parseDecision(request.text, "api", { retryAt, status: "unavailable" }), id: decisionId }],
     now,
   );
   const rules = readByRules(request.text, request.domain, world);
   if (retryAt === null || request.defer !== true) {
-    return { ...rules, actions: [...rules.actions], retryAt, status: "unavailable" };
+    // The rules' reading can still be approved or dismissed: the answer names its decision.
+    return { ...rules, actions: [...rules.actions], decisionId, retryAt, status: "unavailable" };
   }
   await store.enqueueParse(
     { channel: "api", domain: request.domain, retryAt, text: request.text },
@@ -65,6 +71,8 @@ export const mountParseRoutes = (
     const { state } = await store.read(now);
     const read = await readMessage(providersOf(c.get("config")), body.text, {
       cooldowns: await store.llmCooldowns(now),
+      // A person waits on a spinner: past this the rules answer instead.
+      deadlineMs: APP_READ_DEADLINE_MS,
       domain: body.domain,
       now,
       state,
@@ -78,25 +86,25 @@ export const mountParseRoutes = (
     }
     const { confidence, domain, output, actions, provider, questions, rejected } = read.value;
     // Readings while typing come every pause: only the ones the person acts on are logged.
-    if (body.draft !== true) {
-      await store.logDecisions(
-        [
-          parseDecision(body.text, "api", {
-            output,
-            actions,
-            provider,
-            rejected,
-            status: "parsed",
-          }),
-        ],
-        now,
-      );
+    const decisionId = body.draft === true ? undefined : newId();
+    if (decisionId !== undefined) {
+      const thread = body.thread?.map((turn) => turn.text);
+      const entry = parseDecision(body.text, "api", {
+        output,
+        actions,
+        provider,
+        rejected,
+        status: "parsed",
+        thread,
+      });
+      await store.logDecisions([{ ...entry, id: decisionId }], now);
     }
     return ok(
       withLegacyName({
         confidence,
         domain,
         actions: [...actions],
+        ...(decisionId !== undefined && { decisionId }),
         provider,
         ...(questions.length > 0 && { questions: [...questions] }),
         status: "parsed" as const,

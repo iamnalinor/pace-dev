@@ -22,7 +22,7 @@ import {
 
 import { createApp } from "../src/app.ts";
 import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev, readJson } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
 
 /**
 Every answer is read through the endpoint's own output schema, as the client reads it: the
@@ -255,7 +255,94 @@ describe("POST /api/parse: tasks", () => {
       "/api/decisions?q=USB-C",
       { token },
     );
-    expect(decisions[0]).toMatchObject({ outcome: "parsed", rule: "parse.task.create" });
+    expect(decisions[0]).toMatchObject({
+      // What the log needs to say in words what became of the message, and who read it.
+      inputs: {
+        provider: "fake",
+        steps: [{ kind: "task.create", subject: "купить кабель USB-C", taskId: null }],
+        text: "купить кабель USB-C",
+      },
+      outcome: "parsed",
+      rule: "parse.task.create",
+    });
+  });
+
+  it("names the decision of a reading, and records what the person did with it, once", async () => {
+    const token = await loginAsDev("1001");
+    const first = await parse(token, "разобрать почту");
+    // A correction of it: its decision keeps the request it belongs to.
+    const second = asAnswered(
+      await json("/api/parse", {
+        body: {
+          text: "разобрать почту до обеда",
+          thread: [{ actions: first.actions, text: "разобрать почту" }],
+        },
+        token,
+      }),
+    );
+    expect(first.decisionId).toMatch(/^[0-9A-Z]{26}$/u);
+    // A reading while typing is not logged, so it names no decision.
+    const draft = await json<ParseResponse>("/api/parse", {
+      body: { draft: true, text: "разобрать" },
+      token,
+    });
+    expect(draft.decisionId).toBeUndefined();
+    // A second correction: its decision keeps every earlier turn, in order.
+    const third = asAnswered(
+      await json("/api/parse", {
+        body: {
+          text: "«When?» — Today",
+          thread: [
+            { actions: first.actions, text: "разобрать почту" },
+            { actions: second.actions, text: "разобрать почту до обеда" },
+          ],
+        },
+        token,
+      }),
+    );
+    const turns = await answerOf(endpoints.decisions.list, "/api/decisions?q=When", { token });
+    expect(turns.decisions.find((row) => row.id === third.decisionId)?.inputs).toMatchObject({
+      request: "разобрать почту",
+      text: "«When?» — Today",
+      turns: ["разобрать почту до обеда"],
+    });
+    const resolve = async (body: unknown) =>
+      await answerOf(endpoints.decisions.resolve, "/api/decisions/resolve", { body, token });
+    expect(
+      await resolve({
+        decisions: [
+          { id: first.decisionId, resolution: "corrected" },
+          { id: second.decisionId, resolution: "approved", taskId: "t-mail" },
+        ],
+      }),
+    ).toEqual({ resolved: 2 });
+    // The first answer stands: a later Cancel of the same reading, or an unknown id, changes nothing.
+    expect(
+      await resolve({
+        decisions: [
+          { id: second.decisionId, resolution: "cancelled" },
+          { id: "nope", resolution: "cancelled" },
+        ],
+      }),
+    ).toEqual({ resolved: 0 });
+    const listed = await answerOf(endpoints.decisions.list, "/api/decisions?q=почту", { token });
+    // The second correction (never answered) aside: the two readings that were.
+    const decisions = listed.decisions.filter((row) => row.id !== third.decisionId);
+    expect(decisions.map(({ id, resolution, taskId }) => ({ id, resolution, taskId }))).toEqual([
+      { id: second.decisionId, resolution: "approved", taskId: "t-mail" },
+      { id: first.decisionId, resolution: "corrected", taskId: null },
+    ]);
+    expect(decisions[0]?.inputs).toMatchObject({
+      request: "разобрать почту",
+      text: "разобрать почту до обеда",
+      turns: [],
+    });
+    expect(decisions[1]?.inputs).not.toHaveProperty("request");
+    const refused = await call("/api/decisions/resolve", {
+      body: { decisions: [{ id: "x", resolution: "maybe" }] },
+      token,
+    });
+    expect(refused.status).toBe(422);
   });
 
   it("proposes edits, a close, a delete and subtasks of an existing task by its id", async () => {
@@ -326,6 +413,31 @@ describe("POST /api/parse: activities", () => {
       activityId,
       kind: "activity.delete",
     });
+  });
+
+  it("asks how long an activity takes on `#ask` (the fake), and an answer sets it", async () => {
+    const token = await loginAsDev("1002");
+    const asked = await parse(token, "#ask Bar question", "activity");
+    expect(only(asked)).toMatchObject({ kind: "activity.start", label: "Bar question" });
+    expect(asked.questions).toEqual([
+      { field: "expectMinutes", options: ["20m", "1h", "2h"], question: "How long will it take?" },
+    ]);
+    const answered = asAnswered(
+      await json("/api/parse", {
+        body: {
+          domain: "activity",
+          text: "«How long will it take?» — 1h",
+          thread: [{ actions: asked.actions, text: "#ask Bar question" }],
+        },
+        token,
+      }),
+    );
+    expect(only(answered)).toMatchObject({
+      expectMinutes: 60,
+      kind: "activity.start",
+      label: "Bar question",
+    });
+    expect(answered.questions ?? []).toEqual([]);
   });
 
   it("keeps only actions of the field the text came from", async () => {
@@ -426,17 +538,21 @@ describe("POST /api/parse: no model", () => {
     await stub.noteLlmLimits({ fake: "2000-01-01T00:00:00.000Z" }, new Date().toISOString());
     const later = Date.now() + 60_000;
     await stub.drainParses(new Date(later).toISOString());
-    const pulled = await json<{ events: { type: string; payload: { title?: string } }[] }>(
-      "/api/sync/pull",
-      { token },
-    );
+    const pulled = await json<{
+      events: { type: string; payload: { taskId?: string; title?: string } }[];
+    }>("/api/sync/pull", { token });
     const created = pulled.events.find((event) => event.payload.title === "позвонить в банк");
     expect(created?.type).toBe("task.created");
     const { decisions } = await json<{ decisions: { rule: string; outcome: string }[] }>(
       "/api/decisions?q=позвонить",
       { token },
     );
-    expect(decisions[0]).toMatchObject({ outcome: "applied", rule: "parse.deferred" });
+    expect(decisions[0]).toMatchObject({
+      inputs: { steps: [{ kind: "task.create", subject: "позвонить в банк" }] },
+      outcome: "applied",
+      rule: "parse.deferred",
+      taskId: created?.payload.taskId,
+    });
     // The alarm armed when it was queued finds nothing left: no second copy.
     await runDurableObjectAlarm(stub);
     const again = await json<{ events: { type: string; payload: { title?: string } }[] }>(

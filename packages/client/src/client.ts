@@ -110,7 +110,7 @@ export {
   type DayTotal,
   trackedDates,
 } from "./view-models/day.ts";
-export { decisionLabelKey } from "./view-models/decisions.ts";
+export { type DecisionView, decisionViews } from "./view-models/decisions.ts";
 export {
   agentCommand,
   agentLogsCommand,
@@ -200,6 +200,7 @@ export {
   projectsViewModel,
 } from "./view-models/projects.ts";
 export { type DueRelative, relativeDay } from "./view-models/relative-day.ts";
+export { type RepeatChangeProblem, repeatChangeProblem } from "./view-models/repeat-change.ts";
 export {
   reviewDecisions,
   type ReviewRow,

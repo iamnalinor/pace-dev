@@ -1,6 +1,8 @@
 import {
   type CoreState,
+  finalDeadlineOf,
   hasLaterStart,
+  hasNextRepeat,
   type Importance,
   isOpen,
   minutesBetween,
@@ -28,12 +30,18 @@ export type MetaPart =
       /** The due was set in a zone whose offset differs from the device's: show both times. */
       readonly zoneDiffers: boolean;
     }
+  /** The hard end of a two-stage deadline, once the main due date is behind and it is not. */
+  | { readonly kind: "final"; readonly at: string; readonly tz: string }
+  /** Past the main due date and the final deadline too. */
+  | { readonly kind: "final-passed"; readonly at: string; readonly tz: string }
   | { readonly kind: "importance"; readonly importance: Importance }
   | { readonly kind: "late"; readonly minutes: number; readonly isSoft: boolean }
   /** `isSoft`: a resubmission deadline, whose lateness is never told in minutes. */
   | { readonly kind: "left"; readonly minutes: number }
   /** Time until the due, shown next to it: "6d 12h left". */
   | { readonly kind: "paused" }
+  /** Another instance of its series (or weekly homework) follows: the row carries a repeat mark. */
+  | { readonly kind: "repeats" }
   | { readonly kind: "sent"; readonly submitted: number }
   | { readonly kind: "solved"; readonly solved: number; readonly total: number }
   | { readonly kind: "starts"; readonly at: string; readonly tz: string }
@@ -83,33 +91,58 @@ const importancePart = (item: NowItem): readonly MetaPart[] => [
   { kind: "importance", importance: item.importance },
 ];
 
+const repeatsPart = (item: NowItem): readonly MetaPart[] =>
+  hasNextRepeat(item.repeat) ? [{ kind: "repeats" }] : [];
+
 const startsPart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
   item.task.startAt !== null && hasLaterStart(item.task, ctx.now)
     ? [{ kind: "starts", at: item.task.startAt, tz: item.task.startTz ?? ctx.deviceTz }]
     : [];
 
-/** Lateness, else the due date and, while the task is open, the time left to it. */
+/**
+The hard end of an open two-stage deadline once the main one is behind: still ahead, or gone by
+too (a row past both says so, not only how late it is).
+*/
+const finalPart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
+  const final = finalDeadlineOf(item.task, item.preset);
+  if (final === null || item.task.closed !== null) {
+    return [];
+  }
+  const kind = Date.parse(final.at) > Date.parse(ctx.now) ? "final" : "final-passed";
+  return [{ kind, ...final }];
+};
+
+/** The due date (and, while open, the time left to it). */
+const dueDatePart = (task: NowItem["task"], ctx: QueryContext): readonly MetaPart[] => {
+  if (task.dueAt === null || task.dueTz === null) {
+    return [];
+  }
+  const due = { at: task.dueAt, tz: task.dueTz };
+  const isWaiting = hasLaterStart(task, ctx.now);
+  return [
+    {
+      kind: "due",
+      ...due,
+      relative: relativeDay(task.dueAt, ctx),
+      zoneDiffers: zonesDiffer(due, { at: task.dueAt, tz: ctx.deviceTz }),
+    },
+    ...(!isWaiting && task.closed === null
+      ? [{ kind: "left" as const, minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) }]
+      : []),
+  ];
+};
+
+/**
+Lateness, else the due date and, while the task is open, the time left to it. A task that has
+not started yet is never late: its row names the deadline it carries (QA 13 L7).
+*/
 const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   const { task } = item;
-  if (item.lateMinutes !== null) {
+  if (item.lateMinutes !== null && !hasLaterStart(task, ctx.now)) {
     const isSoft = item.preset.deadlinePolicy.kind === "resubmission";
-    return [{ isSoft, kind: "late", minutes: item.lateMinutes }];
+    return [{ isSoft, kind: "late", minutes: item.lateMinutes }, ...finalPart(item, ctx)];
   }
-  if (task.dueAt !== null && task.dueTz !== null) {
-    const due = { at: task.dueAt, tz: task.dueTz };
-    return [
-      {
-        kind: "due",
-        ...due,
-        relative: relativeDay(task.dueAt, ctx),
-        zoneDiffers: zonesDiffer(due, { at: task.dueAt, tz: ctx.deviceTz }),
-      },
-      ...(task.closed === null
-        ? [{ kind: "left" as const, minutes: Math.max(0, minutesBetween(ctx.now, task.dueAt)) }]
-        : []),
-    ];
-  }
-  return [];
+  return dueDatePart(task, ctx);
 };
 
 /** Subtasks solved and sent; a late sheet shows what is still owed. */
@@ -151,6 +184,7 @@ export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
   dimmed: item.importance === "nice_to_have" && item.task.dueAt === null,
   meta: [
     ...importancePart(item),
+    ...repeatsPart(item),
     ...pausedPart(item),
     ...startsPart(item, ctx),
     ...duePart(item, ctx),

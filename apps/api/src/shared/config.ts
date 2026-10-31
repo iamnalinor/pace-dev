@@ -51,44 +51,96 @@ const cidrList = (text: string, ctx: z.RefinementCtx): readonly string[] => {
   return entries;
 };
 
-const EnvSchema = z
-  .object({
-    ENVIRONMENT: z.enum(["development", "test", "production"]),
-    ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
-    TELEGRAM_BOT_USERNAME: z.string().min(1),
-    WEB_ORIGIN: z.url(),
-    TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
-    TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
-    TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
-    TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
-    BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
-    // Several keys (comma or newline separated) are rotated: a key that hits its limit rests.
-    LLM_API_KEY: z.string().default("").transform(csv),
-    LLM_BASE_URL: z.string().default(""),
-    LLM_MODEL: z.string().default(""),
-    LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
-  })
-  .superRefine((value, ctx) => {
-    const configured = [
-      value.LLM_API_KEY.length > 0,
-      value.LLM_BASE_URL !== "",
-      value.LLM_MODEL !== "",
-    ];
-    if (configured.some(Boolean) && !configured.every(Boolean)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["LLM_API_KEY"],
-        message: "LLM_API_KEY, LLM_BASE_URL and LLM_MODEL must be set together",
-      });
+const EnvSchema = z.object({
+  ENVIRONMENT: z.enum(["development", "test", "production"]),
+  ALLOWED_TELEGRAM_IDS: z.string().transform(csv),
+  TELEGRAM_BOT_USERNAME: z.string().min(1),
+  WEB_ORIGIN: z.url(),
+  TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
+  TELEGRAM_WEBHOOK_ALLOWED_CIDRS: z.string().default("").transform(cidrList),
+  TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
+  BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
+  LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
+});
+
+/** One OpenAI-compatible endpoint: its models are tried in order, each with every key. */
+export type LlmEndpoint = {
+  /** The N of `LLM_BASE_URL_N`: lower numbers are asked first. */
+  readonly slot: number;
+  readonly baseUrl: string;
+  readonly apiKeys: readonly string[];
+  readonly models: readonly string[];
+};
+
+// `_1`, `_2`, …: a leading zero (`_01`) is not a slot number, so it cannot merge with `_1`.
+const LLM_VAR = /^LLM_(API_KEY|BASE_URL|MODEL)_(0|[1-9]\d*)$/u;
+const LLM_PARTS = ["BASE_URL", "API_KEY", "MODEL"] as const;
+
+const isHttpUrl = (text: string): boolean =>
+  URL.canParse(text) && ["http:", "https:"].includes(new URL(text).protocol);
+
+type SlotParts = Partial<Record<(typeof LLM_PARTS)[number], string>>;
+
+/** The `LLM_*_N` values of `env`, grouped by N. */
+const llmSlotsOf = (env: object): ReadonlyMap<number, SlotParts> => {
+  const slots = new Map<number, SlotParts>();
+  for (const [name, value] of Object.entries(env)) {
+    const match = LLM_VAR.exec(name);
+    // An empty value counts as unset (`LLM_BASE_URL_1=` in a .dev.vars).
+    if (match === null || typeof value !== "string" || value.trim() === "") {
+      continue;
     }
-    if (value.LLM_BASE_URL === "") {
-      return;
+    const slot = Number(match[2]);
+    const part = match[1] as (typeof LLM_PARTS)[number];
+    slots.set(slot, { ...slots.get(slot), [part]: value.trim() });
+  }
+  return slots;
+};
+
+/** One slot read and checked; a failure is `[variable, message]`. */
+const llmEndpointOf = (
+  slot: number,
+  parts: SlotParts,
+): Result<LlmEndpoint, readonly [string, string]> => {
+  const [urlName = "", keyName = "", modelName = ""] = LLM_PARTS.map(
+    (part) => `LLM_${part}_${String(slot)}`,
+  );
+  const baseUrl = parts.BASE_URL ?? "";
+  const apiKeys = csv(parts.API_KEY ?? "");
+  const models = csv(parts.MODEL ?? "");
+  const missing = [baseUrl !== "", apiKeys.length > 0, models.length > 0].indexOf(false);
+  if (missing !== -1) {
+    const name = [urlName, keyName, modelName][missing] ?? urlName;
+    return err([name, `${urlName}, ${keyName} and ${modelName} go together`]);
+  }
+  return isHttpUrl(baseUrl)
+    ? ok({ apiKeys, baseUrl, models, slot })
+    : err([urlName, "must be an HTTP URL"]);
+};
+
+/**
+The numbered LLM slots: `LLM_BASE_URL_N`, `LLM_API_KEY_N` and `LLM_MODEL_N` set together, any N,
+lowest first. A slot may list several models and keys (comma or newline separated). A broken
+slot is skipped with a reason, never failing the config: the assistant is optional, and a typo
+in one slot must not take the whole API down.
+*/
+const llmEndpointsOf = (
+  env: object,
+): { readonly endpoints: readonly LlmEndpoint[]; readonly skipped: readonly string[] } => {
+  const endpoints: LlmEndpoint[] = [];
+  const skipped: string[] = [];
+  const slots = [...llmSlotsOf(env)].toSorted(([a], [b]) => a - b);
+  for (const [slot, parts] of slots) {
+    const endpoint = llmEndpointOf(slot, parts);
+    if (endpoint.ok) {
+      endpoints.push(endpoint.value);
+    } else {
+      skipped.push(`${endpoint.error[0]}: ${endpoint.error[1]}`);
     }
-    const url = URL.canParse(value.LLM_BASE_URL) ? new URL(value.LLM_BASE_URL) : null;
-    if (url === null || !["http:", "https:"].includes(url.protocol)) {
-      ctx.addIssue({ code: "custom", path: ["LLM_BASE_URL"], message: "must be an HTTP URL" });
-    }
-  });
+  }
+  return { endpoints, skipped };
+};
 
 export type Config = {
   readonly environment: "development" | "production" | "test";
@@ -101,15 +153,18 @@ export type Config = {
   readonly telegramWebhookAllowedCidrs: readonly string[];
   readonly telegramApiRoot: string;
   readonly botInfo: undefined | UserFromGetMe;
-  /** Every key of the compatible endpoint, tried in turn; empty without one. */
-  readonly llmApiKeys: readonly string[];
-  readonly llmBaseUrl: string;
-  readonly llmModel: string;
+  /** The LLM endpoints in priority order; empty = no model, the rules read messages. */
+  readonly llmEndpoints: readonly LlmEndpoint[];
+  /** Why each broken LLM slot was left out (`LLM_BASE_URL_2: must be an HTTP URL`). */
+  readonly llmSkipped: readonly string[];
   /** `fake` answers from inside the Worker (tests, e2e); `auto` uses the providers with a key. */
   readonly llmProvider: "auto" | "fake";
 };
 
-/** Reads and validates the Worker's vars and secrets; a failure names the offending variable. */
+/**
+Reads and validates the Worker's vars and secrets; a failure names the offending variable. A
+broken LLM slot is left out and named in `llmSkipped` instead.
+*/
 export const loadConfig = (env: object): Result<Config, string> => {
   const parsed = EnvSchema.safeParse(env);
   if (!parsed.success) {
@@ -117,6 +172,7 @@ export const loadConfig = (env: object): Result<Config, string> => {
     return err(`config: ${issue?.path.join(".") ?? "env"}: ${issue?.message ?? "invalid"}`);
   }
   const value = parsed.data;
+  const llm = llmEndpointsOf(env);
   return ok({
     environment: value.ENVIRONMENT,
     allowedTelegramIds: value.ALLOWED_TELEGRAM_IDS,
@@ -127,9 +183,8 @@ export const loadConfig = (env: object): Result<Config, string> => {
     telegramWebhookAllowedCidrs: value.TELEGRAM_WEBHOOK_ALLOWED_CIDRS,
     telegramApiRoot: value.TELEGRAM_API_ROOT,
     botInfo: value.BOT_INFO,
-    llmApiKeys: value.LLM_API_KEY,
-    llmBaseUrl: value.LLM_BASE_URL,
-    llmModel: value.LLM_MODEL,
+    llmEndpoints: llm.endpoints,
+    llmSkipped: llm.skipped,
     llmProvider: value.LLM_PROVIDER,
   });
 };

@@ -1,4 +1,4 @@
-import { APICallError, type LanguageModel } from "ai";
+import type { LanguageModel } from "ai";
 
 import {
   blankModelAction,
@@ -13,6 +13,8 @@ import {
   wallClockInstant,
 } from "@pace/core";
 
+import { askReply } from "./fake-ask.ts";
+import { failureOf, FINISH, sleep } from "./fake-call.ts";
 import { DOMAIN_LINES } from "./prompt.ts";
 
 /** What a scripted model does with a message: answer it, be rate limited, or refuse its key. */
@@ -41,47 +43,68 @@ const systemOf = (prompt: readonly PromptMessage[]): string => {
   return typeof system?.content === "string" ? system.content : "";
 };
 
-/**
-A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the process.
-`reply` decides per message; a rate limit throws the 429 a real provider would.
-*/
 /** A model object of the current provider specification (`LanguageModel` also admits ids). */
 type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" }>;
 
+export type FakeModelOptions = {
+  /** How long the model "thinks" before its first token (or its error), in ms. */
+  readonly firstTokenAfterMs?: number;
+  /** Sends the start of its answer, then the stream breaks (a provider dropping mid-answer). */
+  readonly breaksMidStream?: boolean;
+};
+
+/**
+A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the process.
+`reply` decides per message; a rate limit throws the 429 a real provider would. It streams
+the answer as one text part after `firstTokenAfterMs`, and honours an abort while it waits.
+*/
 export const fakeParseModel = (
   reply: (text: string, system: string) => FakeReply,
+  { breaksMidStream = false, firstTokenAfterMs = 0 }: FakeModelOptions = {},
 ): LanguageModel => {
+  /** The scripted answer as JSON text, after the wait; a scripted failure is thrown. */
+  const answerTo = async ({
+    abortSignal,
+    prompt,
+  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<string> => {
+    await sleep(firstTokenAfterMs, abortSignal);
+    const answer = reply(messageOf(prompt), systemOf(prompt));
+    const failure = failureOf(answer);
+    if (failure !== null) {
+      throw failure;
+    }
+    return JSON.stringify(answer);
+  };
   const model: ModelObject = {
-    doGenerate: async ({ prompt }) => {
-      await Promise.resolve();
-      const answer = reply(messageOf(prompt), systemOf(prompt));
-      if ("refusedWith" in answer) {
-        throw new APICallError({
-          message: "Invalid API key",
-          requestBodyValues: {},
-          statusCode: answer.refusedWith,
-          url: "https://fake.llm/v1",
-        });
-      }
-      if ("rateLimitedFor" in answer) {
-        throw new APICallError({
-          message: "Rate limit reached",
-          requestBodyValues: {},
-          responseHeaders: { "retry-after": String(answer.rateLimitedFor) },
-          statusCode: 429,
-          url: "https://fake.llm/v1",
-        });
-      }
+    doGenerate: async (call) => {
+      const text = await answerTo(call);
       return {
-        content: [{ text: JSON.stringify(answer), type: "text" }],
-        finishReason: { raw: "stop", unified: "stop" },
+        content: [{ text, type: "text" }],
+        finishReason: FINISH,
         usage: USAGE,
         warnings: [],
       };
     },
-    doStream: async () => {
-      await Promise.resolve();
-      throw new Error("The fake parse model does not stream");
+    doStream: async (call) => {
+      const text = await answerTo(call);
+      return {
+        stream: new ReadableStream({
+          start: (controller) => {
+            controller.enqueue({ type: "stream-start", warnings: [] });
+            controller.enqueue({ id: "0", type: "text-start" });
+            if (breaksMidStream) {
+              controller.enqueue({ delta: text.slice(0, 10), id: "0", type: "text-delta" });
+              controller.enqueue({ error: new Error("connection reset"), type: "error" });
+              controller.close();
+              return;
+            }
+            controller.enqueue({ delta: text, id: "0", type: "text-delta" });
+            controller.enqueue({ id: "0", type: "text-end" });
+            controller.enqueue({ finishReason: FINISH, type: "finish", usage: USAGE });
+            controller.close();
+          },
+        }),
+      };
     },
     modelId: "fake-parse",
     provider: "fake",
@@ -296,10 +319,15 @@ const decided = (text: string, system: string): ModelOutput => {
 };
 
 /**
-The fake's reading: a command (see `COMMANDS`) as that action; otherwise, by the field the
-prompt names, a new task titled with the message, or the activity its words and time span say.
+The fake's reading: `#ask` (see `askReply`), a command (see `COMMANDS`) as that action;
+otherwise, by the field the prompt names, a new task titled with the message, or the activity
+its words and time span say.
 */
 export const echoReply = (text: string, system: string): ModelOutput => {
+  const asked = askReply(text, system);
+  if (asked !== undefined) {
+    return asked;
+  }
   const domain = domainOfPrompt(system);
   const command = commandOf(text, system);
   if (command !== undefined) {

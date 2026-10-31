@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, type TextInput, View } from "react-native";
+import { type TextInput, View } from "react-native";
+
+import type { RepeatChangeProblem } from "@pace/client";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
@@ -10,11 +12,9 @@ import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 
 import { DatePanel } from "./date-field.tsx";
-import { isDeadlineChoiceValid } from "./deadline-choice.ts";
-import { DeadlinePolicyField } from "./deadline-policy-field.tsx";
+import { DeadlineAndRepeat, DueBeforeStartNote } from "./deadline-and-repeat.tsx";
 import { EstimateOptions } from "./estimate-field.tsx";
 import { OptionRow } from "./option-row.tsx";
-import { RecurrenceField } from "./recurrence-field.tsx";
 import { TaskTextFields } from "./task-text-fields.tsx";
 import { useOutsidePress } from "./use-outside-press.ts";
 import { WhenChips } from "./when-chips.tsx";
@@ -165,6 +165,8 @@ export const TaskFields = ({
   onChange,
   onSubmit,
   options,
+  isStartChosen,
+  repeatProblem = null,
   showDeadlineIssue = false,
   values,
 }: {
@@ -176,6 +178,11 @@ export const TaskFields = ({
   /** The cursor lands in the title (the composer's line moved there). */
   readonly isTitleFocused?: boolean;
   readonly showDeadlineIssue?: boolean;
+  /** Why the repeat choice could not be saved (the editor checks it before any write). */
+  readonly repeatProblem?: null | RepeatChangeProblem;
+  /** The start is the person's (the editor shows an automatic one too): only then is a
+  deadline before it worth a note. */
+  readonly isStartChosen?: boolean;
 }) => {
   const t = useT();
   const titleRef = useRef<TextInput>(null);
@@ -218,24 +225,15 @@ export const TaskFields = ({
         setPanel={setPanel}
         values={values}
       />
-      <DeadlinePolicyField
+      <DueBeforeStartNote isStartChosen={isStartChosen} values={values} />
+      <DeadlineAndRepeat
         isFinalOpen={isFinalOpen}
-        onChange={(deadlinePolicy) => {
-          onChange({ deadlinePolicy });
-        }}
+        onChange={onChange}
         onFinalOpenChange={setIsFinalOpen}
-        value={values.deadlinePolicy}
+        repeatProblem={repeatProblem}
+        showDeadlineIssue={showDeadlineIssue}
+        values={values}
       />
-      <RecurrenceField
-        onChange={(recurrence) => {
-          onChange({ recurrence });
-        }}
-        start={values.start}
-        value={values.recurrence}
-      />
-      {showDeadlineIssue && !isDeadlineChoiceValid(values.deadlinePolicy, values.due) ? (
-        <Text className="font-sans text-[12px] text-warn">{t("form.deadlineInvalid")}</Text>
-      ) : null}
       <TaskTextFields onChange={onChange} values={values} />
     </View>
   );

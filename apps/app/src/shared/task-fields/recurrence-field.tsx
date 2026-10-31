@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 
+import type { RepeatChangeProblem } from "@pace/client";
+
 import { useLanguage, useSettings, useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Calendar } from "#app/ui/calendar.tsx";
@@ -9,6 +11,8 @@ import { TextField } from "#app/ui/text-field.tsx";
 import { formatInZone, type SeriesSchedule } from "@pace/core";
 
 import type { Zoned } from "./date-field.tsx";
+
+import { FormAlert } from "./form-alert.tsx";
 
 type Change = (value: null | SeriesSchedule) => void;
 
@@ -145,15 +149,24 @@ const RepeatEndPicker = ({
   );
 };
 
+const PROBLEM_TEXT = {
+  "repeat/due-before-start": "form.repeat.dueBeforeStart",
+  "repeat/due-passed": "form.repeat.duePassed",
+  "repeat/until-before-start": "form.repeat.untilBeforeStart",
+} as const;
+
 /** A task's own repeat schedule, independent of its category preset. */
 export const RecurrenceField = ({
   onChange,
+  problem = null,
   start,
   value,
 }: {
   readonly value: null | SeriesSchedule;
   readonly start: Zoned;
   readonly onChange: Change;
+  /** Why saving this choice would be refused, said under the field. */
+  readonly problem?: null | RepeatChangeProblem;
 }) => {
   const t = useT();
   return (
@@ -161,6 +174,9 @@ export const RecurrenceField = ({
       <Text className="font-sans text-[12px] text-muted">{t("form.repeat")}</Text>
       <RepeatKindPicker onChange={onChange} value={value} />
       {value === null ? null : <RepeatEndPicker onChange={onChange} start={start} value={value} />}
+      {problem === null || problem === "repeat/task-unknown" ? null : (
+        <FormAlert>{t(PROBLEM_TEXT[problem])}</FormAlert>
+      )}
     </View>
   );
 };
