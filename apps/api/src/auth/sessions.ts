@@ -6,16 +6,25 @@ import type { User } from "./users.ts";
 
 import { randomBase64Url, sha256Hex } from "../shared/crypto.ts";
 import { sessions, users } from "../shared/db/d1-schema.ts";
+import { type RequestPlace, UNKNOWN_PLACE } from "../shared/request-place.ts";
 
 const SESSION_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 60 * 1000;
 
+/** What opened a session: a browser, the phone app, a computer's agent, or a dev login. */
+export type SessionKind = "agent" | "app" | "browser" | "dev";
+
 export type NewSession = {
   readonly userId: string;
-  /** Where the session was created: "web", "android", "dev", or a device's name. */
-  readonly label: string;
+  readonly kind: SessionKind;
+  /** How the person tells it apart: "Chrome on macOS", the phone's model, a computer's name. */
+  readonly name: string;
   readonly now: number;
+  /** Where it signed in from; unknown parts stay null. */
+  readonly place?: RequestPlace | undefined;
+  /** The device whose usage it sends (a phone's install id); an agent files under the session id. */
+  readonly deviceId?: null | string | undefined;
   /** A device token's one permission; a sign-in has none (it may do everything). */
   readonly scope?: SessionScope | undefined;
   /** How long it lasts; a sign-in's 90 days by default. */
@@ -25,7 +34,10 @@ export type NewSession = {
 /** What a device token may do: upload its usage. */
 export type SessionScope = "usage:write";
 
-/** A computer connected with its own token: its id (the session's) and its name. */
+/**
+A device sending with its own token: its id (the phone's install id, or the session's for an
+agent) and its name.
+*/
 export type DeviceIdentity = { readonly id: string; readonly name: string };
 
 /**
@@ -54,8 +66,11 @@ export const createSession = async (
     id,
     userId: input.userId,
     tokenHash: await sha256Hex(token),
-    label: input.label,
+    kind: input.kind,
+    name: input.name,
     scope: input.scope ?? null,
+    ...(input.place ?? UNKNOWN_PLACE),
+    deviceId: input.deviceId ?? null,
     createdAt: new Date(input.now),
     expiresAt: new Date(expiresAt),
     lastSeenAt: new Date(input.now),
@@ -79,7 +94,8 @@ export const findSession = async (
       sessionId: sessions.id,
       lastSeenAt: sessions.lastSeenAt,
       scope: sessions.scope,
-      label: sessions.label,
+      name: sessions.name,
+      deviceId: sessions.deviceId,
       user: {
         id: users.id,
         telegramId: users.telegramId,
@@ -104,7 +120,7 @@ export const findSession = async (
   }
   const scope = isScope(row.scope) ? row.scope : null;
   return {
-    device: scope === null ? null : { id: row.sessionId, name: row.label },
+    device: scope === null ? null : { id: row.deviceId ?? row.sessionId, name: row.name },
     scope,
     sessionId: row.sessionId,
     user: row.user,
@@ -133,20 +149,8 @@ export const listDeviceSessions = async (
     createdAt: row.createdAt.getTime(),
     id: row.id,
     lastSeenAt: row.lastSeenAt.getTime(),
-    name: row.label,
+    name: row.name,
   }));
-};
-
-/** Revokes one of the person's device tokens; how many went (0: no such device). */
-export const revokeDeviceSession = async (
-  db: Db,
-  { id, userId }: { readonly userId: string; readonly id: string },
-): Promise<number> => {
-  const removed = await db
-    .delete(sessions)
-    .where(and(eq(sessions.id, id), eq(sessions.userId, userId), isNotNull(sessions.scope)))
-    .returning({ id: sessions.id });
-  return removed.length;
 };
 
 export const revokeSession = async (db: Db, token: string): Promise<void> => {

@@ -7,13 +7,9 @@ import type { AppEnv } from "../shared/app-env.ts";
 import { requireUser } from "../shared/current-user.ts";
 import { d1 } from "../shared/db/d1.ts";
 import { mount } from "../shared/mount.ts";
+import { deleteSession } from "../shared/session-rows.ts";
 import { userStoreOf } from "../shared/user-store-of.ts";
-import {
-  createSession,
-  type DeviceSession,
-  listDeviceSessions,
-  revokeDeviceSession,
-} from "./sessions.ts";
+import { createSession, type DeviceSession, listDeviceSessions } from "./sessions.ts";
 
 /** A device token lasts five years: a computer sends quietly in the background. */
 const DEVICE_DAYS = 5 * 365;
@@ -67,7 +63,8 @@ export const mountDeviceRoutes = (app: Hono<AppEnv>): void => {
     const now = Date.now();
     const created = await createSession(d1(c.env.DB), {
       days: DEVICE_DAYS,
-      label: body.name,
+      kind: "agent",
+      name: body.name,
       now,
       scope: "usage:write",
       userId: requireUser(c).id,
@@ -75,11 +72,8 @@ export const mountDeviceRoutes = (app: Hono<AppEnv>): void => {
     return ok({ id: created.id, name: body.name, token: created.token });
   });
   mount(app, endpoints.devices.revoke, async ({ c, params }) => {
-    const revoked = await revokeDeviceSession(d1(c.env.DB), {
-      id: params.id,
-      userId: requireUser(c).id,
-    });
-    return revoked > 0
+    const isRevoked = await deleteSession(d1(c.env.DB), requireUser(c).id, params.id);
+    return isRevoked
       ? ok({ ok: true as const })
       : err({ code: "device/unknown", message: "No such device", status: 404 });
   });

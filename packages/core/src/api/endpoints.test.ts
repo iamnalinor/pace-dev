@@ -185,6 +185,21 @@ describe("endpoints", () => {
     expect(() => endpoints.auth.telegram.body.parse({ ...payload, id: "42" })).toThrow();
   });
 
+  it("takes an optional, strict device in the nonce request: the app names the phone, the web sends none", () => {
+    const body = endpoints.auth.nonceCreate.body;
+    expect(body.parse(undefined)).toBeUndefined();
+    expect(body.parse({})).toEqual({});
+    expect(body.parse({ deviceId: "dev-1", deviceName: " Pixel 9a " })).toEqual({
+      deviceId: "dev-1",
+      deviceName: "Pixel 9a",
+    });
+    expect(() => body.parse({ extra: 1 })).toThrow();
+    expect(() => body.parse({ deviceName: " " })).toThrow();
+    expect(() => body.parse({ deviceName: "x".repeat(81) })).toThrow();
+    expect(() => body.parse({ deviceId: "" })).toThrow();
+    expect(() => body.parse({ deviceId: "x".repeat(65) })).toThrow();
+  });
+
   it("parses the nonce poll output as a discriminated union", () => {
     expect(endpoints.auth.noncePoll.output.parse({ status: "pending" })).toEqual({
       status: "pending",

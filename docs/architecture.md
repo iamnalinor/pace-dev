@@ -161,16 +161,25 @@ secrets with zod once per request and stores the result on the context.
   `auth/telegram-widget.ts` builds the sorted `key=value\n` check string, derives the key
   as SHA-256 of the bot token, verifies HMAC-SHA-256 with a constant-time compare and
   rejects `auth_date` older than five minutes.
-- **Android**: `POST /api/auth/nonce` → `{ nonce, deepLink }` (24 random bytes,
-  base64url, 5-minute TTL, stored in D1 `login_nonces`). The bot's `/start login_<nonce>`
-  handler upserts the Telegram user and binds the nonce (`bot-login.ts`; a nonce binds
-  once). `GET /api/auth/nonce/:nonce` answers `pending` until then, then `ready` with a
-  session exactly once (the row is marked consumed).
+- **Android** (and the web through the bot): `POST /api/auth/nonce?from=app|web` → `{ nonce,
+  deepLink }` (24 random bytes, base64url, 5-minute TTL, stored in D1 `login_nonces`). The app
+  sends an optional strict body `{ deviceName, deviceId }` (its phone model and install id); the
+  web sends none. The nonce row keeps `from`, that request's place and the named device, so the
+  session it opens is named and placed by the request that started the login, not by the poll.
+  The bot's `/start login_<nonce>` handler upserts the Telegram user and binds the nonce
+  (`bot-login.ts`; a nonce binds once). `GET /api/auth/nonce/:nonce` answers `pending` until
+  then, then `ready` with a session exactly once (the row is marked consumed and keeps the
+  `sessionId` it opened; `replyChatId`/`replyMessageId` are for the login notice).
 - **Sessions** (`auth/sessions.ts`): 32 random bytes as the bearer token, SHA-256 in D1
-  `sessions` with a label (`web`, `android`, `dev`), 90-day expiry, `lastSeenAt` touched at
-  most hourly. `requireAuth` middleware resolves the bearer to `CurrentUser`; handlers
-  read it with `requireUser(c)`. The fuller session list and login notices belong to a
-  later stage; this release does not expose them.
+  `sessions`, 90-day expiry, `lastSeenAt` touched at most hourly. Each has a `kind` (`browser`:
+  the widget or a bot login from the web; `app`: a bot login from the app; `agent`: a computer's
+  `usage:write` token made in Settings; `dev`), a readable `name` ("Chrome on macOS" from the
+  User-Agent by `auth/user-agent.ts`, the phone's model, the computer's typed name, "Dev login")
+  and where it signed in from (`ip` from `CF-Connecting-IP`, `country`/`city` from `request.cf`,
+  `userAgent`; `shared/request-place.ts`). A phone's session carries its `deviceId`; a
+  `usage:write` session files its uploads under `deviceId ?? sessionId`. `shared/session-rows.ts`
+  `deleteSession` is the one revoke by id. `requireAuth` middleware resolves the bearer to
+  `CurrentUser`; handlers read it with `requireUser(c)`.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
 - **Which server**: the app stores its token with the origin of the server that issued it
   (`pace.session` = `{ origin, token }`); a store for another server reads it as signed out, and

@@ -51,6 +51,7 @@ export {
   type BotLogin,
   type BotLoginError,
   createAuth,
+  type LoginDevice,
 } from "./auth.ts";
 export {
   type Clock,

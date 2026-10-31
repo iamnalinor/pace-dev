@@ -6,7 +6,7 @@ import { endpoints } from "@pace/core";
 import { createApp } from "../src/app.ts";
 import { bindNonce } from "../src/auth/nonce.ts";
 import { upsertTelegramUser } from "../src/auth/users.ts";
-import { hmacSha256Hex } from "../src/shared/crypto.ts";
+import { hmacSha256Hex, sha256Hex } from "../src/shared/crypto.ts";
 import { d1 } from "../src/shared/db/d1.ts";
 import { call, json, loginAsDev, readJson } from "./helpers.ts";
 
@@ -181,3 +181,144 @@ describe("login nonce", () => {
     expect((await call("/api/auth/nonce/unknown-nonce")).status).toBe(404);
   });
 });
+
+/* eslint-disable sonarjs/no-hardcoded-ip -- the address Cloudflare reports is these tests' fixture */
+const CHROME_MAC =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+const FIREFOX_LINUX = "Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0";
+const OKHTTP = "okhttp/4.12.0";
+
+const BERLIN = { city: "Berlin", country: "DE" };
+
+/** A request as Cloudflare hands it over: its address, country and city, and the client's UA. */
+const from = (ip: string, userAgent: string, cf?: typeof BERLIN) => ({
+  cf: cf ?? BERLIN,
+  headers: { "CF-Connecting-IP": ip, "User-Agent": userAgent },
+});
+
+type SessionRow = {
+  readonly id: string;
+  readonly kind: string;
+  readonly name: string;
+  readonly scope: null | string;
+  readonly ip: null | string;
+  readonly country: null | string;
+  readonly city: null | string;
+  readonly user_agent: null | string;
+  readonly device_id: null | string;
+};
+
+const sessionOf = async (token: string): Promise<null | SessionRow> =>
+  await env.DB.prepare(
+    "select id, kind, name, scope, ip, country, city, user_agent, device_id from sessions where token_hash = ?",
+  )
+    .bind(await sha256Hex(token))
+    .first<SessionRow>();
+
+const nonceSessionOf = async (nonce: string): Promise<null | string> =>
+  (
+    await env.DB.prepare("select session_id from login_nonces where nonce = ?")
+      .bind(nonce)
+      .first<{ session_id: null | string }>()
+  )?.session_id ?? null;
+
+/** Binds a nonce to Ada the way the bot does, then polls it the way the app does. */
+const finishBotLogin = async (nonce: string): Promise<string> => {
+  const user = await upsertTelegramUser(
+    d1(env.DB),
+    { firstName: "Ada", name: "Ada", photoUrl: null, telegramId: "1001", username: "ada" },
+    Date.now(),
+  );
+  await bindNonce(d1(env.DB), { nonce, now: Date.now(), userId: user.id });
+  // The poll comes from another address: the session keeps the place the login started from.
+  const ready = await json<{ token: string }>(`/api/auth/nonce/${nonce}`, from("9.9.9.9", OKHTTP));
+  return ready.token;
+};
+
+describe("sessions record their kind, a readable name and where they signed in from", () => {
+  it("a widget login is a browser session named after its browser", async () => {
+    const body = await widgetPayload({ auth_date: nowSeconds(), first_name: "Ada", id: 1001 });
+    const { token } = await json<{ token: string }>("/api/auth/telegram", {
+      body,
+      ...from("1.2.3.4", CHROME_MAC),
+    });
+    expect(await sessionOf(token)).toMatchObject({
+      city: "Berlin",
+      country: "DE",
+      device_id: null,
+      ip: "1.2.3.4",
+      kind: "browser",
+      name: "Chrome on macOS",
+      scope: null,
+      user_agent: CHROME_MAC,
+    });
+  });
+
+  it("a dev login is a dev session", async () => {
+    const { token } = await json<{ token: string }>("/api/auth/dev", {
+      body: { telegramId: "1001" },
+      ...from("1.2.3.4", CHROME_MAC),
+    });
+    expect(await sessionOf(token)).toMatchObject({ ip: "1.2.3.4", kind: "dev", name: "Dev login" });
+  });
+
+  it("a deep-link login from the app is an app session named by the phone, placed where it started", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: { deviceId: "dev-1", deviceName: "Pixel 9a" },
+      ...from("5.6.7.8", OKHTTP, { city: "Hamburg", country: "DE" }),
+    });
+    const token = await finishBotLogin(nonce);
+    const session = await sessionOf(token);
+    expect(session).toMatchObject({
+      city: "Hamburg",
+      country: "DE",
+      device_id: "dev-1",
+      ip: "5.6.7.8",
+      kind: "app",
+      name: "Pixel 9a",
+      scope: null,
+      user_agent: OKHTTP,
+    });
+    expect(await nonceSessionOf(nonce)).toBe(session?.id);
+  });
+
+  it("a deep-link login from the web is a browser session named after the browser that asked", async () => {
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=web", {
+      method: "POST",
+      ...from("1.2.3.4", FIREFOX_LINUX),
+    });
+    const token = await finishBotLogin(nonce);
+    expect(await sessionOf(token)).toMatchObject({
+      device_id: null,
+      ip: "1.2.3.4",
+      kind: "browser",
+      name: "Firefox on Linux",
+      user_agent: FIREFOX_LINUX,
+    });
+  });
+
+  it("an agent made in Settings is an agent session with the typed name and only usage:write", async () => {
+    const owner = await loginAsDev("1001");
+    const created = await json<{ id: string; token: string }>("/api/devices", {
+      body: { name: "Work laptop" },
+      token: owner,
+    });
+    const agent = await sessionOf(created.token);
+    expect(agent).toMatchObject({ kind: "agent", name: "Work laptop", scope: "usage:write" });
+    expect(agent?.id).toBe(created.id);
+  });
+
+  it("refuses a nonce request body with fields it does not know", async () => {
+    const response = await call("/api/auth/nonce?from=app", { body: { extra: 1 } });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "validation" });
+  });
+
+  it.each([{ deviceName: "" }, { deviceId: "x".repeat(65) }, { deviceName: "x".repeat(81) }])(
+    "refuses an out-of-range device in the nonce request (%o)",
+    async (body) => {
+      expect((await call("/api/auth/nonce?from=app", { body })).status).toBe(422);
+    },
+  );
+});
+/* eslint-enable sonarjs/no-hardcoded-ip -- the fixtures above end here */

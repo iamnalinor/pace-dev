@@ -16,6 +16,7 @@ import {
   LogoutSchema,
   MeSchema,
   NonceCreatedSchema,
+  NonceCreateSchema,
   NoncePollSchema,
   TelegramLoginSchema,
 } from "./schemas/auth.ts";
@@ -116,10 +117,12 @@ export const endpoints = {
     }),
     /**
     App login, step 1: mint a nonce and the bot deep link that binds it. `from` is where the
-    login started (the app when absent): the bot's "Return to Pace" leads back there.
+    login started (the app when absent): the bot's "Return to Pace" leads back there. The app
+    names its phone in the body; the session the nonce opens takes that name.
     */
     nonceCreate: endpoint({
       auth: false,
+      body: NonceCreateSchema,
       method: "POST",
       output: NonceCreatedSchema,
       path: "/api/auth/nonce",

@@ -10,13 +10,15 @@ import { requireUser } from "../shared/current-user.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
 import { loginPayload } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
+import { requestPlace, type RequestPlace } from "../shared/request-place.ts";
 import { userStoreOf } from "../shared/user-store-of.ts";
 import { readBearer } from "./auth-middleware.ts";
 import { cachedAvatar, refreshAvatar } from "./avatar.ts";
 import { mountDeviceRoutes } from "./device-routes.ts";
-import { consumeNonce, createNonce } from "./nonce.ts";
-import { createSession, revokeSession } from "./sessions.ts";
+import { consumeNonce, createNonce, type NonceLogin, recordNonceSession } from "./nonce.ts";
+import { createSession, revokeSession, type SessionKind } from "./sessions.ts";
 import { verifyTelegramLogin } from "./telegram-widget.ts";
+import { clientName } from "./user-agent.ts";
 import { findUserById, type TelegramProfile, upsertTelegramUser, type User } from "./users.ts";
 import { isAllowed } from "./whitelist.ts";
 
@@ -34,13 +36,29 @@ const NONCE_NOT_FOUND: Problem = {
   status: 404,
 };
 
+/** An app that did not name its phone (one from before it could) is the Android app. */
+const UNNAMED_APP = "Android";
+
+/**
+What a session opened by a bot login is: the app's, named by the phone it named, or the
+browser's that asked for the nonce, named after that browser.
+*/
+const nonceSession = (
+  login: NonceLogin,
+): { readonly kind: SessionKind; readonly name: string; readonly deviceId: null | string } =>
+  login.from === "app"
+    ? { deviceId: login.deviceId, kind: "app", name: login.deviceName ?? UNNAMED_APP }
+    : { deviceId: null, kind: "browser", name: clientName(login.place.userAgent) };
+
 /** Shared tail of every login: whitelist → user row → session. */
 const signIn = async (
   db: Db,
   config: Config,
   input: {
     readonly profile: TelegramProfile;
-    readonly label: string;
+    readonly kind: SessionKind;
+    readonly name: string;
+    readonly place: RequestPlace;
     readonly now: number;
     readonly apiOrigin: string;
     readonly telegramFetch?: TelegramTransport;
@@ -62,8 +80,10 @@ const signIn = async (
           apiOrigin: input.apiOrigin,
         });
   const { token } = await createSession(db, {
-    label: input.label,
+    kind: input.kind,
+    name: input.name,
     now: input.now,
+    place: input.place,
     userId: user.id,
   });
   return ok({ token, user });
@@ -87,9 +107,12 @@ const telegramLogin =
       Math.floor(now / 1000),
     );
     if (verified.ok) {
+      const place = requestPlace(c.req.raw);
       return await signIn(d1(c.env.DB), config, {
-        label: "web",
+        kind: "browser",
+        name: clientName(place.userAgent),
         now,
+        place,
         profile: verified.value,
         apiOrigin: new URL(c.req.url).origin,
         telegramFetch,
@@ -139,7 +162,14 @@ const pollNonce =
                 },
                 apiOrigin: new URL(c.req.url).origin,
               });
-        const { token } = await createSession(db, { label: "android", now, userId: user.id });
+        const opened = nonceSession(state.login);
+        const { id, token } = await createSession(db, {
+          ...opened,
+          now,
+          place: state.login.place,
+          userId: user.id,
+        });
+        await recordNonceSession(db, params.nonce, id);
         return ok({ status: "ready" as const, token, user });
       }
     }
@@ -158,8 +188,10 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
     username: null,
   };
   return await signIn(d1(c.env.DB), config, {
-    label: "dev",
+    kind: "dev",
+    name: "Dev login",
     now: Date.now(),
+    place: requestPlace(c.req.raw),
     profile,
     apiOrigin: new URL(c.req.url).origin,
   });
@@ -167,9 +199,16 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
 
 export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransport): void => {
   mount(app, endpoints.auth.telegram, telegramLogin(telegramFetch));
-  mount(app, endpoints.auth.nonceCreate, async ({ c, query }) => {
-    const { nonce } = await createNonce(d1(c.env.DB), Date.now());
-    const payload = loginPayload(nonce, query.from ?? "app");
+  mount(app, endpoints.auth.nonceCreate, async ({ body, c, query }) => {
+    const from = query.from ?? "app";
+    const { nonce } = await createNonce(d1(c.env.DB), {
+      deviceId: body?.deviceId,
+      deviceName: body?.deviceName,
+      from,
+      now: Date.now(),
+      place: requestPlace(c.req.raw),
+    });
+    const payload = loginPayload(nonce, from);
     const deepLink = `https://t.me/${c.get("config").telegramBotUsername}?start=${payload}`;
     return ok({ deepLink, nonce });
   });

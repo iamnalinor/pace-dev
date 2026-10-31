@@ -1,5 +1,3 @@
-import Constants from "expo-constants";
-
 import type { ApiClient } from "@pace/client";
 
 import { addMinutesIso, appSessions, endpoints } from "@pace/core";
@@ -8,6 +6,7 @@ import { loadDeviceId } from "./device-id.ts";
 import { calendarAccess, calendarEvents } from "./phone-calendar.ts";
 import { appLabels, readPhoneEvents } from "./phone-data.ts";
 import { isCalendarSyncOn, seriesRules, setUsageCursor, usageCursor } from "./phone-memory.ts";
+import { phoneName } from "./phone-name.ts";
 import { seriallyBySession } from "./session-poll-queue.ts";
 
 /** The calendar copy covers last week and the next two. */
@@ -26,12 +25,6 @@ const quietUsageCursor = (since: string, now: string): string => {
   const reread = addMinutesIso(now, -REREAD_MINUTES);
   const at = Math.max(Date.parse(since), Date.parse(reread));
   return new Date(at).toISOString();
-};
-
-/** How the phone is named next to the computers in Settings → Devices. */
-const deviceName = (): string => {
-  const name = (Constants.deviceName ?? "").trim();
-  return name === "" ? "Android" : name;
 };
 
 const syncCalendar = async (
@@ -105,7 +98,7 @@ const didSendUsageBatches = async ({
       return false;
     }
     await api.call(endpoints.usage.upload, {
-      body: { deviceId, deviceName: deviceName(), sessions: named.slice(index, index + BATCH) },
+      body: { deviceId, deviceName: phoneName(), sessions: named.slice(index, index + BATCH) },
     });
   }
   return true;

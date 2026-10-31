@@ -944,7 +944,13 @@ describe("Firebase push", () => {
       expect(fcm.sends()[0]?.message.data).not.toHaveProperty("message");
       const page = await instance.listNotifications({ limit: 5 });
       expect(page.deliveries[id]).toEqual([
-        expect.objectContaining({ device: "dev", method: "fcm", reason: null, result: "sent" }),
+        // The device as its session is named: a dev login's.
+        expect.objectContaining({
+          device: "Dev login",
+          method: "fcm",
+          reason: null,
+          result: "sent",
+        }),
       ]);
       await instance.resolveNotification(id, "stopped", {
         couriers,
