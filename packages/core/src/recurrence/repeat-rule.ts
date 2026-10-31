@@ -123,6 +123,13 @@ const homeworkRule = (
   return { isLast: false, kind: "weekly", weekday, until: null };
 };
 
+/**
+Another instance follows this one: what a row's repeat mark says. The last instance has none,
+and its screen calls it the last; both read `isLast` here (bug class 1).
+*/
+export const hasNextRepeat = (rule: null | RepeatRule): boolean =>
+  rule !== null && rule.isLast !== true;
+
 /** How the task repeats as of `ctx.now`, or `null` for a one-off and for a series that ended. */
 export const taskRepeatRule = (
   state: Pick<CoreState, "presets" | "series">,

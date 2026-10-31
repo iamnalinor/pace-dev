@@ -92,7 +92,10 @@ export const enInput = {
   "close.closedToast": "{title} · {outcome}",
   "form.startNow": "Starts now",
   "form.deadlinePolicy": "Deadline type",
-  "form.deadlineInvalid": "Set a main due date and a later final deadline.",
+  "form.deadlineNoDue": "Set a main due date: the final deadline comes after it.",
+  "form.finalAfterDue": "Pick a final deadline after the main one ({due}).",
+  "form.finalDaysInvalid": "Set how many days after the main due date (1 or more).",
+  "form.dueBeforeStartNote": "The deadline is before the start — check the dates.",
   "form.deadlineHard": "Hard due date",
   "form.deadlineTwoStage": "Main due + final deadline",
   "form.deadlineSoftHint": "The main due date is a soft target. The final deadline is hard.",
@@ -113,7 +116,8 @@ export const enInput = {
   "form.repeat.noEnd": "No end date",
   "form.repeat.endDate": "Last repeat date",
   "form.repeat.untilBeforeStart": "The last repeat date is before the task starts.",
-  "form.repeat.dueBeforeStart": "The deadline is before the start: every repeat would begin late.",
+  "form.repeat.dueBeforeStart":
+    "The deadline is before the start: every repeat would begin late. Pick a later deadline or an earlier start.",
   "form.repeat.duePassed":
     "The deadline has already passed: a repeat cannot start late. Pick a later deadline.",
   "form.newTask": "New task",

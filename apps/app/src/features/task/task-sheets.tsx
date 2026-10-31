@@ -128,10 +128,27 @@ const repeatProblemOf = (
         due: values.due,
         now: fallback,
         schedule: values.recurrence,
-        start: values.start,
+        // A start shown only because the task has none of its own was never chosen: the series
+        // would start now, as the action starts it (QA 14 L3).
+        start: isStartChosen(state, input) ? values.start : null,
         taskId,
       });
 };
+
+/**
+The start is the person's: the task has one of its own, or it was changed in the editor. The
+editor otherwise shows the task's creation, which nobody chose.
+*/
+const isStartChosen = (
+  state: AppState,
+  input: {
+    readonly before: TaskFormValues;
+    readonly values: TaskFormValues;
+    readonly taskId: string;
+  },
+): boolean =>
+  (state.tasks.byId[input.taskId]?.startAt ?? null) !== null ||
+  !isSameTime(input.before.start, input.values.start);
 
 /** `repeatProblemOf` for the open editor, over the live state and the viewer's clock. */
 const useRepeatProblem = (
@@ -273,6 +290,7 @@ export const EditTaskSheet = ({
       visible
     >
       <TaskFields
+        isStartChosen={isStartChosen(state, { before, taskId: view.id, values })}
         onChange={(patch) => {
           setValues((current) => ({ ...current, ...patch }));
         }}

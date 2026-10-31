@@ -2,6 +2,7 @@ import {
   type CoreState,
   finalDeadlineOf,
   hasLaterStart,
+  hasNextRepeat,
   type Importance,
   isOpen,
   minutesBetween,
@@ -39,7 +40,7 @@ export type MetaPart =
   | { readonly kind: "left"; readonly minutes: number }
   /** Time until the due, shown next to it: "6d 12h left". */
   | { readonly kind: "paused" }
-  /** An instance of a repeating series or a weekly homework: the row carries a repeat mark. */
+  /** Another instance of its series (or weekly homework) follows: the row carries a repeat mark. */
   | { readonly kind: "repeats" }
   | { readonly kind: "sent"; readonly submitted: number }
   | { readonly kind: "solved"; readonly solved: number; readonly total: number }
@@ -91,7 +92,7 @@ const importancePart = (item: NowItem): readonly MetaPart[] => [
 ];
 
 const repeatsPart = (item: NowItem): readonly MetaPart[] =>
-  item.repeat === null ? [] : [{ kind: "repeats" }];
+  hasNextRepeat(item.repeat) ? [{ kind: "repeats" }] : [];
 
 const startsPart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
   item.task.startAt !== null && hasLaterStart(item.task, ctx.now)
