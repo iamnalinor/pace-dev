@@ -181,6 +181,7 @@ export {
   type AutoOutcomeInput,
   type Deadline,
   deadlineOf,
+  finalDeadlineOf,
   NOT_ASSIGNED_REASON,
   type Outcome,
   subtaskOutcome,
@@ -249,6 +250,7 @@ export {
   missingInstanceEvents,
   type MissingInstancesInput,
 } from "./recurrence/hw-instances.ts";
+export * from "./recurrence/repeat-rule.ts";
 export {
   missingSeriesEvents,
   type MissingSeriesInput,
@@ -261,13 +263,7 @@ export {
   seriesReducer,
   type SeriesState,
 } from "./recurrence/series-reducer.ts";
-export {
-  isUntilBeforeStart,
-  nextSeriesSlot,
-  type SeriesSchedule,
-  type SeriesSlot,
-  seriesSlotAt,
-} from "./recurrence/series.ts";
+export * from "./recurrence/series.ts";
 export { err, ok, type Result } from "./result.ts";
 export {
   type ReviewAction,

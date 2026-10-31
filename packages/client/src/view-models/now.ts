@@ -1,5 +1,6 @@
 import {
   type CoreState,
+  finalDeadlineOf,
   hasLaterStart,
   type Importance,
   isOpen,
@@ -28,12 +29,16 @@ export type MetaPart =
       /** The due was set in a zone whose offset differs from the device's: show both times. */
       readonly zoneDiffers: boolean;
     }
+  /** The hard end of a two-stage deadline, once the main due date is behind and it is not. */
+  | { readonly kind: "final"; readonly at: string; readonly tz: string }
   | { readonly kind: "importance"; readonly importance: Importance }
   | { readonly kind: "late"; readonly minutes: number; readonly isSoft: boolean }
   /** `isSoft`: a resubmission deadline, whose lateness is never told in minutes. */
   | { readonly kind: "left"; readonly minutes: number }
   /** Time until the due, shown next to it: "6d 12h left". */
   | { readonly kind: "paused" }
+  /** An instance of a repeating series or a weekly homework: the row carries a repeat mark. */
+  | { readonly kind: "repeats" }
   | { readonly kind: "sent"; readonly submitted: number }
   | { readonly kind: "solved"; readonly solved: number; readonly total: number }
   | { readonly kind: "starts"; readonly at: string; readonly tz: string }
@@ -83,6 +88,9 @@ const importancePart = (item: NowItem): readonly MetaPart[] => [
   { kind: "importance", importance: item.importance },
 ];
 
+const repeatsPart = (item: NowItem): readonly MetaPart[] =>
+  item.repeat === null ? [] : [{ kind: "repeats" }];
+
 const startsPart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] =>
   item.task.startAt !== null && hasLaterStart(item.task, ctx.now)
     ? [{ kind: "starts", at: item.task.startAt, tz: item.task.startTz ?? ctx.deviceTz }]
@@ -93,7 +101,13 @@ const duePart = (item: NowItem, ctx: QueryContext): readonly MetaPart[] => {
   const { task } = item;
   if (item.lateMinutes !== null) {
     const isSoft = item.preset.deadlinePolicy.kind === "resubmission";
-    return [{ isSoft, kind: "late", minutes: item.lateMinutes }];
+    const final = finalDeadlineOf(task, item.preset);
+    return [
+      { isSoft, kind: "late", minutes: item.lateMinutes },
+      ...(final !== null && task.closed === null && Date.parse(final.at) > Date.parse(ctx.now)
+        ? [{ kind: "final" as const, ...final }]
+        : []),
+    ];
   }
   if (task.dueAt !== null && task.dueTz !== null) {
     const due = { at: task.dueAt, tz: task.dueTz };
@@ -151,6 +165,7 @@ export const nowRow = (item: NowItem, ctx: QueryContext): NowRow => ({
   dimmed: item.importance === "nice_to_have" && item.task.dueAt === null,
   meta: [
     ...importancePart(item),
+    ...repeatsPart(item),
     ...pausedPart(item),
     ...startsPart(item, ctx),
     ...duePart(item, ctx),

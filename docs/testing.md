@@ -89,7 +89,7 @@ so parallel tests, `--repeat-each` and reruns against a reused server never shar
 
 Feature tests start from an empty account, so they never see what months of use put in the
 log. `e2e/route-sweep.e2e.ts` closes that gap: `seedLivedIn` (`e2e/support/seed.ts`) pushes a
-log with Russian text, projects, open, future and closed tasks, activities, preset edits,
+log with Russian text, projects, open, future and closed tasks, a monthly series, activities, preset edits,
 corrections and every event type at least once (it fails if `EVENT_TYPES` grows a type the
 seed lacks), then the sweep opens every route file under `apps/app/app` by a direct load, at
 390 and 1440 px. It fails on a thrown error or a `console.error`, a blank page, the crash

@@ -48,7 +48,11 @@ const urlsOf = (file: string, seeded: LivedIn): readonly string[] => {
     return ["/no-such-page"];
   }
   if (route === "/task/[id]") {
-    return [`/task/${seeded.openTaskId}`, `/task/${seeded.doneTaskId}`];
+    return [
+      `/task/${seeded.openTaskId}`,
+      `/task/${seeded.doneTaskId}`,
+      `/task/${seeded.repeatingTaskId}`,
+    ];
   }
   if (route === "/project/[id]") {
     return [`/project/${seeded.algebraId}`];
@@ -88,6 +92,7 @@ const SIGNED_OUT_IDS: LivedIn = {
   algebraId: "01SIGNEDOUT00000000000000A",
   doneTaskId: "01SIGNEDOUT00000000000000D",
   openTaskId: "01SIGNEDOUT00000000000000O",
+  repeatingTaskId: "01SIGNEDOUT00000000000000R",
 };
 
 /** What is wrong with where a signed-out visit landed: anywhere but the login, for a guarded screen. */

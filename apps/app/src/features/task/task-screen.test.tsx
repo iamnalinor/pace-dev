@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
-import { HW_ID, HW_VIEW_NOW, TRK_ID, TRK_NOW } from "@pace/core/testing";
+import { HW_ID, HW_VIEW_NOW, RENT_ID, rentSeriesEvents, TRK_ID, TRK_NOW } from "@pace/core/testing";
 
 import { TaskScreen } from "./task-screen.tsx";
 
@@ -89,6 +89,50 @@ describe("TaskScreen — homework", () => {
     });
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(router.back).toHaveBeenCalled();
+  });
+});
+
+const rentScreen = async () => {
+  const runtime = await createTestRuntime();
+  await runtime.state.ingest(rentSeriesEvents());
+  await renderScreen(<TaskScreen id={RENT_ID} />, runtime);
+  return runtime;
+};
+
+/** The details card's figure under `label`, as a screen reader reads it. */
+const stat = (label: string) => screen.getByLabelText(label);
+
+describe("TaskScreen — repeats and the final deadline", () => {
+  it("says how the series repeats and when its deadline finally ends", async () => {
+    await rentScreen();
+    expect(stat(en("task.due"))).toHaveAccessibilityValue({ text: "Oct 31 23:59" });
+    expect(stat(en("task.repeats"))).toHaveAccessibilityValue({
+      text: "Every month on the last day",
+    });
+    expect(screen.getByText("Every month on the last day")).toBeOnTheScreen();
+    expect(stat(en("task.finalDue"))).toHaveAccessibilityValue({ text: "Nov 7 23:59" });
+  });
+
+  it("names a homework week by its due weekday, and neither line on a one-off task", async () => {
+    await hwScreen();
+    expect(stat(en("task.repeats"))).toHaveAccessibilityValue({ text: "Every Wednesday" });
+    // Algebra's second stage has no end: no final deadline to show.
+    expect(screen.queryByLabelText(en("task.finalDue"))).toBeNull();
+    await screen.unmount();
+    await trkScreen();
+    expect(screen.queryByLabelText(en("task.repeats"))).toBeNull();
+    expect(screen.queryByLabelText(en("task.finalDue"))).toBeNull();
+  });
+
+  it("speaks Russian on a Russian device", async () => {
+    const locale = jest.spyOn(globalThis.navigator, "language", "get").mockReturnValue("ru-RU");
+    try {
+      await rentScreen();
+      expect(stat("Повтор")).toHaveAccessibilityValue({ text: "Каждый месяц, в последний день" });
+      expect(stat("Окончательный срок")).toHaveAccessibilityValue({ text: "7 нояб. 23:59" });
+    } finally {
+      locale.mockRestore();
+    }
   });
 });
 

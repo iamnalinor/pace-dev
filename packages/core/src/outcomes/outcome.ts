@@ -37,6 +37,23 @@ export const deadlineOf = (task: Task, preset: ResolvedPreset): Deadline => {
   }
 };
 
+/**
+The hard end of a two-stage deadline with the zone it reads in (a fixed date's own zone, else
+the due date's); `null` under a hard policy or while the second stage has no end.
+*/
+export const finalDeadlineOf = (
+  task: Task,
+  preset: ResolvedPreset,
+): null | { readonly at: string; readonly tz: string } => {
+  const policy = preset.deadlinePolicy;
+  if (policy.kind === "hard") {
+    return null;
+  }
+  const { finalAt } = deadlineOf(task, preset);
+  const tz = (policy.finalAt === null ? null : policy.finalTz) ?? task.dueTz ?? "UTC";
+  return finalAt === null ? null : { at: finalAt, tz };
+};
+
 const lateness = (at: string, dueAt: null | string): "done" | "done_late" =>
   dueAt !== null && isAfter(at, dueAt) ? "done_late" : "done";
 

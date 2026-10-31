@@ -7,6 +7,11 @@ import {
   HW_DUE,
   HW_ID,
   HW_VIEW_NOW,
+  MOSCOW,
+  NOW,
+  RENT_FINAL,
+  RENT_ID,
+  rentSeriesEvents,
   sheetId,
   TRK_DUE,
   TRK_ID,
@@ -189,5 +194,21 @@ describe("taskViewModel", () => {
       error: "task/unknown",
       ok: false,
     });
+  });
+
+  it("says how a task repeats and where its two-stage deadline ends", () => {
+    const result = taskViewModel(artboardState(NOW, rentSeriesEvents()), RENT_ID, ctx());
+    expect(result.ok && result.value.stats).toMatchObject({
+      finalDue: { at: RENT_FINAL, tz: MOSCOW },
+      repeat: { day: 31, kind: "monthly", until: null },
+    });
+    // A weekly homework instance repeats on its preset's due weekday (Wednesday).
+    expect(view(HW_ID, HW_VIEW_NOW).stats.repeat).toEqual({
+      kind: "weekly",
+      until: null,
+      weekday: 3,
+    });
+    const trk = view(TRK_ID, TRK_NOW).stats;
+    expect(trk).toMatchObject({ finalDue: null, repeat: null });
   });
 });

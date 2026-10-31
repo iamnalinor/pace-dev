@@ -1,4 +1,4 @@
-import type { Event } from "../events/event-schema.ts";
+import type { Event, EventOf } from "../events/event-schema.ts";
 import type { QueryContext } from "./context.ts";
 
 import { coreReducer, type CoreState, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
@@ -52,7 +52,7 @@ export const INBOX_TEXTS = {
   [INBOX_GRADE_ID]: "посмотреть оценку за кр",
   [INBOX_SYNC_ID]: "синк по дашборду метрик, до пятницы",
   [INBOX_CABLE_ID]: "кабель usb-c",
-} as const;
+};
 
 /** The Algebra project's history: eleven closed sheets, two of them closed after their due date. */
 export const DONE_SHEETS = 11;
@@ -396,3 +396,48 @@ export const ctx = (now: string = NOW, deviceTz: string = MOSCOW): QueryContext 
   now,
   deviceTz,
 });
+
+export const RENT_SERIES_ID = "series-rent";
+/** The first instance of the rent series (`seriesInstanceId(RENT_SERIES_ID, "0", 0)`). */
+export const RENT_ID = "rep:series-rent:0:0";
+/** Saturday Oct 31 2026, 23:59 in Moscow. */
+export const RENT_DUE = "2026-10-31T20:59:00.000Z";
+/** A week after `RENT_DUE`: the hard end of its two-stage deadline. */
+export const RENT_FINAL = "2026-11-07T20:59:00.000Z";
+
+const RENT_START = "2026-10-01T09:00:00.000Z";
+
+const RENT_TEMPLATE: EventOf<"series.created">["payload"]["template"] = {
+  taskId: RENT_ID,
+  seriesId: RENT_SERIES_ID,
+  seriesRevision: 0,
+  title: "Rent",
+  presetId: "personal",
+  startAt: RENT_START,
+  startTz: MOSCOW,
+  dueAt: RENT_DUE,
+  dueTz: MOSCOW,
+  subtasks: [],
+  fields: {},
+  overrides: {
+    deadlinePolicy: {
+      kind: "resubmission",
+      softDays: 7,
+      finalMode: "offset",
+      finalAt: null,
+      finalTz: null,
+    },
+  },
+};
+
+/**
+Extra events for `artboardState`: a monthly series "Rent" due on the 31st with a final
+deadline a week later, and its first instance (on Now from October 1).
+*/
+export const rentSeriesEvents = (): readonly Event[] => [
+  at(900, RENT_START, {
+    type: "series.created",
+    payload: { seriesId: RENT_SERIES_ID, schedule: { kind: "monthly" }, template: RENT_TEMPLATE },
+  }),
+  at(901, RENT_START, { type: "task.created", payload: RENT_TEMPLATE }),
+];

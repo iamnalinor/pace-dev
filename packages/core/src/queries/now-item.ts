@@ -6,6 +6,7 @@ import type { QueryContext } from "./context.ts";
 import { type Project, projectById } from "../model/project.ts";
 import { progressOf, solvedCount, submittedCount, type Task } from "../model/task.ts";
 import { presetById } from "../presets/preset-reducer.ts";
+import { type RepeatRule, taskRepeatRule } from "../recurrence/repeat-rule.ts";
 import { err, ok, type Result } from "../result.ts";
 import { minutesBetween } from "../time.ts";
 import { importanceOf, presetOf } from "./classify.ts";
@@ -28,6 +29,8 @@ export type NowItem = {
   /** Minutes past the due date; `null` while on time or without a due date. */
   readonly lateMinutes: null | number;
   readonly isLate: boolean;
+  /** How the task repeats; `null` for a one-off. */
+  readonly repeat: null | RepeatRule;
 };
 
 /** Late against the due date: as of now while open, as of the closing once closed. */
@@ -63,6 +66,7 @@ export const nowItem = (
     dueTz: task.dueTz,
     lateMinutes,
     isLate: lateMinutes !== null,
+    repeat: taskRepeatRule(state, task),
   });
 };
 

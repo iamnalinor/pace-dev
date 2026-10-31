@@ -22,7 +22,13 @@ import { type Closure, INITIAL_TASKS_STATE, type Task, type TasksState } from ".
 import { BASE_PRESETS } from "../presets/base-presets.ts";
 import { INITIAL_PRESETS_STATE, type PresetsState } from "../presets/preset-reducer.ts";
 import { addMinutesIso } from "../time.ts";
-import { autoOutcomeEvents, deadlineOf, subtaskOutcome, taskOutcome } from "./outcome.ts";
+import {
+  autoOutcomeEvents,
+  deadlineOf,
+  finalDeadlineOf,
+  subtaskOutcome,
+  taskOutcome,
+} from "./outcome.ts";
 
 const HW = BASE_PRESETS.hw.definition;
 const WORK = BASE_PRESETS.work.definition;
@@ -109,6 +115,53 @@ describe("deadlineOf", () => {
     const task = taskFixture({ dueAt: "2026-03-28T17:00:00.000Z", dueTz: "Europe/Berlin" });
     expect(deadlineOf(task, offset).finalAt).toBe("2026-03-31T16:00:00.000Z");
     expect(deadlineOf(task, RESUBMISSION).finalAt).toBe(FINAL);
+  });
+});
+
+describe("finalDeadlineOf", () => {
+  it("is null under a hard policy and while a second stage has no final date", () => {
+    expect(finalDeadlineOf(taskFixture(), HW)).toBeNull();
+    const open: ResolvedPreset = {
+      ...HW,
+      deadlinePolicy: { kind: "resubmission", softDays: 7, finalAt: null, finalTz: null },
+    };
+    expect(finalDeadlineOf(taskFixture(), open)).toBeNull();
+  });
+
+  it("gives a fixed final date in the zone it was set in", () => {
+    const fixed: ResolvedPreset = {
+      ...HW,
+      deadlinePolicy: {
+        kind: "resubmission",
+        softDays: 7,
+        finalMode: "fixed",
+        finalAt: FINAL,
+        finalTz: "Europe/Moscow",
+      },
+    };
+    expect(finalDeadlineOf(taskFixture({ dueTz: "UTC" }), fixed)).toEqual({
+      at: FINAL,
+      tz: "Europe/Moscow",
+    });
+  });
+
+  it("gives the date N days after the due date in the due date's zone", () => {
+    const offset: ResolvedPreset = {
+      ...HW,
+      deadlinePolicy: {
+        kind: "resubmission",
+        softDays: 7,
+        finalAt: null,
+        finalTz: null,
+        finalMode: "offset",
+      },
+    };
+    const task = taskFixture({ dueAt: "2026-10-31T20:59:00.000Z", dueTz: "Europe/Moscow" });
+    expect(finalDeadlineOf(task, offset)).toEqual({
+      at: "2026-11-07T20:59:00.000Z",
+      tz: "Europe/Moscow",
+    });
+    expect(finalDeadlineOf(taskFixture({ dueAt: null, dueTz: null }), offset)).toBeNull();
   });
 });
 

@@ -8,13 +8,18 @@ export type MetaTone = "plain" | "strong" | "warn";
 
 export type MetaText = { readonly text: string; readonly tone: MetaTone };
 
+type ZonedPart = Extract<MetaPart, { readonly at: string; readonly tz: string }>;
+
+/** The parts that print an instant in its zone: the due date, the final deadline, a later start. */
+const isZoned = (part: MetaPart): part is ZonedPart => "at" in part;
+
 const partText = (part: MetaPart, viewer: Viewer): string => {
   const { language } = viewer;
   if (part.kind === "importance") {
     return t(language, `importance.${part.importance}`);
   }
-  if (part.kind === "due" || part.kind === "starts") {
-    return t(language, part.kind === "due" ? "meta.due" : "meta.starts", {
+  if (isZoned(part)) {
+    return t(language, `meta.${part.kind}`, {
       when: zonedText({ ...part, mode: "due" }, viewer),
     });
   }
