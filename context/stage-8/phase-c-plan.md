@@ -453,6 +453,42 @@ Not verifiable here: tuning against the owner's production `usage_sessions` with
 
 ---
 
+## Part QA14 — leftovers of QA round 14 (owner: "все что нужно сделать — сделай")
+
+Source: `context/qa-round-14.md` (L1–L10, each with steps, what happened and what is expected — that text is the
+requirement). Every fix is TDD at the level `docs/testing.md` names, with an e2e or app test that reproduces the
+tester's steps first. Each finding gets a bug-lessons check (is it a known class? if not, a new class with the guard).
+
+### Task 14: Task form and composer leftovers (L3, L4, L5, L6 incl. the red title on a fresh form, L7, L8)
+
+**Files:** the task form / composer under `apps/app/src/features/` (find with `grep -rn "Give the task a title" packages apps`),
+the series/deadline validation in `packages/core` (one decision function read by both the form and the action — class 1),
+`packages/core/src/i18n/{en,ru}/*.ts`, tests next to them, `e2e/` for the form flows.
+
+- [ ] L3: in Edit, when the start is the automatic one or earlier than now, the refusal is the same "The deadline has already passed … Pick a later deadline." as in New task; the other refusal names what to change.
+- [ ] L4: "On a date" final deadline missing or not after the main due → "Pick a final deadline after <main due>." (formatted like the chip).
+- [ ] L5: the refusal under Repeat is `role="alert"` (live) and linked from the field with `aria-describedby`; on a phone, the refusal is scrolled into view with the Create button reachable.
+- [ ] L6: ✕ discards the New task draft (a fresh form next time); the title is not red on a fresh, untouched form (error only after a submit attempt or blur with content removed).
+- [ ] L7: a plain task whose start is after its deadline shows the same sentence under Due ("The deadline is before the start") through the same core function as the series refusal; Create stays allowed (it is a warning for a plain task).
+- [ ] L8: Escape in the correction field returns focus to the composer line.
+- [ ] Run `bun test:unit`, `bun test:app`, the touched e2e files, `bun lint`; commit.
+
+### Task 15: Log, rows, toasts and titles leftovers (L1, L2, L9, L10)
+
+**Files:** the decisions-log view-model (M4, `packages/client` / `apps/app/src/features/decisions*`), row repeat mark (M2 code),
+toast copy, route titles (`apps/app/src/app/**` — expo-router `Stack.Screen options.title` or the web `document.title` helper),
+Insights screen, the series next-instance computation in `packages/core`.
+
+- [ ] L1: a superseded reading folds into its conversation's row; an abandoned one (line edited instead of Approve/Cancel) ends "You changed the text instead" (RU mirrored) — never "Shown to you for approval" forever.
+- [ ] L2: drop "(model not recorded)" when there is no model; keep "via local rules".
+- [ ] L9: the last instance of a series carries no repeat mark on rows (one predicate shared with the task screen's "this one is the last" — class 1).
+- [ ] L10a: the toast after Approve says what was done ("Created “<title>”" / RU), not a bare "Done".
+- [ ] L10b: "To Inbox" (Alt+Enter and the button) shows a toast "Sent to Inbox" with Undo, like other adds.
+- [ ] L10c: every route has its own `document.title` on the web ("Now · Pace", "Settings · Pace", … through `t()`); an e2e sweep over all routes asserts distinct titles.
+- [ ] L10d: Insights RU 390 `scrollable-region-focusable` axe violation fixed (focusable scroll region with a label) and the e2e axe sweep covers Insights at 390 in RU.
+- [ ] L10e: the next instance of a daily/monthly series starts at the series' own start time of day (or the start of the day when the series has no explicit start time), not the creation time of day; a fast-check property over creation times.
+- [ ] Run `bun test:unit`, `bun test:app`, the touched e2e files, `bun lint`; commit.
+
 ## Final part — run by the controller (no implementer task)
 
 - [ ] **Docs pass:** `docs/architecture.md` (protocol and `/api/instance`, sessions and login notices, `pace.v2`, background check, automatic sleep, sidebar list), `docs/testing.md` (new int test files, the socket tests, the sleep properties), `docs/mcp.md` / `docs/desktop.md` (sessions list), `docs/self-hosting.md` and README checked against the code, `context/stage-8/README.md` updated for PR 3. Each task already wrote its part; this pass checks they agree.
