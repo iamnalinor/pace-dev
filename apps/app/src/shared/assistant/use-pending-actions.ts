@@ -1,7 +1,14 @@
 import { useRef, useState } from "react";
 
 import type { Actions, Assistant } from "@pace/client";
-import type { Action, Event, MessageKey, ParseQuestion, ParseRequestBody } from "@pace/core";
+import type {
+  Action,
+  DecisionResolution,
+  Event,
+  MessageKey,
+  ParseQuestion,
+  ParseRequestBody,
+} from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
@@ -16,6 +23,8 @@ type Pending = {
   /** What the assistant asks about what stays unclear; answered by a correction. */
   readonly questions: readonly ParseQuestion[];
   readonly status: "parsed" | "unavailable";
+  /** The decision-log rows of the conversation's readings, the last this one's. */
+  readonly decisionIds: readonly string[];
 };
 
 const undoWritten =
@@ -53,7 +62,7 @@ const approvalFeedback = ({
 /** An answer worth showing as a preview; `null` when there is nothing to approve. */
 const pendingOf = (
   answer: Awaited<ReturnType<Assistant["propose"]>>,
-  request: Pick<Pending, "text" | "thread">,
+  request: Pick<Pending, "decisionIds" | "text" | "thread">,
 ): null | Pending =>
   answer === null ||
   answer.status === "queued" ||
@@ -62,6 +71,11 @@ const pendingOf = (
     ? null
     : {
         ...request,
+        // This reading's row joins the conversation's (a draft or an older server names none).
+        decisionIds:
+          answer.decisionId === undefined
+            ? request.decisionIds
+            : [...request.decisionIds, answer.decisionId],
         actions: answer.actions,
         questions: answer.questions ?? [],
         status: answer.status,
@@ -78,7 +92,7 @@ const revise = (
     read,
     setIssue,
   }: {
-    readonly read: (text: string, thread: Pending["thread"]) => Promise<void>;
+    readonly read: (text: string, thread: Thread, decisionIds: Ids) => Promise<void>;
     readonly setIssue: (issue: MessageKey) => void;
   },
 ): void => {
@@ -89,7 +103,34 @@ const revise = (
     setIssue("assistant.tooManyCorrections");
     return;
   }
-  void read(text, [...pending.thread, { text: pending.text, actions: [...pending.actions] }]);
+  void read(
+    text,
+    [...pending.thread, { text: pending.text, actions: [...pending.actions] }],
+    pending.decisionIds,
+  );
+};
+
+type Thread = Pending["thread"];
+type Ids = Pending["decisionIds"];
+
+/**
+Tells the assistant log what became of the conversation (best effort, not awaited); answers
+the task an approval created, if any (the last, as the screen opens it).
+*/
+const tellLog = (
+  assistant: Pick<Assistant, "resolve">,
+  pending: null | Pick<Pending, "decisionIds">,
+  {
+    resolution,
+    written = [],
+  }: { readonly resolution: DecisionResolution; readonly written?: readonly Event[] },
+): null | string => {
+  const created = written.findLast((event) => event.type === "task.created");
+  const taskId = created?.type === "task.created" ? created.payload.taskId : null;
+  if (pending !== null) {
+    void assistant.resolve(pending.decisionIds, resolution, taskId);
+  }
+  return taskId;
 };
 
 /** One conversation with the assistant; a correction replaces actions before any write. */
@@ -105,7 +146,7 @@ export const usePendingActions = (
   const [busy, setBusy] = useState(false);
   const requestRef = useRef(0);
   const isApprovingRef = useRef(false);
-  const read = async (text: string, thread: Pending["thread"]): Promise<void> => {
+  const read = async (text: string, thread: Thread, decisionIds: Ids = []): Promise<void> => {
     const current = ++requestRef.current;
     setBusy(true);
     setIssue(null);
@@ -117,12 +158,19 @@ export const usePendingActions = (
       return;
     }
 
-    const next = pendingOf(answer, { text, thread });
+    const next = pendingOf(answer, { decisionIds, text, thread });
     if (next === null) {
       setIssue(thread.length > 0 ? "assistant.couldNotRevise" : "assistant.couldNotRead");
     } else {
       setPending(next);
     }
+    setBusy(false);
+  };
+  const drop = (resolution: "cancelled" | "inbox"): void => {
+    tellLog(assistant, pending, { resolution });
+    requestRef.current += 1;
+    setPending(null);
+    setIssue(null);
     setBusy(false);
   };
   return {
@@ -135,11 +183,13 @@ export const usePendingActions = (
     followup: (text: string): void => {
       revise(pending, text, { read, setIssue });
     },
+    /** The line went to the Inbox instead: the preview of it goes, and the log is told. */
+    keptInInbox: (): void => {
+      drop("inbox");
+    },
+    /** Dismissed (Cancel, Escape, or the line changed under it): the log is told once. */
     cancel: (): void => {
-      requestRef.current += 1;
-      setPending(null);
-      setIssue(null);
-      setBusy(false);
+      drop("cancelled");
     },
     approve: async (): Promise<void> => {
       if (pending === null || busy || isApprovingRef.current) {
@@ -158,8 +208,7 @@ export const usePendingActions = (
           return;
         }
         setPending(null);
-        const created = written.findLast((event) => event.type === "task.created");
-        onApplied(created?.type === "task.created" ? created.payload.taskId : null);
+        onApplied(tellLog(assistant, pending, { resolution: "approved", written }));
       } finally {
         isApprovingRef.current = false;
         setBusy(false);

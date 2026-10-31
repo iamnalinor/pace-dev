@@ -22,7 +22,7 @@ import {
 
 import { createApp } from "../src/app.ts";
 import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
-import { json, loginAsDev, readJson } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
 
 /**
 Every answer is read through the endpoint's own output schema, as the client reads it: the
@@ -265,6 +265,50 @@ describe("POST /api/parse: tasks", () => {
       outcome: "parsed",
       rule: "parse.task.create",
     });
+  });
+
+  it("names the decision of a reading, and records what the person did with it, once", async () => {
+    const token = await loginAsDev("1001");
+    const first = await parse(token, "разобрать почту");
+    const second = await parse(token, "разобрать почту до обеда");
+    expect(first.decisionId).toMatch(/^[0-9A-Z]{26}$/u);
+    // A reading while typing is not logged, so it names no decision.
+    const draft = await json<ParseResponse>("/api/parse", {
+      body: { draft: true, text: "разобрать" },
+      token,
+    });
+    expect(draft.decisionId).toBeUndefined();
+    const resolve = async (body: unknown) =>
+      await answerOf(endpoints.decisions.resolve, "/api/decisions/resolve", { body, token });
+    expect(
+      await resolve({
+        decisions: [
+          { id: first.decisionId, resolution: "corrected" },
+          { id: second.decisionId, resolution: "approved", taskId: "t-mail" },
+        ],
+      }),
+    ).toEqual({ resolved: 2 });
+    // The first answer stands: a later Cancel of the same reading, or an unknown id, changes nothing.
+    expect(
+      await resolve({
+        decisions: [
+          { id: second.decisionId, resolution: "cancelled" },
+          { id: "nope", resolution: "cancelled" },
+        ],
+      }),
+    ).toEqual({ resolved: 0 });
+    const { decisions } = await answerOf(endpoints.decisions.list, "/api/decisions?q=почту", {
+      token,
+    });
+    expect(decisions.map(({ id, resolution, taskId }) => ({ id, resolution, taskId }))).toEqual([
+      { id: second.decisionId, resolution: "approved", taskId: "t-mail" },
+      { id: first.decisionId, resolution: "corrected", taskId: null },
+    ]);
+    const refused = await call("/api/decisions/resolve", {
+      body: { decisions: [{ id: "x", resolution: "maybe" }] },
+      token,
+    });
+    expect(refused.status).toBe(422);
   });
 
   it("proposes edits, a close, a delete and subtasks of an existing task by its id", async () => {

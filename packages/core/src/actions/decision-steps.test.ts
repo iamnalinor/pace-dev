@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decisionStepOf, readDecisionInputs } from "./decision-steps.ts";
+import { decisionStepOf, readDecisionInputs, resolutionsOf } from "./decision-steps.ts";
 
 const draft = {
   description: null,
@@ -114,9 +114,31 @@ describe("readDecisionInputs", () => {
     ).toEqual({
       ...empty,
       doubtful: ["project"],
-      steps: [{ ...step, kind: "task.delete" }],
+      // An unreadable step keeps its place, so the next one still pairs with its summary.
+      steps: [null, { ...step, kind: "task.delete" }],
       summaries: ["Kept"],
       text: "x",
     });
+  });
+});
+
+describe("resolutionsOf", () => {
+  it("answers the last reading of a conversation; the earlier ones were corrected", () => {
+    expect(resolutionsOf(["d1", "d2", "d3"], "approved", "t1")).toEqual([
+      { id: "d1", resolution: "corrected" },
+      { id: "d2", resolution: "corrected" },
+      { id: "d3", resolution: "approved", taskId: "t1" },
+    ]);
+    expect(resolutionsOf(["d1"], "cancelled", null)).toEqual([
+      { id: "d1", resolution: "cancelled" },
+    ]);
+    expect(resolutionsOf([], "inbox", null)).toEqual([]);
+  });
+
+  it("names at most the ten readings a request may carry, the last always", () => {
+    const ids = Array.from({ length: 12 }, (_, index) => `d${String(index)}`);
+    const answered = resolutionsOf(ids, "approved", null);
+    expect(answered).toHaveLength(10);
+    expect(answered.at(-1)).toEqual({ id: "d11", resolution: "approved" });
   });
 });

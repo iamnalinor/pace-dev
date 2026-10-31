@@ -84,6 +84,24 @@ const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void)
   };
 };
 
+/** To Inbox: the line is kept as a note; a preview of it goes, and the assistant log hears so. */
+const useToInbox = (
+  text: string,
+  pending: Pick<ReturnType<typeof usePendingActions>, "keptInInbox">,
+  done: () => void,
+) => {
+  const { actions } = usePace();
+  const run = useRunAction();
+  return async (): Promise<void> => {
+    if (!(await run(actions.captureInbox(text)))) {
+      return;
+    }
+
+    pending.keptInInbox();
+    done();
+  };
+};
+
 /** The form's place and the line's cursor: open, closed, and where the cursor goes back to. */
 const useFormState = (initialForm: FormOrigin | null) => {
   const [form, setForm] = useState<FormOrigin | null>(initialForm);
@@ -161,8 +179,7 @@ const useFlowState = ({
   readonly isFormInPane: boolean;
   readonly onCreatedTask: (taskId: string) => void;
 }) => {
-  const { actions, assistant, hooks } = usePace();
-  const run = useRunAction();
+  const { assistant, hooks } = usePace();
   const draft = useDraft(initialText, assistant);
   const { ai, edits, onReading, onText, reset, setEdits, text } = draft;
   const model = hooks.useComposer({ edits, text });
@@ -219,11 +236,7 @@ const useFlowState = ({
     setSubtaskDraft: draft.setSubtaskDraft,
     subtaskDraft: draft.subtaskDraft,
     text,
-    toInbox: async (): Promise<void> => {
-      if (await run(actions.captureInbox(text))) {
-        done();
-      }
-    },
+    toInbox: useToInbox(text, pending, done),
     /** A paste is read at once; typing never is. */
     type: (next: string): void => {
       // Against the line as it stands: after adding, the line is empty again.

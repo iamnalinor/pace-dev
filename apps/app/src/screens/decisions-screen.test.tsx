@@ -98,4 +98,14 @@ describe("DecisionsScreen", () => {
     expect(router.push).toHaveBeenCalledWith(`/task/${BOOKS_ID}`);
     expect(screen.queryByRole("button", { name: /Buy cable/u })).toBeNull();
   });
+
+  it("says what the person did with a reading when the log was told", async () => {
+    const dismissed = { ...reading, id: "d4", resolution: "cancelled" };
+    const runtime = await createTestRuntime({
+      routes: { "GET /api/decisions": () => ({ decisions: [dismissed] }) },
+    });
+    await renderScreen(<DecisionsScreen />, runtime);
+    expect(await screen.findByText("You dismissed it; nothing was done")).toBeOnTheScreen();
+    expect(screen.getByText("Suggested a new task “Buy cable”")).toBeOnTheScreen();
+  });
 });

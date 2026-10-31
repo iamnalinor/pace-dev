@@ -1,14 +1,10 @@
 import {
   type Action,
-  type BatchError,
   CLASSIFY_CONFIDENT,
-  type EventInput,
   type Language,
   newId,
   type ParseQuestion,
   type ParseRequestBody,
-  planActions,
-  type Result,
   t,
 } from "@pace/core";
 
@@ -26,7 +22,9 @@ import {
   PREVIEW_ACTIONS,
   questionsOf,
 } from "./preview-buttons.ts";
-import { applyBodies, applyInputs, type BotReply, plain, type Turn, zoneOf } from "./turn.ts";
+import { logReading, tellLog } from "./preview-log.ts";
+import { accept, planAll } from "./preview-write.ts";
+import { applyBodies, type BotReply, plain, type Turn } from "./turn.ts";
 
 /**
 A preview waiting for its button: the text and, when it was understood, its actions. They are
@@ -46,6 +44,11 @@ export type Pending = {
   readonly awaitingChoice: boolean;
   /** The assistant's questions, which option buttons point at by index. Absent in older ones. */
   readonly questions?: readonly ParseQuestion[];
+  /**
+  The decision-log rows of the thread's readings, the last for this preview: a button tells the
+  log what became of them. Absent in previews remembered before it was kept.
+  */
+  readonly decisionIds?: readonly string[];
 };
 
 /** The request a preview is about, also for one remembered before `request` was kept. */
@@ -64,17 +67,17 @@ const unavailable = async (
     text,
     retryAt,
     domain,
+    decisionIds = [],
   }: {
     readonly text: string;
     readonly retryAt: null | string;
     readonly domain: "activity" | "auto" | "task";
+    readonly decisionIds?: readonly string[] | undefined;
   },
 ): Promise<BotReply> => {
-  await turn.store.logDecisions(
-    [parseDecision(text, "bot", { retryAt, status: "unavailable" })],
-    turn.now,
-  );
+  const id = await logReading(turn, parseDecision(text, "bot", { retryAt, status: "unavailable" }));
   return await previewOf(turn, {
+    decisionIds: [...decisionIds, id],
     text,
     read: readByRules(text, domain, { now: turn.now, state: turn.state }),
     isRuleBased: true,
@@ -95,19 +98,6 @@ const actionText = (
     state: turn.state,
   });
 
-/** The events of every action as the bot writes them now, the text as a task's source. */
-const planAll = (
-  turn: Turn,
-  { actions, text }: { readonly text: string; readonly actions: readonly Action[] },
-): Result<readonly EventInput[], BatchError> =>
-  planActions(turn.state, actions, {
-    deviceTz: zoneOf(turn.state),
-    newId: () => newId(),
-    now: turn.now,
-    source: "bot",
-    sourceText: text,
-  });
-
 /** The actions → the events they imply, kept until a button decides; the preview text. */
 const previewOf = async (
   turn: Turn,
@@ -117,7 +107,9 @@ const previewOf = async (
     read,
     isRuleBased = false,
     thread = [],
+    decisionIds,
   }: {
+    readonly decisionIds: readonly string[];
     readonly text: string;
     readonly request?: string;
     readonly read: Reading & { readonly questions?: ModelRead["questions"] };
@@ -141,6 +133,7 @@ const previewOf = async (
     thread,
     awaitingChoice: isNeedsChoice,
     questions: [...questions],
+    decisionIds: [...decisionIds],
   } satisfies Pending);
   if (isNeedsChoice) {
     return {
@@ -186,11 +179,11 @@ export const preview = async (
     return await unavailable(turn, { domain: "auto", retryAt: read.error.retryAt, text });
   }
   const { output, actions, provider, rejected } = read.value;
-  await turn.store.logDecisions(
-    [parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" })],
-    now,
+  const id = await logReading(
+    turn,
+    parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" }),
   );
-  return await previewOf(turn, { text, read: read.value });
+  return await previewOf(turn, { decisionIds: [id], text, read: read.value });
 };
 
 /** A remembered preview that was understood, so a correction can revise it. */
@@ -210,18 +203,21 @@ const showRevision = async (
     read,
     text,
     thread,
+    decisionIds = [],
   }: {
     readonly read: ModelRead;
     readonly text: string;
     readonly thread: NonNullable<ParseRequestBody["thread"]>;
+    readonly decisionIds?: readonly string[] | undefined;
   },
 ): Promise<BotReply> => {
   const { output, actions, provider, rejected } = read;
-  await turn.store.logDecisions(
-    [parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" })],
-    turn.now,
+  const id = await logReading(
+    turn,
+    parseDecision(text, "bot", { output, actions, provider, rejected, status: "parsed" }),
   );
   return await previewOf(turn, {
+    decisionIds: [...decisionIds, id],
     text,
     // The thread's first message is the request, in previews remembered before `request` too.
     request: thread[0]?.text ?? text,
@@ -259,18 +255,12 @@ export const followupPreview = async (
   // Taken now, after the read: an Approve or another answer pressed meanwhile already took it.
   return (await turn.store.recall(id)) === undefined
     ? plain(t(turn.state.settings.language, "bot.expired"))
-    : await showRevision(turn, { read: read.value, text, thread });
-};
-
-/** Accept: the actions planned now, over the state now, and written; `null` once done. */
-const accept = async (
-  turn: Turn,
-  pending: { readonly text: string; readonly actions: readonly Action[] },
-): Promise<null | string> => {
-  const planned = planAll(turn, pending);
-  return planned.ok
-    ? await applyInputs(turn, planned.value)
-    : t(turn.state.settings.language, "bot.failed", { reason: planned.error.error });
+    : await showRevision(turn, {
+        decisionIds: pending.decisionIds,
+        read: read.value,
+        text,
+        thread,
+      });
 };
 
 /** A preview button: write what was understood, keep the text in the Inbox, or drop it. */
@@ -289,24 +279,39 @@ const chooseDomain = async (
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, turn.now);
   return read.ok
     ? await previewOf(turn, {
+        decisionIds: pending.decisionIds ?? [],
         text: pending.text,
         request: requestOf(pending),
         read: read.value,
         thread: pending.thread,
       })
-    : await unavailable(turn, { domain, retryAt: read.error.retryAt, text: pending.text });
+    : await unavailable(turn, {
+        decisionIds: pending.decisionIds,
+        domain,
+        retryAt: read.error.retryAt,
+        text: pending.text,
+      });
 };
 
 const finishPreview = async (turn: Turn, pending: Pending, action: string): Promise<BotReply> => {
   const { language } = turn.state.settings;
   if (action === PREVIEW_ACTIONS.inbox && pending.domain === "task") {
     const failure = await applyBodies(turn, [inboxBody(requestOf(pending))]);
+    if (failure === null) {
+      await tellLog(turn, pending, { resolution: "inbox" });
+    }
     return plain(failure ?? t(language, "bot.savedToInbox"));
   }
   if (action !== PREVIEW_ACTIONS.accept || pending.actions === null || pending.awaitingChoice) {
     return plain(t(language, "bot.expired"));
   }
-  const failure = await accept(turn, { actions: pending.actions, text: requestOf(pending) });
+  const { failure, taskId } = await accept(turn, {
+    actions: pending.actions,
+    text: requestOf(pending),
+  });
+  if (failure === null) {
+    await tellLog(turn, pending, { resolution: "approved", taskId });
+  }
   return plain(failure ?? t(language, "bot.done"));
 };
 
@@ -328,6 +333,7 @@ export const choosePreview = async (
     return plain(t(language, "bot.expired"));
   }
   if (action === PREVIEW_ACTIONS.cancel) {
+    await tellLog(turn, pending, { resolution: "cancelled" });
     return plain(t(language, "bot.cancelled"));
   }
   if (action === PREVIEW_ACTIONS.task || action === PREVIEW_ACTIONS.activity) {

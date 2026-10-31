@@ -4,7 +4,7 @@ import type { Decision, Event } from "@pace/core";
 
 import { artboardState, at, BOOKS_ID } from "@pace/core/testing";
 
-import { decisionView } from "./decisions.ts";
+import { type DecisionView, decisionViews } from "./decisions.ts";
 
 const DECIDED = "2026-10-06T10:00:00.000Z";
 /** Late enough that every event of a test is in the state. */
@@ -60,14 +60,23 @@ const started = (occurredAt: string, label: string): Event =>
     type: "activity.started",
   });
 
-const en = (decision: Decision, extra: readonly Event[] = []) =>
-  decisionView(decision, { language: "en", state: artboardState(LATER, extra) });
-const ru = (decision: Decision, extra: readonly Event[] = []) =>
-  decisionView(decision, { language: "ru", state: artboardState(LATER, extra) });
+const viewIn =
+  (language: "en" | "ru") =>
+  (decision: Decision, extra: readonly Event[] = []): DecisionView => {
+    const [view] = decisionViews([decision], { language, state: artboardState(LATER, extra) });
+    if (view === undefined) {
+      throw new Error("no view");
+    }
+    return view;
+  };
+const en = viewIn("en");
+const ru = viewIn("ru");
 
 describe("decisionView", () => {
-  it("says what became of the message, quotes it, and names what the text did not hold", () => {
-    expect(en(cable, [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")])).toEqual({
+  it("says what became of the message, as recorded, quotes it, and names what the text lacked", () => {
+    const approved: Decision = { ...cable, resolution: "approved", taskId: CABLE_ID };
+    const state = [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")];
+    expect(en(approved, state)).toEqual({
       at: DECIDED,
       id: "d1",
       lines: ["Created task “Buy cable”"],
@@ -78,7 +87,7 @@ describe("decisionView", () => {
       taskId: CABLE_ID,
       via: "via gpt-5.6-luna",
     });
-    expect(ru(cable, [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")])).toEqual(
+    expect(ru(approved, state)).toEqual(
       expect.objectContaining({
         lines: ["Создана задача «Buy cable»"],
         notFound: "Не нашлось в вашем тексте: проект, подзадачи",
@@ -89,13 +98,49 @@ describe("decisionView", () => {
     );
   });
 
-  it("does not claim an approval it cannot see", () => {
+  it("says a reading was dismissed, kept in the Inbox, or corrected, when the log was told", () => {
+    expect(en({ ...cable, resolution: "cancelled" })).toMatchObject({
+      lines: ["Suggested a new task “Buy cable”"],
+      outcome: "You dismissed it; nothing was done",
+      taskId: null,
+    });
+    expect(ru({ ...cable, resolution: "cancelled" }).outcome).toBe(
+      "Вы отменили — ничего не сделано",
+    );
+    expect(en({ ...cable, resolution: "inbox" }).outcome).toBe(
+      "You kept the text in Inbox instead",
+    );
+    expect(en({ ...cable, resolution: "corrected" }).outcome).toBe(
+      "You corrected it; the next reading took its place",
+    );
+    // A dismissed reading claims nothing, even when a task of that name exists.
+    expect(
+      en({ ...cable, resolution: "cancelled" }, [
+        created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home"),
+      ]),
+    ).toMatchObject({ outcome: "You dismissed it; nothing was done", taskId: null });
+    // An answer a newer server knows and this client does not reads as undecided.
+    expect(en({ ...cable, resolution: "postponed" }).outcome).toBe("Shown to you for approval");
+  });
+
+  it("only says what it sees when nothing was recorded: a task of that name, not an approval", () => {
     expect(en(cable)).toMatchObject({
       lines: ["Suggested a new task “Buy cable”"],
       outcome: "Shown to you for approval",
       taskId: null,
     });
-    // A task made a day later, or before the message, is not this one.
+    expect(
+      en(cable, [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")]),
+    ).toMatchObject({
+      lines: ["Suggested a new task “Buy cable”"],
+      outcome: "A task “Buy cable” was created after this",
+      taskId: CABLE_ID,
+    });
+    expect(
+      ru(cable, [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")]).outcome,
+    ).toBe("После этого появилась задача «Buy cable»");
+    // Matched by title too (the request was corrected); a task a day later or before is another.
+    expect(en(cable, [created("2026-10-06T10:01:00.000Z", "buy a cable")]).taskId).toBe(CABLE_ID);
     expect(
       en(cable, [created("2026-10-07T11:00:00.000Z", "buy cable tomorrow #home")]),
     ).toMatchObject({ outcome: "Shown to you for approval" });
@@ -104,11 +149,27 @@ describe("decisionView", () => {
     ).toMatchObject({ outcome: "Shown to you for approval" });
   });
 
-  it("matches a created task by its title when the request was corrected", () => {
-    expect(en(cable, [created("2026-10-06T10:01:00.000Z", "buy a cable")])).toMatchObject({
-      outcome: "You approved it",
-      taskId: CABLE_ID,
+  it("words a close without its outcome (an older row) by its summary, never a dangling “as”", () => {
+    const legacyClose = parsed(
+      { actions: ["The assistant will close “Books” as Done"], text: "books done" },
+      { rule: "parse.task.close" },
+    );
+    expect(en(legacyClose).lines).toEqual(["The assistant will close “Books” as Done"]);
+  });
+
+  it("keeps each summary beside its own step when a step is of a kind this client cannot read", () => {
+    const mixed = parsed({
+      actions: ["The assistant will teleport “Moon”", "The assistant will create “Buy cable”"],
+      steps: [
+        { ...NO_STEP, kind: "task.teleport", subject: "Moon" },
+        { ...NO_STEP, kind: "task.create", subject: "Buy cable" },
+      ],
+      text: "x",
     });
+    expect(en(mixed).lines).toEqual([
+      "The assistant will teleport “Moon”",
+      "Suggested a new task “Buy cable”",
+    ]);
   });
 
   it("words every kind of action, with the task's current title", () => {
@@ -140,7 +201,7 @@ describe("decisionView", () => {
     expect(en(parsed({ steps, text: "x" })).taskId).toBe(BOOKS_ID);
   });
 
-  it("sees a close approved when the task was closed that way after the reading", () => {
+  it("sees a close done after the reading, said as what it sees", () => {
     const close = parsed({
       steps: [{ ...NO_STEP, closeOutcome: "done", kind: "task.close", taskId: BOOKS_ID }],
       text: "books returned",
@@ -151,10 +212,13 @@ describe("decisionView", () => {
         type: "task.closed",
       });
     expect(en(close, [closed("done")])).toMatchObject({
-      lines: ["Closed “Return library books” as Done"],
-      outcome: "You approved it",
+      lines: ["Suggested closing “Return library books” as Done"],
+      outcome: "“Return library books” was closed after this",
       taskId: BOOKS_ID,
     });
+    expect(en({ ...close, resolution: "approved" }, [closed("done")]).lines).toEqual([
+      "Closed “Return library books” as Done",
+    ]);
     expect(en(close, [closed("cancelled")]).outcome).toBe("Shown to you for approval");
   });
 
@@ -180,8 +244,8 @@ describe("decisionView", () => {
       via: "via the assistant model",
     });
     expect(en(legacy, [started("2026-10-06T10:00:30.000Z", "Gym")])).toMatchObject({
-      lines: ["Started “Gym”"],
-      outcome: "You approved it",
+      lines: ["Suggested starting “Gym”"],
+      outcome: "“Gym” was started after this",
     });
     expect(
       ru(
@@ -208,7 +272,9 @@ describe("decisionView", () => {
       ],
       text: "gym since 12:30",
     });
-    expect(en(since, [started("2026-10-06T09:30:00.000Z", "Gym")]).outcome).toBe("You approved it");
+    expect(en(since, [started("2026-10-06T09:30:00.000Z", "Gym")]).outcome).toBe(
+      "“Gym” was started after this",
+    );
     expect(en(since, [started("2026-10-06T11:30:00.000Z", "Gym")]).outcome).toBe(
       "Shown to you for approval",
     );
@@ -217,24 +283,26 @@ describe("decisionView", () => {
     );
   });
 
-  it("says when the assistant was out, read it later, or kept it in the Inbox", () => {
-    expect(
-      en(
-        parsed(
-          { channel: "api", retryAt: null, text: "call the bank" },
-          {
-            explanation: "No model could answer (rate limits); the text was not parsed.",
-            outcome: "unavailable",
-            rule: "parse.unavailable",
-          },
-        ),
-      ),
-    ).toMatchObject({
-      lines: ["The assistant was out of requests"],
+  it("says when the assistant could not answer, read it later, or kept it in the Inbox", () => {
+    const unanswered = parsed(
+      { channel: "api", retryAt: null, text: "call the bank" },
+      {
+        explanation: "No model could answer (rate limits); the text was not parsed.",
+        outcome: "unavailable",
+        rule: "parse.unavailable",
+      },
+    );
+    expect(en(unanswered)).toMatchObject({
+      lines: ["The assistant could not answer"],
       outcome: "Local rules suggested a reading instead",
       request: "call the bank",
       via: null,
     });
+    expect(ru(unanswered).lines).toEqual(["Ассистент не смог ответить"]);
+    // The rules' reading was approved: both are said.
+    expect(en({ ...unanswered, resolution: "approved" }).outcome).toBe(
+      "Local rules suggested a reading instead · You approved it",
+    );
     const deferred = { outcome: "applied", rule: "parse.deferred" };
     expect(
       en(
@@ -292,5 +360,16 @@ describe("decisionView", () => {
       lines: ["Parsed by gpt-5.6-luna; not found in the text: project, subtasks."],
       request: "x",
     });
+  });
+
+  it("words a whole log with one index of the state, the same as row by row", () => {
+    const state = artboardState(LATER, [
+      created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home"),
+    ]);
+    const log = [cable, { ...cable, id: "d2", resolution: "cancelled" }];
+    expect(decisionViews(log, { language: "en", state }).map((view) => view.outcome)).toEqual([
+      "A task “Buy cable” was created after this",
+      "You dismissed it; nothing was done",
+    ]);
   });
 });

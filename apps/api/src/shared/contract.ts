@@ -2,6 +2,7 @@ import type {
   Answer,
   CalendarEvent,
   CoreState,
+  DecisionResolveBody,
   EventInput,
   NewNotification,
   NotificationKind,
@@ -175,6 +176,8 @@ export type BotStoreApi = Pick<UserStoreApi, "apply" | "read"> & {
     meta: ResolveMeta,
   ) => Promise<Result<PoolNotification, ResolveError>>;
   readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
+  /** Records what the person did with readings; the first answer for each stands. The count changed. */
+  readonly resolveDecisions: (answers: readonly DecisionAnswer[]) => Promise<number>;
   /** Providers known to be rate limited at `now` → when they are back. */
   readonly llmCooldowns: (now: string) => Promise<Readonly<Record<string, string>>>;
   readonly noteLlmLimits: (limited: Readonly<Record<string, string>>, now: string) => Promise<void>;
@@ -201,10 +204,20 @@ export type DecisionRecord = {
   readonly inputs: JsonValue;
   readonly outcome: string;
   readonly explanation: string;
+  /** What the person did with an assistant reading; `null` until told. */
+  readonly resolution: null | string;
 };
 
-/** A decision as its maker records it; the store stamps the id and the time. */
-export type DecisionEntry = Omit<DecisionRecord, "at" | "id">;
+/**
+A decision as its maker records it; the store stamps the time, and the id unless the maker
+chose one (a reading names its decision to the client, which later says what became of it).
+*/
+export type DecisionEntry = Omit<DecisionRecord, "at" | "id" | "resolution"> & {
+  readonly id?: string;
+};
+
+/** What the person did with one reading (`POST /api/decisions/resolve`). */
+export type DecisionAnswer = DecisionResolveBody["decisions"][number];
 
 export type DecisionQuery = {
   readonly taskId?: string | undefined;

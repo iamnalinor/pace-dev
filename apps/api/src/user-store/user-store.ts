@@ -34,7 +34,7 @@ import type { Cooldowns } from "../shared/llm/llm.ts";
 
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import * as cloud from "./cloud-data.ts";
-import { insertDecisions, listDecisions } from "./decision-log.ts";
+import { insertDecisions, listDecisions, resolveDecisions } from "./decision-log.ts";
 import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
 import { announceChange } from "./live-sockets.ts";
@@ -329,6 +329,10 @@ export class UserStore extends PoolStore {
   /** Appends to the decision log (notifications here, parses from the routes and the bot). */
   async logDecisions(entries: readonly DecisionEntry[], now: string): Promise<void> {
     await insertDecisions(this.db, entries, now);
+  }
+
+  async resolveDecisions(answers: Parameters<typeof resolveDecisions>[1]): Promise<number> {
+    return await resolveDecisions(this.db, answers);
   }
 
   /** The decision log, newest first. */
