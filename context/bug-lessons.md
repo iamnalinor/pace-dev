@@ -26,6 +26,13 @@ The classes so far are below. Each has its standing rule, and new code is writte
 - **Rule.** A yes/no that the UI shows (enabled, visible, allowed) and the action enforces is one function
   in the view-model, read by both. Test it as a property: *whenever the control is enabled, the action
   accepts*, over every way into the state.
+- **Rule (across the wire).** The same holds when the two sides are the client and the server: a
+  rule the server enforces (e.g. "a session cannot read its own sign-in notice") is one function in
+  `core` that the client also reads before it acts. A fix that changes such a rule on one side gets
+  the other side traced in its review brief, and a steady-state test (count the requests: nothing
+  repeats for the same id, the badge settles). Instance: QA round 15 H1 — the server skipped the
+  own-session notice on read, the feed kept re-marking it (~70 requests a second, the bell never
+  cleared); the server-side fix and its re-review looked at the server diff only.
 
 ### 2. One entry path tested, the others assumed
 - **Bug.** Same as 1. Also: the Inbox button counted something Now's counter did not.
