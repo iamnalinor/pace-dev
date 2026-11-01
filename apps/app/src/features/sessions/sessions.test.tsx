@@ -30,6 +30,14 @@ jest.mock("#app/platform/move-focus.ts", (): unknown => ({
   },
 }));
 
+/** Which field was given the cursor. */
+const mockFocusField = jest.fn<undefined, [unknown]>();
+jest.mock("#app/platform/focus-field.ts", (): unknown => ({
+  focusField: (input: unknown) => {
+    mockFocusField(input);
+  },
+}));
+
 /** The Android app by default; a test may render the web build's Settings instead. */
 const mockDevice = { isPhone: true };
 jest.mock("#app/platform/device.ts", (): unknown => ({
@@ -475,7 +483,15 @@ describe("Settings → Devices and sessions", () => {
     });
     await fireEvent.press(await screen.findByRole("button", { name: "Add a computer" }));
     const field = screen.getByLabelText("Name");
-    expect(field.props).toMatchObject({ autoFocus: true, selectTextOnFocus: true });
+    expect(field.props).toMatchObject({ selectTextOnFocus: true });
+    await waitFor(() => {
+      expect(mockFocusField).toHaveBeenCalled();
+    });
+    expect(
+      (mockFocusField.mock.calls[0]?.[0] as null | { props?: Record<string, unknown> })?.props?.[
+        "accessibilityLabel"
+      ],
+    ).toBe("Name");
     await fireEvent.changeText(field, "Work laptop");
     // Enter twice in one batch: one token (bug class 36).
     await act(async () => {

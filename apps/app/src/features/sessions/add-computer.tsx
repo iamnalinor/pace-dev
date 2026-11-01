@@ -1,15 +1,20 @@
-import { useRef, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { type TextInput, View } from "react-native";
 
 import type { NewAgent } from "@pace/client/react";
 
 import { useT } from "#app/app-state.tsx";
+import { focusField } from "#app/platform/focus-field.ts";
 import { Button } from "#app/ui/button.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
 import { ComputerSteps } from "./computer-steps.tsx";
+
+/** How often, and how many times, the name field asks for focus as the sheet opens. */
+const FOCUS_RETRY_MS = 50;
+const FOCUS_TRIES = 10;
 
 /**
 "Add a computer": a name, then a token of its own (it may only upload app usage) inside one
@@ -29,6 +34,23 @@ export const AddComputer = ({
   const [isBusy, setIsBusy] = useState(false);
   // Enter and the button may land in one batch: one token (bug class 36).
   const sendingRef = useRef(false);
+  const nameRef = useRef<TextInput>(null);
+  // Not `autoFocus`: on the web the sheet gives focus to its dialog as it opens, after the field
+  // took it, and the dialog may still be hidden a moment. Asked again until it takes, briefly.
+  useEffect(() => {
+    const tries = { left: FOCUS_TRIES };
+    const timer = setInterval(() => {
+      tries.left -= 1;
+      if (nameRef.current?.isFocused() === true || tries.left < 0) {
+        clearInterval(timer);
+        return;
+      }
+      focusField(nameRef.current);
+    }, FOCUS_RETRY_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
   const submit = async (): Promise<void> => {
     if (sendingRef.current) {
       return;
@@ -53,13 +75,13 @@ export const AddComputer = ({
           <TextField
             autoComplete="off"
             autoCorrect={false}
-            autoFocus
             enterKeyHint="done"
             error={hasFailed ? t("devices.createFailed") : null}
             label={t("devices.name")}
             maxLength={80}
             onChangeText={setName}
             onSubmitEditing={() => void submit()}
+            ref={nameRef}
             returnKeyType="done"
             selectTextOnFocus
             spellCheck={false}
