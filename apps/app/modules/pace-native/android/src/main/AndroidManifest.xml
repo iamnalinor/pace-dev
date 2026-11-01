@@ -13,6 +13,10 @@
       <action android:name="android.intent.action.MAIN" />
       <category android:name="android.intent.category.LAUNCHER" />
     </intent>
+    <!-- The list of battery-optimized apps (Battery.kt), so resolveActivity can see it. -->
+    <intent>
+      <action android:name="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS" />
+    </intent>
     <!-- Phone makers' autostart pages (Battery.kt), so resolveActivity can see them. -->
     <package android:name="com.miui.securitycenter" />
     <package android:name="com.huawei.systemmanager" />

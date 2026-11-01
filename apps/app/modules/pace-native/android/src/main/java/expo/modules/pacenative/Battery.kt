@@ -4,7 +4,9 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.PowerManager
+import android.provider.Settings
 
 /**
  * Phone makers' own autostart / background pages, tried in order; the first one this phone has
@@ -38,6 +40,40 @@ private val AUTOSTART_PAGES = listOf(
 internal fun ignoresBatteryOptimizations(context: Context): Boolean {
   val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
   return power.isIgnoringBatteryOptimizations(context.packageName)
+}
+
+/**
+ * Asks Android to leave Pace out of battery optimization: its own Allow/Deny dialog for Pace,
+ * else the list of optimized apps, else nothing. A stripped settings app that has neither
+ * screen then leaves the step as it was instead of crashing the app (the vendor pages below are
+ * guarded the same way).
+ */
+internal fun requestBatteryExemption(context: Context) {
+  val dialog = Intent(
+    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+    Uri.parse("package:${context.packageName}"),
+  ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+  try {
+    context.startActivity(dialog)
+    return
+  } catch (_: ActivityNotFoundException) {
+    // No such dialog on this build: the list below.
+  } catch (_: SecurityException) {
+    // Present but not exported to other apps: the list below.
+  }
+  // Listed under `<queries>` in the manifest, so Android 11+ lets resolveActivity see it.
+  val list = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+  if (list.resolveActivity(context.packageManager) == null) {
+    return
+  }
+  try {
+    context.startActivity(list)
+  } catch (_: ActivityNotFoundException) {
+    // Resolved but gone on this build: nothing left to open.
+  } catch (_: SecurityException) {
+    // Present but not exported to other apps: nothing left to open.
+  }
 }
 
 /**

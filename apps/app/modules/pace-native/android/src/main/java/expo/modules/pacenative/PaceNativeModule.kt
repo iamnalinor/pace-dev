@@ -90,19 +90,8 @@ class PaceNativeModule : Module() {
     Function("isIgnoringBatteryOptimizations") { ignoresBatteryOptimizations(context) }
 
     // Android's own Allow/Deny dialog for Pace; a phone whose settings lack it opens the list
-    // of optimized apps instead.
-    Function("requestIgnoreBatteryOptimizations") {
-      try {
-        openSettings(
-          Intent(
-            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-            Uri.parse("package:${context.packageName}"),
-          )
-        )
-      } catch (_: ActivityNotFoundException) {
-        openSettings(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-      }
-    }
+    // of optimized apps instead, and one without either opens nothing (Battery.kt).
+    Function("requestIgnoreBatteryOptimizations") { requestBatteryExemption(context) }
 
     // The phone maker's autostart page (Battery.kt), false when this phone has no known one.
     Function("openAutostartSettings") { openAutostartPage(context) }

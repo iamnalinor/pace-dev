@@ -2,7 +2,7 @@ import * as Notifications from "expo-notifications";
 import { Linking } from "react-native";
 
 import { paceNative } from "../../modules/pace-native/index.ts";
-import { needsBackgroundStep, type PushState } from "./notifications.ts";
+import { isBackgroundStepNeeded, type PushState } from "./notifications.ts";
 import { calendarAccess, requestCalendarAccess } from "./phone-calendar.ts";
 import { hasUsageAccess, openUsageAccessSettings } from "./phone-data.ts";
 
@@ -13,10 +13,10 @@ export type PermissionId = (typeof PERMISSION_IDS)[number];
 
 /**
 The permissions to explain and ask for with this push method: the battery exemption only while
-the phone checks in the background (`needsBackgroundStep`).
+the phone checks in the background (`isBackgroundStepNeeded`).
 */
 export const permissionIdsFor = (push: Pick<PushState, "method">): readonly PermissionId[] =>
-  PERMISSION_IDS.filter((id) => id !== "background" || needsBackgroundStep(push));
+  PERMISSION_IDS.filter((id) => id !== "background" || isBackgroundStepNeeded(push));
 
 /**
 `blocked`: refused for good, only the app's settings page can turn it on. A `settings` one is
