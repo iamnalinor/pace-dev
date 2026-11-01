@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { SyncEventSchema } from "../api/schemas/sync.ts";
 import { type Event, EVENT_ID_MAX, EventIdSchema } from "../events/event-schema.ts";
+import { sortEvents } from "../events/sort.ts";
 import {
   isAutoSleepId,
   sleepDiscardId,
@@ -74,6 +75,20 @@ const lastLog = (log: readonly Event[], uses: readonly DeviceUse[], hhmms: reado
     uses,
     hhmms.map((hhmm) => at(hhmm)),
   ).at(-1)?.log ?? [];
+
+/**
+Passes every 15 minutes from 23:00 until 08:15, the phone telling up to each and each event
+reaching the log from its own instant on, as the server meets them. Answers the last log.
+*/
+const toldEveryQuarter = (events: readonly Event[], uses: readonly DeviceUse[]) =>
+  // eslint-disable-next-line unicorn/no-array-reduce -- each pass decides on the log the one before left
+  Array.from({ length: 38 }, (_, index) => addMinutesIso(at("23:00"), index * 15)).reduce<
+    readonly Event[]
+  >((log, knownUntil) => {
+    const now = addMinutesIso(knownUntil, 5);
+    const arrived = events.filter((event) => event.occurredAt <= now && !log.includes(event));
+    return step([...log, ...arrived], { knownUntil, now, uses }).log;
+  }, []);
 
 /** A use from 20:30 to `end`, told at 23:00. */
 const evening = (end: string) => step([], { knownUntil: at("23:00"), uses: [use("20:30", end)] });
@@ -446,6 +461,55 @@ describe("automatic sleep", () => {
     expect(written.filter((event) => /-\d+$/u.test(event.id))).toEqual([]);
     expect(written.filter((event) => event.type === "event.revoked")).toHaveLength(1);
     expect(sleepsIn(told)).toEqual([sleep("23:50", "07:10")]);
+    expect(step(told, { knownUntil: at("08:45"), uses }).decisions).toEqual([]);
+  });
+
+  it("relies on the person's start applying before its own at the same instant (M1)", () => {
+    // The night above opens at the person's 23:50 start: the log holds both at one instant, and
+    // the materializer applies them by id (`sortEvents`). A ULID sorts before `auto:`, so the work
+    // closes there and the sleep runs on; the rules read the same order (`mainStarts`).
+    const work = byPerson(1, at("23:50"), {
+      payload: { activityId: "work", category: "work", label: "Deploy" },
+      type: "activity.started",
+    });
+    const done = step([work], { knownUntil: at("00:45"), uses: [use("22:30", "22:40")] });
+    expect(done.decisions).toEqual([open("23:50")]);
+    expect(sortEvents(done.log).map((event) => event.id)).toEqual([work.id, startId("23:50")]);
+    expect(sleepsIn(done.log)).toEqual([sleep("23:50", null)]);
+  });
+
+  it("writes nothing again for a main start whatever its id sorts against the rules' own (M1)", () => {
+    // The id schema admits system ids (`hw:`, `rep:`) that sort after `auto:`: at the same instant
+    // such a start would close the sleep the rules open there, so they open none from it.
+    const uses = [use("22:30", "22:40"), use("07:10", "07:25")];
+    const late = {
+      ...byPerson(1, at("23:50"), {
+        payload: { activityId: "work", category: "work", label: "Deploy" },
+        type: "activity.started",
+      }),
+      id: "rep:series:1",
+    };
+    const told = toldEveryQuarter([late], uses);
+    expect(told.filter((event) => isAutoSleepId(event.id) && /-\d+$/u.test(event.id))).toEqual([]);
+    expect(sleepsIn(told)).toEqual([]);
+    expect(step(told, { knownUntil: at("08:45"), uses }).decisions).toEqual([]);
+  });
+
+  it("closes a new night where a start the server recorded for the person closes it (M1)", () => {
+    // "Attend" answered in the feed or Telegram at 01:00 is written by the server (source
+    // `system`), and the materializer closes the running sleep at it like any main start.
+    const uses = [use("23:10", "23:40"), use("07:10", "07:25")];
+    const attend = {
+      ...byPerson(1, at("01:00"), {
+        payload: { activityId: "seminar", category: "study", label: "Seminar" },
+        type: "activity.started",
+      }),
+      source: "system" as const,
+    };
+    const told = toldEveryQuarter([attend], uses);
+    const written = told.filter((event) => isAutoSleepId(event.id));
+    expect(written.filter((event) => /-\d+$/u.test(event.id))).toEqual([]);
+    expect(written.filter((event) => event.type === "event.revoked")).toHaveLength(1);
     expect(step(told, { knownUntil: at("08:45"), uses }).decisions).toEqual([]);
   });
 

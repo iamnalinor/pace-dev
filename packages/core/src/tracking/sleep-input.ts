@@ -1,6 +1,7 @@
 import type { Event, EventOf } from "../events/event-schema.ts";
-import type { DeviceUse, SleepActivity, SleepInput } from "./sleep-auto.ts";
+import type { DeviceUse, MainStart, SleepActivity, SleepInput } from "./sleep-auto.ts";
 
+import { compareEvents } from "../events/sort.ts";
 import { isAutoSleepId, sleepNightOf } from "../ids.ts";
 import { effectiveEvents, materialize } from "../materialize/materializer.ts";
 import { isRestClass } from "./categories.ts";
@@ -187,17 +188,21 @@ const personMarksOf = (effective: readonly Event[], state: TimeState): readonly 
     })
     .toSorted((a, b) => a.localeCompare(b));
 
-/** The person's live starts of a main activity (not alongside): each closes the one running. */
-const mainStartsOf = (effective: readonly Event[]): readonly string[] =>
+/**
+The live starts of a main activity (not alongside) in force, but the rules' own: each closes the
+one running, whoever recorded it (the materializer closes at every main start, so one the server
+recorded for the person, like Attend answered in the feed, counts too). In the canonical order.
+*/
+const mainStartsOf = (effective: readonly Event[]): readonly MainStart[] =>
   effective
     .filter(
       (event): event is EventOf<"activity.started"> =>
         event.type === "activity.started" &&
-        event.source !== "system" &&
+        !isAutoSleepId(event.id) &&
         event.payload.alongside !== true,
     )
-    .map((event) => event.occurredAt)
-    .toSorted((a, b) => a.localeCompare(b));
+    .toSorted(compareEvents)
+    .map((event) => ({ at: event.occurredAt, id: event.id }));
 
 /** Automatic sleep starts in the log. */
 const autoStarts = (log: readonly Event[]) =>

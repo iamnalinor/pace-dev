@@ -124,7 +124,7 @@ describe("what automatic sleep reads from the log", () => {
     expect(input.personMarks).toEqual(
       ["21:45", "22:00", "23:50", "01:00", "01:30"].map((hhmm) => at(hhmm)),
     );
-    expect(input.mainStarts).toEqual([at("22:00")]);
+    expect(input.mainStarts).toEqual([{ at: at("22:00"), id: started.id }]);
   });
 
   it("carries what is known beside the log as it was given", () => {

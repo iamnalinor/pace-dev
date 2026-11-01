@@ -5,13 +5,8 @@ import { event } from "../materialize/task-fixture.fake.ts";
 import { addMinutesIso, wallClockInstant } from "../time.ts";
 import { INITIAL_TIME_STATE } from "./model.ts";
 import { type PhoneEvent, phoneUses } from "./phone-use.ts";
-import {
-  decideSleep,
-  type DeviceUse,
-  type SleepDecision,
-  sleepEvents,
-  type SleepInput,
-} from "./sleep-auto.ts";
+import { decideSleep, type DeviceUse, type SleepDecision, type SleepInput } from "./sleep-auto.ts";
+import { sleepEvents } from "./sleep-events.ts";
 import { sleepInputOf } from "./sleep-input.ts";
 import { timeReducer } from "./time-reducer.ts";
 

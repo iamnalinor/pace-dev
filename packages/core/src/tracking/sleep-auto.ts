@@ -1,10 +1,8 @@
-import type { EventInput } from "../events/event-schema.ts";
-
-import { sleepDiscardId, sleepNightOf, sleepReopenId, sleepStartId, sleepStopId } from "../ids.ts";
+import { compareEvents } from "../events/sort.ts";
+import { sleepNightOf, sleepStartId } from "../ids.ts";
 import { minutesBetween } from "../time.ts";
 import { isRestClass } from "./categories.ts";
 import { bedtimeFloor, type Interval, isBedtime, laterOf, REST_MIN_MINUTES } from "./phone-use.ts";
-import { AUTO_SLEEP_LABEL } from "./sleep-label.ts";
 import {
   decideFor,
   type DeviceUse,
@@ -48,9 +46,16 @@ export type SleepInput = {
   Known once in the log, whatever the phones have told.
   */
   readonly personMarks: readonly string[];
-  /** Where the person's live main starts are: each closes the main activity running then. */
-  readonly mainStarts: readonly string[];
+  /**
+  Every live main start in force but the rules' own (the person's, and those the server recorded
+  for them, like Attend answered in the feed), by the canonical order: each closes the main
+  activity running when the materializer applies it.
+  */
+  readonly mainStarts: readonly MainStart[];
 };
+
+/** A live main start: where it is, and its event's id, which orders it against others there. */
+export type MainStart = { readonly at: string; readonly id: string };
 
 /** An end the person made: a stop of theirs, or an end they set (whatever stop sits there). */
 const hasPersonsEnd = (activity: SleepActivity): boolean =>
@@ -91,7 +96,10 @@ const isOwned = (activity: SleepActivity, known: Known): boolean =>
 
 /**
 A sleep automatic sleep would open at `at`, as the log will hold it before anything is decided
-about it: closed at the first main start of the person's after it, as the materializer closes it.
+about it: closed at the first main start the materializer applies after its own start. At the
+same instant that is by id (`compareEvents`): a person's ULID start applies first, so the night
+opened at it runs on (the C1 fix relies on this); a start whose id sorts after `auto:` (the schema
+admits `hw:` and `rep:`) closes the sleep where it opened, which is then never opened.
 */
 const newSleep = (
   at: string,
@@ -99,12 +107,15 @@ const newSleep = (
     mainStarts,
     night,
     used,
-  }: { mainStarts: readonly string[]; night: string; used: readonly string[] },
+  }: { mainStarts: readonly MainStart[]; night: string; used: readonly string[] },
 ): SleepActivity => {
   const id = sleepStartId(night, at, used);
+  const own = { id, occurredAt: at };
   return {
     category: "sleep",
-    endAt: mainStarts.find((start) => start > at) ?? null,
+    endAt:
+      mainStarts.find((start) => compareEvents({ id: start.id, occurredAt: start.at }, own) > 0)
+        ?.at ?? null,
     id,
     isAutoStart: true,
     isAutoStop: false,
@@ -156,7 +167,7 @@ the person deleted). A rest whose sleep would be discarded as soon as it opened 
 */
 const freshSleeps = (
   known: Known,
-  { mainStarts, taken }: { mainStarts: readonly string[]; taken: ReadonlySet<string> },
+  { mainStarts, taken }: { mainStarts: readonly MainStart[]; taken: ReadonlySet<string> },
 ): readonly SleepActivity[] => {
   // eslint-disable-next-line unicorn/no-array-reduce -- a sleep takes its night from the rests after it
   const chosen = candidatesIn(known).reduce<{
@@ -203,7 +214,7 @@ The automatic start ids a new start must not take: those no longer in force, and
 pass discards (a start in the same minute would otherwise share the discarded one's id). One in
 force is never at stake: its night is taken, or it is the sleep the open would be.
 */
-const startIdsUsed = (
+export const startIdsUsed = (
   input: SleepInput,
   decisions: readonly SleepDecision[],
 ): readonly string[] => [
@@ -350,74 +361,4 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
       return [{ at: sleep.startAt, kind: "open", night }, ...decisions];
     });
   return [...followed, ...opened];
-};
-
-const revoke = (id: string, targetId: string, now: string): EventInput => ({
-  id,
-  occurredAt: now,
-  payload: { targetId },
-  precision: "exact",
-  source: "system",
-  type: "event.revoked",
-});
-
-/** The stop ids an activity already has, in force or revoked: a new stop must not reuse one. */
-const stopIdsOf = (input: SleepInput, activityId: string): readonly string[] => {
-  const activity = input.activities.find((each) => each.id === activityId);
-  return activity === undefined
-    ? []
-    : [
-        ...(activity.stopEventId === null ? [] : [activity.stopEventId]),
-        ...activity.revokedAutoStopIds,
-      ];
-};
-
-const toEvent = (
-  decision: SleepDecision,
-  { input, usedStartIds }: { readonly input: SleepInput; readonly usedStartIds: readonly string[] },
-): EventInput => {
-  const { now } = input;
-  switch (decision.kind) {
-    case "open": {
-      const id = sleepStartId(decision.night, decision.at, usedStartIds);
-      return {
-        id,
-        occurredAt: decision.at,
-        payload: { activityId: id, category: "sleep", label: AUTO_SLEEP_LABEL },
-        precision: "approx",
-        source: "system",
-        type: "activity.started",
-      };
-    }
-    case "stop": {
-      return {
-        id: sleepStopId(decision.activityId, decision.at, stopIdsOf(input, decision.activityId)),
-        occurredAt: decision.at,
-        payload: { activityId: decision.activityId },
-        precision: "approx",
-        source: "system",
-        type: "activity.stopped",
-      };
-    }
-    case "reopen": {
-      return revoke(sleepReopenId(decision.stopEventId), decision.stopEventId, now);
-    }
-    case "discard": {
-      return revoke(sleepDiscardId(decision.startEventId), decision.startEventId, now);
-    }
-  }
-};
-
-/**
-The events the decisions write, through the system path: the start (labelled "Sleep"; the
-screen words it), stops at the instant use ended the sleep, and revocations for a reopen (of
-the stop) and a discard (of the start). Ids follow from the night, the instant and the event
-followed up, so deciding again on the same input names the same events.
-*/
-export const sleepEvents = (
-  decisions: readonly SleepDecision[],
-  input: SleepInput,
-): readonly EventInput[] => {
-  const usedStartIds = startIdsUsed(input, decisions);
-  return decisions.map((decision) => toEvent(decision, { input, usedStartIds }));
 };
