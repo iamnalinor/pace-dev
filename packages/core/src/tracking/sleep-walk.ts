@@ -157,18 +157,28 @@ Where a rest the person logged ends an automatic sleep: at the start of the firs
 after the sleep's start (at the sleep's start for one already running then), the same whether
 it was logged before the sleep opened or after. A person's own sleep is theirs to end.
 */
-const restLimitOf = (sleep: SleepActivity, known: Known): null | string =>
+const restLimitOf = (sleep: SleepActivity, known: Known): readonly string[] =>
   isRulesStart(sleep)
-    ? (known.rests
+    ? known.rests
         .filter((rest) => rest.endAt === null || rest.endAt > sleep.startAt)
         .map((rest) => laterOf(rest.startAt, sleep.startAt))
-        .toSorted((a, b) => a.localeCompare(b))
-        .at(0) ?? null)
-    : null;
+    : [];
+
+/**
+The first instant the sleep cannot run past: a rest of the person's, or where another activity
+the person started closed it (an end with no stop event, which no walk moves).
+*/
+const limitOf = (sleep: SleepActivity, known: Known): null | string =>
+  [
+    ...restLimitOf(sleep, known),
+    ...(sleep.stopEventId === null && sleep.endAt !== null ? [sleep.endAt] : []),
+  ]
+    .toSorted((a, b) => a.localeCompare(b))
+    .at(0) ?? null;
 
 const walk = (sleep: SleepActivity, known: Known): Walk => {
   const spells = rested(usesInside(sleep, known.uses), known.knownUntil);
-  const limit = restLimitOf(sleep, known);
+  const limit = limitOf(sleep, known);
   const from = (index: number, awake: number, isReopening: boolean): Walk => {
     const spell = spells[index];
     if (limit !== null && (spell === undefined || limit < spell.startAt)) {
@@ -209,7 +219,7 @@ const reopenAndStop = (sleep: SleepActivity, walked: Walk): readonly SleepDecisi
   if (end === null) {
     return isReopening ? reopen : [];
   }
-  return sleep.stopEventId !== null && sleep.endAt === end.at
+  return sleep.endAt === end.at
     ? []
     : [...reopen, { activityId: sleep.id, at: end.at, kind: "stop" }];
 };

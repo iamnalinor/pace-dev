@@ -3,7 +3,7 @@ import type { EventInput } from "../events/event-schema.ts";
 import { sleepDiscardId, sleepNightOf, sleepReopenId, sleepStartId, sleepStopId } from "../ids.ts";
 import { minutesBetween } from "../time.ts";
 import { isRestClass } from "./categories.ts";
-import { bedtimeFloor, isBedtime, REST_MIN_MINUTES } from "./phone-use.ts";
+import { bedtimeFloor, isBedtime, laterOf, REST_MIN_MINUTES } from "./phone-use.ts";
 import {
   decideFor,
   type DeviceUse,
@@ -25,6 +25,11 @@ export type SleepInput = {
   readonly activities: readonly SleepActivity[];
   readonly now: string;
   readonly zone: string;
+  /**
+  The latest `knownUntil` an earlier pass decided with (Task 13 keeps it with the decisions);
+  `null` before the first. Less known now never undoes what was written then.
+  */
+  readonly decidedUntil: null | string;
   /** Where `uses` start: nothing before it is known, so nothing before it is decided. */
   readonly usesFrom: string;
   /** Ids of the automatic starts no longer in force (discarded, or deleted by the person). */
@@ -40,7 +45,14 @@ export type SleepInput = {
 const isWalked = (activity: SleepActivity, usesFrom: string): boolean =>
   activity.category === "sleep" &&
   activity.startAt >= usesFrom &&
-  (activity.endAt === null || activity.isAutoStop);
+  (activity.endAt === null || activity.isAutoStop || isClosedRulesSleep(activity));
+
+/**
+A sleep the rules started that another activity the person started closed (an end with no stop
+event): its end stays, but a short one is still discarded like any automatic sleep.
+*/
+const isClosedRulesSleep = (activity: SleepActivity): boolean =>
+  isRulesStart(activity) && activity.stopEventId === null && activity.endAt !== null;
 
 /**
 A sleep the rules own outright: they started it, nobody moved its start or undid one of its
@@ -126,11 +138,11 @@ const freshSleeps = (known: Known, taken: ReadonlySet<string>): readonly SleepAc
 The Rest-class activities that bound automatic sleep: the person's (every one but the sleeps the
 rules started and still own), from before `knownUntil`.
 */
-const restsOf = (activities: readonly SleepActivity[], knownUntil: string): readonly Rest[] =>
+const restsOf = (activities: readonly SleepActivity[], now: string): readonly Rest[] =>
   activities
     .filter(
       (activity) =>
-        isRestClass(activity.category) && !isRulesStart(activity) && activity.startAt < knownUntil,
+        isRestClass(activity.category) && !isRulesStart(activity) && activity.startAt <= now,
     )
     .map(({ endAt, startAt }) => ({ endAt, startAt }));
 
@@ -159,9 +171,19 @@ A sleep the rules own, walked again; when deciding afresh would not open it (lat
 earlier rest, or none at all), it goes too, so where the sleeps end does not depend on the
 order the data came in.
 */
-const reconcile = (sleep: SleepActivity, known: Known, fresh: readonly SleepActivity[]) => {
+const reconcile = (
+  sleep: SleepActivity,
+  known: Known,
+  {
+    fresh,
+    personNights,
+  }: { readonly fresh: readonly SleepActivity[]; readonly personNights: ReadonlySet<string> },
+) => {
   const { after, decisions } = decideFor(sleep, known);
-  const isKept = fresh.some((each) => each.startAt === sleep.startAt);
+  // A sleep of the person's in the same night restrains opening, not the sleep already there.
+  const isKept =
+    personNights.has(sleepNightOf(sleep.startAt, known.zone)) ||
+    fresh.some((each) => each.startAt === sleep.startAt);
   return isKept || after === null ? decisions : [...decisions, discardOf(sleep)];
 };
 
@@ -175,20 +197,25 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
   if (input.knownUntil === null) {
     return [];
   }
-  const { knownUntil, usesFrom } = input;
+  // Less known than an earlier pass decided with undoes nothing: decide on the larger of the two.
+  const knownUntil = laterOf(input.knownUntil, input.decidedUntil ?? input.knownUntil);
+  const { usesFrom } = input;
   const known: Known = {
     knownUntil,
-    rests: restsOf(input.activities, knownUntil),
+    rests: restsOf(input.activities, input.now),
     usesFrom,
     uses: knownUses(input.uses, { knownUntil, usesFrom }),
     zone: input.zone,
   };
   const owned = input.activities.filter((activity) => isOwned(activity, usesFrom));
   const others = input.activities.filter((activity) => !isOwned(activity, usesFrom));
-  const taken = new Set([
-    ...others
+  const personNights = new Set(
+    others
       .filter((activity) => activity.category === "sleep")
       .map((sleep) => sleepNightOf(sleep.startAt, known.zone)),
+  );
+  const taken = new Set([
+    ...personNights,
     ...input.personRevokedAutoStarts.map((start) => start.night),
   ]);
   const fresh = freshSleeps(known, taken);
@@ -196,7 +223,10 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
     ...others
       .filter((activity) => isWalked(activity, usesFrom))
       .map((sleep) => ({ decisions: decideFor(sleep, known).decisions, sleep })),
-    ...owned.map((sleep) => ({ decisions: reconcile(sleep, known, fresh), sleep })),
+    ...owned.map((sleep) => ({
+      decisions: reconcile(sleep, known, { fresh, personNights }),
+      sleep,
+    })),
   ]
     .toSorted((a, b) => a.sleep.startAt.localeCompare(b.sleep.startAt))
     .flatMap(({ decisions }) => decisions);

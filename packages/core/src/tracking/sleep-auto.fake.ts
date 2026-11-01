@@ -182,6 +182,10 @@ export type Known = {
   readonly zone?: string;
   /** Where the uses start being known; noon before the default night unless said. */
   readonly usesFrom?: string;
+  /** The latest `knownUntil` an earlier pass decided with; none unless said. */
+  readonly decidedUntil?: null | string;
+  /** When the pass runs; five minutes after `knownUntil` unless said. */
+  readonly now?: string;
 };
 
 export type Step = {
@@ -193,10 +197,11 @@ export type Step = {
 
 /** One evaluation, as the Durable Object runs it: decide on the log, append the events. */
 export const step = (log: readonly Event[], known: Known): Step => {
-  const { knownUntil, uses, usesFrom = at("12:00"), zone = MOSCOW } = known;
-  const now = knownUntil === null ? at("12:00") : addMinutesIso(knownUntil, 5);
+  const { decidedUntil = null, knownUntil, uses, usesFrom = at("12:00"), zone = MOSCOW } = known;
+  const now = known.now ?? (knownUntil === null ? at("12:00") : addMinutesIso(knownUntil, 5));
   const input: SleepInput = {
     activities: sleepActivitiesOf(log),
+    decidedUntil,
     knownUntil,
     now,
     personRevokedAutoStarts: personRevokedAutoStartsOf(log, zone),
