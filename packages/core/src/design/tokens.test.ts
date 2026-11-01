@@ -81,7 +81,7 @@ describe("colour roles", () => {
     expect(color("light", "bg.app")).toBe("#F4F5F9");
     expect(color("dark", "bg.elevated")).toBe("#1F2333");
     expect(color("light", "accent")).toBe("#2E4AD6");
-    expect(color("dark", "accent.text")).toBe("#A6B5FF");
+    expect(color("dark", "accent.text")).toBe("#ACBAFF");
     expect(color("light", "separator.opaque")).toBe("#DFE1E9");
     expect(color("dark", "logo")).toBe("#C8F03C");
     expect(color("light", "fill.2")).toBe("rgba(20, 28, 70, 0.07)");

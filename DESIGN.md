@@ -47,16 +47,16 @@ colors:
   dark-outline: "#767C93"
   dark-accent: "#97A9FF"
   dark-accent-on: "#0B0D14"
-  dark-accent-text: "#A6B5FF"
+  dark-accent-text: "#ACBAFF"
   dark-accent-pressed: "#8498F7"
   dark-accent-quiet: "rgba(151, 169, 255, 0.16)"
   dark-status-danger: "#FF8274"
   dark-status-danger-quiet: "rgba(255, 130, 116, 0.15)"
-  dark-status-warn: "#FF9B5E"
+  dark-status-warn: "#FFA870"
   dark-status-warn-quiet: "rgba(255, 155, 94, 0.16)"
   dark-status-question: "#F2C275"
-  dark-status-success: "#A6B5FF"
-  dark-focus: "#A6B5FF"
+  dark-status-success: "#ACBAFF"
+  dark-focus: "#ACBAFF"
   dark-logo: "#C8F03C"
   dark-grid: "rgba(150, 170, 255, 0.06)"
   dark-fill-1: "rgba(190, 200, 255, 0.05)"
@@ -381,15 +381,15 @@ Cool paper neutrals carry the screen; one ink-blue accent and one red margin col
 Every role exists in a light (`light-…`) and a dark (`dark-…`) token; components reference the light token and switch to the `dark-` sibling of the same role in dark theme. The dark theme is ink-night, not a grey inversion.
 
 ### Primary
-- **Ballpoint Ink** (light #2E4AD6 / dark #97A9FF): the accent. The one filled primary button per view, the switch track when on, the selected calendar day, the current-nav leading bar, the selected-row bar, the check circle at the moment of checking. Its text form **Ink Text** (#2E4AD6 / #A6B5FF) is for links, plain text buttons (Undo, «Вернуть»), selected chip labels, and `status-success` (done is ink, as in a notebook). **Ink Pressed** (#2640BC / #8498F7) is the pressed primary button. **On-Ink** (#FFFFFF / #0B0D14) is text on an ink fill. **Ink Wash** (`accent-quiet`) is the selected-chip fill and the one-time highlight of a row an assistant proposal just created.
-- **Focus Ink** (#2E4AD6 / #A6B5FF): the focus ring, 2 px with a 2 px offset, on every focusable element.
+- **Ballpoint Ink** (light #2E4AD6 / dark #97A9FF): the accent. The one filled primary button per view, the switch track when on, the selected calendar day, the current-nav leading bar, the selected-row bar, the check circle at the moment of checking. Its text form **Ink Text** (#2E4AD6 / #ACBAFF) is for links, plain text buttons (Undo, «Вернуть»), selected chip labels, and `status-success` (done is ink, as in a notebook). **Ink Pressed** (#2640BC / #8498F7) is the pressed primary button. **On-Ink** (#FFFFFF / #0B0D14) is text on an ink fill. **Ink Wash** (`accent-quiet`) is the selected-chip fill and the one-time highlight of a row an assistant proposal just created.
+- **Focus Ink** (#2E4AD6 / #ACBAFF): the focus ring, 2 px with a 2 px offset, on every focusable element.
 - **Selection Ink** (`selection`): web text selection and the selected-row fill, always together with a non-colour marker (the leading 3 px bar or a checkmark).
 
 ### Secondary
 - **Red Margin** (light #C3352B / dark #FF8274, `status-danger`): the now-line on Day, overdue and late times, the Urgent word, destructive actions and errors, the unsorted-Inbox count badge. Its wash (`status-danger-quiet`) fills the destructive button and danger notices.
 
 ### Tertiary
-- **Burnt Orange** (#B04A0C / #FF9B5E, `status-warn`): "past expected" only: «Всё ещё занимаетесь?», the running line past its expected length. Wash `status-warn-quiet` for notices.
+- **Burnt Orange** (#B04A0C / #FFA870, `status-warn`): "past expected" only: «Всё ещё занимаетесь?», the running line past its expected length. Wash `status-warn-quiet` for notices.
 - **Question Ochre** (#795300 / #F2C275, `status-question`): assistant questions and the «?» mark on a field the model only guessed.
 - **Logo Lime** (#5E8C00 on light / #C8F03C on dark, `logo`): the lime chevron of the Pace mark. Used only by the logo, the favicon and the app icon.
 - **Hue family** (`hue-<name>-stroke`, `hue-<name>-ink`, plus a `tint` at 12 % light / 18 % dark in the sidecar): red, orange, amber, yellow, lime, green, teal, cyan, blue, indigo, violet, pink, slate. `stroke` draws lines, dots and chart marks (≥ 3:1 on `bg-app` in both themes); `ink` is text on its own tint (≥ 5.6:1); `tint` is the tag fill. Activity categories: work blue · study violet · task green · food orange · commute yellow · hygiene cyan · rest teal · chores amber · social pink · sport red · sleep indigo · other slate. Projects keep their ten stored names (`coral` maps to red).

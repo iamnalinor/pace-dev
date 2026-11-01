@@ -322,16 +322,16 @@ NOTEBOOK_DARK = {
     "accent": {
         "default": "#97A9FF",
         "on": "#0B0D14",
-        "text": "#A6B5FF",
+        "text": "#ACBAFF",
         "pressed": "#8498F7",
     },
     "status": {
         "danger": "#FF8274",
-        "warn": "#FF9B5E",
+        "warn": "#FFA870",
         "question": "#F2C275",
-        "success": "#A6B5FF",
+        "success": "#ACBAFF",
     },
-    "focus": "#A6B5FF",
+    "focus": "#ACBAFF",
     "logo": "#C8F03C",
 }
 NOTEBOOK_TRANSLUCENT = {

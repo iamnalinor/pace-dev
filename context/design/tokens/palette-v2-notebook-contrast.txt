@@ -53,14 +53,14 @@ dark
   label.tertiary / bg.cell                7.17  Lc -52.6
   label.tertiary / bg.app                 7.82  Lc -53.4
   label.tertiary / bg.elevated            6.37  Lc -51.1
-  accent.text / bg.cell                   8.92  Lc -63.3
+  accent.text / bg.cell                   9.38  Lc -65.9
   accent.on / accent                      8.72  Lc 59.8
   outline / bg.cell (UI 3:1)              4.24  Lc -31.9
   outline / bg.app (UI 3:1)               4.63  Lc -32.8
-  focus / bg.cell (UI 3:1)                8.92  Lc -63.3
-  focus / bg.app (UI 3:1)                 9.74  Lc -64.1
+  focus / bg.cell (UI 3:1)                9.38  Lc -65.9
+  focus / bg.app (UI 3:1)                10.24  Lc -66.8
   status.danger / bg.cell                 7.27  Lc -53.7
-  status.warn / bg.cell                   8.44  Lc -60.7
+  status.warn / bg.cell                   9.27  Lc -65.5
   status.danger / bg.app                  7.93  Lc -54.6
   hue.red.ink / tint                      7.82  Lc -67.8
   hue.red.stroke / bg.app (UI 3:1)        7.26  Lc 0.0
