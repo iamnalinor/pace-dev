@@ -378,6 +378,8 @@ titles, ≥ 1.35 for body and meta).
 | `numeric.value` | 16/22 · 500 · tnum | 15/21 · 500 · tnum | durations, times and counts in rows |
 | `numeric.stat` | 28/32 · 600 · tnum · −0.02em | 24/28 · 600 · tnum | Insights tile values |
 
+`label.secondary` is for meta text only (footnote, subhead, caption); paragraphs use `label.primary`.
+
 Rules:
 - No eyebrow or kicker above a title (impeccable craft-floor ban; F-TYP-02). The date moves to a
   subtitle under the large title (Now, Day) or into the period control (Week, History, Insights).
