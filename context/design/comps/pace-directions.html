@@ -1,0 +1,462 @@
+<title>Pace Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap">
+<style>
+/* Decision page for the Pace overhaul: the page chrome is quiet and follows the viewer's theme;
+   each frame carries its own direction × theme tokens. Layout: one column of direction cards, each
+   with its thesis, palette and three frames (phone dark, phone light, desktop light). */
+:root {
+  --page: #f6f6f4; --ink: #18181a; --ink2: #55565c; --ink3: #7a7b82; --rule: rgba(0,0,0,.1);
+  --card: #ffffff; --chip: #efefec; --focus: #2e4ad6;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111113; --ink: #ececee; --ink2: #a8a9b0; --ink3: #7f8088; --rule: rgba(255,255,255,.1);
+  --card: #1a1a1d; --chip: #26262a; --focus: #8ea0ff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #111113; --ink: #ececee; --ink2: #a8a9b0; --ink3: #7f8088; --rule: rgba(255,255,255,.1);
+  --card: #1a1a1d; --chip: #26262a; --focus: #8ea0ff; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--page); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased }
+main { max-width: 1320px; margin: 0 auto; display: grid; gap: 40px }
+h1 { font-size: 30px; line-height: 1.15; letter-spacing: -.02em; margin: 0; text-wrap: balance }
+h2 { font-size: 22px; line-height: 1.2; letter-spacing: -.015em; margin: 0; text-wrap: balance }
+h3 { font-size: 13px; font-weight: 600; margin: 0; color: var(--ink2) }
+p { margin: 0; max-width: 72ch }
+.lede { display: grid; gap: 12px; color: var(--ink2) }
+.lede strong { color: var(--ink) }
+.dir { background: var(--card); border: 1px solid var(--rule); border-radius: 20px; padding: 28px; display: grid; gap: 22px; min-width: 0 }
+.dir-head { display: grid; gap: 8px }
+.tag { font-size: 12px; font-weight: 600; color: var(--ink2); background: var(--chip); border-radius: 999px; padding: 3px 10px; justify-self: start }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 28px }
+.fact { display: grid; gap: 4px; min-width: 0 }
+.fact p { color: var(--ink2); font-size: 14px }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px }
+.sw { display: grid; gap: 2px; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums }
+.sw i { display: block; width: 44px; height: 28px; border-radius: 7px; border: 1px solid var(--rule) }
+.frames { display: grid; grid-template-columns: 312px 312px minmax(0, 1fr); gap: 20px; align-items: start }
+@media (max-width: 1100px) { .frames { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) } .frames .desk { grid-column: 1 / -1 } }
+figure { margin: 0; display: grid; gap: 8px; min-width: 0 }
+figcaption { font-size: 12px; color: var(--ink3) }
+.scaler { position: relative; width: 100%; overflow: hidden; border-radius: 14px; border: 1px solid var(--rule) }
+.scaler > .frame { position: absolute; top: 0; left: 0; transform-origin: 0 0 }
+.phone .scaler { aspect-ratio: 390 / 844; border-radius: 28px }
+.desk .scaler { aspect-ratio: 1440 / 900 }
+.side { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px }
+.mini { border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px; display: grid; gap: 6px; font-size: 13px; color: var(--ink2) }
+.mini b { color: var(--ink); font-weight: 600 }
+.rec { border-left: 2px solid var(--focus); padding: 4px 0 4px 18px; display: grid; gap: 8px }
+.note { font-size: 13px; color: var(--ink3) }
+a { color: var(--focus) }
+
+/* ───────────── Frames: shared product structure (identical across directions) ───────────── */
+.frame { font-family: var(--sans); color: var(--l1); background: var(--bg); font-size: 15px; line-height: 1.35;
+  font-feature-settings: "cv11", "tnum"; overflow: hidden; -webkit-font-smoothing: antialiased }
+.frame * { box-sizing: border-box }
+.frame svg { flex: none; display: block }
+.num { font-variant-numeric: tabular-nums }
+.p-root { width: 390px; height: 844px; display: flex; flex-direction: column; position: relative }
+.p-status { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 14px; font-weight: 600 }
+.p-status span:last-child { display: flex; gap: 6px; align-items: center }
+.p-head { padding: 6px 20px 10px; display: flex; align-items: flex-end; justify-content: space-between }
+.p-title { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.05 }
+.p-sub { font-size: 14px; color: var(--l2); margin-top: 4px }
+.iconbtn { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; color: var(--l2) }
+.p-scroll { flex: 1; overflow: hidden; padding: 0 16px; display: flex; flex-direction: column; gap: 14px }
+.p-scroll > * { flex: none }
+.composer { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 6px 0 14px; border-radius: var(--r-field); background: var(--fill); color: var(--l3); font-size: 15px }
+.composer .grow { flex: 1 }
+.composer .send { width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; background: var(--fill2); color: var(--l3) }
+.filters { display: flex; gap: 8px; overflow: hidden }
+.chip { height: 32px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--l2); background: var(--fill); white-space: nowrap }
+.chip.on { background: var(--l1); color: var(--bg) }
+.group { display: grid; gap: 6px }
+.gh { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--l2) }
+.gh .num { font-weight: 500; color: var(--l3) }
+.list { background: var(--cell); border-radius: var(--r-card); overflow: hidden }
+.row { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 12px 14px; position: relative }
+.row + .row::before { content: ""; position: absolute; top: 0; left: 54px; right: 0; height: 1px; background: var(--sep) }
+.check { width: 22px; height: 22px; border-radius: 999px; border: 1.5px solid var(--l4); margin-top: 1px }
+.rt { font-size: 16px; line-height: 1.3; font-weight: 450; letter-spacing: -.005em }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; font-size: 13px; color: var(--l3) }
+.t { height: 20px; padding: 0 7px; border-radius: var(--r-tag); display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 550 }
+.bar { height: 3px; border-radius: 3px; background: var(--fill2); margin-top: 8px; overflow: hidden }
+.bar i { display: block; height: 100%; width: 33%; background: var(--accent) }
+.disclose { display: flex; align-items: center; gap: 6px; padding: 4px 4px; font-size: 14px; font-weight: 500; color: var(--l2) }
+.track { margin: 0 12px 10px; background: var(--elev); border-radius: var(--r-card); box-shadow: var(--shadow); padding: 12px 14px; display: grid; gap: 10px }
+.run { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center }
+.run-l { display: grid; gap: 4px; min-width: 0 }
+.run-top { display: flex; align-items: baseline; gap: 8px; font-size: 15px; font-weight: 600 }
+.run-time { font-variant-numeric: tabular-nums; font-weight: 600 }
+.run-sub { font-size: 12.5px; color: var(--l3) }
+.run-sub.warn { color: var(--warn); font-weight: 550 }
+.btn { height: 36px; padding: 0 14px; border-radius: var(--r-btn); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; white-space: nowrap }
+.btn.tonal { background: var(--fill); color: var(--l1) }
+.btn.primary { background: var(--accent); color: var(--onAccent) }
+.btn.quiet { color: var(--accentText) }
+.btns { display: flex; gap: 6px }
+.tabs { height: 84px; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px 0; border-top: 1px solid var(--sep); background: var(--bar) }
+.tab { display: grid; justify-items: center; align-content: start; gap: 3px; font-size: 11px; font-weight: 550; color: var(--l3); position: relative }
+.tab.on { color: var(--tabOn) }
+.badge { position: absolute; top: -2px; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px; background: var(--badge); color: var(--onBadge); font-size: 11px; font-weight: 700; display: grid; place-items: center }
+
+/* desktop */
+.d-root { width: 1440px; height: 900px; display: grid; grid-template-columns: 248px 1fr 380px }
+.sb { background: var(--side); border-right: 1px solid var(--sep); padding: 18px 12px; display: flex; flex-direction: column; gap: 14px }
+.sb-top { display: flex; align-items: center; gap: 10px; padding: 0 8px; height: 36px }
+.sb-name { font-weight: 650; font-size: 16px; letter-spacing: -.01em }
+.sb-user { margin-left: auto; font-size: 13px; color: var(--l3) }
+.newtask { height: 40px; border-radius: var(--r-btn); background: var(--accent); color: var(--onAccent); display: flex; align-items: center; gap: 8px; padding: 0 12px; font-size: 14px; font-weight: 600 }
+.newtask kbd { margin-left: auto; font: 500 12px var(--sans); opacity: .7 }
+.nav { display: grid; gap: 2px }
+.nv { height: 36px; border-radius: var(--r-nav); display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 14px; font-weight: 500; color: var(--l2) }
+.nv.on { background: var(--navOn); color: var(--navOnText) }
+.nv .cnt { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--l3) }
+.main { padding: 28px 40px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; min-width: 0 }
+.mh { display: flex; align-items: flex-end; justify-content: space-between }
+.mt { font-size: 28px; font-weight: 700; letter-spacing: -.022em; line-height: 1.1 }
+.ms { font-size: 14px; color: var(--l2); margin-top: 4px }
+.datenav { display: flex; gap: 4px; align-items: center }
+.datenav .iconbtn { width: 36px; height: 36px; border-radius: var(--r-btn); background: var(--fill) }
+.sum { display: grid; gap: 8px }
+.sum-line { display: flex; gap: 18px; font-size: 13px; color: var(--l2); align-items: baseline }
+.sum-line b { font-size: 15px; color: var(--l1); font-weight: 600 }
+.stack { display: flex; height: 8px; border-radius: 8px; overflow: hidden; gap: 2px; background: transparent }
+.stack i { display: block; height: 100% }
+.tl { display: grid; grid-template-columns: 64px 1fr; position: relative }
+.hr { font-size: 12px; color: var(--l3); font-variant-numeric: tabular-nums; height: 0; position: relative }
+.blk { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 0 14px; border-radius: var(--r-blk); position: relative; min-width: 0 }
+.blk .bt { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.blk .bs { font-size: 12px; opacity: .8; font-variant-numeric: tabular-nums }
+.blk .bd { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums }
+.gap { border: 1.5px dashed var(--l4); background: transparent; color: var(--l2) }
+.pane { border-left: 1px solid var(--sep); background: var(--paneBg); padding: 28px 28px; display: flex; flex-direction: column; gap: 18px }
+.pk { font-size: 13px; color: var(--l3) }
+.pt { font-size: 20px; font-weight: 650; letter-spacing: -.015em; line-height: 1.25 }
+.kv { display: grid; grid-template-columns: 110px 1fr; gap: 10px 12px; font-size: 14px }
+.kv dt { color: var(--l3) } .kv dd { margin: 0; font-variant-numeric: tabular-nums }
+.apps { display: grid; gap: 8px }
+.app { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 13px }
+.app .ab { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: var(--fill2); overflow: hidden }
+.app .ab i { display: block; height: 100%; background: var(--l3) }
+.pbtns { display: flex; gap: 8px; margin-top: auto }
+
+/* ───────────── Direction A · Тетрадь (ink and margin) ───────────── */
+.A { --r-card: 12px; --r-field: 12px; --r-tag: 5px; --r-btn: 10px; --r-nav: 8px; --r-blk: 6px }
+.A.light { --bg: #F4F5F9; --cell: #FFFFFF; --elev: #FFFFFF; --side: #EDEFF5; --paneBg: #FFFFFF; --bar: rgba(247,248,251,.94);
+  --l1: #12141C; --l2: #4B5064; --l3: #6B7086; --l4: #B4B8C7; --sep: rgba(20,28,70,.09);
+  --fill: rgba(20,28,70,.055); --fill2: rgba(20,28,70,.09); --accent: #2E4AD6; --onAccent: #FFFFFF; --accentText: #2E4AD6;
+  --tint: rgba(46,74,214,.10); --margin: #D33A30; --warn: #C2410C; --tabOn: #2E4AD6; --badge: #2E4AD6; --onBadge: #fff;
+  --navOn: rgba(46,74,214,.10); --navOnText: #2E4AD6; --shadow: 0 1px 2px rgba(20,28,70,.06), 0 8px 24px rgba(20,28,70,.08);
+  --grid: rgba(46,74,214,.07);
+  --p-alg: #5B35B8; --p-alg-t: rgba(91,53,184,.11); --p-work: #0B6E66; --p-work-t: rgba(11,110,102,.11);
+  --p-pers: #A8481A; --p-pers-t: rgba(168,72,26,.11); --i-norm: #2B6E3A; --i-norm-t: rgba(43,110,58,.10);
+  --c-sleep: #5B6BB8; --c-chores: #8A6A1E; --c-study: #5B35B8; --c-task: #2E4AD6; --c-food: #A8481A; --c-other: #6B7086; --c-rest: #0B6E66 }
+.A.dark { --bg: #0D0F15; --cell: #161922; --elev: #1C2030; --side: #11131A; --paneBg: #12141C; --bar: rgba(13,15,21,.94);
+  --l1: #ECEEF4; --l2: #A9AEC0; --l3: #868BA0; --l4: #4A4F63; --sep: rgba(190,200,255,.09);
+  --fill: rgba(190,200,255,.07); --fill2: rgba(190,200,255,.12); --accent: #7D93FF; --onAccent: #0B0D14; --accentText: #94A6FF;
+  --tint: rgba(125,147,255,.16); --margin: #FF6A5C; --warn: #FF9B5E; --tabOn: #94A6FF; --badge: #7D93FF; --onBadge: #0B0D14;
+  --navOn: rgba(125,147,255,.14); --navOnText: #A9B7FF; --shadow: 0 0 0 1px rgba(190,200,255,.07);
+  --grid: rgba(150,170,255,.06);
+  --p-alg: #B9A2FF; --p-alg-t: rgba(155,125,255,.17); --p-work: #63D3C6; --p-work-t: rgba(80,200,185,.15);
+  --p-pers: #FFA07A; --p-pers-t: rgba(255,140,95,.15); --i-norm: #7FD493; --i-norm-t: rgba(110,205,135,.14);
+  --c-sleep: #8C9BE6; --c-chores: #D8B45A; --c-study: #A58CFF; --c-task: #7D93FF; --c-food: #FF9A70; --c-other: #868BA0; --c-rest: #5CCFC0 }
+.A .tl-canvas { background-image: radial-gradient(var(--grid) 1.2px, transparent 1.3px); background-size: 16px 16px; background-position: -1px -1px; border-radius: 10px }
+.A .blk { background: color-mix(in srgb, var(--c) 13%, var(--cell)); color: var(--l1) }
+.A .blk::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: var(--c) }
+.A .blk .bt .dot { display: none }
+.A .nowline { position: absolute; left: 56px; right: 0; height: 1px; background: var(--margin) }
+.A .nowline::before { content: ""; position: absolute; left: -4px; top: -3.5px; width: 8px; height: 8px; border-radius: 99px; background: var(--margin) }
+.A .nowline span { position: absolute; left: -56px; top: -8px; font-size: 11px; font-weight: 700; color: var(--margin); font-variant-numeric: tabular-nums }
+.A .struck .rt { color: var(--l3); text-decoration: line-through; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px }
+.A .struck .check { background: var(--accent); border-color: var(--accent) }
+.A .run-ink { height: 2px; border-radius: 2px; background: var(--fill2); position: relative; overflow: visible }
+.A .run-ink i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 2px }
+.A .run-ink b { position: absolute; top: -4px; width: 1px; height: 10px; background: var(--margin) }
+
+/* ───────────── Direction B · Линии (metro lines, two-tone with tinted fills) ───────────── */
+.B { --r-card: 14px; --r-field: 999px; --r-tag: 999px; --r-btn: 999px; --r-nav: 10px; --r-blk: 10px }
+.B.light { --bg: #F1F1EE; --cell: #FFFFFF; --elev: #FFFFFF; --side: #E7EBE6; --paneBg: #FAFAF8; --bar: rgba(244,244,241,.95);
+  --l1: #151615; --l2: #4C4E4A; --l3: #6E706B; --l4: #B9BBB5; --sep: rgba(0,0,0,.08);
+  --fill: rgba(0,0,0,.05); --fill2: rgba(0,0,0,.08); --accent: #0E7A45; --onAccent: #FFFFFF; --accentText: #0B6E3D;
+  --tint: rgba(14,122,69,.10); --warn: #B45309; --tabOn: #0E7A45; --badge: #D52B1E; --onBadge: #fff;
+  --navOn: rgba(14,122,69,.12); --navOnText: #0B5E35; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px rgba(0,0,0,.08);
+  --p-alg: #6B1F7A; --p-alg-t: rgba(128,0,128,.10); --p-alg-l: #8E2A9E; --p-work: #005B94; --p-work-t: rgba(0,114,186,.10); --p-work-l: #0072BA;
+  --p-pers: #9A4A00; --p-pers-t: rgba(237,145,33,.16); --p-pers-l: #ED9121; --i-norm: #2D6B2F; --i-norm-t: rgba(75,175,79,.14); --i-norm-l: #4BAF4F;
+  --c-sleep: #0072BA; --c-chores: #8D5B2D; --c-study: #8E2A9E; --c-task: #0E7A45; --c-food: #ED9121; --c-other: #A2A5B4; --c-rest: #1EBCEF }
+.B.dark { --bg: #101111; --cell: #1A1B1B; --elev: #222423; --side: #0C0D0D; --paneBg: #141515; --bar: rgba(16,17,17,.95);
+  --l1: #EDEDEA; --l2: #A9AAA5; --l3: #82837E; --l4: #4A4B48; --sep: rgba(255,255,255,.08);
+  --fill: rgba(255,255,255,.06); --fill2: rgba(255,255,255,.10); --accent: #3DBE78; --onAccent: #06130C; --accentText: #57D18E;
+  --tint: rgba(61,190,120,.15); --warn: #F5A04A; --tabOn: #57D18E; --badge: #F0483A; --onBadge: #fff;
+  --navOn: rgba(61,190,120,.14); --navOnText: #7FE0A9; --shadow: 0 0 0 1px rgba(255,255,255,.07);
+  --p-alg: #E39BEF; --p-alg-t: rgba(200,90,220,.18); --p-alg-l: #C463D6; --p-work: #7CC4F5; --p-work-t: rgba(40,150,230,.18); --p-work-l: #2E9BE6;
+  --p-pers: #FFC27A; --p-pers-t: rgba(237,145,33,.18); --p-pers-l: #F0A040; --i-norm: #8FDB92; --i-norm-t: rgba(75,175,79,.18); --i-norm-l: #5CC060;
+  --c-sleep: #2E9BE6; --c-chores: #B98552; --c-study: #C463D6; --c-task: #3DBE78; --c-food: #F0A040; --c-other: #8C8F9C; --c-rest: #36C8F2 }
+.B .t::before { content: ""; width: 7px; height: 7px; border-radius: 99px; background: var(--lc) }
+.B .tl-canvas { position: relative }
+.B .blk { background: color-mix(in srgb, var(--c) 10%, var(--cell)); color: var(--l1); margin-left: 34px }
+.B .blk::after { content: ""; position: absolute; left: -26px; top: -1px; bottom: -1px; width: 6px; border-radius: 3px; background: var(--c) }
+.B .blk::before { content: ""; position: absolute; left: -31px; top: -6px; width: 12px; height: 12px; border-radius: 99px; background: var(--cell); border: 3px solid var(--c); z-index: 2 }
+.B .gap { margin-left: 34px }
+.B .gap::after { content: ""; position: absolute; left: -24px; top: 0; bottom: 0; border-left: 2px dashed var(--l4) }
+.B .blk.branch { margin-left: 70px }
+.B .blk.branch::after { left: -22px; width: 4px }
+.B .blk.branch::before { left: -26px; width: 10px; height: 10px; border-width: 2.5px }
+.B .nowline { position: absolute; left: 64px; right: 0; height: 0; border-top: 2px solid var(--l1) }
+.B .nowline span { position: absolute; left: -64px; top: -9px; font-size: 11px; font-weight: 700; color: var(--l1); font-variant-numeric: tabular-nums }
+.B .run-line { height: 6px; border-radius: 3px; background: var(--fill2); position: relative }
+.B .run-line i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--c) }
+.B .run-line b { position: absolute; top: -3px; width: 12px; height: 12px; border-radius: 99px; background: var(--elev); border: 3px solid var(--c); transform: translateX(-6px) }
+
+/* ───────────── Direction C · Хронограф (graphite and lume) ───────────── */
+.C { --r-card: 10px; --r-field: 10px; --r-tag: 4px; --r-btn: 8px; --r-nav: 6px; --r-blk: 4px }
+.C.dark { --bg: #0B0C0C; --cell: #151716; --elev: #1C1F1D; --side: #0E100F; --paneBg: #111312; --bar: rgba(11,12,12,.95);
+  --l1: #EEF0EA; --l2: #A5A99F; --l3: #7F837A; --l4: #454842; --sep: rgba(235,240,225,.08);
+  --fill: rgba(235,240,225,.06); --fill2: rgba(235,240,225,.10); --accent: #C6EE45; --onAccent: #0B0C0C; --accentText: #CDF25A;
+  --tint: rgba(198,238,69,.12); --warn: #F2A33A; --tabOn: #CDF25A; --badge: #C6EE45; --onBadge: #0B0C0C;
+  --navOn: rgba(235,240,225,.08); --navOnText: #EEF0EA; --shadow: 0 0 0 1px rgba(235,240,225,.07);
+  --p-alg: #C6B3FF; --p-alg-t: rgba(170,145,255,.14); --p-work: #8FD6E8; --p-work-t: rgba(110,200,225,.13);
+  --p-pers: #F7B88A; --p-pers-t: rgba(245,160,110,.14); --i-norm: #B7C2AE; --i-norm-t: rgba(183,194,174,.12);
+  --c-sleep: #6E7FA8; --c-chores: #A08B62; --c-study: #9B8AD6; --c-task: #C6EE45; --c-food: #C98A64; --c-other: #6F736B; --c-rest: #6FA8A0 }
+.C.light { --bg: #F3F4F1; --cell: #FFFFFF; --elev: #FFFFFF; --side: #EBECE8; --paneBg: #FBFBF9; --bar: rgba(243,244,241,.95);
+  --l1: #121411; --l2: #4A4D46; --l3: #6A6E64; --l4: #B9BCB3; --sep: rgba(18,20,17,.09);
+  --fill: rgba(18,20,17,.05); --fill2: rgba(18,20,17,.09); --accent: #C2EA3E; --onAccent: #121411; --accentText: #4A6900;
+  --tint: rgba(120,160,0,.12); --warn: #B45309; --tabOn: #121411; --badge: #121411; --onBadge: #F3F4F1;
+  --navOn: rgba(18,20,17,.07); --navOnText: #121411; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.07);
+  --p-alg: #5A3FB0; --p-alg-t: rgba(90,63,176,.10); --p-work: #0D6577; --p-work-t: rgba(13,101,119,.10);
+  --p-pers: #9C4B16; --p-pers-t: rgba(156,75,22,.10); --i-norm: #4A5243; --i-norm-t: rgba(74,82,67,.09);
+  --c-sleep: #7C8BB3; --c-chores: #A68D5B; --c-study: #7B68C4; --c-task: #9CC22E; --c-food: #C48356; --c-other: #9A9D95; --c-rest: #5E9A92 }
+.C .frame, .C { letter-spacing: -.003em }
+.C .rt { font-weight: 500 }
+.C .tl-ruler { position: absolute; left: 52px; top: 0; bottom: 0; width: 8px;
+  background-image: repeating-linear-gradient(to bottom, var(--l4) 0 1px, transparent 1px 12px); }
+.C .blk { background: color-mix(in srgb, var(--c) 16%, var(--cell)); color: var(--l1); border-left: 0 }
+.C .blk.live { background: color-mix(in srgb, var(--accent) 14%, var(--cell)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent) }
+.C .nowline { position: absolute; left: 44px; right: 0; height: 2px; background: var(--accentText) }
+.C .nowline span { position: absolute; left: -44px; top: -8px; font-size: 11px; font-weight: 700; color: var(--accentText); font-variant-numeric: tabular-nums }
+.C .dial { position: relative; height: 22px }
+.C .dial .ticks { position: absolute; inset: 8px 0 0 0; background-image: repeating-linear-gradient(to right, var(--l4) 0 1px, transparent 1px 7px); height: 6px }
+.C .dial .ticks.major { inset: 6px 0 0 0; height: 10px; background-image: repeating-linear-gradient(to right, var(--l3) 0 1px, transparent 1px 35px) }
+.C .dial .exp { position: absolute; top: 0; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--l2); transform: translateX(-5px) }
+.C .dial .needle { position: absolute; top: 2px; bottom: 0; width: 2px; background: var(--warn); border-radius: 1px }
+.C .dial .needle.ok { background: var(--accentText) }
+.C .run-time { font-size: 20px; font-weight: 600; letter-spacing: -.01em }
+.C .chip.on { background: var(--accent); color: var(--onAccent) }
+.C.light .chip.on { background: var(--l1); color: var(--bg) }
+</style>
+
+<main>
+  <header class="lede">
+    <h1>Pace — three directions</h1>
+    <p>STOP 1 of the design overhaul. The same two screens, built three ways: <strong>Now</strong> on a phone (dark and light) and <strong>Day</strong> on a desktop (light), with the Russian lived-in data the app is tested on. The shell, navigation and controls are identical in every frame on purpose; a direction only changes type rhythm, palette, density and one signature detail. Day's blocks are sample data shaped like the owner's real morning.</p>
+    <p class="note">Rendered in HTML, not in the app: proportions and colours are exact, interaction is not. Frame text is Inter with tabular figures for every time and count.</p>
+  </header>
+  <div id="dirs"></div>
+  <section class="dir" aria-labelledby="other-h">
+    <div class="dir-head"><h2 id="other-h">Also on the table</h2></div>
+    <div class="side" id="others"></div>
+  </section>
+</main>
+
+<script>
+const ICON = {
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  down: '<path d="m6 9 6 6 6-6"/>', left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  hist: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>',
+  sig: '<path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/>'
+};
+const ic = (n, s = 20, w = 1.75) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+const logo = (s = 24) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l5 6-5 6" fill="none" stroke="var(--l3)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 6l5 6-5 6" fill="none" stroke="var(--accentText)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="20" cy="12" r="1.8" fill="var(--accentText)"/></svg>`;
+
+const tag = (label, key) => `<span class="t" style="color:var(--${key});background:var(--${key}-t);--lc:var(--${key}-l, var(--${key}))">${label}</span>`;
+
+function runBar(d) {
+  if (d === "A") return `<div class="run-ink"><i style="width:100%"></i><b style="left:16.6%"></b></div>`;
+  if (d === "B") return `<div class="run-line" style="--c:var(--c-other)"><i style="width:100%"></i><b style="left:100%"></b></div>`;
+  return `<div class="dial"><div class="ticks"></div><div class="ticks major"></div><span class="exp" style="left:16.6%"></span><span class="needle" style="left:calc(100% - 2px)"></span></div>`;
+}
+function runBar2(d) {
+  if (d === "A") return ``;
+  if (d === "B") return ``;
+  return ``;
+}
+
+function phone(d, theme) {
+  const struck = d === "A";
+  return `<div class="frame ${d} ${theme} p-root">
+  <div class="p-status num"><span>16:21</span><span>${ic("sig", 16, 2)}<span>87%</span></span></div>
+  <div class="p-head"><div><div class="p-title">Сейчас</div><div class="p-sub">Воскресенье, 1 ноября</div></div><div class="iconbtn">${ic("bell", 22)}</div></div>
+  <div class="p-scroll">
+    <div class="composer">${ic("plus", 20)}<span class="grow">Задача или вставьте текст</span><span class="send">${ic("up", 18, 2)}</span></div>
+    <div class="filters"><span class="chip on">Все</span><span class="chip">Алгебра</span><span class="chip">Работа</span><span class="chip">Личное</span></div>
+    <div class="group"><div class="gh"><span>Со сроком</span><span class="num">3</span></div>
+      <div class="list">
+        <div class="row"><span class="check"></span><div><div class="rt">Подготовить квартальный отчёт</div>
+          <div class="meta">${tag("Работа", "p-work")}${tag("Обычная", "i-norm")}<span class="num">завтра 18:00 · 23 ч 39 м</span></div></div></div>
+        <div class="row"><span class="check"></span><div><div class="rt">ДЗ по алгебре: №№ 290, 292</div>
+          <div class="meta">${tag("Алгебра", "p-alg")}${tag("Обычная", "i-norm")}<span class="num">4 нояб. · 1 из 3</span></div>
+          <div class="bar"><i></i></div></div></div>
+        <div class="row"><span class="check"></span><div><div class="rt">Квартплата</div>
+          <div class="meta">${tag("Личное", "p-pers")}${ic("repeat", 13)}<span class="num">11 нояб. · 9 дн.</span></div></div></div>
+      </div></div>
+    <div class="group"><div class="gh"><span>Без срока</span><span class="num">2</span></div>
+      <div class="list">
+        <div class="row${struck ? " struck" : ""}"><span class="check"></span><div><div class="rt">Позвонить в банк</div>
+          <div class="meta">${tag("Личное", "p-pers")}<span class="num">${struck ? "сделано только что" : "сегодня"}</span></div></div></div>
+        <div class="row"><span class="check"></span><div><div class="rt">Купить продукты на неделю</div>
+          <div class="meta">${tag("Личное", "p-pers")}<span class="num">4 дн. назад</span></div></div></div>
+      </div></div>
+    <div class="disclose">Позже · 2 ${ic("down", 16)}</div>
+  </div>
+  <div class="track">
+    <div class="run"><div class="run-l"><div class="run-top"><span>Пошёл в ЦСС</span><span class="run-time">2:01</span></div>
+      <div class="run-sub warn">из ~20 м · Ещё занимаетесь?</div></div>
+      <div class="btns"><span class="btn tonal">Да</span><span class="btn tonal">${ic("stop", 14, 2)}Стоп</span></div></div>
+    ${runBar(d)}
+    <div class="run"><div class="run-l"><div class="run-top"><span>Музыка</span><span class="run-time" style="font-weight:500;color:var(--l2)">1:31</span></div>
+      <div class="run-sub">Отдых · параллельно</div></div>
+      <div class="btns"><span class="btn tonal">${ic("stop", 14, 2)}Стоп</span></div></div>
+  </div>
+  <div class="tabs">
+    <div class="tab on">${ic("zap", 24)}Сейчас</div><div class="tab">${ic("clock", 24)}День</div><div class="tab">${ic("cal", 24)}Календарь</div>
+    <div class="tab">${ic("inbox", 24)}<span class="badge num">3</span>Входящие</div><div class="tab">${ic("more", 24)}Ещё</div>
+  </div></div>`;
+}
+
+const PX_PER_MIN = 1.02; // 07:30 → 17:40 in the main column
+const T0 = 7 * 60 + 30;
+const y = (h, m) => ((h * 60 + m) - T0) * PX_PER_MIN;
+const blocks = [
+  { s: [7, 30], e: [8, 10], label: "Собираюсь", sub: "Рутина", c: "chores", dur: "40 м" },
+  { s: [8, 10], e: [9, 0], gap: true, label: "50 м без записи", dur: "" },
+  { s: [9, 0], e: [10, 30], label: "Матанализ, лекция", sub: "Календарь · ауд. 301", c: "study", dur: "1 ч 30 м" },
+  { s: [10, 40], e: [12, 10], label: "Алгебра, семинар", sub: "Календарь · ауд. 214", c: "study", dur: "1 ч 30 м" },
+  { s: [12, 10], e: [13, 0], label: "Обед", sub: "Рутина · Еда", c: "food", dur: "50 м" },
+  { s: [13, 0], e: [14, 20], gap: true, label: "1 ч 20 м без записи", dur: "" },
+  { s: [14, 20], e: [16, 0], label: "ДЗ по алгебре: №№ 290, 292", sub: "Задача · фокус", c: "task", dur: "1 ч 40 м", sel: true },
+  { s: [16, 20], e: [17, 21], label: "Пошёл в ЦСС", sub: "Другое · из ~20 м", c: "other", dur: "2:01", live: true },
+];
+function desk(d, theme) {
+  const nowY = y(17, 21);
+  const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map((h) => `<div class="hr" style="position:absolute;top:${y(h, 0) - 7}px">${String(h).padStart(2, "0")}:00</div>`).join("");
+  const bl = blocks.map((b) => {
+    const top = y(...b.s), h = Math.max(30, y(...b.e) - top - 4);
+    const cls = b.gap ? "blk gap" : `blk${b.live ? " live" : ""}`;
+    const right = b.live ? "calc(50% + 4px)" : "0";
+    const sel = b.sel ? `outline:2px solid var(--accent);outline-offset:1px;` : "";
+    const style = `position:absolute;top:${top}px;height:${h}px;left:0;right:${right};${b.gap ? "" : `--c:var(--c-${b.c});`}${sel}`;
+    const inner = b.gap
+      ? `<div class="bt" style="font-weight:500">${b.label}</div><span class="btn quiet" style="height:26px">Записать</span>`
+      : `<div style="min-width:0"><div class="bt">${b.label}</div>${h > 40 ? `<div class="bs">${String(b.s[0]).padStart(2, "0")}:${String(b.s[1]).padStart(2, "0")}–${b.live ? "сейчас" : String(b.e[0]).padStart(2, "0") + ":" + String(b.e[1]).padStart(2, "0")} · ${b.sub}</div>` : ""}</div><div class="bd"${b.live ? ' style="color:var(--warn)"' : ""}>${b.dur}</div>`;
+    return `<div class="${cls}" style="${style}">${inner}</div>`;
+  }).join("");
+  const branch = `<div class="blk" style="position:absolute;top:${y(16, 50)}px;height:${y(17, 21) - y(16, 50) - 4}px;left:50%;right:0;--c:var(--c-rest)"><div class="bt">Музыка · параллельно</div><div class="bd">1:31</div></div>`;
+  return `<div class="frame ${d} ${theme} d-root">
+  <aside class="sb">
+    <div class="sb-top">${logo(24)}<span class="sb-name">Pace</span><span class="sb-user">Альберт</span></div>
+    <div class="newtask">${ic("plus", 18, 2)}Новая задача<kbd>N</kbd></div>
+    <nav class="nav">
+      <div class="nv">${ic("zap", 18)}Сейчас</div><div class="nv on">${ic("clock", 18)}День</div><div class="nv">${ic("cal", 18)}Календарь</div>
+      <div class="nv">${ic("inbox", 18)}Входящие<span class="cnt num">3</span></div><div class="nv">${ic("folder", 18)}Проекты</div>
+      <div class="nv">${ic("chart", 18)}Аналитика</div><div class="nv">${ic("hist", 18)}История</div><div class="nv">${ic("gear", 18)}Настройки</div>
+    </nav>
+  </aside>
+  <section class="main">
+    <div class="mh"><div><div class="mt">День</div><div class="ms">Воскресенье, 1 ноября</div></div>
+      <div class="datenav"><span class="iconbtn">${ic("left", 18)}</span><span class="iconbtn">${ic("cal", 18)}</span><span class="iconbtn" style="opacity:.4">${ic("right", 18)}</span></div></div>
+    <div class="sum"><div class="sum-line"><span><b class="num">9 ч 41 м</b> учтено</span><span><b class="num">2 ч 10 м</b> без записи</span><span class="num">Сон 7 ч 50 м</span></div>
+      <div class="stack"><i style="flex:3;background:var(--c-study)"></i><i style="flex:1.67;background:var(--c-task)"></i><i style="flex:1.5;background:var(--c-chores)"></i><i style="flex:.83;background:var(--c-food)"></i><i style="flex:2.02;background:var(--c-other)"></i><i style="flex:2.17;background:var(--fill2)"></i></div>
+      <div class="sum-line num" style="font-size:12px;gap:14px"><span>Учёба 3 ч</span><span>Задачи 1 ч 40 м</span><span>Рутина 1 ч 30 м</span><span>Еда 50 м</span><span>Другое 2 ч 01 м</span></div></div>
+    <div class="tl" style="height:${y(17, 40)}px">
+      <div style="position:relative">${hours}</div>
+      <div class="tl-canvas" style="position:relative">${bl}${branch}</div>
+      ${d === "C" ? '<div class="tl-ruler"></div>' : ""}
+      <div class="nowline" style="top:${nowY}px"><span class="num">17:21</span></div>
+    </div>
+  </section>
+  <aside class="pane">
+    <div class="pk">Задача · фокус</div>
+    <div class="pt">ДЗ по алгебре: №№ 290, 292</div>
+    <dl class="kv"><dt>Время</dt><dd>14:20–16:00 · 1 ч 40 м</dd><dt>Задача</dt><dd style="color:var(--accentText);font-weight:550">Открыть задачу</dd><dt>Проект</dt><dd>${tag("Алгебра", "p-alg")}</dd><dt>Записано</dt><dd>кнопкой «Фокус»</dd></dl>
+    <div class="apps"><h3 style="color:var(--l2);font-size:13px;margin:0">Где я сидел</h3>
+      <div class="app"><span>Chrome</span><span class="num">52 м</span><div class="ab"><i style="width:52%"></i></div></div>
+      <div class="app"><span>Telegram</span><span class="num">18 м</span><div class="ab"><i style="width:18%"></i></div></div>
+      <div class="app"><span>VS Code</span><span class="num">12 м</span><div class="ab"><i style="width:12%"></i></div></div></div>
+    <div class="pbtns"><span class="btn tonal">${ic("pencil", 15)}Изменить</span><span class="btn tonal" style="color:var(--warn)">Удалить</span></div>
+  </aside></div>`;
+}
+
+const DIRS = [
+  { id: "A", kind: "Assigned direction", name: "Тетрадь — ink and margin",
+    thesis: "The squared school notebook every Russian student fills: cool paper, ballpoint-blue ink, a red margin rule. One cool accent (ink blue) does every interactive job; red is never decoration, only the now-line and what is overdue. Quiet surfaces, calm density, Apple-grade grouped lists.",
+    move: "Day sits on a faint 4-pt dot grid (the notebook's cells, only behind the timeline) with a red now-line; a checked task is struck through in ink before it leaves the list; the running activity is an ink line with a red mark at its expected length.",
+    accent: "Single cool accent: ink blue #2E4AD6 / #7D93FF. Status red for now and overdue only.",
+    risk: "Blue-on-white is the most familiar accent in productivity apps; it reads calm and Apple-like but leans on the margin details for identity. The logo leaves lime for ink blue.",
+    sw: [["#F4F5F9", "ground"], ["#FFFFFF", "cell"], ["#12141C", "ink"], ["#2E4AD6", "accent"], ["#D33A30", "margin"], ["#0D0F15", "dark"], ["#7D93FF", "accent dk"]] },
+  { id: "B", kind: "Impeccable's pick", name: "Линии — metro lines",
+    thesis: "The Moscow Metro map the owner reads twice a day: every category and project is a line with its own colour, set as quiet tinted fills and short coloured strokes on a warm neutral ground. Two tones carry the shell: neutral surfaces plus a deep green for actions (the logo's green, grown up).",
+    move: "Day is drawn as a metro line: each block a coloured segment with a station ring at its start, gaps a dashed line «без записи», a parallel activity a branch line. Tags carry their line dot. The running activity is a train on its segment.",
+    accent: "Two-tone: deep green #0E7A45 / #3DBE78 for actions, plus a hue family (line colours) as tinted fills with per-theme ink.",
+    risk: "The most colour of the three: it needs strict discipline (colour only for category and state) or it gets busy on Week and Insights. The familiar part is the line itself; it can read as a transit costume if pushed further.",
+    sw: [["#F1F1EE", "ground"], ["#FFFFFF", "cell"], ["#151615", "ink"], ["#0E7A45", "action"], ["#0072BA", "line"], ["#8E2A9E", "line"], ["#ED9121", "line"]] },
+  { id: "C", kind: "Grounded alternate", name: "Хронограф — graphite and lume",
+    thesis: "A watch dial at night: graphite and brushed-steel greys, lume chartreuse only where something runs or must be pressed. Keeps the owner's lime, but as a small, precise light instead of a band: primary action fill, the running timer, the now-line. Dense, numeric, dark-first.",
+    move: "The running activity reads on a minute track: ticks, a bezel mark at the expected length, a needle that turns amber past it. Day's hour ruler is a tick scale; durations read like a chronograph (2:01).",
+    accent: "Single warm accent: lume #C6EE45 (fill with dark text), ink #4A6900 for text on light.",
+    risk: "Closest to the incumbent (dark, dense, lime), so it risks reading as a polish of the old look. Lime on light surfaces is weak as text and must stay a fill.",
+    sw: [["#0B0C0C", "ground"], ["#151716", "cell"], ["#EEF0EA", "ink"], ["#C6EE45", "lume"], ["#F2A33A", "overrun"], ["#F3F4F1", "light"], ["#4A6900", "lume ink"]] },
+];
+
+const root = document.getElementById("dirs");
+root.style.display = "grid"; root.style.gap = "40px";
+for (const d of DIRS) {
+  const el = document.createElement("section");
+  el.className = "dir";
+  el.setAttribute("aria-labelledby", `h-${d.id}`);
+  el.innerHTML = `<div class="dir-head"><span class="tag">${d.kind}</span><h2 id="h-${d.id}">${d.name}</h2><p style="color:var(--ink2)">${d.thesis}</p></div>
+  <div class="facts">
+    <div class="fact"><h3>Signature detail</h3><p>${d.move}</p></div>
+    <div class="fact"><h3>Accent strategy</h3><p>${d.accent}</p></div>
+    <div class="fact"><h3>Honest risk</h3><p>${d.risk}</p></div>
+    <div class="fact"><h3>Palette</h3><div class="swatches">${d.sw.map(([c, n]) => `<span class="sw"><i style="background:${c}"></i>${n}<br>${c}</span>`).join("")}</div></div>
+  </div>
+  <div class="frames">
+    <figure class="phone"><div class="scaler">${phone(d.id, "dark")}</div><figcaption>Now · phone 390 × 844 · dark</figcaption></figure>
+    <figure class="phone"><div class="scaler">${phone(d.id, "light")}</div><figcaption>Now · phone 390 × 844 · light</figcaption></figure>
+    <figure class="desk"><div class="scaler">${desk(d.id, "light")}</div><figcaption>Day · desktop 1440 × 900 · light (detail pane on the right)</figcaption></figure>
+  </div>`;
+  root.appendChild(el);
+}
+
+const OTHERS = [
+  ["Canon — Apple Reminders/Calendar, played straight", "System grouped lists, system-blue tint, SF-like metrics with Inter. Always available; the craft bar is Reminders + Things 3. Choose it if you want no Pace-specific world at all."],
+  ["Declined · design annual plate section", "Kept: one grotesque does every job; hairlines carry the grid. Folded into all three (Inter only, one hairline weight)."],
+  ["Declined · darkroom exposure record", "Kept: state shown without colour — overlapping activities on Day get a hatch, not a red block."],
+  ["Declined · star atlas", "Kept: a fixed ramp encodes rank — importance as one ramp of weight, never ad-hoc colour."],
+  ["Declined · factory catalog sleeve", "Kept: nothing labelled twice — a tag that repeats the section it sits in is removed."],
+  ["Declined · character goods catalog", "Kept: a finite roster with fixed furniture — the four time-bar buttons never move or resize."],
+  ["Declined · zoo guide map, monochrome product marketing", "Kept: one accent, used a handful of times per screen; the rest is the neutral scale."],
+];
+document.getElementById("others").innerHTML = OTHERS.map(([t, p]) => `<div class="mini"><b>${t}</b><span>${p}</span></div>`).join("");
+
+const fit = () => document.querySelectorAll(".scaler").forEach((s) => {
+  const f = s.firstElementChild; const w = f.offsetWidth; f.style.transform = `scale(${s.clientWidth / w})`;
+});
+new ResizeObserver(fit).observe(document.body); fit();
+</script>

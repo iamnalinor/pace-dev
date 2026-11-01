@@ -1,0 +1,375 @@
+[
+  {
+    "file": "routes/now--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/now-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/day--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/week--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/inbox--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/more--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/add--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/add-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/add-2--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/add-3--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/projects--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/project--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/presets--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/preset--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/preset-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/preset-2--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/task-open--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/task-done--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/task-repeating--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/decisions--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/review--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/history--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/history-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/history-2--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/history-3--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/insights--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/insights-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/notifications--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/settings--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/settings-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/settings-2--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/settings-3--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/permissions--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/onboarding--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/oauth-authorize--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/app-auth--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/app-login--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/auth--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/auth-telegram--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "scroll/auth-telegram-1--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "routes/not-found--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/now--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/day--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/week--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/inbox--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/projects--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/presets--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/insights--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/history--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/notifications--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/decisions--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/review--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "empty/settings--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/login--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/app-login--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/app-auth--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/auth--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/oauth-authorize--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/not-found--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "signed-out/login-server-picker--phone-light-en.png",
+    "note": "Android only: not on the web build",
+    "ok": false
+  },
+  {
+    "file": "states/now-composer-typed--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-composer-form--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-assistant-preview--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-assistant-question--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-in-future--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-calendar-tooltip--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/notifications-feed--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-gap-log--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-block-edit--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-log-past--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-pick-date--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/day-previous--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-chores-picker--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-rest-picker--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-task-picker--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-typed-preview--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/time-typed-draft--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/week-event--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-edit-sheet--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-close-as--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-project-picker--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-original-message--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/task-delete-confirm--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/projects-new--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-add-computer--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-connect-ai--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-wipe--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-sessions-loading--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/settings-sessions-error--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/offline--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/toast-to-inbox--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-check-dissolve--phone-light-en.png",
+    "ok": true
+  },
+  {
+    "file": "states/now-check-toast--phone-light-en.png",
+    "ok": true
+  }
+]
