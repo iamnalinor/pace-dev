@@ -1,40 +1,36 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  endpoints,
-  formatInZone,
-  isAutoSleepId,
-  newId,
-  sleepNightOf,
-  wallClockInstant,
-} from "@pace/core";
+import { endpoints, isAutoSleepId, newId, sleepNightOf, wallClockInstant } from "@pace/core";
 
-import { nextSleepCheckAt } from "../src/user-store/alarm.ts";
 import { SLEEP_NEXT_AT_KEY } from "../src/user-store/sleep-pass.ts";
 import { answerOf, call, json, loginAsDev, nonceLogin, pushEvents } from "./helpers.ts";
 
 const MOSCOW = "Europe/Moscow";
-const DAY_MS = 86_400_000;
-
-const dayAfter = (date: string, days = 1): string =>
-  new Date(Date.parse(`${date}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10);
+/** The night the fixtures use (Moscow: its evening and the next day), and 15:00 that next day. */
+const NIGHT = "2099-10-07";
+const NEXT_DAY = "2099-10-08";
+const AFTERNOON = wallClockInstant(NEXT_DAY, "15:00", MOSCOW);
 
 /**
-The latest Moscow night whose morning (09:30) is over: the store decides at the real clock, so
-the fixtures are last night's, always within the 36 hours a pass reads.
+The store's clock, frozen at `AFTERNOON` (only `Date` is faked, inside the Worker too). It lies far
+ahead of the real clock, which workerd's own alarm scheduler keeps: an alarm the store arms is never
+due for the runtime, so it runs only when a test fires it, never on its own alongside (a race that
+left the alarm unset mid-pass, bug-lessons 2026-11-01).
 */
-const NIGHT = ((): string => {
-  const now = new Date().toISOString();
-  const today = formatInZone(now, MOSCOW, "yyyy-MM-dd");
-  const yesterday = dayAfter(today, -1);
-  return wallClockInstant(today, "09:30", MOSCOW) <= now ? yesterday : dayAfter(today, -2);
-})();
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(AFTERNOON));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /** A Moscow wall-clock time in that night: `23:40` is its evening, `07:10` the next morning. */
 const at = (hhmm: string): string =>
-  wallClockInstant(Number(hhmm.slice(0, 2)) >= 12 ? NIGHT : dayAfter(NIGHT), hhmm, MOSCOW);
+  wallClockInstant(Number(hhmm.slice(0, 2)) >= 12 ? NIGHT : NEXT_DAY, hhmm, MOSCOW);
 
 type Raw = Record<string, unknown>;
 
@@ -103,15 +99,22 @@ const sleepDecisions = async (token: string) =>
     .filter((decision) => decision.kind === "sleep")
     .toReversed();
 
-/** Sleep's next look is due now, with the alarm set to fire for it (as the runtime would). */
-const sleepDueNow = async (store: Awaited<ReturnType<typeof storeOf>>): Promise<void> => {
+type Store = Awaited<ReturnType<typeof storeOf>>;
+
+/** Sleep's next look is due now (the store's clock), with the alarm set for it. */
+const sleepDueNow = async (store: Store): Promise<void> => {
   await runInDurableObject(store, async (_instance, state) => {
-    await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now() - 1000);
-    await state.storage.setAlarm(Date.now() - 1000);
+    await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now());
+    await state.storage.setAlarm(Date.now());
   });
 };
 
-const alarmOf = async (store: Awaited<ReturnType<typeof storeOf>>) =>
+/** Fires the store's alarm, which must be set: one that is not means a test lost track of it. */
+const fireAlarm = async (store: Store): Promise<void> => {
+  expect(await runDurableObjectAlarm(store)).toBe(true);
+};
+
+const alarmOf = async (store: Store) =>
   await runInDurableObject(store, async (_instance, state) => await state.storage.getAlarm());
 
 describe("automatic sleep on the server", () => {
@@ -160,8 +163,8 @@ describe("automatic sleep on the server", () => {
     const before = await sleepLog(token);
     await upload(phone, [["23:10", "23:40"]], "01:00");
     await upload(phone, [["07:10", "07:25"]], "07:25");
-    expect(await runDurableObjectAlarm(store)).toBe(true);
-    await runDurableObjectAlarm(store);
+    await fireAlarm(store);
+    await fireAlarm(store);
     expect(await sleepLog(token)).toEqual(before);
     expect(await sleepDecisions(token)).toHaveLength(2);
   });
@@ -203,7 +206,7 @@ describe("automatic sleep on the server", () => {
     expect(stops[1]?.id).not.toBe(first?.id);
     expect(await sleeps(store)).toEqual([{ endAt: at("09:00"), startAt: at("23:40") }]);
     const settled = await sleepLog(token);
-    await runDurableObjectAlarm(store);
+    await fireAlarm(store);
     expect(await sleepLog(token)).toEqual(settled);
   });
 });
@@ -214,7 +217,6 @@ describe("the store's alarm for automatic sleep", () => {
     // waits on, so the alarm is sleep's own.
     const { phone, store } = await phoneAccount("1002", { digestWindows: [] });
     expect(await alarmOf(store)).toBeNull();
-    const before = new Date().toISOString();
     await upload(
       phone,
       [
@@ -223,20 +225,22 @@ describe("the store's alarm for automatic sleep", () => {
       ],
       "07:25",
     );
-    const after = new Date().toISOString();
-    const armed = (await alarmOf(store)) ?? 0;
-    expect(armed).toBeGreaterThanOrEqual(nextSleepCheckAt(before, MOSCOW));
-    expect(armed).toBeLessThanOrEqual(nextSleepCheckAt(after, MOSCOW));
+    // 15:00: the next look is at 21:00.
+    const evening = Date.parse(wallClockInstant(NEXT_DAY, "21:00", MOSCOW));
+    expect(await alarmOf(store)).toBe(evening);
     // An alarm before sleep's time (another wait's) runs no pass and leaves sleep's time armed.
-    await runDurableObjectAlarm(store);
-    expect(await alarmOf(store)).toBe(armed);
-    // At its own time the pass runs and arms the next look.
-    const fired = new Date().toISOString();
+    await fireAlarm(store);
+    expect(await alarmOf(store)).toBe(evening);
+    // At its own time, 23:50, the pass runs and arms the next look 15 minutes on.
+    const lateEvening = wallClockInstant(NEXT_DAY, "23:50", MOSCOW);
+    vi.setSystemTime(new Date(lateEvening));
     await sleepDueNow(store);
-    await runDurableObjectAlarm(store);
-    const again = (await alarmOf(store)) ?? 0;
-    expect(again).toBeGreaterThanOrEqual(nextSleepCheckAt(fired, MOSCOW));
-    expect(again).toBeLessThanOrEqual(nextSleepCheckAt(new Date().toISOString(), MOSCOW));
+    await fireAlarm(store);
+    expect(await alarmOf(store)).toBe(Date.parse(lateEvening) + 15 * 60_000);
+    // And again from that alarm: an alarm never leaves the store without its next look.
+    vi.setSystemTime(new Date(Date.parse(lateEvening) + 15 * 60_000));
+    await fireAlarm(store);
+    expect(await alarmOf(store)).toBe(Date.parse(lateEvening) + 30 * 60_000);
   });
 
   it("decides on a computer's late use at sleep's own alarm, not at its upload or another alarm", async () => {
@@ -256,11 +260,11 @@ describe("the store's alarm for automatic sleep", () => {
     const now = new Date().toISOString();
     const retryAt = new Date(Date.parse(now) + 2 * 60_000).toISOString();
     await store.enqueueParse({ channel: "api", retryAt, text: "купить хлеб" }, now);
-    await runDurableObjectAlarm(store);
+    await fireAlarm(store);
     expect(await sleepLog(token)).toHaveLength(1);
     // Sleep's own alarm decides on it.
     await sleepDueNow(store);
-    await runDurableObjectAlarm(store);
+    await fireAlarm(store);
     expect((await sleepLog(token)).map((event) => [event.type, event.occurredAt])).toEqual([
       ["activity.started", at("23:40")],
       ["activity.stopped", at("03:00")],
