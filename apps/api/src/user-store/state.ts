@@ -118,7 +118,11 @@ const idsOf = (events: readonly Event[], key: keyof Touched): ReadonlySet<string
       .map((entity) => entity[1]),
   );
 
-/** Corrections name no entity: they force a rebuild, which rewrites every row anyway. */
+/**
+The entities a batch in order touches, whose rows the incremental path rewrites. Corrections name
+none: they never take that path (`canApplyInOrder`), and the rebuild they force rewrites the rows
+that differ from the state before (`rewriteChanged`), or every row when the mark is not at it.
+*/
 export const touchedBy = (events: readonly Event[]): Touched => ({
   presetIds: idsOf(events, "presetIds"),
   projectIds: idsOf(events, "projectIds"),
