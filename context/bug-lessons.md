@@ -358,11 +358,6 @@ The same rule applies when a previously successful channel is no longer configur
 - **Bug.** After #45 every Deploy run (after CI and by hand) ended `action_required` with no job started, so the merge never reached production. The new step read all secrets at once (`toJSON(secrets)`) to find the `LLM_*_N` slots; GitHub holds such a run for approval.
 - **Missed because.** Workflows have no tests: the jq was simulated locally and the YAML parsed, but nothing runs a workflow before it is on `main`, and nobody checked what GitHub does with an expression over the whole secrets context.
 - **Rule.** Name every secret a workflow reads; never `toJSON(secrets)` or `toJSON(vars)`. A workflow change that touches secrets is tried on its branch with a harmless dispatchable workflow using the same pattern (here `llm-regression.yml`) before merging. `bun lint` runs `scripts/check-workflows.ts`, which refuses the whole-context expressions.
-### 49. Text a client chose shown as what the server saw
-- **Bug.** Review of the sign-in notices (phase C, Task 5): a deep-link nonce is minted by whoever asks for it, with any `deviceName`. Someone who gets a person to open their link would get a session on that person's account, and a notice that opened with "You signed in from Pixel 9a" would vouch for it in words the stranger chose.
-- **Missed because.** The notice was specified from the person's own logins, where the name is true; no test minted a nonce with a misleading or markup-laden name, and none asked which parts of the text the server observed and which the client claimed.
-- **Rule.** A message that asks for a security decision ("Not me") leads with what the server observed (the address and place Cloudflare reports, never forgeable by the client), then the name the client gave. Client text goes as plain text (no `parse_mode` anywhere, in one `messageBody`), and identity is never merged by a client-chosen id (`deviceId` only files usage). A part the server did not observe (no `CF-Connecting-IP` off Cloudflare's edge) is left out, not guessed. Test with a name full of markup and check it arrives literally.
-
 ### 47. A security notice the one it reports can reach
 - **Bug.** Review of the sign-in notices (Task 5): the session a notice reports had full scope, so right after signing in it could resolve or read its own notice, which deleted the Telegram message and dismissed the phone notification; Not me then answered "Seen" and ended nothing. The deep link's reply was also adopted in whatever chat `/start` came from, so in a group the address and place would have been edited into a group message.
 - **Missed because.** The tests answered the notice from the person's side only (Telegram, the feed of another session, Settings) and sent `/start` from a private chat only; none acted as the newly signed-in session or from a group.
@@ -379,6 +374,11 @@ The same rule applies when a previously successful channel is no longer configur
   - On 4401 the client stops reconnecting and checks its session (`me`), so a 401 signs it out.
   - Test: revoke from each path while a socket is open (`live.int.test.ts`: Settings, Not me, logout, expiry, forged headers).
   - Sweep: the live socket is the only channel that outlasts a request. MCP and the OAuth tokens are checked per request, and agent tokens cannot open a socket.
+
+### 49. Text a client chose shown as what the server saw
+- **Bug.** Review of the sign-in notices (phase C, Task 5): a deep-link nonce is minted by whoever asks for it, with any `deviceName`. Someone who gets a person to open their link would get a session on that person's account, and a notice that opened with "You signed in from Pixel 9a" would vouch for it in words the stranger chose.
+- **Missed because.** The notice was specified from the person's own logins, where the name is true; no test minted a nonce with a misleading or markup-laden name, and none asked which parts of the text the server observed and which the client claimed.
+- **Rule.** A message that asks for a security decision ("Not me") leads with what the server observed (the address and place Cloudflare reports, never forgeable by the client), then the name the client gave. Client text goes as plain text (no `parse_mode` anywhere, in one `messageBody`), and identity is never merged by a client-chosen id (`deviceId` only files usage). A part the server did not observe (no `CF-Connecting-IP` off Cloudflare's edge) is left out, not guessed. Test with a name full of markup and check it arrives literally.
 
 ## Log
 
