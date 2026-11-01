@@ -20,9 +20,19 @@ export type Theme = {
 
 const ThemeContext = createContext<null | Theme>(null);
 
-/** Resolves the device preference and defines the `--pace-*` variables on the root view. */
-export const ThemeProvider = ({ children }: { readonly children: ReactNode }) => {
-  const { preference, scheme, setPreference } = useThemePreference();
+/**
+Resolves the device preference and defines the `--pace-*` variables on the root view. `forced`
+draws a subtree in one scheme whatever the device says (the dev gallery's `theme` param).
+*/
+export const ThemeProvider = ({
+  children,
+  forced,
+}: {
+  readonly children: ReactNode;
+  readonly forced?: ThemeName;
+}) => {
+  const { preference, scheme: preferred, setPreference } = useThemePreference();
+  const scheme = forced ?? preferred;
   const theme = useMemo<Theme>(
     () => ({ palette: tokens[scheme], preference, scheme, setPreference }),
     [preference, scheme, setPreference],

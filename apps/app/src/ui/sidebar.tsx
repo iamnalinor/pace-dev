@@ -135,6 +135,25 @@ const SidebarLink = ({
   );
 };
 
+/** The mark, the name, the owner's avatar and first name (one line, cut), and the bell. */
+export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
+  const t = useT();
+  return (
+    <View className="mb-3 flex-row items-center gap-2 px-2">
+      <PaceMark size={22} />
+      <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
+      {owner === null ? null : <UserAvatar size={24} />}
+      <Text
+        className="min-w-0 flex-1 text-right font-sans text-[13px] text-muted"
+        numberOfLines={1}
+      >
+        {owner ?? ""}
+      </Text>
+      <NotificationBell variant="plain" />
+    </View>
+  );
+};
+
 /**
 The wide window's navigation, beside every signed-in screen (pushed ones included): it
 navigates by path, so a destination already open is shown again rather than stacked twice.
@@ -162,18 +181,7 @@ export const Sidebar = () => {
       className="w-56 gap-1 border-r border-line bg-bg px-3 pb-4 pt-5"
       role="navigation"
     >
-      <View className="mb-3 flex-row items-center gap-2 px-2">
-        <PaceMark size={22} />
-        <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
-        {owner === null ? null : <UserAvatar size={24} />}
-        <Text
-          className="min-w-0 flex-1 text-right font-sans text-[13px] text-muted"
-          numberOfLines={1}
-        >
-          {owner ?? ""}
-        </Text>
-        <NotificationBell variant="plain" />
-      </View>
+      <SidebarHeader owner={owner} />
       <Pressable
         accessibilityLabel={t("nav.newTask")}
         accessibilityRole="button"

@@ -61,7 +61,7 @@ A block of the day: "14:06 – 14:40" (or "– now" while it runs), the category
 label when it says more than the tag, then the duration against its Expect or Limit and a
 pencil. The whole row opens the edit sheet; its task is linked on the line under it.
 */
-const ActivityRow = ({
+export const ActivityRow = ({
   onEdit,
   row,
   satRows,

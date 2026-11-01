@@ -160,7 +160,7 @@ const deliveryLines = (
       ]),
 ];
 
-const Item = ({
+export const Item = ({
   asking,
   deliveries,
   item,
