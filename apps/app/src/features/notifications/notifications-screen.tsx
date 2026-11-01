@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { DeliveryEntry } from "@pace/client";
@@ -9,39 +9,23 @@ import { clockTime } from "#app/format/time.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { useSessions } from "@pace/client/react";
 import {
-  type Answer,
-  ANSWERS,
   formatLeft,
   formatRelativeDay,
-  isOwnSignIn,
   type Language,
   minutesBetween,
   type PoolNotification,
 } from "@pace/core";
+
+import { Answers, Line } from "./answers.tsx";
 
 type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
 
 /** `Fri 18:00` in the zone and language. */
 const dayClock = (iso: string, { language, zone }: Zoned): string =>
   `${new Intl.DateTimeFormat(language, { timeZone: zone, weekday: "short" }).format(new Date(iso))} ${clockTime(iso, zone)}`;
-
-const Line = ({
-  children,
-  tone = "fg",
-}: {
-  readonly children: string;
-  readonly tone?: "fg" | "muted";
-}) => (
-  <Text
-    className={tone === "fg" ? "font-sans text-[15px] text-fg" : "font-sans text-[13px] text-muted"}
-  >
-    {children}
-  </Text>
-);
 
 /** What the notification says, per kind. */
 const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned: Zoned }) => {
@@ -117,65 +101,6 @@ const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned
       return <Line>{t("notifications.overrun", { label: item.payload.label })}</Line>;
     }
   }
-};
-
-/** Not me ends a session for good: the warning look, never the accent; else the first leads. */
-const answerVariant = (answer: Answer, index: number): "danger" | "primary" | "secondary" => {
-  if (answer === "revoked") {
-    return "danger";
-  }
-  return index === 0 ? "primary" : "secondary";
-};
-
-/**
-The answer buttons of an open notification; the answer stays pending until the server has it.
-None on this session's own sign-in: only the person's other devices answer it (`isOwnSignIn`).
-*/
-const Answers = ({
-  item,
-  ownSessionId,
-}: {
-  readonly item: PoolNotification;
-  readonly ownSessionId: string | undefined;
-}) => {
-  const t = useT();
-  const { feed } = useFeed();
-  const [pending, setPending] = useState<Answer | null>(null);
-  const [hasFailed, setHasFailed] = useState(false);
-  if (item.resolution !== null) {
-    return <Line tone="muted">{t(`notify.resolved.${item.resolution}`)}</Line>;
-  }
-  const answers: readonly Answer[] = ANSWERS[item.kind];
-  if (answers.length === 0 || isOwnSignIn(item, ownSessionId)) {
-    return null;
-  }
-  return (
-    <View className="gap-1.5">
-      <View className="flex-row flex-wrap gap-2">
-        {answers.map((answer, index) => (
-          <Button
-            busy={pending === answer}
-            disabled={pending !== null}
-            key={answer}
-            onPress={() => {
-              setPending(answer);
-              setHasFailed(false);
-              void (async () => {
-                const isDone = await feed.resolve(item.id, answer);
-                // Released once the store has the answer (or it was refused), never before.
-                setPending(null);
-                setHasFailed(!isDone);
-              })();
-            }}
-            variant={answerVariant(answer, index)}
-          >
-            {t(`notify.action.${answer}`)}
-          </Button>
-        ))}
-      </View>
-      {hasFailed ? <Line tone="muted">{t("notifications.failedAction")}</Line> : null}
-    </View>
-  );
 };
 
 /** How it went out: to a device through its push method, or the Telegram copy. */

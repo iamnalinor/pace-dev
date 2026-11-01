@@ -236,6 +236,30 @@ test("this session's own sign-in notice is read here: the bell clears, the feed 
   await expect(page.getByRole("button", { name: "Notifications", exact: true })).toBeVisible();
 });
 
+for (const size of [
+  { height: 844, name: "phone", width: 390 },
+  { height: 900, name: "desktop", width: 1440 },
+] as const) {
+  test(`an answer keeps focus in the feed, ${size.name} (QA round 16 M1, bug class 5)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: size.height, width: size.width });
+    const { token } = await loginViaApi(page);
+    await settle(token, "en");
+    await servePool(page);
+    await page.goto("/notifications");
+    // By keyboard: the answered button is replaced by its status, which takes the focus.
+    const notMe = page.getByRole("button", { name: "Not me — end this session" });
+    await notMe.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(":focus")).toHaveText("Session ended");
+    // By mouse the same, and the next answer's status takes it in turn.
+    await page.getByRole("button", { name: "Stop" }).click();
+    await expect(page.locator(":focus")).toHaveText("Stopped");
+    await expectNoA11yViolations(page);
+  });
+}
+
 test("a switch takes keyboard focus visibly and is a 24 px target", async ({ page }) => {
   await page.setViewportSize({ height: 800, width: 1280 });
   await loginViaApi(page);
