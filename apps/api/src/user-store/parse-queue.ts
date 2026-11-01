@@ -329,11 +329,23 @@ const drainItem = async (
   return null;
 };
 
-/** Reads every due text of the queue once; what is still out of reach stays for the next alarm. */
+/** Whether a text is due now; before the first is, the queue's time is armed again. */
+const hasDue = async (deps: DrainDeps, queue: readonly QueuedParse[]): Promise<boolean> => {
+  const due = queueDueAt(queue, deps.now);
+  if (due !== null && due > deps.now) {
+    await armForQueue(deps.storage, deps.now);
+  }
+  return due !== null && due <= deps.now;
+};
+
+/**
+Reads every due text of the queue once; what is still out of reach stays for the next alarm. An
+alarm before the first text is due (another wait's) arms the queue's time again and loads nothing.
+*/
 export const drainQueue = async (deps: DrainDeps): Promise<void> => {
   const queue = await queueOf(deps.storage);
   const config = loadConfig(deps.env);
-  if (queue.length === 0 || !config.ok) {
+  if (!config.ok || !(await hasDue(deps, queue))) {
     return;
   }
   await deps.store.derive(deps.now);

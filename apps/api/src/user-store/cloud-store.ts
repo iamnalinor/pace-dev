@@ -6,7 +6,7 @@ import type * as schema from "./schema.ts";
 
 import { createLogger } from "../shared/logger.ts";
 import * as cloud from "./cloud-data.ts";
-import { saveRuledSeries } from "./notification-pool.ts";
+import { didSaveRuledSeries } from "./notification-pool.ts";
 import { PoolStore } from "./pool-store.ts";
 
 /**
@@ -22,14 +22,17 @@ export abstract class CloudStore extends PoolStore {
 
   /**
   A phone's calendar over a range, replacing what that phone sent for it before, with the series
-  it answers "every time" for (never announced as they start).
+  it answers "every time" for (never announced as they start). The pool looks again only when
+  something changed: the same copy again (every background run sends it) loads no log.
   */
   async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
-    const stored = await cloud.replaceCalendar(this.db, upload);
-    if (upload.ruledSeries !== undefined) {
-      await saveRuledSeries(this.ctx.storage, upload.ruledSeries);
+    const { isChanged, stored } = await cloud.replaceCalendar(this.db, upload);
+    const isRuled =
+      upload.ruledSeries !== undefined &&
+      (await didSaveRuledSeries(this.ctx.storage, upload.ruledSeries));
+    if (isChanged || isRuled) {
+      await this.pool.afterWrite(now);
     }
-    await this.pool.afterWrite(now);
     return stored;
   }
 

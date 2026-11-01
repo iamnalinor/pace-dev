@@ -198,6 +198,60 @@ describe("projections", () => {
     });
     expect((await stub.read(NOW)).state.tasks.byId[taskId]?.importance).toBe("asap");
   });
+  it("rewrites only the rows an out-of-order write changes", async () => {
+    const first = newId();
+    const second = newId();
+    const third = newId();
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      await instance.append(
+        [first, second, third].map((id) => taskCreated(id)),
+        { now: NOW },
+      );
+      await instance.append(
+        [
+          envelope(
+            "task.importance.set",
+            { importance: "asap", taskId: first },
+            { occurredAt: SOLVED_AT },
+          ),
+        ],
+        { now: NOW },
+      );
+      // Recorded now, happened earlier: the log is rematerialized.
+      const activity = envelope(
+        "activity.started",
+        { activityId: newId(), category: "rest", label: "Sleep" },
+        { occurredAt: EARLIER },
+      );
+      const onActivity = meterSql(state.storage);
+      await instance.append([activity], { now: NOW });
+      expect(onActivity.cost().projectionRows).toBe(0);
+      const onTask = meterSql(state.storage);
+      const earlier = envelope(
+        "task.importance.set",
+        { importance: "nice_to_have", taskId: second },
+        { occurredAt: "2026-10-07T09:30:00.000Z" },
+      );
+      await instance.append([earlier], { now: NOW });
+      const deleted = onTask.cost();
+      const rows = async () => ({
+        subtasks: (await instance.db.select().from(schema.subtasks)).toSorted((a, b) =>
+          byText(a.id + a.taskId, b.id + b.taskId),
+        ),
+        tasks: (await instance.db.select().from(schema.tasks)).toSorted((a, b) =>
+          byText(a.id, b.id),
+        ),
+      });
+      const kept = await rows();
+      expect(kept.tasks.find((task) => task.id === second)?.importance).toBe("nice_to_have");
+      // The same rows as every row written from scratch (a deploy's first start).
+      const all = meterSql(state.storage);
+      await new UserStore(state, { ...env, PACE_VERSION: "v-next" }).querySql("SELECT 1");
+      expect(await rows()).toEqual(kept);
+      // Its task and its two problems, deleted and written again: none of the others.
+      expect(deleted.projectionRows).toBeLessThan(all.cost().projectionRows / 2);
+    });
+  });
 });
 
 describe("derive", () => {

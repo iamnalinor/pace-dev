@@ -135,6 +135,8 @@ High-volume phone facts (the calendar copy, app usage) are **not** events. They 
 their own tables in the Durable Object (`calendar_events`, `usage_sessions`, and `phone_uses`:
 when a phone was really in use, which automatic sleep reads instead of its app sessions),
 replaced or added per device through the cloud routes; only derived decisions become events.
+A phone sends its calendar copy with every background run, mostly unchanged, so the store writes
+only the rows that differ and the pool looks again only when a row or the ruled series changed.
 Each usage upload also records how far that device's usage is known (storage key
 `usage:known:<deviceId>`: the phone's `until`, or the arrival of a computer's upload).
 
@@ -337,12 +339,20 @@ notification pool (`notifications`, its delivery log `notification_deliveries`, 
 `meta` (cursors, budgets) and the projections `tasks`, `subtasks`, `projects`, `presets`
 (the materialized state as SQL rows for SQL readers; never the source of truth).
 
-The object keeps core's `CoreState` materialized in memory (`user-store/state.ts`), tagged
+The object keeps core's `CoreState` materialized in memory (`user-store/state-cache.ts`), tagged
 with the log `seq` it was built at; a cache behind the log is rebuilt. A batch that is in
 order (nothing before the last applied `occurredAt`, no correction: core's
 `shouldRematerialize`) is folded incrementally and only the rows it touched are rewritten
 (a preset change rewrites every task row, since it moves their derived columns); anything
-else rebuilds the state and every projection row (`user-store/projections.ts`). After every
+else rebuilds the state and rewrites the projection rows that differ from the state before
+(`user-store/projections.ts`). Production evicts an instance idle for a minute or two, so most
+alarms and uploads at night start with nothing in memory. The projection rows therefore carry a
+mark (key `projections:mark`: the log `seq`, the build that wrote them, as `PACE_VERSION` plus
+the newest DO migration, and the state's zone), written after them: a cold rebuild at the marked
+`seq` and build loads the log but writes no row, and a deploy or a write cut short rewrites every
+row once. Automatic sleep reads the zone from the mark while it is current, without loading the
+log. The log as last loaded is kept in step with what goes in, so a pass that reads it and then
+writes, or a write out of order, does not load it again. After every
 append (a client's sync push, an `apply`) and before every read and every `apply`,
 `derive(now)` appends the system events the state calls for: this week's homework instances, the automatic
 `cancelled_missed` / `skipped` outcomes, then the next instance of a course left with none open
@@ -386,7 +396,11 @@ minutes, a possible wake-up's 90), or, by day (noon to 21:00), when everything i
 decided for good and only new use came after what it knew. A quiet night with an upload or an
 alarm every 15 minutes therefore reads the log when the night opens and when the morning's first
 use ends it, and otherwise only when the person records something or a late upload lands in the
-window (`sleep-pass.test.ts` counts the reads over such a night). The usage reads go through end indexes
+window (`sleep-pass.test.ts` counts the reads over such a night). That holds on a cold instance
+too, the normal case at night: the zone comes from the projection mark, and the alarm's other
+waits pass only at their own time (below). `night-cost.int.test.ts` runs a night of uploads and
+alarms on a new instance each time and counts the log loads (the pool's two digest passes and
+sleep's passes that can decide something, one load each) and the projection rows written (none). The usage reads go through end indexes
 (`phone_uses_end_idx`, `usage_sessions_end_idx`, `calendar_events_end_idx`), so a pass, the pool's
 calendar read and the usage list read the rows of their window, never all history (nothing is
 pruned: the owner keeps the data). Without a phone upload within a day nothing new is decided
@@ -402,8 +416,12 @@ which only ever moves it earlier, so none postpones another's earlier time. `ala
 pool, the queue and sleep (a failure in one does not hold the others back; the pool's or the
 queue's fails the alarm afterwards, so the runtime retries it, while sleep's is logged and looked at
 again later, from 15 minutes up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
-Sleep keeps its own time (`sleep:next-at`): it runs a pass only once that has come, and before
-that arms it again. It looks every 15 minutes from 21:00 to noon in the person's zone and at the
+Each wait keeps its own time and reads nothing before it has come: the pool's (`pool:next-at`,
+the earliest pass any write, retry or pass asked for; a pass takes it and whatever asks during the
+pass arms it again; a failed pass leaves it due for the alarm's retry; a store from before the key
+passes at its next alarm), the queue's (its earliest text) and sleep's (`sleep:next-at`); before
+that each arms its time again. A pool pass loads the log on a cold instance, so it runs at its
+digest slots, event starts and retries, never at sleep's looks. It looks every 15 minutes from 21:00 to noon in the person's zone and at the
 next 21:00 by day (`nextSleepCheckAt`).
 
 **The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone

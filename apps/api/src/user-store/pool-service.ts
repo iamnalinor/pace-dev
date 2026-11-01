@@ -20,7 +20,6 @@ import type * as schema from "./schema.ts";
 
 import { createLogger } from "../shared/logger.ts";
 import { pushConfigOf } from "../shared/push/registry.ts";
-import { armEarliest } from "./alarm.ts";
 import * as cloud from "./cloud-data.ts";
 import * as deliveries from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
@@ -36,7 +35,7 @@ import {
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
 import { answerInputs, answerRefusal, applyAnswer } from "./pool-answers.ts";
-import { armRetry, scheduleNextPass } from "./pool-retry-alarm.ts";
+import { armPass, armRetry, scheduleNextPass, takingPoolTime } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
 import { type Materialized, prepareBatch } from "./state.ts";
@@ -57,6 +56,12 @@ export type PoolHost = {
   readonly insert: (events: readonly Event[]) => Promise<readonly Event[]>;
   readonly derive: (now: string) => Promise<unknown>;
   readonly chatId: () => Promise<string | undefined>;
+};
+
+/** What a pass of the pool added, and when it passes next. */
+export type PoolRun = {
+  readonly created: readonly PoolNotification[];
+  readonly nextAt: null | string;
 };
 
 /** How an answer is given; `couriers` replaces the configured channels (tests). */
@@ -212,6 +217,30 @@ export class NotificationPool {
     }
   }
 
+  /** The pass itself (see `run`). */
+  async #run(now: string, couriers?: Couriers): Promise<PoolRun> {
+    const { storage } = this.#host.ctx;
+    await this.#host.derive(now);
+    const pass = await this.#pass(now);
+    const created: PoolNotification[] = [];
+    for (const item of pass.created) {
+      const added = await this.notify(item, now, { couriers });
+      if (added.ok) {
+        created.push(added.value);
+      } else {
+        createLogger("info").error("A notification broke its contract", { kind: item.kind });
+      }
+    }
+    // Remembered once all of it is in the pool: a pass cut short is planned again next time, and
+    // what it added already is found by its subject, not added or sent twice.
+    await savePoolMemory(storage, pass.memory);
+    for (const settled of pass.settled) {
+      await this.#settle(settled.id, settled.resolution, { couriers, now, origin: "system" });
+    }
+    const isRetry = await this.#retryPending(now, couriers);
+    await scheduleNextPass(storage, { now, nextAt: pass.nextAt, isRetry });
+    return { created, nextAt: pass.nextAt };
+  }
   /**
   After a write: notifications it settled (an event attended from Now's offer, an activity
   stopped) are taken back at once everywhere, and the alarm moves earlier if the pool now has
@@ -224,7 +253,7 @@ export class NotificationPool {
     }
     const at = pass.created.length > 0 ? now : pass.nextAt;
     if (at !== null) {
-      await armEarliest(this.#host.ctx.storage, Date.parse(at));
+      await armPass(this.#host.ctx.storage, at);
     }
   }
 
@@ -331,32 +360,12 @@ export class NotificationPool {
 
   /**
   One pass of the pool (see `poolPass`): adds and delivers what is due, takes back what settled,
-  and arms the alarm for the next pass.
+  and arms the alarm for the next pass (see `takingPoolTime`).
   */
-  async run(
-    now: string,
-    couriers?: Couriers,
-  ): Promise<{ readonly created: readonly PoolNotification[]; readonly nextAt: null | string }> {
-    const { storage } = this.#host.ctx;
-    await this.#host.derive(now);
-    const pass = await this.#pass(now);
-    const created: PoolNotification[] = [];
-    for (const item of pass.created) {
-      const added = await this.notify(item, now, { couriers });
-      if (added.ok) {
-        created.push(added.value);
-      } else {
-        createLogger("info").error("A notification broke its contract", { kind: item.kind });
-      }
-    }
-    // Remembered once all of it is in the pool: a pass cut short is planned again next time, and
-    // what it added already is found by its subject, not added or sent twice.
-    await savePoolMemory(storage, pass.memory);
-    for (const settled of pass.settled) {
-      await this.#settle(settled.id, settled.resolution, { couriers, now, origin: "system" });
-    }
-    const isRetry = await this.#retryPending(now, couriers);
-    await scheduleNextPass(storage, { now, nextAt: pass.nextAt, isRetry });
-    return { created, nextAt: pass.nextAt };
+  async run(now: string, couriers?: Couriers): Promise<PoolRun> {
+    return await takingPoolTime(this.#host.ctx.storage, {
+      now,
+      pass: async () => await this.#run(now, couriers),
+    });
   }
 }

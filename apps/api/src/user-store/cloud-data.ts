@@ -39,33 +39,85 @@ const calendarCopyOf = (deviceId: string, range: Range): SQL | undefined =>
     overlapping(schema.calendarEvents, range),
   );
 
-/** A phone's calendar over a range: its earlier copy of that range goes, the new one comes in. */
+type CalendarRow = typeof schema.calendarEvents.$inferSelect;
+
+const calendarRowOf = (deviceId: string, event: CalendarEvent): CalendarRow => ({
+  attendeeCount: event.attendeeCount ?? null,
+  calendarName: event.calendarName ?? null,
+  deviceId,
+  endAt: event.endAt,
+  eventId: event.id,
+  location: event.location ?? null,
+  notes: event.notes ?? null,
+  organizer: event.organizer ?? null,
+  series: event.series,
+  startAt: event.startAt,
+  title: event.title,
+  url: event.url ?? null,
+});
+
+/** A row's primary key (the device is the copy's own). */
+const calendarKeyOf = (row: CalendarRow): string => JSON.stringify([row.eventId, row.startAt]);
+
+/** Every column, in one order: equal text, equal row. */
+const calendarTextOf = (row: CalendarRow): string =>
+  JSON.stringify([
+    row.eventId,
+    row.startAt,
+    row.endAt,
+    row.title,
+    row.series,
+    row.location,
+    row.notes,
+    row.url,
+    row.calendarName,
+    row.organizer,
+    row.attendeeCount,
+  ]);
+
+/**
+A phone's calendar over a range: its earlier copy of that range goes, the new one comes in. The
+phone sends its copy with every background run (every 15 minutes or so), mostly unchanged, so only
+the rows that differ are deleted and written. Answers how many events came and whether any row
+changed.
+*/
 export const replaceCalendar = async (
   db: Db,
   { deviceId, events, from, to }: CalendarUpload,
-): Promise<number> => {
+): Promise<{ readonly stored: number; readonly isChanged: boolean }> => {
   const { calendarEvents } = schema;
-  await db.delete(calendarEvents).where(calendarCopyOf(deviceId, { from, to }));
+  const fresh = new Map<string, CalendarRow>();
   for (const event of events) {
-    await db
-      .insert(calendarEvents)
-      .values({
-        attendeeCount: event.attendeeCount ?? null,
-        calendarName: event.calendarName ?? null,
-        deviceId,
-        endAt: event.endAt,
-        eventId: event.id,
-        location: event.location ?? null,
-        notes: event.notes ?? null,
-        organizer: event.organizer ?? null,
-        series: event.series,
-        startAt: event.startAt,
-        title: event.title,
-        url: event.url ?? null,
-      })
-      .onConflictDoNothing();
+    const row = calendarRowOf(deviceId, event);
+    if (!fresh.has(calendarKeyOf(row))) {
+      fresh.set(calendarKeyOf(row), row);
+    }
   }
-  return events.length;
+  const kept = await db.select().from(calendarEvents).where(calendarCopyOf(deviceId, { from, to }));
+  const old = new Map(kept.map((row) => [calendarKeyOf(row), calendarTextOf(row)]));
+  const gone = kept.filter((row) => {
+    const now = fresh.get(calendarKeyOf(row));
+    return now === undefined || calendarTextOf(now) !== calendarTextOf(row);
+  });
+  const added = fresh
+    .values()
+    .filter((row) => old.get(calendarKeyOf(row)) !== calendarTextOf(row))
+    .toArray();
+  for (const row of gone) {
+    await db
+      .delete(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.deviceId, deviceId),
+          eq(calendarEvents.eventId, row.eventId),
+          eq(calendarEvents.startAt, row.startAt),
+        ),
+      );
+  }
+  for (const row of added) {
+    await db.insert(calendarEvents).values(row).onConflictDoNothing();
+  }
+  return { isChanged: gone.length > 0 || added.length > 0, stored: events.length };
 };
 
 /**

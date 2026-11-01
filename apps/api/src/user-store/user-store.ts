@@ -41,6 +41,7 @@ import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
 import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
+import { poolAtAlarm } from "./pool-retry-alarm.ts";
 import { NotificationPool } from "./pool-service.ts";
 import * as schema from "./schema.ts";
 import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
@@ -100,6 +101,9 @@ export class UserStore extends CloudStore {
   and from scratch otherwise.
   */
   async #insert(events: readonly Event[]): Promise<readonly Event[]> {
+    if (events.length === 0) {
+      return events;
+    }
     const before = await this.#state.current();
     const inserted = await log.insertNew(this.db, events, before.ids);
     if (inserted.length > 0) {
@@ -269,7 +273,7 @@ export class UserStore extends CloudStore {
           }
           return made;
         },
-        log: async () => await log.loadLog(this.db),
+        log: async () => await this.#state.log(),
         seq: async () => await log.latestSeq(this.db),
         logDecisions: async (entries, at) => {
           await this.logDecisions(entries, at);
@@ -329,12 +333,19 @@ export class UserStore extends CloudStore {
 
   /**
   Everything the store waits on, each arming its own next time again through `armEarliest`: the
-  notification pool, the assistant's queue, automatic sleep.
+  notification pool, the assistant's queue, automatic sleep. Each reads only once its own time has
+  come (`poolAtAlarm`, the queue's due texts, `sleepAtAlarm`): an alarm for one loads no log for the
+  others.
   */
   override async alarm(): Promise<void> {
     const now = new Date().toISOString();
     await runEach([
-      async () => await this.runNotifications(now),
+      async () => {
+        await poolAtAlarm(this.ctx.storage, {
+          now,
+          pass: async () => await this.runNotifications(now),
+        });
+      },
       async () => {
         await this.drainParses(now);
       },
