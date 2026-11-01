@@ -125,6 +125,8 @@ export const enShell = {
   "permissions.usage.step3": "3. Open usage access again and switch Pace on.",
   "permissions.usage.open": "Open usage access",
   "permissions.appInfo": "App info",
+  "permissions.background": "Let Pace check in the background",
+  "permissions.background.why": "Notifications arrive within ~15 minutes instead of hours.",
   "permissions.on": "On",
   "permissions.off": "Off",
   "permissions.blocked": "Turned off in Android settings",

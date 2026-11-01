@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 import type { ThemePreference } from "#app/platform/theme.ts";
 
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
+import { BackgroundHint } from "#app/features/permissions/background-hint.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { SessionsSection } from "#app/features/sessions/sessions-section.tsx";
 import { CategoryEstimates } from "#app/features/settings/category-estimates.tsx";
@@ -126,6 +127,8 @@ export const SettingsScreen = () => {
       <Row label={t("settings.notifications")}>
         <NotificationChannels />
         <PushStatus />
+        {/* Composed here: features do not import each other (dependency-cruiser). */}
+        {IS_PHONE ? <BackgroundHint /> : null}
       </Row>
       <Row label={t("settings.digestWindows")}>
         <DigestWindows />

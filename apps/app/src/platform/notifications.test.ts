@@ -13,6 +13,7 @@ import type { readSessionValue as actualReadSessionValue } from "./session-value
 import * as firebaseProject from "./firebase-project.ts";
 import { clearPresentedPoolNotifications } from "./notification-cleanup.ts";
 import {
+  needsBackgroundStep,
   pollNow,
   pushMethodOf,
   pushStore,
@@ -110,6 +111,15 @@ beforeEach(async () => {
   fake.state.dismissed = [];
   fake.state.scheduleGate = null;
   fake.state.scheduleStarted = null;
+});
+
+describe("needsBackgroundStep", () => {
+  it("asks for the battery exemption only while the phone polls (owner rule)", () => {
+    expect(needsBackgroundStep({ method: "poll" })).toBe(true);
+    for (const method of ["fcm", "none", null] as const) {
+      expect(needsBackgroundStep({ method })).toBe(false);
+    }
+  });
 });
 
 describe("registerPush", () => {

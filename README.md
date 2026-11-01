@@ -372,7 +372,10 @@ falls back to the other, and is tried again later.
 `GOOGLE_SERVICES_JSON`, a server without `FIREBASE_SERVICE_ACCOUNT`, or one with another
 Firebase project) notifications still reach the phone while Pace is closed: a periodic
 background check (Android's WorkManager, about every 15 minutes, later under Doze or a vendor
-battery saver) fetches what waits for it and shows it. There is no foreground service and no
+battery saver) fetches what waits for it and shows it. While the phone uses it, the
+permissions walk-through and *Settings → Notifications* ask to leave Pace out of battery
+optimization (and open the phone maker's autostart page where there is a known one), so the
+check keeps its rhythm; with Google's push that step is not shown. There is no foreground service and no
 ongoing notification. The open app fetches at once on each live update, and Telegram gets
 everything as before. `GET /api/push/methods` says what the server
 accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and

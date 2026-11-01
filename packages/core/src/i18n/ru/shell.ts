@@ -126,6 +126,9 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "permissions.usage.step3": "3. Снова откройте доступ к статистике и включите Pace.",
   "permissions.usage.open": "Открыть доступ к статистике",
   "permissions.appInfo": "О приложении",
+  "permissions.background": "Разрешите Pace проверять в фоне",
+  "permissions.background.why":
+    "Уведомления придут в течение ~15 минут, а не через несколько часов.",
   "permissions.on": "Включено",
   "permissions.off": "Выключено",
   "permissions.blocked": "Выключено в настройках Android",

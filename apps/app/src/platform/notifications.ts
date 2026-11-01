@@ -86,6 +86,15 @@ export const pushStore = createStore<PushState>(() => ({
   offered: null,
 }));
 
+/**
+Whether to ask for the battery-optimization exemption: only while the phone checks in the
+background itself. Google's push wakes the phone on its own, and with none there is nothing to
+fetch (owner rule). The one decision the walk-through, Settings → Permissions and the hint under
+the picker read (bug class 1).
+*/
+// eslint-disable-next-line unicorn/consistent-boolean-name -- name fixed by the plan; reads as a predicate
+export const needsBackgroundStep = ({ method }: Pick<PushState, "method">) => method === "poll";
+
 type MethodsAnswer = {
   readonly pushMethods: readonly ("fcm" | "poll")[];
   readonly fcmProject: null | string;
