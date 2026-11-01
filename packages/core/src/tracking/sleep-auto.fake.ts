@@ -1,4 +1,4 @@
-import { type Event, type EventInput, EventSchema } from "../events/event-schema.ts";
+import { type Event, type EventInput, type EventOf, EventSchema } from "../events/event-schema.ts";
 import { isAutoSleepId, sleepNightOf } from "../ids.ts";
 import { effectiveEvents, materialize } from "../materialize/materializer.ts";
 import { event } from "../materialize/task-fixture.fake.ts";
@@ -83,6 +83,21 @@ const stopOf = (effective: readonly Event[], activityId: string, endAt: null | s
       event.occurredAt === endAt,
   );
 
+/** Where an activity's start event put its start: a live start's instant, a logged block's `startAt`. */
+const startEventAtOf = (effective: readonly Event[], originEventId: string) => {
+  const origin = effective.find((event) => event.id === originEventId);
+  return origin?.type === "activity.logged" ? origin.payload.startAt : origin?.occurredAt;
+};
+
+/** The person's `activity.adjusted` events in force for an activity (never the system's). */
+const adjustedByPerson = (effective: readonly Event[], activityId: string) =>
+  effective.filter(
+    (event): event is EventOf<"activity.adjusted"> =>
+      event.type === "activity.adjusted" &&
+      event.source !== "system" &&
+      event.payload.activityId === activityId,
+  );
+
 /** Ids of the events out of force that a non-system `event.revoked` targets. */
 const revokedByPerson = (log: readonly Event[]): ReadonlySet<string> => {
   const effectiveIds = new Set(effectiveEvents(log).map((event) => event.id));
@@ -97,7 +112,7 @@ const revokedByPerson = (log: readonly Event[]): ReadonlySet<string> => {
 /**
 What Task 13 builds from the user's log: the effective activities, each with the event that
 started it and the one that stopped it, the automatic stops no longer in force (by id) and the
-instants of those the person undid, and whether the person moved the start.
+instants of those the person undid, and whether the person moved the start or set the end.
 */
 export const sleepActivitiesOf = (log: readonly Event[]): readonly SleepActivity[] => {
   const effective = effectiveEvents(log);
@@ -106,6 +121,7 @@ export const sleepActivitiesOf = (log: readonly Event[]): readonly SleepActivity
   const { activities } = materialize(log, timeReducer, INITIAL_TIME_STATE);
   return Object.values(activities).map((activity) => {
     const stop = stopOf(effective, activity.id, activity.endAt);
+    const adjustments = adjustedByPerson(effective, activity.id);
     const revokedStops = log.filter(
       (event) =>
         event.type === "activity.stopped" &&
@@ -119,18 +135,14 @@ export const sleepActivitiesOf = (log: readonly Event[]): readonly SleepActivity
       id: activity.id,
       isAutoStart: isAutoSleepId(activity.originEventId),
       isAutoStop: stop !== undefined && isAutoSleepId(stop.id),
-      isStartAmendedByPerson: effective.some(
-        (event) =>
-          event.type === "activity.adjusted" &&
-          event.source !== "system" &&
-          event.payload.activityId === activity.id &&
-          event.payload.startAt !== undefined,
-      ),
+      isEndAmendedByPerson: adjustments.some((event) => event.payload.endAt !== undefined),
+      isStartAmendedByPerson: adjustments.some((event) => event.payload.startAt !== undefined),
       personRevokedStopsAt: revokedStops
         .filter((event) => personRevoked.has(event.id))
         .map((event) => event.occurredAt),
       revokedAutoStopIds: revokedStops.map((event) => event.id),
       startAt: activity.startAt,
+      startEventAt: startEventAtOf(effective, activity.originEventId) ?? activity.startAt,
       startEventId: activity.originEventId,
       stopEventId: stop?.id ?? null,
     };

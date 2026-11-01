@@ -7,6 +7,8 @@ import { bedtimeFloor, isBedtime, laterOf, REST_MIN_MINUTES } from "./phone-use.
 import {
   decideFor,
   type DeviceUse,
+  endOnceWalked,
+  isClosedByStart,
   isRulesStart,
   type Known,
   knownUses,
@@ -41,26 +43,37 @@ export type SleepInput = {
   }[];
 };
 
-/** A sleep the rules follow: running or stopped by them, and started inside the known uses. */
+/** An end the person made: a stop of theirs, or an end they set (whatever stop sits there). */
+const hasPersonsEnd = (activity: SleepActivity): boolean =>
+  activity.isEndAmendedByPerson || (activity.stopEventId !== null && !activity.isAutoStop);
+
+/**
+A sleep that is the rules' own record: they started it as a sleep, and the person neither moved
+its start, nor named it something else, nor made its end. Every other activity is the person's.
+*/
+const isRulesSleep = (activity: SleepActivity): boolean =>
+  isRulesStart(activity) && activity.category === "sleep" && !hasPersonsEnd(activity);
+
+/**
+A sleep the rules follow, started inside the known uses: running, stopped by them, or (one of
+their own) closed by another activity's start, whose end stays but which is still discarded
+when short like any automatic sleep. An end the person made is never followed.
+*/
 const isWalked = (activity: SleepActivity, usesFrom: string): boolean =>
   activity.category === "sleep" &&
   activity.startAt >= usesFrom &&
-  (activity.endAt === null || activity.isAutoStop || isClosedRulesSleep(activity));
+  !activity.isEndAmendedByPerson &&
+  (activity.endAt === null ||
+    activity.isAutoStop ||
+    (isRulesSleep(activity) && isClosedByStart(activity)));
 
 /**
-A sleep the rules started that another activity the person started closed (an end with no stop
-event): its end stays, but a short one is still discarded like any automatic sleep.
-*/
-const isClosedRulesSleep = (activity: SleepActivity): boolean =>
-  isRulesStart(activity) && activity.stopEventId === null && activity.endAt !== null;
-
-/**
-A sleep the rules own outright: they started it, nobody moved its start or undid one of its
-stops, and it is walked. It is kept only while deciding afresh would open the same one.
+A sleep the rules own outright: their own record (nobody moved its start, renamed it or made
+its end), none of its stops undone, and walked. It is kept only while deciding afresh would open the same one.
 */
 const isOwned = (activity: SleepActivity, usesFrom: string): boolean =>
   isWalked(activity, usesFrom) &&
-  isRulesStart(activity) &&
+  isRulesSleep(activity) &&
   activity.personRevokedStopsAt.length === 0;
 
 /** A sleep automatic sleep would open at `at`, before anything is decided about it. */
@@ -72,10 +85,12 @@ const newSleep = (at: string, night: string, used: readonly string[]): SleepActi
     id,
     isAutoStart: true,
     isAutoStop: false,
+    isEndAmendedByPerson: false,
     isStartAmendedByPerson: false,
     personRevokedStopsAt: [],
     revokedAutoStopIds: [],
     startAt: at,
+    startEventAt: at,
     startEventId: id,
     stopEventId: null,
   };
@@ -135,20 +150,32 @@ const freshSleeps = (known: Known, taken: ReadonlySet<string>): readonly SleepAc
 };
 
 /**
-The Rest-class activities that bound automatic sleep: the person's (every one but the sleeps the
-rules started and still own), from before `knownUntil`.
+The Rest-class activities that bound automatic sleep: the person's (every one but the rules' own
+sleeps), from the instant they start, known by `now` whatever the phones have told.
 */
 const restsOf = (activities: readonly SleepActivity[], now: string): readonly Rest[] =>
   activities
     .filter(
       (activity) =>
-        isRestClass(activity.category) && !isRulesStart(activity) && activity.startAt <= now,
+        isRestClass(activity.category) && !isRulesSleep(activity) && activity.startAt <= now,
     )
     .map(({ endAt, startAt }) => ({ endAt, startAt }));
 
 /**
+The activities with the person's sleeps as this pass's walk leaves them (a sleep of theirs it
+stops is no longer a rest running on). Their walk reads no rests: only automatic starts end at one.
+*/
+const asWalked = (input: SleepInput, unbounded: Known): readonly SleepActivity[] =>
+  input.activities.map((activity) =>
+    isWalked(activity, input.usesFrom) && !isRulesStart(activity)
+      ? { ...activity, endAt: endOnceWalked(activity, unbounded) }
+      : activity,
+  );
+
+/**
 The automatic start ids a new start must not take: those no longer in force, and those this
-pass discards (a start in the same minute would otherwise share the discarded one's id).
+pass discards (a start in the same minute would otherwise share the discarded one's id). One in
+force is never at stake: its night is taken, or it is the sleep the open would be.
 */
 const startIdsUsed = (
   input: SleepInput,
@@ -200,13 +227,14 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
   // Less known than an earlier pass decided with undoes nothing: decide on the larger of the two.
   const knownUntil = laterOf(input.knownUntil, input.decidedUntil ?? input.knownUntil);
   const { usesFrom } = input;
-  const known: Known = {
+  const unbounded: Known = {
     knownUntil,
-    rests: restsOf(input.activities, input.now),
+    rests: [],
     usesFrom,
     uses: knownUses(input.uses, { knownUntil, usesFrom }),
     zone: input.zone,
   };
+  const known: Known = { ...unbounded, rests: restsOf(asWalked(input, unbounded), input.now) };
   const owned = input.activities.filter((activity) => isOwned(activity, usesFrom));
   const others = input.activities.filter((activity) => !isOwned(activity, usesFrom));
   const personNights = new Set(
@@ -214,9 +242,14 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
       .filter((activity) => activity.category === "sleep")
       .map((sleep) => sleepNightOf(sleep.startAt, known.zone)),
   );
+  // Nights settled: the person's sleeps, and those automatic sleep opened that are no longer the
+  // rules' alone (the person deleted, renamed, moved or ended them) in the night they opened in.
   const taken = new Set([
     ...personNights,
     ...input.personRevokedAutoStarts.map((start) => start.night),
+    ...others
+      .filter((activity) => activity.isAutoStart)
+      .map((activity) => sleepNightOf(activity.startEventAt, known.zone)),
   ]);
   const fresh = freshSleeps(known, taken);
   const followed = [

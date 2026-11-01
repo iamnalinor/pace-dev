@@ -32,6 +32,11 @@ export type SleepActivity = {
   readonly startAt: string;
   readonly endAt: null | string;
   readonly startEventId: string;
+  /**
+  Where its start event put the start, before any `activity.adjusted`: the instant of the
+  `activity.started` (a logged block's own `startAt`). The materializer drops a stop before it.
+  */
+  readonly startEventAt: string;
   readonly stopEventId: null | string;
   readonly isAutoStart: boolean;
   readonly isAutoStop: boolean;
@@ -43,6 +48,11 @@ export type SleepActivity = {
   reads as theirs, never discarded, its start never second-guessed.
   */
   readonly isStartAmendedByPerson: boolean;
+  /**
+  The person set its end (`activity.adjusted` with an `endAt`): that end is theirs, like a stop
+  they made, so the rules never walk, move, reopen or discard the sleep.
+  */
+  readonly isEndAmendedByPerson: boolean;
 };
 
 export type SleepDecision =
@@ -59,7 +69,7 @@ export type Known = {
   readonly usesFrom: string;
   readonly uses: readonly Interval[];
   readonly zone: string;
-  /** The person's Rest-class activities that start before `knownUntil`. */
+  /** The person's Rest-class activities that have started by `now`. */
   readonly rests: readonly Rest[];
 };
 
@@ -113,7 +123,8 @@ export const isRulesStart = (sleep: SleepActivity): boolean =>
 The uses that happened inside a sleep. An automatic start claims quiet from that instant, so any
 use after it counts, even one a late upload shows already running then. A person's start is
 their word: the spell they started it from (pressing Sleep in Pace, the home screen after) is
-them going to bed, and only use after that spell counts (class 39).
+them going to bed, and only use after that spell counts (class 39). A start they moved earlier
+keeps the use before where it was first recorded theirs too: they put the start over it.
 */
 const usesInside = (sleep: SleepActivity, uses: readonly Interval[]): readonly Interval[] => {
   const start = sleep.startAt;
@@ -122,8 +133,10 @@ const usesInside = (sleep: SleepActivity, uses: readonly Interval[]): readonly I
       .filter((use) => use.endAt > start)
       .map((use) => ({ endAt: use.endAt, startAt: laterOf(use.startAt, start) }));
   }
-  const bed = awakeSpells(uses).find((spell) => spell.startAt <= start && start <= spell.endAt);
-  const after = bed?.endAt ?? start;
+  const spells = awakeSpells(uses);
+  const bedEnd = (instant: string): string =>
+    spells.find((spell) => spell.startAt <= instant && instant <= spell.endAt)?.endAt ?? instant;
+  const after = laterOf(bedEnd(start), bedEnd(sleep.startEventAt));
   return uses.filter((use) => use.startAt > after);
 };
 
@@ -148,11 +161,6 @@ const hasAutoStopIn = (sleep: SleepActivity, spell: Interval): boolean =>
   sleep.isAutoStop && sleep.endAt !== null && isWithin(spell, sleep.endAt);
 
 /**
-Walks the spells awake after a sleep's start: one at an automatic stop the person undid stays
-inside (they said they were asleep, so its minutes are not taken off), so does a wake-up; the
-first other spell ends the sleep at its start, unless a rest the person logged ends it first.
-*/
-/**
 Where a rest the person logged ends an automatic sleep: at the start of the first one that runs
 after the sleep's start (at the sleep's start for one already running then), the same whether
 it was logged before the sleep opened or after. A person's own sleep is theirs to end.
@@ -165,17 +173,29 @@ const restLimitOf = (sleep: SleepActivity, known: Known): readonly string[] =>
     : [];
 
 /**
-The first instant the sleep cannot run past: a rest of the person's, or where another activity
-the person started closed it (an end with no stop event, which no walk moves).
+Another activity's start closed a sleep started live: an end with no stop event that the person
+did not set either (the materializer closes the running main activity at every main start).
+*/
+export const isClosedByStart = (
+  sleep: SleepActivity,
+): sleep is SleepActivity & { readonly endAt: string } =>
+  sleep.endAt !== null && sleep.stopEventId === null && !sleep.isEndAmendedByPerson;
+
+/**
+The first instant the sleep cannot run past: a rest of the person's, or where another activity's
+start closed it (which no walk moves).
 */
 const limitOf = (sleep: SleepActivity, known: Known): null | string =>
-  [
-    ...restLimitOf(sleep, known),
-    ...(sleep.stopEventId === null && sleep.endAt !== null ? [sleep.endAt] : []),
-  ]
+  [...restLimitOf(sleep, known), ...(isClosedByStart(sleep) ? [sleep.endAt] : [])]
     .toSorted((a, b) => a.localeCompare(b))
     .at(0) ?? null;
 
+/**
+Walks the spells awake after a sleep's start: one at an automatic stop the person undid stays
+inside (they said they were asleep, so its minutes are not taken off), so does a wake-up; the
+first other spell ends the sleep at its start, unless a rest of the person's or a closure ends
+it first.
+*/
 const walk = (sleep: SleepActivity, known: Known): Walk => {
   const spells = rested(usesInside(sleep, known.uses), known.knownUntil);
   const limit = limitOf(sleep, known);
@@ -241,6 +261,10 @@ const endAfter = (sleep: SleepActivity, { end, isReopening }: Walk): null | stri
   }
   return isReopening ? null : sleep.endAt;
 };
+
+/** Where a sleep ends once this pass's decisions about it apply (`null`: it runs on). */
+export const endOnceWalked = (sleep: SleepActivity, known: Known): null | string =>
+  endAfter(sleep, walk(sleep, known));
 
 /**
 A running or automatically stopped sleep, walked again with what is known now: reopened after
