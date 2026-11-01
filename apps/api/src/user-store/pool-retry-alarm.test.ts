@@ -311,6 +311,21 @@ describe("the pool's own time at the store's alarm", () => {
     });
   });
 
+  it("answers when the pool passes next: an earlier time a write asked for during the pass included", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      let answered = "";
+      await takingPoolTime(storage, {
+        now: NOW,
+        pass: async () => {
+          await armAfterWrite(storage, { at: at(30), now: NOW });
+          answered = await scheduleNextPass(storage, { isRetry: false, nextAt: at(600), now: NOW });
+        },
+      });
+      expect(answered).toBe(at(30));
+      expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(30));
+    });
+  });
+
   it("reads a time taken and never released (no lease) as due", async () => {
     await runInDurableObject(freshStore(), async (_instance, { storage }) => {
       await storage.put(POOL_NEXT_AT_KEY, null);

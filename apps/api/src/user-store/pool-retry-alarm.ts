@@ -81,9 +81,10 @@ export const armAfterWrite = async (
 
 /**
 Arms the pool's next pass and answers when it is: the next pool decision or an outstanding
-delivery retry, whichever comes first, and never later than a day on (`LOOK_AGAIN_MS`). It never
-deletes or postpones the alarm: the store's other waits (the assistant's queue, automatic sleep)
-share it.
+delivery retry, whichever comes first, and never later than a day on (`LOOK_AGAIN_MS`), or an
+earlier time something asked for while the pass ran (a write): the pool's own time as it now
+stands. It never deletes or postpones the alarm: the store's other waits (the assistant's queue,
+automatic sleep) share it, and the pass's lease may wake it sooner, to read only the gate.
 */
 export const scheduleNextPass = async (
   storage: DurableObjectStorage,
@@ -100,7 +101,8 @@ export const scheduleNextPass = async (
     from + LOOK_AGAIN_MS,
   );
   await armPool(storage, at);
-  return new Date(at).toISOString();
+  const kept = await storage.get<null | number>(POOL_NEXT_AT_KEY);
+  return new Date(Math.min(at, kept ?? Infinity)).toISOString();
 };
 
 /** Removes the lease `lease` if it is still the one held (a later pass may hold its own). */

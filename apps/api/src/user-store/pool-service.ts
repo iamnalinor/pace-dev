@@ -62,7 +62,10 @@ export type PoolHost = {
   readonly chatId: () => Promise<string | undefined>;
 };
 
-/** What a pass of the pool added, and when it passes next (within a day, see `scheduleNextPass`). */
+/**
+What a pass of the pool added, and when the pool passes next as it now stands: the pass's own next
+time or an earlier one a write asked for while it ran, within a day (`scheduleNextPass`).
+*/
 export type PoolRun = {
   readonly created: readonly PoolNotification[];
   readonly nextAt: string;
