@@ -1,5 +1,13 @@
 /** The time-tracking layer of @pace/core: activities, the time bar's buttons, the timeline. */
 export {
+  isAutoSleepId,
+  sleepDiscardId,
+  sleepNightOf,
+  sleepReopenId,
+  sleepStartId,
+  sleepStopId,
+} from "./ids.ts";
+export {
   type ButtonChoice,
   choiceById,
   TIME_BUTTONS,
@@ -21,6 +29,8 @@ export {
   CATEGORY_COLORS,
   CATEGORY_EXPECT,
   FOCUS_CATEGORIES,
+  isRestClass,
+  REST_CLASS,
 } from "./tracking/categories.ts";
 export {
   type Defaults,
@@ -83,6 +93,14 @@ export {
   screenOnIntervals,
   type SleepCandidate,
 } from "./tracking/phone.ts";
+export {
+  decideSleep,
+  type DeviceUse,
+  type SleepActivity,
+  type SleepDecision,
+  sleepEvents,
+  type SleepInput,
+} from "./tracking/sleep-auto.ts";
 export { timeReducer } from "./tracking/time-reducer.ts";
 export {
   type Gap,

@@ -2,7 +2,7 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import { and, eq, gt, lt, max, notInArray, sql } from "drizzle-orm";
 
-import type { CalendarEvent, Interval, UsageRow } from "@pace/core";
+import type { CalendarEvent, DeviceUse, Interval, UsageRow } from "@pace/core";
 
 import * as schema from "./schema.ts";
 
@@ -197,9 +197,6 @@ export const addUsage = async (
   await noteKnown(storage, upload, now);
   return valid.length + uses;
 };
-
-/** A stretch someone used one of the devices. */
-export type DeviceUse = { deviceId: string; startAt: string; endAt: string };
 
 /** Use on every device, and how far the phones' usage is known (`null`: nothing to decide on). */
 export type SleepUsage = {

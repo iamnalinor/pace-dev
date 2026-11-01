@@ -37,3 +37,7 @@ export const CATEGORY_EXPECT: Readonly<Record<ActivityCategory, null | number>> 
   sleep: 480,
   other: null,
 };
+/** Rest and sleep: while one of them runs, automatic sleep opens nothing (the person is resting). */
+export const REST_CLASS: readonly ActivityCategory[] = ["rest", "sleep"];
+
+export const isRestClass = (category: ActivityCategory): boolean => REST_CLASS.includes(category);
