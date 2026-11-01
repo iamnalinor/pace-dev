@@ -22,7 +22,7 @@ axe (e2e), ESLint flat config, impeccable/apple-design/review-animations reviewe
 **Spec:** `context/design/redesign-spec.md` (read it in full before any task; `§` references below
 point into it). Evidence: `context/design/findings.md` (`F-…` ids). Product truth: `PRODUCT.md`.
 
-**Status:** written before STOP 1. Phase 3 amends it (re-baseline after Phase C merges; the owner's
+**Status:** written before STOP 1; the owner chose direction A (Тетрадь) and answered Q2–Q5 and Q7–Q12 (spec §12); Tasks 7.1–7.2 are re-specified for A's signature (notebook dot grid behind Day, red now-line, ink line under the running activity) in Phase 3. Phase 3 amends it (re-baseline after Phase C merges; the owner's
 direction choice and answers to spec §12). Task contents assume the recommended direction B and the
 §12 defaults; a different answer changes values, not the task list, except where noted.
 
@@ -703,8 +703,7 @@ generated constants), presets `fadeIn/Out`, `riseIn/Out`, `sheetIn/Out`, `dialog
 
 **Files:** `ui/dissolve.tsx` (rewrite), `shared/use-check-task.ts`, `shared/use-close-with-undo.ts`,
 `shared/task-list.tsx` (+ tests); `e2e/motion.e2e.ts` (new).
-- [ ] Spec §6 check-off rows: fill on press-in, dissolve ≤ 260 ms (≤ 24 specks, one transform layer)
-      or the Q2 alternative, rows close up 220 ms on Android **and** web via `RowList`, Undo toast
+- [ ] Spec §6 check-off rows: fill on press-in, fade 160 ms (owner's choice, Q2 = c), rows close up 220 ms on Android **and** web via `RowList`, Undo toast
       with the dissolve; next step on the animation's completion, never a timer (F-MOT-01/02/03).
 - [ ] Failing tests: app — the check fills in the same frame as press-in; the row is removed on the
       completion callback; with a pending store write (deferred promise) the row does not flash back
@@ -763,10 +762,10 @@ session so the first paint uses it), `ui/shell.web.tsx` (main, skip link).
 - [ ] Banner per spec §7 (copy pinned by Task 4.13, overlays without layout push, 44 px button,
       refuses to reload over a draft, `beforeunload`); manifest with `id`, separate maskable icon,
       shortcuts, screenshots, light/dark splash; SVG favicon with scheme media query; logo and icons
-      in Pace green.
+      in the current lime (owner, round 2: `#5E8C00` on light, `#C8F03C` on dark).
 - [ ] Failing tests: banner Refresh with a non-empty composer draft shows "Save your draft first"
-      and does not reload; `generate-icons.test.ts` asserts the logo's accent chevron equals
-      `accent` light. Commit.
+      and does not reload; `generate-icons.test.ts` asserts the logo's bright chevron equals the
+      `logo.light` / `logo.dark` tokens (`#5E8C00` / `#C8F03C`). Commit.
 
 ### Task 6.4: Bundle splitting, layout shift, local CSP
 
@@ -790,7 +789,7 @@ Only what spec §2 names for the chosen direction (B).
 "gap" | "branch"; open }[] }`.
 - [ ] Spec §2 B signature: proportional rail beside the editable rows; block = segment in its
       category stroke with a station ring at its start; gap = dashed segment with Log; parallel =
-      branch line; running station open; now = a station dot in Pace green; overlaps hatched, not
+      branch line; running station open; now = the red margin line (direction A); overlaps hatched, not
       red (declined-challenger raise).
 - [ ] Failing tests: view-model — a 15 h gap is 15× a 1 h block's length; overlapping blocks yield a
       branch; app — the rail is `accessibilityElementsHidden` (rows carry the semantics). Commit.
@@ -807,7 +806,7 @@ Only what spec §2 names for the chosen direction (B).
 
 **Files:** `shared/assistant/*` (proposal accepted highlight), `ui/logo.tsx`, `scripts/generate-icons.ts`.
 - [ ] Spec §6 last row: accepted proposal → created row with a one-time `accent.quiet` highlight
-      fading over 600 ms; logo chevrons in Pace green on both themes (owner, feedback-4).
+      fading over 600 ms; logo chevrons in the current lime on both themes (owner, round 2; feedback-2/4).
 - [ ] Commit.
 
 ---

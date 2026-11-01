@@ -76,6 +76,11 @@ the test suites).
 >   lands and which controls it covers; late or misplaced feedback hides the next action.
 > - **Visual matrix**: inspect each changed screen at 390 px and 1280 px, in both themes
 >   with Russian text; wrapping and contrast can fail only in one combination.
+> - **Responsiveness**: run the main taps (a tab, a filter chip, a check-off, opening a row, Back,
+>   a time-bar button) in a mobile context with touch on and the CPU throttled 4× (CDP
+>   `Emulation.setCPUThrottlingRate`); anything that takes over 100 ms from tap to the next frame
+>   (Event Timing API), or a control that shows nothing when pressed, is a finding
+>   (bug-lessons class 57).
 > - **Guest language and sideways content**: check signed-out pages with a Russian browser
 >   locale and verify the document language; on narrow screens, every sideways region needs
 >   a visible scroll cue and a keyboard focus target.
