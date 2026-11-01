@@ -54,14 +54,15 @@ Todoist and a paper week, and trusts what it shows.
   Enter to create; keyboard shortcuts shown on buttons (⌘ on a Mac, Ctrl elsewhere).
 - Telegram bot as a parallel channel (free text, sign-in notices, Deadline Digest, wipe/delete
   confirmations).
-- Navigation: phone tabs Now · Day · Calendar · Inbox · More (More holds Projects, Insights,
-  History, Settings); desktop sidebar Now → Day → Calendar → Inbox → Projects → Insights →
-  History → Settings, with a New task button and the Telegram name in the header.
+- Navigation (owner's last word, `context/stage-8/ledger.md:96,98`): phone tabs
+  Now · Day · Inbox · More (More holds Week, Projects, Insights, History, Settings); desktop
+  sidebar Now → Day → Week → Inbox → Projects → Insights → History → Settings, with a New task
+  button and the Telegram name in the header. ("Calendar" was tried and reverted to "Week".)
 
 ## Capabilities and Constraints
 
-- Screens: Now (composer, running activity, task list, calendar offer), Day (time bar, timeline
-  with "not logged" gaps), Calendar (week), Inbox, Projects and project pages, Presets, task
+- Screens: Now (composer, task list, calendar offer, the running activity and the time bar; on a
+  phone the time bar folds under "Start something else"), Day (timeline with "not logged" gaps), Week, Inbox, Projects and project pages, Presets, task
   detail (sheet on phone, split pane on desktop), Insights, History, Decisions, Review,
   Notifications feed, Settings (devices and sessions, server picker, digest times, quiet hours,
   export, wipe, delete), Login, Onboarding, Permissions, OAuth consent.
@@ -72,7 +73,7 @@ Todoist and a paper week, and trusts what it shows.
 - Inter is the only typeface, Cyrillic included (owner, feedback 2).
 - Big, fixed-position buttons for the time bar: "each button large enough not to miss, always
   in its place" (owner, feedback 2).
-- Terminology: Subtasks (never "Problems"), Now, Day, Calendar, Inbox, Focus, Done, Log it.
+- Terminology: Subtasks (never "Problems"), Now, Day, Week, Inbox, Focus, Done, Log it.
 - Technical: Expo 57, React Native 0.86, react-native-web 0.21, NativeWind 4, Reanimated 4,
   lucide icons, expo-router; tokens live in `packages/core/src/design/tokens.json` (core stays
   pure). The web build is a PWA served by a Worker.
