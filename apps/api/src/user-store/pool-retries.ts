@@ -26,14 +26,14 @@ again a minute on: `scheduleNextPass`).
 export const hasPendingAfterRetry = async (deps: PoolDeps): Promise<boolean> => {
   const open = await rows.openNotifications(deps.db);
   for (const stored of open) {
-    if (await hasSendRetry(deps, stored)) {
+    if (await hasSendRetry(deps, stored.notification)) {
       await deliverNew(deps, stored);
     }
   }
   await retryDismissals(deps);
   const remaining = await rows.openNotifications(deps.db);
-  for (const stored of remaining) {
-    if (await hasSendRetry(deps, stored)) {
+  for (const { notification } of remaining) {
+    if (await hasSendRetry(deps, notification)) {
       return true;
     }
   }

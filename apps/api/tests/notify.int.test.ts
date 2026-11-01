@@ -1,6 +1,6 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { type CalendarEvent, endpoints, newId } from "@pace/core";
 
@@ -51,6 +51,36 @@ const report = (): Raw =>
   });
 
 const freshStore = () => env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));
+
+/**
+The store's alarm is exactly at `at`, on a store whose pool never passed: it keeps no time of its
+own yet (`pool:next-at`), and that alarm passes it (`poolAtAlarm`).
+*/
+const expectPoolDue = async (state: DurableObjectState, at: string): Promise<void> => {
+  expect(await state.storage.get(POOL_NEXT_AT_KEY)).toBeUndefined();
+  expect(await state.storage.getAlarm()).toBe(Date.parse(at));
+};
+
+/**
+The instants of the tests that check the store's alarm exactly: 2099 has 2026's calendar, and lies
+far ahead of the real clock, which workerd's own scheduler keeps. An alarm armed at a 2026 instant
+is due for it at once, and it runs `alarm()` beside the test and arms the alarm again (class 54).
+*/
+const LATER_CROSSED = "2099-10-07T08:00:00.000Z";
+const LATER_AFTER_TWO = "2099-10-07T11:05:00.000Z";
+
+/** An event of the 2026 fixtures on the 2099 instants. */
+const later = (raw: Raw): Raw =>
+  JSON.parse(JSON.stringify(raw).replaceAll("2026-", "2099-")) as Raw;
+
+/** The test's clock, inside the Worker too: frozen at `at` until the test ends. */
+const onLaterClock = (at = LATER_CROSSED): void => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(at));
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+};
 
 /** The lease a first pass in a row holds (`pool-retry-alarm.ts`). */
 const LEASE_MS = 5 * 60_000;
@@ -196,8 +226,9 @@ describe("the deadline digest", () => {
   });
 
   it("retries a refused Telegram deletion after an app answer", async () => {
+    onLaterClock();
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
-      await instance.notifyTo("1002", CROSSED);
+      await instance.notifyTo("1002", LATER_CROSSED);
       const telegram = telegramRecorder();
       let removalAttempts = 0;
       const flaky: TelegramTarget = {
@@ -221,40 +252,41 @@ describe("the deadline digest", () => {
               sessionId: "delete-retry",
             },
           },
-          CROSSED,
+          LATER_CROSSED,
           { couriers },
         ),
       );
       await instance.resolveNotification(notification.id, "read", {
         couriers,
-        now: "2026-10-07T08:01:00.000Z",
+        now: "2099-10-07T08:01:00.000Z",
         origin: "app",
       });
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0]
           ?.dismissedAt,
       ).toBeNull();
-      expect(await state.storage.getAlarm()).not.toBeNull();
-      await instance.runNotifications("2026-10-07T08:02:00.000Z", couriers);
+      await expectPoolDue(state, "2099-10-07T08:02:00.000Z");
+      await instance.runNotifications("2099-10-07T08:02:00.000Z", couriers);
       expect(removalAttempts).toBe(2);
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0]
           ?.dismissedAt,
-      ).toBe("2026-10-07T08:02:00.000Z");
-      await instance.runNotifications("2026-10-07T08:03:00.000Z", couriers);
+      ).toBe("2099-10-07T08:02:00.000Z");
+      await instance.runNotifications("2099-10-07T08:03:00.000Z", couriers);
       expect(removalAttempts).toBe(2);
     });
   });
 
   it("is added to the pool at a slot and sent to Telegram with links to its tasks", async () => {
+    onLaterClock(LATER_AFTER_TWO);
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
-      await instance.append([setup(), report()], { now: AFTER_TWO });
-      await instance.notifyTo("1002", AFTER_TWO);
-      expect(await state.storage.getAlarm()).not.toBeNull();
+      await instance.append([later(setup()), later(report())], { now: LATER_AFTER_TWO });
+      await instance.notifyTo("1002", LATER_AFTER_TWO);
+      await expectPoolDue(state, LATER_AFTER_TWO);
       const telegram = telegramRecorder();
-      const run = await instance.runNotifications(AFTER_TWO, couriersOf(telegram.target));
+      const run = await instance.runNotifications(LATER_AFTER_TWO, couriersOf(telegram.target));
       expect(run.created.map((item) => item.kind)).toEqual(["deadline_digest"]);
-      expect(run.nextAt).toBe("2026-10-07T18:00:00.000Z");
+      expect(run.nextAt).toBe("2099-10-07T18:00:00.000Z");
       const [message] = telegram.sent();
       expect(message?.body).toMatchObject({ chat_id: "1002" });
       expect(String(message?.body["text"])).toBe(
@@ -269,7 +301,7 @@ describe("the deadline digest", () => {
       ]);
       // The 21:00 slot: reported already at this deadline.
       const evening = await instance.runNotifications(
-        "2026-10-07T18:01:00.000Z",
+        "2099-10-07T18:01:00.000Z",
         couriersOf(telegram.target),
       );
       expect(evening.created).toEqual([]);
@@ -750,6 +782,59 @@ const phoneWithToken = async (pushToken: string) => {
   };
 };
 
+describe("a sign-in notice whose Telegram copy fails", () => {
+  it("is tried again a minute on, ahead of a later time the pool kept, and sent once", async () => {
+    onLaterClock();
+    const now = LATER_CROSSED;
+    const minuteOn = "2099-10-07T08:01:00.000Z";
+    const dayOn = Date.parse("2099-10-08T08:00:00.000Z");
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      await instance.notifyTo("1002", now);
+      await state.storage.put(POOL_NEXT_AT_KEY, dayOn);
+      await state.storage.deleteAlarm();
+      await state.storage.setAlarm(dayOn);
+      const telegram = telegramRecorder();
+      let attempts = 0;
+      const flaky: TelegramTarget = {
+        ...telegram.target,
+        fetch: async (input, init) => {
+          return String(input).endsWith("/sendMessage") && attempts++ === 0
+            ? Response.json({ ok: false }, { status: 500 })
+            : await telegram.target.fetch(input, init);
+        },
+      };
+      // No phone: Telegram is the notice's only copy (no FCM retry to arm the alarm instead).
+      const couriers = couriersOf(flaky);
+      added(
+        await instance.notify(
+          {
+            kind: "login",
+            payload: {
+              country: "Germany",
+              ip: SIGN_IN_IP,
+              kind: "web",
+              name: "Chrome",
+              sessionId: "telegram-only-retry",
+            },
+          },
+          now,
+          { couriers },
+        ),
+      );
+      expect(attempts).toBe(1);
+      expect(await state.storage.get(POOL_NEXT_AT_KEY)).toBe(Date.parse(minuteOn));
+      expect(await state.storage.getAlarm()).toBe(Date.parse(minuteOn));
+      await state.storage.deleteAlarm();
+      await instance.runNotifications(minuteOn, couriers);
+      expect(telegram.sent()).toHaveLength(1);
+      await state.storage.deleteAlarm();
+      await instance.runNotifications("2099-10-07T08:02:00.000Z", couriers);
+      expect(telegram.sent()).toHaveLength(1);
+      expect(attempts).toBe(2);
+    });
+  });
+});
+
 describe("Firebase push", () => {
   it("stops retrying a failed push when that notification's app channel is turned off", async () => {
     const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
@@ -1014,6 +1099,7 @@ describe("Firebase push", () => {
   });
 
   it("retries transient Telegram and FCM send failures on the next pool alarm without duplicate delivery", async () => {
+    onLaterClock();
     const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
     const fcm = await fcmRecorder({ send: [500, 200] });
     const telegram = telegramRecorder();
@@ -1027,7 +1113,7 @@ describe("Firebase push", () => {
       },
     };
     await runInDurableObject(stub, async (instance: UserStore, state) => {
-      await instance.notifyTo("1001", CROSSED);
+      await instance.notifyTo("1001", LATER_CROSSED);
       const couriers = couriersOf(flakyTelegram, fcm.target);
       const login = added(
         await instance.notify(
@@ -1041,7 +1127,7 @@ describe("Firebase push", () => {
               sessionId: "retry-send",
             },
           },
-          CROSSED,
+          LATER_CROSSED,
           { couriers },
         ),
       );
@@ -1049,17 +1135,18 @@ describe("Firebase push", () => {
         expect.objectContaining({ method: "telegram", result: "failed" }),
         expect.objectContaining({ method: "fcm", result: "failed" }),
       ]);
-      expect(await state.storage.getAlarm()).not.toBeNull();
-      await instance.runNotifications("2026-10-07T08:01:00.000Z", couriers);
+      await expectPoolDue(state, "2099-10-07T08:01:00.000Z");
+      await instance.runNotifications("2099-10-07T08:01:00.000Z", couriers);
       expect(fcm.sends()).toHaveLength(2);
       expect(telegramAttempts).toBe(2);
-      await instance.runNotifications("2026-10-07T08:02:00.000Z", couriers);
+      await instance.runNotifications("2099-10-07T08:02:00.000Z", couriers);
       expect(fcm.sends()).toHaveLength(2);
       expect(telegramAttempts).toBe(2);
     });
   });
 
   it("keeps a failed FCM dismissal pending until the next pool pass succeeds", async () => {
+    onLaterClock();
     const { stub } = await phoneWithToken(`fcm-${crypto.randomUUID()}`);
     const fcm = await fcmRecorder({ send: [200, 500, 200] });
     await runInDurableObject(stub, async (instance: UserStore, state) => {
@@ -1076,13 +1163,13 @@ describe("Firebase push", () => {
               sessionId: "retry-dismiss",
             },
           },
-          CROSSED,
+          LATER_CROSSED,
           { couriers },
         ),
       );
       await instance.resolveNotification(login.id, "read", {
         couriers,
-        now: "2026-10-07T08:01:00.000Z",
+        now: "2099-10-07T08:01:00.000Z",
         origin: "app",
       });
       expect(fcm.sends().map((send) => send.message.data["type"])).toEqual([
@@ -1094,13 +1181,13 @@ describe("Firebase push", () => {
           (entry) => entry.method === "fcm",
         )?.dismissedAt,
       ).toBeNull();
-      expect(await state.storage.getAlarm()).not.toBeNull();
-      await instance.runNotifications("2026-10-07T08:02:00.000Z", couriers);
+      await expectPoolDue(state, "2099-10-07T08:02:00.000Z");
+      await instance.runNotifications("2099-10-07T08:02:00.000Z", couriers);
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[login.id]?.find(
           (entry) => entry.method === "fcm",
         )?.dismissedAt,
-      ).toBe("2026-10-07T08:02:00.000Z");
+      ).toBe("2099-10-07T08:02:00.000Z");
       expect(fcm.sends()).toHaveLength(3);
     });
   });

@@ -43,7 +43,7 @@ import {
 } from "./delivery-rows.ts";
 import { broadcast, broadcastBySession } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
-import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
+import { findNotification, setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -320,18 +320,23 @@ export const deliverNew = async (
   }));
 };
 
-/** Open notifications whose latest copy failed and can be retried by a pool pass. */
+/**
+Whether a notification has a copy that failed and can be retried by a pool pass. It reads the
+copies as they stand in the store, never from a row read before: a delivery just made writes its
+outcome there, not into the caller's copy of the row (bug-lessons class 60).
+*/
 export const hasSendRetry = async (
   deps: PoolDeps,
-  stored: StoredNotification,
+  notification: PoolNotification,
 ): Promise<boolean> => {
-  if (stored.telegram.state === "failed") {
+  const current = await findNotification(deps.db, notification.id);
+  if (current?.telegram.state === "failed") {
     return true;
   }
-  if (deps.userId === undefined || !isChannelOn(deps.settings, stored.notification.kind, "app")) {
+  if (deps.userId === undefined || !isChannelOn(deps.settings, notification.kind, "app")) {
     return false;
   }
   const subscriptions = await subscriptionsOf(deps.binding, deps.userId, Date.parse(deps.now));
   const activeSessions = new Set(subscriptions.map((subscription) => subscription.sessionId));
-  return await hasFailedCopy(deps.db, stored.notification.id, activeSessions);
+  return await hasFailedCopy(deps.db, notification.id, activeSessions);
 };

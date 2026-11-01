@@ -431,13 +431,21 @@ describe("a pool pass whose delivery fails and which then breaks", () => {
       const seminar = { ...event(0), endAt: msk("10:30"), startAt: msk("09:00") };
       await instance.syncCalendar(copy(msk("08:00"), [seminar]), msk("08:00"));
       await instance.runNotifications(msk("08:00"));
-      // Telegram is down, and the second delivery of every pass breaks (a bug in its message):
-      // the first one's failed copy has asked for a retry a minute on by then.
+      // Telegram is down, and the delivery of a pass's second notification breaks (a bug in its
+      // message): the first one's failed copy has asked for a retry a minute on by then.
       const down = {
         apiRoot: "https://telegram.test",
         fetch: async () => Response.json({ ok: false }, { status: 500 }),
         token: "123456:TEST-TOKEN",
       };
+      /** Whether this pass has already tried a notification's Telegram copy (its instant is now). */
+      const hasDeliveredNow = (): boolean =>
+        state.storage.sql
+          .exec(
+            "SELECT 1 FROM notification_deliveries WHERE method = 'telegram' AND attempted_at = ?",
+            new Date().toISOString(),
+          )
+          .toArray().length > 0;
       const passes: string[] = [];
       for (;;) {
         const at = await state.storage.getAlarm();
@@ -447,17 +455,17 @@ describe("a pool pass whose delivery fails and which then breaks", () => {
         vi.setSystemTime(new Date(at));
         await state.storage.deleteAlarm();
         const failing = new UserStore(state, deployed);
-        let lookups = 0;
         Object.defineProperties(failing, {
           chatId: {
-            value: async () => {
-              lookups += 1;
-              if (lookups === 1) {
-                passes.push(new Date().toISOString());
-              }
-              return await (lookups < 3
-                ? Promise.resolve("1002")
-                : Promise.reject(new Error("the message broke")));
+            value: async () =>
+              await (hasDeliveredNow()
+                ? Promise.reject(new Error("the message broke"))
+                : Promise.resolve("1002")),
+          },
+          derive: {
+            value: async (now: string) => {
+              passes.push(now);
+              return await UserStore.prototype.derive.call(failing, now);
             },
           },
           runNotifications: {

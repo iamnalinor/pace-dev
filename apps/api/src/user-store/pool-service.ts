@@ -208,9 +208,10 @@ export class NotificationPool {
     if (!stored.ok) {
       return stored;
     }
-    await deliverNew(await this.#deps(now, options.couriers), stored.value, options);
-    const isRetry = await hasSendRetry(await this.#deps(now, options.couriers), stored.value);
-    return ok({ isRetry, notification: stored.value.notification });
+    const deps = await this.#deps(now, options.couriers);
+    const { notification } = stored.value;
+    await deliverNew(deps, stored.value, options);
+    return ok({ isRetry: await hasSendRetry(deps, notification), notification });
   }
 
   /** The pass itself (see `run`). */
