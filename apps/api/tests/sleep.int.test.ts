@@ -2,7 +2,14 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { endpoints, isAutoSleepId, newId, sleepNightOf, wallClockInstant } from "@pace/core";
+import {
+  endpoints,
+  formatInZone,
+  isAutoSleepId,
+  newId,
+  sleepNightOf,
+  wallClockInstant,
+} from "@pace/core";
 
 import { SLEEP_NEXT_AT_KEY } from "../src/user-store/sleep-pass.ts";
 import { answerOf, call, json, loginAsDev, nonceLogin, pushEvents } from "./helpers.ts";
@@ -208,6 +215,49 @@ describe("automatic sleep on the server", () => {
     const settled = await sleepLog(token);
     await fireAlarm(store);
     expect(await sleepLog(token)).toEqual(settled);
+  });
+});
+
+describe("automatic sleep and the person's own records, through the store", () => {
+  it("settles a night the person started work in from a browser: the log stops changing (C1)", async () => {
+    const { phone, store, token } = await phoneAccount("1001", { digestWindows: [] });
+    // The phone is put away at 22:40 and tells every 15 minutes; the night opens at 22:40.
+    vi.setSystemTime(new Date(at("23:30")));
+    await upload(phone, [["22:30", "22:40"]], "23:25");
+    expect((await sleepLog(token)).map((event) => event.occurredAt)).toEqual([at("22:40")]);
+    // 23:50: work started live from a browser, which records no use.
+    vi.setSystemTime(new Date(at("23:50")));
+    const work = envelope("activity.started", {
+      activityId: newId(),
+      category: "work",
+      label: "Deploy",
+    });
+    await pushEvents(token, [work]);
+    // Uploads and sleep's own alarms every 15 minutes until 03:00, the phone quiet throughout.
+    const minutesOn = (minutes: number) =>
+      new Date(Date.parse(at("00:00")) + minutes * 60_000).toISOString();
+    const lengths = [];
+    for (let quarter = 0; quarter <= 12; quarter += 1) {
+      vi.setSystemTime(new Date(minutesOn(quarter * 15)));
+      await upload(phone, [], formatInZone(minutesOn(quarter * 15 - 5), MOSCOW, "HH:mm"));
+      await sleepDueNow(store);
+      await fireAlarm(store);
+      lengths.push((await sleepLog(token)).length);
+    }
+    // The sleep opened before the work goes once, the night opens at the work's start and runs
+    // on; then nothing more is written, under any id.
+    const written = await sleepLog(token);
+    expect(written.map((event) => [event.type, event.occurredAt])).toEqual([
+      ["activity.started", at("22:40")],
+      ["event.revoked", expect.any(String)],
+      ["activity.started", at("23:50")],
+    ]);
+    expect(written.filter((event) => /-\d+$/u.test(event.id))).toEqual([]);
+    expect(new Set(lengths.slice(4))).toEqual(new Set([3]));
+    expect(await sleeps(store)).toEqual(
+      expect.arrayContaining([{ endAt: null, startAt: at("23:50") }]),
+    );
+    expect(await sleepDecisions(token)).toHaveLength(3);
   });
 });
 
