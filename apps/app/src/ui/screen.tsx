@@ -14,8 +14,14 @@ export const Screen = ({
   fills = false,
   footer,
   header,
+  scrollLabel,
 }: {
   readonly children: ReactNode;
+  /**
+  A body that holds no control (Insights) is a stop for the keyboard under this name, so it can
+  be scrolled without a mouse (axe's scrollable-region-focusable; QA round 11 L8).
+  */
+  readonly scrollLabel?: string;
   /**
   The body takes the height left under the header as it is, without scrolling: Week
   fits its grid into it (and scrolls the grid itself only when it cannot).
@@ -39,6 +45,11 @@ export const Screen = ({
             className="flex-1"
             contentContainerClassName="pb-24"
             keyboardShouldPersistTaps="handled"
+            {...(scrollLabel !== undefined && {
+              "aria-label": scrollLabel,
+              role: "region",
+              tabIndex: 0,
+            })}
           >
             {children}
           </ScrollView>

@@ -8,6 +8,12 @@ import { NOW } from "@pace/core/testing";
 import { InsightsScreen } from "./insights-screen.tsx";
 
 describe("InsightsScreen", () => {
+  it("lets a keyboard reach and scroll its body, which holds no control (QA round 11 L8)", async () => {
+    await renderScreen(<InsightsScreen />, await createTestRuntime());
+    const body = screen.getByLabelText("Insights, the week's numbers");
+    expect(body.props).toMatchObject({ tabIndex: 0 });
+  });
+
   it("says so when nothing is tracked", async () => {
     await renderScreen(<InsightsScreen />, await createTestRuntime());
     expect(screen.getByText("Nothing tracked this week yet.")).toBeOnTheScreen();

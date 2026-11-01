@@ -136,6 +136,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "calendar.notesCut": "Остальное — в календаре.",
   "week.details": "Подробности",
   "insights.title": "Аналитика",
+  "insights.body": "{title}: цифры недели",
   "insights.previous": "Предыдущая неделя",
   "insights.next": "Следующая неделя",
   "insights.byCategory": "Время по категориям",

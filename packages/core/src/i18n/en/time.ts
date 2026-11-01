@@ -133,6 +133,7 @@ export const enTime = {
   "calendar.notesCut": "The rest is in the calendar.",
   "week.details": "Details",
   "insights.title": "Insights",
+  "insights.body": "{title}, the week's numbers",
   "insights.previous": "Previous week",
   "insights.next": "Next week",
   "insights.byCategory": "Time by category",
