@@ -73,6 +73,7 @@ export {
   type NotificationFeed,
   parseLiveNotice,
 } from "./notifications.ts";
+export { type PeerTabs, type StoreChange } from "./peer-tabs.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {
   type AppState,

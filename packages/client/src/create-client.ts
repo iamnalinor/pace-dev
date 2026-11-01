@@ -15,6 +15,7 @@ import {
   type SocketLike,
 } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
+import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
 import {
@@ -50,6 +51,8 @@ export type PaceClientOptions = {
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
   /** Defaults to the clock's `now`. */
   readonly now?: () => string;
+  /** The other tabs sharing this store (a browser profile's), told of every change to it. */
+  readonly peers?: PeerTabs | undefined;
   readonly session: SessionStore;
   readonly source: "app" | "web";
   readonly store: EventStore;
@@ -74,8 +77,15 @@ const stateAndSync = (
     onLocal: () => {
       wiring.sendSoon();
     },
+    ...(options.peers !== undefined && { onStored: options.peers.post }),
     source: options.source,
     store: options.store,
+  });
+  options.peers?.listen((message) => {
+    const change = parseStoreChange(message);
+    if (change !== null) {
+      void state.adoptPeerChange(change);
+    }
   });
   const sync = createSyncClient({
     now,

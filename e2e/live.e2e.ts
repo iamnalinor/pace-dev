@@ -91,3 +91,59 @@ test("a task added on one device shows on another within a second and a half, ov
   await laptop.page.context().close();
   await phone.page.context().close();
 });
+
+test("a task added in one tab shows in a second tab of the same profile, and that tab calls nothing (QA 17 M1)", async ({
+  browser,
+}) => {
+  // One profile: one IndexedDB copy, one device id. The server tells no socket of the device that
+  // wrote, and the second tab's pull would find the shared cursor already moved: only the tabs'
+  // own channel can tell it.
+  const telegramId = freshTelegramId();
+  await resetAccount(telegramId);
+  const { token } = await createDevSession(telegramId);
+  const seed = `seeded ${crypto.randomUUID().slice(0, 6)}`;
+  await seedTask(token, seed);
+  const context = await browser.newContext({ viewport: { height: 900, width: 1440 } });
+  await context.addInitScript(
+    ({ key, value }) => {
+      localStorage.setItem(key, value);
+    },
+    { key: SESSION_KEY, value: token },
+  );
+  const first = await context.newPage();
+  await first.goto("/");
+  await expect(nowTasks(first).getByText(seed)).toBeVisible();
+  const second = await context.newPage();
+  // Every sync call and socket request the second tab makes, counted once it has settled.
+  const calls: string[] = [];
+  const sent: string[] = [];
+  const heard: string[] = [];
+  second.on("request", (request) => {
+    if (request.url().includes("/api/sync")) {
+      calls.push(request.url());
+    }
+  });
+  second.on("websocket", (socket) => {
+    socket.on("framesent", ({ payload }) => {
+      sent.push(String(payload));
+    });
+    socket.on("framereceived", ({ payload }) => {
+      heard.push(String(payload));
+    });
+  });
+  await second.goto("/");
+  await expect(nowTasks(second).getByText(seed)).toBeVisible();
+  // Settled: its socket is up (the server said hello) and its start's syncs are done.
+  await expect.poll(() => heard.some((frame) => frame.includes('"type":"hello"'))).toBe(true);
+  await second.waitForTimeout(1500);
+  calls.length = 0;
+  sent.length = 0;
+  const title = `buy stamps ${crypto.randomUUID().slice(0, 6)}`;
+  await addTaskHere(first, title);
+  await expect(nowTasks(second).getByText(title)).toBeVisible({ timeout: 2000 });
+  // The steady state: the second tab stays quiet (nothing pulled again for the same change).
+  await second.waitForTimeout(3000);
+  expect(calls).toEqual([]);
+  expect(sent.filter((frame) => frame !== "ping")).toEqual([]);
+  await context.close();
+});
