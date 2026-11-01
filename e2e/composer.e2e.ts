@@ -77,6 +77,27 @@ test("a pasted message shows actions and is written only on Approve", async ({ p
   await expect(nowTasks(page).getByText(message)).toBeVisible();
 });
 
+for (const [width, height, size] of [
+  [390, 844, "phone"],
+  [1440, 900, "desktop"],
+] as const) {
+  test(`a share to the installed web app lands in the line and stays at /add (${size}, QA 17 M3)`, async ({
+    page,
+  }) => {
+    // The manifest's share_target opens /add with the shared title, text and link in the query.
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto(
+      "/add?title=Article&text=https%3A%2F%2Fexample.com%2Fa%20a%20look%20at%20this&url=https%3A%2F%2Fexample.com%2Fa",
+    );
+    const line = page.getByRole("textbox", { name: "New task" });
+    await expect(line).toHaveValue("Article https://example.com/a a look at this");
+    expect(new URL(page.url()).pathname).toBe("/add");
+    await line.press("Enter");
+    await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
+  });
+}
+
 test("a title typed into the empty form is added on Enter", async ({ page }) => {
   await loginViaApi(page);
   await page.goto("/");

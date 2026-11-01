@@ -31,6 +31,21 @@ const routeFiles = (): readonly string[] =>
 /** What is wrong with the sidebar, by whether the screen should have it. */
 const SIDEBAR_FAULT = ["shown on a bare screen", "missing"] as const;
 
+/**
+Where a signed-in direct load of `url` should stay (QA round 17 M2: Day and Inbox came back as `/`,
+so a reload landed on Now): its own address, except the screens that only send the person on.
+Signing in and the walk-through send a signed-in person on as well, and are not judged here.
+*/
+const expectedLanding = (size: string, url: string): null | string => {
+  if (BARE.some((bare) => url === bare || url.startsWith(`${bare}/`))) {
+    return null;
+  }
+  if (url === "/review") {
+    return "/inbox";
+  }
+  return url === "/more" && size === "desktop" ? "/" : url;
+};
+
 /** On a desktop every screen but signing in and the walk-through keeps the sidebar. */
 const isSidebarScreen = (size: string, url: string): boolean =>
   size === "desktop" && BARE.every((bare) => url !== bare && !url.startsWith(`${bare}/`));
@@ -179,8 +194,11 @@ for (const size of SIZES) {
         const crashes = await page.getByText("Что-то сломалось").count();
         const sidebars = await page.getByRole("navigation", { name: /./u }).count();
         // A signed-in person is sent on from the sign-in screens: judge where the page landed.
-        const isSidebarExpected = isSidebarScreen(size.name, new URL(page.url()).pathname);
+        const landed = new URL(page.url()).pathname;
+        const isSidebarExpected = isSidebarScreen(size.name, landed);
+        const expected = expectedLanding(size.name, url);
         failures.push(
+          ...(expected === null || expected === landed ? [] : [`${url}: landed on ${landed}`]),
           ...errors.map((error) => `${url}: ${error}`),
           ...Array.from({ length: crashes }, () => `${url}: the crash screen`),
           ...[`${url}: sidebar ${SIDEBAR_FAULT[Number(isSidebarExpected)] ?? ""}`].filter(
