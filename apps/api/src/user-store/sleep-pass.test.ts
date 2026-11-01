@@ -293,4 +293,43 @@ describe("the store's alarm", () => {
       expect(await state.storage.getAlarm()).not.toBeNull();
     });
   });
+
+  it("looks again later and later while the pass keeps failing, and as usual once one completes", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2099-10-07T22:30:00.000Z"));
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const failing = { is: true };
+      // The store's own pass, for when it stops failing (the method is protected).
+      const real = Reflect.get(Object.getPrototypeOf(instance) as object, "sleepPass") as (
+        this: UserStore,
+        now: string,
+      ) => Promise<readonly string[]>;
+      Object.defineProperty(instance, "sleepPass", {
+        value: async (now: string) =>
+          failing.is
+            ? await Promise.reject(new Error("the pass broke"))
+            : await real.call(instance, now),
+      });
+      await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now());
+      /** Fires the alarm at sleep's next look; answers how many minutes on it then looks. */
+      const failAgain = async (): Promise<number> => {
+        const at = (await state.storage.get<number>(SLEEP_NEXT_AT_KEY)) ?? NaN;
+        vi.setSystemTime(new Date(at));
+        await instance.alarm();
+        return ((await state.storage.get<number>(SLEEP_NEXT_AT_KEY)) ?? NaN) - at;
+      };
+      const waits = [];
+      for (let index = 0; index < 6; index += 1) {
+        waits.push((await failAgain()) / 60_000);
+      }
+      // 15 minutes, doubling, never more than four hours.
+      expect(waits).toEqual([15, 30, 60, 120, 240, 240]);
+      // A pass that completes (no phone told anything: nothing to arm) starts the count again.
+      failing.is = false;
+      await failAgain();
+      failing.is = true;
+      await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now());
+      expect((await failAgain()) / 60_000).toBe(15);
+    });
+  });
 });

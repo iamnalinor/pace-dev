@@ -393,14 +393,15 @@ pruned: the owner keeps the data). Without a phone upload within a day nothing n
 and nothing armed, but an automatic sleep still running ends where knowledge ended (the highest
 `knownUntil` decided with), and goes when that leaves it short: a dead or signed-out phone never
 leaves a sleep open for days. A phone that tells again later walks it as usual. A failed pass is logged and never fails what ran it: after an
-upload the upload is answered, at the alarm sleep looks again in 15 minutes.
+upload the upload is answered, at the alarm sleep looks again in 15 minutes, doubling while
+passes keep failing up to four hours (key `sleep:failures`; a pass that completes starts it again).
 
 **The alarm** is one per store and shared: the pool's next pass and delivery retries, the
 assistant's queue and automatic sleep each arm it through `armEarliest` (`user-store/alarm.ts`),
 which only ever moves it earlier, so none postpones another's earlier time. `alarm()` runs the
 pool, the queue and sleep (a failure in one does not hold the others back; the pool's or the
 queue's fails the alarm afterwards, so the runtime retries it, while sleep's is logged and looked at
-again in 15 minutes), and each arms its next time again; the runtime takes the alarm off as it fires.
+again later, from 15 minutes up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
 Sleep keeps its own time (`sleep:next-at`): it runs a pass only once that has come, and before
 that arms it again. It looks every 15 minutes from 21:00 to noon in the person's zone and at the
 next 21:00 by day (`nextSleepCheckAt`).

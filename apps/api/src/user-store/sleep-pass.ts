@@ -206,6 +206,13 @@ next look. Without a phone that uploaded within a day, the rules' running sleeps
 knowledge ended (once) and nothing is armed: its next upload starts again. Answers the ids written.
 */
 export const runSleepPass = async (host: SleepHost, now: string): Promise<readonly string[]> => {
+  const made = await passOn(host, now);
+  await completed(host.storage);
+  return made;
+};
+
+/** The pass itself (see `runSleepPass`). */
+const passOn = async (host: SleepHost, now: string): Promise<readonly string[]> => {
   const { held, knownUntil, read, uses, usesFrom } = await readWindow(host, now);
   const zone = await host.zone();
   const decidedUntil = (await host.storage.get<string>(DECIDED_UNTIL_KEY)) ?? null;
@@ -278,14 +285,39 @@ const decideAndHold = async (
   return made;
 };
 
-/** How soon sleep looks again after a pass that failed (as after any pass at night). */
+/** How soon sleep looks again after a pass that failed (as after any pass at night)... */
 const RETRY_MINUTES = 15;
+
+/** ...doubling while passes keep failing, up to this. */
+const RETRY_MAX_MINUTES = 4 * 60;
+
+/** Storage key of how many passes at the alarm have failed in a row. */
+const FAILURES_KEY = "sleep:failures";
+
+/** A pass completed: the next failure waits the shortest again. */
+const completed = async (storage: DurableObjectStorage): Promise<void> => {
+  if ((await storage.get(FAILURES_KEY)) !== undefined) {
+    await storage.delete(FAILURES_KEY);
+  }
+};
+
+/**
+After a pass at the alarm failed: when sleep looks again, 15 minutes on, doubling with each
+failure in a row up to four hours, so a pass that keeps failing (and may load the whole log each
+time) does not run every 15 minutes for good.
+*/
+const retryAtOf = async (storage: DurableObjectStorage, now: string): Promise<number> => {
+  const failures = ((await storage.get<number>(FAILURES_KEY)) ?? 0) + 1;
+  await storage.put(FAILURES_KEY, failures);
+  const minutes = Math.min(RETRY_MINUTES * 2 ** (failures - 1), RETRY_MAX_MINUTES);
+  return Date.parse(now) + minutes * 60_000;
+};
 
 /**
 Sleep's part of `alarm()`: a pass once its own time has come; before that (another wait's alarm
 fired first and took sleep's time with it) its time is armed again and nothing is read. A pass
-that fails is logged and looked at again in 15 minutes: it never fails the alarm, whose retries
-would run the pool and the queue again for it.
+that fails is logged and looked at again later (`retryAtOf`): it never fails the alarm, whose
+retries would run the pool and the queue again for it.
 */
 export const sleepAtAlarm = async (
   storage: DurableObjectStorage,
@@ -305,7 +337,7 @@ export const sleepAtAlarm = async (
     createLogger("info").error("The sleep pass at the alarm failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    const retryAt = Date.parse(now) + RETRY_MINUTES * 60_000;
+    const retryAt = await retryAtOf(storage, now);
     await storage.put(SLEEP_NEXT_AT_KEY, retryAt);
     await armEarliest(storage, retryAt);
   }
