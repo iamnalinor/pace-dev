@@ -13,6 +13,8 @@ export const ruSessions: { readonly [K in keyof typeof enSessions]: string } = {
   "sessions.kind.agent": "Компьютер",
   "sessions.kind.dev": "Вход разработчика",
   "sessions.kind.mcp": "ИИ-приложение",
+  "sessions.added": "Добавлено {time}",
+  "sessions.signedIn": "Вход {time}",
   "sessions.revoke": "Завершить",
   "sessions.disconnect": "Отключить",
   "sessions.revokeConfirm": "Завершить этот сеанс?",

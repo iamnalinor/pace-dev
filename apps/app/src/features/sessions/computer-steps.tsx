@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { TriangleAlert } from "lucide-react-native";
+import { useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import type { NewAgent } from "@pace/client/react";
 
 import { useT } from "#app/app-state.tsx";
 import { browserComputerOs } from "#app/platform/computer-os.ts";
+import { moveFocus } from "#app/platform/move-focus.ts";
 import { useServerInfo } from "#app/platform/server-store.ts";
 import { SHARE_LABEL_KEY, shareText } from "#app/platform/share-text.ts";
 import { Button } from "#app/ui/button.tsx";
+import { useTheme } from "#app/ui/theme-provider.tsx";
 import { agentCommand, agentLogsCommand, type ComputerOs, LINUX_PACKAGES } from "@pace/client";
 
 import { CodeText } from "./code-text.tsx";
@@ -24,19 +27,35 @@ const tokenShareLabel = (isShared: boolean) => {
 };
 
 /**
-After the token is made: the computer's system (preselected from the browser on a computer),
-then that system's steps around the install command and its separate one-time token.
-Self-contained, so it can sit in a sheet or inline in Settings. The commands name the current
-server (`useServerInfo()`), not the build's.
+The token is shown this once: said calmly in the text colour beside a warning mark, not a
+paragraph of alarm red (QA round 15 L7).
 */
-export const ComputerSteps = ({
-  device,
-  onDone,
-}: {
-  readonly device: NewAgent;
-  readonly onDone: () => void;
-}) => {
+const TokenOnce = () => {
   const t = useT();
+  const { palette } = useTheme();
+  return (
+    <View className="flex-row gap-2">
+      <View className="pt-0.5">
+        <TriangleAlert aria-hidden color={palette.warn} size={16} strokeWidth={2} />
+      </View>
+      <Text className="min-w-0 flex-1 font-sans text-[13px] leading-[18px] text-fg2">
+        {t("devices.tokenOnce")}
+      </Text>
+    </View>
+  );
+};
+
+/**
+After the token is made: the computer's system (preselected from the browser on a computer),
+then that system's steps around the install command and its separate one-time token. The
+caller puts Done (`ComputerStepsDone`) where it stays in sight. Arriving, focus lands on the
+chosen system: the control that made the token has gone (QA round 16 L2). The commands name the
+current server (`useServerInfo()`), not the build's; every copy button looks the same.
+*/
+export const ComputerSteps = ({ device }: { readonly device: NewAgent }) => {
+  const t = useT();
+  // Once, as the steps appear; a later change of system keeps focus where the person put it.
+  const hasFocusedRef = useRef(false);
   const [os, setOs] = useState<ComputerOs>(() => browserComputerOs() ?? "windows");
   const [isShared, setIsShared] = useState(false);
   const [isTokenShared, setIsTokenShared] = useState(false);
@@ -45,6 +64,14 @@ export const ComputerSteps = ({
   return (
     <View className="gap-3">
       <OsPicker
+        chosenRef={(node) => {
+          if (node === null || hasFocusedRef.current) {
+            return;
+          }
+
+          hasFocusedRef.current = true;
+          moveFocus(node);
+        }}
         onChange={(next) => {
           setOs(next);
           setIsShared(false);
@@ -68,6 +95,7 @@ export const ComputerSteps = ({
             setIsShared((await shareText(command)) === "done");
           })();
         }}
+        variant="secondary"
       >
         {t(isShared && SHARE_LABEL_KEY === "devices.copy" ? "devices.copied" : SHARE_LABEL_KEY)}
       </Button>
@@ -84,17 +112,22 @@ export const ComputerSteps = ({
       >
         {t(tokenShareLabel(isTokenShared))}
       </Button>
-      <Text className="font-sans text-[13px] leading-[18px] text-warn">
-        {t("devices.tokenOnce")}
-      </Text>
+      <TokenOnce />
       <Text className={STEP}>{t("devices.step3")}</Text>
       <Text className={STEP}>{t("devices.step4")}</Text>
       <CodeText>{agentLogsCommand(os)}</CodeText>
       {os === "linux" && <Text className={NOTE}>{t("devices.waylandGnome")}</Text>}
       <Text className={NOTE}>{t("devices.checkList")}</Text>
-      <Button onPress={onDone} variant="secondary">
-        {t("devices.done")}
-      </Button>
     </View>
+  );
+};
+
+/** Done, closing the steps: the sheet's footer, in sight however long the steps (QA round 15 L7). */
+export const ComputerStepsDone = ({ onDone }: { readonly onDone: () => void }) => {
+  const t = useT();
+  return (
+    <Button onPress={onDone} variant="secondary">
+      {t("devices.done")}
+    </Button>
   );
 };

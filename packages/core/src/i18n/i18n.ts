@@ -20,6 +20,12 @@ const interpolate = (text: string, params: MessageParams | undefined): string =>
   });
 
 /**
+The platform's Russian region names spell «Соединенные Штаты» with е where the language writes ё
+(QA round 15 L10); the one such name a sign-in is likely to come from.
+*/
+const withYo = (name: string): string => name.replaceAll("Соединенн", "Соединённ");
+
+/**
 A country's name in the reader's language, from the code Cloudflare reports (`DE`); the value as
 it came when it names no region (Tor's "T1") or the platform cannot name regions (Hermes has no
 `Intl.DisplayNames`). Settings' session list and the sign-in notice both name places this way.
@@ -29,7 +35,8 @@ export const countryName = (code: string, language: Language): string => {
     return code;
   }
   try {
-    return new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
+    const name = new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
+    return language === "ru" ? withYo(name) : name;
   } catch {
     return code;
   }

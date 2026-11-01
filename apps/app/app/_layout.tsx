@@ -12,6 +12,7 @@ import { isBarePath, RouteGate } from "#app/auth/route-gate.tsx";
 import { IncompatibleGate, useIsServerBlocked } from "#app/features/server/incompatible-screen.tsx";
 import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx";
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
+import { DocumentHead } from "#app/platform/document-head.tsx";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
@@ -55,6 +56,7 @@ const Navigator = () => {
       <View className="flex-1 flex-row bg-bg">
         <CrashContext />
         <DocumentLanguage />
+        <DocumentHead />
         {hasSidebar ? <Sidebar /> : null}
         <View className="flex-1">
           <Stack

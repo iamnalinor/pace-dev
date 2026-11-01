@@ -33,9 +33,30 @@ for (const size of SIZES) {
       await expect(section.getByText("This device")).toBeVisible();
       await expectNoA11yViolations(page);
 
+      // The tab names the screen; the page's scheme follows the app's theme (QA round 15 L8, L14).
+      await expect(page).toHaveTitle("Settings · Pace");
+      await expect
+        .poll(
+          async () =>
+            await page.evaluate(
+              () => globalThis.getComputedStyle(globalThis.document.documentElement).colorScheme,
+            ),
+        )
+        .toBe("light");
       // By keyboard (QA round 15 M2): the name is focused with its suggestion selected, the button
       // shows Enter, and Enter in the field creates the token.
       await section.getByRole("button", { name: "Add a computer" }).click();
+      // The dialog is named by its title, and its scroll stays in it (QA round 15 L8).
+      const dialog = page.getByRole("dialog", { name: "Add a computer" });
+      await expect(dialog).toBeVisible();
+      expect(
+        await dialog.evaluate(
+          (node) =>
+            [...node.querySelectorAll("div")].filter(
+              (div) => globalThis.getComputedStyle(div).overscrollBehaviorY === "contain",
+            ).length,
+        ),
+      ).toBeGreaterThan(0);
       const name = page.getByRole("textbox", { name: "Name" });
       await expect(name).toBeFocused();
       await expect(page.getByRole("button", { name: "Create the token" })).toHaveAttribute(
@@ -46,6 +67,10 @@ for (const size of SIZES) {
       await expect(name).toHaveValue("Linux Mint");
       await page.keyboard.press("Enter");
       await expect(page.getByTestId("device-setup-token")).not.toBeEmpty();
+      // The name step went: focus moves to the next step's chosen system (QA round 16 L2).
+      await expect(dialog.getByRole("radio", { checked: true })).toBeFocused();
+      // Done stays in sight under the scrolling steps (QA round 15 L7).
+      await expect(page.getByRole("button", { name: "Done" })).toBeInViewport();
       // The commands name the local API, the server this build talks to.
       await page.getByRole("radio", { name: "Linux" }).click();
       await expect(page.getByText(/^curl .*pace_agent\.py install /u)).toContainText(
@@ -73,6 +98,12 @@ for (const size of SIZES) {
       });
       await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
       await page.keyboard.press("Enter");
+      await expect(computer.getByRole("button", { name: "Disconnect" })).toBeFocused();
+      // Escape cancels it too, as it closes a sheet (QA round 15 L1), and gives focus back.
+      await page.keyboard.press("Enter");
+      await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(confirm).toHaveCount(0);
       await expect(computer.getByRole("button", { name: "Disconnect" })).toBeFocused();
 
       await computer.getByRole("button", { name: "Disconnect" }).click();

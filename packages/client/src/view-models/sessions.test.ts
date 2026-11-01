@@ -34,32 +34,39 @@ const agent = (lastDataAt: null | string): Session =>
 const metaOf = (item: Session, language: "en" | "ru" = "en"): readonly string[] =>
   sessionRows([item], { language, now: NOW, zone: ZONE })[0]?.meta ?? [];
 
+/** The part about data an app or an agent sent: after the kind, before when it was added. */
+const dataPart = (item: Session, language: "en" | "ru" = "en"): string | undefined =>
+  metaOf(item, language).at(-2);
+
 /** The line of an agent whose newest data ended `minutes` before now. */
-const agentSent = (minutes: number, language: "en" | "ru" = "en"): readonly string[] =>
-  metaOf(agent(before(minutes)), language);
+const agentSent = (minutes: number, language: "en" | "ru" = "en"): string | undefined =>
+  dataPart(agent(before(minutes)), language);
 
 describe("the sessions list", () => {
   it("shows recent data as a duration up to and including eight hours", () => {
     expect(LAST_DATA_EXACT_AFTER_HOURS).toBe(8);
-    expect(agentSent(7 * 60 + 59)).toEqual(["Last data 7h 59m ago"]);
-    expect(agentSent(8 * 60)).toEqual(["Last data 8h ago"]);
+    expect(agentSent(7 * 60 + 59)).toBe("Last data 7h 59m ago");
+    expect(agentSent(8 * 60)).toBe("Last data 8h ago");
   });
 
   it("shows older data as the exact time in the account's zone", () => {
-    expect(agentSent(8 * 60 + 1)).toEqual(["Last data Oct 12, 23:10"]);
-    expect(agentSent(8 * 60 + 1, "ru")).toEqual(["Данные 12 окт., 23:10"]);
+    expect(agentSent(8 * 60 + 1)).toBe("Last data Oct 12, 23:10");
+    expect(agentSent(8 * 60 + 1, "ru")).toBe("Данные 12 окт., 23:10");
   });
 
   it("says when an app or an agent has sent nothing yet", () => {
-    expect(metaOf(agent(null))).toEqual(["Nothing sent yet"]);
-    expect(metaOf(session({ kind: "app", name: "Pixel 9a" }), "ru")).toEqual([
+    expect(dataPart(agent(null))).toBe("Nothing sent yet");
+    expect(dataPart(session({ kind: "app", name: "Pixel 9a" }), "ru")).toBe(
       "Ещё ничего не прислал",
-    ]);
+    );
   });
 
   it("says nothing about data for a browser or an MCP app", () => {
-    expect(metaOf(session())).toEqual([]);
-    expect(metaOf(session({ kind: "mcp", lastSeenAt: null, scopes: ["tasks:read"] }))).toEqual([]);
+    expect(metaOf(session())).toEqual(["Browser", "Signed in Oct 1, 13:00"]);
+    expect(metaOf(session({ kind: "mcp", lastSeenAt: null, scopes: ["tasks:read"] }))).toEqual([
+      "AI app",
+      "Added Oct 1, 13:00",
+    ]);
   });
 
   it("puts the current session first as this device, then the most recently seen", () => {
@@ -79,17 +86,57 @@ describe("the sessions list", () => {
       { language: "en", now: NOW, zone: ZONE },
     );
     expect(rows.map((row) => row.id)).toEqual(["me", "new", "old", "mcp"]);
-    expect(rows[0]).toMatchObject({ isCurrent: true, meta: ["This device"] });
+    expect(rows[0]).toMatchObject({ isCurrent: true, meta: ["Browser", "This device"] });
     expect(rows[1]?.isCurrent).toBe(false);
   });
 
   it("names where a session signed in from: the country in the viewer's language and the address", () => {
     const placed = session({ city: "Berlin", country: "DE", ip: "1.2.3.4" });
-    expect(metaOf(placed)).toEqual(["Germany", "1.2.3.4"]);
-    expect(metaOf(placed, "ru")).toEqual(["Германия", "1.2.3.4"]);
-    expect(metaOf({ ...placed, current: true }, "ru")).toEqual(["Это устройство"]);
+    expect(metaOf(placed)).toEqual(["Browser", "Germany", "1.2.3.4", "Signed in Oct 1, 13:00"]);
+    expect(metaOf(placed, "ru")).toEqual(["Браузер", "Германия", "1.2.3.4", "Вход 1 окт., 13:00"]);
+    expect(metaOf({ ...placed, current: true }, "ru")).toEqual(["Браузер", "Это устройство"]);
     // Cloudflare's "T1" (Tor) is no region: shown as it came.
-    expect(metaOf(session({ country: "T1" }))).toEqual(["T1"]);
+    expect(metaOf(session({ country: "T1" }))).toContain("T1");
+  });
+
+  it("names every row's kind in words and tells same-name rows apart by when they were added", () => {
+    // QA round 15 L5 / L15: an icon alone did not say browser, phone, computer or AI app, and two
+    // "My computer" rows read the same.
+    const rows = sessionRows(
+      [
+        session({
+          createdAt: Date.parse("2026-10-13T01:05:00.000Z"),
+          id: "a",
+          kind: "agent",
+          name: "My computer",
+        }),
+        session({
+          createdAt: Date.parse("2026-10-13T03:40:00.000Z"),
+          id: "b",
+          kind: "agent",
+          name: "My computer",
+        }),
+        session({ id: "dev", kind: "dev", name: "Dev login" }),
+        session({
+          createdAt: Date.parse("2025-12-30T10:00:00.000Z"),
+          id: "app",
+          kind: "app",
+          name: "Pixel 9a",
+        }),
+      ],
+      { language: "en", now: NOW, zone: ZONE },
+    );
+    const meta = Object.fromEntries(rows.map((row) => [row.id, row.meta]));
+    expect(meta["a"]).toEqual(["Computer", "Nothing sent yet", "Added Oct 13, 04:05"]);
+    expect(meta["b"]).toEqual(["Computer", "Nothing sent yet", "Added Oct 13, 06:40"]);
+    expect(meta["dev"]).toEqual(["Developer sign-in", "Signed in Oct 1, 13:00"]);
+    expect(meta["app"]).toEqual(["Phone app", "Nothing sent yet", "Signed in Dec 30 2025, 13:00"]);
+    const ru = sessionRows([session({ kind: "mcp", name: "Claude" })], {
+      language: "ru",
+      now: NOW,
+      zone: ZONE,
+    });
+    expect(ru[0]?.meta).toEqual(["ИИ-приложение", "Добавлено 1 окт., 13:00"]);
   });
 
   it("disconnects an agent and revokes everything else", () => {
@@ -122,7 +169,7 @@ describe("the sessions list", () => {
         fc.integer({ max: 59, min: 0 }),
         (minutes, seconds) => {
           const at = new Date(Date.parse(before(minutes)) - seconds * 1000).toISOString();
-          const [text] = metaOf(agent(at));
+          const text = dataPart(agent(at));
           expect(text?.endsWith(" ago")).toBe(minutes <= limit);
         },
       ),

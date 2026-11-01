@@ -11,6 +11,8 @@ export const enSessions = {
   "sessions.kind.agent": "Computer",
   "sessions.kind.dev": "Developer sign-in",
   "sessions.kind.mcp": "AI app",
+  "sessions.added": "Added {time}",
+  "sessions.signedIn": "Signed in {time}",
   "sessions.revoke": "Revoke",
   "sessions.disconnect": "Disconnect",
   "sessions.revokeConfirm": "End this session?",

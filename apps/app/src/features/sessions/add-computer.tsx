@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { type TextInput, View } from "react-native";
 
 import type { NewAgent } from "@pace/client/react";
@@ -10,11 +10,32 @@ import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
-import { ComputerSteps } from "./computer-steps.tsx";
+import { ComputerSteps, ComputerStepsDone } from "./computer-steps.tsx";
 
 /** How often, and how many times, the name field asks for focus as the sheet opens. */
 const FOCUS_RETRY_MS = 50;
 const FOCUS_TRIES = 10;
+
+/**
+Not `autoFocus`: on the web the sheet gives focus to its dialog as it opens, after the field took
+it, and the dialog may still be hidden a moment. Asked again until it takes, briefly.
+*/
+const useFocusAsSheetOpens = (fieldRef: RefObject<null | TextInput>): void => {
+  useEffect(() => {
+    const tries = { left: FOCUS_TRIES };
+    const timer = setInterval(() => {
+      tries.left -= 1;
+      if (fieldRef.current?.isFocused() === true || tries.left < 0) {
+        clearInterval(timer);
+        return;
+      }
+      focusField(fieldRef.current);
+    }, FOCUS_RETRY_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [fieldRef]);
+};
 
 /**
 "Add a computer": a name, then a token of its own (it may only upload app usage) inside one
@@ -35,22 +56,7 @@ export const AddComputer = ({
   // Enter and the button may land in one batch: one token (bug class 36).
   const sendingRef = useRef(false);
   const nameRef = useRef<TextInput>(null);
-  // Not `autoFocus`: on the web the sheet gives focus to its dialog as it opens, after the field
-  // took it, and the dialog may still be hidden a moment. Asked again until it takes, briefly.
-  useEffect(() => {
-    const tries = { left: FOCUS_TRIES };
-    const timer = setInterval(() => {
-      tries.left -= 1;
-      if (nameRef.current?.isFocused() === true || tries.left < 0) {
-        clearInterval(timer);
-        return;
-      }
-      focusField(nameRef.current);
-    }, FOCUS_RETRY_MS);
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
+  useFocusAsSheetOpens(nameRef);
   const submit = async (): Promise<void> => {
     if (sendingRef.current) {
       return;
@@ -68,7 +74,13 @@ export const AddComputer = ({
     }
   };
   return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} title={t("devices.add")} visible>
+    <Sheet
+      closeLabel={t("common.close")}
+      footer={created === null ? undefined : <ComputerStepsDone onDone={onClose} />}
+      onClose={onClose}
+      title={t("devices.add")}
+      visible
+    >
       {created === null ? (
         <View className="gap-3">
           {/* The name is the sheet's one question: focused, the suggestion selected to type over. */}
@@ -98,7 +110,7 @@ export const AddComputer = ({
           </Button>
         </View>
       ) : (
-        <ComputerSteps device={created} onDone={onClose} />
+        <ComputerSteps device={created} />
       )}
     </Sheet>
   );

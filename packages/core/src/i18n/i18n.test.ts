@@ -151,6 +151,12 @@ describe("countryName", () => {
     expect(countryName("T1", "en")).toBe("T1");
     expect(countryName("Germany", "en")).toBe("Germany");
   });
+
+  it("writes ё where Russian names need it, whatever the platform's data leaves out", () => {
+    // QA round 15 L10: the browser's data reads «Соединенные Штаты».
+    expect(countryName("US", "ru")).toBe("Соединённые Штаты");
+    expect(countryName("US", "en")).toBe("United States");
+  });
 });
 
 describe("plural", () => {

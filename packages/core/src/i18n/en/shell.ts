@@ -228,6 +228,7 @@ export const enShell = {
   "settings.more": "More",
   "nav.inbox": "Inbox",
   "nav.inboxWaiting": "Inbox, {count} waiting",
+  "nav.task": "Task",
   "nav.history": "History",
   "nav.newTask": "New task",
   "bot.notLinked":
