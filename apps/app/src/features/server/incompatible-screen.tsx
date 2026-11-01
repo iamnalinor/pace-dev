@@ -7,6 +7,8 @@ import { useAuth, useT } from "#app/app-state.tsx";
 import { serverHost, serverStore } from "#app/platform/server-store.ts";
 import { Button } from "#app/ui/button.tsx";
 
+import { WAY_OUT } from "./way-out.ts";
+
 /** Whether a signed-in person is held at the versions screen (the app and its server do not fit). */
 export const useIsServerBlocked = (): boolean => {
   const { status } = useAuth();
@@ -15,9 +17,10 @@ export const useIsServerBlocked = (): boolean => {
 };
 
 /**
-"Server and app versions don't match", signed in: what to update and one way out, Log out. The
-server is changed only signed out (the session belongs to this server), so after logging out the
-login screen offers Change; this screen does not.
+"Server and app versions don't match", signed in: what to update and one way out, Log out (and,
+on the web, Refresh for a page older than its server). The server is changed only signed out (the
+session belongs to this server), so after logging out the login screen offers Change; this screen
+does not.
 */
 const IncompatibleScreen = () => {
   const t = useT();
@@ -32,15 +35,20 @@ const IncompatibleScreen = () => {
             {t("server.mismatch")}
           </Text>
           <Text className="font-sans text-[15px] leading-[21px] text-fg2">
-            {t(reason === "client-outdated" ? "server.mismatchApp" : "server.mismatchServer")}
+            {t(reason === "client-outdated" ? WAY_OUT.appOutdated : WAY_OUT.serverOutdated)}
           </Text>
           <Text className="font-sans text-[13px] text-muted">
             {t("server.line", { host: serverHost(origin) })}
           </Text>
         </View>
-        <Button onPress={() => void auth.logout()} variant="secondary">
-          {t("settings.logout")}
-        </Button>
+        <View className="gap-3">
+          {reason === "client-outdated" && WAY_OUT.reload !== null ? (
+            <Button onPress={WAY_OUT.reload}>{t("update.refresh")}</Button>
+          ) : null}
+          <Button onPress={() => void auth.logout()} variant="secondary">
+            {t("settings.logout")}
+          </Button>
+        </View>
       </View>
     </View>
   );

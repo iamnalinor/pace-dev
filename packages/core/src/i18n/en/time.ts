@@ -56,7 +56,7 @@ export const enTime = {
   "time.calendar.nothingNear": "No calendar events around now",
   "time.calendarNone": "Nothing on in your calendar right now.",
   "time.calendarNoneWeb":
-    "Nothing on today in the calendar your phone sends (Pace on Android, with the calendar on in Settings → Devices).",
+    "Nothing on today in the calendar your phone sends (Pace on Android, with the calendar on in {settings} → {section}).",
   "time.calendarUntitled": "Meeting",
   "time.calendarStartUntitled": "Start a meeting without an event",
   "time.calendarSetUp": "Calendar from the phone",

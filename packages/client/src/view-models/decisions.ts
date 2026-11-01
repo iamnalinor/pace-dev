@@ -117,6 +117,9 @@ const sentenceOf = (step: DecisionStep) => {
 A step in words; `null` when the step lacks what its sentence names (an older row's edit
 without its fields, a close without its outcome), so the stored summary is shown instead.
 */
+/** Done (applied), offered (answered or expired), pending (a card still open: QA round 17 L16). */
+type Tense = "done" | "offered" | "pending";
+
 const stepText = (
   step: DecisionStep,
   {
@@ -126,7 +129,7 @@ const stepText = (
   }: {
     readonly lookup: Lookup;
     readonly summary: string | undefined;
-    readonly tense: "done" | "offered";
+    readonly tense: Tense;
   },
 ): null | string => {
   const { language } = lookup;
@@ -163,7 +166,7 @@ export const doneLines = (actions: readonly Action[], world: World): readonly st
 /** Each step in words beside its own summary; a step this client cannot word keeps the summary. */
 const linesOf = (
   { inputs, steps }: { readonly steps: Steps; readonly inputs: DecisionInputs },
-  tense: "done" | "offered",
+  tense: Tense,
   lookup: Lookup,
 ): readonly string[] => {
   const count = Math.max(steps.length, inputs.summaries.length);
@@ -221,11 +224,7 @@ type Row = {
   readonly claimed: ReadonlySet<string>;
 };
 
-const wordsOf = (
-  { inputs, lookup, steps }: Row,
-  tense: "done" | "offered",
-  fallback: MessageKey,
-) => {
+const wordsOf = ({ inputs, lookup, steps }: Row, tense: Tense, fallback: MessageKey) => {
   const lines = linesOf({ inputs, steps }, tense, lookup);
   return lines.length > 0 ? lines : [t(lookup.language, fallback)];
 };
@@ -243,6 +242,13 @@ const answeredParts = (row: Row, resolution: DecisionResolution): Parts => {
   };
 };
 
+/** What became of a reading nobody answered: what the data shows, else waiting or no answer. */
+const WAITING = { false: "decisions.outcome.unanswered", true: "decisions.outcome.shown" } as const;
+const outcomeOf = (seen: ReturnType<typeof seenAfter>, isWaiting: boolean, lookup: Lookup) =>
+  seen === null
+    ? t(lookup.language, WAITING[`${isWaiting}`])
+    : t(lookup.language, seen.key, { subject: seen.subject });
+
 /** A reading shown for approval: what the person did, as recorded, or else what the data shows. */
 const readingParts = (row: Row): Parts => {
   const { decision, inputs, lookup, steps } = row;
@@ -254,17 +260,11 @@ const readingParts = (row: Row): Parts => {
   const reading = { at: decision.at, text: inputs.request ?? inputs.text };
   const seen = seenAfter(known(steps), reading, { claimed: row.claimed, lookup });
   const isEmpty = steps.length === 0 && inputs.summaries.length === 0;
-  const unanswered = isStillOpen(decision.at, lookup.now)
-    ? "decisions.outcome.shown"
-    : "decisions.outcome.unanswered";
-  const outcome =
-    seen === null
-      ? t(lookup.language, unanswered)
-      : t(lookup.language, seen.key, { subject: seen.subject });
+  const isWaiting = seen === null && isStillOpen(decision.at, lookup.now);
   return {
-    lines: wordsOf(row, "offered", "decisions.nothing"),
+    lines: wordsOf(row, isWaiting ? "pending" : "offered", "decisions.nothing"),
     note: null,
-    outcome: isEmpty ? null : outcome,
+    outcome: isEmpty ? null : outcomeOf(seen, isWaiting, lookup),
     taskId: existing([seen?.taskId ?? null, ...stepTasks], lookup),
   };
 };

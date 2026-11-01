@@ -58,7 +58,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "time.calendar.nothingNear": "В календаре рядом нет событий",
   "time.calendarNone": "Сейчас в календаре ничего нет.",
   "time.calendarNoneWeb":
-    "Сегодня в календаре с телефона ничего нет (Pace на Android, календарь включён в Настройках → Устройства).",
+    "Сегодня в календаре с телефона ничего нет (Pace на Android, календарь включён: {settings} → {section}).",
   "time.calendarUntitled": "Встреча",
   "time.calendarStartUntitled": "Начать встречу без события",
   "time.calendarSetUp": "Календарь с телефона",

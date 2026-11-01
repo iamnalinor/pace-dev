@@ -30,7 +30,7 @@ export const enNotify = {
   "notify.kind.event_start": "Event starting",
   "notify.kind.activity_overrun": "Still doing…?",
   "notify.channel.telegram": "Telegram",
-  "notify.channel.app": "App",
+  "notify.channel.app": "Phone",
   "notify.channel.web": "Web",
   "notify.switch": "{kind} in {channel}",
   "notifications.title": "Notifications",
