@@ -214,7 +214,20 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 |---|---|---|---|
 | `POST /api/sync/push` | `{ events: Event[] (≤ 500), storeId }` | `{ accepted: id[], rejected: { id, reason }[], seq }` | a `storeId` that is not the store's current one refuses the whole batch with `409 store/changed`; each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
 | `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
-| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages, and the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
+| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v2, pace.v1, pace.auth.<token>` (`pace.v2` only when offered), `?device=<deviceId>&protocol=<n>` | v1: `{"type":"changed","seq":n}`; v2: `hello` first, then `events`; both: the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket tagged with its subprotocol and device (no duration billed while quiet; `ping` → `pong` without waking it). Whenever its log grows it tells every socket but the writing device's: v1 hears `changed`, v2 gets the new events (below). Not an `endpoint()`: an upgrade is not a JSON call. |
+
+**`pace.v2`** (`packages/core/src/api/live-protocol.ts`) carries the sync hot path over the same
+socket; everything else stays HTTP, which also stays the fallback (a closed socket, or no answer
+within `LIVE_REQUEST_TIMEOUT_MS` = 10 s; a client keeps at most `LIVE_MAX_IN_FLIGHT` = 4 requests
+open). It is additive: the API `PROTOCOL` stays the same and a socket offering only `pace.v1` is
+served as before. Requests are strict, answers loose (an unknown `type` reads as `unknown`).
+
+| Client sends | Server answers |
+|---|---|
+| `{ type: "push", id, storeId, events }` (the HTTP push body, `SyncPushBodySchema`, under a request id of 1–64 characters) | `{ type: "pushed", id, accepted, rejected, seq }` (the HTTP push answer), or `{ type: "error", id, code: "store/changed" }`; the store's same `push` runs, so a known id is accepted again without a second copy |
+| `{ type: "pull", id, since, limit? }` (`limit` 1–500, default `LIVE_PAGE` = 200) | `{ type: "events", id, since, seq, storeId, events, more }`: the HTTP pull's page |
+| anything else (invalid JSON, an unknown type, a bad field) | `{ type: "error", id, code: "bad-request" }` (`id` when one was readable, else empty); the socket stays open |
+| — (after any append) | `{ type: "events", since, seq, storeId, events, more: false }` to every v2 socket but the writing device's, with `since` the sequence before the append; more than `LIVE_PAGE` events go as `events: []`, `more: true`, for the client to pull. The writer hears `pushed` for its batch, and `events` for the system events the server derived from it |
 
 The client sends a local change within 0.8 s of writing it (and what is unsent when the tab
 is hidden or the app goes to the background), pulls on every `changed` and on every

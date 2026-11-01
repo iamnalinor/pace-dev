@@ -9,6 +9,7 @@ export {
   type HttpMethod,
 } from "./api/endpoint.ts";
 export { endpointList, endpoints } from "./api/endpoints.ts";
+export * from "./api/live-protocol.ts";
 export * from "./api/protocol.ts";
 export {
   AccountDeletedSchema,

@@ -2,7 +2,9 @@ import type { z } from "zod";
 
 import { describe, expect, it } from "vitest";
 
+import { LiveNoticeSchema } from "../notify/pool.ts";
 import { endpointList, endpoints } from "./endpoints.ts";
+import { LiveServerMessageSchema } from "./live-protocol.ts";
 
 /** Every object schema reachable from `schema` that refuses keys it does not know. */
 /** Containers that hold schemas but that `loosen` does not walk into. */
@@ -69,6 +71,14 @@ describe("what the server answers", () => {
     const strict = endpointList.flatMap((definition) =>
       strictObjectsIn(definition.output, `${definition.method} ${definition.path}`),
     );
+    expect(strict).toEqual([]);
+  });
+
+  it("never refuses a key a newer server adds to a live socket message either", () => {
+    const strict = [
+      ...strictObjectsIn(LiveServerMessageSchema, "live"),
+      ...strictObjectsIn(LiveNoticeSchema, "live notice"),
+    ];
     expect(strict).toEqual([]);
   });
 

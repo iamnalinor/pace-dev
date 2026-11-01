@@ -122,7 +122,7 @@ export class UserStore extends PoolStore {
       return inserted;
     }
     const seq = await log.latestSeq(this.db);
-    announceChange(this.ctx, inserted, seq);
+    await announceChange(this.ctx, { inserted, seq, since: before.seq });
     if (canApplyInOrder(before, inserted)) {
       const next = applyInOrder(before, inserted, seq);
       await updateProjections(this.db, next.state, touchedBy(inserted));

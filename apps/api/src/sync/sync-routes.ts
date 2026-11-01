@@ -23,11 +23,13 @@ const userStore = (c: Context<AppEnv>) =>
   c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
 
 /**
-The live channel (`GET /api/sync/live`, a WebSocket): the user's store says `changed` as soon
-as the log grows from anywhere but the listening device, so a client pulls at once instead
-of polling. Not an `endpoint()`: an upgrade is not a JSON call. The bearer comes in the
-subprotocols and the app's protocol in the `protocol` query, since a browser cannot set headers
-on a socket.
+The live channel (`GET /api/sync/live`, a WebSocket) to the user's store. On `pace.v1` it says
+`changed` as soon as the log grows from anywhere but the listening device, so a client pulls at
+once instead of polling; on `pace.v2` it sends the new events themselves and takes pushes and
+pulls (`LiveClientMessageSchema`, whose push body is `endpoints.sync.push.body` itself, run by the
+same store `push` and `list` as the HTTP routes below). Not an `endpoint()`: an upgrade
+is not a JSON call. The bearer comes in the subprotocols and the app's protocol in the `protocol`
+query, since a browser cannot set headers on a socket.
 */
 const mountLiveRoute = (app: Hono<AppEnv>): void => {
   app.get("/api/sync/live", async (c) => {
