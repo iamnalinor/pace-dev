@@ -1,4 +1,5 @@
 import {
+  countryName,
   formatDuration,
   formatInZone,
   formatShortDate,
@@ -28,21 +29,6 @@ export type SessionRowsContext = {
   readonly now: string;
   readonly zone: string;
   readonly language: Language;
-};
-
-/**
-The country's name in the viewer's language; the code as it came when it is no region (Tor's
-"T1") or the platform cannot name regions (Hermes has no `Intl.DisplayNames`).
-*/
-const countryName = (code: string, language: Language): string => {
-  if (typeof Intl.DisplayNames !== "function") {
-    return code;
-  }
-  try {
-    return new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
-  } catch {
-    return code;
-  }
 };
 
 /** "Last data 2h 10m ago" up to eight hours, then "Last data Oct 12, 23:10"; "Nothing sent yet". */

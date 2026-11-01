@@ -30,11 +30,12 @@ import {
   hasSendRetry,
   type PoolDeps,
   poolMemoryOf,
+  type PoolNotifyOptions,
   ruledSeriesOf,
   savePoolMemory,
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
-import { answerInputs } from "./pool-answers.ts";
+import { answerInputs, applyAnswer } from "./pool-answers.ts";
 import { armRetry, scheduleNextPass } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
@@ -170,6 +171,7 @@ export class NotificationPool {
     }
     // Written first: an answer whose events did not go in leaves the notification open.
     await this.#host.insert(prepared.value.events);
+    await applyAnswer(notification, resolution, this.#host);
     await this.#settle(notification.id, resolution, meta);
     await this.#host.derive(meta.now);
     await this.afterWrite(meta.now);
@@ -229,20 +231,20 @@ export class NotificationPool {
   }
 
   /**
-  Adds a notification to the pool and delivers it (see `deliverNew`); one about the same subject
-  is delivered where it did not reach yet instead (see `insertNotification`).
+  Adds a notification to the pool and delivers it (see `deliverNew`, which may adopt a Telegram
+  message); one about the same subject is delivered where it did not reach yet instead.
   */
   async notify(
     created: NewNotification,
     now: string,
-    couriers?: Couriers,
+    options: PoolNotifyOptions = {},
   ): Promise<Result<PoolNotification, NotifyError>> {
     const stored = await rows.insertNotification(this.#host.db, created, now);
     if (!stored.ok) {
       return stored;
     }
-    await deliverNew(await this.#deps(now, couriers), stored.value);
-    if (await hasSendRetry(await this.#deps(now, couriers), stored.value)) {
+    await deliverNew(await this.#deps(now, options.couriers), stored.value, options);
+    if (await hasSendRetry(await this.#deps(now, options.couriers), stored.value)) {
       await armRetry(this.#host.ctx.storage, now);
     }
     return ok(stored.value.notification);
@@ -344,7 +346,7 @@ export class NotificationPool {
     const pass = await this.#pass(now);
     const created: PoolNotification[] = [];
     for (const item of pass.created) {
-      const added = await this.notify(item, now, couriers);
+      const added = await this.notify(item, now, { couriers });
       if (added.ok) {
         created.push(added.value);
       } else {

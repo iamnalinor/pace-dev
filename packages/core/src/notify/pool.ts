@@ -1,14 +1,15 @@
 import { z } from "zod";
 
-import type { NotificationKind } from "../model/notification-channels.ts";
-
 import { loosen } from "../api/loose.ts";
 import { knownValue } from "../api/tolerant.ts";
 import { InstantSchema } from "../events/payloads.ts";
+import { NOTIFICATION_KINDS, type NotificationKind } from "../model/notification-channels.ts";
 
 /**
 A sign-in to the account. The sessions feature fills it: which session, what kind of client
-("web", "android", a device name), a readable name ("Chrome on macOS"), where from.
+(`browser`, `app`, `dev`), a readable name ("Chrome on macOS", the phone the app named), where
+from (the address and place Cloudflare reported; empty when it reported none). A deep-link
+login also carries where "Return to Pace" leads, since its notice takes over the bot's reply.
 */
 export const LoginPayloadSchema = z.strictObject({
   sessionId: z.string().min(1).max(64),
@@ -17,6 +18,7 @@ export const LoginPayloadSchema = z.strictObject({
   ip: z.string().max(64),
   country: z.string().max(80),
   city: z.string().max(80).optional(),
+  returnUrl: z.url().max(512).optional(),
 });
 
 /** One task of a digest: its deadline is within a day of the next digest. */
@@ -96,20 +98,34 @@ export const notificationPath = (notification: NewNotification): string => {
 };
 
 /**
-How a notification was settled: an answer (attended, skipped, still going, stopped), seen and
-put away (`read`), or left until it no longer mattered (`expired`).
+How a notification was settled: an answer (a sign-in ended as not the person's, attended,
+skipped, still going, stopped), seen and put away (`read`), or left until it no longer mattered
+(`expired`).
 */
-export const RESOLUTIONS = ["attended", "skipped", "still", "stopped", "read", "expired"] as const;
+export const RESOLUTIONS = [
+  "revoked",
+  "attended",
+  "skipped",
+  "still",
+  "stopped",
+  "read",
+  "expired",
+] as const;
 
 export type Resolution = (typeof RESOLUTIONS)[number];
 
 /** The answers a person can give, per kind; every kind can also be put away as read. */
 export const ANSWERS = {
-  login: [],
+  login: ["revoked"],
   deadline_digest: [],
   event_start: ["attended", "skipped"],
   activity_overrun: ["still", "stopped"],
 } as const satisfies Record<NotificationKind, readonly Resolution[]>;
+
+/** The kinds a person can answer (not only put away): each is a phone category with buttons. */
+export const ANSWERABLE_KINDS: readonly NotificationKind[] = NOTIFICATION_KINDS.filter(
+  (kind) => ANSWERS[kind].length > 0,
+);
 
 /** The answer resolutions a person gives (not `read` or `expired`): the ones of `ANSWERS`. */
 export type Answer = (typeof ANSWERS)[NotificationKind][number];

@@ -1,9 +1,11 @@
 import {
   type Answer,
   ANSWERS,
+  countryName,
   formatDuration,
   formatLeft,
   type Language,
+  type LoginPayload,
   minutesBetween,
   type PoolNotification,
   type Settings,
@@ -66,20 +68,44 @@ const zonedOf = (settings: Pick<Settings, "language" | "timezone">, now: string)
   zone: settings.timezone ?? "UTC",
 });
 
-/** The answer buttons of a notification, one row: `<code>:<id>` for the bot to handle. */
+/**
+The answer buttons of a notification, one row: `<code>:<id>` for the bot to handle. A deep-link
+sign-in's notice took over the bot's reply, so its "Return to Pace" leads the row.
+*/
 const answerButtons = (
   notification: PoolNotification,
   language: Language,
 ): readonly (readonly InlineButton[])[] => {
   const answers: readonly Answer[] = ANSWERS[notification.kind];
-  return answers.length === 0
-    ? []
-    : [
-        answers.map((answer) => ({
-          data: `${POOL_ACTIONS[answer]}:${notification.id}`,
-          label: t(language, `notify.action.${answer}`),
-        })),
-      ];
+  const returnUrl = notification.kind === "login" ? notification.payload.returnUrl : undefined;
+  const row: readonly InlineButton[] = [
+    ...(returnUrl === undefined
+      ? []
+      : [{ label: t(language, "notify.returnToPace"), url: returnUrl }]),
+    ...answers.map((answer) => ({
+      data: `${POOL_ACTIONS[answer]}:${notification.id}`,
+      label: t(language, `notify.action.${answer}`),
+    })),
+  ];
+  return row.length === 0 ? [] : [row];
+};
+
+/**
+Where a sign-in came from, what Cloudflare reported first (the address and the place, which the
+client cannot choose), then the name the client gave or its browser reads as, which it can: a
+deep-link nonce is minted by whoever asks for it. A part not reported is left out (a server not
+behind Cloudflare's edge knows no address). The city is Cloudflare's own spelling.
+*/
+const signInPlace = (
+  { city = "", country, ip, name }: LoginPayload,
+  language: Language,
+): string => {
+  const place = [country === "" ? "" : countryName(country, language), city]
+    .filter((part) => part !== "")
+    .join(", ");
+  return [ip === "" ? "" : t(language, "notify.loginIp", { ip }), place, name]
+    .filter((part) => part !== "")
+    .join(" · ");
 };
 
 /** The one-line body of a notification, the same in Telegram (after its emoji) and on a phone. */
@@ -87,9 +113,7 @@ const bodyOf = (notification: PoolNotification, zoned: Zoned): string => {
   const { language, zone } = zoned;
   switch (notification.kind) {
     case "login": {
-      const { city, country, ip, name } = notification.payload;
-      const place = [city, country].filter((part) => part !== undefined && part !== "").join(", ");
-      return t(language, "notify.login", { ip, name, place });
+      return t(language, "notify.login", { where: signInPlace(notification.payload, language) });
     }
     case "deadline_digest": {
       return [

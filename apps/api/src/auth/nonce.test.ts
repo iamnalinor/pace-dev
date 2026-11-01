@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { d1 } from "../shared/db/d1.ts";
-import { bindNonce, consumeNonce, createNonce, recordNonceSession } from "./nonce.ts";
+import { bindNonce, consumeNonce, createNonce, linkNonceSession } from "./nonce.ts";
 import { upsertTelegramUser } from "./users.ts";
 
 const NOW = Date.UTC(2026, 9, 6, 10);
@@ -44,6 +44,7 @@ describe("login nonces", () => {
     });
     expect(await consumeNonce(db, nonce, NOW + 2 * MINUTE)).toEqual({
       login: { deviceId: null, deviceName: null, from: "web", place: NOWHERE },
+      reply: null,
       status: "ready",
       userId: user.id,
     });
@@ -91,15 +92,25 @@ describe("login nonces", () => {
     await bindNonce(db, { nonce, now: NOW, userId: user.id });
     expect(await consumeNonce(db, nonce, NOW)).toEqual({
       login: { deviceId: "dev-1", deviceName: "Pixel 9a", from: "app", place },
+      reply: null,
       status: "ready",
       userId: user.id,
     });
   });
 
+  it("keeps the bot's reply it was bound with and hands it over with the login", async () => {
+    const db = d1(env.DB);
+    const user = await seedUser();
+    const { nonce } = await createNonce(db, fromWeb);
+    const reply = { chatId: "42", messageId: 7 };
+    await bindNonce(db, { nonce, now: NOW, reply, userId: user.id });
+    expect(await consumeNonce(db, nonce, NOW)).toMatchObject({ reply, status: "ready" });
+  });
+
   it("records the session it opened", async () => {
     const db = d1(env.DB);
     const { nonce } = await createNonce(db, fromWeb);
-    await recordNonceSession(db, nonce, "session-1");
+    await db.batch([linkNonceSession(db, nonce, "session-1")]);
     const row = await env.DB.prepare("select session_id from login_nonces where nonce = ?")
       .bind(nonce)
       .first<{ session_id: null | string }>();

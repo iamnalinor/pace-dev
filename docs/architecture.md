@@ -167,10 +167,21 @@ secrets with zod once per request and stores the result on the context.
   sends an optional strict body `{ deviceName, deviceId }` (its phone model and install id); the
   web sends none. The nonce row keeps `from`, that request's place and the named device, so the
   session it opens is named and placed by the request that started the login, not by the poll.
-  The bot's `/start login_<nonce>` handler upserts the Telegram user and binds the nonce
-  (`bot-login.ts`; a nonce binds once). `GET /api/auth/nonce/:nonce` answers `pending` until
-  then, then `ready` with a session exactly once (the row is marked consumed and keeps the
-  `sessionId` it opened; `replyChatId`/`replyMessageId` are for the login notice).
+  The bot's `/start login_<nonce>` handler checks the nonce can still be bound, replies
+  "Logged in. Return to Pace.", then upserts the Telegram user and binds the nonce together with
+  that reply's `replyChatId`/`replyMessageId` (`bot-login.ts`; one conditional UPDATE, so a nonce
+  binds once; a bind that loses edits the reply to "expired"). `GET /api/auth/nonce/:nonce`
+  answers `pending` until then, then `ready` with a session exactly once: the claim is one
+  conditional UPDATE (bound, unconsumed, unexpired → consumed), and the session insert and the
+  nonce's `sessionId` go in one batch.
+- **Sign-in notices**: every new `browser`, `app` or `dev` session (not agents or MCP grants)
+  calls the user store's `notify({ kind: "login", … })`. The text leads with what Cloudflare
+  reported (IP, country named in the account language, city), then the client's name, as plain
+  text; parts not reported are left out. A deep-link login passes `adoptTelegramMessage` (the
+  bot's reply), so the pool edits that reply into the notice with [Return to Pace] [Not me]
+  instead of sending a second message. "Not me" is the `login` kind's pool answer `revoked`
+  (`nr:<id>` in Telegram, a phone action, the feed): `pool-answers.ts` ends the session through
+  `deleteSession` before the notification resolves; a second press changes nothing.
 - **Sessions** (`auth/sessions.ts`): 32 random bytes as the bearer token, SHA-256 in D1
   `sessions`, 90-day expiry, `lastSeenAt` touched at most hourly. Each has a `kind` (`browser`:
   the widget or a bot login from the web; `app`: a bot login from the app; `agent`: a computer's

@@ -9,7 +9,7 @@ import type { ParseProvider } from "./shared/llm/llm.ts";
 
 import { answerAccountConfirmation, mountAccountRoutes } from "./account/account-routes.ts";
 import { mountAuthRoutes } from "./auth/auth-routes.ts";
-import { bindBotLogin } from "./auth/bot-login.ts";
+import { bindBotLogin, peekBotLogin } from "./auth/bot-login.ts";
 import { findUserIdByTelegramId } from "./auth/users.ts";
 import { isAllowed } from "./auth/whitelist.ts";
 import { mountBotRoutes } from "./bot/bot-routes.ts";
@@ -126,6 +126,7 @@ export const createApp = (deps: AppDeps = PLATFORM_DEPS): Hono<AppEnv> => {
     confirmAccount: answerAccountConfirmation,
     isAllowed,
     parseProviders: deps.parseProviders,
+    peekLogin: peekBotLogin,
     telegramFetch: deps.telegramFetch,
     userIdOf: findUserIdByTelegramId,
   });

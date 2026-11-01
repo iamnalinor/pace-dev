@@ -1,7 +1,7 @@
 import type { NewNotification, PoolNotification, Resolution, Result } from "@pace/core";
 
 import type { ResolveError, ResolveMeta } from "../shared/contract.ts";
-import type { Couriers } from "./notification-pool.ts";
+import type { Couriers, PoolNotifyOptions } from "./notification-pool.ts";
 import type { AnswerMeta, NotificationPool, Polled } from "./pool-service.ts";
 
 import { LiveStore } from "./live-sockets.ts";
@@ -14,15 +14,16 @@ export abstract class PoolStore extends LiveStore {
   protected abstract get pool(): NotificationPool;
 
   /**
-  Adds a notification to the pool and delivers it to every channel its kind is on for.
-  `couriers` replaces the configured channels (tests).
+  Adds a notification to the pool and delivers it to every channel its kind is on for; a
+  Telegram message to adopt becomes its copy there. `couriers` replaces the configured channels
+  (tests).
   */
   async notify(
     created: NewNotification,
     now: string,
-    couriers?: Couriers,
+    options?: PoolNotifyOptions,
   ): ReturnType<NotificationPool["notify"]> {
-    return await this.pool.notify(created, now, couriers);
+    return await this.pool.notify(created, now, options);
   }
 
   /** What waits for a polling device (its session); the cursor acknowledges the fetch before. */

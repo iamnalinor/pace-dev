@@ -10,6 +10,9 @@ import {
   runningActivity,
 } from "@pace/core";
 
+import { d1 } from "../shared/db/d1.ts";
+import { deleteSession } from "../shared/session-rows.ts";
+
 const at = (
   occurredAt: string,
   body: Omit<EventInput, "occurredAt" | "precision" | "source">,
@@ -62,4 +65,24 @@ export const answerInputs = (
   return notification.kind === "activity_overrun"
     ? overrunInputs(notification.payload, resolution, context)
     : [];
+};
+
+/**
+What an answer does outside the store's log: "Not me" ends the sign-in's session, through the
+same revoke Settings uses (one already ended, in Settings or by logging out there, is fine). Run
+before the notification is resolved, so a failure leaves it open to be pressed again.
+*/
+export const applyAnswer = async (
+  notification: PoolNotification,
+  resolution: Resolution,
+  store: {
+    readonly env: { readonly DB: D1Database };
+    readonly ctx: { readonly id: { readonly name?: string | undefined } };
+  },
+): Promise<void> => {
+  // The store is named after its user (`idFromName(userId)`).
+  const userId = store.ctx.id.name;
+  if (resolution === "revoked" && userId !== undefined && notification.kind === "login") {
+    await deleteSession(d1(store.env.DB), userId, notification.payload.sessionId);
+  }
 };

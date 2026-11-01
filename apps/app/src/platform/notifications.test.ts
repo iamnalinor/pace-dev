@@ -647,6 +647,41 @@ describe("the push task", () => {
     expect(fake.state.scheduled.at(-1)).toEqual(expect.objectContaining(shownAgain));
   });
 
+  it("offers Not me on a sign-in notice and ends that session from it in the background", async () => {
+    await setupNotificationCategories("en");
+    expect(fake.state.categories.get("login")).toEqual([
+      {
+        buttonTitle: "Not me — end this session",
+        identifier: "revoked",
+        options: { opensAppToForeground: false },
+      },
+    ]);
+    const { api, fetcher } = apiWith({
+      "POST /api/notifications/n-login/resolve": () => ({
+        notification: { ...login, resolution: "revoked", resolvedAt: login.createdAt },
+      }),
+    });
+    await handlePushTask(
+      {
+        actionIdentifier: "revoked",
+        notification: {
+          request: {
+            content: {
+              categoryIdentifier: "login",
+              data: { kind: "login", notificationId: "n-login", sessionHash: SESSION_HASH },
+            },
+          },
+        },
+      },
+      api,
+    );
+    expect(fetcher.calls.at(-1)).toMatchObject({
+      body: { from: "app", resolution: "revoked" },
+      path: "/api/notifications/n-login/resolve",
+    });
+    expect(fake.state.dismissed).toEqual(["n-login"]);
+  });
+
   it("dismisses a private notification when the phone is signed out", async () => {
     await handlePushTask(
       { actionIdentifier: "skipped", notification: { request: { content: seminarContent } } },

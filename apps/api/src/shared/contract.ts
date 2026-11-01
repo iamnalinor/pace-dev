@@ -118,7 +118,19 @@ export type UserStoreApi = {
   readonly notify: (
     created: NewNotification,
     now: string,
+    options?: NotifyOptions,
   ) => Promise<Result<PoolNotification, NotifyError>>;
+};
+
+/**
+How a notification is delivered. `adoptTelegramMessage`: its Telegram copy is that message,
+already in the chat (the bot's reply to a deep-link login), edited into the notification's text
+and buttons instead of a second message being sent.
+*/
+export type NotifyOptions = {
+  readonly adoptTelegramMessage?:
+    | undefined
+    | { readonly chatId: string; readonly messageId: number };
 };
 
 /** Why a notification was not added: its payload breaks its kind's contract. */
@@ -246,6 +258,7 @@ Callback data of a pool notification's buttons, `<code>:<notificationId>`: sent 
 handled by the bot.
 */
 export const POOL_ACTIONS = {
+  revoked: "nr",
   attended: "na",
   skipped: "ns",
   still: "nk",

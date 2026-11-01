@@ -8,6 +8,7 @@ import {
   type Settings,
 } from "@pace/core";
 
+import type { NotifyOptions } from "../shared/contract.ts";
 import type { PushMessage, PushTransport, SendOutcome } from "../shared/push/transport.ts";
 import type * as schema from "./schema.ts";
 
@@ -25,7 +26,12 @@ import {
   type PushConfig,
   transportFor,
 } from "../shared/push/registry.ts";
-import { sendTelegramMessage, type TelegramTarget } from "../shared/telegram-api.ts";
+import {
+  type OutgoingMessage,
+  sendTelegramMessage,
+  type TelegramTarget,
+  wasTelegramMessageEdited,
+} from "../shared/telegram-api.ts";
 import {
   hasFailedCopy,
   latestAttempt,
@@ -44,6 +50,9 @@ export type Couriers = {
   readonly telegram: null | TelegramTarget;
   readonly push: PushConfig;
 };
+
+/** How a notification is delivered; `couriers` replaces the configured channels (tests). */
+export type PoolNotifyOptions = NotifyOptions & { readonly couriers?: Couriers | undefined };
 
 /** What delivering needs: the store, the account's settings and chat, the instant. */
 export type PoolDeps = {
@@ -83,7 +92,28 @@ export const saveRuledSeries = async (
   await storage.put(RULES_KEY, [...new Set(series)]);
 };
 
-const sendToTelegram = async (deps: PoolDeps, stored: StoredNotification): Promise<void> => {
+type Adopted = NotifyOptions["adoptTelegramMessage"];
+
+/**
+Puts the message in the chat: the adopted one edited into place when there is one and Telegram
+takes the edit, else a new one (the adopted message is gone, say). Where it ended up; a `null`
+message id when Telegram took neither.
+*/
+const placeInChat = async (
+  target: TelegramTarget,
+  { adopted, chatId, message }: { adopted: Adopted; chatId: string; message: OutgoingMessage },
+): Promise<{ readonly chatId: string; readonly messageId: null | number }> => {
+  return adopted !== undefined &&
+    (await wasTelegramMessageEdited(target, { ...adopted, ...message }))
+    ? adopted
+    : { chatId, messageId: await sendTelegramMessage(target, chatId, message) };
+};
+
+const sendToTelegram = async (
+  deps: PoolDeps,
+  stored: StoredNotification,
+  adopted: Adopted,
+): Promise<void> => {
   const { notification } = stored;
   const { chatId, couriers, settings } = deps;
   if (
@@ -103,9 +133,10 @@ const sendToTelegram = async (deps: PoolDeps, stored: StoredNotification): Promi
     now: deps.now,
     webOrigin: deps.webOrigin,
   });
-  const messageId = await sendTelegramMessage(couriers.telegram, chatId, message);
+  const placed = await placeInChat(couriers.telegram, { adopted, chatId, message });
+  const { messageId } = placed;
   await setTelegramCopy(deps.db, notification.id, {
-    chatId,
+    chatId: placed.chatId,
     messageId,
     sentAt: messageId === null ? null : deps.now,
     state: messageId === null ? "failed" : "sent",
@@ -246,9 +277,14 @@ Delivers a notification just added to the pool: Telegram when its kind is on the
 is known, every open client's feed over the live socket (a phone without push shows it from
 there), and each phone's push method when the kind is on for the app. Delivered again (a pass
 repeated after being cut short), it reaches only what it did not reach: Telegram once, each
-device once; one resolved meanwhile goes nowhere.
+device once; one resolved meanwhile goes nowhere. With a message to adopt, the Telegram copy is
+that message edited into place; a retry after a failed first try sends a new one.
 */
-export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Promise<void> => {
+export const deliverNew = async (
+  deps: PoolDeps,
+  stored: StoredNotification,
+  options: NotifyOptions = {},
+): Promise<void> => {
   const { notification } = stored;
   if (notification.resolvedAt !== null) {
     return;
@@ -256,7 +292,7 @@ export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Pr
   if (stored.telegram.state === "pending" || stored.telegram.state === "failed") {
     const last = await latestAttempt(deps.db, notification.id, "telegram");
     if (last === undefined || Date.parse(deps.now) - Date.parse(last.attemptedAt) >= 60_000) {
-      await sendToTelegram(deps, stored);
+      await sendToTelegram(deps, stored, options.adoptTelegramMessage);
     }
   }
   // Queued for polling devices before the open clients hear of it: an open app fetches at once.

@@ -9,6 +9,7 @@ import { readSessionValue, writeSessionValue } from "#app/platform/session-value
 import { type ApiClient, ApiError } from "@pace/client";
 import {
   type Answer,
+  ANSWERABLE_KINDS,
   ANSWERS,
   endpoints,
   type Language,
@@ -140,7 +141,7 @@ export const setupNotificationCategories = async (language: Language): Promise<v
     importance: Notifications.AndroidImportance.HIGH,
     name: t(language, "notify.channel"),
   });
-  for (const kind of ["event_start", "activity_overrun"] as const) {
+  for (const kind of ANSWERABLE_KINDS) {
     const answers: readonly Answer[] = ANSWERS[kind];
     await Notifications.setNotificationCategoryAsync(
       kind,

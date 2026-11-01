@@ -1,3 +1,5 @@
+import type { BatchItem } from "drizzle-orm/batch";
+
 import { and, desc, eq, gt } from "drizzle-orm";
 import { ulid } from "ulidx";
 
@@ -65,15 +67,22 @@ const usageDeviceOf = (row: {
   readonly deviceId: null | string;
 }): null | string => row.deviceId ?? (isScope(row.scope) ? row.sessionId : null);
 
-/** Mints a bearer token (32 random bytes); only its SHA-256 is stored. */
-export const createSession = async (
-  db: Db,
-  input: NewSession,
-): Promise<{ readonly id: string; readonly token: string; readonly expiresAt: number }> => {
+export type PreparedSession = {
+  readonly id: string;
+  readonly token: string;
+  readonly expiresAt: number;
+  readonly insert: BatchItem<"sqlite">;
+};
+
+/**
+A session ready to be stored: its id and bearer token (32 random bytes; only its SHA-256 is
+stored) and the insert, for the caller to batch with whatever must go in with it.
+*/
+export const prepareSession = async (db: Db, input: NewSession): Promise<PreparedSession> => {
   const token = randomBase64Url(32);
   const id = ulid(input.now);
   const expiresAt = input.now + (input.days ?? SESSION_DAYS) * DAY_MS;
-  await db.insert(sessions).values({
+  const insert = db.insert(sessions).values({
     id,
     userId: input.userId,
     tokenHash: await sha256Hex(token),
@@ -86,6 +95,16 @@ export const createSession = async (
     expiresAt: new Date(expiresAt),
     lastSeenAt: new Date(input.now),
   });
+  return { expiresAt, id, insert, token };
+};
+
+/** Mints a bearer session and stores it. */
+export const createSession = async (
+  db: Db,
+  input: NewSession,
+): Promise<{ readonly id: string; readonly token: string; readonly expiresAt: number }> => {
+  const { expiresAt, id, insert, token } = await prepareSession(db, input);
+  await db.batch([insert]);
   return { expiresAt, id, token };
 };
 

@@ -205,6 +205,28 @@ describe("NotificationsScreen", () => {
     expect(screen.queryByRole("button", { name: en("notify.action.stopped") })).toBeNull();
   });
 
+  it("ends a sign-in's session from the feed with Not me, then says it ended", async () => {
+    const resolve = jest.fn(() => ({
+      notification: {
+        ...login,
+        readAt: "2026-10-06T09:05:00.000Z",
+        resolution: "revoked",
+        resolvedAt: "2026-10-06T09:05:00.000Z",
+      },
+    }));
+    const { runtime } = await feedRuntime([login], {
+      "POST /api/notifications/n-login/resolve": resolve,
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    expect(await screen.findByText(en("notify.resolved.revoked"))).toBeOnTheScreen();
+    expect(resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({ resolution: "revoked" }) as unknown,
+      }),
+    );
+  });
+
   it("says a refused answer did not go through and keeps the buttons", async () => {
     const { runtime } = await feedRuntime([overrun], {
       "POST /api/notifications/n-overrun/resolve": () =>
