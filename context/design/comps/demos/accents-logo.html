@@ -1,0 +1,139 @@
+<title>Акценты и логотип · Pace</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root { --page:#f6f6f4; --ink:#18181a; --ink2:#55565c; --ink3:#77787f; --rule:rgba(0,0,0,.1); --card:#fff; --chip:#ececea; --focus:#2e4ad6;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page:#111113; --ink:#ececee; --ink2:#a8a9b0; --ink3:#83848c; --rule:rgba(255,255,255,.1); --card:#1a1a1d; --chip:#27272b; --focus:#8ea0ff; color-scheme:dark } }
+:root[data-theme="dark"] { --page:#111113; --ink:#ececee; --ink2:#a8a9b0; --ink3:#83848c; --rule:rgba(255,255,255,.1); --card:#1a1a1d; --chip:#27272b; --focus:#8ea0ff; color-scheme:dark }
+* { box-sizing:border-box }
+body { background:var(--page); color:var(--ink); font:15px/1.5 var(--sans); padding-block:28px 56px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); -webkit-font-smoothing:antialiased }
+main { max-width:1180px; margin:0 auto; display:grid; gap:24px }
+h1 { font-size:28px; line-height:1.15; letter-spacing:-.02em; margin:0; text-wrap:balance }
+h2 { font-size:19px; line-height:1.25; letter-spacing:-.01em; margin:0 }
+p { margin:0; max-width:70ch; color:var(--ink2) }
+.lede { display:grid; gap:10px }
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.controls button, .seg button { font:500 14px var(--sans); color:var(--ink); background:var(--chip); border:0; border-radius:999px; height:36px; padding:0 14px; cursor:pointer }
+.controls button[aria-pressed="true"], .seg button[aria-pressed="true"] { background:var(--ink); color:var(--page) }
+.controls button:focus-visible, .seg button:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
+.stage { display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start }
+.stage figure { margin:0; display:grid; gap:8px; justify-items:start; min-width:0 }
+figcaption { font-size:13px; color:var(--ink3); max-width:340px }
+.card { background:var(--card); border:1px solid var(--rule); border-radius:18px; padding:20px; display:grid; gap:14px; min-width:0 }
+.note { font-size:13px; color:var(--ink3) }
+
+.ph { --r-card:12px; --r-btn:10px; --r-tag:6px; width:360px; max-width:100%; height:740px; border-radius:30px; overflow:hidden; position:relative;
+  font-family:var(--sans); background:var(--bg); color:var(--l1); font-size:15px; line-height:1.35; font-feature-settings:"cv11","tnum";
+  border:1px solid var(--rule); display:flex; flex-direction:column; -webkit-font-smoothing:antialiased }
+.ph.light { --bg:#F4F5F9; --cell:#FFFFFF; --elev:#FFFFFF; --l1:#12141C; --l2:#4B5064; --l3:#6B7086; --l4:#B4B8C7; --sep:rgba(20,28,70,.09);
+  --fill:rgba(20,28,70,.055); --fill2:rgba(20,28,70,.09); --accent:#2E4AD6; --onAccent:#FFFFFF; --accentText:#2E4AD6; --tint:rgba(46,74,214,.10);
+  --margin:#D33A30; --warn:#C2410C; --shadow:0 1px 2px rgba(20,28,70,.06),0 10px 28px rgba(20,28,70,.10);
+  --p-alg:#5B35B8; --p-alg-t:rgba(91,53,184,.11); --p-work:#0B6E66; --p-work-t:rgba(11,110,102,.11); --p-pers:#A8481A; --p-pers-t:rgba(168,72,26,.11);
+  --c-other:#6B7086; --c-chores:#8A6A1E; --c-rest:#0B6E66; --c-study:#5B35B8 }
+.ph.dark { --bg:#0D0F15; --cell:#161922; --elev:#1E2232; --l1:#ECEEF4; --l2:#B6BACB; --l3:#9297AB; --l4:#4A4F63; --sep:rgba(190,200,255,.09);
+  --fill:rgba(190,200,255,.07); --fill2:rgba(190,200,255,.12); --accent:#7D93FF; --onAccent:#0B0D14; --accentText:#94A6FF; --tint:rgba(125,147,255,.16);
+  --margin:#FF6A5C; --warn:#FF9B5E; --shadow:0 0 0 1px rgba(190,200,255,.08),0 16px 40px rgba(0,0,0,.5);
+  --p-alg:#B9A2FF; --p-alg-t:rgba(155,125,255,.17); --p-work:#63D3C6; --p-work-t:rgba(80,200,185,.15); --p-pers:#FFA07A; --p-pers-t:rgba(255,140,95,.15);
+  --c-other:#9297AB; --c-chores:#D8B45A; --c-rest:#5CCFC0; --c-study:#A58CFF }
+.ph svg { flex:none; display:block }
+.st { height:40px; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-size:13px; font-weight:600; flex:none }
+.hd { padding:4px 18px 10px; display:flex; align-items:flex-end; justify-content:space-between; flex:none }
+.tt { font-size:30px; font-weight:700; letter-spacing:-.025em; line-height:1.05 }
+.sub { font-size:13px; color:var(--l2); margin-top:4px }
+.ib { width:44px; height:44px; display:grid; place-items:center; color:var(--l2); border-radius:999px }
+.scroll { flex:1; overflow:hidden; padding:0 14px; display:flex; flex-direction:column; gap:12px; min-height:0 }
+.scroll > * { flex:none }
+.gh { display:flex; justify-content:space-between; padding:0 4px; font-size:13px; font-weight:600; color:var(--l2) }
+.list { background:var(--cell); border-radius:var(--r-card); overflow:hidden }
+.row { display:grid; grid-template-columns:28px 1fr; gap:12px; padding:11px 14px; position:relative; background:var(--cell) }
+.row + .row::before { content:""; position:absolute; top:0; left:54px; right:0; height:1px; background:var(--sep) }
+.ck { width:24px; height:24px; border-radius:999px; border:1.5px solid var(--l4); margin-top:1px; cursor:pointer; padding:0; background:transparent; display:grid; place-items:center; color:var(--onAccent) }
+.ck:focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.ck.on { background:var(--accent); border-color:var(--accent) }
+.rt { font-size:15.5px; line-height:1.3; position:relative; display:inline }
+.meta { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:5px; font-size:12.5px; color:var(--l3) }
+.t { height:20px; padding:0 7px; border-radius:var(--r-tag); display:inline-flex; align-items:center; font-size:12px; font-weight:550 }
+.urg { color:var(--margin); font-weight:600 } .pri { color:var(--l1); font-weight:600 }
+.tabs { height:76px; display:grid; grid-template-columns:repeat(4,1fr); padding-top:6px; border-top:1px solid var(--sep); flex:none; background:var(--bg) }
+.tab { display:grid; justify-items:center; align-content:start; gap:3px; font-size:11px; font-weight:550; color:var(--l3) }
+.tab.on { color:var(--accentText) }
+.toast { position:absolute; left:14px; right:14px; bottom:88px; background:var(--elev); color:var(--l1); box-shadow:var(--shadow); border-radius:12px;
+  padding:10px 10px 10px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:14px; opacity:0; pointer-events:none }
+.toast button { font:600 14px var(--sans); color:var(--accentText); background:transparent; border:0; height:36px; padding:0 10px; border-radius:8px; cursor:pointer }
+
+.roles { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px }
+.role { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; align-items:start }
+.sw2 { display:flex; gap:4px } .sw2 i { width:34px; height:34px; border-radius:9px; border:1px solid var(--rule); display:block }
+.role b { font-size:14px } .role span { font-size:13px; color:var(--ink2) } .role code { font-size:12px; color:var(--ink3) }
+.hues { display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px }
+.hue { display:grid; gap:3px; font-size:11px; color:var(--ink3) } .hue i { height:28px; border-radius:8px; display:block }
+.logos { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px }
+.lg { border:1px solid var(--rule); border-radius:16px; overflow:hidden; display:grid }
+.lg .pair { display:grid; grid-template-columns:1fr 1fr }
+.lg .side { padding:16px; display:grid; gap:14px; justify-items:start }
+.lg .side.l { background:#EDEFF5; color:#12141C } .lg .side.d { background:#11131A; color:#ECEEF4 }
+.brand { display:flex; align-items:center; gap:8px; font:650 17px var(--sans); letter-spacing:-.01em }
+.icon { width:64px; height:64px; border-radius:16px; display:grid; place-items:center }
+.lg .cap { padding:12px 16px; display:grid; gap:4px; background:var(--card) } .lg .cap b { font-size:14px } .lg .cap span { font-size:13px; color:var(--ink2) }
+.rowsdemo { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px }
+.mini-ph { border-radius:16px; overflow:hidden; border:1px solid var(--rule) }
+.mini-ph .list { border-radius:0 }
+.low-ic { display:inline-flex; align-items:center; gap:2px; color:var(--l3) }
+.dim .rt { color:var(--l2) }
+</style>
+<main>
+  <header class="lede"><h1>Акценты направления A и логотип</h1>
+  <p>В A один акцентный цвет: синие «чернила». Им показывают действие: кнопки, ссылки, выбранное, фокус, отмеченную галочку. Остальные цвета не акценты, у каждого одна работа.</p></header>
+  <section class="card"><h2>Цвета и их работа</h2><div class="roles" id="roles"></div>
+  <h2 style="margin-top:6px">Цвета категорий и проектов (12 оттенков, тонкие линии и теги)</h2><div class="hues" id="hues"></div>
+  <p class="note">Слева светлая тема, справа тёмная. Зелёный есть только как цвет категории или проекта: так помечается «что это», а не «нажми сюда».</p></section>
+  <section class="card"><h2>Логотип: три варианта</h2>
+  <p>Ты пишешь, что светлое, яркое лого лучше. Вот варианты на светлом и тёмном фоне, в шапке сайдбара и как иконка приложения. В первом логотип совпадает с акцентом интерфейса; во втором и третьем зелёный остаётся только у логотипа.</p>
+  <div class="logos" id="logos"></div></section>
+  <section class="card"><h2>Как тихо пометить «Необязательно»</h2>
+  <p>«Срочно» — красное слово, «Приоритет» — жирное слово, «Обычная» не показывается. Для «Необязательно» нужен знак, который не тянет внимание:</p>
+  <div class="rowsdemo" id="low"></div>
+  <div class="controls"><button id="theme" aria-pressed="false">Тёмная тема для строк</button></div></section>
+</main>
+<script>
+const ICON = {"bell": "<path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9\"/><path d=\"M10.3 21a1.94 1.94 0 0 0 3.4 0\"/>", "zap": "<path d=\"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z\"/>", "clock": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/>", "inbox": "<path d=\"M22 12h-6l-2 3h-4l-2-3H2\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/>", "more": "<circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/>", "check": "<path d=\"M20 6 9 17l-5-5\"/>", "cal": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4\"/><path d=\"M8 2v4\"/><path d=\"M3 10h18\"/>", "task": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "coffee": "<path d=\"M10 2v2\"/><path d=\"M14 2v2\"/><path d=\"M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1\"/><path d=\"M6 2v2\"/>", "up": "<path d=\"m18 15-6-6-6 6\"/>", "down": "<path d=\"m6 9 6 6 6-6\"/>", "arrowdown": "<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>", "plus": "<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>"};
+const ic = (n, s = 20, w = 1.75) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+const ROLES = [
+  ["Акцент: чернила", "#2E4AD6", "#7D93FF", "Кнопки, ссылки, выбранное, фокус, отмеченная задача"],
+  ["Красная линия полей", "#D33A30", "#FF6A5C", "Только статус: линия «сейчас», просрочено, «Срочно», удаление"],
+  ["Предупреждение", "#C2410C", "#FF9B5E", "«Ещё занимаетесь?», когда активность идёт вдвое дольше ожидаемого"],
+  ["Вопрос ассистента", "#795300", "#F2C275", "Вопросы и уточнения в предложениях ассистента"],
+  ["Текст и фоны", "#12141C", "#ECEEF4", "Четыре уровня текста и три слоя фона, холодный «тетрадный» оттенок"],
+];
+document.getElementById("roles").innerHTML = ROLES.map(([n,l,d,u]) => `<div class="role"><div class="sw2"><i style="background:${l}"></i><i style="background:${d}"></i></div><div><b>${n}</b><br><span>${u}</span><br><code>${l} · ${d}</code></div></div>`).join("");
+const HUES = [["красный","#CE5249","#F47C70"],["оранжевый","#C56001","#ED8641"],["янтарный","#A87504","#D79700"],["жёлтый","#928103","#BBA500"],["лайм","#659003","#89B645"],["зелёный","#009A4D","#4DBF74"],["бирюзовый","#009585","#09BEAB"],["циан","#0390A4","#0DB8D2"],["синий","#1A83DB","#52A9FE"],["индиго","#6873DE","#8D9BFF"],["фиолетовый","#9364CE","#B68CF2"],["розовый","#C05296","#E57BBA"],["сланец","#717B89","#94A0AE"]];
+document.getElementById("hues").innerHTML = HUES.map(([n,l,d]) => `<div class="hue"><i style="background:linear-gradient(90deg,${l} 50%,${d} 50%)"></i>${n}</div>`).join("");
+const mark = (grey, accent, s = 26) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l5 6-5 6" fill="none" stroke="${grey}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 6l5 6-5 6" fill="none" stroke="${accent}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="20" cy="12" r="1.8" fill="${accent}"/></svg>`;
+const LOGOS = [
+  { name: "1 · Чернила", note: "Логотип того же синего, что и интерфейс. Одна система, ничего лишнего.", l: ["#6B7086","#2E4AD6"], d: ["#868BA0","#94A6FF"], icon: ["#2E4AD6","#FFFFFF","#C9D2FF"] },
+  { name: "2 · Светлый лайм (как было)", note: "Яркий лайм из старого лого. На тёмном горит; на светлом фоне взят более густой лайм, иначе сливается (feedback-2).", l: ["#6B7086","#5E8C00"], d: ["#868BA0","#C8F03C"], icon: ["#14161D","#C8F03C","#8A8F9F"] },
+  { name: "3 · Зелёный", note: "Спокойный зелёный, тот же, что у категории «Задачи» в палитре. Ярче синего, но не кислотный.", l: ["#6B7086","#0E7A45"], d: ["#868BA0","#45C680"], icon: ["#0E7A45","#FFFFFF","#A8E2C2"] },
+];
+document.getElementById("logos").innerHTML = LOGOS.map(o => `<div class="lg"><div class="pair">
+  <div class="side l"><div class="brand">${mark(...o.l)}Pace</div><div class="icon" style="background:${o.icon[0]}">${mark(o.icon[2], o.icon[1], 40)}</div></div>
+  <div class="side d"><div class="brand">${mark(...o.d)}Pace</div><div class="icon" style="background:${o.icon[0]}">${mark(o.icon[2], o.icon[1], 40)}</div></div>
+  </div><div class="cap"><b>${o.name}</b><span>${o.note}</span></div></div>`).join("");
+const base = [
+  ["ДЗ по алгебре: №№ 290, 292", '<span class="urg">Срочно</span><span>4 нояб.</span>'],
+  ["Позвонить в банк", '<span class="pri">Приоритет</span><span>сегодня</span>'],
+  ["Купить продукты на неделю", '<span>4\u00a0дн назад</span>'],
+];
+const LOW = [
+  ["а) Стрелка вниз", "Маленькая серая стрелка ↓ перед датой, без слова. Экранный диктор читает «Необязательно».", (r) => `<div class="row"><span class="ck"></span><div><div class="rt">Разобрать старые конспекты</div><div class="meta"><span class="low-ic" title="Необязательно">${ic("arrowdown",13,2)}</span><span>без срока</span></div></div></div>`],
+  ["б) Слово мелким серым", "«необязательно» строчными в цвете даты, в конце строки.", (r) => `<div class="row"><span class="ck"></span><div><div class="rt">Разобрать старые конспекты</div><div class="meta"><span>без срока</span><span>· необязательно</span></div></div></div>`],
+  ["в) Приглушённое название", "Слова нет, но название задачи серее обычного: строка отходит на второй план.", (r) => `<div class="row dim"><span class="ck"></span><div><div class="rt">Разобрать старые конспекты</div><div class="meta"><span>без срока</span></div></div></div>`],
+];
+const rowsHtml = () => base.map(([t,m]) => `<div class="row"><span class="ck"></span><div><div class="rt">${t}</div><div class="meta">${m}</div></div></div>`).join("");
+const renderLow = (dark) => document.getElementById("low").innerHTML = LOW.map(([n, note, f]) => `<figure style="margin:0;display:grid;gap:8px"><div class="mini-ph ph ${dark ? "dark" : "light"}" style="width:auto;height:auto;border-radius:16px"><div class="list">${rowsHtml()}${f()}</div></div><figcaption><b style="color:var(--ink)">${n}</b> — ${note}</figcaption></figure>`).join("");
+renderLow(false);
+document.getElementById("theme").addEventListener("click", (e) => { const on = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", String(on)); renderLow(on); });
+
+</script>

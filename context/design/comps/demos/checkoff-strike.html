@@ -1,0 +1,171 @@
+<title>Отметка · зачёркивание</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root { --page:#f6f6f4; --ink:#18181a; --ink2:#55565c; --ink3:#77787f; --rule:rgba(0,0,0,.1); --card:#fff; --chip:#ececea; --focus:#2e4ad6;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page:#111113; --ink:#ececee; --ink2:#a8a9b0; --ink3:#83848c; --rule:rgba(255,255,255,.1); --card:#1a1a1d; --chip:#27272b; --focus:#8ea0ff; color-scheme:dark } }
+:root[data-theme="dark"] { --page:#111113; --ink:#ececee; --ink2:#a8a9b0; --ink3:#83848c; --rule:rgba(255,255,255,.1); --card:#1a1a1d; --chip:#27272b; --focus:#8ea0ff; color-scheme:dark }
+* { box-sizing:border-box }
+body { background:var(--page); color:var(--ink); font:15px/1.5 var(--sans); padding-block:28px 56px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); -webkit-font-smoothing:antialiased }
+main { max-width:1180px; margin:0 auto; display:grid; gap:24px }
+h1 { font-size:28px; line-height:1.15; letter-spacing:-.02em; margin:0; text-wrap:balance }
+h2 { font-size:19px; line-height:1.25; letter-spacing:-.01em; margin:0 }
+p { margin:0; max-width:70ch; color:var(--ink2) }
+.lede { display:grid; gap:10px }
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.controls button, .seg button { font:500 14px var(--sans); color:var(--ink); background:var(--chip); border:0; border-radius:999px; height:36px; padding:0 14px; cursor:pointer }
+.controls button[aria-pressed="true"], .seg button[aria-pressed="true"] { background:var(--ink); color:var(--page) }
+.controls button:focus-visible, .seg button:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
+.stage { display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start }
+.stage figure { margin:0; display:grid; gap:8px; justify-items:start; min-width:0 }
+figcaption { font-size:13px; color:var(--ink3); max-width:340px }
+.card { background:var(--card); border:1px solid var(--rule); border-radius:18px; padding:20px; display:grid; gap:14px; min-width:0 }
+.note { font-size:13px; color:var(--ink3) }
+
+.ph { --r-card:12px; --r-btn:10px; --r-tag:6px; width:360px; max-width:100%; height:740px; border-radius:30px; overflow:hidden; position:relative;
+  font-family:var(--sans); background:var(--bg); color:var(--l1); font-size:15px; line-height:1.35; font-feature-settings:"cv11","tnum";
+  border:1px solid var(--rule); display:flex; flex-direction:column; -webkit-font-smoothing:antialiased }
+.ph.light { --bg:#F4F5F9; --cell:#FFFFFF; --elev:#FFFFFF; --l1:#12141C; --l2:#4B5064; --l3:#6B7086; --l4:#B4B8C7; --sep:rgba(20,28,70,.09);
+  --fill:rgba(20,28,70,.055); --fill2:rgba(20,28,70,.09); --accent:#2E4AD6; --onAccent:#FFFFFF; --accentText:#2E4AD6; --tint:rgba(46,74,214,.10);
+  --margin:#D33A30; --warn:#C2410C; --shadow:0 1px 2px rgba(20,28,70,.06),0 10px 28px rgba(20,28,70,.10);
+  --p-alg:#5B35B8; --p-alg-t:rgba(91,53,184,.11); --p-work:#0B6E66; --p-work-t:rgba(11,110,102,.11); --p-pers:#A8481A; --p-pers-t:rgba(168,72,26,.11);
+  --c-other:#6B7086; --c-chores:#8A6A1E; --c-rest:#0B6E66; --c-study:#5B35B8 }
+.ph.dark { --bg:#0D0F15; --cell:#161922; --elev:#1E2232; --l1:#ECEEF4; --l2:#B6BACB; --l3:#9297AB; --l4:#4A4F63; --sep:rgba(190,200,255,.09);
+  --fill:rgba(190,200,255,.07); --fill2:rgba(190,200,255,.12); --accent:#7D93FF; --onAccent:#0B0D14; --accentText:#94A6FF; --tint:rgba(125,147,255,.16);
+  --margin:#FF6A5C; --warn:#FF9B5E; --shadow:0 0 0 1px rgba(190,200,255,.08),0 16px 40px rgba(0,0,0,.5);
+  --p-alg:#B9A2FF; --p-alg-t:rgba(155,125,255,.17); --p-work:#63D3C6; --p-work-t:rgba(80,200,185,.15); --p-pers:#FFA07A; --p-pers-t:rgba(255,140,95,.15);
+  --c-other:#9297AB; --c-chores:#D8B45A; --c-rest:#5CCFC0; --c-study:#A58CFF }
+.ph svg { flex:none; display:block }
+.st { height:40px; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-size:13px; font-weight:600; flex:none }
+.hd { padding:4px 18px 10px; display:flex; align-items:flex-end; justify-content:space-between; flex:none }
+.tt { font-size:30px; font-weight:700; letter-spacing:-.025em; line-height:1.05 }
+.sub { font-size:13px; color:var(--l2); margin-top:4px }
+.ib { width:44px; height:44px; display:grid; place-items:center; color:var(--l2); border-radius:999px }
+.scroll { flex:1; overflow:hidden; padding:0 14px; display:flex; flex-direction:column; gap:12px; min-height:0 }
+.scroll > * { flex:none }
+.gh { display:flex; justify-content:space-between; padding:0 4px; font-size:13px; font-weight:600; color:var(--l2) }
+.list { background:var(--cell); border-radius:var(--r-card); overflow:hidden }
+.row { display:grid; grid-template-columns:28px 1fr; gap:12px; padding:11px 14px; position:relative; background:var(--cell) }
+.row + .row::before { content:""; position:absolute; top:0; left:54px; right:0; height:1px; background:var(--sep) }
+.ck { width:24px; height:24px; border-radius:999px; border:1.5px solid var(--l4); margin-top:1px; cursor:pointer; padding:0; background:transparent; display:grid; place-items:center; color:var(--onAccent) }
+.ck:focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.ck.on { background:var(--accent); border-color:var(--accent) }
+.rt { font-size:15.5px; line-height:1.3; position:relative; display:inline }
+.meta { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:5px; font-size:12.5px; color:var(--l3) }
+.t { height:20px; padding:0 7px; border-radius:var(--r-tag); display:inline-flex; align-items:center; font-size:12px; font-weight:550 }
+.urg { color:var(--margin); font-weight:600 } .pri { color:var(--l1); font-weight:600 }
+.tabs { height:76px; display:grid; grid-template-columns:repeat(4,1fr); padding-top:6px; border-top:1px solid var(--sep); flex:none; background:var(--bg) }
+.tab { display:grid; justify-items:center; align-content:start; gap:3px; font-size:11px; font-weight:550; color:var(--l3) }
+.tab.on { color:var(--accentText) }
+.toast { position:absolute; left:14px; right:14px; bottom:88px; background:var(--elev); color:var(--l1); box-shadow:var(--shadow); border-radius:12px;
+  padding:10px 10px 10px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:14px; opacity:0; pointer-events:none }
+.toast button { font:600 14px var(--sans); color:var(--accentText); background:transparent; border:0; height:36px; padding:0 10px; border-radius:8px; cursor:pointer }
+
+.strike-line { position:absolute; left:0; right:0; top:52%; height:1.6px; background:var(--accent); transform-origin:left center; transform:scaleX(0); border-radius:1px }
+.speck { position:absolute; width:3px; height:3px; border-radius:1px; background:var(--l2); pointer-events:none }
+.row-inner { display:contents }
+</style>
+<main>
+  <header class="lede"><h1>а) Чернильное зачёркивание</h1><p>Название перечёркивается синей чернильной линией (160 мс), строка гаснет (120 мс), список смыкается (220 мс). Всего около 300 мс: фирменная деталь направления A.</p>
+  <p class="note">Демо в HTML на реальной палитре A. Нажми на кружок у любой задачи. «Вернуть» в тосте возвращает строку. «Замедлить ×4» помогает рассмотреть движение; «Меньше движения» показывает, как это выглядит при системной настройке «Уменьшить движение».</p></header>
+  <div class="controls" role="group" aria-label="Настройки демо">
+    <button id="theme" aria-pressed="false">Тёмная тема</button>
+    <button id="slow" aria-pressed="false">Замедлить ×4</button>
+    <button id="reduce" aria-pressed="false">Меньше движения</button>
+    <button id="reset">Сбросить список</button>
+  </div>
+  <div class="stage"><figure><div class="ph light" id="ph">
+    <div class="st"><span>16:21</span><span>87%</span></div>
+    <div class="hd"><div><div class="tt">Сейчас</div><div class="sub">Воскресенье, 1 ноября</div></div><div class="ib" id="bell"></div></div>
+    <div class="scroll"><div class="gh"><span>Со сроком</span><span id="count"></span></div><div class="list" id="list"></div></div>
+    <div class="tabs" id="tabs"></div>
+    <div class="toast" id="toast" role="status"><span id="toastText"></span><button id="undo">Вернуть</button></div>
+  </div><figcaption>Сейчас · телефон 360 × 740</figcaption></figure></div>
+</main>
+<script>
+const ICON = {"bell": "<path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9\"/><path d=\"M10.3 21a1.94 1.94 0 0 0 3.4 0\"/>", "zap": "<path d=\"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z\"/>", "clock": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/>", "inbox": "<path d=\"M22 12h-6l-2 3h-4l-2-3H2\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/>", "more": "<circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/>", "check": "<path d=\"M20 6 9 17l-5-5\"/>", "cal": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4\"/><path d=\"M8 2v4\"/><path d=\"M3 10h18\"/>", "task": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>", "home": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>", "coffee": "<path d=\"M10 2v2\"/><path d=\"M14 2v2\"/><path d=\"M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1\"/><path d=\"M6 2v2\"/>", "up": "<path d=\"m18 15-6-6-6 6\"/>", "down": "<path d=\"m6 9 6 6 6-6\"/>", "arrowdown": "<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>", "plus": "<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>"};
+const ic = (n, s = 20, w = 1.75) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+const VARIANT = "strike";
+const ROWS = [["Подготовить квартальный отчёт", "<span class=\"t\" style=\"color:var(--p-work);background:var(--p-work-t)\">Работа</span><span>завтра 18:00 · 23 ч 39 мин</span>"], ["ДЗ по алгебре: №№ 290, 292", "<span class=\"t\" style=\"color:var(--p-alg);background:var(--p-alg-t)\">Алгебра</span><span class=\"urg\">Срочно</span><span>4 нояб.</span>"], ["Квартплата", "<span class=\"t\" style=\"color:var(--p-pers);background:var(--p-pers-t)\">Личное</span><span>11 нояб. · 9 дн</span>"], ["Позвонить в банк", "<span class=\"t\" style=\"color:var(--p-pers);background:var(--p-pers-t)\">Личное</span><span class=\"pri\">Приоритет</span><span>сегодня</span>"], ["Купить продукты на неделю", "<span class=\"t\" style=\"color:var(--p-pers);background:var(--p-pers-t)\">Личное</span><span>4 дн назад</span>"], ["Прочитать главу 4 к семинару", "<span class=\"t\" style=\"color:var(--p-alg);background:var(--p-alg-t)\">Алгебра</span><span>пт 10:30</span>"]];
+const ph = document.getElementById("ph"), list = document.getElementById("list"), toast = document.getElementById("toast");
+document.getElementById("bell").innerHTML = ic("bell", 22);
+document.getElementById("tabs").innerHTML = [["zap","Сейчас",1],["clock","День"],["inbox","Входящие"],["more","Ещё"]].map(([i,l,on]) => `<div class="tab${on ? " on" : ""}">${ic(i,24)}${l}</div>`).join("");
+const state = { slow: 1, reduce: false, last: null, toastAnim: null, timer: 0 };
+const EASE = { enter: "cubic-bezier(.2,.8,.2,1)", exit: "cubic-bezier(.4,0,1,1)", move: "cubic-bezier(.3,0,0,1)" };
+const d = (ms) => ms * state.slow;
+const mkRow = ([title, meta], i) => {
+  const row = document.createElement("div"); row.className = "row"; row.dataset.i = i;
+  row.innerHTML = `<button class="ck" aria-label="Отметить «${title}» выполненной"></button><div class="body"><div><span class="rt">${title}<span class="strike-line"></span></span></div><div class="meta">${meta}</div></div>`;
+  row.querySelector(".ck").addEventListener("click", () => check(row));
+  return row;
+};
+const count = () => document.getElementById("count").textContent = list.children.length;
+const reset = () => { list.innerHTML = ""; ROWS.forEach((r, i) => list.appendChild(mkRow(r, i))); count(); hideToast(true); };
+const showToast = (title) => {
+  document.getElementById("toastText").textContent = `Готово: ${title}`;
+  state.toastAnim?.cancel();
+  state.toastAnim = toast.animate([{opacity:0, transform:"translateY(8px)"}, {opacity:1, transform:"none"}], {duration: d(state.reduce ? 160 : 220), easing: EASE.enter, fill:"forwards"});
+  toast.style.pointerEvents = "auto";
+  clearTimeout(state.timer); state.timer = setTimeout(() => hideToast(), 6000 * state.slow);
+};
+const hideToast = (instant) => {
+  toast.style.pointerEvents = "none";
+  state.toastAnim?.cancel();
+  if (instant) { toast.style.opacity = 0; return; }
+  state.toastAnim = toast.animate([{opacity:1}, {opacity:0, transform:"translateY(4px)"}], {duration: d(160), easing: EASE.exit, fill:"forwards"});
+};
+const collapse = async (row) => {
+  const h = row.offsetHeight;
+  row.style.overflow = "hidden";
+  if (state.reduce) { row.remove(); return; }
+  await row.animate([{height: h + "px", paddingTop: "11px", paddingBottom: "11px"}, {height: "0px", paddingTop: "0px", paddingBottom: "0px"}], {duration: d(220), easing: EASE.move, fill:"forwards"}).finished;
+  row.remove();
+};
+const leave = async (row) => {
+  const body = row.querySelector(".body"), ck = row.querySelector(".ck");
+  if (state.reduce) { await row.animate([{opacity:1}, {opacity:0}], {duration: d(160), easing: EASE.exit, fill:"forwards"}).finished; return; }
+  if (VARIANT === "strike") {
+    await row.querySelector(".strike-line").animate([{transform:"scaleX(0)"}, {transform:"scaleX(1)"}], {duration: d(160), easing: EASE.enter, fill:"forwards"}).finished;
+    await Promise.all([body, ck].map(el => el.animate([{opacity:1}, {opacity:0}], {duration: d(120), easing: EASE.exit, fill:"forwards"}).finished));
+  } else if (VARIANT === "dissolve") {
+    const rect = row.getBoundingClientRect(), t = row.querySelector(".rt").getBoundingClientRect();
+    const specks = Array.from({length: 24}, () => {
+      const s = document.createElement("span"); s.className = "speck";
+      s.style.left = (t.left - rect.left + Math.random() * t.width) + "px"; s.style.top = (t.top - rect.top + Math.random() * (rect.height - 16)) + "px";
+      row.appendChild(s);
+      return s.animate([{opacity:.9, transform:"translate(0,0) scale(1)"}, {opacity:0, transform:`translate(${(Math.random()-.5)*40}px, ${-8 - Math.random()*24}px) scale(.4)`}], {duration: d(200 + Math.random()*60), easing: EASE.exit, fill:"forwards"}).finished;
+    });
+    await Promise.all([body.animate([{opacity:1, transform:"none"}, {opacity:0, transform:"scale(.98)"}], {duration: d(260), easing: EASE.exit, fill:"forwards"}).finished,
+      ck.animate([{opacity:1}, {opacity:0}], {duration: d(200), delay: d(60), easing: EASE.exit, fill:"forwards"}).finished, ...specks]);
+  } else {
+    await Promise.all([body, ck].map(el => el.animate([{opacity:1}, {opacity:0}], {duration: d(160), easing: EASE.exit, fill:"forwards"}).finished));
+  }
+};
+const check = async (row) => {
+  if (row.dataset.busy) return; row.dataset.busy = "1";
+  const ck = row.querySelector(".ck"); ck.classList.add("on"); ck.innerHTML = ic("check", 15, 2.5);
+  const title = row.querySelector(".rt").firstChild.textContent;
+  state.last = { i: Number(row.dataset.i), next: row.nextElementSibling };
+  showToast(title);
+  await leave(row); await collapse(row); count();
+};
+document.getElementById("undo").addEventListener("click", () => {
+  if (!state.last) return;
+  const row = mkRow(ROWS[state.last.i], state.last.i);
+  const ref = [...list.children].find(r => Number(r.dataset.i) > state.last.i) ?? null;
+  list.insertBefore(row, ref);
+  row.animate([{opacity:0}, {opacity:1}], {duration: d(160), easing: EASE.enter});
+  state.last = null; count(); hideToast();
+});
+const toggle = (id, fn) => document.getElementById(id).addEventListener("click", (e) => { const on = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", String(on)); fn(on); });
+toggle("theme", (on) => { ph.classList.toggle("dark", on); ph.classList.toggle("light", !on); });
+toggle("slow", (on) => state.slow = on ? 4 : 1);
+toggle("reduce", (on) => state.reduce = on);
+document.getElementById("reset").addEventListener("click", reset);
+try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) document.getElementById("reduce").click(); } catch {}
+reset();
+
+</script>
