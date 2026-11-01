@@ -2,7 +2,7 @@
 export const enSessions = {
   "sessions.title": "Devices and sessions",
   "sessions.hint":
-    "Everything signed in to your account: browsers, this app, computers that send app usage and AI apps. End anything you do not recognise.",
+    "Everything signed in to your account: browsers, this app, computers that send app usage and AI apps. End anything you do not recognize.",
   "sessions.loading": "Loading devices",
   "sessions.failed": "Couldn't load devices",
   "sessions.retry": "Try again",

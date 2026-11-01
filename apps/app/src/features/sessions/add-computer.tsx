@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 
 import type { NewAgent } from "@pace/client/react";
 
 import { useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 
@@ -26,7 +27,13 @@ export const AddComputer = ({
   const [created, setCreated] = useState<NewAgent | null>(null);
   const [hasFailed, setHasFailed] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  // Enter and the button may land in one batch: one token (bug class 36).
+  const sendingRef = useRef(false);
   const submit = async (): Promise<void> => {
+    if (sendingRef.current) {
+      return;
+    }
+    sendingRef.current = true;
     setIsBusy(true);
     try {
       setCreated(await create(name.trim() === "" ? t("devices.defaultName") : name.trim()));
@@ -34,6 +41,7 @@ export const AddComputer = ({
     } catch {
       setHasFailed(true);
     } finally {
+      sendingRef.current = false;
       setIsBusy(false);
     }
   };
@@ -41,14 +49,29 @@ export const AddComputer = ({
     <Sheet closeLabel={t("common.close")} onClose={onClose} title={t("devices.add")} visible>
       {created === null ? (
         <View className="gap-3">
+          {/* The name is the sheet's one question: focused, the suggestion selected to type over. */}
           <TextField
+            autoComplete="off"
+            autoCorrect={false}
+            autoFocus
+            enterKeyHint="done"
             error={hasFailed ? t("devices.createFailed") : null}
             label={t("devices.name")}
             maxLength={80}
             onChangeText={setName}
+            onSubmitEditing={() => void submit()}
+            returnKeyType="done"
+            selectTextOnFocus
+            spellCheck={false}
             value={name}
           />
-          <Button busy={isBusy} onPress={() => void submit()}>
+          {/* The field takes Enter itself; the button shows it, as other forms' do. */}
+          <Button
+            busy={isBusy}
+            hotkey={HOTKEYS.enter}
+            hotkeyMode="hint"
+            onPress={() => void submit()}
+          >
             {t("devices.create")}
           </Button>
         </View>

@@ -1,8 +1,21 @@
+import type { Locator } from "@playwright/test";
+
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
 
 /** Screenshots for review land here when set (the run's output folder otherwise). */
 const SHOT_DIR = process.env["E2E_SHOT_DIR"];
+
+/** Where a shown element sits; it must be on screen. */
+const boxOf = async (
+  locator: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> => {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error("not on screen");
+  }
+  return box;
+};
 
 const SIZES = [
   { height: 844, name: "phone", width: 390 },
@@ -20,9 +33,18 @@ for (const size of SIZES) {
       await expect(section.getByText("This device")).toBeVisible();
       await expectNoA11yViolations(page);
 
+      // By keyboard (QA round 15 M2): the name is focused with its suggestion selected, the button
+      // shows Enter, and Enter in the field creates the token.
       await section.getByRole("button", { name: "Add a computer" }).click();
-      await page.getByRole("textbox", { name: "Name" }).fill("Linux Mint");
-      await page.getByRole("button", { name: "Create the token" }).click();
+      const name = page.getByRole("textbox", { name: "Name" });
+      await expect(name).toBeFocused();
+      await expect(page.getByRole("button", { name: "Create the token" })).toHaveAttribute(
+        "aria-keyshortcuts",
+        "Enter",
+      );
+      await page.keyboard.type("Linux Mint");
+      await expect(name).toHaveValue("Linux Mint");
+      await page.keyboard.press("Enter");
       await expect(page.getByTestId("device-setup-token")).not.toBeEmpty();
       // The commands name the local API, the server this build talks to.
       await page.getByRole("radio", { name: "Linux" }).click();
@@ -57,9 +79,19 @@ for (const size of SIZES) {
       await expect(confirm.getByRole("status")).toHaveText(
         "Disconnect this computer? Its token stops working at once.",
       );
+      // One order on every width (QA round 15 M3): the question, then Cancel and the action on
+      // one line under it, Cancel first.
+      const question = await boxOf(confirm.getByRole("status"));
+      const cancel = await boxOf(confirm.getByRole("button", { name: "Cancel" }));
+      const action = await boxOf(confirm.getByRole("button", { name: "Disconnect" }));
+      expect(cancel.y).toBeGreaterThanOrEqual(question.y + question.height);
+      expect(Math.abs(cancel.y - action.y)).toBeLessThan(2);
+      expect(cancel.x + cancel.width).toBeLessThanOrEqual(action.x);
       await expectNoA11yViolations(page);
-      await computer.getByRole("button", { name: "Disconnect" }).click();
+      await confirm.getByRole("button", { name: "Disconnect" }).click();
       await expect(computer).toHaveCount(0);
+      // The row took its focus with it: it moves on to the control after the list (bug class 5).
+      await expect(section.getByRole("button", { name: "Add a computer" })).toBeFocused();
       await page.reload();
       await expect(section.getByText("This device")).toBeVisible();
       await expect(section.getByRole("group", { name: "Linux Mint" })).toHaveCount(0);

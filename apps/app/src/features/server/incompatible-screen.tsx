@@ -24,21 +24,24 @@ const IncompatibleScreen = () => {
   const { auth } = useAuth();
   const { origin, reason } = useStore(serverStore);
   return (
-    <View className="flex-1 justify-center gap-8 bg-bg px-6">
-      <View className="gap-3">
-        <Text accessibilityRole="header" className="font-sans text-[22px] font-semibold text-fg">
-          {t("server.mismatch")}
-        </Text>
-        <Text className="font-sans text-[15px] leading-[21px] text-fg2">
-          {t(reason === "client-outdated" ? "server.mismatchApp" : "server.mismatchServer")}
-        </Text>
-        <Text className="font-sans text-[13px] text-muted">
-          {t("server.line", { host: serverHost(origin) })}
-        </Text>
+    <View className="flex-1 justify-center bg-bg px-6">
+      {/* A centred column on a computer, as the login card is, not the window's left edge. */}
+      <View className="w-full max-w-[440px] gap-8 self-center">
+        <View className="gap-3">
+          <Text accessibilityRole="header" className="font-sans text-[22px] font-semibold text-fg">
+            {t("server.mismatch")}
+          </Text>
+          <Text className="font-sans text-[15px] leading-[21px] text-fg2">
+            {t(reason === "client-outdated" ? "server.mismatchApp" : "server.mismatchServer")}
+          </Text>
+          <Text className="font-sans text-[13px] text-muted">
+            {t("server.line", { host: serverHost(origin) })}
+          </Text>
+        </View>
+        <Button onPress={() => void auth.logout()} variant="secondary">
+          {t("settings.logout")}
+        </Button>
       </View>
-      <Button onPress={() => void auth.logout()} variant="secondary">
-        {t("settings.logout")}
-      </Button>
     </View>
   );
 };

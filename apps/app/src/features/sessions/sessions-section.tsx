@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
+import { moveFocus } from "#app/platform/move-focus.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -24,13 +25,22 @@ type Opened = "addComputer" | "connectAi" | null;
 The list itself: skeleton rows while it loads, a quiet retry line when it cannot, then the rows.
 Ending this device's own session is logging out: it signs out and goes to the login card.
 */
-const SessionList = ({ sessions }: { readonly sessions: Sessions }) => {
+const SessionList = ({
+  afterLast,
+  sessions,
+}: {
+  readonly sessions: Sessions;
+  /** Where focus goes when the last row is ended: the section's next control. */
+  readonly afterLast: RefObject<null | View>;
+}) => {
   const t = useT();
   const router = useRouter();
   const { auth } = useAuth();
   const { timezone } = useSettings();
   const { deviceTz, language, now } = useViewer();
   const [hasEndFailed, setHasEndFailed] = useState(false);
+  // Each row's Revoke or Disconnect, by id: an ended row's focus goes to the next one's.
+  const openersRef = useRef(new Map<string, View>());
   if (sessions.status === "loading") {
     return <Skeleton label={t("sessions.loading")} />;
   }
@@ -44,29 +54,46 @@ const SessionList = ({ sessions }: { readonly sessions: Sessions }) => {
       </View>
     );
   }
-  const end = async (row: Row): Promise<void> => {
+  const rows = sessionRows(sessions.sessions, { language, now, zone: timezone ?? deviceTz });
+  /** The row's going takes its controls with it: focus moves on, never to the page (class 5). */
+  const focusAfter = (row: Row): void => {
+    const at = rows.findIndex((item) => item.id === row.id);
+    // Forward in reading order: the next row's action, else the control after the list.
+    const next = rows
+      .slice(at + 1)
+      .map((item) => openersRef.current.get(item.id))
+      .find((node) => node !== undefined);
+    moveFocus(next ?? afterLast.current);
+  };
+  const didEnd = async (row: Row): Promise<boolean> => {
     try {
       await sessions.revoke(row.id);
     } catch {
       // The row stays, its confirm open for another try; the line under the list says why.
       setHasEndFailed(true);
-      return;
+      return false;
     }
     setHasEndFailed(false);
     if (!row.isCurrent) {
-      return;
+      focusAfter(row);
+      return true;
     }
     await auth.logout();
     router.replace("/login");
+    return true;
   };
-  const rows = sessionRows(sessions.sessions, { language, now, zone: timezone ?? deviceTz });
   return (
     <View>
       {rows.map((row) => (
         <SessionRow
           key={row.id}
-          onEnd={async () => {
-            await end(row);
+          onEnd={async () => await didEnd(row)}
+          openerRef={(node) => {
+            if (node === null) {
+              openersRef.current.delete(row.id);
+            } else {
+              openersRef.current.set(row.id, node);
+            }
           }}
           row={row}
         />
@@ -91,6 +118,7 @@ export const SessionsSection = () => {
   const isWide = useIsWide();
   const sessions = useSessions(api);
   const [opened, setOpened] = useState<Opened>(null);
+  const computerButtonRef = useRef<View>(null);
   const close = () => {
     setOpened(null);
   };
@@ -98,12 +126,13 @@ export const SessionsSection = () => {
     <View className="gap-3">
       <Text className="font-sans text-[13px] leading-[18px] text-muted">{t("sessions.hint")}</Text>
       {IS_PHONE ? <CalendarSyncRow /> : null}
-      <SessionList sessions={sessions} />
+      <SessionList afterLast={computerButtonRef} sessions={sessions} />
       <View className={cx("gap-2", isWide && "flex-row flex-wrap")}>
         <Button
           onPress={() => {
             setOpened("addComputer");
           }}
+          ref={computerButtonRef}
           variant="secondary"
         >
           {t("devices.add")}
