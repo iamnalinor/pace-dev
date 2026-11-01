@@ -15,8 +15,10 @@ ALTER TABLE `sessions` ADD `ip` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `country` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `city` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `device_id` text;--> statement-breakpoint
--- Before `label` goes, existing sessions get their kind and a readable name from it: an agent's
--- label was the computer's typed name; the server wrote `web` (widget), `android` (bot login) and `dev`.
+-- Existing sessions get their kind and a readable name from `label`: an agent's label was the
+-- computer's typed name; the server wrote `web` (widget), `android` (bot login) and `dev`.
+-- `label` itself stays in this release (expand, then contract): the previous Worker still reads and
+-- inserts it between this migration and the deploy, and after a rollback. A later release drops it.
 UPDATE `sessions` SET
 	`kind` = CASE
 		WHEN `scope` = 'usage:write' THEN 'agent'
@@ -30,5 +32,4 @@ UPDATE `sessions` SET
 		WHEN `label` = 'android' THEN 'Android'
 		WHEN `label` = 'web' THEN 'Browser'
 		ELSE coalesce(`label`, '')
-	END;--> statement-breakpoint
-ALTER TABLE `sessions` DROP COLUMN `label`;
+	END;

@@ -192,6 +192,14 @@ secrets with zod once per request and stores the result on the context.
   `usage:write` session files its uploads under `deviceId ?? sessionId`. `shared/session-rows.ts`
   `deleteSession` is the one revoke by id. `requireAuth` middleware resolves the bearer to
   `CurrentUser`; handlers read it with `requireUser(c)`.
+- **Schema changes ship expand, then contract.** `deploy.yml` applies the D1 migrations before the
+  new Worker serves, and `wrangler rollback` runs the previous Worker on the new schema, so no
+  migration drops or renames a column the previous release still reads or writes. The column goes in
+  a later release, once a release has served without it. Open follow-up
+  (`TODO(sessions-label-contract)`): `sessions.label`, replaced by `kind` and `name` in 0008, is
+  still written (`legacyLabelOf`) and never read; the next release's migration first backfills
+  `kind`/`name` again for rows the previous Worker inserted during the deploy window (`name = ''`),
+  then drops `label`, and `legacyLabelOf` goes.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
 - **Which server**: the app stores its token with the origin of the server that issued it
   (`pace.session` = `{ origin, token }`); a store for another server reads it as signed out, and

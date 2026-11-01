@@ -52,6 +52,13 @@ export const sessions = sqliteTable(
     kind: text().notNull().default("browser"),
     /** How the person tells it apart: "Chrome on macOS", the phone's model, a computer's name. */
     name: text().notNull().default(""),
+    /**
+    The pre-0008 name column, still written so a Worker of the previous release (between the
+    migration and the deploy, or after a rollback) reads and inserts sessions as before; no code of
+    this release reads it. TODO(sessions-label-contract): drop it in a later release's migration,
+    once a release has served on `kind` and `name` (docs/architecture.md "Auth and sessions").
+    */
+    label: text().notNull(),
     /** A device token's one permission (`usage:write`); `null` for a full sign-in. */
     scope: text(),
     /** Where it signed in from (`RequestPlace`), each part unknown when not told. */

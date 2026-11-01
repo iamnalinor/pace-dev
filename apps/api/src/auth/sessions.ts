@@ -69,6 +69,28 @@ const usageDeviceOf = (row: {
   readonly deviceId: null | string;
 }): null | string => row.deviceId ?? (isScope(row.scope) ? row.sessionId : null);
 
+/**
+The `label` the previous release's Worker wrote and reads (an agent's label was its computer's
+name, the device name it shows), kept while a rollback can still run it on this schema.
+TODO(sessions-label-contract): goes with the column in a later release.
+*/
+const legacyLabelOf = (kind: SessionKind, name: string): string => {
+  switch (kind) {
+    case "agent": {
+      return name;
+    }
+    case "app": {
+      return "android";
+    }
+    case "browser": {
+      return "web";
+    }
+    case "dev": {
+      return "dev";
+    }
+  }
+};
+
 export type PreparedSession = {
   readonly id: string;
   readonly token: string;
@@ -90,6 +112,7 @@ export const prepareSession = async (db: Db, input: NewSession): Promise<Prepare
     tokenHash: await sha256Hex(token),
     kind: input.kind,
     name: input.name,
+    label: legacyLabelOf(input.kind, input.name),
     scope: input.scope ?? null,
     ...(input.place ?? UNKNOWN_PLACE),
     deviceId: input.deviceId ?? null,

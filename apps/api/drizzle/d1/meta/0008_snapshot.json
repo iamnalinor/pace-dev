@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bc66ecbb-ac4a-4f74-8d0a-649a75076990",
+  "id": "a92284b7-4a67-4c9e-80cd-cf14613cf926",
   "prevId": "8fe77fbb-e652-43ce-87b8-4ebb757307ac",
   "tables": {
     "account_confirmations": {
@@ -418,6 +418,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "''"
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         },
         "scope": {
           "name": "scope",

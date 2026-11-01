@@ -57,6 +57,33 @@ describe("sessions", () => {
     expect(await findSession(db, session.token, NOW + 90 * DAY + 1)).toBeNull();
   });
 
+  it("still writes the old label the previous release's Worker reads (expand, then contract)", async () => {
+    const db = d1(env.DB);
+    const user = await seedUser();
+    const made = await Promise.all([
+      createSession(db, BROWSER(user.id)),
+      createSession(db, { kind: "app", name: "Pixel 8", now: NOW, userId: user.id }),
+      createSession(db, { kind: "dev", name: "Dev login", now: NOW, userId: user.id }),
+      createSession(db, {
+        kind: "agent",
+        name: "Work laptop",
+        now: NOW,
+        scope: "usage:write",
+        userId: user.id,
+      }),
+    ]);
+    const labels = await Promise.all(
+      made.map(
+        async ({ id }) =>
+          await env.DB.prepare("select label from sessions where id = ?").bind(id).first<{
+            label: string;
+          }>(),
+      ),
+    );
+    // The values the previous Worker wrote, so its device name (an agent's label) stays right.
+    expect(labels.map((row) => row?.label)).toEqual(["web", "android", "dev", "Work laptop"]);
+  });
+
   it("never stores the token itself", async () => {
     const db = d1(env.DB);
     const user = await seedUser();
