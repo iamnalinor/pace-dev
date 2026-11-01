@@ -4,8 +4,8 @@ import { Text, View } from "react-native";
 import type { ThemePreference } from "#app/platform/theme.ts";
 
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
-import { ConnectedApps } from "#app/features/oauth/connected-apps.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
+import { SessionsSection } from "#app/features/sessions/sessions-section.tsx";
 import { CategoryEstimates } from "#app/features/settings/category-estimates.tsx";
 import { DangerZone } from "#app/features/settings/delete-account.tsx";
 import { ExportRow } from "#app/features/settings/export-row.tsx";
@@ -139,25 +139,12 @@ export const SettingsScreen = () => {
       <Row label={t("settings.more")}>
         <SettingsLinks />
       </Row>
-      {IS_PHONE ? null : (
-        <Row label={t("settings.export")}>
-          <ExportRow />
-        </Row>
-      )}
-      <Row label={t("settings.devices")}>
-        <Button
-          onPress={() => {
-            router.push("/devices");
-          }}
-          variant="secondary"
-        >
-          {t("devices.title")}
-        </Button>
+      <Row label={t("sessions.title")}>
+        <SessionsSection />
       </Row>
-      <Row label={t("settings.connectedApps")}>
-        <ConnectedApps />
-      </Row>
+      {/* The account's own actions last: export (the web's download), log out, the danger zone. */}
       <View className="gap-3 px-5 py-6">
+        {IS_PHONE ? null : <ExportRow />}
         <Button onPress={() => void logout()} variant="secondary">
           {t("settings.logout")}
         </Button>

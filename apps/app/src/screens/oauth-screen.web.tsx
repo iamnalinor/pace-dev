@@ -3,7 +3,7 @@ import { ScrollView } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import { TelegramWidget } from "#app/auth/telegram-widget.web.tsx";
 import { ConsentFlow } from "#app/features/oauth/consent-flow.tsx";
-import { TELEGRAM_BOT } from "#app/platform/api-base.ts";
+import { useServerInfo } from "#app/platform/server-store.ts";
 
 const navigateTo = (url: string): void => {
   globalThis.location.assign(url);
@@ -12,6 +12,7 @@ const navigateTo = (url: string): void => {
 /** The API's `GET /authorize` redirects MCP clients here with the authorization request intact. */
 export const OAuthScreen = () => {
   const t = useT();
+  const { botUsername } = useServerInfo();
   return (
     <ScrollView
       className="flex-1 bg-bg"
@@ -22,7 +23,7 @@ export const OAuthScreen = () => {
         redirect={navigateTo}
         renderWidget={(onAuth) => (
           <TelegramWidget
-            botUsername={TELEGRAM_BOT}
+            botUsername={botUsername}
             label={t("login.telegram")}
             onAuth={onAuth}
             texts={{

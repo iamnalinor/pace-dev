@@ -8,10 +8,21 @@ import { type ApiClient, createApiClient } from "./api-client.ts";
 import { type Assistant, createAssistant } from "./assistant.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { type Clock, systemClock } from "./clock.ts";
-import { createLiveChannel, type LiveChannel, type SocketLike } from "./live.ts";
+import {
+  createLiveChannel,
+  type LiveChannel,
+  type LiveEventsPage,
+  type SocketLike,
+} from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
+import {
+  httpTransport,
+  preferSocket,
+  socketTransport,
+  type SyncTransport,
+} from "./sync-transport.ts";
 
 export type PaceClient = {
   readonly actions: Actions;
@@ -46,10 +57,13 @@ export type PaceClientOptions = {
   readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
 
-/** The local state and its sync: a local change is sent within a second. */
+/**
+The local state and its sync: a local change is sent within a second, over the live socket while
+it can carry it and over HTTP otherwise (decided per call, see `sync-transport.ts`).
+*/
 const stateAndSync = (
   options: PaceClientOptions,
-  api: ApiClient,
+  transport: SyncTransport,
   now: () => string,
 ): { readonly state: AppStateHandle; readonly sync: SyncClient } => {
   // The sync is wired after the state it reads, so the state reaches it through this.
@@ -63,17 +77,27 @@ const stateAndSync = (
     source: options.source,
     store: options.store,
   });
-  const sync = createSyncClient({ api, now, state, store: options.store });
+  const sync = createSyncClient({
+    now,
+    state,
+    store: options.store,
+    transport,
+  });
   wiring.sendSoon = sync.soon;
   return { state, sync };
 };
 
-/** The live channel next to the API: a server's "changed" asks the sync for a run. */
+/**
+The live channel next to the API: a server's "changed" asks the sync for a run, new events go
+to the sync to apply.
+*/
 const liveChannelOf = (
   options: PaceClientOptions,
   wiring: {
     readonly onChange: () => void;
+    readonly onEvents: (page: LiveEventsPage) => void;
     readonly onMessage: (message: unknown) => void;
+    readonly onSessionEnded: () => void;
     readonly token: () => string | undefined;
   },
 ): LiveChannel =>
@@ -82,7 +106,9 @@ const liveChannelOf = (
     ...(options.createSocket !== undefined && { createSocket: options.createSocket }),
     deviceId: options.deviceId,
     onChange: wiring.onChange,
+    onEvents: wiring.onEvents,
     onMessage: wiring.onMessage,
+    onSessionEnded: wiring.onSessionEnded,
     token: wiring.token,
   });
 
@@ -117,6 +143,47 @@ const noticeRouter = (
 };
 
 /**
+The live channel and the sync it carries: the channel is made first (the sync's calls go over
+it) and reaches the sync once that exists; nothing arrives before `start`.
+*/
+const liveAndSync = (
+  options: PaceClientOptions,
+  deps: {
+    readonly api: ApiClient;
+    readonly auth: Auth;
+    readonly now: () => string;
+    readonly onMessage: (message: unknown) => void;
+  },
+): { readonly live: LiveChannel; readonly state: AppStateHandle; readonly sync: SyncClient } => {
+  const { api, auth } = deps;
+  const wired: { sync?: SyncClient } = {};
+  const live: LiveChannel = liveChannelOf(options, {
+    onChange: () => {
+      wired.sync?.soon();
+    },
+    onEvents: (page) => {
+      void wired.sync?.ingestLive(page);
+    },
+    onMessage: deps.onMessage,
+    // The server ended the socket's session: `me` signs out on its 401, so the app goes to
+    // sign-in; a session still good (an expiry the server misjudged) gets its socket back.
+    onSessionEnded: () => {
+      void (async (): Promise<void> => {
+        const checked = await auth.me();
+        if (checked.ok) {
+          live.start();
+        }
+      })();
+    },
+    token: auth.token,
+  });
+  const transport = preferSocket(socketTransport(live), httpTransport(api));
+  const { state, sync } = stateAndSync(options, transport, deps.now);
+  wired.sync = sync;
+  return { live, state, sync };
+};
+
+/**
 Wires API client → auth → app state → sync → actions on the platform adapters: the one
 way a shell builds the client. A device that starts with a stored token refreshes its
 user right away.
@@ -135,14 +202,12 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   });
   const auth = createAuth({ api, session: options.session });
   token = auth.token;
-  const { state, sync } = stateAndSync(options, api, now);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
-  const live = liveChannelOf(options, {
-    onChange: () => {
-      sync.soon();
-    },
+  const { live, state, sync } = liveAndSync(options, {
+    api,
+    auth,
+    now,
     onMessage: notices.onMessage,
-    token: auth.token,
   });
   const actions = createActions({ clock, source: options.source, state });
 

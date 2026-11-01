@@ -3,11 +3,20 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type { PaceRuntime } from "#app/runtime.ts";
 
 import { PresetScreen } from "#app/screens/preset-screen.tsx";
+import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { PresetsList } from "./presets-list.tsx";
+
+/** Where focus went and what was said, as a confirm asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  moveFocus: (target: unknown, say?: string) => {
+    mockMoveFocus(target, say);
+  },
+}));
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -65,6 +74,23 @@ describe("PresetScreen", () => {
       expect(presetOf(runtime, "work")?.definition).toEqual({ color: "coral" });
     });
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it("keeps focus through the delete confirmation: onto Cancel, saying the question, and back (bug class 5)", async () => {
+    await renderScreen(
+      <PresetScreen from={undefined} id="deferred" />,
+      await createTestRuntime({ world: "empty" }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: en("presets.archive") }));
+    const [toCancel, said] = mockMoveFocus.mock.calls[0] ?? [];
+    const toCancelControl = screen.getByRole("button", { name: en("common.cancel") });
+    expect(isControl(toCancel, toCancelControl)).toBe(true);
+    expect(said).toMatch(/Delete/u);
+    expect(screen.getByText(said ?? "").props).toMatchObject({ role: "status" });
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    const [back] = mockMoveFocus.mock.calls[1] ?? [];
+    const backControl = screen.getByRole("button", { name: en("presets.archive") });
+    expect(isControl(back, backControl)).toBe(true);
   });
 
   it("deletes a preset after a confirmation", async () => {

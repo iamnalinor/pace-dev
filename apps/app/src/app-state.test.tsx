@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react-native";
+import * as BackgroundTask from "expo-background-task";
 import * as Notifications from "expo-notifications";
 import { createHash } from "node:crypto";
 import { AppState, Text } from "react-native";
@@ -12,6 +13,8 @@ import {
   fakeUser,
   problem,
 } from "@pace/client/testing";
+
+import type { createFakeBackgroundTask } from "./testing/background-task.fake.ts";
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
@@ -372,6 +375,59 @@ describe("PaceProvider", () => {
       expect(screen.getByTestId("title")).toHaveTextContent("Now");
     });
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+  });
+
+  it("starts the background check once signed in, and stops it on logout", async () => {
+    const background = BackgroundTask as unknown as ReturnType<typeof createFakeBackgroundTask>;
+    background.registerTaskAsync.mockClear();
+    background.unregisterTaskAsync.mockClear();
+    const { runtime } = await setup();
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    expect(background.registerTaskAsync).not.toHaveBeenCalled();
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(background.registerTaskAsync).toHaveBeenCalledWith("pace.background-check", {
+        minimumInterval: 15,
+      });
+    });
+    expect(background.unregisterTaskAsync).not.toHaveBeenCalled();
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await waitFor(() => {
+      expect(background.unregisterTaskAsync).toHaveBeenCalledWith("pace.background-check");
+    });
+  });
+
+  it("registers the background check even when a network step of the signed-in start fails", async () => {
+    const background = BackgroundTask as unknown as ReturnType<typeof createFakeBackgroundTask>;
+    background.registerTaskAsync.mockClear();
+    const { runtime } = await setup();
+    const refresh = jest
+      .spyOn(runtime.notifications, "refresh")
+      .mockRejectedValue(new Error("offline"));
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(background.registerTaskAsync).toHaveBeenCalledWith("pace.background-check", {
+        minimumInterval: 15,
+      });
+    });
   });
 
   it("drops the local log, outbox, cursor and store id when a 401 signs the device out", async () => {

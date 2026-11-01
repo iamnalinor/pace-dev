@@ -5,6 +5,9 @@ import type { MessageKey } from "@pace/core";
 /** On a phone the command goes on through the share sheet (to the computer, by chat or mail). */
 export const SHARE_LABEL_KEY: MessageKey = "devices.share";
 
+/** The same for a link (the MCP server's URL): the phone has no clipboard module. */
+export const SHARE_URL_LABEL_KEY: MessageKey = "connectAi.share";
+
 /** How passing the command on went. */
 export type ShareOutcome = "done" | "failed";
 

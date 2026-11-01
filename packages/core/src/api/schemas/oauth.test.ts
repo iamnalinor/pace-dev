@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  grantedScopes,
-  OAUTH_SCOPES,
-  OAuthCompleteBodySchema,
-  OAuthGrantSchema,
-  requestedScopes,
-} from "./oauth.ts";
+import { grantedScopes, OAUTH_SCOPES, OAuthCompleteBodySchema, requestedScopes } from "./oauth.ts";
 
 describe("requestedScopes", () => {
   it("offers every scope when the client asked for none", () => {
@@ -61,18 +55,5 @@ describe("OAuth contract schemas", () => {
       }).success,
     ).toBe(true);
     expect(OAuthCompleteBodySchema.safeParse({ ...base, scopes: ["admin"] }).success).toBe(false);
-  });
-
-  it("describes a grant with ISO timestamps", () => {
-    const grant = {
-      id: "g1",
-      clientId: "c1",
-      clientName: "Claude",
-      logoUri: null,
-      scopes: ["tasks:read"],
-      createdAt: "2026-10-07T10:00:00.000Z",
-      expiresAt: null,
-    };
-    expect(OAuthGrantSchema.parse(grant)).toEqual(grant);
   });
 });

@@ -207,4 +207,38 @@ describe("createNotificationFeed", () => {
     await offline.feed.refresh();
     expect(offline.feed.store.getState().status).toBe("failed");
   });
+
+  it("asks the server to mark each notice read once, even one it leaves unread (QA round 15 H1)", async () => {
+    // A server that never marks `kept` (an older one, or one with a rule the client cannot see).
+    const { fake, feed } = feedWith({
+      "GET /api/notifications": () => ({
+        deliveries: {},
+        items: [login("kept", "2026-10-07T09:00:00.000Z")],
+        more: false,
+      }),
+      "POST /api/notifications/read": () => ({ ok: true }),
+    });
+    for (let round = 0; round < 3; round += 1) {
+      await feed.refresh();
+      await feed.markRead(["kept"]);
+    }
+    const reads = fake.calls.filter((call) => call.path === "/api/notifications/read");
+    expect(reads).toHaveLength(1);
+  });
+
+  it("asks again for a notice whose read did not reach the server", async () => {
+    const { fake, feed } = feedWith({
+      "GET /api/notifications": () => ({
+        deliveries: {},
+        items: [login("01A", "2026-10-07T09:00:00.000Z")],
+        more: false,
+      }),
+      "POST /api/notifications/read": () => problem(503, "server/unavailable"),
+    });
+    await feed.refresh();
+    await feed.markRead(["01A"]);
+    await feed.markRead(["01A"]);
+    const reads = fake.calls.filter((call) => call.path === "/api/notifications/read");
+    expect(reads).toHaveLength(2);
+  });
 });

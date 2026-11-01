@@ -1,7 +1,7 @@
-import type { Page } from "@playwright/test";
+import type { Page, Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
-import { loginViaApi } from "./support/login.ts";
+import { createDevSession, freshTelegramId, loginViaApi } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
 
 /**
@@ -142,6 +142,19 @@ const servePool = async (page: Page): Promise<Pool> => {
   return pool;
 };
 
+const isRead = (request: Request): boolean =>
+  request.method() === "POST" && request.url().endsWith("/api/notifications/read");
+
+/** Whether the page asks to mark something read again within two seconds. */
+const isReadAgain = async (page: Page): Promise<boolean> => {
+  try {
+    await page.waitForRequest(isRead, { timeout: 2000 });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** Every kind on for the web, in `language`. */
 const settle = async (token: string, language: "en" | "ru"): Promise<void> => {
   const pushed = await pushAsClient(token, [
@@ -193,6 +206,59 @@ test("the bell counts what is unread, the feed answers and reads well", async ({
   await expect(page.getByRole("switch", { name: "Sign-ins in Web" })).toBeChecked();
   await expectNoA11yViolations(page);
 });
+
+test("this session's own sign-in notice is read here: the bell clears, the feed asks once (QA round 15 H1)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 800, width: 1280 });
+  const telegramId = freshTelegramId();
+  const { token } = await loginViaApi(page, telegramId);
+  await settle(token, "en");
+  // Another device signs in too: its notice is the one unread here; this session's own never is.
+  await createDevSession(telegramId);
+  const reads: unknown[] = [];
+  page.on("request", (request) => {
+    if (isRead(request)) {
+      reads.push(request.postDataJSON());
+    }
+  });
+  await page.goto("/");
+  const bell = page.getByRole("button", { name: "Notifications, 1 unread" });
+  await expect(bell).toBeVisible();
+  await bell.click();
+  await expect(page.getByText("Signed in from Dev login")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Notifications", exact: true })).toBeVisible();
+  await expect.poll(() => reads.length).toBe(1);
+  // A storm showed here as ~70 reads a second: a second read would come within moments.
+  expect(await isReadAgain(page)).toBe(false);
+  expect(reads).toHaveLength(1);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Notifications", exact: true })).toBeVisible();
+});
+
+for (const size of [
+  { height: 844, name: "phone", width: 390 },
+  { height: 900, name: "desktop", width: 1440 },
+] as const) {
+  test(`an answer keeps focus in the feed, ${size.name} (QA round 16 M1, bug class 5)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: size.height, width: size.width });
+    const { token } = await loginViaApi(page);
+    await settle(token, "en");
+    await servePool(page);
+    await page.goto("/notifications");
+    // By keyboard: the answered button is replaced by its status, which takes the focus.
+    const notMe = page.getByRole("button", { name: "Not me — end this session" });
+    await notMe.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(":focus")).toHaveText("Session ended");
+    // By mouse the same, and the next answer's status takes it in turn.
+    await page.getByRole("button", { name: "Stop" }).click();
+    await expect(page.locator(":focus")).toHaveText("Stopped");
+    await expectNoA11yViolations(page);
+  });
+}
 
 test("a switch takes keyboard focus visibly and is a 24 px target", async ({ page }) => {
   await page.setViewportSize({ height: 800, width: 1280 });

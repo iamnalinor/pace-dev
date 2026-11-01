@@ -343,6 +343,26 @@ export default defineConfig([
     },
   },
 
+  // ── Code that runs on Android (Hermes) ───────────────────────────────────────
+  {
+    files: ["packages/core/src/**/*.ts", "packages/client/src/**/*.ts", ...APP],
+    ignores: TESTS,
+    rules: {
+      // Jest (Node) and Playwright (Chrome) have every ES2024 call; Hermes may not (class 11).
+      "no-restricted-properties": [
+        "error",
+        {
+          message:
+            "Hermes (Android) may lack Promise.withResolvers (ES2024); capture the resolvers in `new Promise(...)`.",
+          object: "Promise",
+          property: "withResolvers",
+        },
+      ],
+      // It asks for the very call Hermes may lack; the rule above asks for the opposite.
+      "unicorn/prefer-promise-with-resolvers": "off",
+    },
+  },
+
   // ── API (Cloudflare Worker) ──────────────────────────────────────────────────
   {
     files: [

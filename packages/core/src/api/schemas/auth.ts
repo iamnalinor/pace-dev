@@ -39,6 +39,17 @@ export const AuthSessionSchema = z.object({
   user: UserSchema,
 });
 
+/**
+What the app tells about itself when it starts a bot login: the phone's model and its install
+id, so the session it opens is named and linked to the phone's usage. The web sends nothing.
+*/
+export const NonceCreateSchema = z
+  .strictObject({
+    deviceName: z.string().trim().min(1).max(80).optional(),
+    deviceId: z.string().min(1).max(64).optional(),
+  })
+  .optional();
+
 export const NonceCreatedSchema = z.object({
   nonce: z.string(),
   /** Opens the bot with `/start login_<nonce>`; the bot binds the nonce to the user. */

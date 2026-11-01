@@ -125,6 +125,16 @@ describe("createAuth bot login", () => {
     expect(asked).toEqual(["web", "app"]);
   });
 
+  it("names the phone to the server, so the session it opens is called after it; the web names none", async () => {
+    const { auth, calls } = await setup({ "POST /api/auth/nonce": () => NONCE_CREATED });
+    await auth.startBotLogin("app", { deviceId: "dev-1", deviceName: "Pixel 9a" });
+    await auth.startBotLogin("web");
+    expect(calls.map((call) => call.body)).toEqual([
+      { deviceId: "dev-1", deviceName: "Pixel 9a" },
+      undefined,
+    ]);
+  });
+
   it("polls until the nonce is ready and stores the token", async () => {
     vi.useFakeTimers();
     let polls = 0;

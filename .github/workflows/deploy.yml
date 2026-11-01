@@ -40,6 +40,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # The release tag, when the deployed commit has one, names the Worker's version.
+          fetch-tags: true
       - uses: ./.github/actions/setup
 
       - name: Build web
@@ -53,9 +55,13 @@ jobs:
         working-directory: apps/api
         run: bunx wrangler d1 migrations apply pace --remote
 
+      # PACE_VERSION is what GET /api/instance reports: the release tag on the deployed commit,
+      # else its short commit.
       - name: Deploy API worker
         working-directory: apps/api
-        run: bunx wrangler deploy
+        run: |
+          VERSION="$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)"
+          bunx wrangler deploy --var "PACE_VERSION:$VERSION"
 
       - name: Deploy web (static assets worker)
         working-directory: apps/app

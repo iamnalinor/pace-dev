@@ -4,6 +4,7 @@ import { EVENT_TYPES } from "../events/event-schema.ts";
 import { en } from "./en.ts";
 import { EVENT_LABEL_KEYS } from "./event-labels.ts";
 import {
+  countryName,
   formatDuration,
   formatEyebrow,
   formatLate,
@@ -89,7 +90,7 @@ describe("catalogs", () => {
       "settings.timezone",
       "settings.digestWindows",
       "settings.quietHours",
-      "settings.connectedApps",
+      "sessions.title",
       "settings.logout",
       "common.save",
       "common.cancel",
@@ -140,6 +141,15 @@ describe("t", () => {
 
   it("leaves unknown placeholders visible", () => {
     expect(t("en", "login.openBot")).toBe("Open {bot} in Telegram");
+  });
+});
+
+describe("countryName", () => {
+  it("names a country code in the reader's language and keeps anything else as it came", () => {
+    expect(countryName("DE", "en")).toBe("Germany");
+    expect(countryName("DE", "ru")).toBe("Германия");
+    expect(countryName("T1", "en")).toBe("T1");
+    expect(countryName("Germany", "en")).toBe("Germany");
   });
 });
 

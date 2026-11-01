@@ -22,6 +22,7 @@ export type BotRouteDeps = {
   ) => Promise<{ readonly text: string; readonly isRefused?: true }>;
   readonly telegramFetch: TelegramTransport;
   readonly isAllowed: (telegramId: string, allowedIds: readonly string[]) => boolean;
+  readonly peekLogin: (db: Db) => BotDeps["peekLogin"];
   readonly bindLogin: (db: Db) => BotDeps["bindLogin"];
   /** The Pace user behind a Telegram account, if they ever logged in. */
   readonly userIdOf: (db: Db, telegramId: string) => Promise<null | string>;
@@ -56,8 +57,8 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
     const bot = createBot({
       apiRoot: config.telegramApiRoot,
       // Logging in through the bot also opens the chat notifications go to.
-      bindLogin: async (user, nonce) => {
-        const outcome = await bindLogin(user, nonce);
+      bindLogin: async (user, nonce, reply) => {
+        const outcome = await bindLogin(user, nonce, reply);
         const userId = outcome === "ok" ? await deps.userIdOf(db, user.telegramId) : null;
         if (userId !== null) {
           await storeOf(userId).notifyTo(user.telegramId, new Date().toISOString());
@@ -66,6 +67,7 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
       },
       botInfo: config.botInfo,
       fetch: deps.telegramFetch,
+      peekLogin: deps.peekLogin(db),
       assistant: createAssistant({
         now: () => new Date().toISOString(),
         providers: deps.parseProviders(config),

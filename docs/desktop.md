@@ -27,15 +27,17 @@ Nothing is judged: Pace only shows where the time went.
 
 ## Connect a computer
 
-**Settings → Devices → Add a computer**. Give it a name and press *Create the token*. Pick the
-computer's system (the web app preselects the one it runs on) and follow its steps.
+**Settings → Devices and sessions → Add a computer**. Give it a name and press *Create the token*
+(`POST /api/sessions/agents`). Pick the computer's system (the web app preselects the one it runs
+on) and follow its steps.
 
 The token is shown once and may only upload usage (`usage:write`): it cannot read or change
 anything else, and whatever it sends is filed under its own computer. Paste the install command
 first; when the agent prompts for the token, copy it separately from Pace and paste it there.
 The prompt hides it and the install command contains no token, so it stays out of terminal
 history and process arguments. The agent saves it in `config.json` with private file permissions;
-*Disconnect* in Settings → Devices revokes it at once. Lost it? Disconnect the computer and add it again.
+*Disconnect* in Settings → Devices and sessions revokes it at once (`DELETE /api/sessions/:id`).
+Lost it? Disconnect the computer and add it again.
 
 ### Windows
 
@@ -125,11 +127,11 @@ the running agent's buffer, so it is safe next to it. A second plain `run` exits
 ("Already running"): it would send every session twice.
 
 `uninstall` removes the task, LaunchAgent or service, and `config.json`, `buffer.json` and
-`agent.log`; disconnect the computer in **Settings → Devices** too, which revokes its token.
+`agent.log`; disconnect the computer in **Settings → Devices and sessions** too, which revokes its token.
 
 ## Troubleshooting
 
-- **Nothing in Settings → Devices after 5 minutes.** `status` shows the last send and the last
+- **Nothing in Settings → Devices and sessions after 5 minutes.** `status` shows the last send and the last
   error. "HTTP Error 401" means the token was revoked: disconnect the computer and add it again.
 - **Linux: "Missing xdotool, xprintidle".** Install them (above) and run `install` again.
 - **Linux: "No graphical session here".** Run `install` from a terminal on the desktop, not over

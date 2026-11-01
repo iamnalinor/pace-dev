@@ -67,6 +67,12 @@ covers it, and use it.
   `superpowers:requesting-code-review`, using its reviewer template with the plan or
   requirements and the git range, not a hand-written prompt. Work through the findings with
   `receiving-code-review`. A review by a generic agent does not count.
+- **A change to one side of a contract gets the other side traced**: when a fix or feature changes a
+  rule on the server (what may be read, answered, revoked, returned, which error code), the review
+  brief carries an explicit item "trace the client side" (and the reverse for a client rule), and a
+  test pins the steady state across both: after the action the network goes quiet (no request
+  repeated for the same id) and the screen settles. A diff-only review cannot see the other side
+  (bug-lessons class 1, the read loop of QA round 15).
 - **Domain work goes to the matching specialist agent** (everything-claude-code's agents:
   security, database, TypeScript/React, build errors, e2e, docs; the plugin's own agents for
   UX and design). Use a general-purpose agent only when no specialist fits, and give every

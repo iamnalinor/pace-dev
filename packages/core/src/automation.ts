@@ -108,14 +108,17 @@ export {
   type ActivityOverrunPayload,
   ALL_ANSWERS,
   type Answer,
+  ANSWERABLE_KINDS,
   ANSWERS,
   calendarEventKey,
   canResolveAs,
   type DigestTask,
   type EventStartPayload,
   isAnswer,
+  isOwnSignIn,
   type LiveNotice,
   LiveNoticeSchema,
+  type LoginPayload,
   type NewNotification,
   notificationPath,
   NotificationSchema,
@@ -125,6 +128,7 @@ export {
   refOf,
   type Resolution,
   RESOLUTIONS,
+  seenBy,
 } from "./notify/pool.ts";
 export { answerAt, answerText, readAnswer } from "./parse/answer.ts";
 export { isQuotedFrom, normalizeForEvidence } from "./parse/normalize.ts";

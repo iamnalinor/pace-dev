@@ -33,6 +33,7 @@ export const DevIdentity = ({
           onIdentify(trimmed);
         }}
         variant="secondary"
+        width="fill"
       >
         {t("oauth.devUse")}
       </Button>

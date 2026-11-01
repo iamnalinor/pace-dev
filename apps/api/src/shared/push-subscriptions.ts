@@ -25,7 +25,7 @@ export const subscriptionsOf = async (
   const liveSession = gt(sessions.expiresAt, new Date(now));
   return await d1(binding)
     .select({
-      device: sessions.label,
+      device: sessions.name,
       endpoint: pushSubscriptions.endpoint,
       id: pushSubscriptions.id,
       sessionId: pushSubscriptions.sessionId,

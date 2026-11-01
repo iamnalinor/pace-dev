@@ -20,6 +20,22 @@ const interpolate = (text: string, params: MessageParams | undefined): string =>
   });
 
 /**
+A country's name in the reader's language, from the code Cloudflare reports (`DE`); the value as
+it came when it names no region (Tor's "T1") or the platform cannot name regions (Hermes has no
+`Intl.DisplayNames`). Settings' session list and the sign-in notice both name places this way.
+*/
+export const countryName = (code: string, language: Language): string => {
+  if (typeof Intl.DisplayNames !== "function") {
+    return code;
+  }
+  try {
+    return new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+};
+
+/**
 Looks up `key` in the language's catalog and fills `{name}` placeholders. A key the catalog
 lacks (only possible through a cast or an old client) reads as itself rather than taking the
 screen down with it.

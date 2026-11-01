@@ -1,6 +1,14 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 
-import { endpoints, err, isUlid, ok, type Result } from "@pace/core";
+import {
+  type EndpointOutput,
+  endpoints,
+  err,
+  isUlid,
+  type LoginPayload,
+  ok,
+  type Result,
+} from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { Config } from "../shared/config.ts";
@@ -8,19 +16,31 @@ import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { d1, type Db } from "../shared/db/d1.ts";
-import { loginPayload } from "../shared/login-link.ts";
+import { createLogger } from "../shared/logger.ts";
+import { loginPayload, returnUrl } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
-import { userStoreOf } from "../shared/user-store-of.ts";
-import { readBearer } from "./auth-middleware.ts";
+import { requestPlace, type RequestPlace } from "../shared/request-place.ts";
+import { deleteSession } from "../shared/session-rows.ts";
+import { storeOfUser, userStoreOf } from "../shared/user-store-of.ts";
 import { cachedAvatar, refreshAvatar } from "./avatar.ts";
-import { mountDeviceRoutes } from "./device-routes.ts";
-import { consumeNonce, createNonce } from "./nonce.ts";
-import { createSession, revokeSession } from "./sessions.ts";
+import {
+  consumeNonce,
+  createNonce,
+  linkNonceSession,
+  type NonceLogin,
+  type NonceReply,
+  type NonceState,
+} from "./nonce.ts";
+import { mountSessionRoutes } from "./session-routes.ts";
+import { createSession, prepareSession, type SessionKind } from "./sessions.ts";
 import { verifyTelegramLogin } from "./telegram-widget.ts";
+import { clientName } from "./user-agent.ts";
 import { findUserById, type TelegramProfile, upsertTelegramUser, type User } from "./users.ts";
 import { isAllowed } from "./whitelist.ts";
 
 type Session = { readonly token: string; readonly user: User };
+
+type NoncePoll = EndpointOutput<typeof endpoints.auth.noncePoll>;
 
 const NOT_ALLOWED: Problem = {
   code: "auth/not-allowed",
@@ -34,13 +54,86 @@ const NONCE_NOT_FOUND: Problem = {
   status: 404,
 };
 
-/** Shared tail of every login: whitelist → user row → session. */
+/** An app that did not name its phone (one from before it could) is the Android app. */
+const UNNAMED_APP = "Android";
+
+/**
+What a session opened by a bot login is: the app's, named by the phone it named, or the
+browser's that asked for the nonce, named after that browser.
+*/
+const nonceSession = (
+  login: NonceLogin,
+): { readonly kind: SessionKind; readonly name: string; readonly deviceId: null | string } =>
+  login.from === "app"
+    ? { deviceId: login.deviceId, kind: "app", name: login.deviceName ?? UNNAMED_APP }
+    : { deviceId: null, kind: "browser", name: clientName(login.place.userAgent) };
+
+/** The longest place part a sign-in notice keeps (its payload's bound). */
+const PLACE_PART_MAX = 80;
+
+/** A sign-in that just opened a session, as its notice tells it. */
+type OpenedSignIn = {
+  readonly userId: string;
+  readonly sessionId: string;
+  readonly kind: SessionKind;
+  readonly name: string;
+  readonly place: RequestPlace;
+  readonly now: number;
+  /** The bot's reply to a deep-link login, which the notice takes over. */
+  readonly reply?: NonceReply | null | undefined;
+  /** Where that reply's "Return to Pace" leads; the notice keeps it. */
+  readonly returnUrl?: string | undefined;
+};
+
+/** The notice's payload: unknown parts of the place empty, as the pool's contract has them. */
+const loginPayloadOf = ({
+  kind,
+  name,
+  place,
+  reply = null,
+  returnUrl: back,
+  sessionId,
+}: OpenedSignIn): LoginPayload => ({
+  ...(place.city !== null && { city: place.city.slice(0, PLACE_PART_MAX) }),
+  country: place.country?.slice(0, PLACE_PART_MAX) ?? "",
+  ip: place.ip ?? "",
+  kind,
+  name,
+  ...(reply !== null && back !== undefined && { returnUrl: back }),
+  sessionId,
+});
+
+/**
+Tells the person about a sign-in that just opened a session, on every channel its kind is on
+for (an agent token or an MCP app the person made in Settings is not announced). A deep-link
+login's notice takes over the bot's reply and keeps its "Return to Pace". The sign-in does not
+fail when telling fails: the pool retries a failed send itself; this only logs.
+*/
+const announceSignIn = async (env: Cloudflare.Env, input: OpenedSignIn): Promise<void> => {
+  const { reply = null } = input;
+  try {
+    await storeOfUser(env, input.userId).notify(
+      { kind: "login", payload: loginPayloadOf(input) },
+      new Date(input.now).toISOString(),
+      reply === null ? {} : { adoptTelegramMessage: reply },
+    );
+  } catch (error) {
+    createLogger("info").error("A sign-in notice could not be added", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/** Shared tail of every login: whitelist → user row → session → its notice. */
 const signIn = async (
   db: Db,
   config: Config,
   input: {
+    readonly env: Cloudflare.Env;
     readonly profile: TelegramProfile;
-    readonly label: string;
+    readonly kind: SessionKind;
+    readonly name: string;
+    readonly place: RequestPlace;
     readonly now: number;
     readonly apiOrigin: string;
     readonly telegramFetch?: TelegramTransport;
@@ -61,11 +154,9 @@ const signIn = async (
           },
           apiOrigin: input.apiOrigin,
         });
-  const { token } = await createSession(db, {
-    label: input.label,
-    now: input.now,
-    userId: user.id,
-  });
+  const opened = { kind: input.kind, name: input.name, now: input.now, place: input.place };
+  const { id, token } = await createSession(db, { ...opened, userId: user.id });
+  await announceSignIn(input.env, { ...opened, sessionId: id, userId: user.id });
   return ok({ token, user });
 };
 
@@ -87,9 +178,13 @@ const telegramLogin =
       Math.floor(now / 1000),
     );
     if (verified.ok) {
+      const place = requestPlace(c.req.raw);
       return await signIn(d1(c.env.DB), config, {
-        label: "web",
+        env: c.env,
+        kind: "browser",
+        name: clientName(place.userAgent),
         now,
+        place,
         profile: verified.value,
         apiOrigin: new URL(c.req.url).origin,
         telegramFetch,
@@ -123,27 +218,58 @@ const pollNonce =
         return ok({ status: "pending" as const });
       }
       case "ready": {
-        const stored = await findUserById(db, state.userId);
-        if (stored === null) {
-          return err(NONCE_NOT_FOUND);
-        }
-        const config = c.get("config");
-        const user =
-          config.telegramBotToken === undefined
-            ? stored
-            : await refreshAvatar(db, stored, {
-                target: {
-                  apiRoot: config.telegramApiRoot,
-                  token: config.telegramBotToken,
-                  fetch: telegramFetch,
-                },
-                apiOrigin: new URL(c.req.url).origin,
-              });
-        const { token } = await createSession(db, { label: "android", now, userId: user.id });
-        return ok({ status: "ready" as const, token, user });
+        return await openNonceSession(c, { nonce: params.nonce, now, state, telegramFetch });
       }
     }
   };
+
+/**
+The poll that claimed a bound nonce opens its session: stored in one batch with the nonce's link
+to it (neither goes in without the other), then announced, the notice taking over the bot's reply.
+*/
+const openNonceSession = async (
+  c: Context<AppEnv>,
+  {
+    nonce,
+    now,
+    state,
+    telegramFetch,
+  }: {
+    readonly nonce: string;
+    readonly now: number;
+    readonly state: Extract<NonceState, { readonly status: "ready" }>;
+    readonly telegramFetch: TelegramTransport;
+  },
+): Promise<Result<NoncePoll, Problem>> => {
+  const db = d1(c.env.DB);
+  const stored = await findUserById(db, state.userId);
+  if (stored === null) {
+    return err(NONCE_NOT_FOUND);
+  }
+  const config = c.get("config");
+  const user =
+    config.telegramBotToken === undefined
+      ? stored
+      : await refreshAvatar(db, stored, {
+          target: {
+            apiRoot: config.telegramApiRoot,
+            token: config.telegramBotToken,
+            fetch: telegramFetch,
+          },
+          apiOrigin: new URL(c.req.url).origin,
+        });
+  const opened = { ...nonceSession(state.login), now, place: state.login.place };
+  const session = await prepareSession(db, { ...opened, userId: user.id });
+  await db.batch([session.insert, linkNonceSession(db, nonce, session.id)]);
+  await announceSignIn(c.env, {
+    ...opened,
+    reply: state.reply,
+    returnUrl: returnUrl(config.webOrigin, state.login.from),
+    sessionId: session.id,
+    userId: user.id,
+  });
+  return ok({ status: "ready" as const, token: session.token, user });
+};
 
 const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
   const config = c.get("config");
@@ -158,8 +284,11 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
     username: null,
   };
   return await signIn(d1(c.env.DB), config, {
-    label: "dev",
+    env: c.env,
+    kind: "dev",
+    name: "Dev login",
     now: Date.now(),
+    place: requestPlace(c.req.raw),
     profile,
     apiOrigin: new URL(c.req.url).origin,
   });
@@ -167,17 +296,24 @@ const devLogin: Handler<typeof endpoints.auth.dev> = async ({ c, body }) => {
 
 export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransport): void => {
   mount(app, endpoints.auth.telegram, telegramLogin(telegramFetch));
-  mount(app, endpoints.auth.nonceCreate, async ({ c, query }) => {
-    const { nonce } = await createNonce(d1(c.env.DB), Date.now());
-    const payload = loginPayload(nonce, query.from ?? "app");
+  mount(app, endpoints.auth.nonceCreate, async ({ body, c, query }) => {
+    const from = query.from ?? "app";
+    const { nonce } = await createNonce(d1(c.env.DB), {
+      deviceId: body?.deviceId,
+      deviceName: body?.deviceName,
+      from,
+      now: Date.now(),
+      place: requestPlace(c.req.raw),
+    });
+    const payload = loginPayload(nonce, from);
     const deepLink = `https://t.me/${c.get("config").telegramBotUsername}?start=${payload}`;
     return ok({ deepLink, nonce });
   });
   mount(app, endpoints.auth.noncePoll, pollNonce(telegramFetch));
   mount(app, endpoints.auth.logout, async ({ c }) => {
-    const bearer = readBearer(c.req.header("Authorization"));
-    if (bearer !== undefined) {
-      await revokeSession(d1(c.env.DB), bearer);
+    const sessionId = c.get("sessionId");
+    if (sessionId !== undefined) {
+      await deleteSession(d1(c.env.DB), { sessionId, userId: requireUser(c).id }, userStoreOf(c));
     }
     return ok({ ok: true as const });
   });
@@ -198,5 +334,5 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
           headers: { "Content-Type": avatar.mime, "Cache-Control": "public, max-age=3600" },
         });
   });
-  mountDeviceRoutes(app);
+  mountSessionRoutes(app);
 };

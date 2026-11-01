@@ -87,3 +87,16 @@ export const fakeUser: User = {
 
 /** What the fake `GET /api/me` answers: the user and their store's id. */
 export const fakeMe: Me = { ...fakeUser, storeId: FAKE_STORE_ID };
+
+/** What the fake `GET /api/instance` answers: a server this build fits, as the server words it. */
+export const fakeInstance = {
+  apiOrigin: "https://api.test",
+  botUsername: "PaceTestBot",
+  features: { assistant: true, push: true },
+  loginMethods: ["telegram-widget", "telegram-deeplink"],
+  minClientProtocol: 1,
+  name: "Pace",
+  protocol: 1,
+  version: "1.0.0",
+  webOrigin: "https://web.test",
+} as const;

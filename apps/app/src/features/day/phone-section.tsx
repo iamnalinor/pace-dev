@@ -66,6 +66,7 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
                 }),
               );
             }}
+            width="fill"
           >
             {t("phone.logSleep")}
           </Button>
@@ -76,6 +77,7 @@ export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly 
               phone.dismiss(sleepKey(sleep));
             }}
             variant="secondary"
+            width="fill"
           >
             {t("phone.notSleep")}
           </Button>

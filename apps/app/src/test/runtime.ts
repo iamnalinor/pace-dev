@@ -1,5 +1,11 @@
 import { type Clock, createMemoryEventStore, createMemorySessionStore } from "@pace/client";
-import { createFakeFetch, emptySyncRoutes, fakeMe, type FakeRoute } from "@pace/client/testing";
+import {
+  createFakeFetch,
+  emptySyncRoutes,
+  fakeInstance,
+  fakeMe,
+  type FakeRoute,
+} from "@pace/client/testing";
 import { artboardEvents, MOSCOW, NOW } from "@pace/core/testing";
 
 import { createRuntime, type PaceRuntime } from "../runtime.ts";
@@ -24,11 +30,13 @@ export const frozenClock = ({ deviceTz = MOSCOW, now = NOW }: TestWorld = {}): C
 export const createTestRuntime = async (options: TestWorld = {}): Promise<PaceRuntime> => {
   const api = createFakeFetch({
     ...emptySyncRoutes,
+    // A server this build fits: the versions screen stays out of the way unless a test asks.
+    "GET /api/instance": () => fakeInstance,
     "GET /api/me": () => fakeMe,
     ...options.routes,
   });
+  // The stored server (the build's by default), as the app builds it: the instance check counts.
   const runtime = await createRuntime({
-    baseUrl: "https://api.test",
     clock: frozenClock(options),
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     eventStore: createMemoryEventStore(),

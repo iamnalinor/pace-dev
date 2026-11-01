@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { endpoint, endpoints } from "@pace/core";
+import { CLIENT_OUTDATED, endpoint, endpoints, PROTOCOL, PROTOCOL_HEADER } from "@pace/core";
 
 import { ApiError, createApiClient } from "./api-client.ts";
 
@@ -27,7 +27,11 @@ describe("createApiClient", () => {
     expect(client.isCurrentSession("session-A")).toBe(false);
     await client.call(endpoints.health, {});
     expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/health", {
-      headers: { Accept: "application/json", Authorization: "Bearer session-B" },
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer session-B",
+        "X-Pace-Protocol": "1",
+      },
       method: "GET",
     });
   });
@@ -41,7 +45,11 @@ describe("createApiClient", () => {
     });
     await expect(client.call(endpoints.health, {})).resolves.toEqual({ status: "ok" });
     expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/health", {
-      headers: { Accept: "application/json", Authorization: "Bearer secret" },
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer secret",
+        "X-Pace-Protocol": "1",
+      },
       method: "GET",
     });
   });
@@ -59,6 +67,41 @@ describe("createApiClient", () => {
       message: "Nope",
       status: 403,
     });
+  });
+
+  it("tells the server its protocol on every call, a read and a write alike", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      jsonResponse(200, { status: "ok" }),
+    );
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      token: () => undefined,
+    });
+    const write = endpoint({
+      auth: false,
+      body: z.object({ note: z.string() }),
+      method: "POST",
+      output: z.object({ status: z.literal("ok") }),
+      path: "/api/notes",
+    });
+    await client.call(endpoints.health, {});
+    await client.call(write, { body: { note: "n" } });
+    const sent = fetchMock.mock.calls.map(([, init]) =>
+      new Headers(init.headers).get(PROTOCOL_HEADER),
+    );
+    expect(sent).toEqual([String(PROTOCOL), String(PROTOCOL)]);
+  });
+
+  it("surfaces a server's refusal of an outdated app as `client/outdated`", async () => {
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: async () => jsonResponse(426, { code: "client/outdated", message: "Update the app" }),
+      token: () => "secret",
+    });
+    const call = client.call(endpoints.me, {});
+    await expect(call).rejects.toBeInstanceOf(ApiError);
+    await expect(call).rejects.toMatchObject({ code: CLIENT_OUTDATED, status: 426 });
   });
 
   it("rejects responses that do not match the contract", async () => {
@@ -98,7 +141,11 @@ describe("createApiClient request shaping", () => {
     ).resolves.toEqual({ id: "t1" });
     expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/projects/p%201/tasks?dryRun=1", {
       body: JSON.stringify({ title: "Write tests" }),
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Pace-Protocol": "1",
+      },
       method: "POST",
     });
   });

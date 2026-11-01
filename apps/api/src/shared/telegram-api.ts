@@ -52,6 +52,22 @@ const callTelegram = async (
 };
 
 /**
+A message's text and keyboard as the Bot API takes them. No `parse_mode`: the text goes as plain
+text, so a name a client chose (a phone's name on a deep-link login) can never turn into markup
+or a link.
+*/
+const messageBody = (message: OutgoingMessage): Record<string, unknown> => ({
+  text: message.text,
+  ...(message.buttons.length > 0 && {
+    reply_markup: {
+      inline_keyboard: message.buttons.map((row) =>
+        row.map((button) => inlineKeyboardButton(button)),
+      ),
+    },
+  }),
+});
+
+/**
 Sends `message` to `chatId`; resolves to the id Telegram gave it, or `null` when it was not
 accepted. A network failure counts as "not accepted" rather than an error: one undelivered
 message must not stop the rest.
@@ -63,14 +79,7 @@ export const sendTelegramMessage = async (
 ): Promise<null | number> => {
   const answer = await callTelegram(target, "sendMessage", {
     chat_id: chatId,
-    text: message.text,
-    ...(message.buttons.length > 0 && {
-      reply_markup: {
-        inline_keyboard: message.buttons.map((row) =>
-          row.map((button) => inlineKeyboardButton(button)),
-        ),
-      },
-    }),
+    ...messageBody(message),
   });
   if (answer === null) {
     return null;
@@ -86,16 +95,33 @@ export const wasTelegramMessageSent = async (
   message: OutgoingMessage,
 ): Promise<boolean> => (await sendTelegramMessage(target, chatId, message)) !== null;
 
+/**
+Replaces a message sent earlier with `message` (its buttons too: none given removes them): the
+bot's reply to a deep-link login that becomes its sign-in notice. Whether Telegram accepted it.
+*/
+export const wasTelegramMessageEdited = async (
+  target: TelegramTarget,
+  message: {
+    readonly chatId: string;
+    readonly messageId: number;
+    readonly text: string;
+    readonly buttons?: OutgoingMessage["buttons"];
+  },
+): Promise<boolean> => {
+  const answer = await callTelegram(target, "editMessageText", {
+    chat_id: message.chatId,
+    message_id: message.messageId,
+    ...messageBody({ buttons: message.buttons ?? [], text: message.text }),
+  });
+  return answer !== null;
+};
+
 /** Replaces an older confirmation prompt after a newer request superseded it. */
 export const editTelegramMessage = async (
   target: TelegramTarget,
   message: { readonly chatId: string; readonly messageId: number; readonly text: string },
 ): Promise<void> => {
-  await callTelegram(target, "editMessageText", {
-    chat_id: message.chatId,
-    message_id: message.messageId,
-    text: message.text,
-  });
+  await wasTelegramMessageEdited(target, message);
 };
 
 /** A 4xx refusal except rate limiting cannot be fixed by retrying this deletion. */

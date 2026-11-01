@@ -1,3 +1,5 @@
+import type { Ref } from "react";
+
 import { View } from "react-native";
 
 import { Button } from "./button.tsx";
@@ -10,6 +12,7 @@ twice as wide, as alert dialogs do.
 */
 export const SheetActions = ({
   cancelLabel,
+  cancelRef,
   isBusy = false,
   isDestructive = false,
   isDisabled = false,
@@ -18,6 +21,8 @@ export const SheetActions = ({
   primaryLabel,
 }: {
   readonly cancelLabel?: string;
+  /** The Cancel button, to move focus onto it when an inline confirm opens. */
+  readonly cancelRef?: Ref<View>;
   readonly isBusy?: boolean;
   /** The action cannot be undone: it wears the danger look, not the accent. */
   readonly isDestructive?: boolean;
@@ -32,7 +37,7 @@ export const SheetActions = ({
     <View className="flex-row gap-2">
       {isConfirmation ? (
         <View className="flex-1">
-          <Button onPress={onCancel} variant="secondary">
+          <Button onPress={onCancel} ref={cancelRef} variant="secondary" width="fill">
             {cancelLabel}
           </Button>
         </View>
@@ -44,6 +49,7 @@ export const SheetActions = ({
           hotkey={isConfirmation ? undefined : HOTKEYS.primary}
           onPress={onPrimary}
           variant={isDestructive ? "danger" : "primary"}
+          width="fill"
         >
           {primaryLabel}
         </Button>

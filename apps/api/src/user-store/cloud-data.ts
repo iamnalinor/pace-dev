@@ -148,24 +148,17 @@ export const listUsage = async (db: Db, { from, to }: Range): Promise<readonly U
     .orderBy(usageSessions.startAt);
 };
 
-/** Each device that sent usage: its id, its latest name and the end of its newest session. */
+/**
+Each device that sent usage and the end of its newest session: when the person's sessions list
+says an app or an agent last sent data.
+*/
 export const usageDevices = async (
   db: Db,
-): Promise<
-  readonly { readonly deviceId: string; readonly deviceName: string; readonly at: string }[]
-> => {
+): Promise<readonly { readonly deviceId: string; readonly at: string }[]> => {
   const { usageSessions } = schema;
   const rows = await db
-    .select({
-      at: max(usageSessions.endAt),
-      deviceId: usageSessions.deviceId,
-      deviceName: max(usageSessions.deviceName),
-    })
+    .select({ at: max(usageSessions.endAt), deviceId: usageSessions.deviceId })
     .from(usageSessions)
     .groupBy(usageSessions.deviceId);
-  return rows.map((row) => ({
-    at: row.at ?? "",
-    deviceId: row.deviceId,
-    deviceName: row.deviceName ?? row.deviceId,
-  }));
+  return rows.filter((row): row is { at: string; deviceId: string } => row.at !== null);
 };

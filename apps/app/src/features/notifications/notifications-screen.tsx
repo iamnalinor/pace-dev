@@ -1,19 +1,17 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import type { DeliveryEntry } from "@pace/client";
 
-import { useT } from "#app/app-state.tsx";
+import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Button } from "#app/ui/button.tsx";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { useSessions } from "@pace/client/react";
 import {
-  type Answer,
-  ANSWERS,
   formatLeft,
   formatRelativeDay,
   type Language,
@@ -21,25 +19,13 @@ import {
   type PoolNotification,
 } from "@pace/core";
 
+import { Answers, Line } from "./answers.tsx";
+
 type Zoned = { readonly language: Language; readonly zone: string; readonly now: string };
 
 /** `Fri 18:00` in the zone and language. */
 const dayClock = (iso: string, { language, zone }: Zoned): string =>
   `${new Intl.DateTimeFormat(language, { timeZone: zone, weekday: "short" }).format(new Date(iso))} ${clockTime(iso, zone)}`;
-
-const Line = ({
-  children,
-  tone = "fg",
-}: {
-  readonly children: string;
-  readonly tone?: "fg" | "muted";
-}) => (
-  <Text
-    className={tone === "fg" ? "font-sans text-[15px] text-fg" : "font-sans text-[13px] text-muted"}
-  >
-    {children}
-  </Text>
-);
 
 /** What the notification says, per kind. */
 const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned: Zoned }) => {
@@ -117,48 +103,6 @@ const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned
   }
 };
 
-/** The answer buttons of an open notification; the answer stays pending until the server has it. */
-const Answers = ({ item }: { readonly item: PoolNotification }) => {
-  const t = useT();
-  const { feed } = useFeed();
-  const [pending, setPending] = useState<Answer | null>(null);
-  const [hasFailed, setHasFailed] = useState(false);
-  if (item.resolution !== null) {
-    return <Line tone="muted">{t(`notify.resolved.${item.resolution}`)}</Line>;
-  }
-  const answers: readonly Answer[] = ANSWERS[item.kind];
-  if (answers.length === 0) {
-    return null;
-  }
-  return (
-    <View className="gap-1.5">
-      <View className="flex-row flex-wrap gap-2">
-        {answers.map((answer, index) => (
-          <Button
-            busy={pending === answer}
-            disabled={pending !== null}
-            key={answer}
-            onPress={() => {
-              setPending(answer);
-              setHasFailed(false);
-              void (async () => {
-                const isDone = await feed.resolve(item.id, answer);
-                // Released once the store has the answer (or it was refused), never before.
-                setPending(null);
-                setHasFailed(!isDone);
-              })();
-            }}
-            variant={index === 0 ? "primary" : "secondary"}
-          >
-            {t(`notify.action.${answer}`)}
-          </Button>
-        ))}
-      </View>
-      {hasFailed ? <Line tone="muted">{t("notifications.failedAction")}</Line> : null}
-    </View>
-  );
-};
-
 /** How it went out: to a device through its push method, or the Telegram copy. */
 const deliveryText = (entry: DeliveryEntry, t: ReturnType<typeof useT>, zone: string): string => {
   const time = clockTime(entry.at, zone);
@@ -192,10 +136,12 @@ const deliveryLines = (
 const Item = ({
   deliveries,
   item,
+  ownSessionId,
   zoned,
 }: {
   readonly item: PoolNotification;
   readonly deliveries: readonly DeliveryEntry[];
+  readonly ownSessionId: string | undefined;
   readonly zoned: Zoned;
 }) => {
   const t = useT();
@@ -213,7 +159,7 @@ const Item = ({
           {clockTime(item.createdAt, zoned.zone)}
         </Text>
       </View>
-      <Answers item={item} />
+      <Answers item={item} ownSessionId={ownSessionId} />
       {deliveries
         .flatMap((entry) => deliveryLines(entry, t, zoned.zone))
         .map((line, index) => (
@@ -237,6 +183,9 @@ export const NotificationsScreen = () => {
   const router = useRouter();
   const viewer = useViewer();
   const { deliveries, feed, model, status, zone } = useFeed();
+  const { api } = usePace();
+  // This session's id, to tell its own sign-in notice (which it may not answer) from the rest.
+  const ownSessionId = useSessions(api).sessions.find((session) => session.current)?.id;
   // The zone the feed grouped its days in: the times under each day are in it too.
   const zoned: Zoned = { language: viewer.language, now: viewer.now, zone };
   useEffect(() => {
@@ -291,6 +240,7 @@ export const NotificationsScreen = () => {
                   deliveries={deliveries[item.id] ?? []}
                   item={item}
                   key={item.id}
+                  ownSessionId={ownSessionId}
                   zoned={zoned}
                 />
               ))}

@@ -60,6 +60,7 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
         disabled={telegramId.trim() === ""}
         onPress={() => void submit()}
         variant="secondary"
+        width="fill"
       >
         {t("login.devSubmit")}
       </Button>
@@ -82,11 +83,11 @@ export const Waiting = ({
       <Text className="font-sans text-[15px] font-medium text-fg">{t("login.waiting")}</Text>
       <Text className="text-center font-sans text-[13px] text-muted">{t("login.botHint")}</Text>
       {onReopen === null ? null : (
-        <Button onPress={onReopen} variant="secondary">
+        <Button onPress={onReopen} variant="secondary" width="fill">
           {t("login.openBotAgain")}
         </Button>
       )}
-      <Button onPress={onCancel} variant="ghost">
+      <Button onPress={onCancel} variant="ghost" width="fill">
         {t("common.cancel")}
       </Button>
     </View>

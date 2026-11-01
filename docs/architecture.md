@@ -10,7 +10,7 @@ apps/api (Worker) ────────────────────�
 | Layer | Package | Holds | May import |
 |---|---|---|---|
 | core | `@pace/core` | pure, immutable TypeScript: event schemas, sorting, materializer, reducers, settings, i18n, design tokens, time helpers, `Result`, the zod API contract | its npm deps only (zod, ulidx, date-fns) |
-| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`), auth flows (`createAuth`), the local-first event store and app state (`createAppState`: the four core slices `tasks`/`projects`/`presets`/`settings` folded by the core reducers, the effective `events`, the raw `log` with corrections, and `version`), the actions (`createActions`: every user intent validated by the core's retro rules, appended with the client's envelope, answered as `Result<Event[], ActionError>`), the pure view-models (`view-models/*`: Now rows with typed meta parts, task, project, inbox, review, history over `AppState` + `QueryContext`), the `Clock` (`systemClock`, `quickTimes`), the outbox/sync loop (`createSyncClient`) and `createPaceClient`, which wires them the one way both shells use; the `EventStore`/`SessionStore` ports with memory adapters; `@pace/client/react` adds `createAppHooks` (store selectors plus `useClock`/`useNow`/`useTaskView`/`useProjectView`/`useInbox`/`useReview`/`useHistory`, memoized on the store version and a 30 s tick) and re-exports zustand's `useStore`; `@pace/client/testing` is the fake `fetch` for every test suite, `@pace/core/testing` the artboard fixtures | core |
+| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`), auth flows (`createAuth`), the local-first event store and app state (`createAppState`: the four core slices `tasks`/`projects`/`presets`/`settings` folded by the core reducers, the effective `events`, the raw `log` with corrections, and `version`), the actions (`createActions`: every user intent validated by the core's retro rules, appended with the client's envelope, answered as `Result<Event[], ActionError>`), the pure view-models (`view-models/*`: Now rows with typed meta parts, task, project, inbox, review, history over `AppState` + `QueryContext`), the `Clock` (`systemClock`, `quickTimes`), the outbox/sync loop (`createSyncClient`, over the live socket or HTTP through `sync-transport.ts`) and `createPaceClient`, which wires them the one way both shells use; the `EventStore`/`SessionStore` ports with memory adapters; `@pace/client/react` adds `createAppHooks` (store selectors plus `useClock`/`useNow`/`useTaskView`/`useProjectView`/`useInbox`/`useReview`/`useHistory`, memoized on the store version and a 30 s tick) and re-exports zustand's `useStore`; `@pace/client/testing` is the fake `fetch` for every test suite, `@pace/core/testing` the artboard fixtures | core |
 | api | `@pace/api` | the Cloudflare Worker: Hono app, auth, bot, sync routes, the `UserStore` Durable Object, D1 schema | core |
 | app | `@pace/app` | the one UI: Expo / React Native (expo-router, NativeWind) on Android, and the same screens on the web through react-native-web (a PWA served by the `pace-web` assets Worker) | client, core |
 
@@ -18,7 +18,7 @@ apps/api (Worker) ────────────────────�
 
 `apps/app` builds for Android (`expo run:android`, the release APK) and for the web
 (`bun run build`: `expo export --platform web`, then a Workbox service worker). The web
-build differs in three ways, all in `metro.config.js`:
+build differs in four ways, all through `metro.config.js`:
 
 - **Stand-ins** for phone-only modules (`expo-notifications`, `expo-calendar`,
   `expo-task-manager`, `expo-background-task`, `expo-secure-store`, `expo-share-intent`) live in
@@ -27,13 +27,18 @@ build differs in three ways, all in `metro.config.js`:
 - **`.web.tsx` siblings**: when `x.web.ts(x)` exists next to `x.ts(x)`, the web build uses it
   (the IndexedDB event store, the Telegram Login Widget, the OAuth consent page, the Excel
   export, the update banner). A `.web` file never imports its own base file.
+- **The server**: the phone talks to the server the person chose (`src/platform/server.ts`,
+  Change server on the login screen; the build's `EXPO_PUBLIC_API_URL` by default). The web
+  build always talks to its own deployment (`server.web.ts`): the API's CORS admits only its
+  `WEB_ORIGIN`. Whatever needs the server's API, web app or bot reads `useServerInfo()` (UI) or
+  `readServer()` (background), never the build constants in `api-base.ts`.
 - **Layout**: from 1024 px the tabs become a sidebar and Now shows the picked task beside the
   list (`src/ui/layout.ts`, `src/screens/now-screen.tsx`).
 
 The service worker precaches the build and waits; the update strip offers "Refresh page",
 which hands control to the new worker. The phone tabs are Now, Day, Inbox and More (which
 opens Week and the other destinations). On a wide screen the sidebar lists Now, Day, Week,
-Inbox, Projects, Insights, Devices and Settings.
+Inbox, Projects, Insights and Settings (devices and sessions live inside Settings).
 
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs
@@ -156,17 +161,54 @@ secrets with zod once per request and stores the result on the context.
   `auth/telegram-widget.ts` builds the sorted `key=value\n` check string, derives the key
   as SHA-256 of the bot token, verifies HMAC-SHA-256 with a constant-time compare and
   rejects `auth_date` older than five minutes.
-- **Android**: `POST /api/auth/nonce` → `{ nonce, deepLink }` (24 random bytes,
-  base64url, 5-minute TTL, stored in D1 `login_nonces`). The bot's `/start login_<nonce>`
-  handler upserts the Telegram user and binds the nonce (`bot-login.ts`; a nonce binds
-  once). `GET /api/auth/nonce/:nonce` answers `pending` until then, then `ready` with a
-  session exactly once (the row is marked consumed).
+- **Android** (and the web through the bot): `POST /api/auth/nonce?from=app|web` → `{ nonce,
+  deepLink }` (24 random bytes, base64url, 5-minute TTL, stored in D1 `login_nonces`; each mint
+  clears the expired rows, and the stored User-Agent is capped at 512 characters). The app
+  sends an optional strict body `{ deviceName, deviceId }` (its phone model and install id); the
+  web sends none. The nonce row keeps `from`, that request's place and the named device, so the
+  session it opens is named and placed by the request that started the login, not by the poll.
+  The bot's `/start login_<nonce>` handler checks the nonce can still be bound, replies
+  "Logged in. Return to Pace.", then upserts the Telegram user and binds the nonce together with
+  that reply's `replyChatId`/`replyMessageId` (`bot-login.ts`; one conditional UPDATE, so a nonce
+  binds once; a bind that loses edits the reply to "expired"). `GET /api/auth/nonce/:nonce`
+  answers `pending` until then, then `ready` with a session exactly once: the claim is one
+  conditional UPDATE (bound, unconsumed, unexpired → consumed), and the session insert and the
+  nonce's `sessionId` go in one batch.
+- **Sign-in notices**: every new `browser`, `app` or `dev` session (not agents or MCP grants)
+  calls the user store's `notify({ kind: "login", … })`. The text leads with what Cloudflare
+  reported (IP, country named in the account language, city), then the client's name, as plain
+  text; parts not reported are left out. A deep-link login passes `adoptTelegramMessage` (the
+  bot's reply), so the pool edits that reply into the notice with [Return to Pace] [Not me]
+  instead of sending a second message. "Not me" is the `login` kind's pool answer `revoked`
+  (`nr:<id>` in Telegram, a phone action, the feed): `pool-answers.ts` ends the session through
+  `deleteSession` before the notification resolves; a second press changes nothing.
 - **Sessions** (`auth/sessions.ts`): 32 random bytes as the bearer token, SHA-256 in D1
-  `sessions` with a label (`web`, `android`, `dev`), 90-day expiry, `lastSeenAt` touched at
-  most hourly. `requireAuth` middleware resolves the bearer to `CurrentUser`; handlers
-  read it with `requireUser(c)`. The fuller session list and login notices belong to a
-  later stage; this release does not expose them.
+  `sessions`, 90-day expiry, `lastSeenAt` touched at most hourly. Each has a `kind` (`browser`:
+  the widget or a bot login from the web; `app`: a bot login from the app; `agent`: a computer's
+  `usage:write` token made in Settings; `dev`), a readable `name` ("Chrome on macOS" from the
+  User-Agent by `auth/user-agent.ts`, the phone's model, the computer's typed name, "Dev login")
+  and where it signed in from (`ip` from `CF-Connecting-IP`, `country`/`city` from `request.cf`,
+  `userAgent`; `shared/request-place.ts`). A phone's session carries its `deviceId`; a
+  `usage:write` session files its uploads under `deviceId ?? sessionId`. `shared/session-rows.ts`
+  `deleteSession` is the one revoke by id. `requireAuth` middleware resolves the bearer to
+  `CurrentUser`; handlers read it with `requireUser(c)`.
+- **Schema changes ship expand, then contract.** `deploy.yml` applies the D1 migrations before the
+  new Worker serves, and `wrangler rollback` runs the previous Worker on the new schema, so no
+  migration drops or renames a column the previous release still reads or writes. The column goes in
+  a later release, once a release has served without it. Open follow-up
+  (`TODO(sessions-label-contract)`): `sessions.label`, replaced by `kind` and `name` in 0008, is
+  still written (`legacyLabelOf`) and never read; the next release's migration first backfills
+  `kind`/`name` again for rows the previous Worker inserted during the deploy window (`name = ''`),
+  then drops `label`, and `legacyLabelOf` goes.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
+- **Which server**: the app stores its token with the origin of the server that issued it
+  (`pace.session` = `{ origin, token }`); a store for another server reads it as signed out, and
+  switching servers deletes it and the local log, so a token never reaches another server. On
+  start and on each sign-in and sign-out the app reads `GET /api/instance` (public) and checks the
+  protocols (`compatibility` in core). A server too old for the app (or one without the route), or
+  a `426 client/outdated` on any call, holds a signed-in app at "Server and app versions don't
+  match" with only Log out, and refuses a sign-in on the login screen. An unreachable server
+  blocks nothing. See [self-hosting.md](self-hosting.md).
 
 D1 tables (`src/shared/db/d1-schema.ts`): `users`, `sessions`, `login_nonces`,
 `push_subscriptions` (each session's one push method) and `broken_push_methods`. They are
@@ -180,12 +222,39 @@ Clients keep their own log and an outbox; the server keeps the authoritative seq
 |---|---|---|---|
 | `POST /api/sync/push` | `{ events: Event[] (≤ 500), storeId }` | `{ accepted: id[], rejected: { id, reason }[], seq }` | a `storeId` that is not the store's current one refuses the whole batch with `409 store/changed`; each envelope is validated with the core schema (`user-store/event-log.ts`); a rejected one is reported and the rest still goes in; a known id is accepted again without a second copy; a `recordedAt` after the server clock is clamped to it |
 | `GET /api/sync/pull?since=&limit=` | cursor `since` (default 0), `limit` 1–500 (default 200) | `{ events, seq, more, storeId }` | events after `since` in **sequence** order; `seq` is the cursor for the next call; `more` says whether to call again; `storeId` names the store they came from (below) |
-| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v1, pace.auth.<token>`, `?device=<deviceId>` | `{"type":"changed","seq":n}` messages, and the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket (no duration billed while quiet; `ping` → `pong` without waking it) and says `changed` whenever its log grows, except to the device that wrote the batch. Not an `endpoint()`: an upgrade is not a JSON call. |
+| `GET /api/sync/live` (WebSocket) | subprotocols `pace.v2, pace.v1, pace.auth.<token>` (`pace.v2` only when offered), `?device=<deviceId>&protocol=<n>` | v1: `{"type":"changed","seq":n}`; v2: `hello` first, then `events`; both: the notification pool's notices (`notification`, `dismiss`, `read`, `push-methods-changed`) | the user's Durable Object keeps it as a hibernating socket tagged with its subprotocol, device and session (id and expiry, set by the Worker; no duration billed while quiet; `ping` → `pong` without waking it). Revoking the session (Settings, logout, "Not me", account deletion: all through `deleteSession`) closes its sockets with code `4401` (`LIVE_SESSION_ENDED`); an expired one is closed instead of served, and the app checks its session rather than reconnecting. Whenever its log grows it tells every socket but the writing device's: v1 hears `changed`, v2 gets the new events (below). Not an `endpoint()`: an upgrade is not a JSON call. |
+
+**`pace.v2`** (`packages/core/src/api/live-protocol.ts`) carries the sync hot path over the same
+socket; everything else stays HTTP, which also stays the fallback (a closed socket, or no answer
+within `LIVE_REQUEST_TIMEOUT_MS` = 10 s; a client keeps at most `LIVE_MAX_IN_FLIGHT` = 4 requests
+open). It is additive: the API `PROTOCOL` stays the same and a socket offering only `pace.v1` is
+served as before. Requests are strict, answers loose (an unknown `type` reads as `unknown`).
+
+| Client sends | Server answers |
+|---|---|
+| `{ type: "push", id, storeId, events }` (the HTTP push body, `SyncPushBodySchema`, under a request id of 1–64 characters) | `{ type: "pushed", id, accepted, rejected, seq }` (the HTTP push answer), or `{ type: "error", id, code: "store/changed" }`; the store's same `push` runs, so a known id is accepted again without a second copy |
+| `{ type: "pull", id, since, limit? }` (`limit` 1–500, default `LIVE_PAGE` = 200) | `{ type: "events", id, since, seq, storeId, events, more }`: the HTTP pull's page |
+| anything else (invalid JSON, an unknown type, a bad field) | `{ type: "error", id, code: "bad-request" }` (`id` when one was readable, else empty); the socket stays open |
+| — (after any append) | `{ type: "events", since, seq, storeId, events, more: false }` to every v2 socket but the writing device's, with `since` the sequence before the append; more than `LIVE_PAGE` events go as `events: []`, `more: true`, for the client to pull. The writer hears `pushed` for its batch, and `events` for the system events the server derived from it |
 
 The client sends a local change within 0.8 s of writing it (and what is unsent when the tab
 is hidden or the app goes to the background), pulls on every `changed` and on every
 reconnect of the live socket (back after 1 s, 2 s, … 60 s), and polls as a safety net: every
 5 minutes while the socket is up, every 30 s while it is down.
+
+**One sync, two transports** (`packages/client/src/sync-transport.ts`). The sync client runs
+one pull loop, one outbox push and one `applyPage` over a `SyncTransport` and never knows
+which carries a call: `httpTransport` (the routes above) or `socketTransport` (the live
+socket's `pace.v2`, whose `request` correlates answers by id, keeps at most four open and gives
+up after 10 s, dropping a silent socket to reconnect). `preferSocket` picks per call: the socket
+while it is open and has said `hello`, HTTP when it is closed, speaks only v1, is busy or does
+not answer (`LiveUnavailable`). A push whose answer the socket lost is pushed again over HTTP;
+the server keeps one copy of a known id and accepts it again, so the outbox is marked synced
+once. New `events` the socket brings unasked go to `SyncClient.ingestLive`, which waits for a
+run in flight and then applies the page through the same `applyPage` when it continues the
+cursor of the same store; a page the log already reaches past (the writer's derived events,
+which arrive before its own `pushed`) changes nothing, and anything else (a gap, `more`,
+another store) asks for a run within 0.8 s.
 
 **The store id.** Every user store has a random `storeId` (16 bytes, base64url), made when it
 is created and again whenever it is wiped (account deletion, an epoch change). The pull
@@ -258,6 +327,17 @@ overruns and deadline digest slots. A pass stores notifications once per subject
 delivery per channel and device, and arms the Durable Object alarm for the next due time.
 The feed and open app update through the live socket. Telegram and a configured FCM project
 can deliver outside the app; a phone with a different Firebase project uses polling.
+
+**The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone
+registers `pace.background-check` with `expo-background-task` (WorkManager,
+`minimumInterval: 15`) on sign-in and unregisters it on logout. A run builds its client with
+`backgroundApi()` (`background-api.ts`, shared with the push task): the stored server and the
+token stored for that server, read together, so a token kept for another server reads as
+signed out and nothing is sent. It polls `GET /api/push/poll` only when the phone's method is
+`poll` (the server logs the hand-over as delivered via `poll`), then uploads the calendar and
+usage on every phone, whatever the method, since the server's rules need them at night too.
+Each step is caught on its own (a failed poll never stops the upload); a logout during a run
+makes its client stop sending the ended session's token.
 Answering or settling a notification resolves it in the pool and takes back its copies.
 
 Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,

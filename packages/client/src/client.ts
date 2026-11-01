@@ -51,6 +51,7 @@ export {
   type BotLogin,
   type BotLoginError,
   createAuth,
+  type LoginDevice,
 } from "./auth.ts";
 export {
   type Clock,
@@ -62,6 +63,7 @@ export {
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
 export type { EventStore } from "./event-store.ts";
+export { checkInstance, type InstanceError } from "./instance.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
 export {
   createNotificationFeed,
@@ -215,6 +217,12 @@ export {
   screenTime,
   type ScreenTime,
 } from "./view-models/screen-time.ts";
+export {
+  LAST_DATA_EXACT_AFTER_HOURS,
+  type SessionRow,
+  sessionRows,
+  type SessionRowsContext,
+} from "./view-models/sessions.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,

@@ -6,6 +6,7 @@ import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { paletteVars } from "../platform/theme.ts";
+import { ButtonWidthContext } from "./button.tsx";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { useIsWide } from "./layout.ts";
@@ -87,12 +88,19 @@ const SheetTitle = ({
   </View>
 );
 
+/** The sheet's own hotkeys; its buttons are its actions, taking its width also on a computer. */
+const SheetLayer = ({ children }: { readonly children: ReactNode }) => (
+  <HotkeyLayer>
+    <ButtonWidthContext value="fill">{children}</ButtonWidthContext>
+  </HotkeyLayer>
+);
+
 /**
 A form or a choice over the screen, the way each platform expects one. On a phone it is the
 bottom sheet from the Close artboard: a grab handle, dismissed by a tap on the dim or the
 system back. On a wide window it is a dialog in the middle with a close cross; Escape and a
 click outside close it too. Neither has a Back or Cancel button: leaving is always one tap
-away. The modal itself does not animate: the backdrop fades in place and only the surface
+away. Its buttons fill its width on every window. The modal itself does not animate: the backdrop fades in place and only the surface
 moves, so the dim never rides along with it.
 */
 export const Sheet = ({
@@ -124,7 +132,7 @@ export const Sheet = ({
   const isWide = useIsWide();
   return (
     <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
-      <HotkeyLayer>
+      <SheetLayer>
         {/* A modal renders outside the app's root (a portal on the web): the theme's variables
       are declared again here, or the sheet would lose its surface and ink. */}
         <View
@@ -175,7 +183,7 @@ export const Sheet = ({
             </View>
           </Animated.View>
         </View>
-      </HotkeyLayer>
+      </SheetLayer>
     </Modal>
   );
 };

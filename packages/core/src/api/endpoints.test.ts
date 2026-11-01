@@ -2,7 +2,9 @@ import type { z } from "zod";
 
 import { describe, expect, it } from "vitest";
 
+import { LiveNoticeSchema } from "../notify/pool.ts";
 import { endpointList, endpoints } from "./endpoints.ts";
+import { LiveServerMessageSchema } from "./live-protocol.ts";
 
 /** Every object schema reachable from `schema` that refuses keys it does not know. */
 /** Containers that hold schemas but that `loosen` does not walk into. */
@@ -72,29 +74,51 @@ describe("what the server answers", () => {
     expect(strict).toEqual([]);
   });
 
+  it("never refuses a key a newer server adds to a live socket message either", () => {
+    const strict = [
+      ...strictObjectsIn(LiveServerMessageSchema, "live"),
+      ...strictObjectsIn(LiveNoticeSchema, "live notice"),
+    ];
+    expect(strict).toEqual([]);
+  });
+
   it("parses a calendar answer with keys it does not know, dropping them", () => {
     const answer = { events: [{ ...calendarEvent, colour: "#ff0000" }], nextCursor: "abc" };
     expect(endpoints.calendar.list.output.parse(answer)).toEqual({ events: [calendarEvent] });
   });
 
-  it("reads a device of a kind a newer server added as a phone, keeping the list", () => {
-    const device = {
-      connectedAt: null,
-      id: "d-1",
-      lastActivityAt: null,
+  it("reads a session of a kind a newer server added as a browser, dropping an unreadable one", () => {
+    const entry = {
+      city: null,
+      country: null,
+      createdAt: 1_760_000_000_000,
+      current: false,
+      id: "s-1",
+      ip: null,
+      lastDataAt: null,
       lastSeenAt: null,
       name: "Watch",
     };
     const answer = {
-      devices: [
-        { ...device, kind: "watch" },
-        { ...device, kind: "computer" },
+      sessions: [
+        { ...entry, kind: "watch" },
+        { ...entry, id: "mcp:g-1", kind: "mcp", scopes: ["tasks:read"] },
+        { ...entry, createdAt: "yesterday", kind: "agent" },
       ],
     };
-    expect(endpoints.devices.list.output.parse(answer).devices.map((d) => d.kind)).toEqual([
-      "phone",
-      "computer",
+    const { sessions } = endpoints.sessions.list.output.parse(answer);
+    expect(sessions.map((item) => [item.id, item.kind, item.scopes])).toEqual([
+      ["s-1", "browser", undefined],
+      ["mcp:g-1", "mcp", ["tasks:read"]],
     ]);
+  });
+
+  it("serves the sessions under /api/sessions and has no device or grant lists any more", () => {
+    expect(endpoints.sessions.revoke.path).toBe("/api/sessions/:id");
+    expect(endpoints.sessions.createAgent.path).toBe("/api/sessions/agents");
+    const paths = endpointList.map((definition) => definition.path);
+    expect(paths.filter((path) => path.startsWith("/api/devices"))).toEqual([]);
+    expect(paths.filter((path) => path.startsWith("/api/oauth/grants"))).toEqual([]);
   });
 
   it("pulls events of a precision or source a newer server added, and drops an unreadable one", () => {
@@ -183,6 +207,21 @@ describe("endpoints", () => {
     const payload = { auth_date: 1_700_000_000, first_name: "Ada", hash: "ab", id: 42 };
     expect(endpoints.auth.telegram.body.parse(payload)).toEqual(payload);
     expect(() => endpoints.auth.telegram.body.parse({ ...payload, id: "42" })).toThrow();
+  });
+
+  it("takes an optional, strict device in the nonce request: the app names the phone, the web sends none", () => {
+    const body = endpoints.auth.nonceCreate.body;
+    expect(body.parse(undefined)).toBeUndefined();
+    expect(body.parse({})).toEqual({});
+    expect(body.parse({ deviceId: "dev-1", deviceName: " Pixel 9a " })).toEqual({
+      deviceId: "dev-1",
+      deviceName: "Pixel 9a",
+    });
+    expect(() => body.parse({ extra: 1 })).toThrow();
+    expect(() => body.parse({ deviceName: " " })).toThrow();
+    expect(() => body.parse({ deviceName: "x".repeat(81) })).toThrow();
+    expect(() => body.parse({ deviceId: "" })).toThrow();
+    expect(() => body.parse({ deviceId: "x".repeat(65) })).toThrow();
   });
 
   it("parses the nonce poll output as a discriminated union", () => {

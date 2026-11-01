@@ -9,6 +9,8 @@ export type RequestOptions = {
   readonly token?: string;
   readonly body?: unknown;
   readonly headers?: Record<string, string>;
+  /** What Cloudflare tells about the request (`request.cf`: country, city…); absent by default. */
+  readonly cf?: Readonly<Record<string, unknown>>;
 };
 
 /** Calls the Worker the way a client would: JSON in, JSON out, optional bearer. */
@@ -23,6 +25,7 @@ export const call = async (path: string, options: RequestOptions = {}): Promise<
   return await api.fetch(
     new Request(`https://pace-api.test${path}`, {
       body: options.body === undefined ? null : JSON.stringify(options.body),
+      ...(options.cf !== undefined && { cf: options.cf }),
       headers,
       method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     }),

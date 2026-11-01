@@ -102,7 +102,7 @@ describe("the deadline digest", () => {
             },
           },
           started,
-          couriersOf(telegram.target),
+          { couriers: couriersOf(telegram.target) },
         ),
       );
       const withoutTelegram: Couriers = { push: { fcm: null }, telegram: null };
@@ -159,7 +159,7 @@ describe("the deadline digest", () => {
             },
           },
           started,
-          couriers,
+          { couriers },
         ),
       );
       const resolvedAt = new Date(Date.parse(started) + 1000).toISOString();
@@ -207,7 +207,7 @@ describe("the deadline digest", () => {
             },
           },
           CROSSED,
-          couriers,
+          { couriers },
         ),
       );
       await instance.resolveNotification(notification.id, "read", {
@@ -755,7 +755,7 @@ describe("Firebase push", () => {
             },
           },
           started,
-          couriers,
+          { couriers },
         ),
       );
       const changedAt = new Date(Date.parse(started) + 1000).toISOString();
@@ -797,7 +797,7 @@ describe("Firebase push", () => {
             },
           },
           started,
-          couriersOf(telegram, fcm.target),
+          { couriers: couriersOf(telegram, fcm.target) },
         ),
       );
       const withoutFcm = couriersOf(telegram);
@@ -841,7 +841,7 @@ describe("Firebase push", () => {
             },
           },
           started,
-          couriers,
+          { couriers },
         ),
       );
       await unsubscribe(env.DB, sessionId);
@@ -944,7 +944,13 @@ describe("Firebase push", () => {
       expect(fcm.sends()[0]?.message.data).not.toHaveProperty("message");
       const page = await instance.listNotifications({ limit: 5 });
       expect(page.deliveries[id]).toEqual([
-        expect.objectContaining({ device: "dev", method: "fcm", reason: null, result: "sent" }),
+        // The device as its session is named: a dev login's.
+        expect.objectContaining({
+          device: "Dev login",
+          method: "fcm",
+          reason: null,
+          result: "sent",
+        }),
       ]);
       await instance.resolveNotification(id, "stopped", {
         couriers,
@@ -1025,7 +1031,7 @@ describe("Firebase push", () => {
             },
           },
           CROSSED,
-          couriers,
+          { couriers },
         ),
       );
       expect((await instance.listNotifications({ limit: 5 })).deliveries[login.id]).toEqual([
@@ -1060,7 +1066,7 @@ describe("Firebase push", () => {
             },
           },
           CROSSED,
-          couriers,
+          { couriers },
         ),
       );
       await instance.resolveNotification(login.id, "read", {
@@ -1109,7 +1115,7 @@ describe("Firebase push", () => {
             },
           },
           started,
-          couriers,
+          { couriers },
         ),
       );
       const resolvedAt = new Date(Date.parse(started) + 1000).toISOString();
@@ -1158,7 +1164,7 @@ describe("Firebase push", () => {
           },
         },
         CROSSED,
-        couriersOf(telegramRecorder().target, quiet.target),
+        { couriers: couriersOf(telegramRecorder().target, quiet.target) },
       );
       expect(quiet.calls).toEqual([]);
     });
@@ -1241,7 +1247,7 @@ describe("Firebase push", () => {
           sessionId: "s",
         },
       };
-      const login = added(await instance.notify(signIn, CROSSED, couriers));
+      const login = added(await instance.notify(signIn, CROSSED, { couriers }));
       expect(fcm.sends()).toHaveLength(sends);
       const logged = (await instance.listNotifications({ limit: 5 })).deliveries[login.id] ?? [];
       expect(logged.filter((entry) => entry.method !== "telegram")).toEqual([
@@ -1342,7 +1348,7 @@ describe("Firebase push", () => {
           sessionId: "s",
         },
       };
-      const login = added(await instance.notify(signIn, CROSSED, couriers));
+      const login = added(await instance.notify(signIn, CROSSED, { couriers }));
       expect(fcm.sends()).toHaveLength(2);
       const page = await instance.listNotifications({ limit: 5 });
       expect(page.deliveries[login.id]).toContainEqual(
@@ -1373,9 +1379,9 @@ describe("Firebase push", () => {
           sessionId: "s",
         },
       };
-      const login = added(await instance.notify(signIn, CROSSED, couriers));
-      added(await instance.notify(signIn, CROSSED, couriers));
-      added(await instance.notify(signIn, "2026-10-07T08:05:00.000Z", couriers));
+      const login = added(await instance.notify(signIn, CROSSED, { couriers }));
+      added(await instance.notify(signIn, CROSSED, { couriers }));
+      added(await instance.notify(signIn, "2026-10-07T08:05:00.000Z", { couriers }));
       const page = await instance.listNotifications({ limit: 5 });
       expect(page.deliveries[login.id]?.filter((entry) => entry.method === "fcm")).toEqual([
         expect.objectContaining({ reason: "unavailable", result: "failed" }),
@@ -1442,7 +1448,7 @@ describe("polling", () => {
     const first = await answerOf(endpoints.notifications.poll, "/api/push/poll", { token: phone });
     expect(first.entries).toEqual([
       expect.objectContaining({
-        body: "Signed in: Chrome · 1.2.3.4 · Germany",
+        body: "You signed in from IP 1.2.3.4 · Germany · Chrome",
         notification: expect.objectContaining({ id: login.id }) as unknown,
         notificationId: login.id,
         title: "New sign-in",
@@ -1499,7 +1505,9 @@ describe("the pool's own bookkeeping", () => {
     await runInDurableObject(freshStore(), async (instance: UserStore) => {
       await instance.notifyTo("1002", CROSSED);
       const telegram = telegramRecorder();
-      const refused = await instance.notify(longLogin, CROSSED, couriersOf(telegram.target));
+      const refused = await instance.notify(longLogin, CROSSED, {
+        couriers: couriersOf(telegram.target),
+      });
       expect(refused).toEqual({ error: { code: "notification/invalid" }, ok: false });
       expect((await instance.listNotifications({ limit: 5 })).items).toEqual([]);
       expect(telegram.sent()).toEqual([]);
@@ -1511,8 +1519,12 @@ describe("the pool's own bookkeeping", () => {
       await instance.notifyTo("1002", CROSSED);
       const telegram = telegramRecorder();
       const login = { ...longLogin, payload: { ...longLogin.payload, name: "Chrome" } };
-      const first = await instance.notify(login, CROSSED, couriersOf(telegram.target));
-      const second = await instance.notify(login, CROSSED, couriersOf(telegram.target));
+      const first = await instance.notify(login, CROSSED, {
+        couriers: couriersOf(telegram.target),
+      });
+      const second = await instance.notify(login, CROSSED, {
+        couriers: couriersOf(telegram.target),
+      });
       expect(first.ok && second.ok && first.value.id === second.value.id).toBe(true);
       expect((await instance.listNotifications({ limit: 5 })).items).toHaveLength(1);
       expect(telegram.sent()).toHaveLength(1);
@@ -1536,7 +1548,7 @@ describe("the pool's own bookkeeping", () => {
       }));
       const couriers = couriersOf(telegram.target, fcm.target);
       const digest = { kind: "deadline_digest" as const, payload: { slot: CROSSED, tasks } };
-      added(await instance.notify(digest, CROSSED, couriers));
+      added(await instance.notify(digest, CROSSED, { couriers }));
       const text = String(telegram.sent()[0]?.body["text"]);
       expect(text.length).toBeLessThanOrEqual(4096);
       expect(text.endsWith("…")).toBe(true);

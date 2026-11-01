@@ -7,6 +7,7 @@ import type { SleepCandidate } from "@pace/core";
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
 
 import { createSecureSessionStore } from "./secure-session.ts";
+import { readServer } from "./server.ts";
 import { sessionHashOf } from "./session-fingerprint.ts";
 import { readSessionValue, writeSessionValue } from "./session-value.ts";
 
@@ -28,7 +29,8 @@ export const usePhoneMemoryVersion = (): number => useStore(changes, (state) => 
 const KEEP = 200;
 
 /** A capped list of keys kept on this phone. */
-const currentSession = async (): Promise<null | string> => await createSecureSessionStore().get();
+const currentSession = async (): Promise<null | string> =>
+  await createSecureSessionStore(await readServer()).get();
 
 const privateKey = async (key: string, session: string): Promise<string> =>
   `${key}.${await sessionHashOf(session)}`;

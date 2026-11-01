@@ -1,20 +1,10 @@
 /** Devices: the phone's and the computers' data in the cloud, and connecting a computer. */
 export const enDevices = {
-  "devices.title": "Devices",
-  "devices.hint":
-    "Phones and computers that tell Pace which app is on screen (names and times only, never what is in them), so Day and Week show where you sat.",
-  "devices.loading": "Loading the devices…",
-  "devices.failed": "Could not load the devices. Check the connection.",
-  "devices.empty": "Nothing sends app usage yet.",
-  "devices.computer": "Computer",
-  "devices.phone": "Phone",
   "devices.lastActivity": "Last data {duration} ago",
   "devices.justNow": "Last data just now",
   "devices.nothingYet": "Nothing sent yet",
-  "devices.connected": "Connected {date}",
-  "devices.disconnect": "Disconnect",
-  "devices.disconnectConfirm": "Disconnect {name}? Its token stops working at once.",
-  "devices.disconnectFailed": "Could not disconnect. Try again.",
+  "devices.lastDataAt": "Last data {time}",
+  "devices.thisDevice": "This device",
   "devices.add": "Add a computer",
   "devices.name": "Name",
   "devices.defaultName": "My computer",

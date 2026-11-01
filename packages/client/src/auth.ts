@@ -38,6 +38,9 @@ export type BotLogin = {
   readonly waitForToken: BotLoginPoll["waitForToken"];
 };
 
+/** The phone a bot login starts on: its model and its install id. */
+export type LoginDevice = { readonly deviceName?: string; readonly deviceId?: string };
+
 export type BotLoginPoll = {
   readonly nonce: string;
   /** Polls until the bot bound the nonce; the token is stored before it resolves. */
@@ -61,8 +64,11 @@ export type Auth = {
   /** Errors are the API's code (`auth/not-allowed`, ...) or `network`. */
   readonly loginWithTelegram: (payload: TelegramLogin) => Promise<Result<User, string>>;
   readonly loginWithDev: (telegramId: string) => Promise<Result<User, string>>;
-  /** `from`: where the login starts; the bot's "Return to Pace" leads back there. */
-  readonly startBotLogin: (from: "app" | "web") => Promise<BotLogin>;
+  /**
+  `from`: where the login starts; the bot's "Return to Pace" leads back there. The app names its
+  phone (`device`), so the session it opens is called after it; the web sends none.
+  */
+  readonly startBotLogin: (from: "app" | "web", device?: LoginDevice) => Promise<BotLogin>;
   /** Rebuilds the poller for a nonce held by a login page across a reload. */
   readonly resumeBotLogin: (nonce: string) => BotLoginPoll;
   /** Tells the server, then forgets the token even when the server could not be reached. */
@@ -270,8 +276,8 @@ export const createAuth = (options: {
     me,
     ready: session.ready,
     resumeBotLogin: (nonce) => ({ nonce, waitForToken: waitForToken(api, session, nonce) }),
-    startBotLogin: async (from) => {
-      const created = await api.call(endpoints.auth.nonceCreate, { query: { from } });
+    startBotLogin: async (from, device) => {
+      const created = await api.call(endpoints.auth.nonceCreate, { body: device, query: { from } });
       return { ...created, waitForToken: waitForToken(api, session, created.nonce) };
     },
     store: session.store,

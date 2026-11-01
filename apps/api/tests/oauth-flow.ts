@@ -139,15 +139,6 @@ export const obtainToken = async (
   return { clientId, tokens };
 };
 
-/** `DELETE /api/oauth/grants/:id` (tests/helpers.ts only speaks GET and POST). */
-export const revokeGrant = async (id: string, token?: string): Promise<Response> =>
-  await api.fetch(
-    new Request(`${API_ORIGIN}/api/oauth/grants/${id}`, {
-      headers: token === undefined ? {} : { Authorization: `Bearer ${token}` },
-      method: "DELETE",
-    }),
-  );
-
 /** One JSON-RPC call to the MCP endpoint (stateless streamable HTTP, JSON responses). */
 export const mcpCall = async (
   token: string | undefined,

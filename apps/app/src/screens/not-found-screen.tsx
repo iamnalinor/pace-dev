@@ -22,6 +22,7 @@ export const NotFoundScreen = () => {
           router.replace("/");
         }}
         variant="secondary"
+        width="fill"
       >
         {t("common.home")}
       </Button>

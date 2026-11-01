@@ -47,6 +47,7 @@ export const CardView = ({ card }: { readonly card: InboxCard }) => {
             onPress={() => {
               void run(actions.acceptSuggestion(card.id, card.suggestion));
             }}
+            width="fill"
           >
             {t("common.accept")}
           </Button>
@@ -57,6 +58,7 @@ export const CardView = ({ card }: { readonly card: InboxCard }) => {
               void run(actions.discardInbox(card.id));
             }}
             variant="secondary"
+            width="fill"
           >
             {t("common.delete")}
           </Button>

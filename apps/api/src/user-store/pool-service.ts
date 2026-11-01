@@ -2,7 +2,6 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import {
   addMinutesIso,
-  canResolveAs,
   type CoreState,
   err,
   type Event,
@@ -30,11 +29,12 @@ import {
   hasSendRetry,
   type PoolDeps,
   poolMemoryOf,
+  type PoolNotifyOptions,
   ruledSeriesOf,
   savePoolMemory,
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
-import { answerInputs } from "./pool-answers.ts";
+import { answerInputs, answerRefusal, applyAnswer } from "./pool-answers.ts";
 import { armRetry, scheduleNextPass } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
@@ -170,6 +170,7 @@ export class NotificationPool {
     }
     // Written first: an answer whose events did not go in leaves the notification open.
     await this.#host.insert(prepared.value.events);
+    await applyAnswer(notification, resolution, this.#host);
     await this.#settle(notification.id, resolution, meta);
     await this.#host.derive(meta.now);
     await this.afterWrite(meta.now);
@@ -229,20 +230,20 @@ export class NotificationPool {
   }
 
   /**
-  Adds a notification to the pool and delivers it (see `deliverNew`); one about the same subject
-  is delivered where it did not reach yet instead (see `insertNotification`).
+  Adds a notification to the pool and delivers it (see `deliverNew`, which may adopt a Telegram
+  message); one about the same subject is delivered where it did not reach yet instead.
   */
   async notify(
     created: NewNotification,
     now: string,
-    couriers?: Couriers,
+    options: PoolNotifyOptions = {},
   ): Promise<Result<PoolNotification, NotifyError>> {
     const stored = await rows.insertNotification(this.#host.db, created, now);
     if (!stored.ok) {
       return stored;
     }
-    await deliverNew(await this.#deps(now, couriers), stored.value);
-    if (await hasSendRetry(await this.#deps(now, couriers), stored.value)) {
+    await deliverNew(await this.#deps(now, options.couriers), stored.value, options);
+    if (await hasSendRetry(await this.#deps(now, options.couriers), stored.value)) {
       await armRetry(this.#host.ctx.storage, now);
     }
     return ok(stored.value.notification);
@@ -282,10 +283,7 @@ export class NotificationPool {
   }
 
   /** Marks notifications read; open clients update their badge. */
-  async read(
-    which: { readonly all: true } | { readonly ids: readonly string[] },
-    now: string,
-  ): Promise<void> {
+  async read(which: rows.ReadWhich, now: string): Promise<void> {
     await rows.markRead(this.#host.db, which, now);
     broadcast(this.#host.ctx, { type: "read" });
   }
@@ -306,8 +304,9 @@ export class NotificationPool {
     if (found?.notification.resolvedAt !== null) {
       return found === undefined ? err({ code: "notification/not-found" }) : ok(found.notification);
     }
-    if (!canResolveAs(found.notification.kind, resolution)) {
-      return err({ code: "notification/mismatch" });
+    const refusal = answerRefusal(found.notification, resolution, meta.sessionId);
+    if (refusal !== undefined) {
+      return err({ code: refusal });
     }
     const written = await this.#write(found.notification, resolution, meta);
     if (!written.ok) {
@@ -344,7 +343,7 @@ export class NotificationPool {
     const pass = await this.#pass(now);
     const created: PoolNotification[] = [];
     for (const item of pass.created) {
-      const added = await this.notify(item, now, couriers);
+      const added = await this.notify(item, now, { couriers });
       if (added.ok) {
         created.push(added.value);
       } else {

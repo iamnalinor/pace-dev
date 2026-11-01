@@ -45,7 +45,8 @@ export const requestCalendarPermissions = deny;
 export const getCalendars = nothing;
 export const listEvents = nothing;
 
-// expo-task-manager
+// expo-task-manager, expo-background-task
+export const BackgroundTaskResult = { Failed: 2, Success: 1 } as const;
 export const defineTask = (): void => undefined;
 export const isTaskRegisteredAsync = async (): Promise<boolean> => {
   await Promise.resolve();

@@ -1,4 +1,3 @@
-import * as Notifications from "expo-notifications";
 import { createContext, type ReactNode, use, useCallback, useEffect, useState } from "react";
 import { AppState, View } from "react-native";
 import { useStore } from "zustand";
@@ -6,7 +5,6 @@ import { useStore } from "zustand";
 import type { Auth, AuthState, AppState as ClientState, SyncStatus } from "@pace/client";
 
 import {
-  isAnswer,
   type Language,
   type MessageKey,
   type MessageParams,
@@ -15,21 +13,12 @@ import {
   type User,
 } from "@pace/core";
 
+import { followPhoneNotices, sendPhoneData, startPhonePush } from "./phone-runtime.ts";
+import { startBackgroundCheck, stopBackgroundCheck } from "./platform/background-check.ts";
 import { deviceLanguage } from "./platform/device-language.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
-import { notificationIdOf } from "./platform/notification-id.ts";
-import {
-  answerFromButton,
-  dismissPoolNotification,
-  pollNow,
-  pushStore,
-  registerPush,
-  setupNotificationCategories,
-} from "./platform/notifications.ts";
-import { uploadPhoneData } from "./platform/phone-upload.ts";
-import { startPushTask } from "./platform/push-task.ts";
-import { isForSession } from "./platform/session-fingerprint.ts";
+import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 /**
@@ -42,38 +31,17 @@ const POLL_LIVE_MS = 5 * 60_000;
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 const LanguageReadyContext = createContext<null | string>(null);
 
-/** The phone's calendar and app usage, sent beside the event log (nothing on the web). */
-const sendPhoneData = async (runtime: PaceRuntime): Promise<void> => {
-  if (IS_PHONE) {
-    await uploadPhoneData(runtime.api, runtime.clock.now());
-  }
-};
-
-/**
-The phone's side of the notification pool, on every start and return: the answer buttons,
-the push method (registered again: a token may have changed) and, when it polls, what waits.
-*/
-const startPhonePush = async (runtime: PaceRuntime): Promise<void> => {
-  if (!IS_PHONE) {
-    return;
-  }
-  try {
-    await setupNotificationCategories(runtime.state.store.getState().settings.language);
-    await startPushTask();
-    if ((await registerPush(runtime.api)) === "poll") {
-      await pollNow(runtime.api);
-    }
-  } catch {
-    // Offline: the next start or return tries again; the feed has everything meanwhile.
-  }
-};
-
 /**
 A signed-in start: this week's homework instances, a first sync, then the account's time
 zone from the device when it has none yet (never "not set").
 */
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
+  if (IS_PHONE) {
+    // Every signed-in phone, before any network step (one failing must not skip it): it polls
+    // when its method is `poll`, and always uploads its usage.
+    void startBackgroundCheck();
+  }
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
@@ -87,69 +55,6 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
 
   sync.start({ intervalMs: POLL_OFFLINE_MS });
   runtime.live.start();
-};
-
-/**
-What the live socket says about the pool, on a phone: a notification resolved elsewhere goes
-away at once; a polling phone fetches what waits for it right away; changed push methods mean
-registering again. And an answer button tapped while the app is open answers like the feed.
-*/
-const followPhoneNotices = (runtime: PaceRuntime): (() => void) => {
-  if (!IS_PHONE) {
-    return () => undefined;
-  }
-  const pollIfPolling = (): void => {
-    if (pushStore.getState().method === "poll") {
-      void (async () => {
-        try {
-          await pollNow(runtime.api);
-        } catch {
-          // Offline: the next notice or start fetches it.
-        }
-      })();
-    }
-  };
-  const stopNotices = runtime.onNotice((notice) => {
-    switch (notice.type) {
-      case "push-methods-changed": {
-        void startPhonePush(runtime);
-        break;
-      }
-      case "dismiss": {
-        void dismissPoolNotification(notice.id);
-        pollIfPolling();
-        break;
-      }
-      case "notification": {
-        pollIfPolling();
-        break;
-      }
-      case "read": {
-        break;
-      }
-    }
-  });
-  const responses = Notifications.addNotificationResponseReceivedListener((response) => {
-    const id = notificationIdOf(response.notification.request.content.data);
-    if (id === null || !isAnswer(response.actionIdentifier)) {
-      return;
-    }
-    const resolution = response.actionIdentifier;
-    void answerFromButton({
-      content: response.notification.request.content,
-      id,
-      save: async () => await runtime.notifications.resolve(id, resolution),
-      stillCurrent: async () =>
-        await isForSession(
-          response.notification.request.content.data,
-          runtime.api.currentSessionToken(),
-        ),
-    });
-  });
-  return () => {
-    stopNotices();
-    responses.remove();
-  };
 };
 
 /** A successful sync makes account settings safe to show for that run's session. */
@@ -188,7 +93,13 @@ const runSyncLoop = (
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
-      void bootstrap(runtime);
+      void (async () => {
+        try {
+          await bootstrap(runtime);
+        } catch {
+          // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
+        }
+      })();
     } else {
       onLanguageReady(null);
       sync.stop();
@@ -205,6 +116,9 @@ const runSyncLoop = (
       return;
     }
 
+    if (IS_PHONE) {
+      void stopBackgroundCheck();
+    }
     if (activeSession !== undefined) {
       void clearPresentedPoolNotifications(activeSession);
     }
@@ -241,7 +155,9 @@ const runSyncLoop = (
     })();
   });
   const stopNotices = followPhoneNotices(runtime);
+  const stopServerChecks = watchServer(runtime);
   return () => {
+    stopServerChecks();
     unsubscribe();
     subscription.remove();
     stopNotices();
@@ -253,8 +169,8 @@ const runSyncLoop = (
 };
 
 /**
-Wires auth → API → app state → sync for the whole app. Renders a blank view until the
-platform adapters are ready (the splash screen is still up), then the children.
+Wires auth → API → app state → sync for the whole app, for the chosen server. Renders a blank
+view until the platform adapters are ready (the splash screen is still up), then the children.
 */
 export const PaceProvider = ({
   children,
@@ -265,14 +181,15 @@ export const PaceProvider = ({
 }) => {
   const [runtime, setRuntime] = useState<null | PaceRuntime>(provided ?? null);
   const [languageReadyToken, setLanguageReadyToken] = useState<null | string>(null);
+  const origin = useServerOrigin(provided === undefined);
 
   useEffect(() => {
-    if (provided !== undefined) {
+    if (provided !== undefined || origin === null) {
       return;
     }
     const lifetime = new AbortController();
     void (async () => {
-      const created = await createRuntime();
+      const created = await createRuntime({ baseUrl: origin });
       if (!lifetime.signal.aborted) {
         setRuntime(created);
       }
@@ -280,7 +197,7 @@ export const PaceProvider = ({
     return () => {
       lifetime.abort();
     };
-  }, [provided]);
+  }, [provided, origin]);
 
   useEffect(
     () => (runtime === null ? undefined : runSyncLoop(runtime, setLanguageReadyToken)),

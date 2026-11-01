@@ -78,24 +78,39 @@ const refreshOf =
     }
   };
 
-const markReadOf =
-  ({ api, store }: FeedDeps) =>
-  async (ids: readonly string[]): Promise<void> => {
-    if (ids.length === 0) {
-      return;
-    }
+/**
+Marks notifications read here at once (every call) and tells the server, each id once: a server
+that leaves one unread (it may refuse part of a read, as for a session's own sign-in notice) brings
+it back on the next refresh, and asking again would loop with every refresh the read itself sets
+off (QA round 15 H1). An id whose read did not reach the server is asked again on the next call.
+*/
+const markReadOf = ({ api, store }: FeedDeps) => {
+  const asked = new Set<string>();
+  return async (ids: readonly string[]): Promise<void> => {
+    // Read here every time: a refresh that left before the server marked them brings them back.
     const at = new Date().toISOString();
     store.setState(({ items }) => ({
       items: items.map((item) =>
         ids.includes(item.id) && item.readAt === null ? { ...item, readAt: at } : item,
       ),
     }));
+    const fresh = ids.filter((id) => !asked.has(id));
+    if (fresh.length === 0) {
+      return;
+    }
+    for (const id of fresh) {
+      asked.add(id);
+    }
     try {
-      await api.call(endpoints.notifications.read, { body: { ids: [...ids] } });
+      await api.call(endpoints.notifications.read, { body: { ids: fresh } });
     } catch {
       // Read here already; the server learns on the next open.
+      for (const id of fresh) {
+        asked.delete(id);
+      }
     }
   };
+};
 
 /** A new one goes on top at once; a resolved one shows its answer at once; then the page again. */
 const receiveOf =

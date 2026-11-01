@@ -40,6 +40,7 @@ export const CalendarPrompt = () => {
             onPress={() => {
               void run(actions.startCalendar(event));
             }}
+            width="fill"
           >
             {t("time.attend")}
           </Button>
@@ -54,6 +55,7 @@ export const CalendarPrompt = () => {
               })();
             }}
             variant="secondary"
+            width="fill"
           >
             {t("phone.skip")}
           </Button>

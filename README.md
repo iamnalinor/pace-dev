@@ -169,7 +169,16 @@ account may sign in.
   `ENVIRONMENT` is not `production`.
 
 Deployments for other people: edit `ALLOWED_TELEGRAM_IDS`, `TELEGRAM_BOT_USERNAME` and
-`WEB_ORIGIN` in `wrangler.jsonc`, create your own bot (below) and set its token as a secret.
+`WEB_ORIGIN` in `wrangler.jsonc`, create your own bot (below) and set its token as a secret
+([docs/self-hosting.md](docs/self-hosting.md) walks through it).
+
+## Run your own server
+
+Anyone can run Pace on their own Cloudflare account and use the released Android app with it,
+without building anything: deploy the Worker, then on the app's login screen press **Change**
+next to "Server: …" and enter your API's address. The app checks the server (`GET /api/instance`:
+name, version, bot, protocol) before it switches, and refuses a server whose version does not fit.
+Step by step, and what works without Google push: [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Deployment
 
@@ -288,7 +297,7 @@ phone's calendar* is enabled for the current login. A new login starts with this
 turning it off deletes that login's cloud copy. The phone also sends the apps it had in front,
 names and times only. A computer
 runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
-*Settings → Devices → Add a computer* gives one install line per system (see
+*Settings → Devices and sessions → Add a computer* gives one install line per system (see
 [docs/desktop.md](docs/desktop.md)). Day and Week show where the
 time of each block went; MCP has `get_calendar`, `get_usage` and `get_week`.
 
@@ -355,8 +364,17 @@ and "still doing X?"; sign-ins and digests always come.
 The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
 server offers it and the phone has a Google token, else polling (it fetches what waits for it;
 the open app does so at once on each live update). *Settings → Notifications* on the phone picks
-it by hand (*Auto*, *Google*, *Pace checks* or *Off*) and says which one the phone uses; a pick the
-server or the phone cannot take right now falls back to the other, and is tried again later. `GET /api/push/methods` says what the server
+it by hand (*Automatic*, *Google*, *Background check (every ~15 min)* or *Only in the app*, where
+the phone shows none and the app's bell has them all) and says which one the phone uses; a pick the server or the phone cannot take right now
+falls back to the other, and is tried again later.
+
+**Without Firebase** (a phone without Google services, an APK built without
+`GOOGLE_SERVICES_JSON`, a server without `FIREBASE_SERVICE_ACCOUNT`, or one with another
+Firebase project) notifications still reach the phone while Pace is closed: a periodic
+background check (Android's WorkManager, about every 15 minutes, later under Doze or a vendor
+battery saver) fetches what waits for it and shows it. There is no foreground service and no
+ongoing notification. The open app fetches at once on each live update, and Telegram gets
+everything as before. `GET /api/push/methods` says what the server
 accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and
 phones switch to polling on their next start or at once while open. Each item's delivery log
 ("Delivered to android via Google · 13:47") is shown under it in the feed.

@@ -92,6 +92,8 @@ describe("HistoryScreen", () => {
     }
     await fireEvent.press(firstUndo);
     expect(revoke).not.toHaveBeenCalled();
+    // Undo stays while the dialog asks, so the dialog gives focus back to it (bug class 5).
+    expect(firstUndo).toBeOnTheScreen();
     expect(screen.getByRole("header", { name: en("history.undoConfirm") })).toBeOnTheScreen();
     expect(screen.getByText(en("history.undoConfirmQuestion"))).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));

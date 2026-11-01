@@ -1,12 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type Event, newId } from "@pace/core";
+import { type Event, LIVE_REQUEST_TIMEOUT_MS, newId } from "@pace/core";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createApiClient } from "./api-client.ts";
-import { at, createFakeFetch, type FakeRoute, problem, settingsEvent } from "./fake-fetch.fake.ts";
+import { createPaceClient } from "./create-client.ts";
+import {
+  at,
+  createFakeFetch,
+  FAKE_STORE_ID,
+  fakeMe,
+  type FakeRoute,
+  problem,
+  settingsEvent,
+} from "./fake-fetch.fake.ts";
+import { say } from "./fake-socket.fake.ts";
+import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.ts";
+import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
-import { createSyncClient, type SyncClient } from "./sync-client.ts";
+import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
+import { httpTransport } from "./sync-transport.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
 const STORE_ID = "store-a";
@@ -32,7 +45,7 @@ const setup = async (
   await state.ready;
   const fake = createFakeFetch(routes);
   const api = createApiClient({ baseUrl: "https://api.test", fetch: fake.fetch, token: () => "t" });
-  const sync = createSyncClient({ api, now: () => NOW, state, store });
+  const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
   return { calls: fake.calls, state, store, sync };
 };
 
@@ -72,6 +85,25 @@ describe("createSyncClient push", () => {
       online: true,
       syncing: false,
     });
+  });
+});
+
+describe("createSyncClient on Hermes", () => {
+  it("syncs where the platform has no Promise.withResolvers", async () => {
+    const withResolvers = Object.getOwnPropertyDescriptor(Promise, "withResolvers");
+
+    delete (Promise as { withResolvers?: unknown }).withResolvers;
+    try {
+      const { sync } = await setup(
+        { "GET /api/sync/pull": noPull, "POST /api/sync/push": acceptAll },
+        localEvents(2),
+      );
+      await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 2 } });
+    } finally {
+      if (withResolvers !== undefined) {
+        Object.defineProperty(Promise, "withResolvers", withResolvers);
+      }
+    }
   });
 });
 
@@ -209,30 +241,6 @@ describe("createSyncClient store id", () => {
     await sync.syncNow();
     const pushed = calls.find((call) => call.path === "/api/sync/push");
     expect(pushed?.body).toMatchObject({ storeId: STORE_ID });
-  });
-
-  it("treats a push the server refuses as store/changed like a reset: drops, pulls, never re-pushes", async () => {
-    let storeId = STORE_ID;
-    const { calls, state, store, sync } = await setup(
-      {
-        "GET /api/sync/pull": ({ url }) =>
-          storeId === "store-b" && url.searchParams.get("since") === "0"
-            ? { events: [remote], more: false, seq: 1, storeId }
-            : { ...EMPTY_PAGE, storeId },
-        "POST /api/sync/push": () => {
-          // Wiped between this run's pull and its push.
-          storeId = "store-b";
-          return problem(409, "store/changed");
-        },
-      },
-      localEvents(2),
-    );
-    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
-    expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(1);
-    await expect(store.listAll()).resolves.toEqual([remote]);
-    await expect(store.listPending()).resolves.toEqual([]);
-    await expect(store.getStoreId()).resolves.toBe("store-b");
-    expect(state.store.getState().events).toEqual([remote]);
   });
 
   it("resets at most once a run: a second change stops it, to retry later", async () => {
@@ -406,5 +414,238 @@ describe("createSyncClient soon", () => {
     await vi.advanceTimersByTimeAsync(5000);
     // Stopped (signed out): nothing runs.
     expect(calls).toHaveLength(2);
+  });
+});
+
+/**
+A client wired as the app wires it (`createPaceClient`), on one fake server reachable both ways:
+the live socket (`speaksV2: false` plays an older server that only says `changed`) and HTTP.
+*/
+const setupLive = async (
+  options: { readonly speaksV2?: boolean; readonly seed?: readonly Event[] } = {},
+) => {
+  const server = createFakeSyncServer(FAKE_STORE_ID);
+  server.options.speaksV2 = options.speaksV2 ?? true;
+  server.append(options.seed ?? []);
+  const fake = createFakeFetch({ ...server.routes, "GET /api/me": () => fakeMe });
+  const session = createMemorySessionStore();
+  await session.set("tok");
+  const store = createMemoryEventStore();
+  const client = createPaceClient({
+    baseUrl: "https://api.test",
+    createSocket: server.createSocket,
+    deviceId: "dev-1",
+    fetch: fake.fetch,
+    now: () => NOW,
+    session,
+    source: "web",
+    store,
+  });
+  await client.auth.ready;
+  await client.state.ready;
+  client.live.start();
+  const socket = server.connect();
+  const write = async (count: number): Promise<readonly Event[]> => {
+    for (let index = 0; index < count; index += 1) {
+      await client.state.dispatch({
+        occurredAt: at(10, index),
+        payload: { language: index % 2 === 0 ? "ru" : "en" },
+        type: "settings.updated",
+      });
+    }
+    return await store.listPending();
+  };
+  return { client, fake, server, socket, store, write };
+};
+
+const via = (transport: FakeRequest["transport"], ...types: FakeRequest["type"][]): FakeRequest[] =>
+  types.map((type) => ({ transport, type }));
+
+/** How many copies of each id a log holds. */
+const copies = (events: readonly Event[]): readonly number[] => {
+  const counts = new Map<string, number>();
+  for (const event of events) {
+    counts.set(event.id, (counts.get(event.id) ?? 0) + 1);
+  }
+  return counts.values().toArray();
+};
+
+describe("createSyncClient over the live socket", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("pushes and pulls over an open v2 socket, and calls no sync route", async () => {
+    const { client, fake, server, store, write } = await setupLive({ seed: [remote] });
+    const pending = await write(2);
+    await expect(client.sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 2 } });
+    expect(fake.pathsCalled("/api/sync")).toEqual([]);
+    expect(server.requests).toEqual(via("socket", "pull", "push", "pull"));
+    expect(server.log().map((event) => event.id)).toEqual([remote.id, ...pending.map((e) => e.id)]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    await expect(store.getCursor()).resolves.toBe(3);
+    expect(client.state.store.getState().events.map((event) => event.id)).toContain(remote.id);
+    client.live.stop();
+  });
+
+  it.each([
+    ["goes silent (the timeout)", LIVE_REQUEST_TIMEOUT_MS, false],
+    ["drops", 0, true],
+  ] as const)(
+    "re-pushes over HTTP a socket push the server applied when the socket %s: one copy, outbox empty",
+    async (_, waitMs, isDropped) => {
+      vi.useFakeTimers();
+      const { client, server, socket, store, write } = await setupLive();
+      const markSynced = vi.spyOn(store, "markSynced");
+      // The server applies the push, but its answer never arrives.
+      server.options.silent = new Set<FakeRequest["type"]>(["push"]);
+      const pending = await write(3);
+      const run = client.sync.syncNow();
+      await vi.waitFor(() => {
+        expect(server.log()).toHaveLength(3);
+      });
+      if (isDropped) {
+        socket.drop();
+      }
+      await vi.advanceTimersByTimeAsync(waitMs);
+      await expect(run).resolves.toMatchObject({ ok: true, value: { pushed: 3 } });
+      expect(server.requests).toEqual([
+        ...via("socket", "pull", "push"),
+        ...via("http", "push", "pull"),
+      ]);
+      expect(server.log()).toHaveLength(3);
+      expect(copies(server.log())).toEqual([1, 1, 1]);
+      const local = await store.listAll();
+      expect(local).toHaveLength(3);
+      expect(copies(local)).toEqual([1, 1, 1]);
+      await expect(store.listPending()).resolves.toEqual([]);
+      expect(markSynced.mock.calls.flatMap(([ids]) => ids)).toEqual(
+        expect.arrayContaining(pending.map((event) => event.id)),
+      );
+      client.live.stop();
+    },
+  );
+
+  it("applies a page the server sends unasked when it continues the cursor, without a pull", async () => {
+    vi.useFakeTimers();
+    const { client, server, store } = await setupLive();
+    client.sync.start({ intervalMs: 300_000 });
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    const before = server.requests.length;
+    server.append([remote]);
+    await vi.advanceTimersByTimeAsync(SOON_MS * 2);
+    expect(client.state.store.getState().events).toEqual([remote]);
+    await expect(store.getCursor()).resolves.toBe(1);
+    expect(server.requests).toHaveLength(before);
+    client.sync.stop();
+    client.live.stop();
+  });
+
+  it.each([
+    ["a gap", { more: false, since: 5, storeId: FAKE_STORE_ID }],
+    ["more to pull", { more: true, since: 1, storeId: FAKE_STORE_ID }],
+    ["another store", { more: false, since: 1, storeId: "store-other" }],
+  ] as const)("pulls within SOON_MS after a page with %s, applying none of it", async (_, page) => {
+    vi.useFakeTimers();
+    const { client, server, socket } = await setupLive({ seed: [remote] });
+    client.sync.start({ intervalMs: 300_000 });
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    const before = server.requests.length;
+    const stray = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAB", at(11), { timezone: "UTC" });
+    say(socket, { ...page, events: page.more ? [] : [stray], seq: 9, type: "events" });
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    expect(server.requests.slice(before)).toEqual(via("socket", "pull"));
+    expect(client.state.store.getState().events.map((event) => event.id)).not.toContain(stray.id);
+    client.sync.stop();
+    client.live.stop();
+  });
+
+  it("stays right when the server's derived events reach the writer before its pushed", async () => {
+    const { client, server, store, write } = await setupLive();
+    const derived = {
+      ...settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAC", at(10, 30), {}),
+      deviceId: "server",
+      source: "system",
+    } as const;
+    const other = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAD", at(10, 40), { timezone: "UTC" });
+    // While the push is in flight another device writes (a page that continues the cursor),
+    // and the store derives a system event from the push (a page past the writer's cursor):
+    // both arrive before the writer's `pushed`.
+    server.options.beforePush = () => {
+      server.append([other]);
+    };
+    server.options.derive = () => [derived];
+    const pending = await write(1);
+    await expect(client.sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
+    // The two pages wait for the run; let them be read before looking.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    await expect(store.getCursor()).resolves.toBe(3);
+    const local = await store.listAll();
+    expect(new Set(local.map((event) => event.id))).toEqual(
+      new Set([other.id, derived.id, ...pending.map((event) => event.id)]),
+    );
+    expect(copies(local)).toEqual([1, 1, 1]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(client.state.store.getState().events).toHaveLength(3);
+    client.live.stop();
+  });
+
+  it("goes over HTTP against a server that only speaks v1, and still pulls on its changed", async () => {
+    vi.useFakeTimers();
+    const { client, server, write } = await setupLive({ speaksV2: false });
+    await write(1);
+    await expect(client.sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
+    expect(server.requests).toEqual(via("http", "pull", "push", "pull"));
+    client.sync.start({ intervalMs: 300_000 });
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    const before = server.requests.length;
+    server.append([remote]);
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    expect(server.requests.slice(before)).toEqual(via("http", "pull"));
+    expect(client.state.store.getState().events.map((event) => event.id)).toContain(remote.id);
+    client.sync.stop();
+    client.live.stop();
+  });
+});
+
+/** What a refused push leaves, whichever way it was refused: only the fresh store's log. */
+const expectOnlyTheFreshStore = async (
+  context: Awaited<ReturnType<typeof setupLive>>,
+  fresh: { readonly events: readonly Event[]; readonly storeId: string },
+): Promise<void> => {
+  await expect(context.store.listAll()).resolves.toEqual(fresh.events);
+  await expect(context.store.listPending()).resolves.toEqual([]);
+  await expect(context.store.getStoreId()).resolves.toBe(fresh.storeId);
+  await expect(context.store.getCursor()).resolves.toBe(fresh.events.length);
+  expect(context.client.state.store.getState().events).toEqual(fresh.events);
+};
+
+describe.each([
+  ["http", false],
+  ["socket", true],
+] as const)("createSyncClient store/changed on a push over %s", (transport, speaksV2) => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+
+  it("drops the local copy like a reset, pulls the fresh store and never re-pushes", async () => {
+    const context = await setupLive({ speaksV2 });
+    const { client, server, write } = context;
+    await write(2);
+    // Wiped between this run's pull and its push.
+    server.options.beforePush = () => {
+      server.wipe("store-b", [remote]);
+    };
+    await expect(client.sync.syncNow()).resolves.toEqual({
+      ok: true,
+      value: { pulled: 1, pushed: 0 },
+    });
+    expect(server.requests.filter((request) => request.type === "push")).toEqual(
+      via(transport, "push"),
+    );
+    await expectOnlyTheFreshStore(context, { events: [remote], storeId: "store-b" });
+    client.live.stop();
   });
 });

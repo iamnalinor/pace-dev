@@ -9,6 +9,8 @@ export {
   type HttpMethod,
 } from "./api/endpoint.ts";
 export { endpointList, endpoints } from "./api/endpoints.ts";
+export * from "./api/live-protocol.ts";
+export * from "./api/protocol.ts";
 export {
   AccountDeletedSchema,
   AuthSessionSchema,
@@ -26,9 +28,9 @@ export {
 export {
   CALENDAR_LIMITS,
   type CalendarEvent,
-  type Device,
   type UsageRow,
 } from "./api/schemas/cloud.ts";
+export * from "./api/schemas/instance.ts";
 export {
   type LinkPreview,
   LinkPreviewQuerySchema,
@@ -43,15 +45,12 @@ export {
   OAuthClientInfoSchema,
   OAuthCompleteBodySchema,
   OAuthDenyBodySchema,
-  type OAuthGrant,
-  OAuthGrantRevokedSchema,
-  OAuthGrantSchema,
-  OAuthGrantsSchema,
   OAuthRedirectSchema,
   type OAuthScope,
   OAuthScopeSchema,
   requestedScopes,
 } from "./api/schemas/oauth.ts";
+export { type Session, SessionSchema, SessionsOutputSchema } from "./api/schemas/sessions.ts";
 export {
   STORE_CHANGED,
   StoreIdSchema,
@@ -273,6 +272,7 @@ export {
   reviewItems,
   type ReviewKind,
 } from "./review/to-sort.ts";
+export { normalizeServerUrl, type ServerUrlError } from "./server-url.ts";
 export * from "./time-tracking.ts";
 export {
   addDaysIn,

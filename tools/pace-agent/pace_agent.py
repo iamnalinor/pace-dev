@@ -13,8 +13,8 @@ macOS and Linux (X11, or KDE on Wayland with kdotool).
 
 `install` saves the settings and starts the agent with the computer (Task Scheduler, a
 LaunchAgent, a systemd user service). `run --logs` prints each sample and what it would send,
-and sends nothing. Settings → Devices → Add a computer in Pace shows the whole command; see
-docs/desktop.md.
+and sends nothing. Settings → Devices and sessions → Add a computer in Pace shows the whole
+command; see docs/desktop.md.
 """
 
 from __future__ import annotations
@@ -974,7 +974,7 @@ def uninstall(env: Env) -> int:
             pass
     if env.system not in ("Windows", "Darwin"):
         env.run(["systemctl", "--user", "daemon-reload"])
-    env.say("Removed. Disconnect this computer in Pace too (Settings, Devices).")
+    env.say("Removed. Disconnect this computer in Pace too (Settings, Devices and sessions).")
     return 0
 
 

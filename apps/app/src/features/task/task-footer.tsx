@@ -26,6 +26,8 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
         void run(isFocused ? actions.stopActivity() : actions.focusTask(view.id));
       }}
       variant="secondary"
+      // The left half of the footer's split row: it fills its half on every window.
+      width="fill"
     >
       {t(isFocused ? "time.focusing" : "task.focus")}
     </Button>
@@ -75,6 +77,7 @@ export const TaskFooter = ({
             hotkey={HOTKEYS.primary}
             onLongPress={onClose}
             onPress={finish}
+            width="fill"
           >
             {primary}
           </Button>

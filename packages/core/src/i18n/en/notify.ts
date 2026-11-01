@@ -1,16 +1,20 @@
 /** Notifications: the pool's messages, the feed and the channel settings. */
 export const enNotify = {
   "notify.channel": "Notifications",
-  "notify.login": "🔐 Signed in: {name} · {ip} · {place}",
+  "notify.login": "🔐 You signed in from {where}",
+  "notify.loginIp": "IP {ip}",
+  "notify.returnToPace": "Return to Pace",
   "notify.digestTitle": "⏰ Deadlines in the next day",
   "notify.digestCount": "{count} tasks have approaching deadlines",
   "notify.digestRow": "{title} · {when} · {left} left",
   "notify.eventStart": "📅 {title}, {from}–{to}. Attend?",
   "notify.overrun": "⏱ Still doing {label}? Started {time}, usually ~{duration}.",
+  "notify.action.revoked": "Not me — end this session",
   "notify.action.attended": "Attend",
   "notify.action.skipped": "Skip",
   "notify.action.still": "Yes, still",
   "notify.action.stopped": "Stop",
+  "notify.resolved.revoked": "Session ended",
   "notify.resolved.attended": "✓ Attending",
   "notify.resolved.skipped": "Skipped",
   "notify.resolved.still": "✓ Still going",
@@ -52,14 +56,15 @@ export const enNotify = {
   "notifications.method.poll": "Pace",
   "settings.notifications": "Notifications",
   "settings.push.hint": "How this phone gets notifications",
-  "settings.push.option.auto": "Auto",
-  "settings.push.option.fcm": "FCM (Google)",
-  "settings.push.option.poll": "Pace checks",
-  "settings.push.option.none": "Off",
+  "settings.push.option.auto": "Automatic",
+  "settings.push.option.fcm": "Google",
+  "settings.push.option.poll": "Background check (every ~15 min)",
+  "settings.push.option.none": "Only in the app",
   "settings.push.fcm":
     "FCM sends them through Google's push service, including when Pace is closed.",
-  "settings.push.poll": "On this phone they show while Pace is open: it checks for them then.",
-  "settings.push.none": "This phone shows none; the bell still has them all.",
+  "settings.push.poll":
+    "Pace checks for notifications in the background about every 15 minutes, and at once while it is open.",
+  "settings.push.none": "This phone shows no notifications; they are all in the app's bell.",
   "settings.push.denied":
     "This phone shows none: notifications are not allowed (Settings → Permissions).",
   "settings.push.otherProject":

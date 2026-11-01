@@ -48,9 +48,26 @@ export const sessions = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text().notNull().unique(),
+    /** What opened it (`SessionKind`): `browser`, `app`, `agent` or `dev`. */
+    kind: text().notNull().default("browser"),
+    /** How the person tells it apart: "Chrome on macOS", the phone's model, a computer's name. */
+    name: text().notNull().default(""),
+    /**
+    The pre-0008 name column, still written so a Worker of the previous release (between the
+    migration and the deploy, or after a rollback) reads and inserts sessions as before; no code of
+    this release reads it. TODO(sessions-label-contract): drop it in a later release's migration,
+    once a release has served on `kind` and `name` (docs/architecture.md "Auth and sessions").
+    */
     label: text().notNull(),
     /** A device token's one permission (`usage:write`); `null` for a full sign-in. */
     scope: text(),
+    /** Where it signed in from (`RequestPlace`), each part unknown when not told. */
+    userAgent: text(),
+    ip: text(),
+    country: text(),
+    city: text(),
+    /** The device whose usage it sends (a phone's install id); an agent files under the session id. */
+    deviceId: text(),
     createdAt: integer({ mode: "timestamp_ms" }).notNull(),
     expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
     lastSeenAt: integer({ mode: "timestamp_ms" }).notNull(),
@@ -121,4 +138,19 @@ export const loginNonces = sqliteTable("login_nonces", {
   expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
   userId: text().references(() => users.id, { onDelete: "cascade" }),
   consumedAt: integer({ mode: "timestamp_ms" }),
+  /** Where the login started (`app` or `web`), so the session it opens gets its kind. */
+  from: text(),
+  /** Where the nonce was asked for: the session it opens is placed there, not where it polled. */
+  ip: text(),
+  country: text(),
+  city: text(),
+  userAgent: text(),
+  /** The phone the app named when it asked (its model and install id); none from the web. */
+  deviceName: text(),
+  deviceId: text(),
+  /** The session the nonce opened, once the app's poll consumed it. */
+  sessionId: text(),
+  /** The bot's reply to `/start` for this login, so the login notice can edit it into place. */
+  replyChatId: text(),
+  replyMessageId: integer(),
 });

@@ -1,10 +1,11 @@
 import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 
-import { type ApiClient, createApiClient } from "@pace/client";
+import type { ApiClient } from "@pace/client";
+
 import { endpoints, isAnswer, NOTIFICATION_KINDS, type NotificationKind } from "@pace/core";
 
-import { API_BASE_URL } from "./api-base.ts";
+import { backgroundApi, backgroundToken } from "./background-api.ts";
 import { notificationIdOf } from "./notification-id.ts";
 import {
   answerFromButton,
@@ -13,20 +14,13 @@ import {
   showPoolNotification,
 } from "./notifications.ts";
 import { rememberPushDismissal, wasPushDismissed } from "./push-dismissed.ts";
-import { createSecureSessionStore } from "./secure-session.ts";
 import { isForSession } from "./session-fingerprint.ts";
 
 /** The task Android runs for a push (Firebase data message) and for an answer button tapped. */
 export const PUSH_TASK = "pace.push";
 
-/** The API as the signed-in phone, from the stored session (`null` when signed out). */
-const backgroundApi = async (): Promise<ApiClient | null> => {
-  const token = await createSecureSessionStore().get();
-  return token === null ? null : createApiClient({ baseUrl: API_BASE_URL, token: () => token });
-};
-
 const currentToken = async (api: ApiClient | null | undefined): Promise<null | string> =>
-  api === undefined ? await createSecureSessionStore().get() : (api?.currentSessionToken() ?? null);
+  api === undefined ? await backgroundToken() : (api?.currentSessionToken() ?? null);
 
 type Payload = {
   readonly actionIdentifier?: unknown;

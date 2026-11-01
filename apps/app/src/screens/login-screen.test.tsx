@@ -11,11 +11,17 @@ import type * as CoreActual from "@pace/core";
 import { fakeUser } from "@pace/client/testing";
 import { ok, type t } from "@pace/core";
 
+import type * as DeviceIdActual from "../platform/device-id.ts";
+
 import * as mockSecureStoreModule from "../testing/secure-store.fake.ts";
 import { ThemeProvider } from "../ui/theme-provider.tsx";
 import { LoginScreen } from "./login-screen.tsx";
 
 jest.mock("expo-secure-store", () => mockSecureStoreModule.createFakeSecureStore());
+jest.mock("expo-constants", () => {
+  const actual = jest.requireActual<{ readonly default: object }>("expo-constants");
+  return { __esModule: true, default: { ...actual.default, deviceName: "Pixel 9a" } };
+});
 jest.mock("expo-linking", () => ({
   // No Telegram app in the test: the bot opens through t.me.
   canOpenURL: jest.fn(async () => false),
@@ -109,8 +115,13 @@ describe("LoginScreen", () => {
     await waitFor(() => {
       expect(openURL).toHaveBeenCalledWith("https://t.me/PaceTaskTrackerBot?start=login_abc");
     });
-    // From the app: the bot's "Return to Pace" button leads back into it.
-    expect(auth.startBotLogin).toHaveBeenCalledWith("app");
+    // From the app: the bot's "Return to Pace" button leads back into it, and the session it
+    // opens is named after this phone and linked to its install id.
+    const { loadDeviceId } = jest.requireActual<typeof DeviceIdActual>("../platform/device-id.ts");
+    expect(auth.startBotLogin).toHaveBeenCalledWith("app", {
+      deviceId: await loadDeviceId(),
+      deviceName: "Pixel 9a",
+    });
     expect(screen.getByText("Waiting for Telegram…")).toBeOnTheScreen();
     const [options] = waitForToken.mock.calls[0] ?? [];
     expect(options?.intervalMs).toBe(2000);

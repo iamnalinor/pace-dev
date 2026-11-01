@@ -3,11 +3,14 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import {
   INITIAL_POOL_MEMORY,
   isChannelOn,
+  isOwnSignIn,
   type PoolMemory,
   type PoolNotification,
+  seenBy,
   type Settings,
 } from "@pace/core";
 
+import type { NotifyOptions } from "../shared/contract.ts";
 import type { PushMessage, PushTransport, SendOutcome } from "../shared/push/transport.ts";
 import type * as schema from "./schema.ts";
 
@@ -25,7 +28,12 @@ import {
   type PushConfig,
   transportFor,
 } from "../shared/push/registry.ts";
-import { sendTelegramMessage, type TelegramTarget } from "../shared/telegram-api.ts";
+import {
+  type OutgoingMessage,
+  sendTelegramMessage,
+  type TelegramTarget,
+  wasTelegramMessageEdited,
+} from "../shared/telegram-api.ts";
 import {
   hasFailedCopy,
   latestAttempt,
@@ -33,7 +41,7 @@ import {
   logUnavailable,
   wasDelivered,
 } from "./delivery-rows.ts";
-import { broadcast } from "./live-sockets.ts";
+import { broadcast, broadcastBySession } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
 import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
@@ -44,6 +52,9 @@ export type Couriers = {
   readonly telegram: null | TelegramTarget;
   readonly push: PushConfig;
 };
+
+/** How a notification is delivered; `couriers` replaces the configured channels (tests). */
+export type PoolNotifyOptions = NotifyOptions & { readonly couriers?: Couriers | undefined };
 
 /** What delivering needs: the store, the account's settings and chat, the instant. */
 export type PoolDeps = {
@@ -83,7 +94,27 @@ export const saveRuledSeries = async (
   await storage.put(RULES_KEY, [...new Set(series)]);
 };
 
-const sendToTelegram = async (deps: PoolDeps, stored: StoredNotification): Promise<void> => {
+type Adopted = NotifyOptions["adoptTelegramMessage"];
+
+/**
+Puts the message in the account's chat: the adopted one edited into place when it is a message of
+that chat and Telegram takes the edit, else a new one (the adopted message is gone, say, or in
+another chat, whose members must never see where the person signed in from). Its id; `null` when
+Telegram took neither.
+*/
+const placeInChat = async (
+  target: TelegramTarget,
+  { adopted, chatId, message }: { adopted: Adopted; chatId: string; message: OutgoingMessage },
+): Promise<null | number> =>
+  adopted?.chatId === chatId && (await wasTelegramMessageEdited(target, { ...adopted, ...message }))
+    ? adopted.messageId
+    : await sendTelegramMessage(target, chatId, message);
+
+const sendToTelegram = async (
+  deps: PoolDeps,
+  stored: StoredNotification,
+  adopted: Adopted,
+): Promise<void> => {
   const { notification } = stored;
   const { chatId, couriers, settings } = deps;
   if (
@@ -103,7 +134,8 @@ const sendToTelegram = async (deps: PoolDeps, stored: StoredNotification): Promi
     now: deps.now,
     webOrigin: deps.webOrigin,
   });
-  const messageId = await sendTelegramMessage(couriers.telegram, chatId, message);
+  // The copy and the delivery log name the same chat: the account's (an adopted message is one).
+  const messageId = await placeInChat(couriers.telegram, { adopted, chatId, message });
   await setTelegramCopy(deps.db, notification.id, {
     chatId,
     messageId,
@@ -236,8 +268,11 @@ const pushToDevices = async (deps: PoolDeps, notification: PoolNotification): Pr
   }
   const subscriptions = await subscriptionsOf(deps.binding, deps.userId, Date.parse(deps.now));
   const message = { ...phoneContent(notification, deps.settings, deps.now), notification };
+  // A sign-in's notice never goes to the session it reports (see `isOwnSignIn`).
   for (const subscription of subscriptions) {
-    await pushToDevice(deps, message, subscription);
+    if (!isOwnSignIn(notification, subscription.sessionId)) {
+      await pushToDevice(deps, message, subscription);
+    }
   }
 };
 
@@ -246,9 +281,14 @@ Delivers a notification just added to the pool: Telegram when its kind is on the
 is known, every open client's feed over the live socket (a phone without push shows it from
 there), and each phone's push method when the kind is on for the app. Delivered again (a pass
 repeated after being cut short), it reaches only what it did not reach: Telegram once, each
-device once; one resolved meanwhile goes nowhere.
+device once; one resolved meanwhile goes nowhere. With a message to adopt, the Telegram copy is
+that message edited into place; a retry after a failed first try sends a new one.
 */
-export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Promise<void> => {
+export const deliverNew = async (
+  deps: PoolDeps,
+  stored: StoredNotification,
+  options: NotifyOptions = {},
+): Promise<void> => {
   const { notification } = stored;
   if (notification.resolvedAt !== null) {
     return;
@@ -256,12 +296,16 @@ export const deliverNew = async (deps: PoolDeps, stored: StoredNotification): Pr
   if (stored.telegram.state === "pending" || stored.telegram.state === "failed") {
     const last = await latestAttempt(deps.db, notification.id, "telegram");
     if (last === undefined || Date.parse(deps.now) - Date.parse(last.attemptedAt) >= 60_000) {
-      await sendToTelegram(deps, stored);
+      await sendToTelegram(deps, stored, options.adoptTelegramMessage);
     }
   }
   // Queued for polling devices before the open clients hear of it: an open app fetches at once.
   await pushToDevices(deps, notification);
-  broadcast(deps.ctx, { notification, type: "notification" });
+  // The session a sign-in reports hears of it as read: it may not read it away (`seenBy`).
+  broadcastBySession(deps.ctx, (sessionId) => ({
+    notification: seenBy(notification, sessionId),
+    type: "notification",
+  }));
 };
 
 /** Open notifications whose latest copy failed and can be retried by a pool pass. */

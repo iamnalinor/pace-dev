@@ -10,6 +10,8 @@ export default defineConfig({
   plugins: [
     cloudflareTest(async () => ({
       miniflare: {
+        // A second, empty D1 the migration tests stage older schemas on (tests/migrations.int.test.ts).
+        d1Databases: { MIGRATION_DB: "migration-test-db" },
         bindings: {
           ENVIRONMENT: "test",
           // The LLM parse answers from inside the Worker: no network, no keys.

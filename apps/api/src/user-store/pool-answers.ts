@@ -1,14 +1,20 @@
 import {
   type ActivityOverrunPayload,
   calendarAttend,
+  canResolveAs,
   type CoreState,
   type EventInput,
   type EventStartPayload,
+  isOwnSignIn,
   newId,
   type PoolNotification,
   type Resolution,
   runningActivity,
 } from "@pace/core";
+
+import { d1 } from "../shared/db/d1.ts";
+import { deleteSession } from "../shared/session-rows.ts";
+import { endLiveSessions } from "./live-sessions.ts";
 
 const at = (
   occurredAt: string,
@@ -62,4 +68,51 @@ export const answerInputs = (
   return notification.kind === "activity_overrun"
     ? overrunInputs(notification.payload, resolution, context)
     : [];
+};
+
+/**
+What an answer does outside the store's log: "Not me" ends the sign-in's session, through the
+same revoke Settings uses (one already ended, in Settings or by logging out there, is fine). Run
+before the notification is resolved, so a failure leaves it open to be pressed again.
+*/
+export const applyAnswer = async (
+  notification: PoolNotification,
+  resolution: Resolution,
+  store: { readonly env: { readonly DB: D1Database }; readonly ctx: DurableObjectState },
+): Promise<void> => {
+  if (resolution !== "revoked" || notification.kind !== "login") {
+    return;
+  }
+  // The store is named after its user (`idFromName(userId)`). Without the name nothing can be
+  // ended, and resolving would say "Session ended" anyway: throw, so the notice stays open.
+  const userId = store.ctx.id.name;
+  if (userId === undefined) {
+    throw new Error("Not me: the store does not know its user");
+  }
+  const live = {
+    endLiveSessions: async (sessionId: string, until?: number): Promise<void> => {
+      await endLiveSessions(store.ctx, sessionId, until);
+    },
+  };
+  await deleteSession(
+    d1(store.env.DB),
+    { sessionId: notification.payload.sessionId, userId },
+    live,
+  );
+};
+
+/**
+Why an answer is refused before anything is written: not an answer this kind takes, or the
+session a sign-in notice reports answering that notice itself (it could otherwise put away the
+one message that tells the person about it).
+*/
+export const answerRefusal = (
+  notification: PoolNotification,
+  resolution: Resolution,
+  sessionId: string | undefined,
+): "notification/mismatch" | "notification/own-sign-in" | undefined => {
+  if (isOwnSignIn(notification, sessionId)) {
+    return "notification/own-sign-in";
+  }
+  return canResolveAs(notification.kind, resolution) ? undefined : "notification/mismatch";
 };

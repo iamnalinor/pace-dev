@@ -2,21 +2,11 @@ import type { enDevices } from "../en/devices.ts";
 
 /** Devices: the phone's and the computers' data in the cloud, and connecting a computer. */
 export const ruDevices: { readonly [K in keyof typeof enDevices]: string } = {
-  "devices.title": "Устройства",
-  "devices.hint":
-    "Телефоны и компьютеры, которые сообщают Pace, какое приложение на экране (только названия и время, без содержимого), чтобы День и Неделя показывали, где вы сидели.",
-  "devices.loading": "Загружаем устройства…",
-  "devices.failed": "Не удалось загрузить устройства. Проверьте соединение.",
-  "devices.empty": "Пока ничего не присылает данные.",
-  "devices.computer": "Компьютер",
-  "devices.phone": "Телефон",
   "devices.lastActivity": "Данные {duration} назад",
   "devices.justNow": "Данные только что",
   "devices.nothingYet": "Ещё ничего не прислал",
-  "devices.connected": "Подключён {date}",
-  "devices.disconnect": "Отключить",
-  "devices.disconnectConfirm": "Отключить «{name}»? Его токен сразу перестанет работать.",
-  "devices.disconnectFailed": "Не удалось отключить. Попробуйте ещё раз.",
+  "devices.lastDataAt": "Данные {time}",
+  "devices.thisDevice": "Это устройство",
   "devices.add": "Добавить компьютер",
   "devices.name": "Название",
   "devices.defaultName": "Мой компьютер",

@@ -16,7 +16,8 @@ provider is `@cloudflare/workers-oauth-provider` 1.2 wrapping the Hono app in
 ## Connecting
 
 The server URL is always `https://pace-api.nalinor.dev/mcp` (or `http://localhost:8787/mcp`
-against `wrangler dev`). Clients discover the rest: the first unauthenticated call gets a
+against `wrangler dev`); in the app, Settings → Devices and sessions → *Connect an AI app* shows
+the current server's URL with short steps for Claude, ChatGPT and other clients. Clients discover the rest: the first unauthenticated call gets a
 `401` whose `WWW-Authenticate` names the protected resource metadata
 (`/.well-known/oauth-protected-resource/mcp`), which names the authorization server
 (`/.well-known/oauth-authorization-server`), which names `/authorize`, `/oauth/token` and
@@ -187,15 +188,17 @@ Claude, Cursor and the Inspector as usual.
    and the token's scopes; the handler re-checks the **whitelist** on every call (`403` once a
    Telegram id is removed) and builds a fresh `McpServer` for the request.
 
-"Connected apps" (web settings) lists the person's grants (`GET /api/oauth/grants`: client
-name, logo, scopes, dates) and revokes one (`DELETE /api/oauth/grants/:id`), which deletes its
-access and refresh tokens at once.
+Settings → Devices and sessions lists each grant among the person's sessions (`GET /api/sessions`:
+kind `mcp`, id `mcp:<grant id>`, the client's name, scopes, when it was granted) and revokes one
+(`DELETE /api/sessions/mcp:<grant id>`), which deletes its access and refresh tokens at once
+(`apps/api/src/shared/oauth-grants.ts` reads and revokes grants in `OAUTH_KV`).
 
 ## Code map
 
 ```
 apps/api/src/worker.ts              OAuthProvider({ apiRoute: "/mcp", defaultHandler: the Hono app, … })
-apps/api/src/oauth/oauth-routes.ts  GET /authorize, /api/oauth/{client-info,complete,deny,grants}
+apps/api/src/oauth/oauth-routes.ts  GET /authorize, /api/oauth/{client-info,complete,deny}
+apps/api/src/shared/oauth-grants.ts listGrants / revokeGrant over OAUTH_KV (the sessions list, GET/DELETE /api/sessions)
 apps/api/src/oauth/consent.ts       parseAuthRequest / describeConsent wrappers → Result
 apps/api/src/shared/telegram-identity.ts  widget signature + whitelist + user row (shared with login)
 apps/api/src/mcp/server.ts          TOOLS, createMcpServer(ctx), mcpHandler (whitelist, stateless transport, the user's DO)

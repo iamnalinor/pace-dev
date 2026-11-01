@@ -1,20 +1,12 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import {
-  type EndpointOutput,
-  endpoints,
-  err,
-  type Event,
-  ok,
-  parseEvent,
-  type Result,
-  STORE_CHANGED,
-} from "@pace/core";
+import { err, type Event, ok, parseEvent, type Result, STORE_CHANGED } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 import type { AppStateHandle } from "./state.ts";
+import type { PullPage, SyncTransport } from "./sync-transport.ts";
 
-import { type ApiClient, ApiError } from "./api-client.ts";
+import { ApiError } from "./api-client.ts";
 
 export type SyncStatus = {
   /** False after a transport failure (no network), true again after any response. */
@@ -40,13 +32,19 @@ export type SyncClient = {
   readonly soon: () => void;
   /** The pause between runs from the next one on (rare while the live channel is up). */
   readonly setInterval: (intervalMs: number) => void;
+  /**
+  New events the server sent unasked: applied as a pull's page when they continue the cursor
+  of the same store; anything else (a gap, `more`, another store) asks for a run instead. A
+  page the log already holds (one that waited for a run to finish) changes nothing.
+  */
+  readonly ingestLive: (page: PullPage) => Promise<void>;
 };
 
 /** How long a burst of changes may gather before it is sent. */
-const SOON_MS = 800;
+export const SOON_MS = 800;
 
 const PUSH_BATCH = 200;
-const PULL_LIMIT = "200";
+const PULL_LIMIT = 200;
 const BACKOFF_MIN_MS = 1000;
 const BACKOFF_MAX_MS = 60_000;
 
@@ -81,9 +79,6 @@ const createReset = (store: EventStore, state: AppStateHandle): Reset => {
   };
 };
 
-const isStoreChanged = (error: unknown): boolean =>
-  error instanceof ApiError && error.code === STORE_CHANGED;
-
 type Pushed = {
   readonly pushed: number;
   readonly rejected: readonly string[];
@@ -91,38 +86,25 @@ type Pushed = {
   readonly isReset: boolean;
 };
 
-/** What one sync run works with: the transport, the local copy and its one reset. */
+/**
+What one sync run works with: the transport (whichever carries each call, see
+`sync-transport.ts`), the local copy and its one reset.
+*/
 type Run = {
-  readonly api: ApiClient;
+  readonly transport: SyncTransport;
   readonly reset: Reset;
   readonly state: AppStateHandle;
   readonly store: EventStore;
 };
 
-/** One batch into the store `storeId`; the server's "that store is gone" comes back as a value. */
-const pushBatch = async (
-  api: ApiClient,
-  events: readonly Event[],
-  storeId: string,
-): Promise<EndpointOutput<typeof endpoints.sync.push> | typeof STORE_CHANGED> => {
-  try {
-    return await api.call(endpoints.sync.push, { body: { events: [...events], storeId } });
-  } catch (error) {
-    if (isStoreChanged(error)) {
-      return STORE_CHANGED;
-    }
-    throw error;
-  }
-};
-
 /** Pushes the outbox into the store the pull confirmed, and only into that one. */
-const pushOutbox = async ({ api, reset, store }: Run): Promise<Pushed> => {
+const pushOutbox = async ({ reset, store, transport }: Run): Promise<Pushed> => {
   let pushed = 0;
   const rejected: string[] = [];
   const storeId = await store.getStoreId();
   const batches = storeId === null ? [] : chunk(await store.listPending(), PUSH_BATCH);
   for (const batch of batches) {
-    const result = await pushBatch(api, batch, storeId ?? "");
+    const result = await transport.push(batch, storeId ?? "");
     if (result === STORE_CHANGED) {
       await reset(null);
       return { isReset: true, pushed, rejected };
@@ -162,30 +144,59 @@ const isSameStore = async (
   return false;
 };
 
-const pullSince = async ({ api, reset, state, store }: Run): Promise<number> => {
+/**
+Applies one page of the server's log: the pull's pages and the live socket's alike. A page of
+another store drops the local copy instead (`null`); otherwise its valid events go in and the
+cursor moves to its `seq`.
+*/
+const applyPage = async (
+  { reset, state, store }: Run,
+  page: PullPage,
+): Promise<null | readonly Event[]> => {
+  if (!(await isSameStore(store, reset, page))) {
+    return null;
+  }
+  const events = validEvents(page.events);
+  await state.ingest(events);
+  await store.setCursor(page.seq);
+  return events;
+};
+
+const pullSince = async (run: Run): Promise<number> => {
   let pulled = 0;
   let isMore = true;
   while (isMore) {
-    const since = await store.getCursor();
-    const page = await api.call(endpoints.sync.pull, {
-      query: { limit: PULL_LIMIT, since: String(since) },
-    });
-    if (!(await isSameStore(store, reset, { since, storeId: page.storeId }))) {
+    const page = await run.transport.pull(await run.store.getCursor(), PULL_LIMIT);
+    const events = await applyPage(run, page);
+    if (events === null) {
       // Dropped: start again from the fresh store's first event.
       pulled = 0;
       continue;
     }
-    const events = validEvents(page.events);
-    await state.ingest(events);
-    await store.setCursor(page.seq);
     pulled += events.length;
     isMore = page.more;
   }
   return pulled;
 };
 
+/**
+How a page the server sent unasked fits the local log: `apply` when it continues the cursor of
+the same store, `known` when the log already reaches past it, `pull` otherwise.
+*/
+const fitOf = async (store: EventStore, page: PullPage): Promise<"apply" | "known" | "pull"> => {
+  const storeId = await store.getStoreId();
+  const cursor = await store.getCursor();
+  if (storeId !== page.storeId) {
+    return "pull";
+  }
+  if (page.seq <= cursor) {
+    return "known";
+  }
+  return page.since === cursor && !page.more ? "apply" : "pull";
+};
+
 type SyncDeps = {
-  readonly api: ApiClient;
+  readonly transport: SyncTransport;
   readonly now: () => string;
   readonly state: AppStateHandle;
   readonly store: EventStore;
@@ -195,11 +206,10 @@ const runSync = async (
   deps: SyncDeps,
   status: StoreApi<SyncStatus>,
 ): Promise<Result<SyncSummary, string>> => {
-  const { api, now, state, store } = deps;
-  status.setState({ syncing: true });
+  const { now, state, store, transport } = deps;
   try {
     await state.ready;
-    const run: Run = { api, reset: createReset(store, state), state, store };
+    const run: Run = { reset: createReset(store, state), state, store, transport };
     // The pull goes first: it confirms the store id, so an outbox meant for a store that
     // was reset since is dropped instead of landing in the fresh one (the push names the
     // store too, for a reset between the two).
@@ -255,17 +265,53 @@ const createTimer = (run: () => void) => {
   };
 };
 
-/** Runs at most one sync at a time; a second caller shares the run in flight. */
+/** Runs tasks one after another, each after the previous one settled. */
+const createSerial = () => {
+  let tail: Promise<unknown> = Promise.resolve();
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    const previous = tail;
+    // `new Promise`, not `Promise.withResolvers`: Hermes (Android) may lack the ES2024 call.
+    let release: ((value: null) => void) | undefined;
+    tail = new Promise<null>((resolve) => {
+      release = resolve;
+    });
+    try {
+      await previous;
+      return await task();
+    } finally {
+      release?.(null);
+    }
+  };
+};
+
+/**
+Runs at most one sync at a time; a second caller shares the run in flight. A live page waits for
+the run in flight, so the two never move the cursor at once.
+*/
 const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
+  const serial = createSerial();
   let inFlight: Promise<Result<SyncSummary, string>> | undefined;
   let failures = 0;
   return {
     failures: (): number => failures,
+    /** Applies a live page that fits; true when a pull is needed instead. */
+    ingestLive: async (page: PullPage): Promise<boolean> =>
+      await serial(async () => {
+        const { state, store, transport } = deps;
+        await state.ready;
+        const fit = await fitOf(store, page);
+        if (fit === "apply") {
+          await applyPage({ reset: createReset(store, state), state, store, transport }, page);
+        }
+        return fit === "pull";
+      }),
     syncNow: async (): Promise<Result<SyncSummary, string>> => {
       if (inFlight !== undefined) {
         return await inFlight;
       }
-      inFlight = runSync(deps, status);
+      // Syncing from the call on, even while a live page is still being applied.
+      status.setState({ syncing: true });
+      inFlight = serial(async () => await runSync(deps, status));
       try {
         const result = await inFlight;
         failures = result.ok ? 0 : failures + 1;
@@ -294,7 +340,23 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
       }
     })();
   });
+  // A run already due sooner stays: a burst of changes goes at most this long after the first.
+  const soon = (): void => {
+    if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
+      timer.in(SOON_MS);
+    }
+  };
   return {
+    ingestLive: async (page) => {
+      try {
+        if (await runner.ingestLive(page)) {
+          soon();
+        }
+      } catch {
+        // The local store failed to take it: a run pulls it and reports what goes wrong.
+        soon();
+      }
+    },
     setInterval: (next) => {
       if (intervalMs === undefined || next === intervalMs) {
         return;
@@ -303,12 +365,7 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
       intervalMs = next;
       timer.in(next);
     },
-    // A run already due sooner stays: a burst of changes goes at most this long after the first.
-    soon: () => {
-      if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
-        timer.in(SOON_MS);
-      }
-    },
+    soon,
     start: (options) => {
       if (intervalMs !== undefined) {
         return;

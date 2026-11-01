@@ -31,6 +31,27 @@ const ok = async (token: string, name: string, args: Record<string, unknown> = {
 const minutesAgo = (minutes: number): string =>
   new Date(Date.now() - minutes * 60_000).toISOString();
 
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+Yesterday in UTC (the fresh account's zone), whatever the hour of the run: a day that is whole
+and in the past, so a day's timeline built on it never depends on how near midnight the test
+runs. `at(hh, mm)` is an instant on it.
+*/
+const yesterday = () => {
+  const midnight = Date.UTC(
+    new Date().getUTCFullYear(),
+    new Date().getUTCMonth(),
+    new Date().getUTCDate(),
+  );
+  const start = midnight - DAY_MS;
+  return {
+    at: (hours: number, minutes = 0): string =>
+      new Date(start + (hours * 60 + minutes) * 60_000).toISOString(),
+    date: new Date(start).toISOString().slice(0, 10),
+  };
+};
+
 describe("MCP time tools", () => {
   it("starts from a button, switches, runs one alongside, stops, and shows the day", async () => {
     const token = (await obtainToken(ALL)).tokens.access_token;
@@ -46,21 +67,24 @@ describe("MCP time tools", () => {
       ]),
     );
 
-    await ok(token, "start_activity", { at: minutesAgo(90), buttonId: "rest:workout" });
+    // On a fixed day, not "90 minutes ago": run just after midnight UTC, that would straddle two days.
+    const day1 = yesterday();
+    await ok(token, "start_activity", { at: day1.at(12), buttonId: "rest:workout" });
     const { activityId: music } = await ok(token, "start_activity", {
       alongside: true,
-      at: minutesAgo(40),
+      at: day1.at(12, 50),
       category: "rest",
       label: "Music",
     });
-    await ok(token, "start_activity", { at: minutesAgo(30), category: "food", label: "Lunch" });
-    await ok(token, "stop_activity", { activityId: music, at: minutesAgo(20) });
-    await ok(token, "stop_activity");
+    await ok(token, "start_activity", { at: day1.at(13), category: "food", label: "Lunch" });
+    await ok(token, "stop_activity", { activityId: music, at: day1.at(13, 10) });
+    await ok(token, "stop_activity", { at: day1.at(13, 30) });
     expect((await call(token, "stop_activity")).content[0]?.text).toMatch(
       /^activity\/none-running/u,
     );
 
-    const day = await ok(token, "get_day");
+    const day = await ok(token, "get_day", { date: day1.date });
+    expect(day["zone"]).toBe("UTC");
     const labels = (day["segments"] as { label: string; minutes: number }[]).map((segment) => [
       segment.label,
       segment.minutes,

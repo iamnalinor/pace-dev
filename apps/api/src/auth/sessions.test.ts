@@ -3,14 +3,25 @@ import { describe, expect, it } from "vitest";
 
 import { sha256Hex } from "../shared/crypto.ts";
 import { d1 } from "../shared/db/d1.ts";
-import { createSession, findSession, revokeSession } from "./sessions.ts";
+import { deleteSession } from "../shared/session-rows.ts";
+import { createSession, findSession } from "./sessions.ts";
 import { upsertTelegramUser } from "./users.ts";
 
 const NOW = Date.UTC(2026, 9, 6, 10);
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
+const BROWSER = (userId: string) => ({
+  kind: "browser" as const,
+  name: "Chrome on macOS",
+  now: NOW,
+  userId,
+});
+
 // Storage is shared within a test file, so every test gets its own user.
+/** A store with no live sockets to close. */
+const NO_SOCKETS = { endLiveSessions: (): void => undefined };
+
 const seedUser = async () =>
   await upsertTelegramUser(
     d1(env.DB),
@@ -33,11 +44,12 @@ describe("sessions", () => {
   it("issues an opaque token that resolves to the user for 90 days", async () => {
     const db = d1(env.DB);
     const user = await seedUser();
-    const session = await createSession(db, { label: "web", now: NOW, userId: user.id });
+    const session = await createSession(db, BROWSER(user.id));
     expect(session.token).toMatch(/^[\w-]{43}$/);
     expect(session.expiresAt).toBe(NOW + 90 * DAY);
     expect(await findSession(db, session.token, NOW + 89 * DAY)).toEqual({
       device: null,
+      expiresAt: session.expiresAt,
       scope: null,
       sessionId: session.id,
       user,
@@ -45,10 +57,37 @@ describe("sessions", () => {
     expect(await findSession(db, session.token, NOW + 90 * DAY + 1)).toBeNull();
   });
 
+  it("still writes the old label the previous release's Worker reads (expand, then contract)", async () => {
+    const db = d1(env.DB);
+    const user = await seedUser();
+    const made = await Promise.all([
+      createSession(db, BROWSER(user.id)),
+      createSession(db, { kind: "app", name: "Pixel 8", now: NOW, userId: user.id }),
+      createSession(db, { kind: "dev", name: "Dev login", now: NOW, userId: user.id }),
+      createSession(db, {
+        kind: "agent",
+        name: "Work laptop",
+        now: NOW,
+        scope: "usage:write",
+        userId: user.id,
+      }),
+    ]);
+    const labels = await Promise.all(
+      made.map(
+        async ({ id }) =>
+          await env.DB.prepare("select label from sessions where id = ?").bind(id).first<{
+            label: string;
+          }>(),
+      ),
+    );
+    // The values the previous Worker wrote, so its device name (an agent's label) stays right.
+    expect(labels.map((row) => row?.label)).toEqual(["web", "android", "dev", "Work laptop"]);
+  });
+
   it("never stores the token itself", async () => {
     const db = d1(env.DB);
     const user = await seedUser();
-    const session = await createSession(db, { label: "web", now: NOW, userId: user.id });
+    const session = await createSession(db, BROWSER(user.id));
     const row = await sessionRow(session.token);
     expect(row?.token_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(row?.token_hash).not.toBe(session.token);
@@ -57,16 +96,16 @@ describe("sessions", () => {
   it("rejects unknown and revoked tokens", async () => {
     const db = d1(env.DB);
     const user = await seedUser();
-    const session = await createSession(db, { label: "web", now: NOW, userId: user.id });
+    const session = await createSession(db, BROWSER(user.id));
     expect(await findSession(db, "not-a-token", NOW)).toBeNull();
-    await revokeSession(db, session.token);
+    await deleteSession(db, { sessionId: session.id, userId: user.id }, NO_SOCKETS);
     expect(await findSession(db, session.token, NOW)).toBeNull();
   });
 
   it("touches lastSeenAt at most once per hour", async () => {
     const db = d1(env.DB);
     const user = await seedUser();
-    const session = await createSession(db, { label: "web", now: NOW, userId: user.id });
+    const session = await createSession(db, BROWSER(user.id));
     const lastSeen = async (): Promise<number | undefined> =>
       (await sessionRow(session.token))?.last_seen_at;
 
@@ -74,5 +113,55 @@ describe("sessions", () => {
     expect(await lastSeen()).toBe(NOW);
     await findSession(db, session.token, NOW + HOUR + 1);
     expect(await lastSeen()).toBe(NOW + HOUR + 1);
+  });
+
+  it("names a usage token's device by the phone's id when it has one, by the session's otherwise", async () => {
+    const db = d1(env.DB);
+    const user = await seedUser();
+    const agent = await createSession(db, {
+      kind: "agent",
+      name: "Work laptop",
+      now: NOW,
+      scope: "usage:write",
+      userId: user.id,
+    });
+    expect((await findSession(db, agent.token, NOW))?.device).toEqual({
+      id: agent.id,
+      name: "Work laptop",
+    });
+    const phone = await createSession(db, {
+      deviceId: "dev-1",
+      kind: "app",
+      name: "Pixel 9a",
+      now: NOW,
+      scope: "usage:write",
+      userId: user.id,
+    });
+    expect((await findSession(db, phone.token, NOW))?.device).toEqual({
+      id: "dev-1",
+      name: "Pixel 9a",
+    });
+  });
+
+  it("deletes one of the person's sessions by id, and only theirs, closing its sockets", async () => {
+    const db = d1(env.DB);
+    const user = await seedUser();
+    const stranger = await seedUser();
+    const session = await createSession(db, BROWSER(user.id));
+    const ended: string[] = [];
+    const live = {
+      endLiveSessions: (sessionId: string): void => {
+        ended.push(sessionId);
+      },
+    };
+    expect(
+      await deleteSession(db, { sessionId: session.id, userId: stranger.id }, NO_SOCKETS),
+    ).toBe(false);
+    expect(await findSession(db, session.token, NOW)).not.toBeNull();
+    expect(await deleteSession(db, { sessionId: session.id, userId: user.id }, live)).toBe(true);
+    expect(await findSession(db, session.token, NOW)).toBeNull();
+    // Already gone: its sockets are closed all the same (one may have opened in between).
+    expect(await deleteSession(db, { sessionId: session.id, userId: user.id }, live)).toBe(false);
+    expect(ended).toEqual([session.id, session.id]);
   });
 });

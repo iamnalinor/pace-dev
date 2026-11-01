@@ -6,7 +6,8 @@ import type { TelegramLogin } from "@pace/core";
 
 import { useAuth, useT } from "../app-state.tsx";
 import { TelegramWidget } from "../auth/telegram-widget.web.tsx";
-import { IS_DEV_LOGIN_ENABLED, TELEGRAM_BOT } from "../platform/api-base.ts";
+import { IS_DEV_LOGIN_ENABLED } from "../platform/api-base.ts";
+import { useServerInfo } from "../platform/server-store.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
 import { DevLoginForm, errorKey, Waiting } from "./login-parts.tsx";
@@ -49,10 +50,11 @@ const LoginOptions = ({
   readonly onTelegram: (user: TelegramLogin) => void;
 }) => {
   const t = useT();
+  const { botUsername } = useServerInfo();
   return (
     <View className="gap-3">
       <TelegramWidget
-        botUsername={TELEGRAM_BOT}
+        botUsername={botUsername}
         label={t("login.telegram")}
         onAuth={onTelegram}
         texts={{
@@ -61,7 +63,12 @@ const LoginOptions = ({
           slow: t("login.widgetSlow"),
         }}
       />
-      <Button busy={bot.phase.kind === "starting"} onPress={() => void bot.start()} variant="ghost">
+      <Button
+        busy={bot.phase.kind === "starting"}
+        onPress={() => void bot.start()}
+        variant="ghost"
+        width="fill"
+      >
         {t("login.botFallback")}
       </Button>
     </View>

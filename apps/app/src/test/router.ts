@@ -1,3 +1,5 @@
+import { type EffectCallback, useEffect } from "react";
+
 /** The router calls a screen makes, recorded for assertions. */
 export const router = {
   back: jest.fn<undefined, []>(),
@@ -18,6 +20,10 @@ export const routerModule = () => ({
   },
   // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
   usePathname: () => "/",
+  // A mounted screen is focused: the effect runs as it would on focus.
+  useFocusEffect: (effect: EffectCallback) => {
+    useEffect(effect, [effect]);
+  },
   // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name
   useIsFocused: () => true,
   // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- stands in for expo-router's hook of this name

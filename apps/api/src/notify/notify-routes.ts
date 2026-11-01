@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 
-import { endpoints, err, ok } from "@pace/core";
+import { endpoints, err, ok, seenBy } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { ResolveErrorCode } from "../shared/contract.ts";
@@ -17,6 +17,10 @@ const RESOLVE_PROBLEMS: Readonly<Record<ResolveErrorCode, Omit<Problem, "code">>
   "event/not-found": { message: "The answer could not be written", status: 409 },
   "notification/mismatch": { message: "That answer does not fit this notification", status: 422 },
   "notification/not-found": { message: "No such notification", status: 404 },
+  "notification/own-sign-in": {
+    message: "A sign-in cannot be answered by the session it reports",
+    status: 403,
+  },
   "preset/unknown": { message: "The answer could not be written", status: 409 },
   "retro/before-created": { message: "The answer could not be written", status: 409 },
   "retro/future": { message: "The answer could not be written", status: 409 },
@@ -93,17 +97,23 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
   mountPushRoutes(app);
   mount(app, endpoints.notifications.list, async ({ c, query }) => {
     const page = await userStoreOf(c).listNotifications(query);
+    // As this session sees them: its own sign-in notice reads as read (`seenBy`, QA round 15 H1).
+    const reader = c.get("sessionId");
     return ok({
       deliveries: Object.fromEntries(
         Object.entries(page.deliveries).map(([id, entries]) => [id, [...entries]]),
       ),
-      items: [...page.items],
+      items: page.items.map((item) => seenBy(item, reader)),
       more: page.more,
     });
   });
 
   mount(app, endpoints.notifications.read, async ({ body, c }) => {
-    await userStoreOf(c).readNotifications(body, new Date().toISOString());
+    // The caller's own sign-in notice stays unread: it is the person's, not that session's.
+    await userStoreOf(c).readNotifications(
+      { ...body, reader: c.get("sessionId") },
+      new Date().toISOString(),
+    );
     return ok({ ok: true as const });
   });
 
@@ -111,6 +121,7 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
     const result = await userStoreOf(c).resolveNotification(params.id, body.resolution, {
       now: new Date().toISOString(),
       origin: body.from,
+      sessionId: c.get("sessionId"),
     });
     return result.ok ? ok({ notification: result.value }) : err(resolveProblem(result.error.code));
   });

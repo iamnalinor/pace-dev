@@ -8,6 +8,22 @@ import { MOSCOW, NOW } from "@pace/core/testing";
 
 import { NotificationsScreen } from "./notifications-screen.tsx";
 
+/** Where focus went, as the feed asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  isFocusLost: () => true,
+  moveFocus: (target: unknown) => {
+    mockMoveFocus(target);
+  },
+}));
+
+/** What a focus target says: the text of the line it wraps (the status is a View around a Text). */
+const textOf = (target: unknown): unknown => {
+  const line = (target as null | { readonly props?: { readonly children?: unknown } })?.props
+    ?.children;
+  return (line as null | { readonly props?: { readonly children?: unknown } })?.props?.children;
+};
+
 // eslint-disable-next-line sonarjs/no-hardcoded-ip -- the address a sign-in notice shows
 const SIGN_IN_IP = "1.2.3.4";
 
@@ -178,6 +194,33 @@ describe("NotificationsScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/decisions");
   });
 
+  it("asks to mark each notice read once, though the server leaves one unread and every read refreshes the feed (QA round 15 H1)", async () => {
+    const holder: { runtime?: Awaited<ReturnType<typeof createTestRuntime>> } = {};
+    // The server leaves both unread (as it does a session's own sign-in notice); each read's live
+    // "read" notice reloads the feed, as the socket does.
+    const read = jest.fn(() => {
+      setTimeout(() => {
+        holder.runtime?.notifications.receive({ type: "read" });
+      }, 0);
+      return { ok: true };
+    });
+    const { runtime } = await feedRuntime([login, digest], {
+      "POST /api/notifications/read": read,
+    });
+    holder.runtime = runtime;
+    await renderScreen(<NotificationsScreen />, runtime);
+    await screen.findByText(en("notifications.digestTitle"));
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    });
+    const asked = (read.mock.calls as unknown as [{ body: { ids: string[] } }][]).flatMap(
+      ([request]) => request.body.ids,
+    );
+    expect(asked.toSorted((a, b) => a.localeCompare(b))).toEqual(["n-digest", "n-login"]);
+  });
+
   it("answers Yes, still from the feed: pending until the server has it, then its resolution", async () => {
     const answered = {
       ...overrun,
@@ -203,6 +246,81 @@ describe("NotificationsScreen", () => {
     });
     expect(await screen.findByText(en("notify.resolved.still"))).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: en("notify.action.stopped") })).toBeNull();
+  });
+
+  it("ends a sign-in's session from the feed with Not me, then says it ended", async () => {
+    const resolve = jest.fn(() => ({
+      notification: {
+        ...login,
+        readAt: "2026-10-06T09:05:00.000Z",
+        resolution: "revoked",
+        resolvedAt: "2026-10-06T09:05:00.000Z",
+      },
+    }));
+    const { runtime } = await feedRuntime([login], {
+      "POST /api/notifications/n-login/resolve": resolve,
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    expect(await screen.findByText(en("notify.resolved.revoked"))).toBeOnTheScreen();
+    expect(resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({ resolution: "revoked" }) as unknown,
+      }),
+    );
+  });
+
+  it("moves focus to the status that replaces the answered button (QA round 16 M1, bug class 5)", async () => {
+    const { runtime } = await feedRuntime([login], {
+      "POST /api/notifications/n-login/resolve": () => ({
+        notification: {
+          ...login,
+          readAt: "2026-10-06T09:05:00.000Z",
+          resolution: "revoked",
+          resolvedAt: "2026-10-06T09:05:00.000Z",
+        },
+      }),
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    await screen.findByText(en("notify.resolved.revoked"));
+    expect(mockMoveFocus).toHaveBeenCalledTimes(1);
+    expect(textOf(mockMoveFocus.mock.calls[0]?.[0])).toBe(en("notify.resolved.revoked"));
+  });
+
+  it("does not move focus when the answer is refused: the button keeps it", async () => {
+    const { runtime } = await feedRuntime([login], {
+      "POST /api/notifications/n-login/resolve": () => {
+        throw new Error("offline");
+      },
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
+    expect(mockMoveFocus).not.toHaveBeenCalled();
+  });
+
+  it("offers no Not me on this session's own sign-in, which only the person's other devices answer", async () => {
+    const thisSession = {
+      city: null,
+      country: "DE",
+      createdAt: 1,
+      current: true,
+      id: "s",
+      ip: SIGN_IN_IP,
+      kind: "browser",
+      lastDataAt: null,
+      lastSeenAt: 1,
+      name: "Chrome on macOS",
+    };
+    const { runtime } = await feedRuntime([login], {
+      "GET /api/sessions": () => ({ sessions: [thisSession] }),
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await screen.findByText(en("notifications.login", { name: "Chrome on macOS" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: en("notify.action.revoked") })).toBeNull();
+    });
   });
 
   it("says a refused answer did not go through and keeps the buttons", async () => {
