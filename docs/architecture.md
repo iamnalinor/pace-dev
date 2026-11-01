@@ -95,6 +95,10 @@ clock is frozen within a request). System-generated events use deterministic ids
 every device and the server produce the same event once:
 
 - `instanceId(presetId, isoWeek)` → `hw:<presetId>:<isoWeek>` (recurring homework)
+- `seriesInstanceId(seriesId, revisionKey, n)` → `rep:<series>:<revision>:<n>` (a task series's
+  n-th instance; `n` counts from the series' `template.startAt`, which `seriesAnchor` sets to the
+  start the person chose or else to 00:00 of the day the series was made, so later instances start
+  at the person's time of day or at the start of their day, never at the minute of creation)
 - `autoOutcomeId(taskId, kind)` → `auto:<taskId>:missed|skipped` (automatic outcomes)
 - automatic sleep: `auto:sleep-<night>:start-<yyyyMMddTHHmm>` (the start and its activity),
   `auto:sleep-stop-<digest of the activity id>-<yyyyMMddTHHmm>`, and `auto:<stop id>:reopen` /
@@ -280,6 +284,18 @@ change in the same run stops it and the next run retries. What was written on th
 while a reset was under way goes with it. Signing out (a 401 on `/api/me` included) drops
 the local log, outbox, cursor and id as well.
 
+**A one-time re-pull after an update.** A client update that accepts events older clients left
+out (their pull skipped what they could not read and moved the cursor past it) raises
+`SYNC_SCHEMA_VERSION` in `sync-client.ts`; the store keeps the version its log was pulled under
+(`getSyncVersion`, 0 for logs from before versions). A run that finds a lower one sets the cursor
+to 0 and the version to the current one, in that order, before its pull: the log and the outbox
+stay, events the log already holds are skipped on the way in, the outbox is pushed as usual, and
+the next start pulls from its cursor again. A reset stores the current version with the fresh copy,
+and a log without a store id is dropped by its pull anyway. Version 1 is the id limit raised from
+64 to 128. On the server the re-pull is the ordinary paged pull (`listPage`: the next `limit`
+events after `since` by the `seq` primary key), so it costs one request per 200 events, once per
+device.
+
 A reset also forgets the store's Telegram chat; the store then sends to the user's private
 chat, whose id is their Telegram id (looked up in D1 by the store's name, the user id).
 
@@ -377,6 +393,16 @@ signed out and nothing is sent. It polls `GET /api/push/poll` only when the phon
 usage on every phone, whatever the method, since the server's rules need them at night too.
 Each step is caught on its own (a failed poll never stops the upload); a logout during a run
 makes its client stop sending the ended session's token.
+
+**The battery step**: Android defers an optimized app's background work for hours, so a phone
+whose push method is `poll` is asked to leave Pace out of battery optimization. One predicate,
+`isBackgroundStepNeeded` (`platform/notifications.ts`: method `poll`), decides whether the
+permission walk-through lists the `background` step, Settings → Permissions shows it and the hint
+under the push picker appears (bug class 1); with Google push, or no method, nothing is asked.
+Allow opens the phone maker's autostart page where there is one (`Battery.kt`, the packages
+listed under `<queries>` in the module's manifest) and Android's own exemption dialog on top of
+it; a phone without the dialog gets the list of optimized apps, and one without either opens
+nothing instead of crashing.
 Answering or settling a notification resolves it in the pool and takes back its copies.
 
 Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,

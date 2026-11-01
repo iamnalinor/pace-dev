@@ -73,7 +73,8 @@ server at the latest release.
    `url=https://<your api>/telegram/webhook`, `secret_token=<TELEGRAM_WEBHOOK_SECRET>` and
    `allowed_updates=["message","callback_query"]`, then store `getMe`'s `result` with
    `bunx wrangler secret put BOT_INFO`.
-7. **Check it**: `https://<your api>/api/instance` answers your bot, version and protocol.
+7. **Check it**: `https://<your api>/api/instance` answers your server's name, version, protocol,
+   bot, origins and features.
 8. **In the app**: on the login screen press **Change** next to "Server: …", type your API's
    address (`pace-api.example.dev`; https only, plain http only for `localhost`, `10.0.2.2` and
    private networks during development), press **Check**, then **Use this server**, and sign in.
@@ -90,7 +91,9 @@ the project that sends it. So a self-hosted server gets **no Google push** with 
 even with a Firebase project of its own (Settings says why). Everything else works:
 
 - while the app is open, notifications arrive instantly over the live connection;
-- in the background, the phone checks your server about every 15 minutes;
+- in the background, the phone checks your server about every 15 minutes (the permissions
+  walk-through then asks to leave Pace out of battery optimization, or Android defers the check
+  for hours; on phones that have one it also opens the maker's autostart page);
 - reminders and alerts also come from your bot in Telegram.
 
 Instant push needs your own build of the app with your Firebase project
