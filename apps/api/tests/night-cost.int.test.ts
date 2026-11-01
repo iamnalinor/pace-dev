@@ -422,6 +422,62 @@ describe("a pool pass that keeps failing", () => {
   });
 });
 
+describe("a pool pass whose delivery fails and which then breaks", () => {
+  it("backs off as any failing pass does, not at the minute its own failed delivery asked for", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      // A seminar at 09:00 beside the digest: the 09:00 pass adds and delivers two notifications.
+      const seminar = { ...event(0), endAt: msk("10:30"), startAt: msk("09:00") };
+      await instance.syncCalendar(copy(msk("08:00"), [seminar]), msk("08:00"));
+      await instance.runNotifications(msk("08:00"));
+      // Telegram is down, and the second delivery of every pass breaks (a bug in its message):
+      // the first one's failed copy has asked for a retry a minute on by then.
+      const down = {
+        apiRoot: "https://telegram.test",
+        fetch: async () => Response.json({ ok: false }, { status: 500 }),
+        token: "123456:TEST-TOKEN",
+      };
+      const passes: string[] = [];
+      for (;;) {
+        const at = await state.storage.getAlarm();
+        if (at === null || at > Date.parse(addMinutesIso(msk("09:00"), 20))) {
+          break;
+        }
+        vi.setSystemTime(new Date(at));
+        await state.storage.deleteAlarm();
+        const failing = new UserStore(state, deployed);
+        let lookups = 0;
+        Object.defineProperties(failing, {
+          chatId: {
+            value: async () => {
+              lookups += 1;
+              if (lookups === 1) {
+                passes.push(new Date().toISOString());
+              }
+              return await (lookups < 3
+                ? Promise.resolve("1002")
+                : Promise.reject(new Error("the message broke")));
+            },
+          },
+          runNotifications: {
+            value: async (now: string) =>
+              await UserStore.prototype.runNotifications.call(failing, now, {
+                push: { fcm: null },
+                telegram: down,
+              }),
+          },
+        });
+        // A failed pass fails the alarm; the runtime would run it again (not simulated).
+        await Promise.allSettled([failing.alarm()]);
+      }
+      expect(passes).toEqual(
+        ["09:00", "09:01", "09:03", "09:07", "09:15"].map((hhmm) => msk(hhmm)),
+      );
+    });
+  });
+});
+
 describe("a phone's calendar copy cut short", () => {
   it("is looked at by the pool with the next upload when the pool's look after its rows died", async () => {
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {

@@ -438,7 +438,9 @@ lease's wake runs it again, whether or not the runtime retries the alarm (class 
 keeps being cut short (the CPU limit, where no `catch` runs) waits 5, 10, 20 minutes and so on up
 to four hours; after a pass that completed, that wake reads the gate and loads nothing. A failed
 pass runs again a minute on, doubling while passes keep failing or being cut short, up to four
-hours (a pass that completes clears `pool:failures`), or sooner when a write asks for it; a store from before the key passes
+hours (a pass that completes clears `pool:failures`), or sooner when a write asks for it (a pass
+asks for its own delivery retries only at its end, so one that breaks after a failed delivery
+still backs off); a store from before the key passes
 at its next alarm, and one with no alarm at all (main deleted it when nothing was coming; a store
 just made or wiped has none) gets one at once from its next write or calendar copy, changed or
 not (`armIfPoolUnplanned`), so its pool starts its own times. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15

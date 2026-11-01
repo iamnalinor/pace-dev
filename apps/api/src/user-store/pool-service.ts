@@ -35,6 +35,7 @@ import {
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
 import { answerInputs, answerRefusal, applyAnswer } from "./pool-answers.ts";
+import { hasPendingAfterRetry } from "./pool-retries.ts";
 import { armAfterWrite, armRetry, scheduleNextPass, takingPoolTime } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
@@ -141,18 +142,26 @@ export class NotificationPool {
     });
   }
 
-  /** Resolves a notification and takes it back everywhere; one resolved already stays as it is. */
-  async #settle(id: string, resolution: Resolution, meta: AnswerMeta): Promise<void> {
+  /**
+  Resolves a notification and takes it back everywhere; one resolved already stays as it is.
+  Answers whether a copy is still to take back (a pass retries it: `hasPendingAfterRetry`).
+  */
+  async #withdraw(id: string, resolution: Resolution, meta: AnswerMeta): Promise<boolean> {
     const { db } = this.#host;
     const stored = await rows.findNotification(db, id);
-    if (
+    return (
       stored !== undefined &&
       (await rows.didResolve(db, { id, now: meta.now, resolution })) &&
       (await hasPendingAfterWithdraw(await this.#deps(meta.now, meta.couriers), stored, {
         ...meta,
         resolution,
       }))
-    ) {
+    );
+  }
+
+  /** `#withdraw`, then a pass a minute on when a copy is still to take back. */
+  async #settle(id: string, resolution: Resolution, meta: AnswerMeta): Promise<void> {
+    if (await this.#withdraw(id, resolution, meta)) {
       await armRetry(this.#host.ctx.storage, meta.now);
     }
   }
@@ -186,38 +195,19 @@ export class NotificationPool {
     return ok(null);
   }
 
-  /** Retries copies still pending and reports whether another alarm is needed. */
-  async #retryPending(now: string, couriers?: Couriers): Promise<boolean> {
-    const deps = await this.#deps(now, couriers);
-    const open = await rows.openNotifications(this.#host.db);
-    for (const stored of open) {
-      if (await hasSendRetry(deps, stored)) {
-        await deliverNew(deps, stored);
-      }
+  /** Adds and delivers (see `notify`); answers whether a copy failed and wants a retry. */
+  async #add(
+    created: NewNotification,
+    now: string,
+    options: PoolNotifyOptions,
+  ): Promise<Result<{ notification: PoolNotification; isRetry: boolean }, NotifyError>> {
+    const stored = await rows.insertNotification(this.#host.db, created, now);
+    if (!stored.ok) {
+      return stored;
     }
-    await this.#retryDismissals(deps);
-    const remaining = await rows.openNotifications(this.#host.db);
-    for (const stored of remaining) {
-      if (await hasSendRetry(deps, stored)) {
-        return true;
-      }
-    }
-    const pending = await deliveries.pendingDismissalIds(this.#host.db);
-    return pending.length > 0;
-  }
-
-  async #retryDismissals(deps: PoolDeps): Promise<void> {
-    const pendingIds = await deliveries.pendingDismissalIds(this.#host.db);
-    for (const id of pendingIds) {
-      const stored = await rows.findNotification(this.#host.db, id);
-      if (stored === undefined) {
-        continue;
-      }
-      await hasPendingAfterWithdraw(deps, stored, {
-        origin: "system",
-        resolution: stored.notification.resolution ?? "read",
-      });
-    }
+    await deliverNew(await this.#deps(now, options.couriers), stored.value, options);
+    const isRetry = await hasSendRetry(await this.#deps(now, options.couriers), stored.value);
+    return ok({ isRetry, notification: stored.value.notification });
   }
 
   /** The pass itself (see `run`). */
@@ -226,10 +216,12 @@ export class NotificationPool {
     await this.#host.derive(now);
     const pass = await this.#pass(now);
     const created: PoolNotification[] = [];
+    // The pass asks for its retries once, at its end (`scheduleNextPass`): a time asked for on
+    // the way would also stand after a pass that then breaks, ahead of its backoff.
     for (const item of pass.created) {
-      const added = await this.notify(item, now, { couriers });
+      const added = await this.#add(item, now, { couriers });
       if (added.ok) {
-        created.push(added.value);
+        created.push(added.value.notification);
       } else {
         createLogger("info").error("A notification broke its contract", { kind: item.kind });
       }
@@ -238,9 +230,9 @@ export class NotificationPool {
     // what it added already is found by its subject, not added or sent twice.
     await savePoolMemory(storage, pass.memory);
     for (const settled of pass.settled) {
-      await this.#settle(settled.id, settled.resolution, { couriers, now, origin: "system" });
+      await this.#withdraw(settled.id, settled.resolution, { couriers, now, origin: "system" });
     }
-    const isRetry = await this.#retryPending(now, couriers);
+    const isRetry = await hasPendingAfterRetry(await this.#deps(now, couriers));
     const nextAt = await scheduleNextPass(storage, { isRetry, nextAt: pass.nextAt, now });
     return { created, nextAt };
   }
@@ -268,15 +260,11 @@ export class NotificationPool {
     now: string,
     options: PoolNotifyOptions = {},
   ): Promise<Result<PoolNotification, NotifyError>> {
-    const stored = await rows.insertNotification(this.#host.db, created, now);
-    if (!stored.ok) {
-      return stored;
-    }
-    await deliverNew(await this.#deps(now, options.couriers), stored.value, options);
-    if (await hasSendRetry(await this.#deps(now, options.couriers), stored.value)) {
+    const added = await this.#add(created, now, options);
+    if (added.ok && added.value.isRetry) {
       await armRetry(this.#host.ctx.storage, now);
     }
-    return ok(stored.value.notification);
+    return added.ok ? ok(added.value.notification) : added;
   }
 
   /** What waits for a polling device; the cursor of the fetch before acknowledges what it got. */
