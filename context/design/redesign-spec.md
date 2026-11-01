@@ -2441,6 +2441,12 @@ this spec introduces. Use the Expo build, Chrome in a tab and the installed PWA,
 
 ## 12. Open questions for the owner
 
+**Owner answers, 2026-11-01** (round 1): Q1 → **A · Тетрадь**. Q2 → **a, strike-through** (leaning; demos of all three published to compare). Q3 → **a, hide Normal**, and mark "Low" (Необязательно) differently from Urgent/Priority so it draws no attention (three options shown in the accents demo; pending). Q4 → a. Q5 → a. Q6 → **b, modifier shortcuts** (see the browser caveat below; pending). Q7 → a. Q8 → a. Q9 → pending (demo published). Q10 → a. Q11 → a. Q12 → a, leaning (demo published). Logo: the owner prefers a bright logo; options in the accents demo (pending).
+
+Demos (private artifacts; sources in `context/design/comps/demos/`): check-off a/b/c — https://claude.ai/artifact/XEftj2wtbmCVeTsfH6c2LP, https://claude.ai/artifact/9xe8ZPtaEHF5TDhN1d9XJ5, https://claude.ai/artifact/GNkXkPcMVk2h2p8vwbeddJ; Material You — https://claude.ai/artifact/NvUXXnTDvVTRNjuTA5JXEk; phone time bar — https://claude.ai/artifact/KLvpgUhDtYmQsLQHNo7Rha; accents, logo and low-importance marks — https://claude.ai/artifact/BSjfceFA52AasjsVm5vmyZ.
+
+Q6 caveat: browsers reserve Ctrl+N (new window) and give Ctrl+F to page search, so the web app cannot take them; the modifier options are Alt+N / Alt+F (⌥N / ⌥F on a Mac, matched by key code) or Ctrl+Shift+… .
+
 Answer "defaults" to accept every recommended default.
 
 | # | Question | Options | Recommended default | Consequence |
