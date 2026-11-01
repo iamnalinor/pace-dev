@@ -42,7 +42,10 @@ import { type Materialized, prepareBatch } from "./state.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
-/** The calendar a pass looks at around now: what started lately and what starts soon. */
+/**
+The calendar a pass looks at around now: what started lately and what starts soon. The pool passes
+at least daily (`scheduleNextPass`), so what lies ahead must stay longer than a day.
+*/
 const CALENDAR_BACK_MINUTES = 24 * 60;
 const CALENDAR_AHEAD_MINUTES = 3 * 24 * 60;
 
@@ -58,10 +61,10 @@ export type PoolHost = {
   readonly chatId: () => Promise<string | undefined>;
 };
 
-/** What a pass of the pool added, and when it passes next. */
+/** What a pass of the pool added, and when it passes next (within a day, see `scheduleNextPass`). */
 export type PoolRun = {
   readonly created: readonly PoolNotification[];
-  readonly nextAt: null | string;
+  readonly nextAt: string;
 };
 
 /** How an answer is given; `couriers` replaces the configured channels (tests). */
@@ -238,8 +241,8 @@ export class NotificationPool {
       await this.#settle(settled.id, settled.resolution, { couriers, now, origin: "system" });
     }
     const isRetry = await this.#retryPending(now, couriers);
-    await scheduleNextPass(storage, { now, nextAt: pass.nextAt, isRetry });
-    return { created, nextAt: pass.nextAt };
+    const nextAt = await scheduleNextPass(storage, { isRetry, nextAt: pass.nextAt, now });
+    return { created, nextAt };
   }
   /**
   After a write: notifications it settled (an event attended from Now's offer, an activity

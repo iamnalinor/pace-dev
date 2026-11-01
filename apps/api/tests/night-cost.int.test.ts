@@ -96,6 +96,22 @@ const dueTomorrow = (): readonly Raw[] => [
   ),
 ];
 
+/**
+Fires every alarm due by `until` as the runtime does (taken off, then run), each on a new instance:
+production evicts one idle for a minute or two.
+*/
+const fireDue = async (state: DurableObjectState, until: string): Promise<void> => {
+  for (;;) {
+    const at = await state.storage.getAlarm();
+    if (at === null || at > Date.parse(until)) {
+      return;
+    }
+    vi.setSystemTime(new Date(at));
+    await state.storage.deleteAlarm();
+    await new UserStore(state, deployed).alarm();
+  }
+};
+
 /** Fires the store's alarm at `at` as the runtime does (taken off, then run), on a new instance. */
 const fireAt = async (state: DurableObjectState, at: string): Promise<void> => {
   vi.setSystemTime(new Date(at));
@@ -131,18 +147,6 @@ describe("a night of automatic sleep on a cold store", () => {
       nothing in memory, the same storage.
       */
       const cold = (): UserStore => new UserStore(state, deployed);
-      /** Fires every alarm due by `until`, as the runtime does: taken off, then run. */
-      const fireDue = async (until: string): Promise<void> => {
-        for (;;) {
-          const at = await state.storage.getAlarm();
-          if (at === null || at > Date.parse(until)) {
-            return;
-          }
-          vi.setSystemTime(new Date(at));
-          await state.storage.deleteAlarm();
-          await cold().alarm();
-        }
-      };
       /** The phone's use over the night, which it tells as it ends. */
       const uses = [
         { endAt: msk("20:40"), startAt: msk("20:10") },
@@ -161,7 +165,7 @@ describe("a night of automatic sleep on a cold store", () => {
       // An upload every 15 minutes from 21:10 until 09:40, alarms firing in between.
       for (let quarter = 0; quarter <= 50; quarter += 1) {
         const now = addMinutesIso(msk("21:10"), quarter * 15);
-        await fireDue(now);
+        await fireDue(state, now);
         await upload(now);
       }
       const night = cost();
@@ -218,6 +222,40 @@ describe("the notification pool at the store's alarm", () => {
       // The runtime runs the failed alarm again.
       await fireAt(state, msk("09:01"));
       expect(digests(state)).toHaveLength(1);
+    });
+  });
+});
+
+describe("the notification pool with nothing coming", () => {
+  it("looks again within a day, so an event that comes into its calendar window is announced", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const start = msk("08:00");
+      vi.setSystemTime(new Date(start));
+      // No digest at all, and nothing within the three days of calendar a pass reads.
+      await instance.append(
+        [envelope("settings.updated", { digestWindows: [], timezone: MOSCOW }, start)],
+        { now: start },
+      );
+      await instance.runNotifications(start);
+      // The return flight, four days on at 10:00, on a copy the phone sends again unchanged.
+      const flight = {
+        endAt: addMinutesIso(start, 4 * 1440 + 240),
+        id: "ev-flight",
+        series: null,
+        startAt: addMinutesIso(start, 4 * 1440 + 120),
+        title: "Return flight",
+      };
+      for (let day = 0; day <= 4; day += 1) {
+        const now = addMinutesIso(start, day * 1440);
+        await fireDue(state, now);
+        vi.setSystemTime(new Date(now));
+        await new UserStore(state, deployed).syncCalendar(copy(now, [flight]), now);
+      }
+      await fireDue(state, addMinutesIso(flight.startAt, 1));
+      const announced = state.storage.sql
+        .exec("SELECT created_at FROM notifications WHERE kind = 'event_start'")
+        .toArray();
+      expect(announced).toEqual([{ created_at: flight.startAt }]);
     });
   });
 });

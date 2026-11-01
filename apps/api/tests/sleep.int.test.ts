@@ -338,7 +338,8 @@ describe("the store's alarm for automatic sleep", () => {
     const retryAt = new Date(Date.parse(now) + 2 * 60_000).toISOString();
     await store.enqueueParse({ channel: "api", retryAt, text: "купить хлеб" }, now);
     const run = await store.runNotifications(now);
-    expect(run.nextAt).toBeNull();
+    // Nothing is coming, so the pool looks again in a day (never "never": bug-lessons class 57).
+    expect(run.nextAt).toBe(new Date(Date.parse(now) + 24 * 3_600_000).toISOString());
     expect(await alarmOf(store)).toBe(Date.parse(retryAt));
   });
 

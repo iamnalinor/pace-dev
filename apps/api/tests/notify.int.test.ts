@@ -117,9 +117,7 @@ describe("the deadline digest", () => {
       );
       expect(telegram.sent()).toHaveLength(1);
       expect(telegram.calls.filter((entry) => entry.method === "deleteMessage")).toHaveLength(0);
-      expect(await state.storage.getAlarm()).toBe(
-        run.nextAt === null ? null : Date.parse(run.nextAt),
-      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(run.nextAt));
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0],
       ).toMatchObject({ dismissedAt: null, reason: "dismissal-unavailable" });
@@ -171,9 +169,7 @@ describe("the deadline digest", () => {
       const passAt = new Date(Date.parse(started) + 61_000).toISOString();
       const run = await instance.runNotifications(passAt, couriers);
       expect(removalAttempts).toBe(1);
-      expect(await state.storage.getAlarm()).toBe(
-        run.nextAt === null ? null : Date.parse(run.nextAt),
-      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(run.nextAt));
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0],
       ).toMatchObject({ dismissedAt: null, reason: "dismissal-refused" });
@@ -775,9 +771,7 @@ describe("Firebase push", () => {
         couriers,
       );
       expect(fcm.sends()).toHaveLength(1);
-      expect(await state.storage.getAlarm()).toBe(
-        run.nextAt === null ? null : Date.parse(run.nextAt),
-      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(run.nextAt));
     });
   });
 
@@ -814,9 +808,7 @@ describe("Firebase push", () => {
         withoutFcm,
       );
       expect(fcm.sends()).toHaveLength(1);
-      expect(await state.storage.getAlarm()).toBe(
-        run.nextAt === null ? null : Date.parse(run.nextAt),
-      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(run.nextAt));
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.find(
           (entry) => entry.method === "fcm",
@@ -852,9 +844,7 @@ describe("Firebase push", () => {
       // The retry's alarm fires: the runtime takes it off before the pass.
       await state.storage.deleteAlarm();
       const run = await instance.runNotifications(now, couriers);
-      expect(await state.storage.getAlarm()).toBe(
-        run.nextAt === null ? null : Date.parse(run.nextAt),
-      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(run.nextAt));
       expect(fcm.sends()).toHaveLength(1);
     });
   });
@@ -1132,9 +1122,7 @@ describe("Firebase push", () => {
       const passAt = new Date(Date.parse(started) + 61_000).toISOString();
       const run = await instance.runNotifications(passAt, couriers);
       expect(fcm.sends()).toHaveLength(2);
-      expect(await state.storage.getAlarm()).toBe(
-        run.nextAt === null ? null : Date.parse(run.nextAt),
-      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(run.nextAt));
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.find(
           (entry) => entry.method === "fcm",

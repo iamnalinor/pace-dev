@@ -4,7 +4,15 @@ import { armEarliest } from "./alarm.ts";
 const RETRY_MS = 60_000;
 
 /**
-Storage key of when the pool next wants a pass (epoch ms; `null` when nothing is coming): the
+The longest the pool waits between passes: a day, within the three days of calendar a pass reads
+(`pool-service.ts`), so an event enters a pass's window before it starts even when no write and no
+change of the calendar asks for a pass, and a time left by older rules heals within a day. A pass
+that finds nothing coming (no digest window, no event near) still looks again by then.
+*/
+const LOOK_AGAIN_MS = 24 * 60 * 60_000;
+
+/**
+Storage key of when the pool next wants a pass (epoch ms; `null` while a pass has taken it): the
 store's alarm also fires for sleep's looks and the assistant's queue, and a pass loads the whole
 log on a cold instance, so `alarm()` runs one only once this has come. A store from before the key
 has none, and passes at its next alarm.
@@ -31,8 +39,10 @@ export const armPass = async (storage: DurableObjectStorage, at: string): Promis
 };
 
 /**
-The next pool decision or an outstanding delivery retry, whichever comes first. It never deletes
-or postpones the alarm: the store's other waits (the assistant's queue, automatic sleep) share it.
+Arms the pool's next pass and answers when it is: the next pool decision or an outstanding
+delivery retry, whichever comes first, and never later than a day on (`LOOK_AGAIN_MS`). It never
+deletes or postpones the alarm: the store's other waits (the assistant's queue, automatic sleep)
+share it.
 */
 export const scheduleNextPass = async (
   storage: DurableObjectStorage,
@@ -41,12 +51,15 @@ export const scheduleNextPass = async (
     nextAt,
     isRetry,
   }: { readonly now: string; readonly nextAt: null | string; readonly isRetry: boolean },
-): Promise<void> => {
-  const next = nextAt === null ? null : Date.parse(nextAt);
-  const at = isRetry ? Math.min(next ?? Infinity, Date.parse(now) + RETRY_MS) : next;
-  if (at !== null) {
-    await armPool(storage, at);
-  }
+): Promise<string> => {
+  const from = Date.parse(now);
+  const at = Math.min(
+    nextAt === null ? Infinity : Date.parse(nextAt),
+    isRetry ? from + RETRY_MS : Infinity,
+    from + LOOK_AGAIN_MS,
+  );
+  await armPool(storage, at);
+  return new Date(at).toISOString();
 };
 
 /**
