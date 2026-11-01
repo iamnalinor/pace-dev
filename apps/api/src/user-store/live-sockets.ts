@@ -10,6 +10,7 @@ import {
   isServed,
   namedSession,
   servedSockets,
+  sessionOf,
   sessionTags,
 } from "./live-sessions.ts";
 import { storeIdOf } from "./store-identity.ts";
@@ -112,16 +113,27 @@ export const announceChange = async (ctx: DurableObjectState, change: LogChange)
   announce(LIVE_V2, events);
 };
 
-/** Sends a message to every live client (a feed update: a notification new or resolved). */
-export const broadcast = (ctx: DurableObjectState, message: object): void => {
-  const text = JSON.stringify(message);
+/**
+Sends every live client the message made for the session that opened its socket (a notification as
+that session sees it, `seenBy`).
+*/
+export const broadcastBySession = (
+  ctx: DurableObjectState,
+  messageFor: (sessionId: string | undefined) => object,
+): void => {
   for (const socket of servedSockets(ctx)) {
+    const message = messageFor(sessionOf(ctx, socket));
     try {
-      socket.send(text);
+      socket.send(JSON.stringify(message));
     } catch {
       // A socket closing meanwhile: its client reloads the feed when it reconnects.
     }
   }
+};
+
+/** Sends a message to every live client (a feed update: a notification new or resolved). */
+export const broadcast = (ctx: DurableObjectState, message: object): void => {
+  broadcastBySession(ctx, () => message);
 };
 
 /**

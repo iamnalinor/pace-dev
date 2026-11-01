@@ -16,6 +16,13 @@ export const sessionTags = (sessionId: string, expiresAt: number): readonly stri
   `${EXPIRES_TAG}${String(expiresAt)}`,
 ];
 
+/** The session a socket was opened by (from its tag); `undefined` for one with none. */
+export const sessionOf = (ctx: DurableObjectState, socket: WebSocket): string | undefined =>
+  ctx
+    .getTags(socket)
+    .find((tag) => tag.startsWith(SESSION_TAG))
+    ?.slice(SESSION_TAG.length);
+
 /** The session and expiry a request names, as the Worker set them; `null` when either is missing. */
 export const namedSession = (
   sessionId: null | string,

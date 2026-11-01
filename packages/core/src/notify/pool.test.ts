@@ -9,6 +9,7 @@ import {
   isAnswer,
   isOwnSignIn,
   RESOLUTIONS,
+  seenBy,
 } from "./pool.ts";
 
 describe("the answers", () => {
@@ -55,5 +56,29 @@ describe("isOwnSignIn", () => {
       payload: { slot: "2026-10-06T06:00:00.000Z", tasks: [] },
     };
     expect(isOwnSignIn(digest, "s-1")).toBe(false);
+  });
+});
+
+describe("seenBy", () => {
+  const login = {
+    createdAt: "2026-10-06T10:00:00.000Z",
+    id: "n-1",
+    kind: "login" as const,
+    payload: { country: "", ip: "", kind: "app", name: "Pixel", sessionId: "s-1" },
+    readAt: null,
+    resolution: null,
+    resolvedAt: null,
+  };
+
+  it("reads a session's own sign-in notice as read to that session, as of its arrival", () => {
+    // The server never marks it read for that session, so its bell must not wait for it.
+    expect(seenBy(login, "s-1")).toEqual({ ...login, readAt: login.createdAt });
+  });
+
+  it("leaves it as it is for every other reader, and every other notice for everyone", () => {
+    expect(seenBy(login, "s-2")).toBe(login);
+    expect(seenBy(login, undefined)).toBe(login);
+    const read = { ...login, readAt: "2026-10-06T11:00:00.000Z" };
+    expect(seenBy(read, "s-1")).toBe(read);
   });
 });

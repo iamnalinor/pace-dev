@@ -201,6 +201,31 @@ const userStore = async (token: string) => {
   return env.USER_STORE.get(env.USER_STORE.idFromName(me.id));
 };
 
+/** The first sign-in notice a fresh v1 socket of `token` hears, as it is sent to that socket. */
+const heardSignIn = async (
+  token: string,
+  device: string,
+): Promise<{ readonly readAt: null | string }> => {
+  const { socket } = await open(token, device);
+  if (socket === null) {
+    throw new Error("no socket");
+  }
+  return await new Promise((resolve) => {
+    socket.addEventListener("message", ({ data }) => {
+      const message = JSON.parse(String(data)) as {
+        readonly type: string;
+        readonly notification?: { readonly kind: string; readonly readAt: null | string };
+      };
+      if (!(message.type === "notification" && message.notification?.kind === "login")) {
+        return;
+      }
+
+      socket.close();
+      resolve(message.notification);
+    });
+  });
+};
+
 /*
 The race of the final review: the Worker reads the session in D1 and forwards the upgrade, and the
 revoke (D1 delete, then `endLiveSessions`) lands in between. The upgrade reaching the store
@@ -517,6 +542,22 @@ describe("live sockets end with their session", () => {
     const [, page] = await ownerV2.until("events");
     expect(page.id).toBe("p");
     ownerV2.socket.close();
+  });
+
+  it("tells the session a sign-in reports of its notice as read, the person's others as unread", async () => {
+    const [reported, owner] = [await loginAsDev("1001"), await loginAsDev("1001")];
+    const reportedHears = heardSignIn(reported, "phone-1");
+    const ownerHears = heardSignIn(owner, "laptop-1");
+    const sessionId = await sessionIdOf(reported);
+    await (await userStore(owner)).notify(
+      {
+        kind: "login",
+        payload: { country: "", ip: "", kind: "dev", name: "Dev login", sessionId },
+      },
+      new Date().toISOString(),
+    );
+    expect((await reportedHears).readAt).not.toBeNull();
+    expect((await ownerHears).readAt).toBeNull();
   });
 
   it("closes the socket of a session that logs out", async () => {

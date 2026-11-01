@@ -558,6 +558,18 @@ describe("Not me", () => {
     expect(await sessionRow(sessionId)).toBeNull();
   });
 
+  it("reads as read to the session it reports, so its bell can clear, and stays unread for the person's others", async () => {
+    const { admin, notice, sessionId, token } = await signedIn();
+    // The reported session's feed has nothing to mark: the server never would (QA round 15 H1).
+    const own = (
+      await answerOf(endpoints.notifications.list, "/api/notifications?limit=50", { token })
+    ).items.find((item) => item.id === notice.id);
+    expect(own?.readAt).toBe(notice.createdAt);
+    expect(own?.resolution).toBeNull();
+    // Nothing was written: the person's other devices still see it unread.
+    expect((await loginNoticeOf(admin, sessionId)).readAt).toBeNull();
+  });
+
   it("is not pushed to the phone of the session it reports", async () => {
     const admin = await adminOf(String(ADA));
     const phone = await loginAsDev(String(ADA));

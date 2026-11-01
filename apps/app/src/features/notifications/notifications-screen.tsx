@@ -119,6 +119,14 @@ const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned
   }
 };
 
+/** Not me ends a session for good: the warning look, never the accent; else the first leads. */
+const answerVariant = (answer: Answer, index: number): "danger" | "primary" | "secondary" => {
+  if (answer === "revoked") {
+    return "danger";
+  }
+  return index === 0 ? "primary" : "secondary";
+};
+
 /**
 The answer buttons of an open notification; the answer stays pending until the server has it.
 None on this session's own sign-in: only the person's other devices answer it (`isOwnSignIn`).
@@ -159,7 +167,7 @@ const Answers = ({
                 setHasFailed(!isDone);
               })();
             }}
-            variant={index === 0 ? "primary" : "secondary"}
+            variant={answerVariant(answer, index)}
           >
             {t(`notify.action.${answer}`)}
           </Button>

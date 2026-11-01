@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 
-import { endpoints, err, ok } from "@pace/core";
+import { endpoints, err, ok, seenBy } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
 import type { ResolveErrorCode } from "../shared/contract.ts";
@@ -97,11 +97,13 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
   mountPushRoutes(app);
   mount(app, endpoints.notifications.list, async ({ c, query }) => {
     const page = await userStoreOf(c).listNotifications(query);
+    // As this session sees them: its own sign-in notice reads as read (`seenBy`, QA round 15 H1).
+    const reader = c.get("sessionId");
     return ok({
       deliveries: Object.fromEntries(
         Object.entries(page.deliveries).map(([id, entries]) => [id, [...entries]]),
       ),
-      items: [...page.items],
+      items: page.items.map((item) => seenBy(item, reader)),
       more: page.more,
     });
   });

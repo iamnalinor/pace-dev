@@ -128,6 +128,7 @@ export {
   refOf,
   type Resolution,
   RESOLUTIONS,
+  seenBy,
 } from "./notify/pool.ts";
 export { answerAt, answerText, readAnswer } from "./parse/answer.ts";
 export { isQuotedFrom, normalizeForEvidence } from "./parse/normalize.ts";

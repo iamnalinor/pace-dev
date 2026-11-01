@@ -178,6 +178,33 @@ describe("NotificationsScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/decisions");
   });
 
+  it("asks to mark each notice read once, though the server leaves one unread and every read refreshes the feed (QA round 15 H1)", async () => {
+    const holder: { runtime?: Awaited<ReturnType<typeof createTestRuntime>> } = {};
+    // The server leaves both unread (as it does a session's own sign-in notice); each read's live
+    // "read" notice reloads the feed, as the socket does.
+    const read = jest.fn(() => {
+      setTimeout(() => {
+        holder.runtime?.notifications.receive({ type: "read" });
+      }, 0);
+      return { ok: true };
+    });
+    const { runtime } = await feedRuntime([login, digest], {
+      "POST /api/notifications/read": read,
+    });
+    holder.runtime = runtime;
+    await renderScreen(<NotificationsScreen />, runtime);
+    await screen.findByText(en("notifications.digestTitle"));
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    });
+    const asked = (read.mock.calls as unknown as [{ body: { ids: string[] } }][]).flatMap(
+      ([request]) => request.body.ids,
+    );
+    expect(asked.toSorted((a, b) => a.localeCompare(b))).toEqual(["n-digest", "n-login"]);
+  });
+
   it("answers Yes, still from the feed: pending until the server has it, then its resolution", async () => {
     const answered = {
       ...overrun,

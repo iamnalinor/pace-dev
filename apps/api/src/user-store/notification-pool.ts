@@ -6,6 +6,7 @@ import {
   isOwnSignIn,
   type PoolMemory,
   type PoolNotification,
+  seenBy,
   type Settings,
 } from "@pace/core";
 
@@ -40,7 +41,7 @@ import {
   logUnavailable,
   wasDelivered,
 } from "./delivery-rows.ts";
-import { broadcast } from "./live-sockets.ts";
+import { broadcast, broadcastBySession } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
 import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
@@ -300,7 +301,11 @@ export const deliverNew = async (
   }
   // Queued for polling devices before the open clients hear of it: an open app fetches at once.
   await pushToDevices(deps, notification);
-  broadcast(deps.ctx, { notification, type: "notification" });
+  // The session a sign-in reports hears of it as read: it may not read it away (`seenBy`).
+  broadcastBySession(deps.ctx, (sessionId) => ({
+    notification: seenBy(notification, sessionId),
+    type: "notification",
+  }));
 };
 
 /** Open notifications whose latest copy failed and can be retried by a pool pass. */

@@ -151,6 +151,20 @@ export const isOwnSignIn = (
   sessionId !== undefined &&
   notification.payload.sessionId === sessionId;
 
+/**
+A notification as the session `sessionId` sees it: its own sign-in notice reads as read (as of its
+arrival), since that session may not read it away (`isOwnSignIn`) and its bell would otherwise
+count it for good, while its feed asked again and again to mark it (QA round 15 H1). Nothing is
+written: the person's other devices still see it unread.
+*/
+export const seenBy = (
+  notification: PoolNotification,
+  sessionId: string | undefined,
+): PoolNotification =>
+  notification.readAt === null && isOwnSignIn(notification, sessionId)
+    ? { ...notification, readAt: notification.createdAt }
+    : notification;
+
 /** Whether a person may settle a notification of `kind` this way. */
 export const canResolveAs = (kind: NotificationKind, resolution: Resolution): boolean =>
   resolution === "read" || (ANSWERS[kind] as readonly Resolution[]).includes(resolution);
