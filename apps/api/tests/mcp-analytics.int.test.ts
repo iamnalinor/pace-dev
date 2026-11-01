@@ -75,6 +75,26 @@ describe("MCP analytics tools", () => {
     expect(replaced["rows"]).toEqual([["Kept me"]]);
   });
 
+  it("never shows the phone's unlock times: not in the schema, not to any query", async () => {
+    const token = (await obtainToken(ANALYTICS)).tokens.access_token;
+    const { tables } = await ok(token, "describe_schema");
+    const names = (tables as { name: string }[]).map((table) => table.name);
+    expect(names).toContain("usage_sessions");
+    expect(names).not.toContain("phone_uses");
+    for (const sql of [
+      "SELECT * FROM phone_uses",
+      'SELECT * FROM "phone_uses"',
+      "SELECT * FROM 'phone_uses'",
+      "SELECT * FROM [Phone_Uses]",
+      "SELECT count(*) FROM main.PHONE_USES",
+      "WITH u AS (SELECT * FROM `phone_uses`) SELECT * FROM u",
+    ]) {
+      const result = await call(token, "query_sql", { sql });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toMatch(/^sql\/forbidden/u);
+    }
+  });
+
   it("replays the reminders over a range and refuses a range that is too long", async () => {
     const token = (await obtainToken(ANALYTICS)).tokens.access_token;
     await ok(token, "create_task", { importance: "normal", title: "Regular" });
