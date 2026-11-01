@@ -86,8 +86,8 @@ export const applyAnswer = async (
     return;
   }
   const live = {
-    endLiveSessions: (sessionId: string): void => {
-      endLiveSessions(store.ctx, sessionId);
+    endLiveSessions: async (sessionId: string, until?: number): Promise<void> => {
+      await endLiveSessions(store.ctx, sessionId, until);
     },
   };
   await deleteSession(

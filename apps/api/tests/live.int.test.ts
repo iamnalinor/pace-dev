@@ -1,3 +1,4 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
@@ -198,6 +199,25 @@ const wait = async (ms: number): Promise<void> => {
 const userStore = async (token: string) => {
   const me = await json<{ id: string }>("/api/me", { token });
   return env.USER_STORE.get(env.USER_STORE.idFromName(me.id));
+};
+
+/*
+The race of the final review: the Worker reads the session in D1 and forwards the upgrade, and the
+revoke (D1 delete, then `endLiveSessions`) lands in between. The upgrade reaching the store
+afterwards must be refused, or the ended session keeps a socket until its expiry.
+*/
+const upgradeHeldPastRevoke = async (
+  store: Awaited<ReturnType<typeof userStore>>,
+  sessionId: string,
+): Promise<Response> => {
+  const headers = {
+    [LIVE_EXPIRES_HEADER]: String(Date.now() + 86_400_000),
+    [LIVE_SESSION_HEADER]: sessionId,
+    "Sec-WebSocket-Protocol": "pace.v2",
+    Upgrade: "websocket",
+  };
+  const request = new Request("https://pace-api.test/api/sync/live?device=phone-1", { headers });
+  return await store.fetch(request);
 };
 
 /** The log's latest sequence number (an empty push answers it). */
@@ -574,6 +594,70 @@ describe("live sockets end with their session", () => {
     const [, page] = await inbox.until("events");
     expect(page.id).toBe("p");
     socket.close();
+  });
+
+  it("refuses an upgrade that checked the session before a revoke and reaches the store after it", async () => {
+    const [ended, kept] = [await loginAsDev("1001"), await loginAsDev("1001")];
+    const store = await userStore(kept);
+    // The Worker's check passed while the session was still there.
+    const sessionId = await sessionIdOf(ended);
+    const revoked = await call(`/api/sessions/${sessionId}`, { method: "DELETE", token: kept });
+    expect(revoked.status).toBe(200);
+    const late = await upgradeHeldPastRevoke(store, sessionId);
+    expect(late.status).toBe(401);
+    expect(late.webSocket).toBeNull();
+    // Another session of the same person still opens.
+    const keptSocket = await openV2(kept, "laptop-1");
+    expect(await keptSocket.closed()).toBeNull();
+    keptSocket.socket.close();
+  });
+
+  it("refuses the late upgrade of a session ended with Not me, and of one that logged out", async () => {
+    const [intruder, owner, leaver] = [
+      await loginAsDev("1001"),
+      await loginAsDev("1001"),
+      await loginAsDev("1001"),
+    ];
+    const store = await userStore(owner);
+    const intruderId = await sessionIdOf(intruder);
+    const leaverId = await sessionIdOf(leaver);
+    const notice = await store.notify(
+      {
+        kind: "login",
+        payload: { country: "", ip: "", kind: "dev", name: "Dev login", sessionId: intruderId },
+      },
+      new Date().toISOString(),
+    );
+    if (!notice.ok) {
+      throw new Error(notice.error.code);
+    }
+    const answered = await call(`/api/notifications/${notice.value.id}/resolve`, {
+      body: { from: "web", resolution: "revoked" },
+      token: owner,
+    });
+    expect(answered.status).toBe(200);
+    expect((await call("/api/auth/logout", { method: "POST", token: leaver })).status).toBe(200);
+    for (const sessionId of [intruderId, leaverId]) {
+      const late = await upgradeHeldPastRevoke(store, sessionId);
+      expect(late.status).toBe(401);
+      expect(late.webSocket).toBeNull();
+    }
+  });
+
+  it("forgets an ended session once it would have expired anyway", async () => {
+    const token = await loginAsDev("1001");
+    const store = await userStore(token);
+    await store.endLiveSessions("short-lived", Date.now() + 200);
+    expect((await upgradeHeldPastRevoke(store, "short-lived")).status).toBe(401);
+    await wait(300);
+    // The next revoke prunes what has expired; the expired one's id is no longer kept.
+    await store.endLiveSessions("another", Date.now() + 86_400_000);
+    const kept = await runInDurableObject(store, async (_instance, state) =>
+      (await state.storage.list({ prefix: "ended-session:" })).keys().toArray(),
+    );
+    // Other tests of this file revoke sessions of the same person: only these two are asserted.
+    expect(kept).toContain("ended-session:another");
+    expect(kept).not.toContain("ended-session:short-lived");
   });
 
   it("refuses a socket no session was named for", async () => {

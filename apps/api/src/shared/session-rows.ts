@@ -6,13 +6,15 @@ import { sessions } from "./db/d1-schema.ts";
 
 /** The person's store, as a revoke needs it: its RPC stub, or the store itself. */
 export type LiveSessions = {
-  readonly endLiveSessions: (sessionId: string) => Promise<void> | void;
+  /** `until` is the session's expiry: the store refuses it a socket until then. */
+  readonly endLiveSessions: (sessionId: string, until?: number) => Promise<void> | void;
 };
 
 /**
 Ends one of the person's sessions by its id: its token stops working at once, its push
 subscription goes with it (cascade) and its live sockets are closed (the bearer is checked only
-when a socket opens, so a socket must not outlive its session). The one revoke Settings, logging
+when a socket opens, so a socket must not outlive its session, nor open after it from a check made
+before the delete). The one revoke Settings, logging
 out, "Not me" and the agents share; true when a row went, false when there was none (already
 ended, or not theirs). The sockets are closed either way: none of another person's is in `live`.
 */
@@ -25,7 +27,8 @@ export const deleteSession = async (
   const removed = await db
     .delete(sessions)
     .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)))
-    .returning({ id: sessions.id });
-  await live.endLiveSessions(sessionId);
+    .returning({ expiresAt: sessions.expiresAt });
+  // One already gone was ended (and its expiry kept by the store) by whoever removed it.
+  await live.endLiveSessions(sessionId, removed[0]?.expiresAt.getTime());
   return removed.length > 0;
 };

@@ -60,11 +60,45 @@ export const servedSockets = (ctx: DurableObjectState, tag?: string): readonly W
   return ctx.getWebSockets(tag).filter((socket) => isServed(ctx, socket, now));
 };
 
+/** Where the store keeps a session that ended, until it would have expired (`endLiveSessions`). */
+const ENDED_PREFIX = "ended-session:";
+
+/**
+Whether a session has ended here: an upgrade the Worker checked before a revoke can reach the store
+after the revoke's `endLiveSessions`, and must not be accepted then (the store serializes both).
+*/
+export const isEndedSession = async (
+  ctx: DurableObjectState,
+  sessionId: string,
+): Promise<boolean> => (await ctx.storage.get<number>(`${ENDED_PREFIX}${sessionId}`)) !== undefined;
+
+/** Drops the ended sessions that have expired by `now`: no upgrade can name them any more. */
+const pruneEnded = async (ctx: DurableObjectState, now: number): Promise<void> => {
+  const ended = await ctx.storage.list<number>({ prefix: ENDED_PREFIX });
+  const expired = [...ended].filter(([, until]) => until <= now).map(([key]) => key);
+  if (expired.length > 0) {
+    await ctx.storage.delete(expired);
+  }
+};
+
 /**
 Closes the live sockets of a session that ended (revoked in Settings, logged out, "Not me"), or of
-every session when none is named (the account is gone), with `LIVE_SESSION_ENDED`.
+every session when none is named (the account is gone), with `LIVE_SESSION_ENDED`. A named session
+with its expiry (`until`) is also kept as ended until then, so an upgrade racing the revoke is
+refused (`isEndedSession`); that bounds the record by the session's own life.
 */
-export const endLiveSessions = (ctx: DurableObjectState, sessionId?: string): void => {
+export const endLiveSessions = async (
+  ctx: DurableObjectState,
+  sessionId?: string,
+  until?: number,
+): Promise<void> => {
+  if (sessionId !== undefined && until !== undefined) {
+    const now = Date.now();
+    await pruneEnded(ctx, now);
+    if (until > now) {
+      await ctx.storage.put(`${ENDED_PREFIX}${sessionId}`, until);
+    }
+  }
   const sockets = ctx.getWebSockets(
     sessionId === undefined ? undefined : `${SESSION_TAG}${sessionId}`,
   );

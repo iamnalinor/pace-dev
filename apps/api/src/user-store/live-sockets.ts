@@ -6,6 +6,7 @@ import { LIVE_EXPIRES_HEADER, LIVE_SESSION_HEADER, liveProtocolOf } from "../sha
 import { answerLiveMessage, type LiveStoreCalls } from "./live-messages.ts";
 import {
   endLiveSessions,
+  isEndedSession,
   isServed,
   namedSession,
   servedSockets,
@@ -33,9 +34,13 @@ Accepts a live client as a hibernating WebSocket (no duration billed while it is
 with the subprotocol it speaks, the session that opened it (see `live-sessions.ts`) and the device
 it serves, so that device is not told about its own writes. Tags are all a socket keeps: they
 survive hibernation, memory does not. A v2 socket hears `hello` first. A request the Worker named
-no session for is refused: no socket outlives a session it cannot be tied to.
+no session for is refused: no socket outlives a session it cannot be tied to. Neither does one for
+a session that ended after the Worker checked it (`isEndedSession`).
 */
-export const acceptLiveSocket = (ctx: DurableObjectState, request: Request): Response => {
+export const acceptLiveSocket = async (
+  ctx: DurableObjectState,
+  request: Request,
+): Promise<Response> => {
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
     return new Response("Expected a WebSocket", { status: 426 });
   }
@@ -43,7 +48,7 @@ export const acceptLiveSocket = (ctx: DurableObjectState, request: Request): Res
     request.headers.get(LIVE_SESSION_HEADER),
     request.headers.get(LIVE_EXPIRES_HEADER),
   );
-  if (session === null) {
+  if (session === null || (await isEndedSession(ctx, session.sessionId))) {
     return new Response("No session", { status: 401 });
   }
   const protocol = liveProtocolOf(request.headers.get("Sec-WebSocket-Protocol"));
@@ -148,13 +153,16 @@ export abstract class LiveStore extends DurableObject implements LiveStoreCalls 
 
   abstract list(...args: Parameters<LiveStoreCalls["list"]>): ReturnType<LiveStoreCalls["list"]>;
 
-  override fetch(request: Request): Response {
-    return acceptLiveSocket(this.ctx, request);
+  override async fetch(request: Request): Promise<Response> {
+    return await acceptLiveSocket(this.ctx, request);
   }
 
-  /** Closes the live sockets of a session that ended, or of all when none is named. */
-  endLiveSessions(sessionId?: string): void {
-    endLiveSessions(this.ctx, sessionId);
+  /**
+  Closes the live sockets of a session that ended, or of all when none is named; a named one with
+  its expiry is refused a socket until then.
+  */
+  async endLiveSessions(sessionId?: string, until?: number): Promise<void> {
+    await endLiveSessions(this.ctx, sessionId, until);
   }
 
   /**
