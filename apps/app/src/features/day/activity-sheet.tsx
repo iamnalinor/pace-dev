@@ -26,7 +26,7 @@ import {
   ACTIVITY_CATEGORIES,
   type ActivityCategory,
   CATEGORY_COLORS,
-  formatEyebrow,
+  formatDaySpan,
   type MessageKey,
 } from "@pace/core";
 
@@ -266,8 +266,9 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
     <Sheet
       closeLabel={t("common.close")}
       onClose={onClose}
-      // The block's day, taken from the day on screen: only the times are typed.
-      subtitle={formatEyebrow(target.startAt, zone, language)}
+      // Only the times are typed, so the days they fall on are named here: both for a night, and
+      // as typed once the times read right (a retyped end moves near where it was).
+      subtitle={formatDaySpan(range ?? target, zone, language)}
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
       visible
     >

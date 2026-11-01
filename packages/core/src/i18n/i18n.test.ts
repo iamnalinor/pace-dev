@@ -5,6 +5,7 @@ import { en } from "./en.ts";
 import { EVENT_LABEL_KEYS } from "./event-labels.ts";
 import {
   countryName,
+  formatDaySpan,
   formatDuration,
   formatEyebrow,
   formatLate,
@@ -309,6 +310,54 @@ describe("page header dates", () => {
     );
     expect(formatEyebrow("2026-10-08T12:00:00.000Z", "Europe/Moscow", "ru")).toBe(
       "четверг · 8 окт.",
+    );
+  });
+
+  it("names the days a block spans, the end's own day when it is another", () => {
+    const zone = "Europe/Moscow";
+    // Saturday 23:25 → Sunday 07:40 in Moscow.
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-04T04:40:00.000Z", startAt: "2026-10-03T20:25:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe("Sat · Oct 3 – Sun · Oct 4");
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-04T04:40:00.000Z", startAt: "2026-10-03T20:25:00.000Z" },
+        zone,
+        "ru",
+      ),
+    ).toBe("сб · 3 окт. – вс · 4 окт.");
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-02T04:00:00.000Z", startAt: "2026-09-30T17:00:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe("Wed · Sep 30 – Fri · Oct 2");
+  });
+
+  it("names one day for a block within it, ending at its midnight, or still running", () => {
+    const zone = "Europe/Moscow";
+    const saturday = "Saturday · Oct 3";
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-03T07:00:00.000Z", startAt: "2026-10-03T06:00:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe(saturday);
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-03T21:00:00.000Z", startAt: "2026-10-03T19:00:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe(saturday);
+    expect(formatDaySpan({ endAt: null, startAt: "2026-10-03T06:00:00.000Z" }, zone, "en")).toBe(
+      saturday,
     );
   });
 

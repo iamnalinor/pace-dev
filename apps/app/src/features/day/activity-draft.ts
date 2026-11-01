@@ -1,6 +1,6 @@
 import type { ActivityForm, ActivityRange, ActivityTarget } from "@pace/client";
 
-import { fromWallClock, wallClock } from "#app/format/time.ts";
+import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
 import { addDaysIn, type MessageKey, type TimeState } from "@pace/core";
 
 /** What the Day sheet checks before a block is saved, each fault under its own field. */
@@ -18,11 +18,11 @@ export type Faults = {
 const MAX_OVERNIGHT_MS = 12 * 3_600_000;
 
 /**
-The end on the block's day, or after midnight when it is earlier than the start and the night
+A new block's end on its day, or after midnight when it is earlier than the start and the night
 is short; `null` for an end equal to the start or a reversed pair (10:00 → 09:30), which
 would otherwise silently make a day-long block.
 */
-const endOf = (sameDay: string, startAt: string, zone: string): null | string => {
+const newEndOf = (sameDay: string, startAt: string, zone: string): null | string => {
   if (sameDay > startAt) {
     return sameDay;
   }
@@ -31,29 +31,98 @@ const endOf = (sameDay: string, startAt: string, zone: string): null | string =>
   return sameDay < startAt && length <= MAX_OVERNIGHT_MS ? nextDay : null;
 };
 
+/** The instant the field opened on while it still shows it: a field nobody touched moves nothing. */
+const keptAt = (typed: string, atIso: null | string, zone: string): null | string =>
+  atIso !== null && typed === clockTime(atIso, zone) ? atIso : null;
+
 /**
-The typed clock times on the block's own day (see `endOf` for one past midnight). A logged
-block needs its end; a running one has none yet.
+A retyped end of a block that has one: the instant with that wall clock nearest to where the
+block ended, on the day before, of or after it (QA round 17 review I1). The sheet types clock
+times only, and a block's end may be a day or two after its start: a night, a timer left running.
+Reading it on the start's day cut a 30-hour block by a day without a word.
 */
-/** What is wrong with the end, if anything: missing on a logged block, not a time, reversed. */
+const movedEndOf = (typed: string, endAt: string, zone: string): null | string => {
+  const was = Date.parse(endAt);
+  const nearest = [-1, 0, 1]
+    .map((days) => wallClock(addDaysIn(endAt, days, zone), zone).date)
+    .map((date) => fromWallClock({ date, time: typed, tz: zone }))
+    .filter((atIso) => atIso !== null)
+    .toSorted((a, b) => Math.abs(Date.parse(a) - was) - Math.abs(Date.parse(b) - was));
+  return nearest[0] ?? null;
+};
+
+/**
+The typed end as an instant before it meets the start: the one the sheet opened on when
+untouched, near the old end when retyped on a block that has one, else on the block's day.
+`undefined` when the text is not a time.
+*/
+const endFrom = (typed: string, target: SheetTarget, zone: string): string | undefined => {
+  const kept = keptAt(typed, target.endAt, zone);
+  if (kept !== null) {
+    return kept;
+  }
+  const read =
+    target.kind === "edit" && target.endAt !== null
+      ? movedEndOf(typed, target.endAt, zone)
+      : fromWallClock({ date: wallClock(target.startAt, zone).date, time: typed, tz: zone });
+  return read ?? undefined;
+};
+
+/**
+The end once it meets the start: kept when after it, `null` for a reversed pair. Only a new
+block's retyped end may still read as past midnight (see `newEndOf`).
+*/
+const endAfter = (
+  endAt: string,
+  startAt: string,
+  { isNewEnd, zone }: { readonly isNewEnd: boolean; readonly zone: string },
+): null | string => {
+  if (isNewEnd) {
+    return newEndOf(endAt, startAt, zone);
+  }
+  return Date.parse(endAt) > Date.parse(startAt) ? endAt : null;
+};
+
+/**
+What is wrong with the end, if anything: missing on a logged block, not a time (`undefined`),
+reversed (`null` once there is a start to meet).
+*/
 const toFault = (
   draft: Draft,
   target: SheetTarget,
-  times: {
-    readonly startAt: null | string;
-    readonly sameDay: null | string;
-    readonly zone: string;
-  },
+  times: { readonly startAt: null | string; readonly endAt: null | string | undefined },
 ): MessageKey | null => {
   if (draft.to === "") {
     return target.kind === "log" ? "day.badTime" : null;
   }
-  if (times.sameDay === null) {
+  if (times.endAt === undefined) {
     return "day.badTime";
   }
-  return times.startAt !== null && endOf(times.sameDay, times.startAt, times.zone) === null
-    ? "day.badRange"
-    : null;
+  return times.startAt !== null && times.endAt === null ? "day.badRange" : null;
+};
+
+type Times = {
+  /** `null` when the text is not a time. */
+  readonly startAt: null | string;
+  /** `undefined` when the text is not a time; `null` when none was typed or it is reversed. */
+  readonly endAt: null | string | undefined;
+};
+
+/**
+The sheet's typed times as instants. A field left as it opened gives back the very instant it
+showed (its seconds, a repeated summer-time hour, a day or more of length); a retyped start is
+read on the block's own day, a retyped end as `endFrom` says.
+*/
+const typedTimes = (draft: Draft, target: SheetTarget, zone: string): Times => {
+  const { date } = wallClock(target.startAt, zone);
+  const startAt =
+    keptAt(draft.from, target.startAt, zone) ?? fromWallClock({ date, time: draft.from, tz: zone });
+  const endAt = draft.to === "" ? null : endFrom(draft.to, target, zone);
+  if (endAt === null || endAt === undefined || startAt === null) {
+    return { endAt, startAt };
+  }
+  const isNewEnd = target.kind === "log" && keptAt(draft.to, target.endAt, zone) === null;
+  return { endAt: endAfter(endAt, startAt, { isNewEnd, zone }), startAt };
 };
 
 export const readDraft = (
@@ -61,20 +130,15 @@ export const readDraft = (
   target: SheetTarget,
   zone: string,
 ): { readonly range: ActivityRange | null; readonly faults: Faults } => {
-  const { date } = wallClock(target.startAt, zone);
-  const startAt = fromWallClock({ date, time: draft.from, tz: zone });
-  const sameDay = draft.to === "" ? null : fromWallClock({ date, time: draft.to, tz: zone });
+  const { endAt, startAt } = typedTimes(draft, target, zone);
   const faults: Faults = {
     from: startAt === null ? "day.badTime" : null,
     label: draft.label.trim() === "" ? "day.whatMissing" : null,
-    to: toFault(draft, target, { sameDay, startAt, zone }),
+    to: toFault(draft, target, { endAt, startAt }),
   };
-  if (startAt === null || faults.to !== null) {
-    return { faults, range: null };
-  }
   return {
     faults,
-    range: { endAt: sameDay === null ? null : endOf(sameDay, startAt, zone), startAt },
+    range: startAt === null || faults.to !== null ? null : { endAt: endAt ?? null, startAt },
   };
 };
 

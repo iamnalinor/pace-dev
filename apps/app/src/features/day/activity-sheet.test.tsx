@@ -324,6 +324,31 @@ describe("what saving an edit sends", () => {
     expect(runtime.state.store.getState().time.activities[activityId]?.label).toBe("Sleep");
   });
 
+  // QA round 17 review I1: the sheet opens on the real boundaries, a day or more apart.
+  it.each([
+    ["a 13-hour night", "2026-10-04T17:00:00.000Z", "2026-10-05T06:00:00.000Z"],
+    ["a 30-hour block", "2026-10-02T17:00:00.000Z", "2026-10-04T04:00:00.000Z"],
+  ])("renames %s without moving either end", async (_name, startAt, endAt) => {
+    const { activityId, runtime, saved } = await editSheet({ endAt, startAt });
+    await fireEvent.changeText(screen.getByLabelText("What"), "Standup");
+    expect((await saved()).map((event) => event.type)).toEqual(["activity.labelled"]);
+    expect(runtime.state.store.getState().time.activities[activityId]).toMatchObject({
+      endAt,
+      startAt,
+    });
+  });
+
+  it("moves the end of a 30-hour block on the day it ends", async () => {
+    const { activityId, saved } = await editSheet({
+      endAt: "2026-10-04T04:00:00.000Z",
+      startAt: "2026-10-02T17:00:00.000Z",
+    });
+    await fireEvent.changeText(screen.getByLabelText("To"), "0630");
+    expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
+      ["activity.adjusted", { activityId, endAt: "2026-10-04T03:30:00.000Z" }],
+    ]);
+  });
+
   it("sends the end alone when only the end moved, never the start it did not touch", async () => {
     const { activityId, saved } = await editSheet();
     await fireEvent.changeText(screen.getByLabelText("To"), "1330");
@@ -331,6 +356,16 @@ describe("what saving an edit sends", () => {
     expect(written.map((event) => [event.type, event.payload])).toEqual([
       ["activity.adjusted", { activityId, endAt: "2026-10-06T10:30:00.000Z" }],
     ]);
+  });
+});
+
+describe("the sheet's day", () => {
+  it("names both days of a night, and the one day once the end moves back before midnight", async () => {
+    // Saturday 23:25 → Sunday 07:40 in Moscow, opened from Sunday's row (QA round 17 L14, review m7).
+    await editSheet({ endAt: "2026-10-04T04:40:00.000Z", startAt: "2026-10-03T20:25:00.000Z" });
+    expect(screen.getByText("Sat · Oct 3 – Sun · Oct 4")).toBeOnTheScreen();
+    await fireEvent.changeText(screen.getByLabelText("To"), "2350");
+    expect(screen.getByText("Saturday · Oct 3")).toBeOnTheScreen();
   });
 });
 
