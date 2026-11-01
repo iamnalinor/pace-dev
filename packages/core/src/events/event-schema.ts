@@ -85,6 +85,12 @@ export type EventType = (typeof EVENT_TYPES)[number];
 // anything non-blank after the prefix is accepted; the reducers own the exact shape.
 const SYSTEM_ID = /^(?:hw|auto|rep):\S+$/;
 
+/**
+The longest event id the sync carries (`SyncEventSchema`): a deterministic id built longer is
+stored by the server but never reaches a client, whose pull leaves it out.
+*/
+export const EVENT_ID_MAX = 64;
+
 export const EventIdSchema = z.string().refine((value) => isUlid(value) || SYSTEM_ID.test(value), {
   message: "Expected a ULID or a deterministic system id",
 });

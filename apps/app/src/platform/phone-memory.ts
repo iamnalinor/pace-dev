@@ -2,8 +2,6 @@ import * as SecureStore from "expo-secure-store";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 
-import type { SleepCandidate } from "@pace/core";
-
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
 
 import { createSecureSessionStore } from "./secure-session.ts";
@@ -82,15 +80,11 @@ const keyList = (storeKey: string) => {
   };
 };
 
-/** The key a sleep guess is remembered by (dismissed, asked about). */
-export const sleepKey = (sleep: Pick<SleepCandidate, "startAt">): string =>
-  `sleep@${sleep.startAt}`;
-
 /** The key one occurrence of a calendar event is remembered by. */
 export const calendarKey = (event: Pick<PhoneCalendarEvent, "id" | "startAt">): string =>
   `calendar@${event.id}@${event.startAt}`;
 
-/** What the person waved away on this phone: a sleep stretch, a calendar event. */
+/** What the person waved away on this phone: a calendar event. */
 const dismissed = keyList("pace.phone.dismissed");
 
 export const dismissedKeys = dismissed.all;

@@ -22,6 +22,7 @@ import { parseProviders } from "../shared/llm/providers.ts";
 import { readMessage } from "../shared/llm/read.ts";
 import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
 import { taskUrl } from "../shared/web-links.ts";
+import { armEarliest } from "./alarm.ts";
 import { telegramOf, webOriginOf } from "./notifier.ts";
 
 /** A text to read once the assistant is back: kept in the store until then. */
@@ -95,11 +96,7 @@ export const armForQueue = async (storage: DurableObjectStorage, now: string): P
   if (due === null) {
     return;
   }
-  const at = Math.max(Date.parse(due), Date.parse(now) + 1000);
-  const existing = await storage.getAlarm();
-  if (existing === null || at < existing) {
-    await storage.setAlarm(at);
-  }
+  await armEarliest(storage, Math.max(Date.parse(due), Date.parse(now) + 1000));
 };
 
 /** What a queued text became: written as read, put in the Inbox, or still waiting. */

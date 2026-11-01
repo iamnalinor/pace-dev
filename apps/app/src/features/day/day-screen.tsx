@@ -32,13 +32,7 @@ import {
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
-import {
-  CalendarSection,
-  EndedAtPrompt,
-  SleepCard,
-  UsageAccessHint,
-  UsageLine,
-} from "./phone-section.tsx";
+import { CalendarSection, EndedAtPrompt, UsageAccessHint, UsageLine } from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
 /** "of ~30m", when the block has an Expect. */
@@ -317,7 +311,6 @@ export const DayScreen = () => {
   return (
     <Screen header={header}>
       <Totals day={day} />
-      {phone.hasUsageAccess ? <SleepCard phone={phone} zone={day.zone} /> : null}
       {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
       {day.entries.length === 0 ? (
         <Text className="px-5 py-6 font-sans text-[14px] text-muted">{t("day.empty")}</Text>

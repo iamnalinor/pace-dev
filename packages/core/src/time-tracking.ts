@@ -88,10 +88,8 @@ export {
   type AppMinutes,
   appSessions,
   appUsage,
-  detectSleep,
   phonePickupAt,
   screenOnIntervals,
-  type SleepCandidate,
 } from "./tracking/phone.ts";
 export {
   decideSleep,
@@ -101,6 +99,9 @@ export {
   sleepEvents,
   type SleepInput,
 } from "./tracking/sleep-auto.ts";
+export { sleepInputOf, type SleepKnowledge } from "./tracking/sleep-input.ts";
+export { AUTO_SLEEP_LABEL, shownLabel } from "./tracking/sleep-label.ts";
+export { readSleepDecision, type SleepLogInputs, sleepRuleOf } from "./tracking/sleep-log.ts";
 export { timeReducer } from "./tracking/time-reducer.ts";
 export {
   type Gap,

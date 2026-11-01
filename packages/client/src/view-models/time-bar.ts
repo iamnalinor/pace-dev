@@ -3,6 +3,7 @@ import {
   type ActivityCategory,
   CATEGORY_COLORS,
   type CoreState,
+  type Language,
   type MessageKey,
   type MessageParams,
   paceStatus,
@@ -11,6 +12,7 @@ import {
   type QueryContext,
   remindAt,
   runningActivities,
+  shownLabel,
   TIME_BUTTONS,
   type TimeButton,
 } from "@pace/core";
@@ -74,7 +76,10 @@ const focusedTaskOf = (main: Activity | null): null | string =>
 
 const MS_PER_MINUTE = 60_000;
 
-const runningView = (active: Activity, now: string): RunningView => {
+const runningView = (
+  active: Activity,
+  { language, now }: { readonly language: Language; readonly now: string },
+): RunningView => {
   const minutes = Math.max(
     0,
     Math.floor((Date.parse(now) - Date.parse(active.startAt)) / MS_PER_MINUTE),
@@ -86,7 +91,7 @@ const runningView = (active: Activity, now: string): RunningView => {
     color: CATEGORY_COLORS[active.category],
     expectMinutes: active.expectMinutes,
     isAlongside: active.isAlongside,
-    label: active.label,
+    label: shownLabel(active, language),
     minutes,
     share: target === null ? null : Math.min(1, minutes / target),
     startAt: active.startAt,
@@ -117,14 +122,18 @@ const isButtonRunning = (
 The time bar at the bottom of Day: the four buttons, always in their places, and what is
 running (the main activity and whatever runs alongside it).
 */
-export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext): TimeBarModel => {
+export const timeBarModel = (
+  state: Pick<CoreState, "settings" | "time">,
+  ctx: QueryContext,
+): TimeBarModel => {
   const running = runningActivities(state.time, ctx.now);
+  const shown = { language: state.settings.language, now: ctx.now };
   const main = running.find((activity) => !activity.isAlongside) ?? null;
   const mainButton = main?.buttonId ?? null;
   return {
     alongside: running
       .filter((activity) => activity.isAlongside)
-      .map((activity) => runningView(activity, ctx.now)),
+      .map((activity) => runningView(activity, shown)),
     buttons: TIME_BUTTONS.map((button) => {
       const choices = button.choices.map((choice) => ({
         expectMinutes: choice.expectMinutes,
@@ -143,7 +152,7 @@ export const timeBarModel = (state: Pick<CoreState, "time">, ctx: QueryContext):
       };
     }),
     focusedTaskId: focusedTaskOf(main),
-    running: main === null ? null : runningView(main, ctx.now),
+    running: main === null ? null : runningView(main, shown),
   };
 };
 

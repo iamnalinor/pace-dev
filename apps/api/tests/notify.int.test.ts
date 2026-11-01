@@ -767,6 +767,9 @@ describe("Firebase push", () => {
         ],
         { now: changedAt },
       );
+      // The retry's alarm fires: the runtime takes it off before the pass, which arms only what
+      // is still due (nothing moves an alarm set earlier, so a pass outside it would keep it).
+      await state.storage.deleteAlarm();
       const run = await instance.runNotifications(
         new Date(Date.parse(started) + 61_000).toISOString(),
         couriers,
@@ -846,6 +849,8 @@ describe("Firebase push", () => {
       );
       await unsubscribe(env.DB, sessionId);
       const now = new Date(Date.parse(started) + 60_000).toISOString();
+      // The retry's alarm fires: the runtime takes it off before the pass.
+      await state.storage.deleteAlarm();
       const run = await instance.runNotifications(now, couriers);
       expect(await state.storage.getAlarm()).toBe(
         run.nextAt === null ? null : Date.parse(run.nextAt),

@@ -16,6 +16,7 @@ import {
 
 import { existing, type Lookup, lookupOf, seenAfter, type World } from "./decision-lookup.ts";
 import { providerLabel } from "./decision-provider.ts";
+import { systemRow } from "./decision-system.ts";
 import { conversationOf, quoted } from "./decision-text.ts";
 import { isFolded } from "./decision-threads.ts";
 
@@ -288,11 +289,6 @@ const parseParts = (row: Row): Parts => {
   }
 };
 
-const NOTIFICATIONS: Readonly<Record<string, MessageKey>> = {
-  sent: "decisions.notificationSent",
-  suppressed: "decisions.notificationHeld",
-};
-
 const viewOf = (
   decision: Decision,
   { claimed, lookup }: { readonly lookup: Lookup; readonly claimed: ReadonlySet<string> },
@@ -314,20 +310,7 @@ const viewOf = (
     };
   }
   const none = { followups: [], notFound: null, request: null, via: null };
-  const notification =
-    decision.kind === "notification" && Object.hasOwn(NOTIFICATIONS, decision.outcome)
-      ? NOTIFICATIONS[decision.outcome]
-      : undefined;
-  return notification === undefined
-    ? { ...base, ...none, lines: [decision.explanation], note: null, outcome: null, taskId: null }
-    : {
-        ...base,
-        ...none,
-        lines: [t(language, notification)],
-        note: decision.explanation,
-        outcome: null,
-        taskId: null,
-      };
+  return { ...base, ...none, ...systemRow(decision, language), outcome: null, taskId: null };
 };
 
 /**

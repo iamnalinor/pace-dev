@@ -8,6 +8,7 @@ import {
   formatInZone,
   type ProjectColorName,
   type QueryContext,
+  shownLabel,
   startOfWeekIn,
   timeline,
 } from "@pace/core";
@@ -175,7 +176,10 @@ export const weekModel = (
           endAt: segment.endAt,
           id: `${segment.activityId}-${segment.startAt}`,
           isAlongside: segment.isAlongside,
-          label: segment.label,
+          label: shownLabel(
+            { id: segment.activityId, label: segment.label },
+            state.settings.language,
+          ),
           minutes: segment.minutes,
           startAt: segment.startAt,
           taskId: segment.taskId,

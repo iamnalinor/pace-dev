@@ -4,6 +4,7 @@ import { sleepDiscardId, sleepNightOf, sleepReopenId, sleepStartId, sleepStopId 
 import { minutesBetween } from "../time.ts";
 import { isRestClass } from "./categories.ts";
 import { bedtimeFloor, isBedtime, laterOf, REST_MIN_MINUTES } from "./phone-use.ts";
+import { AUTO_SLEEP_LABEL } from "./sleep-label.ts";
 import {
   decideFor,
   type DeviceUse,
@@ -305,7 +306,7 @@ const toEvent = (
       return {
         id,
         occurredAt: decision.at,
-        payload: { activityId: id, category: "sleep", label: "Sleep" },
+        payload: { activityId: id, category: "sleep", label: AUTO_SLEEP_LABEL },
         precision: "approx",
         source: "system",
         type: "activity.started",

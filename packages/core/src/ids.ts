@@ -72,17 +72,39 @@ longer in force: a start in the same minute as one of them takes the next unused
 export const sleepStartId = (night: string, atIso: string, used: readonly string[] = []): string =>
   firstUnused(`auto:sleep-${night}:start-${minuteStamp(atIso)}`, new Set(used));
 
+/** Multiplies two 32-bit words as the platform's `Math.imul` does (overflow wraps). */
+const mix = (word: number, factor: number): number => Math.imul(word, factor);
+
 /**
-An automatic stop of a sleep (automatic or the person's) at an instant. `used` are the stop ids
-this activity already has, in force or revoked: a stop decided again where a reopen undid one,
-or seconds away in the same minute, takes the next unused suffix instead of an id the log
-already holds, which would write nothing (edit, undo, edit: class 38).
+A short fixed-length digest of `text` (53 bits as 11 base-36 characters, cyrb53): names an
+activity inside an id without carrying its id, which can be as long as an id may be.
+*/
+const digestOf = (text: string): string => {
+  const codes = Array.from({ length: text.length }, (_, index) => text.codePointAt(index) ?? 0);
+  // eslint-disable-next-line unicorn/no-array-reduce -- a hash folds each character into its state
+  const [h1, h2] = codes.reduce<readonly [number, number]>(
+    ([a, b], code) => [mix(a ^ code, 2_654_435_761), mix(b ^ code, 1_597_334_677)],
+    [0xde_ad_be_ef, 0x41_c6_ce_57],
+  );
+  const low = mix(h1 ^ (h1 >>> 16), 2_246_822_507) ^ mix(h2 ^ (h2 >>> 13), 3_266_489_909);
+  const high = mix(h2 ^ (h2 >>> 16), 2_246_822_507) ^ mix(h1 ^ (h1 >>> 13), 3_266_489_909);
+  return (4_294_967_296 * (2_097_151 & high) + (low >>> 0)).toString(36).padStart(11, "0");
+};
+
+/**
+An automatic stop of a sleep (automatic or the person's) at an instant. The activity is named by
+a digest of its id, so the stop and its reopen stay within what the sync carries (an automatic
+sleep's own id nested in full overran it: class 12). `used` are the stop ids this activity
+already has, in force or revoked: a stop decided again where a reopen undid one, or seconds away
+in the same minute, takes the next unused suffix instead of an id the log already holds, which
+would write nothing (edit, undo, edit: class 38).
 */
 export const sleepStopId = (
   activityId: string,
   atIso: string,
   used: readonly string[] = [],
-): string => firstUnused(`auto:${activityId}:stop-${minuteStamp(atIso)}`, new Set(used));
+): string =>
+  firstUnused(`auto:sleep-stop-${digestOf(activityId)}-${minuteStamp(atIso)}`, new Set(used));
 
 /** The revocation of an automatic stop after a short wake: the sleep goes on. */
 export const sleepReopenId = (stopEventId: string): string => `auto:${stopEventId}:reopen`;
@@ -91,7 +113,7 @@ export const sleepReopenId = (stopEventId: string): string => `auto:${stopEventI
 export const sleepDiscardId = (startEventId: string): string => `auto:${startEventId}:discard`;
 
 const AUTO_SLEEP_START = /^auto:sleep-\d{4}-\d{2}-\d{2}:start-\d{8}T\d{4}$/u;
-const AUTO_SLEEP_STOP = /^auto:\S+:stop-\d{8}T\d{4}$/u;
+const AUTO_SLEEP_STOP = /^auto:sleep-stop-[\da-z]{11}-\d{8}T\d{4}$/u;
 /** The `-2`, `-3`… a start or a stop carries when its first id is already used. */
 const SUFFIX = /-[1-9]\d*$/u;
 

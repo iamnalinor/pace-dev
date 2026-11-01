@@ -504,3 +504,58 @@ describe("decisionView", () => {
     expect(en(parsed({ provider: "rules", text: "x" })).via).toBe("via local rules");
   });
 });
+
+/** A row automatic sleep wrote on the server about the instant `at`, decided in Moscow. */
+const slept = (rule: string, at: string): Decision => ({
+  at: "2026-10-08T04:15:00.000Z",
+  explanation: `${rule} at ${at}`,
+  id: `sleep-${at}`,
+  inputs: {
+    activityId: "auto:sleep-2026-10-07:start-20261007T2040",
+    at,
+    decidedUntil: null,
+    eventId: "auto:sleep-2026-10-07:start-20261007T2040",
+    knownUntil: "2026-10-08T04:10:00.000Z",
+    spells: [{ endAt: "2026-10-07T20:40:00.000Z", startAt: "2026-10-07T20:10:00.000Z" }],
+    zone: "Europe/Moscow",
+  },
+  kind: "sleep",
+  outcome: "applied",
+  rule,
+  taskId: null,
+});
+
+/** One row of each decision automatic sleep makes, as worded in `language`. */
+const sleepLines = (language: "en" | "ru") =>
+  logIn(language, [
+    slept("sleep.open", "2026-10-07T20:40:00.000Z"),
+    slept("sleep.stop", "2026-10-08T04:10:00.000Z"),
+    slept("sleep.reopen", "2026-10-08T00:00:00.000Z"),
+    slept("sleep.discard", "2026-10-07T18:10:00.000Z"),
+  ]).map((view) => view.lines);
+
+describe("automatic sleep in the log", () => {
+  it("words each decision with its time in the person's zone, never the rule's key", () => {
+    expect(sleepLines("en")).toEqual([
+      ["Sleep started at 23:40 (no phone use since)"],
+      ["Sleep ended at 07:10 (the phone was picked up)"],
+      ["Sleep continued: a short wake at 03:00"],
+      ["A short rest at 21:10 was not sleep"],
+    ]);
+    expect(sleepLines("ru")).toEqual([
+      ["Сон начался в 23:40 (с тех пор телефоном не пользовались)"],
+      ["Сон закончился в 07:10 (взяли телефон)"],
+      ["Сон продолжился: короткое пробуждение в 03:00"],
+      ["Короткий отдых в 21:10 не был сном"],
+    ]);
+    const shown = JSON.stringify(logIn("ru", [slept("sleep.open", "2026-10-07T20:40:00.000Z")]));
+    expect(shown).not.toContain("sleep.open");
+  });
+
+  it("shows the server's own words for a sleep row it cannot read", () => {
+    const newer = slept("sleep.merge", "2026-10-07T20:40:00.000Z");
+    expect(logIn("en", [newer])[0]?.lines).toEqual(["sleep.merge at 2026-10-07T20:40:00.000Z"]);
+    const broken = { ...slept("sleep.open", "x"), explanation: "Sleep opened" };
+    expect(logIn("en", [broken])[0]?.lines).toEqual(["Sleep opened"]);
+  });
+});

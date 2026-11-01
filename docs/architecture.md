@@ -96,9 +96,15 @@ every device and the server produce the same event once:
 
 - `instanceId(presetId, isoWeek)` → `hw:<presetId>:<isoWeek>` (recurring homework)
 - `autoOutcomeId(taskId, kind)` → `auto:<taskId>:missed|skipped` (automatic outcomes)
+- automatic sleep: `auto:sleep-<night>:start-<yyyyMMddTHHmm>` (the start and its activity),
+  `auto:sleep-stop-<digest of the activity id>-<yyyyMMddTHHmm>`, and `auto:<stop id>:reopen` /
+  `auto:<start id>:discard` for the revocations; a `-2`, `-3`… suffix where the first is used
 
-`EventIdSchema` accepts a ULID or `^(?:hw|auto):[^\s:]+:[^\s:]+$`; the log stores an id
-once (`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op.
+`EventIdSchema` accepts a ULID or `^(?:hw|auto|rep):\S+$`; the log stores an id once
+(`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op. The sync carries ids of at
+most `EVENT_ID_MAX` (64) characters: one built longer stays on the server and a client's pull
+leaves it out, so a deterministic id never nests another id whole (the sleep stop names its
+activity by a digest).
 
 ### Materialization rules
 
@@ -331,6 +337,27 @@ delivery per channel and device, and arms the Durable Object alarm for the next 
 The feed and open app update through the live socket. Telegram and a configured FCM project
 can deliver outside the app; a phone with a different Firebase project uses polling.
 
+**Automatic sleep** (`user-store/sleep-pass.ts`) runs after every usage upload and at the alarm.
+A pass reads use on every device from 36 hours back and how far the phones have told
+(`usageForSleep`), builds the rules' input from the log with core's `sleepInputOf` (the same
+builder the rules' own tests use), decides with `decideSleep` and appends `sleepEvents` through
+the system path (device `server`, deterministic `auto:sleep-…` ids, so passes are idempotent).
+Each decision that wrote an event goes to `decisions` (kind `sleep`, rule `sleep.open` /
+`sleep.stop` / `sleep.reopen` / `sleep.discard`, inputs: the instant, the zone, `knownUntil` and
+the spells awake around it); the assistant log words them through `decision-sleep.ts`. The
+highest `knownUntil` a pass decided with is kept (key `sleep:decided-until`) and passed back, so
+less known later undoes nothing. The stored label `"Sleep"` is the server's; every screen shows
+an automatic sleep through `shownLabel` in the reader's language. Without a phone upload within
+a day nothing is decided and nothing armed.
+
+**The alarm** is one per store and shared: the pool's next pass and delivery retries, the
+assistant's queue and automatic sleep each arm it through `armEarliest` (`user-store/alarm.ts`),
+which only ever moves it earlier, so none postpones another's earlier time. `alarm()` runs the
+pool, the queue and a sleep pass (a failure in one does not hold the others back and fails the
+alarm afterwards), and each arms its next time again; the runtime takes the alarm off as it
+fires. Sleep looks again every 15 minutes from 21:00 to noon in the person's zone and at the
+next 21:00 by day (`nextSleepCheckAt`).
+
 **The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone
 registers `pace.background-check` with `expo-background-task` (WorkManager,
 `minimumInterval: 15`) on sign-in and unregisters it on logout. A run builds its client with
@@ -347,9 +374,10 @@ Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`,
 `apply(inputs, { source, deviceId, now })` (derives, then validates the batch in order with
 core's `validateEventInput`, the first refusal stops it and none of it is written; stamps
 ids, `recordedAt` and the device; returns the stored events and the new state), `dryRun`
-(the same without any write, derivation included), `derive(now)`, `countEvents`. The MCP tools (and the bot from stage
-2) reach it through `UserStoreApi` in `shared/contract.ts`; alarms (digests) join in stage
-2, so heavy recomputes never cross a network boundary.
+(the same without any write, derivation included), `derive(now)`, `countEvents`, `addUsage`
+(stores an upload, then runs a sleep pass), `usageForSleep`. The MCP tools and the bot reach it
+through `UserStoreApi` in `shared/contract.ts`, so heavy recomputes never cross a network
+boundary.
 
 ## How to add an endpoint
 

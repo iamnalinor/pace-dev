@@ -314,10 +314,12 @@ the native code and runs the JS logic against mocks).
 - **Settings → Permissions**: the same four, each with its state (on / off / turned off in
   Android settings) and one button. Calendar series you answered "every time" are listed
   there too, each with Forget.
-- **Sleep**: after a night with the phone idle for at least 3 h touching 21:00–12:00,
-  the Day screen shows a "Last night" card with the times and how often you woke up
-  (screen-on glances up to 5 min are merged into the night). *Log sleep* writes a `sleep`
-  block; *Not sleep* hides that guess on this phone.
+- **Sleep**: the phone sends when it was in use (unlocked, an app in front) about every
+  15 minutes, and the server records the night by itself, without asking: a sleep opens
+  after 45 minutes with no use on any device from 21:00 on, ends when a device is used
+  again, and continues as if never stopped after a short wake in the small hours. A rest
+  shorter than 3 hours is not kept as sleep. The assistant log says each step ("Sleep
+  started at 23:40 (no phone use since)"); History undoes any of them.
 - **Phone time per block**: under each block on Day, "Phone 25m: YouTube, Telegram…"
   sums foreground app time inside it. It only shows where the time went: nothing is taken
   off the block.

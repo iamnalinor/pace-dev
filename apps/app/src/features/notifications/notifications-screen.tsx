@@ -17,6 +17,7 @@ import {
   type Language,
   minutesBetween,
   type PoolNotification,
+  shownLabel,
 } from "@pace/core";
 
 import { Answers, Line } from "./answers.tsx";
@@ -98,7 +99,9 @@ const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned
       );
     }
     case "activity_overrun": {
-      return <Line>{t("notifications.overrun", { label: item.payload.label })}</Line>;
+      const { activityId, label } = item.payload;
+      const shown = shownLabel({ id: activityId, label }, zoned.language);
+      return <Line>{t("notifications.overrun", { label: shown })}</Line>;
     }
   }
 };

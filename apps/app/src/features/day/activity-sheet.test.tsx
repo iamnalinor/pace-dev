@@ -241,6 +241,61 @@ describe("moving a block's end", () => {
   });
 });
 
+/** The Day sheet on a logged 12:00–13:00 Moscow block, and the events a save writes. */
+const editSheet = async () => {
+  const runtime = await createTestRuntime();
+  await runtime.actions.logPast({
+    category: "work",
+    endAt: "2026-10-06T10:00:00.000Z",
+    label: "Team chat",
+    startAt: "2026-10-06T09:00:00.000Z",
+  });
+  const [activity] = Object.values(runtime.state.store.getState().time.activities);
+  const before = runtime.state.store.getState().log.length;
+  const onClose = jest.fn();
+  await renderScreen(
+    <ActivitySheet
+      onClose={onClose}
+      target={{
+        activityId: activity?.id ?? "",
+        category: "work",
+        endAt: "2026-10-06T10:00:00.000Z",
+        kind: "edit",
+        label: "Team chat",
+        startAt: "2026-10-06T09:00:00.000Z",
+      }}
+      zone="Europe/Moscow"
+    />,
+    runtime,
+  );
+  const saved = async () => {
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    return runtime.state.store.getState().log.slice(before);
+  };
+  return { activityId: activity?.id ?? "", saved };
+};
+
+describe("what saving an edit sends", () => {
+  it("sends no boundary when only the name and category changed", async () => {
+    const { saved } = await editSheet();
+    await fireEvent.changeText(screen.getByLabelText("What"), "Standup");
+    const written = await saved();
+    expect(written.map((event) => event.type)).toEqual(["activity.labelled"]);
+  });
+
+  it("sends the end alone when only the end moved, never the start it did not touch", async () => {
+    const { activityId, saved } = await editSheet();
+    await fireEvent.changeText(screen.getByLabelText("To"), "1330");
+    const written = await saved();
+    expect(written.map((event) => [event.type, event.payload])).toEqual([
+      ["activity.adjusted", { activityId, endAt: "2026-10-06T10:30:00.000Z" }],
+    ]);
+  });
+});
+
 describe("deleting a block", () => {
   it("asks for a second tap, then takes it off the day", async () => {
     const runtime = await createTestRuntime();

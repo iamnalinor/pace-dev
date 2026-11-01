@@ -134,14 +134,12 @@ const corrections = (
 const movementError = (
   deps: ActionDeps,
   moved: ReturnType<typeof moveChange>,
-  endAt: null | string,
+  { endAt, startAt }: { readonly startAt: string; readonly endAt: null | string },
 ): ActionError | null => {
   if (isAhead(deps, moved.startAt) || isAhead(deps, moved.endAt)) {
     return "retro/future";
   }
-  return endAt !== null && Date.parse(endAt) <= Date.parse(moved.startAt)
-    ? "action/invalid-input"
-    : null;
+  return endAt !== null && Date.parse(endAt) <= Date.parse(startAt) ? "action/invalid-input" : null;
 };
 
 /** Validate both edits before writing either event. */
@@ -154,10 +152,14 @@ const saveEdit = async (
   if (activity === undefined) {
     return err("event/not-found");
   }
-  const isMoved =
-    entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
   const moved = moveChange(target, entry);
-  const moveError = isMoved ? movementError(deps, moved, moved.endAt ?? activity.endAt) : null;
+  const isMoved = moved.startAt !== undefined || moved.endAt !== undefined;
+  const moveError = isMoved
+    ? movementError(deps, moved, {
+        endAt: moved.endAt ?? activity.endAt,
+        startAt: moved.startAt ?? activity.startAt,
+      })
+    : null;
   if (moveError !== null) {
     return err(moveError);
   }

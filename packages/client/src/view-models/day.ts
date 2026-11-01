@@ -11,6 +11,7 @@ import {
   LANGUAGES,
   type ProjectColorName,
   type QueryContext,
+  shownLabel,
   startOfDayIn,
   t,
   taskById,
@@ -142,17 +143,24 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
   const from = date === null ? today : startOfDayIn(date, zone);
   const to = addDaysIn(from, 1, zone);
   const day = timeline(state.time, { from, now: ctx.now, to });
-  const rows: readonly DayEntry[] = [...day.segments, ...day.alongside].map((segment) => ({
-    key: `${segment.activityId}-${segment.startAt}`,
-    kind: "activity",
-    target: editTargetOf(segment),
-    row: {
-      ...segment,
-      color: CATEGORY_COLORS[segment.category],
-      showsLabel: !isCategoryName(segment.label, segment.category),
-      taskLink: taskLinkOf(state, segment),
-    },
-  }));
+  const rows: readonly DayEntry[] = [...day.segments, ...day.alongside].map((segment) => {
+    const label = shownLabel(
+      { id: segment.activityId, label: segment.label },
+      state.settings.language,
+    );
+    return {
+      key: `${segment.activityId}-${segment.startAt}`,
+      kind: "activity",
+      target: editTargetOf({ ...segment, label }),
+      row: {
+        ...segment,
+        color: CATEGORY_COLORS[segment.category],
+        label,
+        showsLabel: !isCategoryName(label, segment.category),
+        taskLink: taskLinkOf(state, segment),
+      },
+    };
+  });
   // A day with nothing on it is empty, not one gap from midnight to now.
   const gaps: readonly DayEntry[] =
     rows.length === 0

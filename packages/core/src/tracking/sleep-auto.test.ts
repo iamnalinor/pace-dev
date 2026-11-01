@@ -1,7 +1,8 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { type Event, EventIdSchema } from "../events/event-schema.ts";
+import { SyncEventSchema } from "../api/schemas/sync.ts";
+import { type Event, EVENT_ID_MAX, EventIdSchema } from "../events/event-schema.ts";
 import {
   isAutoSleepId,
   sleepDiscardId,
@@ -132,7 +133,7 @@ describe("sleep ids", () => {
     const start = sleepStartId(NIGHT, at("23:40"));
     expect(start).toBe("auto:sleep-2026-10-07:start-20261007T2040");
     const stopped = sleepStopId(start, at("07:10"));
-    expect(stopped).toBe(`auto:${start}:stop-20261008T0410`);
+    expect(stopped).toMatch(/^auto:sleep-stop-[\da-z]{11}-20261008T0410$/u);
     expect(sleepReopenId(stopped)).toBe(`auto:${stopped}:reopen`);
     expect(sleepDiscardId(start)).toBe(`auto:${start}:discard`);
     const personStop = sleepStopId("01ARZ3NDEKTSV4RRFFQ69G5001", at("02:10"));
@@ -140,6 +141,40 @@ describe("sleep ids", () => {
       expect(EventIdSchema.safeParse(id).success).toBe(true);
       expect(isAutoSleepId(id)).toBe(true);
     }
+  });
+
+  it("keeps every id within what the sync carries, whatever the activity's id (class 12)", () => {
+    // The longest the ids get: suffixed starts and stops, an activity id of the most a client sends.
+    const start = sleepStartId(NIGHT, at("23:40"), [
+      sleepStartId(NIGHT, at("23:40")),
+      ...Array.from(
+        { length: 10 },
+        (_, index) => `${sleepStartId(NIGHT, at("23:40"))}-${index + 2}`,
+      ),
+    ]);
+    expect(start.endsWith("-12")).toBe(true);
+    const long = "x".repeat(EVENT_ID_MAX);
+    const stops = [start, long].map((activityId) =>
+      sleepStopId(activityId, at("03:00"), [
+        sleepStopId(activityId, at("03:00")),
+        ...Array.from(
+          { length: 10 },
+          (_, index) => `${sleepStopId(activityId, at("03:00"))}-${index + 2}`,
+        ),
+      ]),
+    );
+    for (const id of [
+      start,
+      sleepDiscardId(start),
+      ...stops,
+      ...stops.map((stop) => sleepReopenId(stop)),
+    ]) {
+      expect(EventIdSchema.safeParse(id).success).toBe(true);
+      expect(SyncEventSchema.shape.id.safeParse(id).success).toBe(true);
+      expect(isAutoSleepId(id)).toBe(true);
+    }
+    // Two sleeps stopped by the same use at the same instant keep apart.
+    expect(sleepStopId(start, at("03:00"))).not.toBe(sleepStopId(long, at("03:00")));
   });
 
   it("tells automatic sleep ids from everything else in the log", () => {
@@ -166,6 +201,7 @@ describe("sleep ids", () => {
     const first = sleepStopId(start, at("03:00"));
     const second = sleepStopId(start, at("03:00"), [first]);
     expect(second).toBe(`${first}-2`);
+    expect(first).not.toContain(start);
     expect(sleepStopId(start, at("03:00"), [first, second])).toBe(`${first}-3`);
     // A stop seconds away in the same minute gets its own id too.
     const secondsLater = addMinutesIso(at("03:00"), 0.5);
@@ -565,15 +601,21 @@ describe("automatic sleep", () => {
     expect(step(again.log, known).decisions).toEqual([]);
   });
 
-  it("never reopens an end the person set at the automatic stop's own instant", () => {
-    // Stopped at 03:00 by a short wake; the person confirms 03:00 as the end before the rest after it is known.
+  it("reopens a stop the person saved without changing its end, never an end they changed", () => {
+    // Stopped at 03:00 by a short wake, before the rest after it is known.
     const uses = [use("23:10", "23:40"), use("03:00", "03:06"), use("07:10", "07:25")];
     const stopped = lastLog([], uses, ["00:30", "03:20"]);
     expect(sleepsIn(stopped)).toEqual([sleep("23:40", "03:00")]);
-    const confirmed = [...stopped, endedByPerson(startId("23:40"), "03:00", "03:25")];
-    expect(step(confirmed, { knownUntil: at("04:40"), uses }).decisions).toEqual([]);
-    expect(step(confirmed, { knownUntil: at("07:30"), uses }).decisions).toEqual([]);
-    expect(sleepsIn(confirmed)).toEqual([sleep("23:40", "03:00")]);
+    // Saving the edit sheet with the end as it was sets nothing: the stop is still the rules'.
+    const saved = [...stopped, endedByPerson(startId("23:40"), "03:00", "03:25")];
+    expect(step(saved, { knownUntil: at("04:40"), uses }).decisions).toEqual([
+      reopen("23:40", "03:00"),
+    ]);
+    // Moving it to 03:05 is the person's end: never reopened or moved.
+    const changed = [...stopped, endedByPerson(startId("23:40"), "03:05", "03:25")];
+    expect(step(changed, { knownUntil: at("04:40"), uses }).decisions).toEqual([]);
+    expect(step(changed, { knownUntil: at("07:30"), uses }).decisions).toEqual([]);
+    expect(sleepsIn(changed)).toEqual([sleep("23:40", "03:05")]);
   });
 
   it("keeps the night of an automatic sleep the person moved out of it", () => {

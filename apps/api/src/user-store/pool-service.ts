@@ -20,6 +20,7 @@ import type * as schema from "./schema.ts";
 
 import { createLogger } from "../shared/logger.ts";
 import { pushConfigOf } from "../shared/push/registry.ts";
+import { armEarliest } from "./alarm.ts";
 import * as cloud from "./cloud-data.ts";
 import * as deliveries from "./delivery-rows.ts";
 import { broadcast } from "./live-sockets.ts";
@@ -222,10 +223,8 @@ export class NotificationPool {
       await this.#settle(settled.id, settled.resolution, { now, origin: "system" });
     }
     const at = pass.created.length > 0 ? now : pass.nextAt;
-    const { storage } = this.#host.ctx;
-    const existing = await storage.getAlarm();
-    if (at !== null && (existing === null || Date.parse(at) < existing)) {
-      await storage.setAlarm(Date.parse(at));
+    if (at !== null) {
+      await armEarliest(this.#host.ctx.storage, Date.parse(at));
     }
   }
 

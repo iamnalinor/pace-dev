@@ -5,6 +5,7 @@ import {
   INITIAL_CORE_STATE,
   isCorrection,
   materializeAt,
+  shownLabel,
   taskById,
 } from "@pace/core";
 
@@ -67,7 +68,11 @@ const titleOf = (state: HistorySource, event: Event, taskId: null | string): nul
   }
   if ("activityId" in event.payload) {
     const activity = state.time.activities[event.payload.activityId];
-    return activity?.label ?? ("label" in event.payload ? (event.payload.label ?? null) : null);
+    const label =
+      activity?.label ?? ("label" in event.payload ? (event.payload.label ?? null) : null);
+    return label === null
+      ? null
+      : shownLabel({ id: event.payload.activityId, label }, state.settings.language);
   }
   return event.type === "task.created" ? event.payload.title : null;
 };

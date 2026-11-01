@@ -4,12 +4,19 @@ import type { ActivityEntry, ActivityTarget } from "./activity-edit-types.ts";
 
 import { type ActionDeps, stamp } from "./deps.ts";
 
+/**
+The boundaries the sheet changed, and only those: an edit that carries a value it did not change
+reads on the server as the person setting it (automatic sleep then never moves that end). A
+running block's end is not the sheet's to set. Empty when neither moved.
+*/
 export const moveChange = (
   target: Extract<ActivityTarget, { kind: "edit" }>,
   entry: ActivityEntry,
-): { readonly startAt: string; readonly endAt?: string } => ({
-  startAt: entry.startAt,
-  ...(entry.endAt !== null && target.endAt !== null && { endAt: entry.endAt }),
+): { readonly startAt?: string; readonly endAt?: string } => ({
+  ...(entry.startAt !== target.startAt && { startAt: entry.startAt }),
+  ...(entry.endAt !== null &&
+    target.endAt !== null &&
+    entry.endAt !== target.endAt && { endAt: entry.endAt }),
 });
 
 const labelChange = (entry: ActivityEntry) => ({

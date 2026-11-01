@@ -1,6 +1,6 @@
-import { type Event, type EventInput, type EventOf, EventSchema } from "../events/event-schema.ts";
-import { isAutoSleepId, sleepNightOf } from "../ids.ts";
-import { effectiveEvents, materialize } from "../materialize/materializer.ts";
+import { SyncEventSchema } from "../api/schemas/sync.ts";
+import { type Event, type EventInput, EventSchema } from "../events/event-schema.ts";
+import { materialize } from "../materialize/materializer.ts";
 import { event } from "../materialize/task-fixture.fake.ts";
 import { addMinutesIso, wallClockInstant } from "../time.ts";
 import { INITIAL_TIME_STATE } from "./model.ts";
@@ -8,11 +8,11 @@ import { type PhoneEvent, phoneUses } from "./phone-use.ts";
 import {
   decideSleep,
   type DeviceUse,
-  type SleepActivity,
   type SleepDecision,
   sleepEvents,
   type SleepInput,
 } from "./sleep-auto.ts";
+import { sleepInputOf } from "./sleep-input.ts";
 import { timeReducer } from "./time-reducer.ts";
 
 export const MOSCOW = "Europe/Moscow";
@@ -75,106 +75,13 @@ export const SPARSE_EVENING: readonly DeviceUse[] = Array.from({ length: 8 }, (_
   return { deviceId: "phone", endAt: addMinutesIso(startAt, 3), startAt };
 });
 
-const stopOf = (effective: readonly Event[], activityId: string, endAt: null | string) =>
-  effective.find(
-    (event) =>
-      event.type === "activity.stopped" &&
-      event.payload.activityId === activityId &&
-      event.occurredAt === endAt,
-  );
-
-/** Where an activity's start event put its start: a live start's instant, a logged block's `startAt`. */
-const startEventAtOf = (effective: readonly Event[], originEventId: string) => {
-  const origin = effective.find((event) => event.id === originEventId);
-  return origin?.type === "activity.logged" ? origin.payload.startAt : origin?.occurredAt;
-};
-
-/** The person's `activity.adjusted` events in force for an activity (never the system's). */
-const adjustedByPerson = (effective: readonly Event[], activityId: string) =>
-  effective.filter(
-    (event): event is EventOf<"activity.adjusted"> =>
-      event.type === "activity.adjusted" &&
-      event.source !== "system" &&
-      event.payload.activityId === activityId,
-  );
-
-/** Ids of the events out of force that a non-system `event.revoked` targets. */
-const revokedByPerson = (log: readonly Event[]): ReadonlySet<string> => {
-  const effectiveIds = new Set(effectiveEvents(log).map((event) => event.id));
-  return new Set(
-    log
-      .filter((event) => event.source !== "system")
-      .map((event) => (event.type === "event.revoked" ? event.payload.targetId : ""))
-      .filter((id) => id !== "" && !effectiveIds.has(id)),
-  );
-};
-
-/**
-What Task 13 builds from the user's log: the effective activities, each with the event that
-started it and the one that stopped it, the automatic stops no longer in force (by id) and the
-instants of those the person undid, and whether the person moved the start or set the end.
-*/
-export const sleepActivitiesOf = (log: readonly Event[]): readonly SleepActivity[] => {
-  const effective = effectiveEvents(log);
-  const effectiveIds = new Set(effective.map((event) => event.id));
-  const personRevoked = revokedByPerson(log);
-  const { activities } = materialize(log, timeReducer, INITIAL_TIME_STATE);
-  return Object.values(activities).map((activity) => {
-    const stop = stopOf(effective, activity.id, activity.endAt);
-    const adjustments = adjustedByPerson(effective, activity.id);
-    const revokedStops = log.filter(
-      (event) =>
-        event.type === "activity.stopped" &&
-        event.payload.activityId === activity.id &&
-        isAutoSleepId(event.id) &&
-        !effectiveIds.has(event.id),
-    );
-    return {
-      category: activity.category,
-      endAt: activity.endAt,
-      id: activity.id,
-      isAutoStart: isAutoSleepId(activity.originEventId),
-      isAutoStop: stop !== undefined && isAutoSleepId(stop.id),
-      isEndAmendedByPerson: adjustments.some((event) => event.payload.endAt !== undefined),
-      isStartAmendedByPerson: adjustments.some((event) => event.payload.startAt !== undefined),
-      personRevokedStopsAt: revokedStops
-        .filter((event) => personRevoked.has(event.id))
-        .map((event) => event.occurredAt),
-      revokedAutoStopIds: revokedStops.map((event) => event.id),
-      startAt: activity.startAt,
-      startEventAt: startEventAtOf(effective, activity.originEventId) ?? activity.startAt,
-      startEventId: activity.originEventId,
-      stopEventId: stop?.id ?? null,
-    };
-  });
-};
-
-/** Automatic sleep starts no longer in force, whoever revoked them. */
-export const revokedAutoStartIdsOf = (log: readonly Event[]): readonly string[] => {
-  const effectiveIds = new Set(effectiveEvents(log).map((event) => event.id));
-  return log
-    .filter((event) => event.type === "activity.started" && isAutoSleepId(event.id))
-    .map((event) => event.id)
-    .filter((id) => !effectiveIds.has(id));
-};
-
-/** Automatic sleep starts the person deleted (a non-system revocation in force), with their night. */
-export const personRevokedAutoStartsOf = (
-  log: readonly Event[],
-  zone: string,
-): SleepInput["personRevokedAutoStarts"] => {
-  const personRevoked = revokedByPerson(log);
-  return log
-    .filter(
-      (event) =>
-        event.type === "activity.started" && isAutoSleepId(event.id) && personRevoked.has(event.id),
-    )
-    .map((event) => ({ night: sleepNightOf(event.occurredAt, zone), startEventId: event.id }));
-};
+/** The rules' input builder, as the server's pass uses it (the tests read activities through it). */
+export { sleepActivitiesOf } from "./sleep-input.ts";
 
 /**
 The log after appending events, as the store does: an id already in the log writes nothing.
-Each event goes through the event schema, so an id or payload the log would refuse fails here.
+Each event goes through the event schema and the sync's envelope, so an id or payload the log
+would refuse, or one a client's pull would leave out (an id over 64 characters), fails here.
 */
 export const appended = (
   log: readonly Event[],
@@ -184,7 +91,8 @@ export const appended = (
   const ids = new Set(log.map((event) => event.id));
   const fresh = events
     .filter((input) => input.id !== undefined && !ids.has(input.id))
-    .map((input) => EventSchema.parse({ ...input, deviceId: "server", recordedAt: now }));
+    .map((input) => EventSchema.parse({ ...input, deviceId: "server", recordedAt: now }))
+    .map((event) => ({ ...event, ...SyncEventSchema.pick({ id: true }).parse(event) }));
   return [...log, ...fresh];
 };
 
@@ -211,17 +119,7 @@ export type Step = {
 export const step = (log: readonly Event[], known: Known): Step => {
   const { decidedUntil = null, knownUntil, uses, usesFrom = at("12:00"), zone = MOSCOW } = known;
   const now = known.now ?? (knownUntil === null ? at("12:00") : addMinutesIso(knownUntil, 5));
-  const input: SleepInput = {
-    activities: sleepActivitiesOf(log),
-    decidedUntil,
-    knownUntil,
-    now,
-    personRevokedAutoStarts: personRevokedAutoStartsOf(log, zone),
-    revokedAutoStartIds: revokedAutoStartIdsOf(log),
-    uses,
-    usesFrom,
-    zone,
-  };
+  const input = sleepInputOf(log, { decidedUntil, knownUntil, now, uses, usesFrom, zone });
   const decisions = decideSleep(input);
   const events = sleepEvents(decisions, input);
   return { decisions, events, input, log: appended(log, events, now) };

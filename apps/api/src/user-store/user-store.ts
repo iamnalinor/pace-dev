@@ -1,7 +1,6 @@
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import {
-  type CalendarEvent,
   err,
   type Event,
   type EventInput,
@@ -9,7 +8,6 @@ import {
   parseEvent,
   type Result,
   STORE_CHANGED,
-  type UsageRow,
 } from "@pace/core";
 
 import type {
@@ -32,20 +30,20 @@ import type {
 } from "../shared/contract.ts";
 import type { Cooldowns } from "../shared/llm/llm.ts";
 
+import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
-import * as cloud from "./cloud-data.ts";
+import { CloudStore } from "./cloud-store.ts";
 import { insertDecisions, listDecisions, resolveDecisions } from "./decision-log.ts";
 import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
 import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
-import { saveRuledSeries } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
 import { NotificationPool } from "./pool-service.ts";
-import { PoolStore } from "./pool-store.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
+import { runSleepPass } from "./sleep-pass.ts";
 import {
   applyInOrder,
   canApplyInOrder,
@@ -72,7 +70,7 @@ another epoch is emptied (see `STORE_EPOCH`) and migrations run. The state is ca
 memory with the log sequence it was built at and rebuilt when the cache is stale or a batch
 cannot be applied in order.
 */
-export class UserStore extends PoolStore {
+export class UserStore extends CloudStore {
   #cache: Materialized | undefined;
 
   readonly #pool: NotificationPool;
@@ -281,50 +279,31 @@ export class UserStore extends PoolStore {
     return await this.ctx.storage.get<JsonValue>(`memo:${key}`);
   }
 
-  /**
-  A phone's calendar over a range, replacing what that phone sent for it before, with the series
-  it answers "every time" for (never announced as they start).
-  */
-  async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
-    const stored = await cloud.replaceCalendar(this.db, upload);
-    if (upload.ruledSeries !== undefined) {
-      await saveRuledSeries(this.ctx.storage, upload.ruledSeries);
-    }
-    await this.#pool.afterWrite(now);
-    return stored;
-  }
-
-  /** The calendar's events overlapping a range. */
-  async calendar(range: cloud.Range): Promise<readonly CalendarEvent[]> {
-    return await cloud.listCalendar(this.db, range);
-  }
-
-  /** Forgets one phone's calendar copy (it stopped sending it). */
-  async clearCalendar(deviceId: string): Promise<void> {
-    await cloud.clearCalendar(this.db, deviceId);
-  }
-
-  /** A device's app sessions (names and times only), a phone's uses and how far it read. */
-  async addUsage(upload: cloud.UsageUpload, now: string): Promise<number> {
-    return await cloud.addUsage({ db: this.db, storage: this.ctx.storage }, upload, now);
-  }
-
-  /**
-  Use on every device from `from` on, and how far the phones' usage is known at `now` (`null` when
-  no phone uploaded within the day before): what automatic sleep decides on, at its own `now`.
-  */
-  async usageForSleep(from: string, now: string): Promise<cloud.SleepUsage> {
-    return await cloud.usageForSleep({ db: this.db, storage: this.ctx.storage }, { from, now });
-  }
-
-  /** Each device that sent usage, with the end of its newest session. */
-  async usageDevices(): Promise<ReturnType<typeof cloud.usageDevices>> {
-    return await cloud.usageDevices(this.db);
-  }
-
-  /** App sessions on every device overlapping a range. */
-  async usage(range: cloud.Range): Promise<readonly UsageRow[]> {
-    return await cloud.listUsage(this.db, range);
+  /** One pass of automatic sleep (see `runSleepPass`); its events go through the system path. */
+  protected override async sleepPass(now: string): Promise<readonly string[]> {
+    return await runSleepPass(
+      {
+        insert: async (inputs, at) => {
+          const made = await this.#system(inputs, at);
+          if (made.length > 0) {
+            await this.derive(at);
+            await this.#pool.afterWrite(at);
+          }
+          return made;
+        },
+        log: async () => await log.loadLog(this.db),
+        logDecisions: async (entries, at) => {
+          await this.logDecisions(entries, at);
+        },
+        storage: this.ctx.storage,
+        usageForSleep: async (from, at) => await this.usageForSleep(from, at),
+        zone: async () => {
+          const { state } = await this.#current();
+          return state.settings.timezone ?? notifier.SERVER_TZ;
+        },
+      },
+      now,
+    );
   }
 
   /** Appends to the decision log (notifications here, parses from the routes and the bot). */
@@ -372,20 +351,19 @@ export class UserStore extends PoolStore {
     return await notifier.chatFor(this.ctx.storage, this.env.DB, this.ctx.id.name);
   }
 
+  /**
+  Everything the store waits on, each arming its own next time again through `armEarliest`: the
+  notification pool, the assistant's queue, automatic sleep.
+  */
   override async alarm(): Promise<void> {
     const now = new Date().toISOString();
-    // A failed pass of the pool does not hold the assistant's queue back; it fails the alarm
-    // afterwards, so the runtime tries it again.
-    let failure: Error | null = null;
-    try {
-      await this.runNotifications(now);
-    } catch (error) {
-      failure = error instanceof Error ? error : new Error(String(error));
-    }
-    await this.drainParses(now);
-    if (failure !== null) {
-      throw failure;
-    }
+    await runEach([
+      async () => await this.runNotifications(now),
+      async () => {
+        await this.drainParses(now);
+      },
+      async () => await this.sleepPass(now),
+    ]);
   }
 
   /** The providers known to be rate limited at `now`, to skip until their time. */
