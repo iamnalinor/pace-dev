@@ -42,10 +42,21 @@ for (const size of SIZES) {
             ? info.outputPath(`settings-${size.name}.png`)
             : `${SHOT_DIR}/settings-${size.name}.png`,
       });
+      // By keyboard, focus stays in the row (bug class 5): onto Cancel inside the confirm, which
+      // is named by its question, and back onto Disconnect when cancelled.
+      await computer.getByRole("button", { name: "Disconnect" }).focus();
+      await page.keyboard.press("Enter");
+      const confirm = computer.getByRole("group", {
+        name: "Disconnect this computer? Its token stops working at once.",
+      });
+      await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(computer.getByRole("button", { name: "Disconnect" })).toBeFocused();
+
       await computer.getByRole("button", { name: "Disconnect" }).click();
-      await expect(
-        computer.getByText("Disconnect this computer? Its token stops working at once."),
-      ).toBeVisible();
+      await expect(confirm.getByRole("status")).toHaveText(
+        "Disconnect this computer? Its token stops working at once.",
+      );
       await expectNoA11yViolations(page);
       await computer.getByRole("button", { name: "Disconnect" }).click();
       await expect(computer).toHaveCount(0);

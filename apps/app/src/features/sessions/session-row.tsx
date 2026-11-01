@@ -14,6 +14,7 @@ import type { MessageKey } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
+import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 const ICON: Readonly<Record<Row["kind"], LucideIcon>> = {
@@ -43,10 +44,38 @@ const confirmKey = (row: Row): MessageKey => {
   return row.isCurrent ? "sessions.revokeCurrentConfirm" : "sessions.revokeConfirm";
 };
 
+/** The kind's icon (named for screen readers), the name as it came and the viewer's line. */
+const Identity = ({ row }: { readonly row: Row }) => {
+  const t = useT();
+  const { palette } = useTheme();
+  const Icon = ICON[row.kind];
+  return (
+    <>
+      <View
+        accessibilityLabel={t(KIND_KEY[row.kind])}
+        accessibilityRole="image"
+        className="h-8 w-8 items-center justify-center rounded-full bg-raised"
+      >
+        <Icon color={palette.fg2} size={18} strokeWidth={1.75} />
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text className="font-sans text-[15px] font-medium text-fg" numberOfLines={1}>
+          {row.name}
+        </Text>
+        {row.meta.length === 0 ? null : (
+          <Text className="font-sans text-[13px] text-muted">{row.meta.join(" · ")}</Text>
+        )}
+      </View>
+    </>
+  );
+};
+
 /**
 One way into the account: an icon for its kind, its name as it came (never translated), the
-viewer's line under it, and Revoke (Disconnect for a computer) asked inline first. The confirm
-holds a synchronous latch, so presses landing in one batch end the session once (bug class 36).
+viewer's line under it, and Revoke (Disconnect for a computer) asked inline first. Opening the
+confirm moves focus to its Cancel and says the question; Cancel gives focus back to the button
+(bug class 5). The confirm holds a synchronous latch, so presses landing in one batch end the
+session once (bug class 36).
 */
 export const SessionRow = ({
   onEnd,
@@ -57,11 +86,11 @@ export const SessionRow = ({
   readonly onEnd: () => Promise<void>;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const [isConfirming, setIsConfirming] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const sendingRef = useRef(false);
-  const Icon = ICON[row.kind];
+  const focus = useConfirmFocus();
+  const question = t(confirmKey(row));
   const actionLabel = t(row.action === "disconnect" ? "sessions.disconnect" : "sessions.revoke");
   const end = async (): Promise<void> => {
     if (sendingRef.current) {
@@ -80,26 +109,14 @@ export const SessionRow = ({
   return (
     <View aria-label={row.name} className="gap-2 py-1" role="group">
       <View className="min-h-12 flex-row items-center gap-3">
-        <View
-          accessibilityLabel={t(KIND_KEY[row.kind])}
-          accessibilityRole="image"
-          className="h-8 w-8 items-center justify-center rounded-full bg-raised"
-        >
-          <Icon color={palette.fg2} size={18} strokeWidth={1.75} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text className="font-sans text-[15px] font-medium text-fg" numberOfLines={1}>
-            {row.name}
-          </Text>
-          {row.meta.length === 0 ? null : (
-            <Text className="font-sans text-[13px] text-muted">{row.meta.join(" · ")}</Text>
-          )}
-        </View>
+        <Identity row={row} />
         {isConfirming ? null : (
           <Button
             onPress={() => {
+              focus.toCancel();
               setIsConfirming(true);
             }}
+            ref={focus.openerRef()}
             variant="ghost"
           >
             {actionLabel}
@@ -107,14 +124,25 @@ export const SessionRow = ({
         )}
       </View>
       {isConfirming ? (
-        <View className="flex-row flex-wrap items-center gap-2 pl-11">
-          <Text className="min-w-[160px] flex-1 font-sans text-[14px] text-fg">
-            {t(confirmKey(row))}
+        // Named by its question, so landing on Cancel inside it reads the question too.
+        <View
+          aria-label={question}
+          className="flex-row flex-wrap items-center gap-2 pl-11"
+          role="group"
+        >
+          <Text
+            accessibilityLiveRegion="polite"
+            className="min-w-[160px] flex-1 font-sans text-[14px] text-fg"
+            role="status"
+          >
+            {question}
           </Text>
           <Button
             onPress={() => {
+              focus.toOpener();
               setIsConfirming(false);
             }}
+            ref={focus.cancelRef(question)}
             variant="ghost"
           >
             {t("common.cancel")}

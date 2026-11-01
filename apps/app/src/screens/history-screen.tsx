@@ -61,7 +61,8 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
         {entry.revokedBy === null ? null : (
           <Text className="font-sans text-[12px] text-muted">{t("history.revoked")}</Text>
         )}
-        {!isConfirming && entry.revocable ? (
+        {/* Undo stays while the dialog asks, so the dialog gives focus back to it (bug class 5). */}
+        {entry.revocable ? (
           <Button
             onPress={() => {
               setIsConfirming(true);

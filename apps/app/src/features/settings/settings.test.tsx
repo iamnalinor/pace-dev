@@ -4,10 +4,19 @@ import * as Notifications from "expo-notifications";
 import * as firebaseProject from "#app/platform/firebase-project.ts";
 import { pushStore, registerPush, setPushChoice } from "#app/platform/notifications.ts";
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
+import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
+
+/** Where focus went and what was said, as a confirm asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  moveFocus: (target: unknown, say?: string) => {
+    mockMoveFocus(target, say);
+  },
+}));
 
 const mockPendingConfirmation = {
   current: null as null | {
@@ -305,6 +314,28 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
     expect(String(wipe.props["className"])).toMatch(/border-warn/u);
+  });
+
+  it("keeps focus through Wipe's and Delete's first confirm: onto Cancel and back to the opener (bug class 5)", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
+    const [toCancel, said] = mockMoveFocus.mock.calls[0] ?? [];
+    const toCancelControl = screen.getByRole("button", { name: en("common.cancel") });
+    expect(isControl(toCancel, toCancelControl)).toBe(true);
+    expect(said).toBe(en("settings.deleteAccount.warning"));
+    expect(screen.getByText(en("settings.deleteAccount.warning")).props).toMatchObject({
+      role: "status",
+    });
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    const [back] = mockMoveFocus.mock.calls[1] ?? [];
+    const backControl = screen.getByRole("button", { name: en("settings.deleteAccount") });
+    expect(isControl(back, backControl)).toBe(true);
+
+    await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    const [wipeBack] = mockMoveFocus.mock.calls[3] ?? [];
+    const wipeBackControl = screen.getByRole("button", { name: en("settings.wipe") });
+    expect(isControl(wipeBack, wipeBackControl)).toBe(true);
   });
 
   it("follows the server, not this device's clock, past the request's expiry (bug class 35)", async () => {

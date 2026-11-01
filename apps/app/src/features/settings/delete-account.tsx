@@ -6,6 +6,7 @@ import type { AccountAction, AccountConfirmation, AccountConfirmationStatus } fr
 
 import { useAuth, useSync, useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
+import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 
@@ -140,16 +141,25 @@ const useDangerFlow = () => {
   return { action, begin, cancel, isBusy, notice, request, setAction, setNotice };
 };
 
-const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow> }) => {
+/** Wipe and Delete, each opening its warning; focus moves on to the warning's Cancel. */
+const DangerOpeners = ({
+  flow,
+  focus,
+}: {
+  readonly flow: ReturnType<typeof useDangerFlow>;
+  readonly focus: ReturnType<typeof useConfirmFocus>;
+}) => {
   const t = useT();
-  return flow.action === null ? (
+  return (
     <View className="flex-row flex-wrap gap-2">
       <View className="self-start">
         <Button
           onPress={() => {
+            focus.toCancel();
             flow.setAction("wipe");
             flow.setNotice(null);
           }}
+          ref={focus.openerRef("wipe")}
           variant="secondary"
         >
           {t("settings.wipe")}
@@ -158,26 +168,50 @@ const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow
       <View className="self-start">
         <Button
           onPress={() => {
+            focus.toCancel();
             flow.setAction("delete");
             flow.setNotice(null);
           }}
+          ref={focus.openerRef("delete")}
           variant="ghost"
         >
           {t("settings.deleteAccount")}
         </Button>
       </View>
     </View>
+  );
+};
+
+/** Wipe or Delete, then its warning with Cancel; focus goes to Cancel and back to the opener (class 5). */
+const DangerPrompt = ({ flow }: { readonly flow: ReturnType<typeof useDangerFlow> }) => {
+  const t = useT();
+  const focus = useConfirmFocus();
+  const warning = t(
+    flow.action === "wipe" ? "settings.wipe.warning" : "settings.deleteAccount.warning",
+  );
+  return flow.action === null ? (
+    <DangerOpeners flow={flow} focus={focus} />
   ) : (
-    <View className="gap-3 rounded-xl border border-warn bg-surface p-4">
-      <Text className="font-sans text-[14px] leading-5 text-fg">
-        {t(flow.action === "wipe" ? "settings.wipe.warning" : "settings.deleteAccount.warning")}
+    <View
+      aria-label={warning}
+      className="gap-3 rounded-xl border border-warn bg-surface p-4"
+      role="group"
+    >
+      <Text
+        accessibilityLiveRegion="polite"
+        className="font-sans text-[14px] leading-5 text-fg"
+        role="status"
+      >
+        {warning}
       </Text>
       {flow.request === null ? (
         <SheetActions
           cancelLabel={t("common.cancel")}
+          cancelRef={focus.cancelRef(warning)}
           isBusy={flow.isBusy}
           isDestructive
           onCancel={() => {
+            focus.toOpener(flow.action ?? undefined);
             flow.setAction(null);
           }}
           onPrimary={() => {

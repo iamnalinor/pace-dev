@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react-native";
 
-import { createContext, use } from "react";
-import { ActivityIndicator, Pressable, Text } from "react-native";
+import { createContext, type Ref, use } from "react";
+import { ActivityIndicator, Pressable, Text, type View } from "react-native";
 
 import { cx } from "./cx.ts";
 import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
@@ -132,6 +132,7 @@ export const Button = ({
   icon: Icon,
   onLongPress,
   onPress,
+  ref,
   variant = "primary",
   width,
 }: {
@@ -146,6 +147,8 @@ export const Button = ({
   readonly onPress: () => void;
   /** A second way in (the full close sheet behind a one-tap Done). */
   readonly onLongPress?: () => void;
+  /** The pressable itself, to move focus onto it. */
+  readonly ref?: Ref<View> | undefined;
   readonly variant?: ButtonVariant;
   /** `auto` unless a container (a sheet) says otherwise. */
   readonly width?: ButtonWidth;
@@ -168,6 +171,7 @@ export const Button = ({
       disabled={isBlocked}
       onLongPress={onLongPress}
       onPress={onPress}
+      ref={ref}
       style={widthStyle}
     >
       {busy ? (

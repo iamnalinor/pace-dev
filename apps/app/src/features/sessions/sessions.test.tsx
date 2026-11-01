@@ -1,11 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
-import { type StyleProp, StyleSheet, type ViewStyle } from "react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 
 import { serverStore } from "#app/platform/server-store.ts";
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
+import { isAtTextWidth } from "#app/test/button-width.ts";
 import { deadControls } from "#app/test/dead-controls.ts";
+import { isControl } from "#app/test/focus-target.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -19,6 +20,14 @@ const mockLayout = { isWide: false };
 jest.mock("#app/ui/layout.ts", (): unknown => ({
   ...jest.requireActual("#app/ui/layout.ts"),
   useIsWide: () => mockLayout.isWide,
+}));
+
+/** Where focus went and what was said, as the row asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  moveFocus: (target: unknown, say?: string) => {
+    mockMoveFocus(target, say);
+  },
 }));
 
 /** The Android app by default; a test may render the web build's Settings instead. */
@@ -185,6 +194,27 @@ describe("Settings → Devices and sessions", () => {
     });
     expect(server.deleted).toEqual(["01FIREFOX"]);
     expect(screen.getByLabelText("Chrome on macOS")).toBeOnTheScreen();
+  });
+
+  it("moves focus into the confirm and says its question, and gives focus back on Cancel", async () => {
+    await renderSettings(sessionsServer(ALL).routes);
+    const row = await screen.findByLabelText("Firefox on Linux");
+    await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+    // The question is announced: a polite live region, and the confirm is named by it.
+    const question = within(row).getByText("End this session?");
+    expect(question.props).toMatchObject({ accessibilityLiveRegion: "polite", role: "status" });
+    expect(within(row).getByLabelText("End this session?")).toBeOnTheScreen();
+    // Focus lands on Cancel (the safe choice), saying the question on the way.
+    expect(mockMoveFocus).toHaveBeenCalledTimes(1);
+    const [cancelTarget, said] = mockMoveFocus.mock.calls[0] ?? [];
+    expect(said).toBe("End this session?");
+    expect(isControl(cancelTarget, within(row).getByRole("button", { name: "Cancel" }))).toBe(true);
+
+    await fireEvent.press(within(row).getByRole("button", { name: "Cancel" }));
+    expect(mockMoveFocus).toHaveBeenCalledTimes(2);
+    const [backTarget, saidBack] = mockMoveFocus.mock.calls[1] ?? [];
+    expect(saidBack).toBeUndefined();
+    expect(isControl(backTarget, within(row).getByRole("button", { name: "Revoke" }))).toBe(true);
   });
 
   it("disconnects a computer and revokes an MCP app, each asked first", async () => {
@@ -406,35 +436,28 @@ describe("Settings' order", () => {
   });
 });
 
-/** The style a button was laid out with, flattened. */
-const styleOf = (name: string): Readonly<Record<string, unknown>> => {
+/** Whether the first button named `name` is stretched to its container (not kept to its text). */
+const isStretched = (name: string): boolean => {
   const [button] = screen.getAllByRole("button", { name });
-  // A button without a style of its own flattens to nothing.
-  const flat = StyleSheet.flatten(button?.props["style"] as StyleProp<ViewStyle>) as
-    | undefined
-    | ViewStyle;
-  return { ...flat };
+  return button !== undefined && !isAtTextWidth(button);
 };
-
-const isStretched = (style: Readonly<Record<string, unknown>>): boolean =>
-  style["width"] === "100%" || style["alignSelf"] !== "flex-start";
 
 describe("Settings' buttons", () => {
   it("size to their text on a computer's window", async () => {
     mockLayout.isWide = true;
     await renderSettings(sessionsServer(ALL).routes);
     await screen.findByLabelText("Firefox on Linux");
-    expect(isStretched(styleOf("Revoke"))).toBe(false);
-    expect(isStretched(styleOf("Add a computer"))).toBe(false);
-    expect(isStretched(styleOf("Connect an AI app"))).toBe(false);
-    expect(isStretched(styleOf("Log out"))).toBe(false);
+    expect(isStretched("Revoke")).toBe(false);
+    expect(isStretched("Add a computer")).toBe(false);
+    expect(isStretched("Connect an AI app")).toBe(false);
+    expect(isStretched("Log out")).toBe(false);
   });
 
   it("fill a phone's width where they are the main action", async () => {
     await renderSettings(sessionsServer(ALL).routes);
     await screen.findByLabelText("Firefox on Linux");
-    expect(isStretched(styleOf("Log out"))).toBe(true);
-    expect(isStretched(styleOf("Add a computer"))).toBe(true);
+    expect(isStretched("Log out")).toBe(true);
+    expect(isStretched("Add a computer")).toBe(true);
   });
 
   it("all do something when pressed on a phone (bug class 10)", async () => {
