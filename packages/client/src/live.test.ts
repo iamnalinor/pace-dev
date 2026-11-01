@@ -10,7 +10,7 @@ import {
 
 import { fakeSockets, say } from "./fake-socket.fake.ts";
 import { LiveUnavailable } from "./live-requests.ts";
-import { createLiveChannel, liveUrl } from "./live.ts";
+import { createLiveChannel, liveUrl, PONG_WAIT_MS } from "./live.ts";
 
 describe("liveUrl", () => {
   it("turns the API's address into the socket's, with the device and the app's protocol", () => {
@@ -108,6 +108,41 @@ describe("createLiveChannel", () => {
     sockets.made[2]?.drop();
     vi.advanceTimersByTime(120_000);
     expect(sockets.made).toHaveLength(3);
+  });
+
+  it("takes a ping left without its pong as a quiet socket: reconnects within seconds (QA round 16 L1)", () => {
+    const sockets = fakeSockets();
+    const onChange = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange,
+      token: () => "tok",
+    });
+    live.start();
+    const [socket] = sockets.made;
+    socket?.open();
+    // A healthy line: the pong comes and the socket stays.
+    vi.advanceTimersByTime(45_000 + 30_000);
+    expect(live.status.getState().isConnected).toBe(true);
+    // The network switched: the socket reads as open, but nothing comes back, not even its close.
+    if (socket !== undefined) {
+      socket.answersPing = false;
+      socket.isHalfOpen = true;
+    }
+    // The next ping goes at 90 s; its pong never comes.
+    vi.advanceTimersByTime(15_000 + PONG_WAIT_MS - 1);
+    expect(live.status.getState().isConnected).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(live.status.getState().isConnected).toBe(false);
+    expect(socket?.closed).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(sockets.made).toHaveLength(2);
+    sockets.made[1]?.open();
+    // Back on the line: it catches up on what it missed.
+    expect(onChange).toHaveBeenCalledTimes(2);
+    live.stop();
   });
 
   it("stops reconnecting when the server ends the socket's session, and says so", () => {
