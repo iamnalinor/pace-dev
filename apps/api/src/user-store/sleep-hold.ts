@@ -13,7 +13,7 @@ import {
 // nothing on (bug-lessons class 55): the store loads the whole log for a pass that decides.
 
 /** Storage key of how far the last pass's decisions hold (`Held`): a pass within it loads nothing. */
-const HELD_KEY = "sleep:held";
+export const HELD_KEY = "sleep:held";
 
 /**
 How far the last pass that read the log holds, as digests (the log's `seq` and the zone; the uses;
@@ -127,6 +127,14 @@ export const keptHold = (held: Held | undefined, usesFrom: string): Held | undef
     ? held
     : undefined;
 
-/** The hold the last pass that read the log left, if any. */
-export const heldOf = async (storage: DurableObjectStorage): Promise<Held | undefined> =>
-  await storage.get<Held>(HELD_KEY);
+/** A hold as stored: one the build before the anchor saved has none. */
+type StoredHeld = Omit<Held, "anchor"> & { readonly anchor?: string };
+
+/**
+The hold the last pass that read the log left, if any. One without an anchor (saved by the build
+before it) is dropped here, explicitly: the pass then decides and holds again from its own front.
+*/
+export const heldOf = async (storage: DurableObjectStorage): Promise<Held | undefined> => {
+  const held = await storage.get<StoredHeld>(HELD_KEY);
+  return held?.anchor === undefined ? undefined : { ...held, anchor: held.anchor };
+};

@@ -13,6 +13,7 @@ import {
 
 import type { UserStore } from "./user-store.ts";
 
+import { HELD_KEY, heldOf } from "./sleep-hold.ts";
 import {
   DECIDED_UNTIL_KEY,
   runSleepPass,
@@ -88,6 +89,24 @@ describe("one pass of automatic sleep", () => {
       // From there on, that pass's front is the anchor.
       await runSleepPass(host, hoursOn(30));
       expect(calls.froms.at(-1)).toBe(hoursOn(24.25 - 36));
+      expect(calls.logs).toBe(2);
+    });
+  });
+
+  it("drops a hold the build before the anchor saved: one log read, then held as usual", async () => {
+    await runInDurableObject(freshStore(), async (_instance, state) => {
+      const { calls, host } = hostOf(state.storage);
+      await runSleepPass(host, NOW);
+      expect(calls.logs).toBe(1);
+      // The same hold as the previous build stored it: no anchor.
+      const { anchor: _dropped, ...withoutAnchor } = (await heldOf(state.storage)) ?? {};
+      await state.storage.put(HELD_KEY, withoutAnchor);
+      await runSleepPass(host, "2099-10-07T22:45:00.000Z");
+      expect(calls.logs).toBe(2);
+      expect((await heldOf(state.storage))?.anchor).toBe(
+        addMinutesIso("2099-10-07T22:45:00.000Z", -36 * 60),
+      );
+      await runSleepPass(host, "2099-10-07T23:00:00.000Z");
       expect(calls.logs).toBe(2);
     });
   });
