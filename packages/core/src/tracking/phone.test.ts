@@ -1,16 +1,8 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import {
-  appSessions,
-  appUsage,
-  detectSleep,
-  type PhoneEvent,
-  phonePickupAt,
-  screenOnIntervals,
-  SLEEP_MIN_MINUTES,
-  WAKE_UP_MAX_MINUTES,
-} from "./phone.ts";
+import { type PhoneEvent, SLEEP_MIN_MINUTES, WAKE_UP_MAX_MINUTES } from "./phone-use.ts";
+import { appSessions, appUsage, detectSleep, phonePickupAt, screenOnIntervals } from "./phone.ts";
 
 const MOSCOW = "Europe/Moscow";
 /** Moscow wall clock on Oct 7–8 2026 (UTC+3) as an ISO instant. */

@@ -58,10 +58,26 @@ export const UsageSessionSchema = z.strictObject({
   endAt: z.iso.datetime(),
 });
 
+/**
+A stretch the person was really using a device: on a phone, unlocked or an app in front while
+the lock screen was away (an alarm or a call shown over it is not use).
+*/
+const UsageUseSchema = z.strictObject({
+  startAt: z.iso.datetime(),
+  endAt: z.iso.datetime(),
+});
+
 export const UsageUploadSchema = z.strictObject({
   deviceId: z.string().min(1).max(64),
   deviceName: z.string().trim().min(1).max(80),
   sessions: z.array(UsageSessionSchema).max(1000),
+  /** The phone's uses since its last upload (automatic sleep reads these, not the app sessions). */
+  uses: z.array(UsageUseSchema).max(1000).optional(),
+  /**
+  How far the phone read its usage: quiet up to here is known quiet. Sent with the last request
+  of an upload; an older app sends none.
+  */
+  until: z.iso.datetime().optional(),
 });
 
 export const UsageRowSchema = z.object({

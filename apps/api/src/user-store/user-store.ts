@@ -285,14 +285,7 @@ export class UserStore extends PoolStore {
   A phone's calendar over a range, replacing what that phone sent for it before, with the series
   it answers "every time" for (never announced as they start).
   */
-  async syncCalendar(
-    upload: cloud.Range & {
-      readonly deviceId: string;
-      readonly events: readonly CalendarEvent[];
-      readonly ruledSeries?: readonly string[] | undefined;
-    },
-    now: string,
-  ): Promise<number> {
+  async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
     const stored = await cloud.replaceCalendar(this.db, upload);
     if (upload.ruledSeries !== undefined) {
       await saveRuledSeries(this.ctx.storage, upload.ruledSeries);
@@ -311,9 +304,18 @@ export class UserStore extends PoolStore {
     await cloud.clearCalendar(this.db, deviceId);
   }
 
-  /** A device's app sessions (names and times only). */
-  async addUsage(upload: Parameters<typeof cloud.addUsage>[1]): Promise<number> {
-    return await cloud.addUsage(this.db, upload);
+  /** A device's app sessions (names and times only), a phone's uses and how far it read. */
+  async addUsage(upload: cloud.UsageUpload, now: string): Promise<number> {
+    return await cloud.addUsage({ db: this.db, storage: this.ctx.storage }, upload, now);
+  }
+
+  /**
+  Use on every device from `from` on, and how far the phones' usage is known (`null` when no
+  phone uploaded within a day): what automatic sleep decides on.
+  */
+  async usageForSleep(from: string): Promise<cloud.SleepUsage> {
+    const now = new Date().toISOString();
+    return await cloud.usageForSleep({ db: this.db, storage: this.ctx.storage }, { from, now });
   }
 
   /** Each device that sent usage, with the end of its newest session. */

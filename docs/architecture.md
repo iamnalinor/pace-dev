@@ -120,8 +120,11 @@ the `notificationChannels` switches on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
 High-volume phone facts (the calendar copy, app usage) are **not** events. They have
-their own tables in the Durable Object (`calendar_events`, `usage_sessions`), replaced or
-added per device through the cloud routes; only derived decisions become events.
+their own tables in the Durable Object (`calendar_events`, `usage_sessions`, and `phone_uses`:
+when a phone was really in use, which automatic sleep reads instead of its app sessions),
+replaced or added per device through the cloud routes; only derived decisions become events.
+Each usage upload also records how far that device's usage is known (storage key
+`usage:known:<deviceId>`: the phone's `until`, or the arrival of a computer's upload).
 
 ## API contract
 
@@ -304,7 +307,7 @@ emptied: `deleteAll` (SQL tables and keys) and its alarm. Raising the epoch drop
 user's data at once, so a breaking change never needs a data migration (and the DO
 migrations could be squashed into one `0000`). Tables (`user-store/schema.ts`): `events`
 (`seq` primary key, `id` unique, indexed by `occurredAt`), `calendar_events`,
-`usage_sessions`, `decisions` (every automatic decision with its inputs, for "why?"), the
+`usage_sessions`, `phone_uses`, `decisions` (every automatic decision with its inputs, for "why?"), the
 notification pool (`notifications`, its delivery log `notification_deliveries`, and
 `poll_outbox` for phones that poll),
 `meta` (cursors, budgets) and the projections `tasks`, `subtasks`, `projects`, `presets`

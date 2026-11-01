@@ -57,6 +57,24 @@ export const usageSessions = sqliteTable(
   ],
 );
 
+/**
+When the person was really using a phone (unlocked, or an app in front while the lock screen was
+away): what automatic sleep reads, never the app sessions (an alarm over the lock screen is one).
+One row per phone and start; a use sent again while it lasts keeps the later end.
+*/
+export const phoneUses = sqliteTable(
+  "phone_uses",
+  {
+    deviceId: text().notNull(),
+    startAt: text().notNull(),
+    endAt: text().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.deviceId, table.startAt] }),
+    index("phone_uses_end_idx").on(table.endAt),
+  ],
+);
+
 /** Every automatic decision with its inputs, so "why?" can be answered later. */
 export const decisions = sqliteTable(
   "decisions",
