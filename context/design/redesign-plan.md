@@ -538,8 +538,9 @@ due as one formatted string).
 **Interfaces:** Running card: category dot + name (`headline`), live time `numeric.live`, "из ~20 мин"
 (`footnote`), Stop (`Button secondary` with filled-square icon), "Yes, still" when past 2×; time
 bar: four fixed tiles Calendar / Task / Chores / Rest (neutral at rest; running tile shows its
-category stroke), typed field with outlined draft while parsing; phone: folds under «Начать
-другое»; region budget (§3.3).
+category stroke), typed field with a dashed-outline draft while parsing; phone (Q12 default): the
+tiles stay visible while something runs, only the typed field folds under «Начать другое», and the
+whole bar folds only past the 40 % region budget (§3.3).
 - [ ] Failing tests: tiles keep identical size and position with any label length (RU); the running
       name is not a tag; a long name truncates before Stop (F-DAT-02); region budget — with two
       proposals open the list keeps ≥ 50 % height (Review Focus 2, e2e in `overlays.e2e.ts`);
@@ -564,8 +565,8 @@ now-screen) (+ tests).
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 
 **Files:** `src/features/day/**` (+ tests).
-- [ ] Spec §5 Day: page template, period control ‹ date › with Today only away from today
-      (F-CMP-05), grouped rows with one divider rule, gaps as rows with Log, Log past as a row action,
+- [ ] Spec §5 Day: page template, `PeriodStepper` ‹ date › with Today only away from today
+      (F-CMP-05), the inspector on desktop when a block or gap is selected (collapsed otherwise), grouped rows with one divider rule, gaps as rows with Log, Log past as a row action,
       screen-time section in the same list system.
 - [ ] Failing tests: Today button absent on today, present on another day; day switch replaces
       content with no crossfade (F-MOT-07). Commit.
