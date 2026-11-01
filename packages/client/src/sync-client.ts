@@ -270,13 +270,16 @@ const createSerial = () => {
   let tail: Promise<unknown> = Promise.resolve();
   return async <T>(task: () => Promise<T>): Promise<T> => {
     const previous = tail;
-    const done = Promise.withResolvers<null>();
-    tail = done.promise;
+    // `new Promise`, not `Promise.withResolvers`: Hermes (Android) may lack the ES2024 call.
+    let release: ((value: null) => void) | undefined;
+    tail = new Promise<null>((resolve) => {
+      release = resolve;
+    });
     try {
       await previous;
       return await task();
     } finally {
-      done.resolve(null);
+      release?.(null);
     }
   };
 };

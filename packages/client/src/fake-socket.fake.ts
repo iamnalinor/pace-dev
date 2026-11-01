@@ -10,6 +10,11 @@ export type FakeSocket = SocketLike & {
   readonly protocols: readonly string[];
   readonly sent: string[];
   closed: boolean;
+  /**
+  A half-open connection (a network switch): `close()` is never confirmed by a close event, as a
+  browser waits out the closing handshake with a peer that is gone.
+  */
+  isHalfOpen: boolean;
   /** What the server would do. */
   open: () => void;
   receive: (data: string) => void;
@@ -40,9 +45,12 @@ export const fakeSockets = (): {
         },
         close: () => {
           socket.closed = true;
-          emit("close", {});
+          if (!socket.isHalfOpen) {
+            emit("close", {});
+          }
         },
         closed: false,
+        isHalfOpen: false,
         drop: (code) => {
           emit("close", code === undefined ? {} : { code });
         },

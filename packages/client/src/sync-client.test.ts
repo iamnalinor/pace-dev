@@ -88,6 +88,25 @@ describe("createSyncClient push", () => {
   });
 });
 
+describe("createSyncClient on Hermes", () => {
+  it("syncs where the platform has no Promise.withResolvers", async () => {
+    const withResolvers = Object.getOwnPropertyDescriptor(Promise, "withResolvers");
+
+    delete (Promise as { withResolvers?: unknown }).withResolvers;
+    try {
+      const { sync } = await setup(
+        { "GET /api/sync/pull": noPull, "POST /api/sync/push": acceptAll },
+        localEvents(2),
+      );
+      await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 0, pushed: 2 } });
+    } finally {
+      if (withResolvers !== undefined) {
+        Object.defineProperty(Promise, "withResolvers", withResolvers);
+      }
+    }
+  });
+});
+
 describe("createSyncClient pull", () => {
   it("pulls pages until more is false, ingests them and advances the cursor", async () => {
     const pages: Record<string, unknown> = {

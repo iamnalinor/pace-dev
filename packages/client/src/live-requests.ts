@@ -50,23 +50,24 @@ export const createRequests = (onTimeout: () => void): Requests => {
       if (pending.size >= LIVE_MAX_IN_FLIGHT || pending.has(id)) {
         throw new LiveUnavailable("busy");
       }
-      const { promise, reject, resolve } = Promise.withResolvers<LiveServerMessage>();
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        reject(new LiveUnavailable("timeout"));
-        onTimeout();
-      }, LIVE_REQUEST_TIMEOUT_MS);
-      // Registered before it is sent: an answer may come back at once.
-      pending.set(id, { reject, resolve, timer });
-      try {
-        send();
-      } catch {
-        // A socket closing meanwhile: its close fails the rest.
-        pending.delete(id);
-        clearTimeout(timer);
-        reject(new LiveUnavailable("closed"));
-      }
-      return await promise;
+      // `new Promise`, not `Promise.withResolvers`: Hermes (Android) may lack the ES2024 call.
+      return await new Promise<LiveServerMessage>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new LiveUnavailable("timeout"));
+          onTimeout();
+        }, LIVE_REQUEST_TIMEOUT_MS);
+        // Registered before it is sent: an answer may come back at once.
+        pending.set(id, { reject, resolve, timer });
+        try {
+          send();
+        } catch {
+          // A socket closing meanwhile: its close fails the rest.
+          pending.delete(id);
+          clearTimeout(timer);
+          reject(new LiveUnavailable("closed"));
+        }
+      });
     },
     settle: (message: LiveServerMessage): boolean => {
       const id = "id" in message ? message.id : undefined;

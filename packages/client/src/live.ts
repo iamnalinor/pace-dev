@@ -197,15 +197,18 @@ const follow = (socket: SocketLike, on: Handlers): void => {
 
 /**
 The socket in use, whether it speaks v2 (its server said `hello`), and the requests open on it.
-A request without an answer in time means the socket went quiet: it is closed (its close
-reconnects) and nothing more is asked of it meanwhile.
+A request without an answer in time means the socket went quiet: it is closed and `onQuiet` runs
+at once, without waiting for its close event, which a half-open socket (a network switch) may not
+send for minutes; meanwhile the channel would read as connected and poll rarely.
 */
-const createLine = () => {
+const createLine = (onQuiet: () => void) => {
   let socket: SocketLike | undefined;
   let isV2 = false;
   const requests = createRequests(() => {
-    isV2 = false;
-    socket?.close();
+    const quiet = socket;
+    // Dropped first, so its close event (if it ever comes) is one of a socket no longer current.
+    onQuiet();
+    quiet?.close();
   });
   return {
     current: (): SocketLike | undefined => socket,
@@ -215,8 +218,11 @@ const createLine = () => {
       isV2 = false;
       requests.failAll();
     },
+    // A socket already replaced saying hello late says nothing about the current one.
     hello: (from: SocketLike): void => {
-      isV2 = socket === from;
+      if (socket === from) {
+        isV2 = true;
+      }
     },
     isV2: (): boolean => isV2,
     request: async (message: LiveClientMessage): Promise<LiveServerMessage> => {
@@ -274,7 +280,10 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const createSocket = options.createSocket ?? globalSocket;
   const status = createStore<LiveStatus>(() => ({ isConnected: false }));
   const timers = createTimers();
-  const line = createLine();
+  // A quiet socket is gone as of now (its late close event is ignored: it is no longer current).
+  const line = createLine(() => {
+    closed(undefined);
+  });
   let failures = 0;
   let isRunning = false;
   /** The socket is gone: its requests fail, and it comes back unless its session ended. */

@@ -240,6 +240,54 @@ describe("createLiveChannel requests (pace.v2)", () => {
     live.stop();
   });
 
+  it("reconnects after a timeout even when the quiet socket never confirms its close (half-open)", async () => {
+    const { live, socket, sockets } = openChannel();
+    socket.isHalfOpen = true;
+    const settled = Promise.allSettled([live.request(pull("r1"))]);
+    expect(live.status.getState().isConnected).toBe(true);
+    await vi.advanceTimersByTimeAsync(LIVE_REQUEST_TIMEOUT_MS);
+    await settled;
+    expect(socket.closed).toBe(true);
+    // Not connected any more (the sync polls often again), and a new socket comes.
+    expect(live.status.getState().isConnected).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sockets.made).toHaveLength(2);
+    live.stop();
+  });
+
+  it("keeps v2 on when a socket it already replaced says hello late", async () => {
+    const { live, socket: first, sockets } = openChannel(false);
+    first.drop();
+    await vi.advanceTimersByTimeAsync(1000);
+    const second = sockets.made[1];
+    if (second === undefined) {
+      throw new Error("no second socket");
+    }
+    second.open();
+    say(second, { protocol: LIVE_V2, type: "hello" });
+    expect(live.isV2()).toBe(true);
+    say(first, { protocol: LIVE_V2, type: "hello" });
+    expect(live.isV2()).toBe(true);
+    live.stop();
+  });
+
+  it("works where the platform has no Promise.withResolvers (Hermes on Android)", async () => {
+    const withResolvers = Object.getOwnPropertyDescriptor(Promise, "withResolvers");
+
+    delete (Promise as { withResolvers?: unknown }).withResolvers;
+    try {
+      const { live, socket } = openChannel();
+      const answer = live.request(pull("r1"));
+      say(socket, { ...page, id: "r1", type: "events" });
+      await expect(answer).resolves.toEqual({ ...page, id: "r1", type: "events" });
+      live.stop();
+    } finally {
+      if (withResolvers !== undefined) {
+        Object.defineProperty(Promise, "withResolvers", withResolvers);
+      }
+    }
+  });
+
   it("keeps at most four requests open: the next one is refused without being sent", async () => {
     const { live, socket } = openChannel();
     const open = Array.from(
