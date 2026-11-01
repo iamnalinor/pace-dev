@@ -930,6 +930,30 @@ describe("automatic sleep", () => {
     expect(step([], early).decisions).toEqual([]);
   });
 
+  it("keeps a night whose last evening use has left the window, and opens no other in it", () => {
+    // Put away at 19:52: the night starts at 21:00 and ends at 07:10.
+    const night = [use("19:30", "19:52"), use("07:10", "07:25")];
+    const stopped = lastLog([], night, ["07:30"]);
+    expect(sleepsIn(stopped)).toEqual([sleep("21:00", "07:10")]);
+    // 36 hours on, the window's front sits between 19:52 and 21:00: the use the start was found
+    // after is gone, the sleep is still in. Nothing known says the night was otherwise.
+    for (const front of ["19:52", "20:00", "20:59", "21:00"]) {
+      const passed: Known = {
+        knownUntil: at("08:00"),
+        now: at("08:05"),
+        uses: night,
+        usesFrom: at(front),
+      };
+      expect(step(stopped, passed).decisions).toEqual([]);
+    }
+    // A wake after 02:00 that is no wake-up: the night still ends there, and no second one opens.
+    const broken = [use("19:30", "19:52"), use("02:00", "02:50"), use("07:10", "07:25")];
+    const ended = lastLog([], broken, ["07:30"]);
+    expect(sleepsIn(ended)).toEqual([sleep("21:00", "02:00")]);
+    const later: Known = { knownUntil: at("08:00"), uses: broken, usesFrom: at("20:30") };
+    expect(step(ended, later).decisions).toEqual([]);
+  });
+
   it("opens a sleep only after a rest the person recorded, and none over one", () => {
     const rest = byPerson(1, at("22:30"), {
       payload: { activityId: "rest", category: "rest", label: "Rest" },

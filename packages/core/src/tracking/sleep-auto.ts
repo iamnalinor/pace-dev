@@ -78,12 +78,16 @@ export const isWalked = (activity: SleepActivity, usesFrom: string): boolean =>
 
 /**
 A sleep the rules own outright: their own record (nobody moved its start, renamed it or made
-its end), none of its stops undone, and walked. It is kept only while deciding afresh would open the same one.
+its end), none of its stops undone, and walked, with the use (or recorded instant) its start was
+found after still among the known ones. It is kept only while deciding afresh would open the
+same one; once the window's front has passed that use, deciding afresh cannot see where the night
+started, so the sleep is walked as it stands (its night stays taken) and never reconciled away.
 */
-const isOwned = (activity: SleepActivity, usesFrom: string): boolean =>
-  isWalked(activity, usesFrom) &&
+const isOwned = (activity: SleepActivity, known: Known): boolean =>
+  isWalked(activity, known.usesFrom) &&
   isRulesSleep(activity) &&
-  activity.personRevokedStopsAt.length === 0;
+  activity.personRevokedStopsAt.length === 0 &&
+  known.uses.some((use) => use.endAt <= activity.startAt);
 
 /**
 A sleep automatic sleep would open at `at`, as the log will hold it before anything is decided
@@ -280,8 +284,8 @@ export type SleepPlan = {
 
 export const planOf = (input: SleepInput, knownUntil: string): SleepPlan => {
   const known = knownOf(input, knownUntil);
-  const owned = input.activities.filter((activity) => isOwned(activity, input.usesFrom));
-  const others = input.activities.filter((activity) => !isOwned(activity, input.usesFrom));
+  const owned = input.activities.filter((activity) => isOwned(activity, known));
+  const others = input.activities.filter((activity) => !isOwned(activity, known));
   const personNights = new Set(
     others
       .filter((activity) => activity.category === "sleep")

@@ -125,6 +125,31 @@ describe("how far a pass of automatic sleep holds", () => {
     );
   }, 60_000);
 
+  it("13. decides nothing more as the window's front moves on, short of what is known", () => {
+    fc.assert(
+      fc.property(
+        world,
+        fc.integer({ max: SPAN, min: 1 }),
+        ({ known, lag, raw, records, zone }, front) => {
+          const { done, knownUntil, now, uses } = passAt({ known, lag, raw, records, zone });
+          const usesFrom = addMinutesIso(base(zone), front);
+          fc.pre(usesFrom < knownUntil);
+          // The store reads only the uses that end after the front (`usageForSleep`).
+          const again = step(done.log, {
+            decidedUntil: knownUntil,
+            knownUntil,
+            now,
+            uses: uses.filter((use) => use.endAt > usesFrom),
+            usesFrom,
+            zone,
+          });
+          expect(again.decisions).toEqual([]);
+        },
+      ),
+      { numRuns: 1000 },
+    );
+  }, 60_000);
+
   it("13. decides nothing more by day once settled, whatever is used after it", () => {
     const freshArb = fc.array(
       fc.record({
