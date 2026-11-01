@@ -286,7 +286,7 @@ the local log, outbox, cursor and id as well.
 
 **A one-time re-pull after an update.** A client update that accepts events older clients left
 out (their pull skipped what they could not read and moved the cursor past it) raises
-`SYNC_SCHEMA_VERSION` in `sync-client.ts`; the store keeps the version its log was pulled under
+`SYNC_SCHEMA_VERSION` in `sync-version.ts`; the store keeps the version its log was pulled under
 (`getSyncVersion`, 0 for logs from before versions). A run that finds a lower one sets the cursor
 to 0 and the version to the current one, in that order, before its pull: the log and the outbox
 stay, events the log already holds are skipped on the way in, the outbox is pushed as usual, and

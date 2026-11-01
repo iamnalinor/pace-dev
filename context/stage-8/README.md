@@ -23,7 +23,8 @@ automatic sleep rules (12) run in the user's store, the phone's sleep card gone,
 assistant log (13); the sync's id limit raised to 128 and a one-time re-pull from 0 on every
 installed client so the long-id events their cursor skipped arrive; QA rounds 14–16 leftovers
 (14, 15: among them ✕ drops the New task draft, and a series without a start begins its later
-instances at 00:00 of their day); the docs pass. The `sessions.label` contract (drop the column)
+instances at 00:00 of their day; a series made before keeps its creation minute until it is
+made again); the docs pass. The `sessions.label` contract (drop the column)
 is the next release's first migration (`TODO(sessions-label-contract)` in `docs/architecture.md`).
 
 **Left for the owner** (product calls, not decided here): kind groups in the sessions list (QA 15

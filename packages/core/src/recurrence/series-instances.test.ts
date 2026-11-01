@@ -5,7 +5,7 @@ import { type Event, type EventInput, type EventOf, parseEvent } from "../events
 import { newId } from "../ids.ts";
 import { coreReducer, INITIAL_CORE_STATE } from "../materialize/core-state.ts";
 import { materialize } from "../materialize/materializer.ts";
-import { formatInZone } from "../time.ts";
+import { formatInZone, wallClockInstant } from "../time.ts";
 import { missingSeriesEvents, seriesInstanceId } from "./series-instances.ts";
 import { seriesAnchor } from "./series.ts";
 
@@ -234,51 +234,58 @@ const clockOf = (minutes: number): string => {
   return `${hour}:${minute}`;
 };
 
+/**
+A series made at `made` in `zone` counting from `anchor`, and its first instance as the app
+writes it: starting at the chosen start, else at the minute it was made.
+*/
+const madeSeries = (
+  made: string,
+  schedule: EventOf<"series.created">["payload"]["schedule"],
+  anchor: { readonly at: string; readonly first: string; readonly zone: string },
+): readonly Event[] => {
+  const { dueAt: _dueAt, dueTz: _dueTz, ...template } = seriesCreated.payload.template;
+  const series = envelope({
+    ...seriesCreated,
+    occurredAt: made,
+    payload: {
+      ...seriesCreated.payload,
+      schedule,
+      template: { ...template, overrides: {}, startAt: anchor.at, startTz: anchor.zone },
+    },
+  });
+  const first = envelope({
+    id: template.taskId,
+    type: "task.created",
+    occurredAt: made,
+    precision: "exact",
+    source: "system",
+    payload: { ...template, overrides: {}, startAt: anchor.first, startTz: anchor.zone },
+  });
+  return [series, first];
+};
+
 describe("the next instance's time of day (QA round 14 L10e, round 11 M3)", () => {
-  const MOSCOW = "Europe/Moscow";
-  // Any instant in 2026-2027: the series is made at any minute of any day.
-  const madeAt = fc
-    .integer({
-      max: Date.parse("2027-12-31T00:00:00.000Z"),
-      min: Date.parse("2026-01-01T00:00:00.000Z"),
-    })
-    .map((ms) => new Date(ms).toISOString());
+  // Moscow keeps no DST; New York changes its clocks at 02:00 twice a year (class 9).
+  const zones = fc.constantFrom("Europe/Moscow", "America/New_York");
+  // Any instant in 2026-2027, often in the two days before a New York clock change: the series is
+  // made at any minute of any day, and the next instance may land across the change.
+  const anyMade = fc.integer({
+    max: Date.parse("2027-12-31T00:00:00.000Z"),
+    min: Date.parse("2026-01-01T00:00:00.000Z"),
+  });
+  const nearChange = fc
+    .tuple(
+      fc.constantFrom("2026-03-08", "2026-11-01", "2027-03-14", "2027-11-07"),
+      fc.integer({ max: 2 * 86_400_000, min: 0 }),
+    )
+    .map(([day, ms]) => Date.parse(`${day}T07:00:00.000Z`) - ms);
+  const madeAt = fc.oneof(anyMade, nearChange).map((ms) => new Date(ms).toISOString());
   const schedules = fc.constantFrom(
     { kind: "daily" } as const,
     { kind: "monthly" } as const,
     { kind: "weekly" } as const,
     { days: 3, kind: "every_n_days" } as const,
   );
-
-  /**
-  A series made at `made` (Moscow) counting from `anchor`, and its first instance as the app
-  writes it: starting at the chosen start, else at the minute it was made.
-  */
-  const madeSeries = (
-    made: string,
-    schedule: EventOf<"series.created">["payload"]["schedule"],
-    anchor: { readonly at: string; readonly first: string },
-  ): readonly Event[] => {
-    const { dueAt: _dueAt, dueTz: _dueTz, ...template } = seriesCreated.payload.template;
-    const series = envelope({
-      ...seriesCreated,
-      occurredAt: made,
-      payload: {
-        ...seriesCreated.payload,
-        schedule,
-        template: { ...template, overrides: {}, startAt: anchor.at, startTz: MOSCOW },
-      },
-    });
-    const first = envelope({
-      id: template.taskId,
-      type: "task.created",
-      occurredAt: made,
-      precision: "exact",
-      source: "system",
-      payload: { ...template, overrides: {}, startAt: anchor.first, startTz: MOSCOW },
-    });
-    return [series, first];
-  };
 
   /** The instance the series makes after the first, seen a minute after the series was made. */
   const nextStart = (log: readonly Event[], made: string): string => {
@@ -292,12 +299,12 @@ describe("the next instance's time of day (QA round 14 L10e, round 11 M3)", () =
 
   it("starts at the start of its day when the person chose no start, whatever minute the series was made", () => {
     fc.assert(
-      fc.property(madeAt, schedules, (made, schedule) => {
-        const anchor = seriesAnchor(undefined, { at: made, tz: MOSCOW });
-        const next = nextStart(madeSeries(made, schedule, { at: anchor, first: made }), made);
-        expect(formatInZone(next, MOSCOW, "HH:mm")).toBe("00:00");
+      fc.property(madeAt, schedules, zones, (made, schedule, zone) => {
+        const anchor = seriesAnchor(undefined, { at: made, tz: zone });
+        const next = nextStart(madeSeries(made, schedule, { at: anchor, first: made, zone }), made);
+        expect(formatInZone(next, zone, "HH:mm")).toBe("00:00");
         expect(
-          formatInZone(next, MOSCOW, "yyyy-MM-dd") > formatInZone(made, MOSCOW, "yyyy-MM-dd"),
+          formatInZone(next, zone, "yyyy-MM-dd") > formatInZone(made, zone, "yyyy-MM-dd"),
         ).toBe(true);
       }),
     );
@@ -306,19 +313,27 @@ describe("the next instance's time of day (QA round 14 L10e, round 11 M3)", () =
   it("starts at the series' own time of day when the person chose a start", () => {
     fc.assert(
       fc.property(
-        madeAt,
-        schedules,
-        fc.integer({ max: 24 * 60 - 1, min: 0 }).map((minutes) => clockOf(minutes)),
-        (made, schedule, time) => {
-          const day = formatInZone(made, MOSCOW, "yyyy-MM-dd");
+        fc.record({ made: madeAt, schedule: schedules, zone: zones }),
+        // Any minute but New York's spring-forward hour, which that night does not have.
+        fc
+          .integer({ max: 24 * 60 - 1, min: 0 })
+          .filter((minutes) => minutes < 120 || minutes >= 180)
+          .map((minutes) => clockOf(minutes)),
+        ({ made, schedule, zone }, time) => {
           // The chosen start, on the day after the series was made, at a time of the person's.
-          const chosen = new Date(
-            Date.parse(`${day}T${time}:00.000+03:00`) + 86_400_000,
-          ).toISOString();
-          const anchor = seriesAnchor(chosen, { at: made, tz: MOSCOW });
+          const day = formatInZone(
+            new Date(Date.parse(made) + 86_400_000).toISOString(),
+            zone,
+            "yyyy-MM-dd",
+          );
+          const chosen = wallClockInstant(day, time, zone);
+          const anchor = seriesAnchor(chosen, { at: made, tz: zone });
           expect(anchor).toBe(chosen);
-          const next = nextStart(madeSeries(made, schedule, { at: anchor, first: chosen }), chosen);
-          expect(formatInZone(next, MOSCOW, "HH:mm")).toBe(time);
+          const next = nextStart(
+            madeSeries(made, schedule, { at: anchor, first: chosen, zone }),
+            chosen,
+          );
+          expect(formatInZone(next, zone, "HH:mm")).toBe(time);
         },
       ),
     );
