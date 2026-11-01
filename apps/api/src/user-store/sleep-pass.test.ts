@@ -18,6 +18,7 @@ import {
   DECIDED_UNTIL_KEY,
   runSleepPass,
   SLEEP_NEXT_AT_KEY,
+  sleepAtAlarm,
   type SleepHost,
 } from "./sleep-pass.ts";
 
@@ -260,6 +261,35 @@ describe("a pass once the phones have told nothing for a day", () => {
       const reads = calls.logs;
       await runSleepPass(host, dayLater);
       expect(calls.logs).toBe(reads);
+    });
+  });
+});
+
+describe("a pass cut short", () => {
+  it("is run again by the alarm's retry when it dies ending a dead phone's sleep (class 58)", async () => {
+    await runInDurableObject(freshStore(), async (_instance, state) => {
+      const usage: { knownUntil: null | string; uses: DeviceUse[] } = {
+        knownUntil: msk("05:00"),
+        uses: [phoneUse("23:10", "23:40")],
+      };
+      const { host, log } = keepingHost(state.storage, usage);
+      await runSleepPass(host, msk("05:05"));
+      usage.knownUntil = null;
+      const dayLater = new Date(Date.parse(msk("05:05")) + 24 * 3_600_000).toISOString();
+      // The isolate is reset as the pass reads the log: nothing after that runs (a pass called
+      // directly has no catch, so the store is left as a reset leaves it).
+      const cut: SleepHost = {
+        ...host,
+        log: async () => { throw new Error("cut short"); },
+      };
+      await expect(runSleepPass(cut, dayLater)).rejects.toThrow("cut short");
+      // The runtime runs the alarm again: sleep's look is still due, and the sleep is ended.
+      await sleepAtAlarm(state.storage, {
+        now: dayLater,
+        pass: async () => await runSleepPass(host, dayLater),
+      });
+      expect(log.at(-1)).toMatchObject({ occurredAt: msk("05:00"), type: "activity.stopped" });
+      expect(await state.storage.get(SLEEP_NEXT_AT_KEY)).toBeUndefined();
     });
   });
 });
