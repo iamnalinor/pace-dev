@@ -310,11 +310,10 @@ export class UserStore extends PoolStore {
   }
 
   /**
-  Use on every device from `from` on, and how far the phones' usage is known (`null` when no
-  phone uploaded within a day): what automatic sleep decides on.
+  Use on every device from `from` on, and how far the phones' usage is known at `now` (`null` when
+  no phone uploaded within the day before): what automatic sleep decides on, at its own `now`.
   */
-  async usageForSleep(from: string): Promise<cloud.SleepUsage> {
-    const now = new Date().toISOString();
+  async usageForSleep(from: string, now: string): Promise<cloud.SleepUsage> {
     return await cloud.usageForSleep({ db: this.db, storage: this.ctx.storage }, { from, now });
   }
 

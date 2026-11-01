@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type PhoneEvent, phoneUses } from "./phone-use.ts";
+import { isLockedAt, type PhoneEvent, phoneUses } from "./phone-use.ts";
 
 const at = (hhmm: string): string => `2026-10-06T${hhmm}:00.000Z`;
 
@@ -29,5 +29,22 @@ describe("phoneUses", () => {
       { at: at("06:35"), kind: "screen-off" },
     ];
     expect(phoneUses(events, at("10:00"))).toEqual([]);
+  });
+});
+
+describe("isLockedAt", () => {
+  const events: readonly PhoneEvent[] = [
+    { at: at("07:10"), kind: "unlock" },
+    { at: at("01:21"), kind: "lock" },
+  ];
+
+  it("is the last lock or unlock at or before the instant, in time order", () => {
+    expect(isLockedAt(events, at("03:00"))).toBe(true);
+    expect(isLockedAt(events, at("07:10"))).toBe(false);
+  });
+
+  it("reads as unlocked when nothing tells", () => {
+    expect(isLockedAt(events, at("01:00"))).toBe(false);
+    expect(isLockedAt([], at("01:00"))).toBe(false);
   });
 });

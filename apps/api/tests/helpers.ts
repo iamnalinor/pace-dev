@@ -1,6 +1,10 @@
 import type { z } from "zod";
 
-import { exports } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
+
+import { bindNonce } from "../src/auth/nonce.ts";
+import { findUserIdByTelegramId } from "../src/auth/users.ts";
+import { d1 } from "../src/shared/db/d1.ts";
 
 export const api = exports.default;
 
@@ -68,4 +72,30 @@ export const loginAsDev = async (telegramId: string): Promise<string> => {
   }
   const { token } = await readJson<{ token: string }>(response);
   return token;
+};
+
+/**
+A deep-link login of an existing account, as the app (`from=app`, named by the phone: an `app`
+session) or the web (`from=web`: a `browser` session) starts it: the bot binds the nonce, the
+client polls it.
+*/
+export const nonceLogin = async (
+  telegramId: string,
+  {
+    deviceId,
+    from,
+    request = {},
+  }: {
+    readonly from: "app" | "web";
+    readonly deviceId?: string;
+    readonly request?: Pick<RequestOptions, "cf" | "headers">;
+  },
+): Promise<string> => {
+  const { nonce } = await json<{ nonce: string }>(`/api/auth/nonce?from=${from}`, {
+    body: deviceId === undefined ? {} : { deviceId, deviceName: "Pixel 9a" },
+    ...request,
+  });
+  const userId = (await findUserIdByTelegramId(d1(env.DB), telegramId)) ?? "";
+  await bindNonce(d1(env.DB), { nonce, now: Date.now(), userId });
+  return (await json<{ token: string }>(`/api/auth/nonce/${nonce}`)).token;
 };

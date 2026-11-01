@@ -26,7 +26,7 @@ export const writeSessionValue = async ({
 }: {
   readonly key: string;
   readonly session: string;
-  readonly value: number | string;
+  readonly value: number | Readonly<Record<string, boolean | number | string>> | string;
   readonly isCurrentSession: () => boolean;
 }): Promise<void> => {
   if (isCurrentSession()) {

@@ -439,6 +439,52 @@ describe("what the phone tells about its use, for sleep on the server", () => {
     expect(next?.["until"]).toBe("2026-10-06T10:30:00.000Z");
   });
 
+  it("still knows the phone is locked after reads with no use, when the alarm rings", async () => {
+    // Locked at 01:21; nothing then until the alarm rings over the lock screen at 06:30.
+    mockPhone.events = [
+      happened("01:21", 17),
+      happened("01:21", 16),
+      happened("06:30", 15),
+      happened("06:30", 1, CLOCK),
+      happened("06:35", 2, CLOCK),
+      happened("06:35", 16),
+    ];
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    // A read with the lock and no use, then one with nothing at all: each starts 10 min back.
+    await uploadPhoneData(runtime.api, "2026-10-06T03:00:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T04:00:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T06:40:00.000Z");
+    const alarm = usageSent(sent).at(-1);
+    expect(alarm?.["sessions"]).toEqual([{ app: "Clock", ...use("06:30", "06:35") }]);
+    expect(alarm?.["uses"]).toEqual([]);
+  });
+
+  it("never reads an app started over the lock screen as use when the next read starts on it", async () => {
+    // The alarm rings at 06:30 over the lock screen; the phone is unlocked at 06:33 to stop it.
+    mockPhone.events = [
+      ...NIGHT.slice(0, 6),
+      happened("06:30", 15),
+      happened("06:30", 1, CLOCK),
+      happened("06:33", 18),
+      happened("06:40", 2, CLOCK),
+      happened("06:41", 16),
+    ];
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    await uploadPhoneData(runtime.api, "2026-10-06T06:45:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T07:00:00.000Z");
+    const [first, next] = usageSent(sent);
+    expect(first?.["uses"]).toEqual([
+      use("01:00", "01:21"),
+      use("01:01", "01:20"),
+      use("06:33", "06:41"),
+    ]);
+    // The Clock's session starts the next read (06:30), before the lock state is read again.
+    expect(next?.["sessions"]).toEqual([{ app: "Clock", ...use("06:30", "06:40") }]);
+    expect(next?.["uses"]).toEqual([use("06:33", "06:41")]);
+  });
+
   it("tells how far it read when the phone was not used at all", async () => {
     mockPhone.events = [];
     const sent: Sent[] = [];

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { endpoints } from "@pace/core";
 
-import { answerOf, call, json, loginAsDev } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev, nonceLogin } from "./helpers.ts";
 
 const RANGE = "from=2026-10-05T00:00:00.000Z&to=2026-10-12T00:00:00.000Z";
 
@@ -133,12 +133,19 @@ const storeOf = async (token: string) => {
   return env.USER_STORE.get(env.USER_STORE.idFromName(me.id));
 };
 
-/** A signed-in phone of an account with nothing in it yet (tests in a file share the store). */
+/**
+The app signed in on a phone (an `app` session), of an account with nothing in it yet (tests in
+a file share the store).
+*/
 const freshPhone = async (telegramId: string): Promise<string> => {
   const earlier = await loginAsDev(telegramId);
   await call("/api/test/account", { method: "DELETE", token: earlier });
-  return await loginAsDev(telegramId);
+  await loginAsDev(telegramId);
+  return await nonceLogin(telegramId, { deviceId: "phone-1", from: "app" });
 };
+
+/** The moment the sleep rule decides at: just after the uploads a test made. */
+const nowIso = (): string => new Date().toISOString();
 
 const NIGHT = "2026-10-06T18:00:00.000Z";
 
@@ -164,7 +171,7 @@ describe("what the sleep rules know about use", () => {
       token,
     });
     expect(answer.stored).toBeGreaterThan(0);
-    const usage = await (await storeOf(token)).usageForSleep(NIGHT);
+    const usage = await (await storeOf(token)).usageForSleep(NIGHT, nowIso());
     expect(usage).toEqual({
       knownUntil: "2026-10-07T01:00:00.000Z",
       uses: [
@@ -201,7 +208,7 @@ describe("what the sleep rules know about use", () => {
       body: { ...body, until: "2026-10-06T23:30:00.000Z" },
       token,
     });
-    const usage = await (await storeOf(token)).usageForSleep(NIGHT);
+    const usage = await (await storeOf(token)).usageForSleep(NIGHT, nowIso());
     expect(usage).toEqual({
       knownUntil: "2026-10-06T23:30:00.000Z",
       uses: [
@@ -233,7 +240,7 @@ describe("what the sleep rules know about use", () => {
     });
     expect(sent.stored).toBe(1);
     const store = await storeOf(token);
-    expect(await store.usageForSleep(NIGHT)).toEqual({
+    expect(await store.usageForSleep(NIGHT, nowIso())).toEqual({
       knownUntil: null,
       uses: [
         {
@@ -245,26 +252,59 @@ describe("what the sleep rules know about use", () => {
     });
     // With the phone's upload beside it: both devices' use, bounded by the phone.
     await json("/api/usage/sessions", { body: phoneNight, token });
-    const both = await store.usageForSleep(NIGHT);
+    const both = await store.usageForSleep(NIGHT, nowIso());
     expect(both.knownUntil).toBe("2026-10-07T01:00:00.000Z");
     expect(both.uses.map((use) => use.deviceId)).toEqual([computer.id, "phone-1"]);
     // What ended before `from` is left out.
-    expect((await store.usageForSleep("2026-10-06T21:45:00.000Z")).uses).toEqual([
+    expect((await store.usageForSleep("2026-10-06T21:45:00.000Z", nowIso())).uses).toEqual([
       expect.objectContaining({ deviceId: computer.id }),
     ]);
   });
 
   it("decides nothing from a phone that has not uploaded for a day", async () => {
-    const token = await freshPhone("1002");
-    const store = await storeOf(token);
-    const dayAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-    await store.addUsage({ ...phoneNight, isPhone: true }, dayAgo);
-    expect((await store.usageForSleep(NIGHT)).knownUntil).toBeNull();
-    await store.addUsage(
-      { ...phoneNight, isPhone: true, until: "2026-10-07T00:30:00.000Z" },
-      new Date().toISOString(),
+    const store = await storeOf(await freshPhone("1002"));
+    const uploaded = "2026-10-07T01:05:00.000Z";
+    await store.addUsage({ ...phoneNight, isPhone: true }, uploaded);
+    // Before, at and after the day's edge (class 9): exactly a day old is already stale.
+    expect((await store.usageForSleep(NIGHT, "2026-10-08T01:04:00.000Z")).knownUntil).toBe(
+      "2026-10-07T01:00:00.000Z",
     );
-    expect((await store.usageForSleep(NIGHT)).knownUntil).toBe("2026-10-07T00:30:00.000Z");
+    expect((await store.usageForSleep(NIGHT, "2026-10-08T01:05:00.000Z")).knownUntil).toBeNull();
+    expect((await store.usageForSleep(NIGHT, "2026-10-08T01:06:00.000Z")).knownUntil).toBeNull();
+    // A new upload bounds it again.
+    await store.addUsage(
+      { ...phoneNight, isPhone: true, until: "2026-10-08T00:30:00.000Z" },
+      "2026-10-08T01:06:00.000Z",
+    );
+    expect((await store.usageForSleep(NIGHT, "2026-10-08T01:06:00.000Z")).knownUntil).toBe(
+      "2026-10-08T00:30:00.000Z",
+    );
+  });
+
+  it("lets only the app on a phone say how far use is known, never a browser", async () => {
+    const phone = await freshPhone("1001");
+    const browser = await nonceLogin("1001", { from: "web" });
+    const dev = await loginAsDev("1001");
+    const late = { ...phoneNight, deviceId: "not-a-phone", until: "2026-10-06T22:00:00.000Z" };
+    for (const token of [browser, dev]) {
+      expect((await call("/api/usage/sessions", { body: late, token })).status).toBe(200);
+    }
+    const store = await storeOf(phone);
+    // Neither a bound nor uses from them; their app sessions count like a computer's.
+    expect(await store.usageForSleep(NIGHT, nowIso())).toEqual({
+      knownUntil: null,
+      uses: [
+        {
+          deviceId: "not-a-phone",
+          endAt: "2026-10-06T22:05:00.000Z",
+          startAt: "2026-10-06T22:00:00.000Z",
+        },
+      ],
+    });
+    await json("/api/usage/sessions", { body: phoneNight, token: phone });
+    expect((await store.usageForSleep(NIGHT, nowIso())).knownUntil).toBe(
+      "2026-10-07T01:00:00.000Z",
+    );
   });
 
   it("never takes a phone's word for a quiet later than its upload arrived", async () => {
@@ -274,7 +314,7 @@ describe("what the sleep rules know about use", () => {
       body: { ...phoneNight, until: "2099-01-01T00:00:00.000Z" },
       token,
     });
-    const { knownUntil } = await (await storeOf(token)).usageForSleep(NIGHT);
+    const { knownUntil } = await (await storeOf(token)).usageForSleep(NIGHT, nowIso());
     const after = new Date().toISOString();
     expect(knownUntil !== null && knownUntil >= before && knownUntil <= after).toBe(true);
   });
@@ -286,7 +326,7 @@ describe("what the sleep rules know about use", () => {
       body: { ...phoneNight, deviceId: "phone-2", until: "2026-10-06T23:15:00.000Z", uses: [] },
       token,
     });
-    expect((await (await storeOf(token)).usageForSleep(NIGHT)).knownUntil).toBe(
+    expect((await (await storeOf(token)).usageForSleep(NIGHT, nowIso())).knownUntil).toBe(
       "2026-10-06T23:15:00.000Z",
     );
   });
@@ -295,7 +335,7 @@ describe("what the sleep rules know about use", () => {
     const token = await freshPhone("1002");
     const { until: _until, uses: _uses, ...older } = phoneNight;
     await json("/api/usage/sessions", { body: older, token });
-    expect(await (await storeOf(token)).usageForSleep(NIGHT)).toEqual({
+    expect(await (await storeOf(token)).usageForSleep(NIGHT, nowIso())).toEqual({
       knownUntil: null,
       uses: [
         {

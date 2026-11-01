@@ -64,6 +64,7 @@ export {
   bedtimeFloor,
   type Interval,
   isBedtime,
+  isLockedAt,
   isWakeUp,
   NIGHT_UNTIL_HOUR,
   type PhoneEvent,

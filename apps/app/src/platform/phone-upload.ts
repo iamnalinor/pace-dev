@@ -1,6 +1,14 @@
 import type { ApiClient } from "@pace/client";
 
-import { addMinutesIso, appSessions, endpoints, type Interval, phoneUses } from "@pace/core";
+import {
+  addMinutesIso,
+  appSessions,
+  endpoints,
+  type Interval,
+  isLockedAt,
+  type PhoneEvent,
+  phoneUses,
+} from "@pace/core";
 
 import { loadDeviceId } from "./device-id.ts";
 import { calendarAccess, calendarEvents } from "./phone-calendar.ts";
@@ -123,10 +131,9 @@ const didSendUsageBatches = async ({
 
 /**
 Where the next read starts: at the earlier of the last app session's start and the start of the
-use that ends last, since both may still grow and are sent again. Reading from the last use also
-reads the lock that followed it, so an alarm shown over the lock screen later never looks like an
-app in front of an unlocked phone (class 39). With neither, a little back from now, so an app
-opened just now is not cut at its start.
+use that ends last, since both may still grow and are sent again. With neither, a little back
+from now, so an app opened just now is not cut at its start. The lock screen's state there is
+kept with it (`isLockedAt`).
 */
 const nextUsageCursor = ({
   named,
@@ -150,18 +157,35 @@ const nextUsageCursor = ({
   return starts.toSorted((a, b) => a.localeCompare(b)).at(0) ?? quietUsageCursor(since, now);
 };
 
-const uploadUsage = async (api: ApiClient, deviceId: string, now: string): Promise<void> => {
-  const session = api.currentSessionToken();
-  if (session === undefined) {
-    return;
-  }
-  const since = (await usageCursor(session)) ?? addMinutesIso(now, -FIRST_LOOKBACK_MINUTES);
+/**
+What the phone recorded since the cursor (a day back without one), `null` without usage access.
+The read starts with the lock screen as the read before left it: an app shown over it after
+`since` is not use, though the lock itself came before this read (class 39).
+*/
+const readSinceCursor = async (
+  session: string,
+  now: string,
+): Promise<null | { readonly since: string; readonly events: readonly PhoneEvent[] }> => {
+  const cursor = await usageCursor(session);
+  const since = cursor?.at ?? addMinutesIso(now, -FIRST_LOOKBACK_MINUTES);
   const phone = await readPhoneEvents(since, now);
   if (!phone.hasAccess) {
+    return null;
+  }
+  const locked: readonly PhoneEvent[] =
+    cursor?.locked === true ? [{ at: since, kind: "lock" }] : [];
+  return { events: [...locked, ...phone.events], since };
+};
+
+const uploadUsage = async (api: ApiClient, deviceId: string, now: string): Promise<void> => {
+  const session = api.currentSessionToken();
+  const read = session === undefined ? null : await readSinceCursor(session, now);
+  if (session === undefined || read === null) {
     return;
   }
-  const sessions = appSessions(phone.events, now).filter((session) => session.startAt >= since);
-  const uses = phoneUses(phone.events, now).filter((use) => use.startAt >= since);
+  const { events, since } = read;
+  const sessions = appSessions(events, now).filter((session) => session.startAt >= since);
+  const uses = phoneUses(events, now).filter((use) => use.startAt >= since);
   const labels = await appLabels([...new Set(sessions.map((session) => session.app))]);
   const named = sessions.map((session) => ({
     app: (labels[session.app] ?? session.app).slice(0, 120),
@@ -171,7 +195,8 @@ const uploadUsage = async (api: ApiClient, deviceId: string, now: string): Promi
   if (!(await didSendUsageBatches({ api, deviceId, named, now, session, uses }))) {
     return;
   }
-  await setUsageCursor(session, nextUsageCursor({ named, now, since, uses }), () =>
+  const at = nextUsageCursor({ named, now, since, uses });
+  await setUsageCursor(session, { at, locked: isLockedAt(events, at) }, () =>
     api.isCurrentSession(session),
   );
 };

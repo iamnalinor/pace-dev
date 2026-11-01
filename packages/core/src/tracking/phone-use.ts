@@ -49,10 +49,17 @@ export const isBedtime = (atIso: string, zone: string): boolean => {
 };
 
 /** Lock-screen state at `atIso`: the last lock or unlock before it says (unlocked when unknown). */
-const isLockedAt = (sorted: readonly PhoneEvent[], atIso: string): boolean =>
+const isLockedInSorted = (sorted: readonly PhoneEvent[], atIso: string): boolean =>
   sorted.findLast(
     (event) => event.at <= atIso && (event.kind === "lock" || event.kind === "unlock"),
   )?.kind === "lock";
+
+/**
+Whether the lock screen showed at `atIso`, as the events up to it tell (unlocked when they do
+not): a read that starts later carries it, so an alarm over the lock screen stays not use.
+*/
+export const isLockedAt = (events: readonly PhoneEvent[], atIso: string): boolean =>
+  isLockedInSorted(byTime(events), atIso);
 
 /**
 Where a spell in front ends: at the screen going off. When the next thing written is the screen
@@ -126,7 +133,7 @@ export const phoneUses = (events: readonly PhoneEvent[], now: string): readonly 
     }));
   // Only the times: which app was in front stays on the phone.
   const inFront = foregroundIntervals(events, now)
-    .filter((interval) => !isLockedAt(sorted, interval.startAt))
+    .filter((interval) => !isLockedInSorted(sorted, interval.startAt))
     .map(({ endAt, startAt }) => ({ endAt, startAt }));
   return [...unlocked, ...inFront].toSorted((a, b) => a.startAt.localeCompare(b.startAt));
 };
