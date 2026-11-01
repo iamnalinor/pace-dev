@@ -106,6 +106,7 @@ export {
   autoOutcomeId,
   type AutoOutcomeKind,
   createIdFactory,
+  deferredReadId,
   type IdFactory,
   instanceId,
   isUlid,

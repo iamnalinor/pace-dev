@@ -6,6 +6,7 @@ import { EVENT_ID_MAX } from "./events/event-schema.ts";
 import {
   autoOutcomeId,
   createIdFactory,
+  deferredReadId,
   instanceId,
   isUlid,
   newId,
@@ -120,6 +121,8 @@ const idsOf = ({
     stop,
     sleepDiscardId(start),
     sleepReopenId(stop),
+    deferredReadId(task, index),
+    deferredReadId(task, "inbox"),
   ];
 };
 
@@ -145,7 +148,7 @@ describe("every deterministic id fits what the sync carries (class 12)", () => {
     task: ulid,
   });
 
-  it("holds for homework, series, outcome and automatic sleep ids at their longest", () => {
+  it("holds for homework, series, outcome, automatic sleep and read-later ids at their longest", () => {
     fc.assert(
       fc.property(world, (world) => {
         expect(idsOf(world).filter((id) => !isCarried(id))).toEqual([]);

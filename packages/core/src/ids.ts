@@ -41,6 +41,14 @@ export type AutoOutcomeKind = "missed" | "skipped";
 /** Automatic outcomes are system-generated once per task and kind. */
 export const autoOutcomeId = (taskId: string, kind: AutoOutcomeKind): string =>
   `auto:${taskId}:${kind}`;
+
+/**
+An event that a text read later writes, named after the text's place in the store's queue: a
+drain cut short after the write and run again finds what it wrote, and writes no second copy.
+`part` is the event's place in the reading, or `inbox` for the text kept in the Inbox instead.
+*/
+export const deferredReadId = (queuedId: string, part: "inbox" | number): string =>
+  `auto:read-${queuedId}-${String(part)}`;
 /** Minute precision in UTC (`20261007T2040`): the instant part of the sleep ids. */
 const minuteStamp = (atIso: string): string => formatInZone(atIso, "UTC", "yyyyMMdd'T'HHmm");
 
