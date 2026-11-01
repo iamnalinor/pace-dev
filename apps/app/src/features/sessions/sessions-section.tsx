@@ -1,12 +1,12 @@
 import { useRouter } from "expo-router";
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { useStore } from "zustand";
 
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { moveFocus } from "#app/platform/move-focus.ts";
 import { useOnReturn } from "#app/platform/on-return.ts";
+import { useSignInsChanged } from "#app/shared/notifications/use-sign-ins-changed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -139,46 +139,12 @@ const SessionList = ({
   );
 };
 
-/** A return and the notice refresh it brings come within this of each other: one reload. */
-const RELOAD_SETTLE_MS = 250;
-
 /**
 Keeps the list current (QA round 15 M1): it reloads when the person comes back to the app or the
-tab, and when a sign-in notice arrives or is answered once the feed has loaded (a new browser, a
-Not me elsewhere). Triggers close together make one request (QA round 15 L9).
+tab, and when a sign-in notice arrives or is answered (one request for both).
 */
 const useLiveSessions = (sessions: Sessions): void => {
-  const { notifications } = usePace();
-  const signIns = useStore(notifications.store, (state) =>
-    state.status === "ready"
-      ? state.items
-          .filter((item) => item.kind === "login")
-          .map((item) => `${item.id}:${item.resolution ?? ""}`)
-          .join(",")
-      : null,
-  );
-  const { reload } = sessions;
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const reloadSoon = useCallback(() => {
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(reload, RELOAD_SETTLE_MS);
-  }, [reload]);
-  useEffect(
-    () => () => {
-      clearTimeout(timerRef.current);
-    },
-    [],
-  );
-  useOnReturn(reloadSoon);
-  // The feed's first load is what the list already shows; only a change after it is news.
-  const shownRef = useRef(signIns);
-  useEffect(() => {
-    const shown = shownRef.current;
-    shownRef.current = signIns;
-    if (shown !== null && signIns !== null && shown !== signIns) {
-      reloadSoon();
-    }
-  }, [reloadSoon, signIns]);
+  useOnReturn(useSignInsChanged(sessions.reload));
 };
 
 /**

@@ -223,6 +223,7 @@ export {
   sessionRows,
   type SessionRowsContext,
 } from "./view-models/sessions.ts";
+export { type ListedSessions, signInState } from "./view-models/sign-in-notice.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,

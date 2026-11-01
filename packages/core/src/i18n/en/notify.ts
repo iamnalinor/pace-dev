@@ -41,6 +41,8 @@ export const enNotify = {
   "notifications.assistantLog": "Assistant log",
   "notifications.digestTitle": "Deadlines in the next day",
   "notifications.openNow": "Open Now",
+  "notifications.notMeConfirm": "End that session? Whoever uses it is signed out at once.",
+  "notifications.notMeEnd": "End session",
   "notifications.login": "Signed in from {name}",
   "notifications.eventStart": "{title}, {from}–{to}",
   "notifications.overrun": "Still doing {label}?",

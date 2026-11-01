@@ -11,6 +11,8 @@ export type NewAgent = { readonly id: string; readonly name: string; readonly to
 export type Sessions = {
   readonly status: "error" | "loading" | "ready";
   readonly sessions: readonly Session[];
+  /** When the shown list was asked for (this device's clock); null until one arrived. */
+  readonly loadedAt: null | string;
   readonly reload: () => void;
   /**
   Ends a session or revokes an MCP app's grant; the row goes once the server agrees, or says it
@@ -22,23 +24,28 @@ export type Sessions = {
   readonly createAgent: (name: string) => Promise<NewAgent>;
 };
 
-type Loaded = Pick<Sessions, "sessions" | "status">;
+type Loaded = Pick<Sessions, "loadedAt" | "sessions" | "status">;
 
 /** The server has no such session (any more): a revoke of it has nothing left to do. */
 const isAlreadyEnded = (error: unknown): boolean =>
   error instanceof ApiError && error.code === "session/not-found";
 
 export const useSessions = (api: ApiClient): Sessions => {
-  const [loaded, setLoaded] = useState<Loaded>({ sessions: [], status: "loading" });
+  const [loaded, setLoaded] = useState<Loaded>({
+    loadedAt: null,
+    sessions: [],
+    status: "loading",
+  });
   const [generation, setGeneration] = useState(0);
   useEffect(() => {
     // Dropped on unmount, so a late answer never updates a screen that is gone.
     const lifetime = { isCurrent: true };
     void (async () => {
+      const askedAt = new Date().toISOString();
       try {
         const { sessions } = await api.call(endpoints.sessions.list, {});
         if (lifetime.isCurrent) {
-          setLoaded({ sessions, status: "ready" });
+          setLoaded({ loadedAt: askedAt, sessions, status: "ready" });
         }
       } catch {
         if (lifetime.isCurrent) {
@@ -79,6 +86,7 @@ export const useSessions = (api: ApiClient): Sessions => {
         sessions: current.sessions.filter((session) => session.id !== id),
       }));
     },
+    loadedAt: loaded.loadedAt,
     sessions: loaded.sessions,
     status: loaded.status,
   };

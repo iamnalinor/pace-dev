@@ -43,6 +43,8 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notifications.assistantLog": "Журнал ассистента",
   "notifications.digestTitle": "Сроки в ближайшие сутки",
   "notifications.openNow": "Открыть Now",
+  "notifications.notMeConfirm": "Завершить тот сеанс? Тот, кто им пользуется, сразу выйдет.",
+  "notifications.notMeEnd": "Завершить сеанс",
   "notifications.login": "Вход с {name}",
   "notifications.eventStart": "{title}, {from}–{to}",
   "notifications.overrun": "Всё ещё занимаетесь: {label}?",

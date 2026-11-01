@@ -110,9 +110,32 @@ const DELIVERIES = {
   ],
 };
 
-/** Answers the pool's endpoints in the browser; an answer resolves the item it names. */
+/**
+Answers the pool's endpoints in the browser; an answer resolves the item it names. The sign-in's
+session ("s-1", Firefox on Windows) is in the account's list, so the feed offers Not me for it (a
+notice whose session already ended says so instead).
+*/
 const servePool = async (page: Page): Promise<Pool> => {
   const pool = poolOf();
+  await page.route(
+    (url) => url.pathname === "/api/sessions",
+    async (route) => {
+      const listed = (await (await route.fetch()).json()) as { sessions: unknown[] };
+      const firefox = {
+        city: "Berlin",
+        country: "DE",
+        createdAt: Date.parse(at(4)),
+        current: false,
+        id: "s-1",
+        ip: "203.0.113.7",
+        kind: "browser",
+        lastDataAt: null,
+        lastSeenAt: Date.parse(at(4)),
+        name: "Firefox on Windows",
+      };
+      await route.fulfill({ json: { sessions: [...listed.sessions, firefox] } });
+    },
+  );
   await page.route(
     (url) => url.pathname === "/api/notifications",
     async (route) => {
@@ -248,9 +271,18 @@ for (const size of [
     await settle(token, "en");
     await servePool(page);
     await page.goto("/notifications");
-    // By keyboard: the answered button is replaced by its status, which takes the focus.
+    // By keyboard: Not me asks first, focus on Cancel; Escape cancels and gives focus back
+    // (QA round 15 L11). Then End session: the answered button is replaced by its status, which
+    // takes the focus.
     const notMe = page.getByRole("button", { name: "Not me — end this session" });
     await notMe.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(notMe).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "End session" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator(":focus")).toHaveText("Session ended");
     // By mouse the same, and the next answer's status takes it in turn.

@@ -2,14 +2,14 @@ import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import type { DeliveryEntry } from "@pace/client";
-
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
+import { useSignInsChanged } from "#app/shared/notifications/use-sign-ins-changed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
+import { type DeliveryEntry, type ListedSessions, signInState } from "@pace/client";
 import { useSessions } from "@pace/client/react";
 import {
   formatLeft,
@@ -28,21 +28,45 @@ type Zoned = { readonly language: Language; readonly zone: string; readonly now:
 const dayClock = (iso: string, { language, zone }: Zoned): string =>
   `${new Intl.DateTimeFormat(language, { timeZone: zone, weekday: "short" }).format(new Date(iso))} ${clockTime(iso, zone)}`;
 
-/** What the notification says, per kind. */
-const Body = ({ item, zoned }: { readonly item: PoolNotification; readonly zoned: Zoned }) => {
+type SignInPayload = Extract<PoolNotification, { kind: "login" }>["payload"];
+
+/** A sign-in: from what, then where; this very session's own says "This device" first. */
+const SignInBody = ({
+  isOwn,
+  payload,
+}: {
+  readonly isOwn: boolean;
+  readonly payload: SignInPayload;
+}) => {
+  const t = useT();
+  const { city, country, ip, name } = payload;
+  return (
+    <View className="gap-0.5">
+      <Line>{t("notifications.login", { name })}</Line>
+      <Line tone="muted">
+        {[isOwn ? t("devices.thisDevice") : undefined, ip, city, country]
+          .filter((part) => part !== undefined && part !== "")
+          .join(" · ")}
+      </Line>
+    </View>
+  );
+};
+
+/** What the notification says, per kind; a sign-in about this very session says "This device". */
+const Body = ({
+  isOwn,
+  item,
+  zoned,
+}: {
+  readonly isOwn: boolean;
+  readonly item: PoolNotification;
+  readonly zoned: Zoned;
+}) => {
   const t = useT();
   const router = useRouter();
   switch (item.kind) {
     case "login": {
-      const { city, country, ip, name } = item.payload;
-      return (
-        <View className="gap-0.5">
-          <Line>{t("notifications.login", { name })}</Line>
-          <Line tone="muted">
-            {[ip, city, country].filter((part) => part !== undefined && part !== "").join(" · ")}
-          </Line>
-        </View>
-      );
+      return <SignInBody isOwn={isOwn} payload={item.payload} />;
     }
     case "deadline_digest": {
       return (
@@ -139,15 +163,16 @@ const deliveryLines = (
 const Item = ({
   deliveries,
   item,
-  ownSessionId,
+  listed,
   zoned,
 }: {
   readonly item: PoolNotification;
   readonly deliveries: readonly DeliveryEntry[];
-  readonly ownSessionId: string | undefined;
+  readonly listed: ListedSessions;
   readonly zoned: Zoned;
 }) => {
   const t = useT();
+  const state = signInState(item, listed);
   return (
     <View
       className="gap-1.5 border-t border-line px-5 py-3"
@@ -156,13 +181,13 @@ const Item = ({
     >
       <View className="flex-row items-start gap-3">
         <View className="min-w-0 flex-1">
-          <Body item={item} zoned={zoned} />
+          <Body isOwn={state === "own"} item={item} zoned={zoned} />
         </View>
         <Text className="font-sans text-[12px] tabular-nums text-muted">
           {clockTime(item.createdAt, zoned.zone)}
         </Text>
       </View>
-      <Answers item={item} ownSessionId={ownSessionId} />
+      <Answers item={item} state={state} />
       {deliveries
         .flatMap((entry) => deliveryLines(entry, t, zoned.zone))
         .map((line, index) => (
@@ -187,8 +212,16 @@ export const NotificationsScreen = () => {
   const viewer = useViewer();
   const { deliveries, feed, model, status, zone } = useFeed();
   const { api } = usePace();
-  // This session's id, to tell its own sign-in notice (which it may not answer) from the rest.
-  const ownSessionId = useSessions(api).sessions.find((session) => session.current)?.id;
+  // The account's sessions: this one's own sign-in (which it may not answer) and the sign-ins
+  // whose session already ended elsewhere (nothing left to end) read apart from the rest; the
+  // list follows new and answered sign-ins.
+  const sessions = useSessions(api);
+  useSignInsChanged(sessions.reload);
+  const listed: ListedSessions = {
+    current: sessions.sessions.find((session) => session.current)?.id,
+    ids: new Set(sessions.sessions.map((session) => session.id)),
+    loadedAt: sessions.status === "ready" ? sessions.loadedAt : null,
+  };
   // The zone the feed grouped its days in: the times under each day are in it too.
   const zoned: Zoned = { language: viewer.language, now: viewer.now, zone };
   useEffect(() => {
@@ -243,7 +276,7 @@ export const NotificationsScreen = () => {
                   deliveries={deliveries[item.id] ?? []}
                   item={item}
                   key={item.id}
-                  ownSessionId={ownSessionId}
+                  listed={listed}
                   zoned={zoned}
                 />
               ))}

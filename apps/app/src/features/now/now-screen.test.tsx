@@ -28,6 +28,21 @@ const Board = () => (
 
 const calendar = Calendar as unknown as FakeCalendar;
 
+/** Where focus went, as Now asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  isFocusLost: () => true,
+  moveFocus: (target: unknown) => {
+    mockMoveFocus(target);
+  },
+}));
+
+/** What a focus target says: its accessible name. */
+const saidBy = (target: unknown): unknown =>
+  (target as null | { readonly props?: Readonly<Record<string, unknown>> })?.props?.[
+    "accessibilityLabel"
+  ];
+
 beforeEach(() => {
   jest.clearAllMocks();
   (SecureStore as unknown as FakeSecureStore).values.clear();
@@ -307,6 +322,31 @@ describe("NowBoard", () => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
   });
+
+  it.each([
+    ["Attend", "✓ Attending"],
+    ["Skip", "Skipped"],
+  ])(
+    "hands focus to the outcome once %s takes the calendar card away (bug class 5)",
+    async (button, outcome) => {
+      seminarSoon();
+      const runtime = await createTestRuntime({
+        routes: {
+          "POST /api/calendar/skip": () => ({ ok: true }),
+        },
+      });
+      await renderScreen(<Board />, runtime);
+      const card = await screen.findByLabelText("From your calendar");
+      await fireEvent.press(within(card).getByRole("button", { name: button }));
+      await waitFor(() => {
+        expect(screen.queryByLabelText("From your calendar")).toBeNull();
+      });
+      // The card's buttons went with it: its outcome takes focus, never the page or another action.
+      const status = await screen.findByText(`${outcome} · Seminar`);
+      expect(status).toBeOnTheScreen();
+      expect(saidBy(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(`${outcome} · Seminar`);
+    },
+  );
 
   describe("Attend on an Android phone in Moscow (the owner's 13:47, a 12:15–15:20 colloquium)", () => {
     /** 13:47 in Moscow (UTC+3): what the phone's clock read in the owner's screenshot. */
