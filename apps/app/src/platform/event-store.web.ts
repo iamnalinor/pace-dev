@@ -8,6 +8,7 @@ const DB_NAME = "pace";
 const DB_VERSION = 1;
 const CURSOR_KEY = "cursor";
 const STORE_ID_KEY = "storeId";
+const SYNC_VERSION_KEY = "syncVersion";
 
 type PaceDb = DBSchema & {
   readonly events: {
@@ -94,6 +95,10 @@ const idbBackend = (db: Db): EventStore => ({
     const row = await db.get("meta", STORE_ID_KEY);
     return typeof row?.value === "string" ? row.value : null;
   },
+  getSyncVersion: async () => {
+    const row = await db.get("meta", SYNC_VERSION_KEY);
+    return typeof row?.value === "number" ? row.value : 0;
+  },
   listAll: async () => await db.getAllFromIndex("events", "byOccurredAt"),
   listPending: async () => await listPending(db),
   markSynced: async (ids) => {
@@ -104,6 +109,9 @@ const idbBackend = (db: Db): EventStore => ({
   },
   setStoreId: async (storeId) => {
     await db.put("meta", { key: STORE_ID_KEY, value: storeId });
+  },
+  setSyncVersion: async (version) => {
+    await db.put("meta", { key: SYNC_VERSION_KEY, value: version });
   },
 });
 
@@ -119,7 +127,10 @@ const openBackend = async (): Promise<EventStore> => {
   }
 };
 
-/** The local event log in IndexedDB (database `pace`): events, the outbox, the cursor and the store id. */
+/**
+The local event log in IndexedDB (database `pace`): events, the outbox, and in `meta` the cursor,
+the store id and the sync version.
+*/
 export const createEventStore = (): EventStore => {
   let backendPromise: Promise<EventStore> | undefined;
   const call = async <T>(run: (store: EventStore) => Promise<T>): Promise<T> => {
@@ -140,6 +151,7 @@ export const createEventStore = (): EventStore => {
     },
     getCursor: async () => await call(async (store) => await store.getCursor()),
     getStoreId: async () => await call(async (store) => await store.getStoreId()),
+    getSyncVersion: async () => await call(async (store) => await store.getSyncVersion()),
     listAll: async () => await call(async (store) => await store.listAll()),
     listPending: async () => await call(async (store) => await store.listPending()),
     markSynced: async (ids) => {
@@ -155,6 +167,11 @@ export const createEventStore = (): EventStore => {
     setStoreId: async (storeId) => {
       await call(async (store) => {
         await store.setStoreId(storeId);
+      });
+    },
+    setSyncVersion: async (version) => {
+      await call(async (store) => {
+        await store.setSyncVersion(version);
       });
     },
   };

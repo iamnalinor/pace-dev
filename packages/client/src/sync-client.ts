@@ -7,6 +7,7 @@ import type { AppStateHandle } from "./state.ts";
 import type { PullPage, SyncTransport } from "./sync-transport.ts";
 
 import { ApiError } from "./api-client.ts";
+import { SYNC_SCHEMA_VERSION, upgradeCursor } from "./sync-version.ts";
 
 export type SyncStatus = {
   /** False after a transport failure (no network), true again after any response. */
@@ -72,6 +73,8 @@ const createReset = (store: EventStore, state: AppStateHandle): Reset => {
     }
     isUsed = true;
     await store.clear();
+    // The fresh copy is pulled from 0 by this client, so it needs no re-pull of its own.
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
     if (storeId !== null) {
       await store.setStoreId(storeId);
     }
@@ -209,6 +212,7 @@ const runSync = async (
   const { now, state, store, transport } = deps;
   try {
     await state.ready;
+    await upgradeCursor(store);
     const run: Run = { reset: createReset(store, state), state, store, transport };
     // The pull goes first: it confirms the store id, so an outbox meant for a store that
     // was reset since is dropped instead of landing in the fresh one (the push names the

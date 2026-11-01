@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Event, LIVE_REQUEST_TIMEOUT_MS, newId } from "@pace/core";
 
+import type { EventStore } from "./event-store.ts";
+
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createApiClient } from "./api-client.ts";
 import { createPaceClient } from "./create-client.ts";
@@ -20,6 +22,7 @@ import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
 import { httpTransport } from "./sync-transport.ts";
+import { SYNC_SCHEMA_VERSION } from "./sync-version.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
 const STORE_ID = "store-a";
@@ -28,6 +31,20 @@ const noPull: FakeRoute = () => EMPTY_PAGE;
 const acceptAll: FakeRoute = ({ body }) => {
   const { events } = body as { events: readonly Event[] };
   return { accepted: events.map((event) => event.id), rejected: [], seq: events.length };
+};
+
+/** A sync over `store` as the app starts it: a fresh state read from the store. */
+const started = async (store: EventStore, routes: Readonly<Record<string, FakeRoute>>) => {
+  const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+  await state.ready;
+  const fake = createFakeFetch(routes);
+  const api = createApiClient({
+    baseUrl: "https://api.test",
+    fetch: fake.fetch,
+    token: () => "t",
+  });
+  const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+  return { calls: fake.calls, state, sync };
 };
 
 const setup = async (
@@ -41,12 +58,7 @@ const setup = async (
 }> => {
   const store = createMemoryEventStore();
   await store.append(pending);
-  const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
-  await state.ready;
-  const fake = createFakeFetch(routes);
-  const api = createApiClient({ baseUrl: "https://api.test", fetch: fake.fetch, token: () => "t" });
-  const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
-  return { calls: fake.calls, state, store, sync };
+  return { ...(await started(store, routes)), store };
 };
 
 const localEvents = (count: number): readonly Event[] =>
@@ -215,6 +227,7 @@ describe("createSyncClient store id", () => {
     );
     await store.setStoreId(STORE_ID);
     await store.setCursor(9);
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
     // The old outbox never reaches the fresh store.
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
@@ -289,6 +302,7 @@ describe("createSyncClient store id", () => {
     });
     await store.setStoreId(STORE_ID);
     await store.setCursor(9);
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
     const run = sync.syncNow();
     // Written on the old copy while the server's answer (a new store) is on its way.
     await state.dispatch({
@@ -303,6 +317,80 @@ describe("createSyncClient store id", () => {
     await expect(store.listPending()).resolves.toEqual([]);
     expect(state.store.getState().events).toEqual([remote]);
     expect(state.store.getState().settings.language).toBe("ru");
+  });
+});
+
+describe("createSyncClient after an update that reads more of the log", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+  // Older clients refused ids past 64 characters and moved their cursor past such events.
+  const longId = `auto:rep:01ARZ3NDEKTSV4RRFFQ69G5FAA:01ARZ3NDEKTSV4RRFFQ69G5FAB:12:missed`;
+  const skipped = { ...settingsEvent(longId, at(10), { timezone: "UTC" }), source: "system" };
+
+  /** A store as an installed client left it: pulled up to 500, one change not yet sent. */
+  const upgradedStore = async () => {
+    const store = createMemoryEventStore();
+    await store.append([remote]);
+    await store.markSynced([remote.id]);
+    const [outbox] = localEvents(1);
+    await store.append(outbox === undefined ? [] : [outbox]);
+    await store.setStoreId(STORE_ID);
+    await store.setCursor(500);
+    return { outbox, store };
+  };
+
+  it("re-pulls from 0 once, keeps and sends its outbox, and pulls from its cursor after that", async () => {
+    const { outbox, store } = await upgradedStore();
+    const sinces: (null | string)[] = [];
+    const pushed: string[] = [];
+    const routes: Readonly<Record<string, FakeRoute>> = {
+      "GET /api/sync/pull": ({ url }) => {
+        const since = url.searchParams.get("since");
+        sinces.push(since);
+        return since === "0"
+          ? { events: [remote, skipped], more: false, seq: 501, storeId: STORE_ID }
+          : { ...EMPTY_PAGE, seq: Number(since) };
+      },
+      "POST /api/sync/push": (request) => {
+        const { events } = request.body as { events: readonly Event[] };
+        pushed.push(...events.map((event) => event.id));
+        return acceptAll(request);
+      },
+    };
+    const first = await started(store, routes);
+    await expect(first.sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
+    expect(sinces).toEqual(["0", "501"]);
+    expect(pushed).toEqual([outbox?.id]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(first.state.store.getState().settings).toMatchObject({
+      language: "ru",
+      timezone: "UTC",
+    });
+    await expect(store.getCursor()).resolves.toBe(501);
+    // The next start pulls from where it stopped.
+    const next = await started(store, routes);
+    await next.sync.syncNow();
+    expect(sinces).toEqual(["0", "501", "501"]);
+    expect(next.state.store.getState().settings.timezone).toBe("UTC");
+  });
+
+  it("does not re-pull again after its store was reset and pulled from 0", async () => {
+    const { store } = await upgradedStore();
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    const sinces: (null | string)[] = [];
+    const routes: Readonly<Record<string, FakeRoute>> = {
+      "GET /api/sync/pull": ({ url }) => {
+        const since = url.searchParams.get("since");
+        sinces.push(since);
+        return since === "0"
+          ? { events: [remote], more: false, seq: 3, storeId: "store-b" }
+          : { ...EMPTY_PAGE, seq: Number(since), storeId: "store-b" };
+      },
+      "POST /api/sync/push": acceptAll,
+    };
+    await (await started(store, routes)).sync.syncNow();
+    expect(sinces).toEqual(["500", "0"]);
+    await (await started(store, routes)).sync.syncNow();
+    expect(sinces).toEqual(["500", "0", "3"]);
   });
 });
 
