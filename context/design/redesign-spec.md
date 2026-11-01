@@ -1,6 +1,6 @@
 # Pace redesign spec (design overhaul, 2026-11)
 
-Status: **draft for STOP 1**. Nothing here is built yet. The owner picks a direction (§2) and answers
+Status: **draft for STOP 1**. Nothing here is built yet. **Owner decision (2026-11-01): direction A · Тетрадь.** §2's recommendation of B is superseded; §3.1 values are re-derived for A in Phase 3 (same roles and structure; ink-blue accent, red margin as status only, the same 12-hue family). The owner picks a direction (§2) and answers
 the open questions (§12); then the spec is amended (Phase 3) and implemented (Phase 4,
 `redesign-plan.md`).
 
