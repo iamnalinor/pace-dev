@@ -98,7 +98,7 @@ a { color: var(--focus) }
 .btn.primary { background: var(--accent); color: var(--onAccent) }
 .btn.quiet { color: var(--accentText) }
 .btns { display: flex; gap: 6px }
-.tabs { height: 84px; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px 0; border-top: 1px solid var(--sep); background: var(--bar) }
+.tabs { height: 84px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 4px 0; border-top: 1px solid var(--sep); background: var(--bar) }
 .tab { display: grid; justify-items: center; align-content: start; gap: 3px; font-size: 11px; font-weight: 550; color: var(--l3); position: relative }
 .tab.on { color: var(--tabOn) }
 .badge { position: absolute; top: -2px; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px; background: var(--badge); color: var(--onBadge); font-size: 11px; font-weight: 700; display: grid; place-items: center }
@@ -334,7 +334,7 @@ function phone(d, theme) {
       <div class="btns"><span class="btn tonal">${ic("stop", 14, 2)}Стоп</span></div></div>
   </div>
   <div class="tabs">
-    <div class="tab on">${ic("zap", 24)}Сейчас</div><div class="tab">${ic("clock", 24)}День</div><div class="tab">${ic("cal", 24)}Календарь</div>
+    <div class="tab on">${ic("zap", 24)}Сейчас</div><div class="tab">${ic("clock", 24)}День</div>
     <div class="tab">${ic("inbox", 24)}<span class="badge num">3</span>Входящие</div><div class="tab">${ic("more", 24)}Ещё</div>
   </div></div>`;
 }
@@ -372,7 +372,7 @@ function desk(d, theme) {
     <div class="sb-top">${logo(24)}<span class="sb-name">Pace</span><span class="sb-user">Альберт</span></div>
     <div class="newtask">${ic("plus", 18, 2)}Новая задача<kbd>N</kbd></div>
     <nav class="nav">
-      <div class="nv">${ic("zap", 18)}Сейчас</div><div class="nv on">${ic("clock", 18)}День</div><div class="nv">${ic("cal", 18)}Календарь</div>
+      <div class="nv">${ic("zap", 18)}Сейчас</div><div class="nv on">${ic("clock", 18)}День</div><div class="nv">${ic("cal", 18)}Неделя</div>
       <div class="nv">${ic("inbox", 18)}Входящие<span class="cnt num">3</span></div><div class="nv">${ic("folder", 18)}Проекты</div>
       <div class="nv">${ic("chart", 18)}Аналитика</div><div class="nv">${ic("hist", 18)}История</div><div class="nv">${ic("gear", 18)}Настройки</div>
     </nav>
