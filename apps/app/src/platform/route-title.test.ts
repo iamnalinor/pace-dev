@@ -25,7 +25,9 @@ describe("the page title per route (QA round 11 L11, round 14 L10)", () => {
   it("puts the screen before the app's name, and keeps the app's name alone where there is none", () => {
     expect(documentTitle("/settings", say)).toBe("Settings · Pace");
     expect(documentTitle("/task/01ABC", say)).toBe("Task · Pace");
-    expect(documentTitle("/somewhere-else", say)).toBe("Pace");
+    expect(documentTitle("/auth/telegram", say)).toBe("Pace");
+    // A path no route answers says so, as the page does (QA 17 L11).
+    expect(documentTitle("/somewhere-else", say)).toBe("Page not found · Pace");
     // A trailing slash or a query names the same screen.
     expect(documentTitle("/week/", say)).toBe("Week · Pace");
     // The app's name comes from the catalog, as everywhere else (fix round 1).
