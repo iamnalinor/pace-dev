@@ -5,6 +5,9 @@ import { z } from "zod";
 import { err, ok, type Result } from "@pace/core";
 
 import { parseCidr } from "./ip.ts";
+import { createLogger } from "./logger.ts";
+
+const log = createLogger("info");
 
 /** `getMe` as stored in BOT_INFO; the capability flags default to false when the JSON is trimmed. */
 const BotInfoSchema = z.object({
@@ -62,7 +65,7 @@ const EnvSchema = z.object({
   TELEGRAM_API_ROOT: z.url().default("https://api.telegram.org"),
   BOT_INFO: z.string().transform(parseJson).pipe(BotInfoSchema).optional(),
   LLM_PROVIDER: z.enum(["auto", "fake"]).default("auto"),
-  API_ORIGIN: z.url().optional(),
+  API_ORIGIN: z.string().optional(),
   PACE_VERSION: z.string().optional(),
 });
 
@@ -167,6 +170,23 @@ export type Config = {
   readonly version: string;
 };
 
+/**
+The Worker's own origin as configured: blank or malformed reads as unset (the request's origin is
+used) and is logged, so a typo in a self-hoster's setting never answers every request with 500
+(bug class 40).
+*/
+const apiOriginOf = (value: string | undefined): string | undefined => {
+  const origin = value?.trim() ?? "";
+  if (origin === "") {
+    return undefined;
+  }
+  if (!isHttpUrl(origin)) {
+    log.warn("config: API_ORIGIN ignored", { why: "must be an http(s) URL" });
+    return undefined;
+  }
+  return origin;
+};
+
 /** An unset or blank version is a build no deploy named. */
 const versionOf = (value: string | undefined): string => {
   const version = value?.trim() ?? "";
@@ -198,7 +218,7 @@ export const loadConfig = (env: object): Result<Config, string> => {
     llmEndpoints: llm.endpoints,
     llmSkipped: llm.skipped,
     llmProvider: value.LLM_PROVIDER,
-    apiOrigin: value.API_ORIGIN,
+    apiOrigin: apiOriginOf(value.API_ORIGIN),
     version: versionOf(value.PACE_VERSION),
   });
 };

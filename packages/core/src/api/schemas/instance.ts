@@ -23,11 +23,13 @@ export const InstanceSchema = z.object({
   apiOrigin: z.string(),
   /** A method this client does not know (a newer server's) is dropped. */
   loginMethods: knownValues(z.enum(LOGIN_METHODS)),
-  /** A feature a server does not mention is off. */
-  features: z.object({
-    push: z.boolean().default(false),
-    assistant: z.boolean().default(false),
-  }),
+  /** A feature a server does not mention is off, also when it names no features at all. */
+  features: z
+    .object({
+      push: z.boolean().default(false),
+      assistant: z.boolean().default(false),
+    })
+    .prefault({}),
 });
 
 export type Instance = z.output<typeof InstanceSchema>;

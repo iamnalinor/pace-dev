@@ -80,10 +80,14 @@ export const applyAnswer = async (
   resolution: Resolution,
   store: { readonly env: { readonly DB: D1Database }; readonly ctx: DurableObjectState },
 ): Promise<void> => {
-  // The store is named after its user (`idFromName(userId)`).
-  const userId = store.ctx.id.name;
-  if (resolution !== "revoked" || userId === undefined || notification.kind !== "login") {
+  if (resolution !== "revoked" || notification.kind !== "login") {
     return;
+  }
+  // The store is named after its user (`idFromName(userId)`). Without the name nothing can be
+  // ended, and resolving would say "Session ended" anyway: throw, so the notice stays open.
+  const userId = store.ctx.id.name;
+  if (userId === undefined) {
+    throw new Error("Not me: the store does not know its user");
   }
   const live = {
     endLiveSessions: async (sessionId: string, until?: number): Promise<void> => {

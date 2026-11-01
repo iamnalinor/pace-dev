@@ -40,7 +40,8 @@ server at the latest release.
    - `WEB_ORIGIN`: where your web app is served (`https://pace.example.dev`), the only origin the
      API's CORS admits.
    - `API_ORIGIN`: your API's own origin (`https://pace-api.example.dev`): the OAuth issuer and the
-     MCP resource.
+     MCP resource. A blank or malformed value is ignored (and logged): the origin requests arrive
+     at is used instead.
 
    For the web app, change the custom domain in `apps/app/wrangler.web.jsonc` too.
 4. **Secrets** (in `apps/api`, `bunx wrangler secret put <NAME>`):

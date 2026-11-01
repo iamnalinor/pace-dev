@@ -128,6 +128,17 @@ describe("loadConfig", () => {
     );
   });
 
+  it("treats a blank or malformed API_ORIGIN as unset, keeping the API up (a broken setting never takes it down)", () => {
+    for (const value of ["", "  ", "api.pace.test", "not a url", "ftp://api.pace.test"]) {
+      const config = configured({ API_ORIGIN: value });
+      expect(config).toBeDefined();
+      expect(config?.apiOrigin).toBeUndefined();
+    }
+    expect(configured({ API_ORIGIN: " https://api.pace.test " })?.apiOrigin).toBe(
+      "https://api.pace.test",
+    );
+  });
+
   it("parses BOT_INFO as JSON when present", () => {
     const result = loadConfig({
       ...base,

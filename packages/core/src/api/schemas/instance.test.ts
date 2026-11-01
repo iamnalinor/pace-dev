@@ -29,6 +29,14 @@ describe("the instance answer", () => {
     expect(read).not.toHaveProperty("region");
   });
 
+  it("reads a server that names no features as one with every feature off (class 13)", () => {
+    const { features: _omitted, ...withoutFeatures } = answer;
+    expect(endpoints.instance.output.parse(withoutFeatures).features).toEqual({
+      assistant: false,
+      push: false,
+    });
+  });
+
   it("reads a server without a web app as `webOrigin: null`", () => {
     const { webOrigin: _omitted, ...withoutWeb } = answer;
     expect(endpoints.instance.output.parse(withoutWeb).webOrigin).toBeNull();
