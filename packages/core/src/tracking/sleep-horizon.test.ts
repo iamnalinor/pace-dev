@@ -66,6 +66,11 @@ const recordEvents = (zone: string, record: Record, index: number): readonly Eve
 };
 
 const world = fc.record({
+  /**
+  How far the window's front moved on by the later pass (minutes after `base`): it moves with
+  `now`, so a later pass reads the uses that end after it, and only those.
+  */
+  front: fc.integer({ max: SPAN, min: 0 }),
   known: fc.integer({ max: SPAN, min: 0 }),
   /** How far the pass runs after what the phones told: their uploads lag, by hours in Doze. */
   lag: fc.integer({ max: 240, min: 5 }),
@@ -103,20 +108,37 @@ const passAt = ({
   };
 };
 
+/** The later pass's window: from the front moved on (short of what was known), its uses. */
+const windowAt = (
+  { front, zone }: { front: number; zone: string },
+  { knownUntil, uses }: { knownUntil: string; uses: readonly DeviceUse[] },
+) => {
+  const usesFrom = addMinutesIso(base(zone), front);
+  const isShort = usesFrom < knownUntil;
+  return {
+    isShort,
+    usesFrom,
+    within: (more: readonly DeviceUse[]) =>
+      [...uses, ...more].filter((use) => use.endAt > usesFrom),
+  };
+};
+
 describe("how far a pass of automatic sleep holds", () => {
-  it("13. decides nothing more before its horizon, with the same uses and log", () => {
+  it("13. decides nothing more before its horizon, with the same uses and log, wherever the window's front is", () => {
     fc.assert(
-      fc.property(world, ({ known, lag, later, raw, records, zone }) => {
+      fc.property(world, ({ front, known, lag, later, raw, records, zone }) => {
         const { done, knownUntil, now, uses } = passAt({ known, lag, raw, records, zone });
         const { quietUntil } = sleepHorizon(done.input);
         const reached = addMinutesIso(knownUntil, later);
         fc.pre(quietUntil === null || reached < quietUntil);
+        const window = windowAt({ front, zone }, { knownUntil, uses });
+        fc.pre(window.isShort);
         const again = step(done.log, {
           decidedUntil: knownUntil,
           knownUntil: reached,
           now: reached > now ? addMinutesIso(reached, 5) : now,
-          uses,
-          usesFrom: base(zone),
+          uses: window.within([]),
+          usesFrom: window.usesFrom,
           zone,
         });
         expect(again.decisions).toEqual([]);
@@ -150,7 +172,7 @@ describe("how far a pass of automatic sleep holds", () => {
     );
   }, 60_000);
 
-  it("13. decides nothing more by day once settled, whatever is used after it", () => {
+  it("13. decides nothing more by day once settled, whatever is used after it, wherever the window's front is", () => {
     const freshArb = fc.array(
       fc.record({
         device: fc.constantFrom("phone", "laptop"),
@@ -160,7 +182,7 @@ describe("how far a pass of automatic sleep holds", () => {
       { maxLength: 10 },
     );
     fc.assert(
-      fc.property(world, freshArb, ({ known, lag, raw, records, zone }, fresh) => {
+      fc.property(world, freshArb, ({ front, known, lag, raw, records, zone }, fresh) => {
         const { done, knownUntil, now, uses } = passAt({ known, lag, raw, records, zone });
         const hour = Number(formatInZone(knownUntil, zone, "H"));
         fc.pre(sleepHorizon(done.input).isSettled && hour >= 12 && hour < 21);
@@ -175,12 +197,14 @@ describe("how far a pass of automatic sleep holds", () => {
           }))
           .filter((each) => each.endAt < evening);
         const until = laterOf(knownUntil, ...added.map((each) => each.endAt));
+        const window = windowAt({ front, zone }, { knownUntil, uses });
+        fc.pre(window.isShort);
         const again = step(done.log, {
           decidedUntil: knownUntil,
           knownUntil: until,
           now: until > now ? addMinutesIso(until, 5) : now,
-          uses: [...uses, ...added],
-          usesFrom: base(zone),
+          uses: window.within(added),
+          usesFrom: window.usesFrom,
           zone,
         });
         expect(again.decisions).toEqual([]);

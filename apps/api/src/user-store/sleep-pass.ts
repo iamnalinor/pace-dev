@@ -1,21 +1,16 @@
 import {
   addMinutesIso,
   awakeSpells,
-  BEDTIME_FROM_HOUR,
   decideSleep,
   type DeviceUse,
   type Event,
   type EventInput,
-  formatInZone,
-  NIGHT_UNTIL_HOUR,
   type SleepDecision,
   sleepEvents,
-  sleepHorizon,
   type SleepInput,
   sleepInputOf,
   type SleepLogInputs,
   sleepRuleOf,
-  wallClockInstant,
 } from "@pace/core";
 
 import type { DecisionEntry } from "../shared/contract.ts";
@@ -23,6 +18,7 @@ import type { SleepUsage } from "./cloud-data.ts";
 
 import { createLogger } from "../shared/logger.ts";
 import { armEarliest, nextSleepCheckAt } from "./alarm.ts";
+import { type DecidedOn, heldOf, hold, isHeld, keptHold, usesAfter } from "./sleep-hold.ts";
 
 /** Storage key of the highest `knownUntil` a pass decided with: less known later undoes nothing. */
 export const DECIDED_UNTIL_KEY = "sleep:decided-until";
@@ -38,23 +34,6 @@ Storage key of the `decidedUntil` the last pass without a fresh phone ended the 
 the same again (an older app's uploads keep nothing fresh) reads nothing.
 */
 const ENDED_AT_KEY = "sleep:ended-at";
-
-/** Storage key of how far the last pass's decisions hold (`Held`): a pass within it loads nothing. */
-const HELD_KEY = "sleep:held";
-
-/**
-How far the last pass that read the log holds, as digests (the log's `seq` and the zone; the uses;
-the uses that start before what it decided on) and core's `sleepHorizon` of its input.
-*/
-type Held = {
-  readonly log: string;
-  readonly uses: string;
-  readonly usesBefore: string;
-  /** The `knownUntil` it decided on (never below `decidedUntil`). */
-  readonly decidedOn: string;
-  readonly quietUntil: null | string;
-  readonly isSettled: boolean;
-};
 
 /** How far back a pass reads use: a night and the evening before it, whatever the upload's delay. */
 const USES_FOR_MINUTES = 36 * 60;
@@ -168,57 +147,6 @@ const entriesOf = (
   });
 };
 
-/** A SHA-256 digest of a value's JSON. */
-const digestOf = async (value: unknown): Promise<string> => {
-  const bytes = new TextEncoder().encode(JSON.stringify(value));
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
-};
-
-/** What a pass decides on, as `Held` compares it. */
-type DecidedOn = {
-  readonly decidedOn: string;
-  readonly seq: number;
-  readonly uses: readonly DeviceUse[];
-  readonly zone: string;
-};
-
-const digestsOf = async ({ decidedOn, seq, uses, zone }: DecidedOn) => ({
-  log: await digestOf({ seq, zone }),
-  uses: await digestOf(uses),
-  usesBefore: await digestOf(uses.filter((use) => use.startAt < decidedOn)),
-});
-
-/** 21:00 local on the day of `at`: the first instant a sleep can start after a day. */
-const eveningOf = (at: string, zone: string): string =>
-  wallClockInstant(formatInZone(at, zone, "yyyy-MM-dd"), `${String(BEDTIME_FROM_HOUR)}:00`, zone);
-
-/**
-Whether the last pass still holds: the same log and zone, and either the same uses with less known
-than its horizon, or (all it followed decided for good, by day: noon to 21:00 local) only new use
-after what it knew, and still before the evening. Nothing it can decide on changed, so the whole
-log is not loaded again for it (each phone upload moves `knownUntil`).
-*/
-const isHeld = async (held: Held | undefined, now: DecidedOn): Promise<boolean> => {
-  if (held === undefined) {
-    return false;
-  }
-  const digests = await digestsOf({ ...now, decidedOn: held.decidedOn });
-  if (digests.log !== held.log) {
-    return false;
-  }
-  const isQuiet =
-    digests.uses === held.uses && (held.quietUntil === null || now.decidedOn < held.quietUntil);
-  const hour = Number(formatInZone(held.decidedOn, now.zone, "H"));
-  const isSettledDay =
-    held.isSettled &&
-    hour >= NIGHT_UNTIL_HOUR &&
-    hour < BEDTIME_FROM_HOUR &&
-    now.decidedOn < eveningOf(held.decidedOn, now.zone) &&
-    digests.usesBefore === held.usesBefore;
-  return isQuiet || isSettledDay;
-};
-
 /**
 Keeps the highest `knownUntil` decided with, read again just before the write: a pass that
 overlapped this one (an upload's, waiting on a send) may have decided on more. Answers it.
@@ -239,19 +167,6 @@ const armNextLook = async (storage: DurableObjectStorage, now: string, zone: str
   await armEarliest(storage, at);
 };
 
-/**
-After a pass that read the log: remembers how far its decisions hold (as the log stands after its
-own writes), so the next pass within that loads nothing.
-*/
-const hold = async (
-  host: SleepHost,
-  { decidedOn, input }: { decidedOn: Omit<DecidedOn, "seq">; input: SleepInput },
-): Promise<void> => {
-  const digests = await digestsOf({ ...decidedOn, seq: await host.seq() });
-  const held: Held = { ...digests, decidedOn: decidedOn.decidedOn, ...sleepHorizon(input) };
-  await host.storage.put(HELD_KEY, held);
-};
-
 /** Decides on the log as it stands, writes the events and the rows. Answers the ids written. */
 const decideOn = async (
   host: SleepHost,
@@ -265,18 +180,33 @@ const decideOn = async (
 };
 
 /**
-One pass of automatic sleep over the person's store at `now`: reads use from 36 hours back and
-how far the phones have told, and unless the last pass that read the log still holds (`isHeld`),
-decides on the log as it stands (`decideSleep`), appends the events through the system path and
-logs each decision that wrote one, with what it relied on. Keeps the highest `knownUntil` it
-decided with, and arms the next look. Without a phone that uploaded within a day, the rules' running
-sleeps end where knowledge ended (once) and nothing is armed: its next upload starts again.
-Answers the ids written. (A use that
-leaves the 36 hours is not a change: it only ever concerns a night long decided.)
+The use a pass reads: from the anchor of the hold it may still be within, else from its own front
+(36 hours back); `uses` are those of its own window, which it decides on.
+*/
+const readWindow = async (host: SleepHost, now: string) => {
+  const usesFrom = addMinutesIso(now, -USES_FOR_MINUTES);
+  const held = keptHold(await heldOf(host.storage), usesFrom);
+  const read = await host.usageForSleep(held?.anchor ?? usesFrom, now);
+  return {
+    held,
+    knownUntil: read.knownUntil,
+    read,
+    uses: usesAfter(read.uses, usesFrom),
+    usesFrom,
+  };
+};
+
+/**
+One pass of automatic sleep over the person's store at `now`: reads use from 36 hours back (from
+the hold's anchor while one lasts) and how far the phones have told, and unless the last pass that
+read the log still holds (`isHeld`), decides on the log as it stands (`decideSleep`) with the use
+of the last 36 hours, appends the events through the system path and logs each decision that
+wrote one, with what it relied on. Keeps the highest `knownUntil` it decided with, and arms the
+next look. Without a phone that uploaded within a day, the rules' running sleeps end where
+knowledge ended (once) and nothing is armed: its next upload starts again. Answers the ids written.
 */
 export const runSleepPass = async (host: SleepHost, now: string): Promise<readonly string[]> => {
-  const usesFrom = addMinutesIso(now, -USES_FOR_MINUTES);
-  const { knownUntil, uses } = await host.usageForSleep(usesFrom, now);
+  const { held, knownUntil, read, uses, usesFrom } = await readWindow(host, now);
   const zone = await host.zone();
   const decidedUntil = (await host.storage.get<string>(DECIDED_UNTIL_KEY)) ?? null;
   if (knownUntil === null) {
@@ -284,10 +214,7 @@ export const runSleepPass = async (host: SleepHost, now: string): Promise<readon
     return await endWhereKnown(host, { decidedUntil, now, uses, usesFrom, zone });
   }
   const decidedOn = { decidedOn: laterOf(knownUntil, decidedUntil), uses, zone };
-  const isSame = await isHeld(await host.storage.get<Held>(HELD_KEY), {
-    ...decidedOn,
-    seq: await host.seq(),
-  });
+  const isSame = await isHeld(held, { ...decidedOn, seq: await host.seq(), uses: read.uses });
   const made = isSame
     ? []
     : await decideAndHold(host, { decidedOn, decidedUntil, knownUntil, now, usesFrom });
@@ -347,7 +274,7 @@ const decideAndHold = async (
   const { uses, zone } = decidedOn;
   const input = sleepInputOf(log, { decidedUntil, knownUntil, now, uses, usesFrom, zone });
   const made = await decideOn(host, { input, log, now });
-  await hold(host, { decidedOn, input });
+  await hold(host.storage, { decidedOn, input, seq: await host.seq() });
   return made;
 };
 

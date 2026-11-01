@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addMinutesIso,
   type DeviceUse,
   type Event,
   type EventInput,
@@ -33,7 +34,7 @@ const USES = [
 
 /** A store's side of the pass, recording what it was asked for. */
 const hostOf = (storage: DurableObjectStorage, knownUntil = "2099-10-07T22:00:00.000Z") => {
-  const calls = { inserted: [] as EventInput[], logs: 0 };
+  const calls = { froms: [] as string[], inserted: [] as EventInput[], logs: 0 };
   const host: SleepHost = {
     insert: async (inputs) => {
       calls.inserted.push(...inputs);
@@ -48,7 +49,11 @@ const hostOf = (storage: DurableObjectStorage, knownUntil = "2099-10-07T22:00:00
     },
     seq: async () => 7,
     storage,
-    usageForSleep: async () => ({ knownUntil, uses: USES }),
+    // As the store reads them: only the uses that end after `from` (class 55).
+    usageForSleep: async (from) => {
+      calls.froms.push(from);
+      return { knownUntil, uses: USES.filter((use) => use.endAt > from) };
+    },
     zone: async () => "Europe/Moscow",
   };
   return { calls, host };
@@ -66,6 +71,24 @@ describe("one pass of automatic sleep", () => {
       // The phone told more: decided again.
       await runSleepPass(hostOf(state.storage, "2099-10-07T22:20:00.000Z").host, NOW);
       expect(await state.storage.get(DECIDED_UNTIL_KEY)).toBe("2099-10-07T22:20:00.000Z");
+    });
+  });
+
+  it("reads from the hold's front while it lasts, and lets it go a day past the window's own", async () => {
+    await runInDurableObject(freshStore(), async (_instance, state) => {
+      const { calls, host } = hostOf(state.storage);
+      const hoursOn = (hours: number) => addMinutesIso(NOW, hours * 60);
+      await runSleepPass(host, NOW);
+      await runSleepPass(host, hoursOn(5));
+      await runSleepPass(host, hoursOn(24));
+      // A day past the window's front: read from the front again, and decided again.
+      await runSleepPass(host, hoursOn(24.25));
+      expect(calls.froms).toEqual([hoursOn(-36), hoursOn(-36), hoursOn(-36), hoursOn(24.25 - 36)]);
+      expect(calls.logs).toBe(2);
+      // From there on, that pass's front is the anchor.
+      await runSleepPass(host, hoursOn(30));
+      expect(calls.froms.at(-1)).toBe(hoursOn(24.25 - 36));
+      expect(calls.logs).toBe(2);
     });
   });
 
@@ -111,53 +134,69 @@ const keepingHost = (
     },
     seq: async () => log.length,
     storage,
-    usageForSleep: async () => ({ ...usage, uses: [...usage.uses] }),
+    // As the store reads them: only the uses that end after `from`, the window's front moving
+    // with every pass (class 55).
+    usageForSleep: async (from) => ({
+      ...usage,
+      uses: usage.uses.filter((use) => use.endAt > from),
+    }),
     zone: async () => "Europe/Moscow",
   };
   return { calls, host, log };
 };
 
+type Day = "06" | "07" | "08";
 /** Moscow wall clock on the night of 2099-10-07 (evening) and the day after. */
-const msk = (hhmm: string, day: "07" | "08" = Number(hhmm.slice(0, 2)) >= 12 ? "07" : "08") =>
+const msk = (hhmm: string, day: Day = Number(hhmm.slice(0, 2)) >= 12 ? "07" : "08") =>
   wallClockInstant(`2099-10-${day}`, hhmm, "Europe/Moscow");
-const phoneUse = (from: string, to: string, day?: "07" | "08"): DeviceUse => ({
+const phoneUse = (from: string, to: string, day?: Day): DeviceUse => ({
   deviceId: "phone",
   endAt: msk(to, day),
   startAt: msk(from, day),
 });
+/** A day on the phone: ten minutes every 40 from `from`, `count` times. */
+const dayOfUse = (from: string, count: number): readonly DeviceUse[] =>
+  Array.from({ length: count }, (_, index) => {
+    const startAt = addMinutesIso(from, index * 40);
+    return { deviceId: "phone", endAt: addMinutesIso(startAt, 10), startAt };
+  });
+/** The day before the night: on the phone from 08:00 until 20:50, then 23:10–23:40. */
+const DAY_07 = [...dayOfUse(msk("08:00", "07"), 20), phoneUse("23:10", "23:40")];
 
 describe("a pass that loads nothing it can decide nothing on", () => {
   it("reads the log at night only when knowing more can change a decision", async () => {
     await runInDurableObject(freshStore(), async (_instance, state) => {
-      const usage = { knownUntil: msk("23:50"), uses: [phoneUse("23:10", "23:40")] };
+      // A full day before it too (09:00–22:30 on the 6th, asleep until 08:00), which the window's
+      // front, 36 hours behind each pass, leaves use by use all night.
+      const before = dayOfUse(msk("09:00", "06"), 21);
+      const usage = { knownUntil: msk("23:50"), uses: [...before, ...DAY_07] };
       const { calls, host, log } = keepingHost(state.storage, usage);
-      await runSleepPass(host, msk("23:55"));
+      // The night before is decided at once: from 22:30 to 08:00.
+      expect(await runSleepPass(host, msk("23:55"))).toHaveLength(2);
       expect(calls.logs).toBe(1);
-      // The phone tells 00:10: still short of the 45 minutes that open the night.
-      usage.knownUntil = msk("00:10");
-      await runSleepPass(host, msk("00:15"));
-      expect(calls.logs).toBe(1);
-      // 00:25 is the horizon: the night opens at 23:40.
-      usage.knownUntil = msk("00:30");
-      expect(await runSleepPass(host, msk("00:35"))).toHaveLength(1);
-      expect(calls.logs).toBe(2);
-      expect(log.map((event) => event.occurredAt)).toEqual([msk("23:40")]);
-      // Quiet on: every upload moves `knownUntil`, and nothing is read until a use comes.
-      for (const hhmm of ["00:45", "01:00", "02:00", "05:00"]) {
-        usage.knownUntil = msk(hhmm);
-        await runSleepPass(host, msk(hhmm));
+      // An upload or an alarm every 15 minutes until morning, the phone telling as it goes.
+      const passes = Array.from({ length: 31 }, (_, index) =>
+        addMinutesIso(msk("00:10"), index * 15),
+      );
+      for (const now of passes) {
+        usage.knownUntil = addMinutesIso(now, -5);
+        if (usage.knownUntil >= msk("07:30")) {
+          usage.uses = [...before, ...DAY_07, phoneUse("07:10", "07:25")];
+        }
+        await runSleepPass(host, now);
       }
-      expect(calls.logs).toBe(2);
-      usage.uses = [...usage.uses, phoneUse("07:10", "07:25")];
-      usage.knownUntil = msk("07:30");
-      expect(await runSleepPass(host, msk("07:35"))).toHaveLength(1);
+      // Read when 00:25 opened the night at 23:40, and when 07:10 ended it: nowhere else.
       expect(calls.logs).toBe(3);
+      expect(log.map((event) => [event.type, event.occurredAt]).slice(2)).toEqual([
+        ["activity.started", msk("23:40")],
+        ["activity.stopped", msk("07:10")],
+      ]);
     });
   });
 
   it("reads no log by day for the phone's use once the night is decided, but does for late use in it", async () => {
     await runInDurableObject(freshStore(), async (_instance, state) => {
-      const night = [phoneUse("23:10", "23:40"), phoneUse("07:10", "07:25")];
+      const night = [...DAY_07, phoneUse("07:10", "07:25")];
       const usage = { knownUntil: msk("12:30", "08"), uses: [...night] };
       const { calls, host } = keepingHost(state.storage, usage);
       await runSleepPass(host, msk("12:35", "08"));

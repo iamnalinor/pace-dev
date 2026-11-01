@@ -373,12 +373,20 @@ only what the person changed (times at the minute it shows them, the label again
 one), so a save never makes the worded label or an unchanged time the person's. A pass loads the
 log only when what it decides on can have changed since the last pass that read it (key
 `sleep:held`: digests of the log's `seq` and the zone, of the uses, and of the uses before what it
-decided on, with core's `sleepHorizon` of its input). It skips when the log, zone and uses are the
+decided on, with core's `sleepHorizon` of its input; `user-store/sleep-hold.ts`). The uses digested are those of the window
+that pass decided on, from its front (the hold's `anchor`): while the hold lasts, later passes read
+from the anchor rather than from their own front, so the front moving on with `now` changes no
+digest, and use that arrives late anywhere in the window still does. A use leaving the window is
+no change (core's property 13 moves the front: a night whose evening use left the window stands as
+decided), and a day past the front the hold is let go and made again, so no read grows without
+bound. It skips when the log, zone and uses are the
 same and `knownUntil` is still short of the horizon (the next instant a decision compares with:
 a use or a recorded instant becoming known, a rest's bound, the open rest's candidate and its 45
 minutes, a possible wake-up's 90), or, by day (noon to 21:00), when everything it followed is
-decided for good and only new use came after what it knew. Phone uploads therefore read the log a
-few times a night, not every 15 minutes. The usage reads go through end indexes
+decided for good and only new use came after what it knew. A quiet night with an upload or an
+alarm every 15 minutes therefore reads the log when the night opens and when the morning's first
+use ends it, and otherwise only when the person records something or a late upload lands in the
+window (`sleep-pass.test.ts` counts the reads over such a night). The usage reads go through end indexes
 (`phone_uses_end_idx`, `usage_sessions_end_idx`, `calendar_events_end_idx`), so a pass, the pool's
 calendar read and the usage list read the rows of their window, never all history (nothing is
 pruned: the owner keeps the data). Without a phone upload within a day nothing new is decided
