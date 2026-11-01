@@ -99,6 +99,7 @@ export {
   sleepEvents,
   type SleepInput,
 } from "./tracking/sleep-auto.ts";
+export { type SleepHorizon, sleepHorizon } from "./tracking/sleep-horizon.ts";
 export { sleepInputOf, type SleepKnowledge } from "./tracking/sleep-input.ts";
 export { AUTO_SLEEP_LABEL, shownLabel } from "./tracking/sleep-label.ts";
 export { readSleepDecision, type SleepLogInputs, sleepRuleOf } from "./tracking/sleep-log.ts";

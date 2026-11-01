@@ -276,6 +276,17 @@ const endAfter = (sleep: SleepActivity, { end, isReopening }: Walk): null | stri
   return isReopening ? null : sleep.endAt;
 };
 
+/**
+No use after what is known can change a sleep once it goes as too short, or its end is decided for
+good at an instant already known (an end the person's record put past it, a use before it can
+still move): only a running sleep, or one whose end may still turn out a wake, waits on more use.
+*/
+export const isDecided = (sleep: SleepActivity, known: Known): boolean => {
+  const walked = walk(sleep, known);
+  const { end } = walked;
+  return isTooShort(sleep, walked) || (end !== null && end.isFinal && end.at <= known.knownUntil);
+};
+
 /** Where a sleep ends once this pass's decisions about it apply (`null`: it runs on). */
 export const endOnceWalked = (sleep: SleepActivity, known: Known): null | string =>
   endAfter(sleep, walk(sleep, known));

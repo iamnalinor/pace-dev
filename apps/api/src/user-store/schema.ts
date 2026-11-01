@@ -38,6 +38,8 @@ export const calendarEvents = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.deviceId, table.eventId, table.startAt] }),
     index("calendar_events_start_idx").on(table.startAt),
+    // Reads of a range go through the end: the start would reach back over all history.
+    index("calendar_events_end_idx").on(table.endAt),
   ],
 );
 
@@ -54,6 +56,8 @@ export const usageSessions = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.deviceId, table.app, table.startAt] }),
     index("usage_sessions_start_idx").on(table.startAt),
+    // Reads of a range (automatic sleep's, every pass) go through the end, not over all history.
+    index("usage_sessions_end_idx").on(table.endAt),
   ],
 );
 

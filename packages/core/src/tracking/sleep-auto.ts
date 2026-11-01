@@ -68,7 +68,7 @@ A sleep the rules follow, started inside the known uses: running, stopped by the
 their own) closed by another activity's start, whose end stays but which is still discarded
 when short like any automatic sleep. An end the person made is never followed.
 */
-const isWalked = (activity: SleepActivity, usesFrom: string): boolean =>
+export const isWalked = (activity: SleepActivity, usesFrom: string): boolean =>
   activity.category === "sleep" &&
   activity.startAt >= usesFrom &&
   !activity.isEndAmendedByPerson &&
@@ -120,7 +120,7 @@ Where a sleep may start in [at, until) once the person's ended rests there are o
 latest of their ends, or `at`. One still running ends the sleep where it began instead (the
 walk stops a sleep at a rest), so such a start is discarded before it opens.
 */
-const pastRests = (at: string, until: string, rests: readonly Rest[]): string =>
+export const pastRests = (at: string, until: string, rests: readonly Rest[]): string =>
   rests
     .filter(
       (rest): rest is Rest & { readonly endAt: string } =>
@@ -268,20 +268,19 @@ const knownOf = (input: SleepInput, knownUntil: string): Known => {
   return { ...unbounded, rests: restsOf(asWalked(input, unbounded), input.now) };
 };
 
-/**
-What automatic sleep does with what is known: walks the sleeps it follows (reopen, stop,
-discard), keeps those it owns only while deciding afresh would open the same ones, and opens
-the rest. Nothing is decided without the phones' use (`knownUntil` null), nothing from use
-after `knownUntil`, nothing before `usesFrom`.
-*/
-export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
-  if (input.knownUntil === null) {
-    return [];
-  }
-  const known = knownOf(input, input.knownUntil);
-  const { usesFrom } = input;
-  const owned = input.activities.filter((activity) => isOwned(activity, usesFrom));
-  const others = input.activities.filter((activity) => !isOwned(activity, usesFrom));
+/** What a pass decides on: what is known, the sleeps the rules own and the others, the fresh ones. */
+export type SleepPlan = {
+  readonly known: Known;
+  readonly owned: readonly SleepActivity[];
+  readonly others: readonly SleepActivity[];
+  readonly personNights: ReadonlySet<string>;
+  readonly fresh: readonly SleepActivity[];
+};
+
+export const planOf = (input: SleepInput, knownUntil: string): SleepPlan => {
+  const known = knownOf(input, knownUntil);
+  const owned = input.activities.filter((activity) => isOwned(activity, input.usesFrom));
+  const others = input.activities.filter((activity) => !isOwned(activity, input.usesFrom));
   const personNights = new Set(
     others
       .filter((activity) => activity.category === "sleep")
@@ -296,8 +295,22 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
       .filter((activity) => activity.isAutoStart)
       .map((activity) => sleepNightOf(activity.startEventAt, known.zone)),
   ]);
-  const { mainStarts } = input;
-  const fresh = freshSleeps(known, { mainStarts, taken });
+  const fresh = freshSleeps(known, { mainStarts: input.mainStarts, taken });
+  return { fresh, known, others, owned, personNights };
+};
+
+/**
+What automatic sleep does with what is known: walks the sleeps it follows (reopen, stop,
+discard), keeps those it owns only while deciding afresh would open the same ones, and opens
+the rest. Nothing is decided without the phones' use (`knownUntil` null), nothing from use
+after `knownUntil`, nothing before `usesFrom`.
+*/
+export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
+  if (input.knownUntil === null) {
+    return [];
+  }
+  const { fresh, known, others, owned, personNights } = planOf(input, input.knownUntil);
+  const { mainStarts, usesFrom } = input;
   const followed = [
     ...others
       .filter((activity) => isWalked(activity, usesFrom))

@@ -371,9 +371,18 @@ less known later undoes nothing. The stored label `"Sleep"` is the server's; eve
 an automatic sleep through `shownLabel` in the reader's language, and the Day sheet sends back
 only what the person changed (times at the minute it shows them, the label against the shown
 one), so a save never makes the worded label or an unchanged time the person's. A pass loads the
-log only when what it decides on changed since the last one (a digest of the uses, `knownUntil`,
-`decidedUntil`, the log's `seq` and the zone, key `sleep:seen`). Without a phone upload within a
-day nothing is decided and nothing armed. A failed pass after an upload is logged; the upload is
+log only when what it decides on can have changed since the last pass that read it (key
+`sleep:held`: digests of the log's `seq` and the zone, of the uses, and of the uses before what it
+decided on, with core's `sleepHorizon` of its input). It skips when the log, zone and uses are the
+same and `knownUntil` is still short of the horizon (the next instant a decision compares with:
+a use or a recorded instant becoming known, a rest's bound, the open rest's candidate and its 45
+minutes, a possible wake-up's 90), or, by day (noon to 21:00), when everything it followed is
+decided for good and only new use came after what it knew. Phone uploads therefore read the log a
+few times a night, not every 15 minutes. The usage reads go through end indexes
+(`phone_uses_end_idx`, `usage_sessions_end_idx`, `calendar_events_end_idx`), so a pass, the pool's
+calendar read and the usage list read the rows of their window, never all history (nothing is
+pruned: the owner keeps the data). Without a phone upload within a day nothing is decided and
+nothing armed. A failed pass after an upload is logged; the upload is
 answered and the alarm tries again.
 
 **The alarm** is one per store and shared: the pool's next pass and delivery retries, the

@@ -1,6 +1,7 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 
-import { and, eq, gt, lt, max, notInArray, sql } from "drizzle-orm";
+import { and, eq, gt, max, notInArray, type Query, type SQL, sql } from "drizzle-orm";
 
 import type { CalendarEvent, DeviceUse, Interval, UsageRow } from "@pace/core";
 
@@ -18,21 +19,33 @@ export type CalendarUpload = Range & {
   readonly ruledSeries?: readonly string[] | undefined;
 };
 
+/**
+The rows of a table overlapping a range, read through the index on their end: those that end after
+`from`, the history before it left unread. (`+` keeps SQLite off the start's index, which would
+read every row that starts before `to`, back to the first.)
+*/
+const overlapping = (
+  columns: { readonly startAt: SQLiteColumn; readonly endAt: SQLiteColumn },
+  { from, to }: Range,
+): SQL | undefined => and(sql`+${columns.startAt} < ${to}`, gt(columns.endAt, from));
+
+/**
+One phone's calendar rows overlapping a range, read through the end index too (`+` keeps SQLite off
+the primary key, which would read every row the phone ever sent).
+*/
+const calendarCopyOf = (deviceId: string, range: Range): SQL | undefined =>
+  and(
+    sql`+${schema.calendarEvents.deviceId} = ${deviceId}`,
+    overlapping(schema.calendarEvents, range),
+  );
+
 /** A phone's calendar over a range: its earlier copy of that range goes, the new one comes in. */
 export const replaceCalendar = async (
   db: Db,
   { deviceId, events, from, to }: CalendarUpload,
 ): Promise<number> => {
   const { calendarEvents } = schema;
-  await db
-    .delete(calendarEvents)
-    .where(
-      and(
-        eq(calendarEvents.deviceId, deviceId),
-        lt(calendarEvents.startAt, to),
-        gt(calendarEvents.endAt, from),
-      ),
-    );
+  await db.delete(calendarEvents).where(calendarCopyOf(deviceId, { from, to }));
   for (const event of events) {
     await db
       .insert(calendarEvents)
@@ -56,19 +69,22 @@ export const replaceCalendar = async (
 };
 
 /**
+The calendar's rows overlapping a range (unordered: ordering in SQL would send SQLite back to the
+start's index).
+*/
+const calendarRange = (db: Db, range: Range) =>
+  db.select().from(schema.calendarEvents).where(overlapping(schema.calendarEvents, range));
+
+const byStart = <T extends { readonly startAt: string }>(a: T, b: T): number =>
+  a.startAt.localeCompare(b.startAt);
+
+/**
 The calendar's events overlapping a range, each occurrence once: two phones send the same event
 under their own local ids, so the same title and times count as one.
 */
-export const listCalendar = async (
-  db: Db,
-  { from, to }: Range,
-): Promise<readonly CalendarEvent[]> => {
-  const { calendarEvents } = schema;
-  const rows = await db
-    .select()
-    .from(calendarEvents)
-    .where(and(lt(calendarEvents.startAt, to), gt(calendarEvents.endAt, from)))
-    .orderBy(calendarEvents.startAt);
+export const listCalendar = async (db: Db, range: Range): Promise<readonly CalendarEvent[]> => {
+  const found = await calendarRange(db, range);
+  const rows = found.toSorted(byStart);
   return rows
     .filter(
       (row, index) =>
@@ -221,33 +237,48 @@ const knownUntilOf = (
     .at(0) ?? null;
 
 /**
+The two reads automatic sleep makes from `from` on, each through an index on its end so a pass reads
+only the rows inside its window, never the whole table: the phones' uses, and the other devices'
+app sessions (not a phone's own: an alarm over the lock screen is one).
+*/
+const sleepUses = (
+  db: Db,
+  { from, phoneIds }: { readonly from: string; readonly phoneIds: string[] },
+) => {
+  const { phoneUses, usageSessions } = schema;
+  return {
+    others: db
+      .select({
+        deviceId: usageSessions.deviceId,
+        endAt: usageSessions.endAt,
+        startAt: usageSessions.startAt,
+      })
+      .from(usageSessions)
+      .where(and(gt(usageSessions.endAt, from), notInArray(usageSessions.deviceId, phoneIds))),
+    phones: db
+      .select({ deviceId: phoneUses.deviceId, endAt: phoneUses.endAt, startAt: phoneUses.startAt })
+      .from(phoneUses)
+      .where(gt(phoneUses.endAt, from)),
+  };
+};
+
+/**
 What automatic sleep reads from `from` on: the phones' uses and the other devices' app sessions
-(a phone's own sessions are not use: an alarm over the lock screen is one), by start; and how far
-that is known, the earliest `until` among the phones that uploaded within a day (`null` when none
-did: nothing can be decided). A computer bounds nothing: switched off at night it stops sending.
+(see `sleepUseQueries`), by start; and how far that is known, the earliest `until` among the phones
+that uploaded within a day (`null` when none did: nothing can be decided). A computer bounds
+nothing: switched off at night it stops sending.
 */
 export const usageForSleep = async (
   { db, storage }: { readonly db: Db; readonly storage: DurableObjectStorage },
   { from, now }: { readonly from: string; readonly now: string },
 ): Promise<SleepUsage> => {
-  const { phoneUses, usageSessions } = schema;
   const known = [...(await storage.list<KnownUsage>({ prefix: KNOWN_PREFIX }))];
   const phones = known
     .filter(([, record]) => record.isPhone)
     .map(([key, record]) => ({ deviceId: key.slice(KNOWN_PREFIX.length), ...record }));
-  const phoneRows = await db
-    .select({ deviceId: phoneUses.deviceId, endAt: phoneUses.endAt, startAt: phoneUses.startAt })
-    .from(phoneUses)
-    .where(gt(phoneUses.endAt, from));
-  const phoneIds = phones.map((phone) => phone.deviceId);
-  const otherRows = await db
-    .select({
-      deviceId: usageSessions.deviceId,
-      endAt: usageSessions.endAt,
-      startAt: usageSessions.startAt,
-    })
-    .from(usageSessions)
-    .where(and(gt(usageSessions.endAt, from), notInArray(usageSessions.deviceId, phoneIds)));
+  const queries = sleepUses(db, { from, phoneIds: phones.map((phone) => phone.deviceId) });
+  const phoneRows = await queries.phones;
+  const otherRows = await queries.others;
   const fresh = new Date(Date.parse(now) - KNOWN_FOR_MS).toISOString();
   return {
     knownUntil: knownUntilOf(phones, fresh),
@@ -255,10 +286,10 @@ export const usageForSleep = async (
   };
 };
 
-/** App sessions on every device overlapping a range, by start. */
-export const listUsage = async (db: Db, { from, to }: Range): Promise<readonly UsageRow[]> => {
+/** App sessions on every device overlapping a range (unordered, as the calendar's). */
+const usageRange = (db: Db, range: Range) => {
   const { usageSessions } = schema;
-  return await db
+  return db
     .select({
       app: usageSessions.app,
       deviceId: usageSessions.deviceId,
@@ -267,8 +298,30 @@ export const listUsage = async (db: Db, { from, to }: Range): Promise<readonly U
       startAt: usageSessions.startAt,
     })
     .from(usageSessions)
-    .where(and(lt(usageSessions.startAt, to), gt(usageSessions.endAt, from)))
-    .orderBy(usageSessions.startAt);
+    .where(overlapping(usageSessions, range));
+};
+
+/** App sessions on every device overlapping a range, by start. */
+export const listUsage = async (db: Db, range: Range): Promise<readonly UsageRow[]> => {
+  const found = await usageRange(db, range);
+  return found.toSorted(byStart);
+};
+
+/**
+The statements behind the reads of a range, as SQLite gets them: what the cost test plans and
+counts the rows of.
+*/
+export const rangeStatements = (
+  db: Db,
+  { from, phoneIds, range }: { from: string; phoneIds: string[]; range: Range },
+): Readonly<Record<"calendar" | "otherUses" | "phoneUses" | "usage", Query>> => {
+  const uses = sleepUses(db, { from, phoneIds });
+  return {
+    calendar: calendarRange(db, range).toSQL(),
+    otherUses: uses.others.toSQL(),
+    phoneUses: uses.phones.toSQL(),
+    usage: usageRange(db, range).toSQL(),
+  };
 };
 
 /**
