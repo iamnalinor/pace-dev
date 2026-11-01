@@ -1,0 +1,88 @@
+light
+  label.primary / bg.cell                18.02  Lc 104.8
+  label.primary / bg.app                 16.07  Lc 96.9
+  label.primary / bg.elevated            18.02  Lc 104.8
+  label.secondary / bg.cell               8.58  Lc 89.5
+  label.secondary / bg.app                7.65  Lc 81.7
+  label.secondary / bg.elevated           8.58  Lc 89.5
+  label.tertiary / bg.cell                5.41  Lc 77.0
+  label.tertiary / bg.app                 4.83  Lc 69.1
+  label.tertiary / bg.elevated            5.41  Lc 77.0
+  accent.text / bg.cell                   6.60  Lc 82.2
+  accent.on / accent                      5.40  Lc -81.8
+  outline / bg.cell (UI 3:1)              3.37  Lc 61.2
+  outline / bg.app (UI 3:1)               3.00  Lc 53.3
+  focus / bg.cell (UI 3:1)                5.40  Lc 76.4
+  focus / bg.app (UI 3:1)                 4.81  Lc 68.6
+  status.danger / bg.cell                 6.57  Lc 80.9
+  status.warn / bg.cell                   5.86  Lc 78.8
+  hue.red.ink / tint                      6.23  Lc 74.0
+  hue.red.stroke / bg.app (UI 3:1)        3.80  Lc 0.0
+  hue.orange.ink / tint                   6.17  Lc 74.1
+  hue.orange.stroke / bg.app (UI 3:1)     3.71  Lc 0.0
+  hue.amber.ink / tint                    5.97  Lc 73.8
+  hue.amber.stroke / bg.app (UI 3:1)      3.59  Lc 0.0
+  hue.yellow.ink / tint                   5.94  Lc 74.0
+  hue.yellow.stroke / bg.app (UI 3:1)     3.49  Lc 0.0
+  hue.lime.ink / tint                     5.75  Lc 73.2
+  hue.lime.stroke / bg.app (UI 3:1)       3.38  Lc 0.0
+  hue.green.ink / tint                    5.54  Lc 71.4
+  hue.green.stroke / bg.app (UI 3:1)      3.27  Lc 0.0
+  hue.teal.ink / tint                     5.62  Lc 71.8
+  hue.teal.stroke / bg.app (UI 3:1)       3.32  Lc 0.0
+  hue.cyan.ink / tint                     5.70  Lc 72.3
+  hue.cyan.stroke / bg.app (UI 3:1)       3.39  Lc 0.0
+  hue.blue.ink / tint                     5.89  Lc 73.0
+  hue.blue.stroke / bg.app (UI 3:1)       3.52  Lc 0.0
+  hue.indigo.ink / tint                   6.11  Lc 74.5
+  hue.indigo.stroke / bg.app (UI 3:1)     3.67  Lc 0.0
+  hue.violet.ink / tint                   6.27  Lc 75.0
+  hue.violet.stroke / bg.app (UI 3:1)     3.78  Lc 0.0
+  hue.pink.ink / tint                     6.30  Lc 74.5
+  hue.pink.stroke / bg.app (UI 3:1)       3.83  Lc 0.0
+  hue.slate.ink / tint                    6.18  Lc 75.1
+  hue.slate.stroke / bg.app (UI 3:1)      3.82  Lc 0.0
+dark
+  label.primary / bg.cell                14.72  Lc -94.5
+  label.primary / bg.app                 16.12  Lc -95.5
+  label.primary / bg.elevated            12.98  Lc -93.0
+  label.secondary / bg.cell              10.36  Lc -72.1
+  label.secondary / bg.app               11.36  Lc -73.1
+  label.secondary / bg.elevated           9.14  Lc -70.6
+  label.tertiary / bg.cell                6.96  Lc -51.8
+  label.tertiary / bg.app                 7.63  Lc -52.7
+  label.tertiary / bg.elevated            6.14  Lc -50.2
+  accent.text / bg.cell                   9.04  Lc -64.9
+  accent.on / accent                      8.69  Lc 60.8
+  outline / bg.cell (UI 3:1)              4.09  Lc -31.1
+  outline / bg.app (UI 3:1)               4.48  Lc -32.0
+  focus / bg.cell (UI 3:1)                9.04  Lc -64.9
+  focus / bg.app (UI 3:1)                 9.91  Lc -65.9
+  status.danger / bg.cell                 6.82  Lc -51.5
+  status.warn / bg.cell                   8.20  Lc -59.9
+  hue.red.ink / tint                      7.70  Lc -67.5
+  hue.red.stroke / bg.app (UI 3:1)        7.17  Lc 0.0
+  hue.orange.ink / tint                   7.69  Lc -67.8
+  hue.orange.stroke / bg.app (UI 3:1)     7.28  Lc 0.0
+  hue.amber.ink / tint                    7.76  Lc -68.6
+  hue.amber.stroke / bg.app (UI 3:1)      7.49  Lc 0.0
+  hue.yellow.ink / tint                   7.75  Lc -69.0
+  hue.yellow.stroke / bg.app (UI 3:1)     7.65  Lc 0.0
+  hue.lime.ink / tint                     7.87  Lc -70.5
+  hue.lime.stroke / bg.app (UI 3:1)       7.96  Lc 0.0
+  hue.green.ink / tint                    7.88  Lc -70.7
+  hue.green.stroke / bg.app (UI 3:1)      8.12  Lc 0.0
+  hue.teal.ink / tint                     8.13  Lc -71.7
+  hue.teal.stroke / bg.app (UI 3:1)       8.07  Lc 0.0
+  hue.cyan.ink / tint                     8.08  Lc -71.3
+  hue.cyan.stroke / bg.app (UI 3:1)       7.93  Lc 0.0
+  hue.blue.ink / tint                     7.74  Lc -69.0
+  hue.blue.stroke / bg.app (UI 3:1)       7.62  Lc 0.0
+  hue.indigo.ink / tint                   7.67  Lc -68.3
+  hue.indigo.stroke / bg.app (UI 3:1)     7.44  Lc 0.0
+  hue.violet.ink / tint                   7.60  Lc -67.4
+  hue.violet.stroke / bg.app (UI 3:1)     7.23  Lc 0.0
+  hue.pink.ink / tint                     7.50  Lc -66.4
+  hue.pink.stroke / bg.app (UI 3:1)       7.09  Lc 0.0
+  hue.slate.ink / tint                    7.30  Lc -65.2
+  hue.slate.stroke / bg.app (UI 3:1)      7.11  Lc 0.0
