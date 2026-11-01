@@ -26,6 +26,8 @@ import unicorn from "eslint-plugin-unicorn";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
+import { plugin as pace } from "./scripts/eslint-rules/index.ts";
+
 /** Fails loudly if a plugin stops shipping a config we rely on (instead of silently linting less). */
 const required = <T>(value: T | undefined, name: string): T => {
   if (value === undefined) {
@@ -295,6 +297,11 @@ export default defineConfig([
     },
   },
   {
+    files: ["scripts/eslint-rules/index.ts"],
+    // The plugin entry point, imported by eslint.config.ts.
+    rules: { "check-file/no-index": "off" },
+  },
+  {
     files: ["apps/app/modules/**/index.ts"],
     // Expo local modules are resolved by their folder's index.ts (autolinking convention).
     rules: { "check-file/no-index": "off" },
@@ -422,6 +429,14 @@ export default defineConfig([
     settings: {
       "better-tailwindcss": { cwd: "apps/app", tailwindConfig: "tailwind.config.js" },
     },
+  },
+  // Design values come from the tokens (spec §9.3). A warning, counted in
+  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error.
+  {
+    files: APP,
+    ignores: TESTS,
+    plugins: { pace },
+    rules: { "pace/no-raw-design-values": "warn" },
   },
   {
     files: APP_JS_CONFIGS,

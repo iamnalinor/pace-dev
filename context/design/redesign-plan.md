@@ -874,4 +874,4 @@ Escape) get their bug-lessons entries in the task that fixes them.
 
 ## Lint baseline
 
-(Filled in by Task 1.3: the number of `pace/no-raw-design-values` warnings at introduction.)
+Task 1.3 (2026-11-01): 425 warnings of `pace/no-raw-design-values` at introduction, by message id: `arbitraryClass` 424, `rawDuration` 1, `rawColor` 0, `rawRadius` 0, `rawFontMetric` 0, `offScaleClass` not active yet (needs `GENERATED_CLASSES`, Task 2.2). `scripts/eslint-all.ts` tolerates exactly this count for the app part (`DESIGN_VALUE_WARNINGS`); lower it with every migration step, never raise it.

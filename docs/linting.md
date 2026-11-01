@@ -62,6 +62,7 @@ TS 7 yet.
   classes, no `this`, no `throw`, `readonly` everywhere.
 - React (the app, phone and web): **@eslint-react** strict type-checked, **react-hooks** (incl. the
   React Compiler rules), **better-tailwindcss** (Tailwind v3 via `apps/app/tailwind.config.js` for NativeWind).
+- **pace/no-raw-design-values** (own plugin, `scripts/eslint-rules/`, `warn` in the app): raw colours, radii, font metrics, durations and Tailwind arbitrary values (`p-[13px]`) must come from the design tokens; the app part of `scripts/eslint-all.ts` tolerates only the baseline count (`DESIGN_VALUE_WARNINGS`), a ratchet to drive to zero.
 - Tests: **@vitest/eslint-plugin**, **playwright** (e2e).
 - `eslint-config-prettier` turns off stylistic rules the formatter owns; `curly: all`
   and `no-unexpected-multiline` do not conflict with Biome and are re-enabled after it.
