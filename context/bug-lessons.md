@@ -441,6 +441,20 @@ The same rule applies when a previously successful channel is no longer configur
   never between a navigator and its nested one. The route sweep asserts that every signed-in direct load
   keeps its own address (except the screens that only redirect).
 
+### 58. A copy still loading shown as the final answer
+- **Bug.** QA round 17 M4: on a device with nothing local (a new browser, after logging out) every screen
+  said "Nothing to do right now.", "No projects yet", … for as long as the first pull took, and in the
+  browser's language before the account's.
+- **Missed because.** App tests start from a filled world or an empty one, never an empty copy waiting
+  for its pull; e2e pulls a few events from a local Worker in well under a second and asserts the end
+  state.
+- **Rule.** A screen tells "empty" from "not known yet". Screens fed by the local log are covered as a
+  whole while a signed-in copy that holds nothing has not finished a sync for this session
+  (`useIsFirstSync`, `FirstSyncCover`: placeholders, no words in either language, the app mounted but
+  not drawn); a failed sync ends the cover and the offline line says why. Screens fed by a server call
+  show their empty copy only once loaded (`status === "loaded"`). Test with the pull held: an app test
+  with a deferred route, an e2e with the pull delayed that samples the page.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -614,3 +628,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-01 | QA round 17 M2: Day, Inbox, More and `/add` opened by URL rewrote the address to `/` (a reload landed on Now): the route gate's blank page delayed the tabs navigator past the router's first address write | 57 (new) | yes: the other waits inside the root stack are the versions screen (`IncompatibleGate`, shown only once the server is checked, then the tabs remount on purpose) and `PaceProvider`'s blank page, which sits above every navigator | `route-sweep.e2e.ts` asserts the landed address of every signed-in direct load (RED on Day, Inbox, More and `/add` at both widths); `route-gate.test.tsx`: the hold mounts the navigator once and keeps it through a sign-out |
 | 2026-11-01 | QA round 17 M3: the web app's `share_target` (`/add?title=&text=&url=`) dropped what was shared: `/add` read only Android's share intent | 10 | yes: the manifest declares no other entry; the Android share path still reads its intent, now through the same `sharedLine` | `composer.e2e.ts`: a share to `/add` fills the line at both widths, keeps the address and reads on Enter; `shared-line.test.ts` (parts joined, a link inside the text not repeated) |
 | 2026-11-01 | QA round 17 M1: a second tab of the same browser profile never saw the first tab's changes until a reload. The tabs share the device id, so the server's live push skips them all ("do not tell the writer"), and they share one IndexedDB copy, so the second tab's pull found the cursor already moved | 1 (across the wire: a server rule that assumes one writer per device id, a client that runs one writer per tab) | yes: the server's skip stays (the device is one writer to the server); the tabs of a profile now tell each other every change they make to the shared copy over a `BroadcastChannel` (`PeerTabs`): written or pulled events are taken in without a write, a dropped copy (log out, reset store) is read again; a tab never passes on what it heard (no echo). The other per-device rule in the client, `undoLast` (the device's latest event), is not used by any screen | `peer-tabs.test.ts`: two clients on one store and one fake server: an edit in one shows in the other with no request from it, a pull by one reaches the other, a cleared copy empties the other, one message per change (RED without the channel); `live.e2e.ts`: two pages of one context, an add in one shows in the other within 2 s and the other sends no sync request or socket message for 3 s |
+| 2026-11-01 | QA round 17 M4: the first sync into an empty copy showed final empty states, in the browser's language | 58 (new) | yes: the screens fed by a server call (notifications, the assistant log, devices) already wait for `loaded`; every screen fed by the log is now covered at the root | `sync-frame.test.tsx`: a held pull shows the placeholder and no empty copy, a filled copy is never covered, a failed sync gives way to the offline line; `sync-state.e2e.ts`: a Russian account in an English browser with the pull delayed 2 s shows no empty copy in ten samples, then "Сейчас" |
+| 2026-11-01 | QA round 17 M5: nothing said "offline" or "not synced yet"; `errors.offline` was used nowhere | 41 (a string carried and used nowhere) | yes: the other unused-looking state, `SyncStatus.online`, had no reader either; it now drives the line with the browser's own "no network" | `sync-frame.test.tsx`: the line shows while the sync cannot reach the server and clears after a sync that can; `sync-state.e2e.ts`: offline → line, a task written offline, online → line gone and the task on the server |

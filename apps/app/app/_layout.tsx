@@ -23,6 +23,7 @@ import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
 import { Sidebar } from "#app/ui/sidebar.tsx";
+import { FirstSyncCover, OfflineFrame } from "#app/ui/sync-frame.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
 import { TooltipHost } from "#app/ui/tooltip.tsx";
@@ -53,46 +54,53 @@ const Navigator = () => {
   useCrashNotice();
   return (
     <UpdateBanner>
-      <View className="flex-1 flex-row bg-bg">
-        <CrashContext />
-        <DocumentLanguage />
-        <DocumentHead />
-        {hasSidebar ? <Sidebar /> : null}
-        <View className="flex-1">
-          <NavigatorHold>
-            <Stack
-              // A signed-in app its server does not fit sees the versions screen instead of any
-              // route; the navigator stays mounted, so logging out lands on the login screen.
-              layout={({ children }) => (
-                <IncompatibleGate>
-                  <RouteGate path={path}>{children}</RouteGate>
-                </IncompatibleGate>
-              )}
-              screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
-              screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
-            >
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="login" options={{ animation: "fade" }} />
-              <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
-              <Stack.Screen name="task/[id]" />
-              <Stack.Screen name="project/[id]" />
-              <Stack.Screen name="projects" />
-              <Stack.Screen name="week" />
-              <Stack.Screen name="insights" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="review" />
-              <Stack.Screen name="history" />
-              <Stack.Screen name="permissions" />
-              <Stack.Screen name="notifications" />
-              <Stack.Screen
-                name="onboarding"
-                options={{ animation: "fade", gestureEnabled: false }}
-              />
-            </Stack>
-          </NavigatorHold>
-        </View>
-        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      </View>
+      <OfflineFrame>
+        <FirstSyncCover isBare={isBarePath(path)}>
+          <View className="flex-1 flex-row bg-bg">
+            <CrashContext />
+            <DocumentLanguage />
+            <DocumentHead />
+            {hasSidebar ? <Sidebar /> : null}
+            <View className="flex-1">
+              <NavigatorHold>
+                <Stack
+                  // A signed-in app its server does not fit sees the versions screen instead of any
+                  // route; the navigator stays mounted, so logging out lands on the login screen.
+                  layout={({ children }) => (
+                    <IncompatibleGate>
+                      <RouteGate path={path}>{children}</RouteGate>
+                    </IncompatibleGate>
+                  )}
+                  screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
+                  screenOptions={{
+                    contentStyle: { backgroundColor: palette.bg },
+                    headerShown: false,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="login" options={{ animation: "fade" }} />
+                  <Stack.Screen name="auth/index" options={{ animation: "fade" }} />
+                  <Stack.Screen name="task/[id]" />
+                  <Stack.Screen name="project/[id]" />
+                  <Stack.Screen name="projects" />
+                  <Stack.Screen name="week" />
+                  <Stack.Screen name="insights" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="review" />
+                  <Stack.Screen name="history" />
+                  <Stack.Screen name="permissions" />
+                  <Stack.Screen name="notifications" />
+                  <Stack.Screen
+                    name="onboarding"
+                    options={{ animation: "fade", gestureEnabled: false }}
+                  />
+                </Stack>
+              </NavigatorHold>
+            </View>
+            <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+          </View>
+        </FirstSyncCover>
+      </OfflineFrame>
     </UpdateBanner>
   );
 };
