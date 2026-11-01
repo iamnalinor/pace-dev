@@ -1,4 +1,5 @@
-const tokens = require("@pace/core/design/tokens.json");
+// The v1 block: the app is switched to the v2 tokens in Task 2.2.
+const tokens = require("@pace/core/design/tokens.json").v1;
 
 // Semantic colors come from CSS variables so the same class names work in both themes;
 // the variables are defined per theme in app/_layout.tsx via NativeWind's `vars()`.

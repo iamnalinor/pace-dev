@@ -326,7 +326,7 @@ NOTEBOOK_DARK = {
         "pressed": "#8498F7",
     },
     "status": {
-        "danger": "#FF6F61",
+        "danger": "#FF8274",
         "warn": "#FF9B5E",
         "question": "#F2C275",
         "success": "#A6B5FF",
@@ -363,7 +363,7 @@ NOTEBOOK_TRANSLUCENT = {
         },
         "separator": {"default": "rgba(190, 200, 255, 0.10)", "opaque": "#262A37"},
         "accentQuiet": "rgba(151, 169, 255, 0.16)",
-        "dangerQuiet": "rgba(255, 111, 97, 0.15)",
+        "dangerQuiet": "rgba(255, 130, 116, 0.15)",
         "warnQuiet": "rgba(255, 155, 94, 0.16)",
         "selection": "rgba(151, 169, 255, 0.26)",
         "grid": "rgba(150, 170, 255, 0.06)",
