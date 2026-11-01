@@ -50,10 +50,10 @@ const pass = async (
 A pass that dies once it has taken the pool's time, as one does when its isolate is reset while it
 waits on a delivery (a deploy, the CPU limit): it never settles, so nothing after it runs.
 */
-const cutShort = async (storage: DurableObjectStorage): Promise<void> => {
+const cutShort = async (storage: DurableObjectStorage, now = NOW): Promise<void> => {
   await new Promise<void>((resolve) => {
     void takingPoolTime(storage, {
-      now: NOW,
+      now,
       pass: async () => {
         resolve();
         await new Promise<never>(() => undefined);
@@ -275,6 +275,39 @@ describe("the pool's own time at the store's alarm", () => {
       await storage.deleteAlarm();
       await armIfPoolUnplanned(storage, NOW);
       expect(await storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it("waits longer after each pass cut short in a row (5, 10, 20 minutes), and 5 after one completes", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      const waits: number[] = [];
+      let now = NOW;
+      for (let cut = 0; cut < 3; cut += 1) {
+        await storage.deleteAlarm();
+        await cutShort(storage, now);
+        const lease = (await storage.get<number>(POOL_LEASE_KEY)) ?? NaN;
+        waits.push((lease - Date.parse(now)) / MINUTE);
+        // Its wake is armed, and the gate passes at the lease's end, not before.
+        expect(await storage.getAlarm()).toBe(lease);
+        expect(await isDueAt(storage, new Date(lease - 1).toISOString())).toBe(false);
+        expect(await isDueAt(storage, new Date(lease).toISOString())).toBe(true);
+        now = new Date(lease).toISOString();
+      }
+      expect(waits).toEqual([5, 10, 20]);
+      await pass(storage, { nextAt: null, now });
+      await cutShort(storage, now);
+      expect(await storage.get(POOL_LEASE_KEY)).toBe(Date.parse(now) + 5 * MINUTE);
+    });
+  });
+
+  it("counts a pass cut short and one that fails alike: each waits longer than the one before", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      await cutShort(storage, NOW);
+      // The lease's end (5 minutes): the pass fails this time, its second in a row.
+      await expect(failingAt(storage, at(5))).rejects.toThrow("the pass broke");
+      expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(5 + 2));
+      await cutShort(storage, at(7));
+      expect(await storage.get(POOL_LEASE_KEY)).toBe(ms(7 + 20));
     });
   });
 

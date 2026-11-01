@@ -429,14 +429,16 @@ hours, delivery retries, and never later than a day after the pass before (`sche
 a pass that finds nothing coming still looks again within a day, within the three days of
 calendar it reads, so an event that comes into that window with no write and an unchanged
 calendar copy is still announced, and a time left by older rules heals (bug-lessons class 57). A
-pass first writes a lease (`pool:lease`, five minutes on), arms the alarm at the lease's end and
-takes the pool's time (`null`); whatever asks for a pass while it runs arms the time again, its
+pass first counts itself (`pool:failures`, the passes in a row that have not completed), writes a
+lease (`pool:lease`, five minutes on for the first pass in a row, doubling for each one after up to
+four hours), arms the alarm at the lease's end and takes the pool's time (`null`); whatever asks for a pass while it runs arms the time again, its
 own next decision included, and at the end it gives the lease back if it is still its own. A
 pass cut short (an isolate reset mid-delivery: a deploy, the CPU limit) leaves its lease, and the
-lease's wake runs it again, whether or not the runtime retries the alarm (class 58); after a pass
-that completed, that wake reads the gate and loads nothing. A failed pass runs again a minute
-on, doubling while passes keep failing, up to four hours (`pool:failures`; a pass that completes
-starts the count again), or sooner when a write asks for it; a store from before the key passes
+lease's wake runs it again, whether or not the runtime retries the alarm (class 58), and one that
+keeps being cut short (the CPU limit, where no `catch` runs) waits 5, 10, 20 minutes and so on up
+to four hours; after a pass that completed, that wake reads the gate and loads nothing. A failed
+pass runs again a minute on, doubling while passes keep failing or being cut short, up to four
+hours (a pass that completes clears `pool:failures`), or sooner when a write asks for it; a store from before the key passes
 at its next alarm, and one with no alarm at all (main deleted it when nothing was coming; a store
 just made or wiped has none) gets one at once from its next write or calendar copy, changed or
 not (`armIfPoolUnplanned`), so its pool starts its own times. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15

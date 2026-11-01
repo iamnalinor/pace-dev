@@ -12,8 +12,10 @@ that finds nothing coming (no digest window, no event near) still looks again by
 const LOOK_AGAIN_MS = 24 * 60 * 60_000;
 
 /**
-How long a pass holds the pool: one whose isolate is reset while it works (a deploy, the CPU limit)
-never ends and never says so, and the alarm passes again once this has run out.
+How long the first pass in a row holds the pool: one whose isolate is reset while it works (a
+deploy, the CPU limit) never ends and never says so, and the alarm passes again once its lease has
+run out. Each pass taken while the one before did not complete holds it twice as long, up to four
+hours (`backoff`).
 */
 const LEASE_MS = 5 * 60_000;
 
@@ -108,49 +110,59 @@ const release = async (storage: DurableObjectStorage, lease: number): Promise<vo
   }
 };
 
-/** The longest a pass that keeps failing waits before it runs again. */
+/** The longest a pass that keeps failing or being cut short waits before it runs again. */
 const RETRY_MAX_MS = 4 * 60 * 60_000;
 
-/** Storage key of how many passes in a row have failed. */
+/**
+Storage key of how many passes in a row have not completed, the one running included: counted as
+a pass takes the pool, before its work, so a pass cut short (no `catch` runs) counts as much as
+one that throws, and cleared by a pass that completes.
+*/
 const FAILURES_KEY = "pool:failures";
 
+/** `base` doubled for each pass in a row before the `attempt`th that did not complete, up to four hours. */
+const backoff = (base: number, attempt: number): number =>
+  Math.min(base * 2 ** (attempt - 1), RETRY_MAX_MS);
+
 /**
-Arms the pass after one that failed at `now`: a minute on, doubling while passes keep failing, up
-to four hours, or an earlier time a write asked for meanwhile. A pass that keeps failing (a bug, a
-store too big for the CPU limit) loads the log a few times in its first hour and then every four
-hours, never at every lease's end.
+Arms the pass after the `attempt`th in a row, which failed at `now`: a minute on, doubling while
+passes keep failing, up to four hours, or an earlier time a write asked for meanwhile.
 */
-const retryAfterFailure = async (storage: DurableObjectStorage, now: number): Promise<void> => {
-  const failures = ((await storage.get<number>(FAILURES_KEY)) ?? 0) + 1;
-  await storage.put(FAILURES_KEY, failures);
-  const again = now + Math.min(RETRY_MS * 2 ** (failures - 1), RETRY_MAX_MS);
+const retryAfterFailure = async (
+  storage: DurableObjectStorage,
+  { attempt, now }: { readonly attempt: number; readonly now: number },
+): Promise<void> => {
+  const again = now + backoff(RETRY_MS, attempt);
   const known = await storage.get<null | number>(POOL_NEXT_AT_KEY);
   const at = known === null || known === undefined ? again : Math.min(known, again);
   await storage.put(POOL_NEXT_AT_KEY, at);
   await armEarliest(storage, at);
 };
 
-/** A pass completed: the next failure waits the shortest again. */
+/** A pass completed: the next pass is the first in a row again. */
 const completed = async (storage: DurableObjectStorage): Promise<void> => {
-  if ((await storage.get(FAILURES_KEY)) !== undefined) {
-    await storage.delete(FAILURES_KEY);
-  }
+  await storage.delete(FAILURES_KEY);
 };
 
 /**
 Runs a pass, which holds a lease and takes the pool's time: whatever asks for a pass while it runs
-(a write, a retry, its own next decision) arms it again. The lease, written first, outlives a pass
-cut short, and the alarm is armed at its end, so such a pass runs again then even when the runtime
-never runs the alarm again; after a pass that completed, that wake reads the gate and nothing
-else. A pass that fails looks again later and later (`retryAfterFailure`), or at an earlier time a
-write asked for meanwhile.
+(a write, a retry, its own next decision) arms it again. The pass is counted first (`FAILURES_KEY`)
+and the lease written, so both outlive a pass cut short, and the alarm is armed at the lease's end:
+such a pass runs again then even when the runtime never runs the alarm again. After a pass that
+completed, that wake reads the gate and nothing else. A pass that keeps being cut short (a store
+too big for the CPU limit, where no `catch` runs) holds a longer lease each time, 5 minutes
+doubling to four hours, and one that keeps failing looks again later and later
+(`retryAfterFailure`): either loads the log a few times in its first hour and then every four
+hours, never at every lease's end.
 */
 export const takingPoolTime = async <T>(
   storage: DurableObjectStorage,
   { now, pass }: { readonly now: string; readonly pass: () => Promise<T> },
 ): Promise<T> => {
   const from = Date.parse(now);
-  const lease = from + LEASE_MS;
+  const attempt = ((await storage.get<number>(FAILURES_KEY)) ?? 0) + 1;
+  await storage.put(FAILURES_KEY, attempt);
+  const lease = from + backoff(LEASE_MS, attempt);
   await storage.put(POOL_LEASE_KEY, lease);
   await storage.put(POOL_NEXT_AT_KEY, null);
   await armEarliest(storage, lease);
@@ -160,7 +172,7 @@ export const takingPoolTime = async <T>(
     await completed(storage);
     return result;
   } catch (error) {
-    await retryAfterFailure(storage, from);
+    await retryAfterFailure(storage, { attempt, now: from });
     await release(storage, lease);
     throw error;
   }
