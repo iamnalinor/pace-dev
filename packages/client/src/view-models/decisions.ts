@@ -1,4 +1,5 @@
 import {
+  type Action,
   ACTION_KINDS,
   type ActionKind,
   type Decision,
@@ -6,6 +7,7 @@ import {
   type DecisionInputs,
   type DecisionResolution,
   type DecisionStep,
+  decisionStepOf,
   type Language,
   type MessageKey,
   type ParseField,
@@ -142,6 +144,20 @@ const stepText = (
     subject: subjectOf(step, lookup, summary),
     to: step.renamedTo ?? "",
   });
+};
+
+/**
+What an approval did, one line per action in the log's past tense ("Created task “X”"), for the
+toast after Approve that said only "Done" (QA round 11 L3); a step this client cannot word keeps
+its summary.
+*/
+export const doneLines = (actions: readonly Action[], world: World): readonly string[] => {
+  const lookup = lookupOf(world);
+  return actions.map(
+    (action) =>
+      stepText(decisionStepOf(action), { lookup, summary: action.summary, tense: "done" }) ??
+      action.summary,
+  );
 };
 
 /** Each step in words beside its own summary; a step this client cannot word keeps the summary. */

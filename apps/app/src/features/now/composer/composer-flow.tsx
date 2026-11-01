@@ -84,7 +84,10 @@ const useReadLater = (ask: () => Promise<AiOutcome | null>, onSaved: () => void)
   };
 };
 
-/** To Inbox: the line is kept as a note; a preview of it goes, and the assistant log hears so. */
+/**
+To Inbox: the line is kept as a note and a toast says so; a preview of it goes, and the assistant
+log hears so.
+*/
 const useToInbox = (
   text: string,
   pending: Pick<ReturnType<typeof usePendingActions>, "keptInInbox">,
@@ -92,10 +95,14 @@ const useToInbox = (
 ) => {
   const { actions } = usePace();
   const run = useRunAction();
+  const toast = useToast();
+  const t = useT();
   return async (): Promise<void> => {
     if (!(await run(actions.captureInbox(text)))) {
       return;
     }
+    // Where the line went, in words: only the Inbox badge moved before (QA round 14 L10).
+    toast.show({ message: t("composer.toInboxDone") });
 
     pending.keptInInbox();
     done();

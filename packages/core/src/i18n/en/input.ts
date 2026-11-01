@@ -135,6 +135,7 @@ export const enInput = {
   "composer.placeholder": "Add a task or paste text",
   "composer.addTo": "Add to {title}",
   "composer.toInbox": "To Inbox",
+  "composer.toInboxDone": "Added to Inbox",
   "composer.category": "Category",
   "composer.project": "Project",
   "composer.noProject": "No project",

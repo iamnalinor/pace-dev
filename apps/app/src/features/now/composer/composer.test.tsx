@@ -478,6 +478,21 @@ describe("Composer", () => {
     expect(created(runtime, "синк по дашборду")?.sourceText).toBe(
       "синк по дашборду завтра 15:00 1ч",
     );
+    // The toast says what was done, not a bare "Done" (QA round 11 L3, round 14 L10).
+    expect(
+      await screen.findByText(en("decisions.done.task.create", { subject: "синк по дашборду" })),
+    ).toBeOnTheScreen();
+  });
+
+  it("opens an empty form without blaming the title, and asks for one once it was typed away (QA round 14 L6)", async () => {
+    const runtime = await createTestRuntime();
+    await renderComposer(runtime);
+    await fireEvent.press(screen.getByRole("button", { name: en("nav.newTask") }));
+    expect(title()).toHaveDisplayValue("");
+    expect(screen.queryByText(en("edit.titleRequired"))).toBeNull();
+    await fireEvent.changeText(title(), "x");
+    await fireEvent.changeText(title(), "");
+    expect(screen.getByText(en("edit.titleRequired"))).toBeOnTheScreen();
   });
 
   it("expands to the form by hand: the line moves into the title, a category brings its importance", async () => {
@@ -574,6 +589,8 @@ describe("Composer", () => {
       const titles = Object.values(runtime.state.store.getState().tasks.byId).map((t) => t.title);
       expect(titles).toContain("think about the trip");
     });
+    // It says where the line went: only the badge moved before (QA round 14 L10).
+    expect(await screen.findByText(en("composer.toInboxDone"))).toBeOnTheScreen();
   });
 
   it("parses a pasted homework at once and writes nothing until Approve", async () => {
