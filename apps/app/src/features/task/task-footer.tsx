@@ -75,6 +75,7 @@ export const TaskFooter = ({
             hotkey={HOTKEYS.primary}
             onLongPress={onClose}
             onPress={finish}
+            width="fill"
           >
             {primary}
           </Button>

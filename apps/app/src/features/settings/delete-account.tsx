@@ -214,7 +214,9 @@ export const DangerZone = () => {
   const flow = useDangerFlow();
   return (
     <View className="gap-3">
-      <Text className="font-sans text-[14px] font-semibold text-warn">{t("settings.danger")}</Text>
+      <Text accessibilityRole="header" className="font-sans text-[14px] font-semibold text-warn">
+        {t("settings.danger")}
+      </Text>
       <DangerPrompt flow={flow} />
       {flow.notice === null ? null : (
         <Text accessibilityRole="alert" className="font-sans text-[13px] text-warn">

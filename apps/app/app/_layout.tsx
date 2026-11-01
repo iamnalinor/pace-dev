@@ -80,7 +80,6 @@ const Navigator = () => {
             <Stack.Screen name="review" />
             <Stack.Screen name="history" />
             <Stack.Screen name="permissions" />
-            <Stack.Screen name="devices" />
             <Stack.Screen name="notifications" />
             <Stack.Screen
               name="onboarding"

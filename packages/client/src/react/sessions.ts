@@ -46,6 +46,10 @@ export const useSessions = (api: ApiClient): Sessions => {
     };
   }, [api, generation]);
   const reload = useCallback(() => {
+    // A retry after a failure shows the loading state again; a refresh of a shown list does not.
+    setLoaded((current) =>
+      current.status === "error" ? { ...current, status: "loading" } : current,
+    );
     setGeneration((current) => current + 1);
   }, []);
   return {

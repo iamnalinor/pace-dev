@@ -43,6 +43,7 @@ export const CrashScreen = ({ error }: { readonly error: Error }) => {
         onPress={() => {
           void reloadAppAsync();
         }}
+        width="fill"
       >
         {t(language, "crash.retry")}
       </Button>

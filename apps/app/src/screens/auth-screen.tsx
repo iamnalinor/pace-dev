@@ -47,6 +47,7 @@ export const AuthScreen = () => {
             router.replace("/login");
           }}
           variant="secondary"
+          width="fill"
         >
           {t("auth.backToLogin")}
         </Button>

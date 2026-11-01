@@ -16,7 +16,8 @@ provider is `@cloudflare/workers-oauth-provider` 1.2 wrapping the Hono app in
 ## Connecting
 
 The server URL is always `https://pace-api.nalinor.dev/mcp` (or `http://localhost:8787/mcp`
-against `wrangler dev`). Clients discover the rest: the first unauthenticated call gets a
+against `wrangler dev`); in the app, Settings → Devices and sessions → *Connect an AI app* shows
+the current server's URL with short steps for Claude, ChatGPT and other clients. Clients discover the rest: the first unauthenticated call gets a
 `401` whose `WWW-Authenticate` names the protected resource metadata
 (`/.well-known/oauth-protected-resource/mcp`), which names the authorization server
 (`/.well-known/oauth-authorization-server`), which names `/authorize`, `/oauth/token` and

@@ -63,7 +63,12 @@ const LoginOptions = ({
           slow: t("login.widgetSlow"),
         }}
       />
-      <Button busy={bot.phase.kind === "starting"} onPress={() => void bot.start()} variant="ghost">
+      <Button
+        busy={bot.phase.kind === "starting"}
+        onPress={() => void bot.start()}
+        variant="ghost"
+        width="fill"
+      >
         {t("login.botFallback")}
       </Button>
     </View>

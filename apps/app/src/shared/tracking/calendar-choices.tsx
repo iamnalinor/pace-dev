@@ -50,7 +50,7 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
           label={t("time.calendarSetUp")}
           onPress={() => {
             close();
-            router.push("/devices");
+            router.push("/settings");
           }}
         />
       )}

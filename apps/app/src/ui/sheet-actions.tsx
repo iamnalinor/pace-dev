@@ -32,7 +32,7 @@ export const SheetActions = ({
     <View className="flex-row gap-2">
       {isConfirmation ? (
         <View className="flex-1">
-          <Button onPress={onCancel} variant="secondary">
+          <Button onPress={onCancel} variant="secondary" width="fill">
             {cancelLabel}
           </Button>
         </View>
@@ -44,6 +44,7 @@ export const SheetActions = ({
           hotkey={isConfirmation ? undefined : HOTKEYS.primary}
           onPress={onPrimary}
           variant={isDestructive ? "danger" : "primary"}
+          width="fill"
         >
           {primaryLabel}
         </Button>

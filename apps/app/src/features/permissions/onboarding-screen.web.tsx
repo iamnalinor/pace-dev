@@ -19,6 +19,7 @@ export const OnboardingScreen = () => {
           onPress={() => {
             router.replace("/");
           }}
+          width="fill"
         >
           {t("onboarding.web.continue")}
         </Button>

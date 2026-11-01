@@ -67,12 +67,16 @@ const SignInButtons = ({
   const { loginWebOrigin } = useServerInfo();
   return (
     <View className="gap-3">
-      <Button busy={bot.phase.kind === "starting"} onPress={guard(() => void bot.start())}>
+      <Button
+        busy={bot.phase.kind === "starting"}
+        onPress={guard(() => void bot.start())}
+        width="fill"
+      >
         {t("login.openTelegram")}
       </Button>
       {/* Only the current server's own web app: the token it hands back is sent here. */}
       {loginWebOrigin === null ? null : (
-        <Button onPress={guard(() => void onWeb(loginWebOrigin))} variant="secondary">
+        <Button onPress={guard(() => void onWeb(loginWebOrigin))} variant="secondary" width="fill">
           {t("login.webFallback")}
         </Button>
       )}

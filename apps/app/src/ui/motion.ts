@@ -29,3 +29,9 @@ export const SHEET_ENTER = SlideInDown.duration(240).reduceMotion(ReduceMotion.S
 
 /** A dialog in the middle of a wide window: it grows in place from slightly smaller. */
 export const DIALOG_ENTER = ZoomIn.duration(160).reduceMotion(ReduceMotion.System);
+
+/**
+One half of a placeholder's breath (a skeleton while a list loads): it dims and comes back,
+and stands still under reduced motion.
+*/
+export const PLACEHOLDER_BREATH = { duration: 900, reduceMotion: ReduceMotion.System } as const;

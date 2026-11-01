@@ -36,6 +36,7 @@ export const AppLinkScreen = () => {
               onPress={() => {
                 globalThis.location.assign(intentUrl(token));
               }}
+              width="fill"
             >
               {t("appLink.open")}
             </Button>

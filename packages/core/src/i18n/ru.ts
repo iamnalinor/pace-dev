@@ -7,6 +7,7 @@ import { ruInput } from "./ru/input.ts";
 import { ruLibrary } from "./ru/library.ts";
 import { ruNotify } from "./ru/notify.ts";
 import { ruServer } from "./ru/server.ts";
+import { ruSessions } from "./ru/sessions.ts";
 import { ruShell } from "./ru/shell.ts";
 import { ruTime } from "./ru/time.ts";
 
@@ -21,4 +22,5 @@ export const ru: { readonly [K in keyof typeof en]: string } = {
   ...ruNotify,
   ...ruDecisions,
   ...ruServer,
+  ...ruSessions,
 };

@@ -23,6 +23,7 @@ export const LoginReturnScreen = () => {
           onPress={() => {
             globalThis.location.assign(isAndroid ? appIntent(globalThis.location.origin) : "/");
           }}
+          width="fill"
         >
           {t("loginReturn.open")}
         </Button>

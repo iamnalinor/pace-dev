@@ -38,7 +38,7 @@ build differs in four ways, all through `metro.config.js`:
 The service worker precaches the build and waits; the update strip offers "Refresh page",
 which hands control to the new worker. The phone tabs are Now, Day, Inbox and More (which
 opens Week and the other destinations). On a wide screen the sidebar lists Now, Day, Week,
-Inbox, Projects, Insights, Devices and Settings.
+Inbox, Projects, Insights and Settings (devices and sessions live inside Settings).
 
 dependency-cruiser (`.dependency-cruiser.mjs`) fails `bun lint` when a dependency crosses
 a boundary: core imports no workspace, client never imports an app or the API, the UIs

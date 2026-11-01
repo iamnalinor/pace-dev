@@ -1,9 +1,11 @@
 import type { LucideIcon } from "lucide-react-native";
 
+import { createContext, use } from "react";
 import { ActivityIndicator, Pressable, Text } from "react-native";
 
 import { cx } from "./cx.ts";
 import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
+import { useIsWide } from "./layout.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { KEYBOARD, useHotkey } from "./use-hotkey.tsx";
 
@@ -29,6 +31,27 @@ const HINT: Readonly<Record<ButtonVariant, string>> = {
   ghost: "text-muted",
   primary: "text-accentFg",
   secondary: "text-muted",
+};
+
+/**
+How wide a button is. `auto`: as wide as its text on a computer's window (from 1024 px), the
+container's width below (a phone's main action). `fill`: the container lays it out on every
+window, the full width of a column: a sheet's actions, the halves of a split row, the main action
+of a narrow centred card (which centres it instead).
+*/
+export type ButtonWidth = "auto" | "fill";
+
+/** What a button inside takes when it names no width: a sheet makes its buttons fill. */
+export const ButtonWidthContext = createContext<ButtonWidth>("auto");
+
+/** On a computer's window an `auto` button keeps to its text; otherwise the container decides. */
+const AT_TEXT_WIDTH = { alignSelf: "flex-start" } as const;
+
+/** The style that keeps a button at its text's width, when it should. */
+const useWidthStyle = (width: ButtonWidth | undefined): typeof AT_TEXT_WIDTH | undefined => {
+  const inherited = use(ButtonWidthContext);
+  const isWide = useIsWide();
+  return isWide && (width ?? inherited) === "auto" ? AT_TEXT_WIDTH : undefined;
 };
 
 /** The icon in the label's colour. */
@@ -110,6 +133,7 @@ export const Button = ({
   onLongPress,
   onPress,
   variant = "primary",
+  width,
 }: {
   readonly busy?: boolean;
   readonly children: string;
@@ -123,8 +147,11 @@ export const Button = ({
   /** A second way in (the full close sheet behind a one-tap Done). */
   readonly onLongPress?: () => void;
   readonly variant?: ButtonVariant;
+  /** `auto` unless a container (a sheet) says otherwise. */
+  readonly width?: ButtonWidth;
 }) => {
   const isBlocked = disabled || busy;
+  const widthStyle = useWidthStyle(width);
   const keyshortcuts = useButtonHotkey(hotkey, hotkeyMode === "global" && !isBlocked, onPress);
   return (
     <Pressable
@@ -141,6 +168,7 @@ export const Button = ({
       disabled={isBlocked}
       onLongPress={onLongPress}
       onPress={onPress}
+      style={widthStyle}
     >
       {busy ? (
         <ActivityIndicator accessibilityLabel={children} />

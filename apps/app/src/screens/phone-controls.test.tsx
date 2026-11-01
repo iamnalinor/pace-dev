@@ -3,7 +3,6 @@ import type { ReactElement } from "react";
 import { act } from "@testing-library/react-native";
 
 import { DayScreen } from "#app/features/day/day-screen.tsx";
-import { DevicesScreen } from "#app/features/devices/devices-screen.tsx";
 import { NotificationsScreen } from "#app/features/notifications/notifications-screen.tsx";
 import { WeekScreen } from "#app/features/week/week-screen.tsx";
 import { deadControls } from "#app/test/dead-controls.ts";
@@ -29,8 +28,8 @@ const onArtboard = (ui: ReactElement) => async () => {
   return { extra: () => runtime.state.store.getState().log.length };
 };
 
-/** Devices with a server that lists none and makes one. */
-const devices = async () => {
+/** Settings, signed in, with a server that lists no sessions and makes a computer's. */
+const settingsWithSessions = async () => {
   const runtime = await createTestRuntime({
     routes: {
       "GET /api/sessions": () => ({ sessions: [] }),
@@ -38,7 +37,7 @@ const devices = async () => {
     },
   });
   await runtime.auth.adoptToken("session-devices");
-  await renderScreen(<DevicesScreen />, runtime);
+  await renderScreen(<SettingsScreen />, runtime);
   return { extra: () => runtime.state.store.getState().log.length };
 };
 
@@ -58,7 +57,6 @@ describe("every control on a phone screen does something", () => {
     ["Day", <DayScreen key="day" />],
     ["Inbox", <InboxScreen key="inbox" />],
     ["More", <MoreScreen key="more" />],
-    ["Settings", <SettingsScreen key="settings" />],
     ["Week", <WeekScreen key="week" />],
   ])("%s", async (_name, ui) => {
     expect(await deadControls(onArtboard(ui), OUTSIDE_THE_APP)).toEqual([]);
@@ -79,7 +77,8 @@ describe("every control on a phone screen does something", () => {
     expect(controlsInsideControls()).toEqual([]);
   });
 
-  it("Devices, where Add a computer once did nothing on phones", async () => {
-    expect(await deadControls(devices)).toEqual([]);
+  // Signed in, as Settings always is: the phone's calendar switch acts for the session.
+  it("Settings, where Add a computer once did nothing on phones", async () => {
+    expect(await deadControls(settingsWithSessions)).toEqual([]);
   });
 });

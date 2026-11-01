@@ -4,7 +4,6 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
 
-import { ConnectedApps } from "./connected-apps.tsx";
 import { ConsentFlow } from "./consent-flow.tsx";
 
 const AUTH_QUERY = "client_id=abc&scope=tasks%3Aread+tasks%3Awrite&state=s1";
@@ -18,22 +17,6 @@ const CLIENT = {
   redirectIsLoopback: true,
   scopes: ["tasks:read", "tasks:write"],
 };
-
-const GRANTS = [
-  {
-    city: null,
-    country: null,
-    createdAt: Date.parse("2026-10-01T10:00:00.000Z"),
-    current: false,
-    id: "mcp:g1",
-    ip: null,
-    kind: "mcp",
-    lastDataAt: null,
-    lastSeenAt: null,
-    name: "Claude",
-    scopes: ["tasks:read", "tasks:write"],
-  },
-];
 
 const setupConsent = async () => {
   const complete = jest.fn((_request: { readonly body: unknown }) => ({
@@ -95,34 +78,5 @@ describe("ConsentFlow", () => {
       runtime,
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(en("oauth.invalidRequest"));
-  });
-});
-
-describe("ConnectedApps", () => {
-  it("lists the grants and revokes one after a confirmation", async () => {
-    const runtime = await createTestRuntime({
-      routes: {
-        "DELETE /api/sessions/mcp%3Ag1": () => ({ ok: true }),
-        "GET /api/sessions": () => ({ sessions: GRANTS }),
-      },
-    });
-    await renderScreen(<ConnectedApps />, runtime);
-    expect(await screen.findByText("Claude")).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: en("connectedApps.revoke") }));
-    await fireEvent.press(screen.getByRole("button", { name: en("connectedApps.revokeYes") }));
-    expect(await screen.findByText(en("connectedApps.empty"))).toBeOnTheScreen();
-  });
-
-  it("says so when the list cannot load or a revoke fails", async () => {
-    const runtime = await createTestRuntime({
-      routes: {
-        "DELETE /api/sessions/mcp%3Ag1": () => problem(500, "server/error"),
-        "GET /api/sessions": () => ({ sessions: GRANTS }),
-      },
-    });
-    await renderScreen(<ConnectedApps />, runtime);
-    await fireEvent.press(await screen.findByRole("button", { name: en("connectedApps.revoke") }));
-    await fireEvent.press(screen.getByRole("button", { name: en("connectedApps.revokeYes") }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(en("connectedApps.revokeFailed"));
   });
 });

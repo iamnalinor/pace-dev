@@ -90,7 +90,7 @@ describe("catalogs", () => {
       "settings.timezone",
       "settings.digestWindows",
       "settings.quietHours",
-      "settings.connectedApps",
+      "sessions.title",
       "settings.logout",
       "common.save",
       "common.cancel",

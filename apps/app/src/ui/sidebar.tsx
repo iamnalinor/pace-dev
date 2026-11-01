@@ -79,7 +79,7 @@ const DESTINATIONS: readonly Destination[] = [
     href: "/settings",
     icon: Settings,
     label: "nav.settings",
-    owns: (path) => ["/settings", "/devices", "/presets"].some((own) => path.startsWith(own)),
+    owns: (path) => ["/settings", "/presets"].some((own) => path.startsWith(own)),
   },
 ];
 

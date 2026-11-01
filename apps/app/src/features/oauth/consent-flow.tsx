@@ -81,7 +81,12 @@ const ReadyStep = ({
       )}
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <Button disabled={consent.isBusy} onPress={() => void consent.deny()} variant="secondary">
+          <Button
+            disabled={consent.isBusy}
+            onPress={() => void consent.deny()}
+            variant="secondary"
+            width="fill"
+          >
             {t("oauth.deny")}
           </Button>
         </View>
@@ -89,6 +94,7 @@ const ReadyStep = ({
           <Button
             disabled={consent.isBusy || consent.identity === null}
             onPress={() => void consent.allow()}
+            width="fill"
           >
             {t("oauth.allow")}
           </Button>

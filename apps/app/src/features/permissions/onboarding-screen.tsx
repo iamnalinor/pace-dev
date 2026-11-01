@@ -48,8 +48,10 @@ const Intro = ({
     <Frame
       footer={
         <>
-          <Button onPress={onContinue}>{t("onboarding.continue")}</Button>
-          <Button onPress={onLater} variant="ghost">
+          <Button onPress={onContinue} width="fill">
+            {t("onboarding.continue")}
+          </Button>
+          <Button onPress={onLater} variant="ghost" width="fill">
             {t("onboarding.notNow")}
           </Button>
         </>
@@ -105,8 +107,10 @@ const Step = ({
     <Frame
       footer={
         <>
-          <Button onPress={action.act}>{action.label}</Button>
-          <Button onPress={onSkip} variant="ghost">
+          <Button onPress={action.act} width="fill">
+            {action.label}
+          </Button>
+          <Button onPress={onSkip} variant="ghost" width="fill">
             {t("common.skip")}
           </Button>
         </>
@@ -140,7 +144,13 @@ const Summary = ({
 }) => {
   const t = useT();
   return (
-    <Frame footer={<Button onPress={onStart}>{t("onboarding.done.start")}</Button>}>
+    <Frame
+      footer={
+        <Button onPress={onStart} width="fill">
+          {t("onboarding.done.start")}
+        </Button>
+      }
+    >
       <Text accessibilityRole="header" className="font-sans text-[26px] font-semibold text-fg">
         {t("onboarding.done.title")}
       </Text>
