@@ -52,12 +52,23 @@ const report = (): Raw =>
 
 const freshStore = () => env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));
 
+/** The lease a first pass in a row holds (`pool-retry-alarm.ts`). */
+const LEASE_MS = 5 * 60_000;
+
 /**
-When the pool next passes, as it keeps it: every retry the pool arms moves it earlier. (The store's
-alarm may come sooner, at the lease's end of the pass just run, and only reads this then.)
+After a pass at `passAt` run as the alarm's (the runtime took the alarm off first): the pool keeps
+the time the pass answered as its own (`pool:next-at`, which every retry moves earlier), and the
+store's alarm is the pass's lease's end or that time, whichever comes first.
 */
-const poolTimeOf = async (state: DurableObjectState): Promise<number | undefined> =>
-  await state.storage.get<number>(POOL_NEXT_AT_KEY);
+const expectArmedAfterPass = async (
+  state: DurableObjectState,
+  { nextAt, passAt }: { readonly nextAt: string; readonly passAt: string },
+): Promise<void> => {
+  expect(await state.storage.get<number>(POOL_NEXT_AT_KEY)).toBe(Date.parse(nextAt));
+  expect(await state.storage.getAlarm()).toBe(
+    Math.min(Date.parse(passAt) + LEASE_MS, Date.parse(nextAt)),
+  );
+};
 
 type Call = { readonly method: string; readonly body: Raw };
 
@@ -119,13 +130,12 @@ describe("the deadline digest", () => {
         now: new Date(Date.parse(started) + 1000).toISOString(),
         origin: "app",
       });
-      const run = await instance.runNotifications(
-        new Date(Date.parse(started) + 61_000).toISOString(),
-        withoutTelegram,
-      );
+      const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      await state.storage.deleteAlarm();
+      const run = await instance.runNotifications(passAt, withoutTelegram);
       expect(telegram.sent()).toHaveLength(1);
       expect(telegram.calls.filter((entry) => entry.method === "deleteMessage")).toHaveLength(0);
-      expect(await poolTimeOf(state)).toBe(Date.parse(run.nextAt));
+      await expectArmedAfterPass(state, { nextAt: run.nextAt, passAt });
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0],
       ).toMatchObject({ dismissedAt: null, reason: "dismissal-unavailable" });
@@ -175,9 +185,10 @@ describe("the deadline digest", () => {
         origin: "app",
       });
       const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      await state.storage.deleteAlarm();
       const run = await instance.runNotifications(passAt, couriers);
       expect(removalAttempts).toBe(1);
-      expect(await poolTimeOf(state)).toBe(Date.parse(run.nextAt));
+      await expectArmedAfterPass(state, { nextAt: run.nextAt, passAt });
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.[0],
       ).toMatchObject({ dismissedAt: null, reason: "dismissal-refused" });
@@ -774,12 +785,10 @@ describe("Firebase push", () => {
       // The retry's alarm fires: the runtime takes it off before the pass, which arms only what
       // is still due (nothing moves an alarm set earlier, so a pass outside it would keep it).
       await state.storage.deleteAlarm();
-      const run = await instance.runNotifications(
-        new Date(Date.parse(started) + 61_000).toISOString(),
-        couriers,
-      );
+      const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      const run = await instance.runNotifications(passAt, couriers);
       expect(fcm.sends()).toHaveLength(1);
-      expect(await poolTimeOf(state)).toBe(Date.parse(run.nextAt));
+      await expectArmedAfterPass(state, { nextAt: run.nextAt, passAt });
     });
   });
 
@@ -811,12 +820,11 @@ describe("Firebase push", () => {
         now: new Date(Date.parse(started) + 1000).toISOString(),
         origin: "app",
       });
-      const run = await instance.runNotifications(
-        new Date(Date.parse(started) + 61_000).toISOString(),
-        withoutFcm,
-      );
+      const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      await state.storage.deleteAlarm();
+      const run = await instance.runNotifications(passAt, withoutFcm);
       expect(fcm.sends()).toHaveLength(1);
-      expect(await poolTimeOf(state)).toBe(Date.parse(run.nextAt));
+      await expectArmedAfterPass(state, { nextAt: run.nextAt, passAt });
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.find(
           (entry) => entry.method === "fcm",
@@ -852,7 +860,7 @@ describe("Firebase push", () => {
       // The retry's alarm fires: the runtime takes it off before the pass.
       await state.storage.deleteAlarm();
       const run = await instance.runNotifications(now, couriers);
-      expect(await poolTimeOf(state)).toBe(Date.parse(run.nextAt));
+      await expectArmedAfterPass(state, { nextAt: run.nextAt, passAt: now });
       expect(fcm.sends()).toHaveLength(1);
     });
   });
@@ -1128,9 +1136,10 @@ describe("Firebase push", () => {
         origin: "app",
       });
       const passAt = new Date(Date.parse(started) + 61_000).toISOString();
+      await state.storage.deleteAlarm();
       const run = await instance.runNotifications(passAt, couriers);
       expect(fcm.sends()).toHaveLength(2);
-      expect(await poolTimeOf(state)).toBe(Date.parse(run.nextAt));
+      await expectArmedAfterPass(state, { nextAt: run.nextAt, passAt });
       expect(
         (await instance.listNotifications({ limit: 5 })).deliveries[notification.id]?.find(
           (entry) => entry.method === "fcm",
