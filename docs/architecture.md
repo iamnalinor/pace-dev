@@ -10,7 +10,7 @@ apps/api (Worker) ────────────────────�
 | Layer | Package | Holds | May import |
 |---|---|---|---|
 | core | `@pace/core` | pure, immutable TypeScript: event schemas, sorting, materializer, reducers, settings, i18n, design tokens, time helpers, `Result`, the zod API contract | its npm deps only (zod, ulidx, date-fns) |
-| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`), auth flows (`createAuth`), the local-first event store and app state (`createAppState`: the four core slices `tasks`/`projects`/`presets`/`settings` folded by the core reducers, the effective `events`, the raw `log` with corrections, and `version`), the actions (`createActions`: every user intent validated by the core's retro rules, appended with the client's envelope, answered as `Result<Event[], ActionError>`), the pure view-models (`view-models/*`: Now rows with typed meta parts, task, project, inbox, review, history over `AppState` + `QueryContext`), the `Clock` (`systemClock`, `quickTimes`), the outbox/sync loop (`createSyncClient`) and `createPaceClient`, which wires them the one way both shells use; the `EventStore`/`SessionStore` ports with memory adapters; `@pace/client/react` adds `createAppHooks` (store selectors plus `useClock`/`useNow`/`useTaskView`/`useProjectView`/`useInbox`/`useReview`/`useHistory`, memoized on the store version and a 30 s tick) and re-exports zustand's `useStore`; `@pace/client/testing` is the fake `fetch` for every test suite, `@pace/core/testing` the artboard fixtures | core |
+| client | `@pace/client` | the typed API client (`createApiClient`, `ApiError`), auth flows (`createAuth`), the local-first event store and app state (`createAppState`: the four core slices `tasks`/`projects`/`presets`/`settings` folded by the core reducers, the effective `events`, the raw `log` with corrections, and `version`), the actions (`createActions`: every user intent validated by the core's retro rules, appended with the client's envelope, answered as `Result<Event[], ActionError>`), the pure view-models (`view-models/*`: Now rows with typed meta parts, task, project, inbox, review, history over `AppState` + `QueryContext`), the `Clock` (`systemClock`, `quickTimes`), the outbox/sync loop (`createSyncClient`, over the live socket or HTTP through `sync-transport.ts`) and `createPaceClient`, which wires them the one way both shells use; the `EventStore`/`SessionStore` ports with memory adapters; `@pace/client/react` adds `createAppHooks` (store selectors plus `useClock`/`useNow`/`useTaskView`/`useProjectView`/`useInbox`/`useReview`/`useHistory`, memoized on the store version and a 30 s tick) and re-exports zustand's `useStore`; `@pace/client/testing` is the fake `fetch` for every test suite, `@pace/core/testing` the artboard fixtures | core |
 | api | `@pace/api` | the Cloudflare Worker: Hono app, auth, bot, sync routes, the `UserStore` Durable Object, D1 schema | core |
 | app | `@pace/app` | the one UI: Expo / React Native (expo-router, NativeWind) on Android, and the same screens on the web through react-native-web (a PWA served by the `pace-web` assets Worker) | client, core |
 
@@ -233,6 +233,20 @@ The client sends a local change within 0.8 s of writing it (and what is unsent w
 is hidden or the app goes to the background), pulls on every `changed` and on every
 reconnect of the live socket (back after 1 s, 2 s, … 60 s), and polls as a safety net: every
 5 minutes while the socket is up, every 30 s while it is down.
+
+**One sync, two transports** (`packages/client/src/sync-transport.ts`). The sync client runs
+one pull loop, one outbox push and one `applyPage` over a `SyncTransport` and never knows
+which carries a call: `httpTransport` (the routes above) or `socketTransport` (the live
+socket's `pace.v2`, whose `request` correlates answers by id, keeps at most four open and gives
+up after 10 s, dropping a silent socket to reconnect). `preferSocket` picks per call: the socket
+while it is open and has said `hello`, HTTP when it is closed, speaks only v1, is busy or does
+not answer (`LiveUnavailable`). A push whose answer the socket lost is pushed again over HTTP;
+the server keeps one copy of a known id and accepts it again, so the outbox is marked synced
+once. New `events` the socket brings unasked go to `SyncClient.ingestLive`, which waits for a
+run in flight and then applies the page through the same `applyPage` when it continues the
+cursor of the same store; a page the log already reaches past (the writer's derived events,
+which arrive before its own `pushed`) changes nothing, and anything else (a gap, `more`,
+another store) asks for a run within 0.8 s.
 
 **The store id.** Every user store has a random `storeId` (16 bytes, base64url), made when it
 is created and again whenever it is wiped (account deletion, an epoch change). The pull
