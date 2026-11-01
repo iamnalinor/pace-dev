@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { SyncEventSchema } from "./api/schemas/sync.ts";
 import { EVENT_ID_MAX } from "./events/event-schema.ts";
+import { compareEvents } from "./events/sort.ts";
 import {
   autoOutcomeId,
   createIdFactory,
@@ -63,6 +64,31 @@ describe("isUlid", () => {
     expect(isUlid("")).toBe(false);
     expect(isUlid("hw:p:2026-W41")).toBe(false);
     expect(isUlid("01ARZ3NDEKTSV4RRFFQ69G5FA")).toBe(false);
+  });
+});
+
+describe("deferredReadId keeps a reading in the order it was planned (class 59)", () => {
+  // A reading's events share one `occurredAt`, so the canonical order is their ids'.
+  const at = "2026-10-07T09:00:00.000Z";
+  const part = fc.nat({ max: 999_999 });
+  const queued = newId(1);
+  const placed = (index: number) => ({ id: deferredReadId(queued, index), occurredAt: at });
+
+  it("puts event i before event j at one instant for every i < j", () => {
+    fc.assert(
+      fc.property(fc.tuple(part, part), ([first, second]) => {
+        fc.pre(first !== second);
+        const [i, j] = first < second ? [first, second] : [second, first];
+        expect(compareEvents(placed(i), placed(j))).toBe(-1);
+      }),
+    );
+  });
+
+  it("orders the eleventh event after the third", () => {
+    const ids = Array.from({ length: 12 }, (_, index) => deferredReadId(queued, index));
+    expect(
+      ids.toSorted((a, b) => compareEvents({ id: a, occurredAt: at }, { id: b, occurredAt: at })),
+    ).toEqual(ids);
   });
 });
 

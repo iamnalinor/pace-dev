@@ -42,13 +42,19 @@ export type AutoOutcomeKind = "missed" | "skipped";
 export const autoOutcomeId = (taskId: string, kind: AutoOutcomeKind): string =>
   `auto:${taskId}:${kind}`;
 
+/** Digits of a read-later event's place: a reading writes far fewer than a million events. */
+const READ_PART_DIGITS = 6;
+
 /**
 An event that a text read later writes, named after the text's place in the store's queue: a
 drain cut short after the write and run again finds what it wrote, and writes no second copy.
 `part` is the event's place in the reading, or `inbox` for the text kept in the Inbox instead.
+The reading's events share one `occurredAt`, so the canonical order is their ids' (code units):
+the place is zero-padded to six digits, so the eleventh event sorts after the third, as fresh
+ULIDs did (bug-lessons class 59).
 */
 export const deferredReadId = (queuedId: string, part: "inbox" | number): string =>
-  `auto:read-${queuedId}-${String(part)}`;
+  `auto:read-${queuedId}-${part === "inbox" ? part : String(part).padStart(READ_PART_DIGITS, "0")}`;
 /** Minute precision in UTC (`20261007T2040`): the instant part of the sleep ids. */
 const minuteStamp = (atIso: string): string => formatInZone(atIso, "UTC", "yyyyMMdd'T'HHmm");
 
