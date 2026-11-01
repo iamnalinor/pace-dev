@@ -8,7 +8,7 @@
     "*.ts",
     "*.config.*",
     ".dependency-cruiser.mjs",
-    "scripts/*.ts",
+    "scripts/**/*.ts",
     "nativewind-env.d.ts"
   ]
 }
