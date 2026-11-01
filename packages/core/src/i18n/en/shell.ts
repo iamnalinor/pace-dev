@@ -214,6 +214,7 @@ export const enShell = {
   "settings.review.hint": "What the system could not settle on its own.",
   "zone.banner": "This device is in {device}; the account uses {account}.",
   "zone.use": "Use {device}",
+  "zone.keep": "Keep {account}",
   "source.app": "App",
   "source.web": "Web",
   "source.bot": "Bot",

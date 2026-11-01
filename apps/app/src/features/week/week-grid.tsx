@@ -209,7 +209,11 @@ const DayItems = ({
       .map((block) => ({ at: rest.grid.place(block), block, kind: "block" as const }))
       .filter((item) => isPlaced(item)),
   ];
-  const lanes = lanesOf(items.map((item) => (item.kind === "event" ? item.event : item.block)));
+  // Laid out by the height each is drawn at (a short block is drawn MIN_TARGET_PX tall).
+  const lanes = lanesOf(
+    items.map((item) => (item.kind === "event" ? item.event : item.block)),
+    (MIN_TARGET_PX / rest.grid.hourPx) * 60,
+  );
   return items.map((item, index) => (
     <ItemBox
       key={pickedKey(pickOf(item))}

@@ -215,6 +215,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "time.zoned": "{time} {zone} (у вас {local})",
   "zone.banner": "Устройство в поясе {device}; аккаунт использует {account}.",
   "zone.use": "Использовать {device}",
+  "zone.keep": "Оставить {account}",
   "source.app": "Приложение",
   "source.web": "Веб",
   "source.bot": "Бот",
