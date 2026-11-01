@@ -48,7 +48,8 @@ const hostOf = (storage: DurableObjectStorage, knownUntil = "2099-10-07T22:00:00
     logDecisions: async () => {
       await Promise.resolve();
     },
-    seq: async () => 7,
+    // The log's sequence moves with every event written, as the store's does.
+    seq: async () => 7 + calls.inserted.length,
     storage,
     // As the store reads them: only the uses that end after `from` (class 55).
     usageForSleep: async (from) => {
