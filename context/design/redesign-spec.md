@@ -119,7 +119,7 @@ from this cloud session, so the comps are a private artifact page and the choice
 ### A · Тетрадь — ink and margin (the roll's assigned direction)
 
 The squared school notebook: cool paper, ballpoint-blue ink, a red margin rule. One cool accent
-(ink blue `#2E4AD6` / `#7D93FF`) does every interactive job; red is status only (now-line, overdue).
+(ink blue `#2E4AD6` / `#97A9FF`) does every interactive job; red is status only (now-line, overdue).
 Signature: Day sits on a faint 4-pt dot grid (only behind the timeline) with a red now-line; a
 checked task is struck through in ink before it leaves; the running activity is an ink line with a
 red mark at its expected length.
