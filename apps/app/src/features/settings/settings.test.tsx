@@ -178,6 +178,26 @@ describe("SettingsScreen", () => {
     expect(server.registered.at(-1)).toEqual({ endpoint: "fcm-token", method: "fcm" });
   });
 
+  it("names each way plainly, and says the background check's rhythm", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    const option = (name: string) => screen.getByRole("radio", { name });
+    await waitFor(() => {
+      expect(option("Google")).toBeOnTheScreen();
+    });
+    expect(option("Automatic")).toBeOnTheScreen();
+    expect(option("Background check (every ~15 min)")).toBeOnTheScreen();
+    expect(option("Only while the app is open")).toBeOnTheScreen();
+    await fireEvent.press(option("Background check (every ~15 min)"));
+    expect(
+      await screen.findByText(
+        "Pace checks for notifications in the background about every 15 minutes, and at once while it is open.",
+      ),
+    ).toBeOnTheScreen();
+  });
+
   it("goes back to automatic after a pick, which then uses what the server prefers", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";

@@ -22,6 +22,7 @@
     "@pace/core": "workspace:*",
     "core-js": "3.50.0",
     "expo": "57.0.27",
+    "expo-background-task": "57.0.21",
     "expo-build-properties": "57.0.22",
     "expo-calendar": "57.0.5",
     "expo-constants": "57.0.21",

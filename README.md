@@ -364,8 +364,17 @@ and "still doing X?"; sign-ins and digests always come.
 The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
 server offers it and the phone has a Google token, else polling (it fetches what waits for it;
 the open app does so at once on each live update). *Settings → Notifications* on the phone picks
-it by hand (*Auto*, *Google*, *Pace checks* or *Off*) and says which one the phone uses; a pick the
-server or the phone cannot take right now falls back to the other, and is tried again later. `GET /api/push/methods` says what the server
+it by hand (*Automatic*, *Google*, *Background check (every ~15 min)* or *Only while the app is
+open*) and says which one the phone uses; a pick the server or the phone cannot take right now
+falls back to the other, and is tried again later.
+
+**Without Firebase** (a phone without Google services, an APK built without
+`GOOGLE_SERVICES_JSON`, a server without `FIREBASE_SERVICE_ACCOUNT`, or one with another
+Firebase project) notifications still reach the phone while Pace is closed: a periodic
+background check (Android's WorkManager, about every 15 minutes, later under Doze or a vendor
+battery saver) fetches what waits for it and shows it. There is no foreground service and no
+ongoing notification. The open app fetches at once on each live update, and Telegram gets
+everything as before. `GET /api/push/methods` says what the server
 accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and
 phones switch to polling on their next start or at once while open. Each item's delivery log
 ("Delivered to android via Google · 13:47") is shown under it in the feed.

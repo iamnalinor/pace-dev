@@ -319,6 +319,17 @@ overruns and deadline digest slots. A pass stores notifications once per subject
 delivery per channel and device, and arms the Durable Object alarm for the next due time.
 The feed and open app update through the live socket. Telegram and a configured FCM project
 can deliver outside the app; a phone with a different Firebase project uses polling.
+
+**The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone
+registers `pace.background-check` with `expo-background-task` (WorkManager,
+`minimumInterval: 15`) on sign-in and unregisters it on logout. A run builds its client with
+`backgroundApi()` (`background-api.ts`, shared with the push task): the stored server and the
+token stored for that server, read together, so a token kept for another server reads as
+signed out and nothing is sent. It polls `GET /api/push/poll` only when the phone's method is
+`poll` (the server logs the hand-over as delivered via `poll`), then uploads the calendar and
+usage on every phone, whatever the method, since the server's rules need them at night too.
+Each step is caught on its own (a failed poll never stops the upload); a logout during a run
+makes its client stop sending the ended session's token.
 Answering or settling a notification resolves it in the pool and takes back its copies.
 
 Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,
