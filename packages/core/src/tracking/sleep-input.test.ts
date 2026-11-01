@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import type * as materializer from "../materialize/materializer.ts";
 
 import { sleepStartId } from "../ids.ts";
+import { effectiveEvents, materialize } from "../materialize/materializer.ts";
 import { at, byPerson, MOSCOW, step, use } from "./sleep-auto.fake.ts";
 import { sleepActivitiesOf, sleepInputOf } from "./sleep-input.ts";
+
+// The materializer's two reads, counted (each still does what it does).
+vi.mock("../materialize/materializer.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof materializer>();
+  return {
+    ...actual,
+    effectiveEvents: vi.fn(actual.effectiveEvents),
+    materialize: vi.fn(actual.materialize),
+  };
+});
 
 const NIGHT = "2026-10-07";
 const START = sleepStartId(NIGHT, at("23:40"));
@@ -125,6 +138,24 @@ describe("what automatic sleep reads from the log", () => {
       ["21:45", "22:00", "23:50", "01:00", "01:30"].map((hhmm) => at(hhmm)),
     );
     expect(input.mainStarts).toEqual([{ at: at("22:00"), id: started.id }]);
+  });
+
+  it("reads the whole log once: one materialized state and one effective list for the input", () => {
+    const log = night();
+    vi.mocked(materialize).mockClear();
+    vi.mocked(effectiveEvents).mockClear();
+    sleepInputOf(log, {
+      decidedUntil: null,
+      knownUntil: at("07:30"),
+      now: at("07:35"),
+      uses: [],
+      usesFrom: at("12:00"),
+      zone: MOSCOW,
+    });
+    const ofWhole = (calls: readonly (readonly unknown[])[]) =>
+      calls.filter(([events]) => events === log);
+    expect(ofWhole(vi.mocked(materialize).mock.calls)).toHaveLength(1);
+    expect(ofWhole(vi.mocked(effectiveEvents).mock.calls)).toHaveLength(1);
   });
 
   it("carries what is known beside the log as it was given", () => {

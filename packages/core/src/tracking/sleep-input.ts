@@ -113,11 +113,24 @@ undid, and whether the person changed its start or its end. Who changed what is 
 the sleeps and automatic starts still running or ending at or after `since` (the pass's uses
 start): the rules never look at an older one, and each edit costs a look at the log as it was.
 */
-export const sleepActivitiesOf = (log: readonly Event[], since = ""): readonly SleepActivity[] => {
-  const effective = effectiveEvents(log);
+export const sleepActivitiesOf = (log: readonly Event[], since = ""): readonly SleepActivity[] =>
+  activitiesOf(log, { ...readOf(log), since });
+
+/** The log read once: the events in force and the state they make (the costly part of a pass). */
+type LogRead = { readonly effective: readonly Event[]; readonly state: TimeState };
+
+const readOf = (log: readonly Event[]): LogRead => ({
+  effective: effectiveEvents(log),
+  state: materialize(log, timeReducer, INITIAL_TIME_STATE),
+});
+
+/** `sleepActivitiesOf` on a log already read. */
+const activitiesOf = (
+  log: readonly Event[],
+  { effective, since, state }: LogRead & { readonly since: string },
+): readonly SleepActivity[] => {
   const effectiveIds = new Set(effective.map((event) => event.id));
   const personRevoked = revokedByPerson(log, effectiveIds);
-  const state = materialize(log, timeReducer, INITIAL_TIME_STATE);
   const changed = changedByPerson(log, {
     effective,
     relevant: (activity) =>
@@ -214,15 +227,16 @@ activity, the instants the person recorded and where their starts close, the aut
 longer in force, and those the person deleted with their night.
 */
 export const sleepInputOf = (log: readonly Event[], knowledge: SleepKnowledge): SleepInput => {
-  const effective = effectiveEvents(log);
+  const read = readOf(log);
+  const { effective, state } = read;
   const effectiveIds = new Set(effective.map((event) => event.id));
   const personRevoked = revokedByPerson(log, effectiveIds);
   const revoked = autoStarts(log).filter((event) => !effectiveIds.has(event.id));
   return {
     ...knowledge,
-    activities: sleepActivitiesOf(log, knowledge.usesFrom),
+    activities: activitiesOf(log, { ...read, since: knowledge.usesFrom }),
     mainStarts: mainStartsOf(effective),
-    personMarks: personMarksOf(effective, materialize(log, timeReducer, INITIAL_TIME_STATE)),
+    personMarks: personMarksOf(effective, state),
     personRevokedAutoStarts: revoked
       .filter((event) => personRevoked.has(event.id))
       .map((event) => ({
