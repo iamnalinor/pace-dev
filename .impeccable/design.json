@@ -1,0 +1,793 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T15:03:09.352Z",
+  "title": "Design System: Pace",
+  "extensions": {
+    "colorMeta": {
+      "dark-accent": {
+        "role": "primary",
+        "displayName": "Acid Lime (dark)",
+        "canonical": "oklch(93.8% 0.211 121)",
+        "tonalRamp": [
+          "#060f00",
+          "#1c2c00",
+          "#354c00",
+          "#516f00",
+          "#719200",
+          "#95b421",
+          "#bbd76f",
+          "#e3faab"
+        ]
+      },
+      "light-accent": {
+        "role": "primary",
+        "displayName": "Acid Lime (light)",
+        "canonical": "oklch(89.9% 0.203 122)",
+        "tonalRamp": [
+          "#050f00",
+          "#1a2c00",
+          "#334c00",
+          "#4f6f00",
+          "#6e9200",
+          "#93b42f",
+          "#b9d775",
+          "#e2faaf"
+        ]
+      },
+      "dark-accent-text": {
+        "role": "primary",
+        "displayName": "Lime Ink (dark)",
+        "canonical": "oklch(93.8% 0.211 121)",
+        "tonalRamp": [
+          "#060f00",
+          "#1c2c00",
+          "#354c00",
+          "#516f00",
+          "#719200",
+          "#95b421",
+          "#bbd76f",
+          "#e3faab"
+        ]
+      },
+      "light-accent-text": {
+        "role": "primary",
+        "displayName": "Lime Ink (light)",
+        "canonical": "oklch(48.6% 0.124 126)",
+        "tonalRamp": [
+          "#050f00",
+          "#1b2b00",
+          "#354b00",
+          "#506c15",
+          "#708f3c",
+          "#95b06c",
+          "#bcd39b",
+          "#e4f7cb"
+        ]
+      },
+      "dark-accent-quiet": {
+        "role": "secondary",
+        "displayName": "Quiet Indigo (dark)",
+        "canonical": "oklch(55.7% 0.208 268)",
+        "tonalRamp": [
+          "#020035",
+          "#0d1764",
+          "#203497",
+          "#3551cd",
+          "#5376f4",
+          "#7a9eff",
+          "#a5c5ff",
+          "#d1edff"
+        ]
+      },
+      "light-accent-quiet": {
+        "role": "secondary",
+        "displayName": "Quiet Indigo (light)",
+        "canonical": "oklch(52.6% 0.199 268)",
+        "tonalRamp": [
+          "#020133",
+          "#0d1961",
+          "#203593",
+          "#3653c8",
+          "#5477ef",
+          "#7b9fff",
+          "#a6c6ff",
+          "#d2edff"
+        ]
+      },
+      "dark-accent-quiet-text": {
+        "role": "secondary",
+        "displayName": "Indigo Ink (dark)",
+        "canonical": "oklch(74.7% 0.130 272)",
+        "tonalRamp": [
+          "#050625",
+          "#18204c",
+          "#303c77",
+          "#4a5aa5",
+          "#6a7cca",
+          "#8fa1e5",
+          "#b6c6ff",
+          "#dfedff"
+        ]
+      },
+      "light-accent-quiet-text": {
+        "role": "secondary",
+        "displayName": "Indigo Ink (light)",
+        "canonical": "oklch(52.6% 0.199 268)",
+        "tonalRamp": [
+          "#020133",
+          "#0d1961",
+          "#203593",
+          "#3653c8",
+          "#5477ef",
+          "#7b9fff",
+          "#a6c6ff",
+          "#d2edff"
+        ]
+      },
+      "dark-bg": {
+        "role": "neutral",
+        "displayName": "Pitch",
+        "canonical": "oklch(15.0% 0.002 286)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424243",
+          "#616162",
+          "#828283",
+          "#a5a5a6",
+          "#c9c9ca",
+          "#eeeeef"
+        ]
+      },
+      "light-bg": {
+        "role": "neutral",
+        "displayName": "Cool Fog",
+        "canonical": "oklch(94.9% 0.006 264)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#414244",
+          "#606164",
+          "#818286",
+          "#a3a5a8",
+          "#c8c9cb",
+          "#edeef0"
+        ]
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "Surface (dark)",
+        "canonical": "oklch(19.2% 0.004 286)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424244",
+          "#616163",
+          "#828284",
+          "#a5a5a7",
+          "#c9c9cb",
+          "#eeeef0"
+        ]
+      },
+      "light-surface": {
+        "role": "neutral",
+        "displayName": "Surface (light)",
+        "canonical": "oklch(100.0% 0.000 89)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "dark-raised": {
+        "role": "neutral",
+        "displayName": "Raised (dark)",
+        "canonical": "oklch(22.8% 0.006 285)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252527",
+          "#424244",
+          "#616164",
+          "#828285",
+          "#a5a5a8",
+          "#c9c9cb",
+          "#eeeef0"
+        ]
+      },
+      "light-raised": {
+        "role": "neutral",
+        "displayName": "Raised (light)",
+        "canonical": "oklch(91.6% 0.008 271)",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#242528",
+          "#414246",
+          "#5f6166",
+          "#808287",
+          "#a3a5a9",
+          "#c8c9cd",
+          "#edeef1"
+        ]
+      },
+      "dark-fg": {
+        "role": "neutral",
+        "displayName": "Ink (dark)",
+        "canonical": "oklch(94.4% 0.003 286)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424243",
+          "#616162",
+          "#828284",
+          "#a5a5a6",
+          "#c9c9ca",
+          "#eeeeef"
+        ]
+      },
+      "light-fg": {
+        "role": "neutral",
+        "displayName": "Ink (light)",
+        "canonical": "oklch(21.0% 0.008 274)",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#242528",
+          "#414245",
+          "#606166",
+          "#818287",
+          "#a4a5a9",
+          "#c8c9cc",
+          "#edeef1"
+        ]
+      },
+      "dark-fg2": {
+        "role": "neutral",
+        "displayName": "Ink 2 (dark)",
+        "canonical": "oklch(77.2% 0.010 286)",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252528",
+          "#414146",
+          "#616166",
+          "#828288",
+          "#a4a4aa",
+          "#c9c9cd",
+          "#eeeef2"
+        ]
+      },
+      "light-fg2": {
+        "role": "neutral",
+        "displayName": "Ink 2 (light)",
+        "canonical": "oklch(36.5% 0.014 274)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#242529",
+          "#404248",
+          "#5f6169",
+          "#80828a",
+          "#a3a5ac",
+          "#c7c9cf",
+          "#edeef3"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "Muted (dark)",
+        "canonical": "oklch(63.6% 0.013 286)",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252429",
+          "#414147",
+          "#606068",
+          "#81818a",
+          "#a4a4ab",
+          "#c8c8cf",
+          "#eeeef3"
+        ]
+      },
+      "light-muted": {
+        "role": "neutral",
+        "displayName": "Muted (light)",
+        "canonical": "oklch(48.3% 0.013 274)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#242529",
+          "#404248",
+          "#5f6168",
+          "#80828a",
+          "#a3a5ac",
+          "#c7c9cf",
+          "#edeef3"
+        ]
+      },
+      "dark-faint": {
+        "role": "neutral",
+        "displayName": "Faint (dark)",
+        "canonical": "oklch(59.3% 0.014 285)",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252429",
+          "#414148",
+          "#606068",
+          "#81818a",
+          "#a4a4ac",
+          "#c8c8cf",
+          "#eeeef3"
+        ]
+      },
+      "light-faint": {
+        "role": "neutral",
+        "displayName": "Faint (light)",
+        "canonical": "oklch(55.0% 0.014 275)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#24252a",
+          "#404248",
+          "#5f6169",
+          "#80828a",
+          "#a3a5ac",
+          "#c7c9cf",
+          "#edeef3"
+        ]
+      },
+      "dark-warn": {
+        "role": "tertiary",
+        "displayName": "Warn (dark)",
+        "canonical": "oklch(75.3% 0.155 41)",
+        "tonalRamp": [
+          "#220000",
+          "#490b00",
+          "#732400",
+          "#a13d0b",
+          "#c76036",
+          "#e48a67",
+          "#ffb497",
+          "#ffdfc7"
+        ]
+      },
+      "light-warn": {
+        "role": "tertiary",
+        "displayName": "Warn (light)",
+        "canonical": "oklch(54.1% 0.159 38)",
+        "tonalRamp": [
+          "#230000",
+          "#4a0800",
+          "#752100",
+          "#a33a13",
+          "#ca5d3a",
+          "#e7886a",
+          "#ffb299",
+          "#ffddc9"
+        ]
+      },
+      "dark-question": {
+        "role": "tertiary",
+        "displayName": "Question (dark)",
+        "canonical": "oklch(83.4% 0.141 85)",
+        "tonalRamp": [
+          "#180600",
+          "#381f00",
+          "#5c3b00",
+          "#825900",
+          "#a57b00",
+          "#c4a04d",
+          "#e4c584",
+          "#ffecba"
+        ]
+      },
+      "light-question": {
+        "role": "tertiary",
+        "displayName": "Question (light)",
+        "canonical": "oklch(49.6% 0.101 88)",
+        "tonalRamp": [
+          "#140900",
+          "#322200",
+          "#533f00",
+          "#775d11",
+          "#9a7f3a",
+          "#baa36a",
+          "#dac899",
+          "#fcedc9"
+        ]
+      },
+      "project-blue": {
+        "role": "tertiary",
+        "displayName": "Project blue",
+        "canonical": "oklch(72.3% 0.143 265)",
+        "tonalRamp": [
+          "#010728",
+          "#0f2150",
+          "#253d7d",
+          "#3c5cac",
+          "#5c7fd1",
+          "#83a3eb",
+          "#adc9ff",
+          "#d8efff"
+        ]
+      },
+      "project-violet": {
+        "role": "tertiary",
+        "displayName": "Project violet",
+        "canonical": "oklch(75.3% 0.141 293)",
+        "tonalRamp": [
+          "#0e0325",
+          "#29194b",
+          "#463376",
+          "#664fa3",
+          "#8771c8",
+          "#a997e4",
+          "#ccbeff",
+          "#f0e6ff"
+        ]
+      },
+      "project-green": {
+        "role": "tertiary",
+        "displayName": "Project green",
+        "canonical": "oklch(79.3% 0.127 156)",
+        "tonalRamp": [
+          "#001202",
+          "#003013",
+          "#00512b",
+          "#017445",
+          "#399765",
+          "#6db88c",
+          "#9edab4",
+          "#cdfcde"
+        ]
+      },
+      "project-amber": {
+        "role": "tertiary",
+        "displayName": "Project amber",
+        "canonical": "oklch(83.4% 0.141 85)",
+        "tonalRamp": [
+          "#180600",
+          "#381f00",
+          "#5c3b00",
+          "#825900",
+          "#a57b00",
+          "#c4a04d",
+          "#e4c584",
+          "#ffecba"
+        ]
+      },
+      "project-coral": {
+        "role": "tertiary",
+        "displayName": "Project coral",
+        "canonical": "oklch(71.2% 0.181 22)",
+        "tonalRamp": [
+          "#260000",
+          "#4f0006",
+          "#7c0e1b",
+          "#ac2831",
+          "#d44f51",
+          "#f17e7b",
+          "#ffaba6",
+          "#ffd8d3"
+        ]
+      },
+      "project-pink": {
+        "role": "tertiary",
+        "displayName": "Project pink",
+        "canonical": "oklch(77.9% 0.158 348)",
+        "tonalRamp": [
+          "#1f0010",
+          "#45062d",
+          "#6e1e4d",
+          "#99366f",
+          "#c05991",
+          "#dd84b2",
+          "#fbafd4",
+          "#ffdaf7"
+        ]
+      },
+      "project-teal": {
+        "role": "tertiary",
+        "displayName": "Project teal",
+        "canonical": "oklch(80.7% 0.107 190)",
+        "tonalRamp": [
+          "#001110",
+          "#002f2d",
+          "#004f4c",
+          "#00726e",
+          "#1a9590",
+          "#60b6b1",
+          "#94d8d3",
+          "#c7faf7"
+        ]
+      },
+      "project-slate": {
+        "role": "tertiary",
+        "displayName": "Project slate",
+        "canonical": "oklch(71.7% 0.031 264)",
+        "tonalRamp": [
+          "#080b12",
+          "#20252f",
+          "#3b424f",
+          "#596172",
+          "#7a8394",
+          "#9da5b5",
+          "#c3c9d7",
+          "#e9eff9"
+        ]
+      },
+      "project-orange": {
+        "role": "tertiary",
+        "displayName": "Project orange",
+        "canonical": "oklch(72.7% 0.176 41)",
+        "tonalRamp": [
+          "#250000",
+          "#4d0200",
+          "#791b00",
+          "#a83400",
+          "#d05926",
+          "#ec855e",
+          "#ffb090",
+          "#ffdcc2"
+        ]
+      },
+      "project-yellow": {
+        "role": "tertiary",
+        "displayName": "Project yellow",
+        "canonical": "oklch(84.8% 0.142 100)",
+        "tonalRamp": [
+          "#120a00",
+          "#302400",
+          "#504200",
+          "#736100",
+          "#958300",
+          "#b5a74e",
+          "#d6cb86",
+          "#f9f1bb"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Wordmark on the sign-in screens only (ui/logo.tsx:48)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Tab-level screen titles (ui/screen-header.tsx:55)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Pushed-screen titles (ui/back-header.tsx:51)."
+      },
+      "title-sheet": {
+        "displayName": "Sheet title",
+        "purpose": "Sheet and dialog titles (ui/sheet.tsx:76)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Field text, done/dimmed task titles."
+      },
+      "body-strong": {
+        "displayName": "Body strong",
+        "purpose": "Open task titles and button labels."
+      },
+      "body-sm": {
+        "displayName": "Body small",
+        "purpose": "Sidebar links, toasts, switch rows, empty states."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Sheet subtitles, banners, time-bar status, tooltips."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Meta lines, field labels and hints, chips, key hints."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Color tags, tab labels, count badges."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Tailwind shadow-lg: the toast (ui/toast.tsx:125) and the wide dialog (ui/sheet.tsx:157) only; invisible on the dark bg."
+      },
+      {
+        "name": "modal-scrim",
+        "value": "rgba(0, 0, 0, 0.55)",
+        "purpose": "Backdrop behind every sheet and dialog (ui/sheet.tsx:43)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "row-enter",
+        "value": "fade-in 180ms",
+        "purpose": "A row arriving in a list (ui/motion.ts)."
+      },
+      {
+        "name": "row-exit",
+        "value": "fade-out 140ms",
+        "purpose": "A row leaving."
+      },
+      {
+        "name": "row-layout",
+        "value": "linear 200ms",
+        "purpose": "Rows below sliding into the freed place."
+      },
+      {
+        "name": "backdrop-enter",
+        "value": "fade-in 180ms",
+        "purpose": "Sheet dim fades in place."
+      },
+      {
+        "name": "sheet-enter",
+        "value": "slide-in-down 240ms",
+        "purpose": "Phone sheet rising from the bottom edge."
+      },
+      {
+        "name": "dialog-enter",
+        "value": "zoom-in 160ms",
+        "purpose": "Wide-window dialog growing in place."
+      },
+      {
+        "name": "placeholder-breath",
+        "value": "opacity 1 to 0.45, 900ms, repeat reverse",
+        "purpose": "Skeleton while a list loads."
+      },
+      {
+        "name": "pulse-dot",
+        "value": "opacity 1 to 0.3, 900ms, repeat reverse",
+        "purpose": "Running activity dot (ui/pulse-dot.tsx)."
+      },
+      {
+        "name": "animated-height",
+        "value": "220ms",
+        "purpose": "Height change of the composer card (ui/animated-height.tsx:11)."
+      },
+      {
+        "name": "dissolve",
+        "value": "750ms, cubic ease-out quad (Easing.out(Easing.quad))",
+        "purpose": "Checked task turns to dust (ui/dissolve.tsx:13)."
+      },
+      {
+        "name": "update-banner-slide",
+        "value": "300ms",
+        "purpose": "Web update banner (platform/update-banner.web.tsx:19)."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "ReduceMotion.System",
+        "purpose": "Every animation stops under the OS reduced-motion setting."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Lime fill for the main action (ui/button.tsx:19,203). Incumbent; owner rejected lime at large scale.",
+      "html": "<button class=\"ds-btn-primary\">Done <span class=\"ds-key\">⌘↵</span></button>",
+      "css": ".ds-btn-primary{font-family: Inter, system-ui, sans-serif;display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:8px 16px;border:none;border-radius:10px;background:#d4ff3a;color:#0b0b0c;font-size:15px;font-weight:500;cursor:pointer}.ds-btn-primary .ds-key{font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:active{opacity:.8}.ds-btn-primary:focus-visible{outline:2px solid #ececee;outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Surface fill with a hairline (ui/button.tsx:21).",
+      "html": "<button class=\"ds-btn-secondary\">Log past activity</button>",
+      "css": ".ds-btn-secondary{font-family: Inter, system-ui, sans-serif;min-height:48px;padding:8px 16px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:#141416;color:#ececee;font-size:15px;font-weight:500;cursor:pointer}.ds-btn-secondary:hover{background:#1c1c1f}.ds-btn-secondary:active{opacity:.8}.ds-btn-secondary:focus-visible{outline:2px solid #ececee;outline-offset:2px}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "2px warn outline for irreversible steps (ui/button.tsx:17).",
+      "html": "<button class=\"ds-btn-danger\">Delete account</button>",
+      "css": ".ds-btn-danger{font-family: Inter, system-ui, sans-serif;min-height:48px;padding:8px 16px;border:2px solid #ff8a5c;border-radius:10px;background:#141416;color:#ff8a5c;font-size:15px;font-weight:500;cursor:pointer}.ds-btn-danger:active{opacity:.8}.ds-btn-danger:focus-visible{outline:2px solid #ececee;outline-offset:2px}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Recessed bg-filled field with a muted label (ui/text-field.tsx:25-34).",
+      "html": "<label class=\"ds-field\"><span>Title</span><input placeholder=\"What needs doing\" /></label>",
+      "css": ".ds-field{font-family: Inter, system-ui, sans-serif;display:flex;flex-direction:column;gap:6px}.ds-field span{font-size:12px;color:#8a8a93}.ds-field input{height:44px;padding:0 12px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:#0b0b0c;color:#ececee;font-size:15px;outline:none}.ds-field input::placeholder{color:#7d7d86}.ds-field input:focus-visible{border-color:#4263eb}"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "32px pill with a 2px border; neutral and colored, unselected and selected (ui/chip.tsx:15-22).",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\">Light</button><button class=\"ds-chip ds-chip-on\">Dark</button><button class=\"ds-chip ds-chip-green\">Rest</button><button class=\"ds-chip ds-chip-green ds-chip-on\">Sport</button></div>",
+      "css": ".ds-chips{display:flex;gap:6px}.ds-chip{font-family: Inter, system-ui, sans-serif;height:32px;padding:0 12px;border:2px solid rgba(255,255,255,.1);border-radius:999px;background:#141416;color:#b4b4bb;font-size:12px;cursor:pointer}.ds-chip.ds-chip-on{border-color:#ececee;background:#1c1c1f;color:#ececee;font-weight:500}.ds-chip-green{border-color:#6fd49a;color:#6fd49a}.ds-chip-green.ds-chip-on{background:#6fd49a;border-color:#6fd49a;color:#0b0b0c}.ds-chip:active{opacity:.8}.ds-chip:focus-visible{outline:2px solid #ececee;outline-offset:2px}"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "sidebar-link-current",
+      "description": "Wide-window sidebar: lime New task, links with raised current row and indigo icon (ui/sidebar.tsx:115-180).",
+      "html": "<nav class=\"ds-side\"><a class=\"ds-side-new\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg>New task<span>N</span></a><a class=\"ds-side-link ds-cur\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"M13 2 3 14h9l-1 8 10-12h-9l1-8z\"/></svg>Now</a><a class=\"ds-side-link\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg>Day</a></nav>",
+      "css": ".ds-side{font-family: Inter, system-ui, sans-serif;width:224px;display:flex;flex-direction:column;gap:4px;padding:20px 12px 16px;background:#0b0b0c;border-right:1px solid rgba(255,255,255,.1)}.ds-side-new{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;margin-bottom:12px;border-radius:12px;background:#d4ff3a;color:#0b0b0c;font-size:14px;font-weight:500}.ds-side-new span{margin-left:auto;font-size:12px}.ds-side-link{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:12px;color:#b4b4bb;font-size:14px;cursor:pointer}.ds-side-link svg{color:#8a8a93}.ds-side-link.ds-cur{background:#1c1c1f;color:#ececee;font-weight:500}.ds-side-link.ds-cur svg{color:#91a7ff}.ds-side-link:hover{background:#141416}.ds-side-link:focus-visible{outline:2px solid #ececee;outline-offset:2px}"
+    },
+    {
+      "name": "Task Row",
+      "kind": "custom",
+      "refersTo": "task-row",
+      "description": "Check circle, 15px title, meta line of washed tags and muted text (shared/task-row.tsx:71-85).",
+      "html": "<div class=\"ds-row\"><span class=\"ds-check\"></span><div class=\"ds-row-main\"><div class=\"ds-row-title\">Finish the quarterly report</div><div class=\"ds-meta\"><span class=\"ds-tag ds-tag-violet\">Work</span><span class=\"ds-tag ds-tag-coral\">ASAP</span><span>Due tomorrow 18:00 · <em>late</em></span></div><div class=\"ds-prog\"><i></i></div></div></div>",
+      "css": ".ds-row{font-family: Inter, system-ui, sans-serif;display:flex;gap:12px;padding:12px;border-radius:12px}.ds-row:hover{background:#1c1c1f}.ds-check{flex:none;width:22px;height:22px;border:1.5px solid #8a8a93;border-radius:50%;box-sizing:border-box}.ds-row-main{flex:1;display:flex;flex-direction:column;gap:5px}.ds-row-title{font-size:15px;font-weight:500;color:#ececee}.ds-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:12px;line-height:16px;color:#8a8a93}.ds-meta em{font-style:normal;color:#ff8a5c}.ds-tag{padding:1px 6px;border-radius:8px;font-size:11px;font-weight:500;line-height:16px}.ds-tag-violet{background:rgba(180,156,255,.22);color:#b49cff}.ds-tag-coral{background:rgba(255,107,107,.22);color:#ff8a8a}.ds-prog{position:relative;height:3px;border-radius:8px;background:rgba(255,255,255,.12)}.ds-prog i{position:absolute;left:0;top:0;height:3px;width:30%;border-radius:8px;background:#ececee}"
+    },
+    {
+      "name": "Time Bar Buttons",
+      "kind": "custom",
+      "refersTo": "time-bar-button",
+      "description": "Fixed 56px activity buttons: ink outline at rest, indigo fill while running, dashed when unavailable (shared/tracking/time-bar.tsx:131-167).",
+      "html": "<div class=\"ds-tb\"><button class=\"ds-tb-btn ds-run\">Work</button><button class=\"ds-tb-btn ds-green\">Rest</button><button class=\"ds-tb-btn ds-off\">Calendar</button></div>",
+      "css": ".ds-tb{font-family: Inter, system-ui, sans-serif;display:flex;gap:8px}.ds-tb-btn{flex:1;height:56px;border:2px solid;border-radius:14px;background:#141416;font-size:12px;line-height:14px;cursor:pointer}.ds-run{background:#4263eb;border-color:#4263eb;color:#fff;font-weight:500}.ds-green{border-color:#6fd49a;color:#6fd49a}.ds-off{border-style:dashed;border-color:rgba(255,255,255,.1);color:#8a8a93}.ds-tb-btn:active{opacity:.8}.ds-tb-btn:focus-visible{outline:2px solid #ececee;outline-offset:2px}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Surface card with hairline and 14px radius, the default container (features/insights/card.tsx:15).",
+      "html": "<section class=\"ds-card\"><h3>Time by category</h3><div class=\"ds-bar\"><i></i></div></section>",
+      "css": ".ds-card{font-family: Inter, system-ui, sans-serif;display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:#141416;color:#ececee}.ds-card h3{margin:0;font-size:14px;font-weight:500}.ds-bar{height:10px;border-radius:0 4px 4px 0;background:rgba(255,255,255,.12);overflow:hidden}.ds-bar i{display:block;height:100%;width:60%;border-radius:0 4px 4px 0;background:#7aa2ff}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Dark Utility Panel",
+    "overview": "Pace ships as a near-black (dark default) or cool-grey (light) utility surface. Every screen is one column of hairline-bordered cards and rows set in Inter, with a single high-voltage lime accent for primary actions and a second, quieter indigo accent for state: the running activity, the current tab, the count badge, the focused composer. Color otherwise comes from a ten-hue \"project\" palette that appears only as small washed tags and outlined chips. Density is moderate: 44 to 56 px touch targets everywhere, a 4 px spacing grid, type mostly at 11 to 15 px. One React Native tree draws Android and the web (react-native-web); the only layout switch is the 1024 px \"wide\" breakpoint, where a 224 px sidebar and a 400 px detail pane appear.\n\nThe system is coherent at the token level (one JSON source, `packages/core/src/design/tokens.json`, mirrored into `--pace-*` CSS variables, with WCAG contrast pinned by `packages/core/src/design/contrast.test.ts`). It is weaker at the composition level. The owner's feedback concentrates there: the lime read as \"противно кислотный жёлтый\" (repulsively acid yellow) when it filled a full-width banner (`context/feedback-3.md:8-12`), \"два серых\" (two greys) side by side read as bad design (`feedback-3.md:62-64`), Day had dividers between some rows and not others (`feedback-4.md:121-124`), and the expanded composer was \"громоздкое\" (bulky) (`feedback-4.md:84-90`). Some of these are fixed in code at 057e484 (the update banner is now indigo, `apps/app/src/platform/update-banner.web.tsx:81`; status and importance tags now differ in hue, `packages/core/src/design/tokens.ts:71-88`). The underlying tendencies are still there: grey on grey, a hairline on every container, and lime as the default \"do it\" color.",
+    "keyCharacteristics": [
+      "Two themes from one token file; dark is the fallback when the OS gives no preference (`apps/app/src/platform/theme.ts:33-41`).",
+      "Two accents: lime `accent` for primary actions, indigo `accentQuiet` for state and navigation.",
+      "Ten project hues used only as 22 % washes under contrast-checked `ink-*` text, or as 2 px outlines.",
+      "Flat tonal layering (`bg` < `surface` < `raised`) with 1 px `line` hairlines. Only two shadows exist (toast, wide dialog).",
+      "Inter at weights 400, 500 and 600, Latin and Cyrillic, self-hosted on the web.",
+      "Short fades (140 to 240 ms), plus one signature: a checked task dissolves into dust over 750 ms."
+    ],
+    "rules": [
+      {
+        "name": "The Two Accents Rule (incumbent)",
+        "body": "Lime means \"do this\", indigo means \"this is on or here\". The code says it outright: \"lime is for the actions\" (`count-badge.tsx:4-5`).",
+        "section": "colors"
+      },
+      {
+        "name": "The Washed Tag Rule (incumbent)",
+        "body": "A project hue reaches text only through its `ink-*` shade over a 22 % wash of itself. Raw `project-*` hex never colors text.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule (incumbent)",
+        "body": "Inter everywhere, Cyrillic included. Nothing else ships.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline-On-Everything Rule (incumbent)",
+        "body": "Containers separate by a 1 px `line` border, not by shadow or space. This is the source of the \"где-то есть черточки, где-то нет\" (dashes in some places, not in others) complaint (`feedback-4.md:124`) whenever a list mixes bordered and unbordered rows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep every color in `packages/core/src/design/tokens.json` and reach it through `--pace-*` variables. The contrast test (`contrast.test.ts`) is the reason the incumbent passes AA in both themes.",
+      "**Do** keep 44 px touch targets around visually smaller controls, as `CheckCircle` and `Chip` do.",
+      "**Do** put hue on text only through an `ink-*` shade checked against its wash.",
+      "**Do** keep Inter for Cyrillic as well as Latin (owner, `feedback-2.md`).",
+      "**Do** keep each time-bar button large and in a fixed place (owner, `feedback-2.md`: \"каждая кнопка была довольно большой … и всегда находилась в своём месте\", every button fairly big and always in its own place)."
+    ],
+    "donts": [
+      "**Don't** spread the lime accent across large areas such as banners or bands. The owner called it \"противно кислотный жёлтый\" and asked for the palette to change (`feedback-3.md:8-15`).",
+      "**Don't** put two neutral-grey tags side by side with different meanings (`feedback-3.md:62-64`: \"Плохой дизайн: два серых\", bad design: two greys).",
+      "**Don't** mix bordered and unbordered rows in one list. Day's uneven dividers were rejected (`feedback-4.md:121-124`).",
+      "**Don't** expand a quick-entry composer into a tall in-place form. The owner found it bulky and asked for it to move into the free right pane (`feedback-4.md:84-90`).",
+      "**Don't** add a full-width button whose action is a no-op in the current state (a \"This week\" button while on this week, `feedback-4.md:114-117`)."
+    ]
+  }
+}
