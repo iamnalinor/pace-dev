@@ -260,7 +260,7 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
       `chores → amber`, `social → pink`, `sport → red`, `sleep → indigo`, `other → slate`.
 - [ ] **Step 2:** Run unit tests; FAIL (Task 1.2 tests + this one).
 - [ ] **Step 3:** Write `tokens.json` v2 with the shape and values of spec §3 (colour values from
-      `context/design/tokens/palette-v2-lines.json`; type, space, radius, size, motion, z from
+      `context/design/tokens/palette-v2-notebook.json` — direction A, the owner's choice; type, space, radius, size, motion, z from
       §3.2–3.8). Rewrite `tokens.ts` accessors; keep v1 exports as deprecated aliases only for the
       duration of Task 2.2 (deleted at its end).
 - [ ] **Step 4:** Run; PASS (all pairs meet their targets — if one fails, fix the value in
@@ -662,10 +662,9 @@ label).
 - [ ] Inset grouped sections in the order of spec §5 Settings; notifications as per-channel rows or
       the compact matrix with named groups (F-LAY-09); time fields sized to content; sessions list
       with inline revoke confirm (focus to successor); danger zone with `Button destructive`
-      (F-CMP-07); single-key shortcuts switch (Q6, F-A11Y-03); server line middle-ellipsizes the host
+      (F-CMP-07); shortcuts listed under Settings › Keyboard (no switch: there are no single-key shortcuts any more; Q6); server line middle-ellipsizes the host
       (F-DAT-11).
-- [ ] Failing tests: `deadControls()` at phone width; the shortcuts switch disables `n`/`f`; revoke
-      confirm Escape returns focus. Commit.
+- [ ] Failing tests: `deadControls()` at phone width; revoke confirm Escape returns focus. Commit.
 
 ### Task 4.12: More and the signed-out screens
 
@@ -777,30 +776,33 @@ Week), `scripts/serve-web.ts` (apply `_headers`), skeleton heights in the kit.
 
 ---
 
-## Batch 7 — Identity details (PR "Design overhaul 6/7: Pace's own details")
+## Batch 7 — Identity details (direction A)
 
-Only what spec §2 names for the chosen direction (B).
+Only what spec §2 names for the chosen direction (A · Тетрадь).
 
-### Task 7.1: Day drawn as a line
+### Task 7.1: Day on the notebook page (direction A)
 
-**Files:** `src/features/day/day-line.tsx` (new) (+ test), `packages/client/src/view-models/day.ts`
+**Files:** `src/features/day/day-rail.tsx` (new) (+ test), `packages/client/src/view-models/day.ts`
 (rail geometry).
-**Interfaces:** `dayLine(blocks, gaps, now, zone): { segments: { from; to; hue; kind: "block" |
-"gap" | "branch"; open }[] }`.
-- [ ] Spec §2 B signature: proportional rail beside the editable rows; block = segment in its
-      category stroke with a station ring at its start; gap = dashed segment with Log; parallel =
-      branch line; running station open; now = the red margin line (direction A); overlaps hatched, not
-      red (declined-challenger raise).
-- [ ] Failing tests: view-model — a 15 h gap is 15× a 1 h block's length; overlapping blocks yield a
-      branch; app — the rail is `accessibilityElementsHidden` (rows carry the semantics). Commit.
+**Interfaces:** `dayRail(blocks, gaps, now, zone): { items: { from; to; hue; kind: "block" | "gap" |
+"parallel"; open }[]; nowAt }` (proportional, long gaps capped at 3 h with a scale break).
+- [ ] Spec §2 A signature: a faint dot grid (`grid` token, 16 px pitch, only behind the timeline)
+      under a proportional rail beside the editable rows; each block a tinted band with a 1 px
+      "pen" line in its category stroke at its leading edge; a gap a dashed band with Log; a parallel
+      activity a narrower band beside the main one; overlaps hatched, not red; **now = the red margin
+      line** (`status.danger`, 1 px, with a dot and the time in `caption`).
+- [ ] Failing tests: view-model — a 2 h gap is twice a 1 h block's length, a 15 h gap is capped at 3 h
+      with `scaleBreak: true`; overlapping blocks yield `parallel`; app — the rail is
+      `accessibilityElementsHidden` (the rows carry the semantics). Commit.
 
-### Task 7.2: The running "train" and the Week day strip
+### Task 7.2: The running activity's ink line and the Week day strip
 
 **Files:** `shared/tracking/running-card.tsx`, `src/features/week/day-strip.tsx`.
-- [ ] Spec §2 B: under the running activity, a short segment in its category stroke from start to
-      the expected length, the station moving with elapsed time (static between minute ticks; no
-      continuous animation); Week's day strip as the compressed line. Failing test: the station's
-      position = elapsed / max(expected × 2, elapsed). Commit.
+- [ ] Spec §2 A: under the running activity, a 2 px ink line (`accent`) from start to now with a red
+      1 px mark at the expected length; past 2× the line turns `status.warn` with "Ещё занимаетесь?"
+      (no continuous animation: it moves with the minute tick). Week's phone day strip uses the same
+      ink/now vocabulary. Failing test: the mark sits at expected / max(expected × 2, elapsed) of the
+      width; the line's colour switches at 2×. Commit.
 
 ### Task 7.3: Proposal highlight and the logo
 
