@@ -417,8 +417,9 @@ passes keep failing up to four hours (key `sleep:failures`; a pass that complete
 assistant's queue and automatic sleep each arm it through `armEarliest` (`user-store/alarm.ts`),
 which only ever moves it earlier, so none postpones another's earlier time. `alarm()` runs the
 pool, the queue and sleep (a failure in one does not hold the others back; the pool's or the
-queue's fails the alarm afterwards, so the runtime retries it, while sleep's is logged and looked at
-again later, from an hour up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
+queue's fails the alarm afterwards, so the runtime retries it, while the pool itself passes again
+only once its backoff has come, from a minute up to four hours, and sleep's is logged and looked
+at again later, from an hour up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
 Each wait keeps its own time and reads nothing before it has come: the pool's (`pool:next-at`,
 the earliest pass any write, retry or pass asked for), the queue's (its earliest text) and
 sleep's (`sleep:next-at`); before that each arms its time again. A pool pass loads the log on a
@@ -428,12 +429,15 @@ hours, delivery retries, and never later than a day after the pass before (`sche
 a pass that finds nothing coming still looks again within a day, within the three days of
 calendar it reads, so an event that comes into that window with no write and an unchanged
 calendar copy is still announced, and a time left by older rules heals (bug-lessons class 57). A
-pass first writes a lease (`pool:lease`, five minutes on), then takes the pool's time (`null`);
-whatever asks for a pass while it runs arms the time again, its own next decision included, and
-at the end it gives the lease back if it is still its own. A pass cut short (an isolate reset
-mid-delivery: a deploy, the CPU limit) leaves its lease, and the alarm passes again once the
-lease has run out (class 58); a failed pass leaves the pool due for the alarm's retry; a store
-from before the key passes at its next alarm. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15
+pass first writes a lease (`pool:lease`, five minutes on), arms the alarm at the lease's end and
+takes the pool's time (`null`); whatever asks for a pass while it runs arms the time again, its
+own next decision included, and at the end it gives the lease back if it is still its own. A
+pass cut short (an isolate reset mid-delivery: a deploy, the CPU limit) leaves its lease, and the
+lease's wake runs it again, whether or not the runtime retries the alarm (class 58); after a pass
+that completed, that wake reads the gate and loads nothing. A failed pass runs again a minute
+on, doubling while passes keep failing, up to four hours (`pool:failures`; a pass that completes
+starts the count again), or sooner when a write asks for it; a store from before the key passes
+at its next alarm. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15
 minutes; a night's start is its last use and its end the morning's first, whenever a pass sees
 them, and each phone upload runs a pass, so the hour only delays a night while no phone uploads) and at the
 next 21:00 by day (`nextSleepCheckAt`).

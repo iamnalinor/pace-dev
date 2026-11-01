@@ -61,8 +61,12 @@ const cutShort = async (storage: DurableObjectStorage): Promise<void> => {
   });
 };
 
-/** Runs the pool's part of an alarm at `now`; answers whether it passed. */
+/**
+Runs the pool's part of an alarm at `now`, the alarm taken off first as the runtime does; answers
+whether it passed.
+*/
 const hasPassedAt = async (storage: DurableObjectStorage, now: string): Promise<boolean> => {
+  await storage.deleteAlarm();
   let hasPassed = false;
   await poolAtAlarm(storage, {
     now,
@@ -72,6 +76,29 @@ const hasPassedAt = async (storage: DurableObjectStorage, now: string): Promise<
     },
   });
   return hasPassed;
+};
+
+/** A pass that fails at `now`. */
+const failingAt = async (storage: DurableObjectStorage, now: string): Promise<void> => {
+  await takingPoolTime(storage, {
+    now,
+    pass: async () => {
+      await Promise.reject(new Error("the pass broke"));
+    },
+  });
+};
+
+/** Whether the pool's part of an alarm at `now` would pass; nothing runs. */
+const isDueAt = async (storage: DurableObjectStorage, now: string): Promise<boolean> => {
+  let isDue = false;
+  await poolAtAlarm(storage, {
+    now,
+    pass: async () => {
+      isDue = true;
+      await Promise.resolve();
+    },
+  });
+  return isDue;
 };
 
 describe("the pool's own time at the store's alarm", () => {
@@ -98,7 +125,31 @@ describe("the pool's own time at the store's alarm", () => {
     await runInDurableObject(freshStore(), async (_instance, { storage }) => {
       await pass(storage, { nextAt: null, now: NOW });
       expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(24 * 60));
+      // The lease's wake comes first, passes nothing and arms the day on.
+      expect(await hasPassedAt(storage, at(5))).toBe(false);
       expect(await storage.getAlarm()).toBe(ms(24 * 60));
+    });
+  });
+
+  it("arms the alarm at the lease's end as a pass takes the pool, and that wake reads only the gate", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      await storage.deleteAlarm();
+      await pass(storage, { nextAt: at(60), now: NOW });
+      expect(await storage.getAlarm()).toBe(ms(5));
+      // The pass completed: the wake passes nothing and arms the pass's own time.
+      expect(await hasPassedAt(storage, at(5))).toBe(false);
+      expect(await storage.getAlarm()).toBe(ms(60));
+    });
+  });
+
+  it("runs a pass cut short at its lease's end even when the runtime never runs the alarm again", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      await pass(storage, { nextAt: at(60), now: at(-60) });
+      await storage.deleteAlarm();
+      await cutShort(storage);
+      // The runtime took the alarm off as it fired and never retries: the lease's wake is set.
+      expect(await storage.getAlarm()).toBe(ms(5));
+      expect(await hasPassedAt(storage, at(5))).toBe(true);
     });
   });
 
@@ -112,6 +163,7 @@ describe("the pool's own time at the store's alarm", () => {
         now: NOW,
       });
       expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(30));
+      expect(await hasPassedAt(storage, at(5))).toBe(false);
       expect(await storage.getAlarm()).toBe(ms(30));
     });
   });
@@ -159,18 +211,37 @@ describe("the pool's own time at the store's alarm", () => {
     });
   });
 
-  it("leaves the pool due at once when a pass fails with nothing earlier asked for", async () => {
+  it("looks again a minute on when a pass fails with nothing earlier asked for", async () => {
     await runInDurableObject(freshStore(), async (_instance, { storage }) => {
       await pass(storage, { nextAt: at(60), now: at(-60) });
-      const failing = takingPoolTime(storage, {
-        now: NOW,
-        pass: async () => {
-          await Promise.reject(new Error("the pass broke"));
-        },
-      });
-      await expect(failing).rejects.toThrow("the pass broke");
-      expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(0));
-      expect(await hasPassedAt(storage, at(0.05))).toBe(true);
+      await storage.deleteAlarm();
+      await expect(failingAt(storage, NOW)).rejects.toThrow("the pass broke");
+      expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(1));
+      expect(await storage.getAlarm()).toBe(ms(1));
+      expect(await hasPassedAt(storage, at(0.05))).toBe(false);
+      expect(await hasPassedAt(storage, at(1))).toBe(true);
+    });
+  });
+
+  it("looks again later and later while passes keep failing, never at every lease's end", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      const waits: number[] = [];
+      let now = NOW;
+      for (let failure = 0; failure < 10; failure += 1) {
+        await expect(failingAt(storage, now)).rejects.toThrow("the pass broke");
+        const next = (await storage.get<number>(POOL_NEXT_AT_KEY)) ?? NaN;
+        waits.push((next - Date.parse(now)) / MINUTE);
+        // The lease's wake five minutes on passes only when the pool is due by then.
+        const wake = new Date(Date.parse(now) + 5 * MINUTE).toISOString();
+        expect(await isDueAt(storage, wake)).toBe(next <= Date.parse(wake));
+        now = new Date(next).toISOString();
+      }
+      // A minute, doubling, never more than four hours.
+      expect(waits).toEqual([1, 2, 4, 8, 16, 32, 64, 128, 240, 240]);
+      // A pass that completes starts the count again.
+      await pass(storage, { nextAt: null, now });
+      await expect(failingAt(storage, now)).rejects.toThrow("the pass broke");
+      expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(Date.parse(now) + MINUTE);
     });
   });
 

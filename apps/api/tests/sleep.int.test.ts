@@ -280,6 +280,9 @@ describe("the store's alarm for automatic sleep", () => {
     const evening = Date.parse(wallClockInstant(NEXT_DAY, "21:00", MOSCOW));
     expect(await alarmOf(store)).toBe(evening);
     // An alarm before sleep's time (another wait's) runs no pass and leaves sleep's time armed.
+    // That one is the pool's first pass (a store from before its key), so its lease's wake comes
+    // first and only reads the waits' times.
+    await fireAlarm(store);
     await fireAlarm(store);
     expect(await alarmOf(store)).toBe(evening);
     // At its own time, 23:50, the pass runs and arms the next look an hour on.
