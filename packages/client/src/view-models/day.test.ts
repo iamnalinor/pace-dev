@@ -118,6 +118,40 @@ const linksOf = (activities: readonly Activity[]) =>
     entry.kind === "activity" ? [[entry.row.label, entry.row.taskLink]] : [],
   );
 
+describe("dayModel edit targets (QA round 17 L14)", () => {
+  // A night from Monday 23:25 to Tuesday 07:40, Moscow: Tuesday shows it from 00:00.
+  const night = activity({
+    category: "sleep",
+    endAt: "2026-10-06T04:40:00.000Z",
+    id: "n1",
+    label: "Sleep",
+    startAt: "2026-10-05T20:25:00.000Z",
+  });
+
+  it("opens an overnight block with its real start and end, while the row shows the day's part", () => {
+    const entry = dayModel(withActivities([night]), null, ctx()).entries.find(
+      (item) => item.kind === "activity",
+    );
+    expect(entry?.kind === "activity" ? entry.row.startAt : null).toBe("2026-10-05T21:00:00.000Z");
+    expect(entry?.target).toMatchObject({
+      endAt: "2026-10-06T04:40:00.000Z",
+      kind: "edit",
+      startAt: "2026-10-05T20:25:00.000Z",
+    });
+  });
+
+  it("opens the evening part on the day before with the real end, not midnight", () => {
+    const monday = "2026-10-05T12:00:00.000Z";
+    const entry = dayModel(withActivities([night]), monday, ctx()).entries.find(
+      (item) => item.kind === "activity",
+    );
+    expect(entry?.target).toMatchObject({
+      endAt: "2026-10-06T04:40:00.000Z",
+      startAt: "2026-10-05T20:25:00.000Z",
+    });
+  });
+});
+
 describe("dayModel task links", () => {
   it("says Open task when the label is the task's title, and names the task when it is not", () => {
     const title = artboardState().tasks.byId[HW_ID]?.title ?? "";

@@ -1,5 +1,6 @@
 import {
   accountTz,
+  type Activity,
   type ActivityCategory,
   activityLabel,
   addDaysIn,
@@ -89,6 +90,10 @@ export const trackedDates = (state: CoreState, ctx: QueryContext): ReadonlySet<s
   );
 };
 
+/**
+What a block's sheet edits: the activity as it is, not the part the day shows. A night from 23:25
+shows from 00:00 on the next day, and its sheet still says From 23:25 (QA round 17 L14).
+*/
 const editTargetOf = (
   row: Pick<
     DayRow,
@@ -101,14 +106,15 @@ const editTargetOf = (
     | "startAt"
     | "taskId"
   >,
+  activity: Activity | undefined,
 ): ActivityTarget => ({
   activityId: row.activityId,
   category: row.category,
-  endAt: row.isRunning ? null : row.endAt,
+  endAt: row.isRunning ? null : (activity?.endAt ?? row.endAt),
   expectMinutes: row.expectMinutes,
   kind: "edit",
   label: row.label,
-  startAt: row.startAt,
+  startAt: activity?.startAt ?? row.startAt,
   taskId: row.taskId,
 });
 
@@ -151,7 +157,7 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
     return {
       key: `${segment.activityId}-${segment.startAt}`,
       kind: "activity",
-      target: editTargetOf({ ...segment, label }),
+      target: editTargetOf({ ...segment, label }, state.time.activities[segment.activityId]),
       row: {
         ...segment,
         color: CATEGORY_COLORS[segment.category],
