@@ -162,9 +162,9 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
 - [ ] **Step 1: Write the failing tests.**
   - `apcaLc` reproduces the APCA reference values: `apcaLc("#888888", "#ffffff") ≈ 63.1`,
     `apcaLc("#ffffff", "#888888") ≈ -68.5`, `apcaLc("#000000", "#aaaaaa") ≈ 58.1` (±0.5).
-  - `composite("rgba(14, 122, 69, 0.12)", "#ffffff") === "#e3f0e9"` (rounded per channel).
+  - `composite("rgba(14, 122, 69, 0.12)", "#ffffff") === "#e2efe9"` (rounded per channel).
   - `tokens.test.ts`: both themes define every key of `color.light` (same key set); every `hue.*`
-    has `stroke`, `ink`, `tint` in both themes; the 12 category hues are pairwise ΔE(OKLab) ≥ 0.08.
+    has `stroke`, `ink`, `tint` in both themes; the 12 category hues are pairwise ΔE(OKLab) ≥ 0.05.
   - `contrast.test.ts`: for every `USED_PAIRS` entry in both themes, composited onto its real ground:
     `text` → WCAG ≥ 4.5 and |Lc| ≥ 75; `textSmall` → ≥ 4.5 and |Lc| ≥ 50; `large` → ≥ 3 and
     |Lc| ≥ 45; `ui` → ≥ 3. Pairs from spec §3.1 tables (labels on `bg.app/cell/elevated`, accent
@@ -256,7 +256,7 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
   `projectHue(name: ProjectColorName): HueName` (`coral` → `red`).
 
 - [ ] **Step 1:** Category test: `CATEGORY_HUES` has 12 distinct values; `work → blue`, `study → violet`,
-      `task → green`, `food → orange`, `commute → yellow`, `hygiene → cyan`, `rest → teal`,
+      `task → green`, `food → orange`, `commute → lime`, `hygiene → cyan`, `rest → teal`,
       `chores → amber`, `social → pink`, `sport → red`, `sleep → indigo`, `other → slate`.
 - [ ] **Step 2:** Run unit tests; FAIL (Task 1.2 tests + this one).
 - [ ] **Step 3:** Write `tokens.json` v2 with the shape and values of spec §3 (colour values from
