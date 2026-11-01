@@ -160,16 +160,20 @@ export const timeBarModel = (
 const searchable = (text: string): string => text.toLocaleLowerCase().replaceAll("ё", "е");
 
 /**
-The Task button's picker: Now's open tasks in Now's order (those that start later last),
-narrowed to the titles that hold every word typed, in any case and order.
+The Task button's picker: with nothing typed, Now's open tasks in Now's order that are on now (not
+paused, not starting later: QA round 17 L4); typed, every open task whose title holds every word,
+in any case and order, the later ones last, so starting one early stays possible.
 */
-export const taskChoices = <Row extends Pick<NowRow, "id" | "title">>(
+export const taskChoices = <Row extends Pick<NowRow, "id" | "meta" | "title">>(
   board: { readonly rows: readonly Row[]; readonly future: readonly Row[] },
   query: string,
 ): readonly Row[] => {
   const words = searchable(query)
     .split(/\s+/u)
     .filter((word) => word !== "");
+  if (words.length === 0) {
+    return board.rows.filter((row) => row.meta.every((part) => part.kind !== "paused"));
+  }
   return [...board.rows, ...board.future].filter((row) => {
     const title = searchable(row.title);
     return words.every((word) => title.includes(word));

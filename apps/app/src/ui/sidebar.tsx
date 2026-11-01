@@ -162,18 +162,26 @@ export const Sidebar = () => {
       className="w-56 gap-1 border-r border-line bg-bg px-3 pb-4 pt-5"
       role="navigation"
     >
-      <View className="mb-3 flex-row items-center gap-2 px-2">
+      <View className="flex-row items-center gap-2 px-2">
         <PaceMark size={22} />
-        <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
-        {owner === null ? null : <UserAvatar size={24} />}
-        <Text
-          className="min-w-0 flex-1 text-right font-sans text-[13px] text-muted"
-          numberOfLines={1}
-        >
-          {owner ?? ""}
-        </Text>
+        <Text className="flex-1 font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
         <NotificationBell variant="plain" />
       </View>
+      {/* Who is signed in, on a line of its own: beside the logo and the bell it had 23 px (QA 17 M6). */}
+      {owner === null ? (
+        <View className="mb-2" />
+      ) : (
+        <View
+          accessibilityLabel={t("nav.signedInAs", { name: owner })}
+          accessible
+          className="mb-3 flex-row items-center gap-2 px-2"
+        >
+          <UserAvatar size={24} />
+          <Text className="min-w-0 flex-1 font-sans text-[13px] text-fg2" numberOfLines={1}>
+            {owner}
+          </Text>
+        </View>
+      )}
       <Pressable
         accessibilityLabel={t("nav.newTask")}
         accessibilityRole="button"

@@ -135,13 +135,14 @@ describe("decisionView", () => {
       ]),
     ).toMatchObject({ outcome: "You dismissed it; nothing was done", taskId: null });
     // An answer a newer server knows and this client does not reads as undecided.
-    expect(en({ ...cable, resolution: "postponed" }).outcome).toBe("Shown to you for approval");
+    expect(en({ ...cable, resolution: "postponed" }).outcome).toBe("Waiting for your answer");
   });
 
   it("only says what it sees when nothing was recorded: a task of that name, not an approval", () => {
+    // A card still open speaks in the assistant's voice, as the card did (QA 17 L16).
     expect(en(cable)).toMatchObject({
-      lines: ["Suggested a new task “Buy cable”"],
-      outcome: "Shown to you for approval",
+      lines: ["The assistant will create task “Buy cable”"],
+      outcome: "Waiting for your answer",
       taskId: null,
     });
     expect(
@@ -158,10 +159,10 @@ describe("decisionView", () => {
     expect(en(cable, [created("2026-10-06T10:01:00.000Z", "buy a cable")]).taskId).toBe(CABLE_ID);
     expect(
       en(cable, [created("2026-10-07T11:00:00.000Z", "buy cable tomorrow #home")]),
-    ).toMatchObject({ outcome: "Shown to you for approval" });
+    ).toMatchObject({ outcome: "Waiting for your answer" });
     expect(
       en(cable, [created("2026-10-06T09:00:00.000Z", "buy cable tomorrow #home")]),
-    ).toMatchObject({ outcome: "Shown to you for approval" });
+    ).toMatchObject({ outcome: "Waiting for your answer" });
   });
 
   it("words a close without its outcome (an older row) by its summary, never a dangling “as”", () => {
@@ -183,7 +184,7 @@ describe("decisionView", () => {
     });
     expect(en(mixed).lines).toEqual([
       "The assistant will teleport “Moon”",
-      "Suggested a new task “Buy cable”",
+      "The assistant will create task “Buy cable”",
     ]);
   });
 
@@ -201,16 +202,16 @@ describe("decisionView", () => {
       { ...NO_STEP, activityId: "a-gone", kind: "activity.delete" },
     ];
     expect(en(parsed({ steps, text: "x" })).lines).toEqual([
-      "Suggested moving the deadline of “Return library books”",
-      "Suggested changing “Return library books”: title, project",
-      "Suggested deleting task “Return library books”",
-      "Suggested closing “Return library books” as Done",
-      "Suggested subtasks for “Return library books”",
-      "Suggested marking subtasks solved in “Return library books”",
-      "Suggested starting “Gym”",
-      "Suggested logging “Walk”",
-      "Suggested changing “…”: name",
-      "Suggested deleting “…” from your day",
+      "The assistant will move the deadline of “Return library books”",
+      "The assistant will change “Return library books”: title, project",
+      "The assistant will delete task “Return library books”",
+      "The assistant will close “Return library books” as Done",
+      "The assistant will add subtasks to “Return library books”",
+      "The assistant will mark subtasks solved in “Return library books”",
+      "The assistant will start “Gym”",
+      "The assistant will log “Walk”",
+      "The assistant will change “…”: name",
+      "The assistant will delete “…” from your day",
     ]);
     // The task an edit was about can be opened.
     expect(en(parsed({ steps, text: "x" })).taskId).toBe(BOOKS_ID);
@@ -234,7 +235,7 @@ describe("decisionView", () => {
     expect(en({ ...close, resolution: "approved" }, [closed("done")]).lines).toEqual([
       "Closed “Return library books” as Done",
     ]);
-    expect(en(close, [closed("cancelled")]).outcome).toBe("Shown to you for approval");
+    expect(en(close, [closed("cancelled")]).outcome).toBe("Waiting for your answer");
   });
 
   it("reads an older row from its rule, summaries and explanation", () => {
@@ -253,7 +254,7 @@ describe("decisionView", () => {
       },
     );
     expect(en(legacy)).toMatchObject({
-      lines: ["Suggested starting “Gym”"],
+      lines: ["The assistant will start “Gym”"],
       notFound: null,
       request: "gym",
       via: null,
@@ -273,7 +274,7 @@ describe("decisionView", () => {
         ),
       ),
     ).toMatchObject({
-      lines: ["Предложена задача «Купить кабель»", "Ассистент удалит «Старое»"],
+      lines: ["Ассистент создаст задачу «Купить кабель»", "Ассистент удалит «Старое»"],
       via: null,
     });
     // A summary without a quoted name is shown as it was written.
@@ -291,10 +292,10 @@ describe("decisionView", () => {
       "“Gym” was started after this",
     );
     expect(en(since, [started("2026-10-06T11:30:00.000Z", "Gym")]).outcome).toBe(
-      "Shown to you for approval",
+      "Waiting for your answer",
     );
     expect(en(since, [started("2026-10-06T09:30:00.000Z", "Run")]).outcome).toBe(
-      "Shown to you for approval",
+      "Waiting for your answer",
     );
   });
 
@@ -431,7 +432,7 @@ describe("decisionView", () => {
     const extra = [created("2026-10-06T10:00:20.000Z", "buy cable tomorrow #home")];
     expect(logIn("en", [newer, cable], { extra }).map((view) => view.outcome)).toEqual([
       "A task “Buy cable” was created after this",
-      "Shown to you for approval",
+      "Waiting for your answer",
     ]);
   });
 
@@ -455,7 +456,7 @@ describe("decisionView", () => {
     expect(en(rename).lines).toEqual(["Renamed “Old books” to “New”"]);
     expect(ru(rename).lines).toEqual(["Переименовано «Old books» в «New»"]);
     expect(en({ ...rename, resolution: null }).lines).toEqual([
-      "Suggested renaming “Old books” to “New”",
+      "The assistant will rename “Old books” to “New”",
     ]);
   });
 
@@ -486,7 +487,7 @@ describe("decisionView", () => {
     // The same request typed again an hour later is another conversation.
     const again = { ...cable, at: "2026-10-06T08:00:00.000Z", id: "d0" };
     expect(logIn("en", [corrected, first, again]).map((view) => view.id)).toEqual(["d2", "d0"]);
-    expect(logIn("en", [corrected])[0]?.outcome).toBe("Shown to you for approval");
+    expect(logIn("en", [corrected])[0]?.outcome).toBe("Waiting for your answer");
     const later = logIn("en", [corrected], { now: "2026-10-06T11:00:00.000Z" })[0];
     expect(later?.outcome).toBe("No answer — the card was closed or replaced");
     expect(logIn("ru", [corrected], { now: "2026-10-06T11:00:00.000Z" })[0]?.outcome).toBe(
@@ -572,6 +573,6 @@ describe("automatic sleep in the log", () => {
       { steps: [{ ...NO_STEP, activityId: auto, kind: "activity.delete" }], text: "удали сон" },
       { rule: "parse.activity.delete" },
     );
-    expect(ru(offered, [sleep]).lines).toEqual(["Предложено удалить «Сон» из дня"]);
+    expect(ru(offered, [sleep]).lines).toEqual(["Ассистент удалит «Сон» из дня"]);
   });
 });

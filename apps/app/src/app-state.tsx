@@ -251,6 +251,42 @@ export const useSync = (): {
   return { status: useStore(sync.status), syncNow: sync.syncNow };
 };
 
+/**
+Signed in on a copy that held nothing when this session's first sync began, until that sync has
+finished: the screens would show their final empty states, then the pulled log in the device's
+language, and only then the account's (QA round 17 M4). A copy that held the log is never
+covered; a failed sync ends it too (the offline strip says why), so a copy that cannot reach the
+server is never hidden for good.
+*/
+export const useIsFirstSync = (): boolean => {
+  const { status } = useAuth();
+  const { api, hooks, sync } = usePace();
+  const readyToken = use(LanguageReadyContext);
+  const isLoading = hooks.useAppState((state) => state.status === "loading");
+  const isEmpty = hooks.useAppState(
+    (state) => state.status === "ready" && state.events.length === 0,
+  );
+  const hasFailed = useStore(sync.status, (current) => current.lastError !== null);
+  const isLanguageReady = readyToken !== null && readyToken === api.currentSessionToken();
+  const isWaiting = status === "signed-in" && !isLanguageReady && !hasFailed;
+  // Once read empty, the copy stays covered while its first pages arrive, until the sync ends; a
+  // copy still being read from the device is covered only until it is read (local first).
+  const [wasEmpty, setWasEmpty] = useState(false);
+  const isEmptyCopy = isWaiting && (isEmpty || wasEmpty);
+  if (wasEmpty !== isEmptyCopy) {
+    setWasEmpty(isEmptyCopy);
+  }
+  return isEmptyCopy || (isWaiting && isLoading);
+};
+
+/** Signed in and the last sync could not reach the server (QA round 17 M5). */
+export const useIsOffline = (): boolean => {
+  const { status } = useAuth();
+  const { sync } = usePace();
+  const isOnline = useStore(sync.status, (current) => current.online);
+  return status === "signed-in" && !isOnline;
+};
+
 export const useAppState = <T,>(selector: (state: ClientState) => T): T =>
   usePace().hooks.useAppState(selector);
 

@@ -22,6 +22,17 @@ describe("project forms", () => {
     expect(await screen.findByRole("link", { name: "Physics" })).toBeOnTheScreen();
   });
 
+  it("puts the cursor in a new project's name; Enter on it empty says what is missing (QA 17 L6)", async () => {
+    await renderScreen(<ProjectsScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByRole("button", { name: en("projects.new") }));
+    const name = screen.getByLabelText(en("projects.name"));
+    expect(name).toHaveProp("autoFocus", true);
+    await fireEvent(name, "submitEditing");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      en("actionError.project/name-required"),
+    );
+  });
+
   it("renames a project and archives it from its page", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<ProjectScreen id={ALGEBRA_ID} />, runtime);

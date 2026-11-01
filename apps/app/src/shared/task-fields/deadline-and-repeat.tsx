@@ -6,7 +6,11 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 
 import type { TaskFormValues } from "./task-form-types.ts";
 
-import { deadlineChoiceProblem, type DeadlineChoiceProblem } from "./deadline-choice.ts";
+import {
+  deadlineChoiceProblem,
+  type DeadlineChoiceProblem,
+  isDeadlineTypeShown,
+} from "./deadline-choice.ts";
 import { DeadlinePolicyField } from "./deadline-policy-field.tsx";
 import { FormAlert, FormNote } from "./form-alert.tsx";
 import { RecurrenceField } from "./recurrence-field.tsx";
@@ -86,14 +90,16 @@ export const DeadlineAndRepeat = ({
       : null;
   return (
     <>
-      <DeadlinePolicyField
-        isFinalOpen={isFinalOpen}
-        onChange={(deadlinePolicy) => {
-          onChange({ deadlinePolicy });
-        }}
-        onFinalOpenChange={onFinalOpenChange}
-        value={values.deadlinePolicy}
-      />
+      {isDeadlineTypeShown(values.deadlinePolicy, values.due) ? (
+        <DeadlinePolicyField
+          isFinalOpen={isFinalOpen}
+          onChange={(deadlinePolicy) => {
+            onChange({ deadlinePolicy });
+          }}
+          onFinalOpenChange={onFinalOpenChange}
+          value={values.deadlinePolicy}
+        />
+      ) : null}
       {deadlineProblem === null ? null : (
         <DeadlineAlert due={values.due} problem={deadlineProblem} />
       )}

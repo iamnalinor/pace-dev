@@ -180,4 +180,19 @@ describe("lanesOf", () => {
       { lane: 1, lanes: 2 },
     ]);
   });
+
+  // QA round 17 L8: a block of a few seconds is drawn as tall as a finger; laid out by its real
+  // length, it sat under its neighbour, half covered (axe target-size).
+  it("lays a short stretch out by the height it is drawn at, beside what that height reaches", () => {
+    const short = stretch("10:00", "10:01");
+    const next = stretch("10:10", "11:00");
+    expect(lanesOf([short, next])).toEqual([
+      { lane: 0, lanes: 1 },
+      { lane: 0, lanes: 1 },
+    ]);
+    expect(lanesOf([short, next], 30)).toEqual([
+      { lane: 0, lanes: 2 },
+      { lane: 1, lanes: 2 },
+    ]);
+  });
 });

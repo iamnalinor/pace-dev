@@ -1,8 +1,13 @@
 import type { MessageKey } from "@pace/core";
 
 /** Each route's first segment and the title its screen shows. */
-const TITLES: Readonly<Record<string, MessageKey>> = {
+const TITLES: Readonly<Record<string, MessageKey | null>> = {
   "": "nav.now",
+  add: "nav.add",
+  // Signing in and its ways back: the app's name alone.
+  app: null,
+  auth: null,
+  oauth: null,
   day: "nav.day",
   decisions: "decisions.title",
   history: "history.title",
@@ -22,14 +27,18 @@ const TITLES: Readonly<Record<string, MessageKey>> = {
   week: "nav.week",
 };
 
-/** The title key of the screen at `path` (its first segment decides), or null for none. */
+/**
+The title key of the screen at `path` (its first segment decides), or null for none; a path no
+route answers is "Page not found", as the page says (QA round 17 L11).
+*/
 export const routeTitleKey = (path: string): MessageKey | null => {
   const [first = ""] =
     path
       .split(/[?#]/u, 1)[0]
       ?.split("/")
       .filter((part) => part !== "") ?? [];
-  return TITLES[first] ?? null;
+  const key = TITLES[first];
+  return key === undefined ? "errors.pageNotFound" : key;
 };
 
 /**

@@ -30,6 +30,7 @@ export const enShell = {
   "account.unknown": "Unknown confirmation.",
   "account.notYours": "This confirmation is not yours.",
   "nav.main": "Main",
+  "nav.signedInAs": "Signed in as {name}",
   "login.title": "Sign in to Pace",
   "login.subtitle": "Your tasks and time, at your own pace.",
   "login.endedElsewhere":
@@ -187,6 +188,7 @@ export const enShell = {
   "common.retry": "Retry",
   "common.home": "Go home",
   "errors.offline": "You are offline. Changes will sync when you reconnect.",
+  "sync.firstSync": "Syncing your data",
   "errors.llmUnavailable": "The assistant is unavailable right now. Try again in a moment.",
   "errors.notFound": "Not found.",
   "errors.pageNotFound": "Page not found",
@@ -212,6 +214,7 @@ export const enShell = {
   "settings.review.hint": "What the system could not settle on its own.",
   "zone.banner": "This device is in {device}; the account uses {account}.",
   "zone.use": "Use {device}",
+  "zone.keep": "Keep {account}",
   "source.app": "App",
   "source.web": "Web",
   "source.bot": "Bot",

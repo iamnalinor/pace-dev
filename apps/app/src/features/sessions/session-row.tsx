@@ -62,17 +62,15 @@ const Identity = ({ row }: { readonly row: Row }) => {
         <View
           accessibilityLabel={row.meta.join(", ")}
           accessible
-          className="flex-row flex-wrap"
+          className="flex-row flex-wrap gap-x-3"
           testID="session-meta"
         >
-          {row.meta.map((part, index) => (
-            // A part and the dot after it wrap together, so a line never starts with the dot.
-            <View className="max-w-full flex-row" key={part}>
-              <Text className="shrink font-sans text-[13px] text-muted">{part}</Text>
-              {index === row.meta.length - 1 ? null : (
-                <Text className="font-sans text-[13px] text-muted">{" · "}</Text>
-              )}
-            </View>
+          {/* Parts apart by a gap, not a dot: a wrapped line never ends or starts on a dangling
+              separator (QA round 17 L2); each part keeps together where it can. */}
+          {row.meta.map((part) => (
+            <Text className="max-w-full font-sans text-[13px] text-muted" key={part}>
+              {part}
+            </Text>
           ))}
         </View>
       </View>

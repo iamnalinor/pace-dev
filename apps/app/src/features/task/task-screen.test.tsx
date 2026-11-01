@@ -504,5 +504,7 @@ describe("TaskScreen — work", () => {
   it("says so when the task does not exist", async () => {
     await renderScreen(<TaskScreen id="t-nope" />, await createTestRuntime());
     expect(screen.getByText(en("task.notFound"))).toBeOnTheScreen();
+    // No project picker over a task that is not there (QA 17 L11).
+    expect(screen.queryByText(en("task.noProject"))).toBeNull();
   });
 });

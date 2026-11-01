@@ -306,6 +306,17 @@ describe("NowBoard", () => {
     expect(screen.queryByRole("button", { name: "Use UTC" })).toBeNull();
   });
 
+  it("keeps the account's zone on Keep, and the card stays away on this device (QA 17 L10)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC" });
+    await renderScreen(<Board />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: "Keep Europe/Moscow" }));
+    expect(screen.queryByRole("button", { name: "Use UTC" })).toBeNull();
+    expect(runtime.state.store.getState().settings.timezone).toBe("Europe/Moscow");
+    // Kept on this device for the next visit, until either zone changes.
+    await expect(SecureStore.getItemAsync("pace.zoneKept")).resolves.toBe("UTC|Europe/Moscow");
+    await SecureStore.deleteItemAsync("pace.zoneKept");
+  });
+
   it("offers a calendar event about to start: Attend tracks it under its title", async () => {
     seminarSoon();
     const runtime = await createTestRuntime();

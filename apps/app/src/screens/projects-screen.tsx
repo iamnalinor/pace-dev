@@ -36,6 +36,7 @@ const NewProject = () => {
     <View className="mb-3">
       <ProjectForm
         initial={{ color: "blue", name: "" }}
+        isNameFocused
         onCancel={() => {
           setIsOpen(false);
         }}
