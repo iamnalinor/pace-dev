@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react-native";
 
-import { createContext, type Ref, use } from "react";
+import { createContext, type Ref, use, useCallback, useLayoutEffect, useRef } from "react";
 import { ActivityIndicator, Pressable, Text, type View } from "react-native";
 
+import { moveFocus } from "../platform/move-focus.ts";
 import { cx } from "./cx.ts";
 import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
 import { useIsWide } from "./layout.ts";
@@ -117,6 +118,36 @@ const useButtonHotkey = (
     : { "aria-keyshortcuts": ariaHotkey(hotkey, KEYBOARD) };
 };
 
+/** What the busy-focus hook remembers between renders. */
+type FocusMemory = { isFocused: boolean; isRestoring: boolean; node: null | View };
+
+/**
+Keeps keyboard focus through a busy spell: a busy button is disabled, which drops focus to the
+page on the web (QA round 15 M4, bug class 5); one that had focus when it turned busy takes it
+back when it is pressable again (after a failure; a success usually removes it). Answers the
+pressable's focus handlers; the node comes with its focus event.
+*/
+const useFocusThroughBusy = (isBusy: boolean) => {
+  const memoryRef = useRef<FocusMemory>({ isFocused: false, isRestoring: false, node: null });
+  useLayoutEffect(() => {
+    const memory = memoryRef.current;
+    if (isBusy) {
+      memory.isRestoring = memory.isFocused;
+    } else if (memory.isRestoring) {
+      memory.isRestoring = false;
+      moveFocus(memory.node);
+    }
+  }, [isBusy]);
+  const onFocus = useCallback((event: { readonly currentTarget: unknown }) => {
+    memoryRef.current.isFocused = true;
+    memoryRef.current.node = event.currentTarget as View;
+  }, []);
+  const onBlur = useCallback(() => {
+    memoryRef.current.isFocused = false;
+  }, []);
+  return { onBlur, onFocus };
+};
+
 /**
 A pill-ish button at least 48px tall (a label that wraps makes it taller), optionally with an icon before the label; `busy` swaps the label
 for a spinner and blocks presses. With a `hotkey` and a keyboard, the shortcut shows after the
@@ -156,6 +187,7 @@ export const Button = ({
   const isBlocked = disabled || busy;
   const widthStyle = useWidthStyle(width);
   const keyshortcuts = useButtonHotkey(hotkey, hotkeyMode === "global" && !isBlocked, onPress);
+  const focus = useFocusThroughBusy(busy);
   return (
     <Pressable
       accessibilityHint={hint}
@@ -169,6 +201,8 @@ export const Button = ({
         isBlocked && "opacity-50",
       )}
       disabled={isBlocked}
+      onBlur={focus.onBlur}
+      onFocus={focus.onFocus}
       onLongPress={onLongPress}
       onPress={onPress}
       ref={ref}
