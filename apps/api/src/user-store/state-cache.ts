@@ -28,7 +28,7 @@ type Db = DrizzleSqliteDODatabase<typeof schema>;
 /**
 A store's materialized state, cached in memory with the log sequence it was built at, and the
 projection rows that mirror it. An instance starts with nothing in memory (production evicts one
-idle for a minute or two, so between alarms 15 minutes apart every one starts cold): a rebuild
+idle for a minute or two, so between alarms at night and phone uploads every one starts cold): a rebuild
 loads the log, but rewrites the rows only when their mark (`ProjectionMark`) is behind the log or
 from another build, and the zone is read from that mark without loading the log at all.
 */

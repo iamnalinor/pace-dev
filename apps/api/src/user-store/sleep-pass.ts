@@ -17,7 +17,7 @@ import type { DecisionEntry } from "../shared/contract.ts";
 import type { SleepUsage } from "./cloud-data.ts";
 
 import { createLogger } from "../shared/logger.ts";
-import { armEarliest, nextSleepCheckAt } from "./alarm.ts";
+import { armEarliest, nextSleepCheckAt, SLEEP_CHECK_MINUTES } from "./alarm.ts";
 import { type DecidedOn, heldOf, hold, isHeld, keptHold, usesAfter } from "./sleep-hold.ts";
 
 /** Storage key of the highest `knownUntil` a pass decided with: less known later undoes nothing. */
@@ -286,7 +286,7 @@ const decideAndHold = async (
 };
 
 /** How soon sleep looks again after a pass that failed (as after any pass at night)... */
-const RETRY_MINUTES = 15;
+const RETRY_MINUTES = SLEEP_CHECK_MINUTES;
 
 /** ...doubling while passes keep failing, up to this. */
 const RETRY_MAX_MINUTES = 4 * 60;
@@ -302,9 +302,9 @@ const completed = async (storage: DurableObjectStorage): Promise<void> => {
 };
 
 /**
-After a pass at the alarm failed: when sleep looks again, 15 minutes on, doubling with each
-failure in a row up to four hours, so a pass that keeps failing (and may load the whole log each
-time) does not run every 15 minutes for good.
+After a pass at the alarm failed: when sleep looks again, an hour on (as after any pass at night),
+doubling with each failure in a row up to four hours, so a pass that keeps failing (and may load
+the whole log each time) does not run every hour for good.
 */
 const retryAtOf = async (storage: DurableObjectStorage, now: string): Promise<number> => {
   const failures = ((await storage.get<number>(FAILURES_KEY)) ?? 0) + 1;

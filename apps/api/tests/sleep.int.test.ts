@@ -233,7 +233,8 @@ describe("automatic sleep and the person's own records, through the store", () =
       label: "Deploy",
     });
     await pushEvents(token, [work]);
-    // Uploads and sleep's own alarms every 15 minutes until 03:00, the phone quiet throughout.
+    // Uploads every 15 minutes until 03:00, each with sleep's look due too (more often than its
+    // hourly alarm), the phone quiet throughout.
     const minutesOn = (minutes: number) =>
       new Date(Date.parse(at("00:00")) + minutes * 60_000).toISOString();
     const lengths = [];
@@ -262,7 +263,7 @@ describe("automatic sleep and the person's own records, through the store", () =
 });
 
 describe("the store's alarm for automatic sleep", () => {
-  it("looks again within 15 minutes at night, at 21:00 by day, and again after each alarm", async () => {
+  it("looks again within the hour at night, at 21:00 by day, and again after each alarm", async () => {
     // No digest windows and a night already over (nothing running long): nothing else the store
     // waits on, so the alarm is sleep's own.
     const { phone, store } = await phoneAccount("1002", { digestWindows: [] });
@@ -281,16 +282,16 @@ describe("the store's alarm for automatic sleep", () => {
     // An alarm before sleep's time (another wait's) runs no pass and leaves sleep's time armed.
     await fireAlarm(store);
     expect(await alarmOf(store)).toBe(evening);
-    // At its own time, 23:50, the pass runs and arms the next look 15 minutes on.
+    // At its own time, 23:50, the pass runs and arms the next look an hour on.
     const lateEvening = wallClockInstant(NEXT_DAY, "23:50", MOSCOW);
     vi.setSystemTime(new Date(lateEvening));
     await sleepDueNow(store);
     await fireAlarm(store);
-    expect(await alarmOf(store)).toBe(Date.parse(lateEvening) + 15 * 60_000);
+    expect(await alarmOf(store)).toBe(Date.parse(lateEvening) + 60 * 60_000);
     // And again from that alarm: an alarm never leaves the store without its next look.
-    vi.setSystemTime(new Date(Date.parse(lateEvening) + 15 * 60_000));
+    vi.setSystemTime(new Date(Date.parse(lateEvening) + 60 * 60_000));
     await fireAlarm(store);
-    expect(await alarmOf(store)).toBe(Date.parse(lateEvening) + 30 * 60_000);
+    expect(await alarmOf(store)).toBe(Date.parse(lateEvening) + 120 * 60_000);
   });
 
   it("decides on a computer's late use at sleep's own alarm, not at its upload or another alarm", async () => {

@@ -393,8 +393,8 @@ bound. It skips when the log, zone and uses are the
 same and `knownUntil` is still short of the horizon (the next instant a decision compares with:
 a use or a recorded instant becoming known, a rest's bound, the open rest's candidate and its 45
 minutes, a possible wake-up's 90), or, by day (noon to 21:00), when everything it followed is
-decided for good and only new use came after what it knew. A quiet night with an upload or an
-alarm every 15 minutes therefore reads the log when the night opens and when the morning's first
+decided for good and only new use came after what it knew. A quiet night with an upload every 15 minutes
+and sleep's hourly alarm therefore reads the log when the night opens and when the morning's first
 use ends it, and otherwise only when the person records something or a late upload lands in the
 window (`sleep-pass.test.ts` counts the reads over such a night). That holds on a cold instance
 too, the normal case at night: the zone comes from the projection mark, and the alarm's other
@@ -407,7 +407,7 @@ pruned: the owner keeps the data). Without a phone upload within a day nothing n
 and nothing armed, but an automatic sleep still running ends where knowledge ended (the highest
 `knownUntil` decided with), and goes when that leaves it short: a dead or signed-out phone never
 leaves a sleep open for days. A phone that tells again later walks it as usual. A failed pass is logged and never fails what ran it: after an
-upload the upload is answered, at the alarm sleep looks again in 15 minutes, doubling while
+upload the upload is answered, at the alarm sleep looks again in an hour, doubling while
 passes keep failing up to four hours (key `sleep:failures`; a pass that completes starts it again).
 
 **The alarm** is one per store and shared: the pool's next pass and delivery retries, the
@@ -415,13 +415,15 @@ assistant's queue and automatic sleep each arm it through `armEarliest` (`user-s
 which only ever moves it earlier, so none postpones another's earlier time. `alarm()` runs the
 pool, the queue and sleep (a failure in one does not hold the others back; the pool's or the
 queue's fails the alarm afterwards, so the runtime retries it, while sleep's is logged and looked at
-again later, from 15 minutes up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
+again later, from an hour up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
 Each wait keeps its own time and reads nothing before it has come: the pool's (`pool:next-at`,
 the earliest pass any write, retry or pass asked for; a pass takes it and whatever asks during the
 pass arms it again; a failed pass leaves it due for the alarm's retry; a store from before the key
 passes at its next alarm), the queue's (its earliest text) and sleep's (`sleep:next-at`); before
 that each arms its time again. A pool pass loads the log on a cold instance, so it runs at its
-digest slots, event starts and retries, never at sleep's looks. It looks every 15 minutes from 21:00 to noon in the person's zone and at the
+digest slots, event starts and retries, never at sleep's looks. It looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15
+minutes; a night's start is its last use and its end the morning's first, whenever a pass sees
+them, and each phone upload runs a pass, so the hour only delays a night while no phone uploads) and at the
 next 21:00 by day (`nextSleepCheckAt`).
 
 **The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone

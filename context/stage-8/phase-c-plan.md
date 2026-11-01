@@ -433,14 +433,14 @@ Not verifiable here: the Kotlin code compiles and the intents open the right pag
 - Consumes: Task 11's `usageForSleep`, Task 12's `decideSleep`, `sleepEvents`.
 - Produces:
   - `runSleepPass(store, now): Promise<readonly string[]>` — builds `SleepInput` from the state (sleep-category activities with their start/stop event ids; `isAutoSleepId`) and `usageForSleep(now − 36 h)`, appends `sleepEvents` through the store's system insert, logs each decision in `decisions` with `kind "sleep"`, `rule` = `sleep.open | sleep.stop | sleep.reopen | sleep.discard`, `inputs` = the spells and `knownUntil` it relied on.
-  - `alarm.ts`: `armEarliest(storage: DurableObjectStorage, at: number): Promise<void>` (moves the alarm only earlier) and `nextSleepCheckAt(now: string, zone: string): number` — `now + 15 min` while the local time is in 21:00–12:00, else the next 21:00. The pool's `scheduleNextPass` no longer deletes or overwrites an earlier alarm (it, the parse queue and the sleep pass all arm through `armEarliest`; `alarm()` re-arms every due time it still has).
+  - `alarm.ts`: `armEarliest(storage: DurableObjectStorage, at: number): Promise<void>` (moves the alarm only earlier) and `nextSleepCheckAt(now: string, zone: string): number` — `now + 60 min` (15 min until the owner's decision of 2026-11-01: hourly) while the local time is in 21:00–12:00, else the next 21:00. The pool's `scheduleNextPass` no longer deletes or overwrites an earlier alarm (it, the parse queue and the sleep pass all arm through `armEarliest`; `alarm()` re-arms every due time it still has).
   - Decisions view: "Sleep started at 23:40 (no phone use since)", "Sleep ended at 07:10 (the phone was picked up)", "Sleep continued: a short wake at 03:00", "A short rest at 21:10 was not sleep" (RU mirrored); no rule keys on screen.
 
 - [ ] **Step 1: Failing API tests** — `sleep.int.test.ts` (account zone Europe/Moscow; upload fixtures through `POST /api/usage/sessions` with `uses` and `until` as a phone; run the alarm with `runDurableObjectAlarm` as the notifier tests do; read `GET /api/sync/pull` events parsed with the endpoint's output schema):
   - Scenario 1 (23:40 → 07:10) → one `activity.started` id `auto:sleep-<night>:start-…` occurredAt 23:40 `source "system"`, then `activity.stopped` at 07:10 after the morning upload.
   - Scenario 2 → stop, then `event.revoked` of that stop after the quiet upload; effective state one sleep.
   - Uploading the same fixtures again and running the alarm twice → no new events (idempotent).
-  - The alarm is armed at most 15 min ahead during the night, at the next 21:00 by day; a pending parse-queue retry earlier than that keeps its earlier alarm (no overwrite).
+  - The alarm is armed at most 60 min ahead during the night (15 before 2026-11-01), at the next 21:00 by day; a pending parse-queue retry earlier than that keeps its earlier alarm (no overwrite).
   - Each decision is in `decisions` with its rule and inputs.
   - Undo in History: revoking the automatic stop by hand, then a new use → a new stop with a different id is written (class 38: edit → undo → edit).
 - [ ] **Step 2: Run** `bun test:api` → FAIL. **Step 3: Implement.**

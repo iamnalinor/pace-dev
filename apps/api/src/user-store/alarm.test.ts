@@ -35,22 +35,22 @@ const minutesFrom = (day: string, zone: string): readonly string[] => {
 };
 
 describe("when automatic sleep looks again", () => {
-  it("looks every 15 minutes from 21:00 to noon, and waits for 21:00 by day (class 9)", () => {
+  it("looks every hour from 21:00 to noon, and waits for 21:00 by day (class 9)", () => {
     expect(nextSleepCheckAt("2026-10-07T17:59:00.000Z", MOSCOW)).toBe(
       Date.parse("2026-10-07T18:00:00.000Z"),
     );
     expect(nextSleepCheckAt("2026-10-07T18:00:00.000Z", MOSCOW)).toBe(
-      Date.parse("2026-10-07T18:15:00.000Z"),
+      Date.parse("2026-10-07T19:00:00.000Z"),
     );
     expect(nextSleepCheckAt("2026-10-08T08:59:00.000Z", MOSCOW)).toBe(
-      Date.parse("2026-10-08T09:14:00.000Z"),
+      Date.parse("2026-10-08T09:59:00.000Z"),
     );
     expect(nextSleepCheckAt("2026-10-08T09:00:00.000Z", MOSCOW)).toBe(
       Date.parse("2026-10-08T18:00:00.000Z"),
     );
   });
 
-  it("is always ahead: 15 minutes in the night, a 21:00 the same day otherwise, across DST", () => {
+  it("is always ahead: an hour in the night, a 21:00 the same day otherwise, across DST", () => {
     for (const [day, zone] of [
       ["2026-10-07", MOSCOW],
       ["2026-10-31", NEW_YORK],
@@ -61,7 +61,7 @@ describe("when automatic sleep looks again", () => {
         const today = formatInZone(now, zone, "yyyy-MM-dd");
         const expected =
           hour >= 21 || hour < 12
-            ? Date.parse(now) + 15 * MINUTE
+            ? Date.parse(now) + 60 * MINUTE
             : Date.parse(wallClockInstant(today, "21:00", zone));
         expect(nextSleepCheckAt(now, zone)).toBe(expected);
         expect(expected).toBeGreaterThan(Date.parse(now));

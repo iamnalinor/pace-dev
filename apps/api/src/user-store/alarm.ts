@@ -31,11 +31,16 @@ export const runEach = async (passes: readonly (() => Promise<unknown>)[]): Prom
   }
 };
 
-/** How often automatic sleep looks again while a sleep can start or end. */
-const SLEEP_CHECK_MINUTES = 15;
+/**
+How often automatic sleep looks again while a sleep can start or end (owner, 2026-11-01: hourly,
+not every 15 minutes). A night's start is the last use before it and its end the morning's first
+use, whenever a pass sees them, and every phone upload runs a pass, so the hour only delays when a
+night appears while no phone uploads.
+*/
+export const SLEEP_CHECK_MINUTES = 60;
 
 /**
-When automatic sleep should look again after `now`: in 15 minutes while the local time is in
+When automatic sleep should look again after `now`: in an hour while the local time is in
 the hours a sleep can start or end (21:00 to noon, the night's span from bedtime), else at the
 next 21:00 local. The wall clock is read in the zone, so a DST change moves nothing.
 */

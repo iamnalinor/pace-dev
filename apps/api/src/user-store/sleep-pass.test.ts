@@ -194,7 +194,7 @@ describe("a pass that loads nothing it can decide nothing on", () => {
       // The night before is decided at once: from 22:30 to 08:00.
       expect(await runSleepPass(host, msk("23:55"))).toHaveLength(2);
       expect(calls.logs).toBe(1);
-      // An upload or an alarm every 15 minutes until morning, the phone telling as it goes.
+      // An upload every 15 minutes until morning (the phone's background run), telling as it goes.
       const passes = Array.from({ length: 31 }, (_, index) =>
         addMinutesIso(msk("00:10"), index * 15),
       );
@@ -306,8 +306,8 @@ describe("the store's alarm", () => {
       await instance.enqueueParse({ channel: "api", retryAt: now, text: "купить хлеб" }, now);
       await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now());
       await expect(instance.alarm()).resolves.toBeUndefined();
-      // Sleep looks again in 15 minutes, as after any pass at night.
-      const again = Date.now() + 15 * 60_000;
+      // Sleep looks again in an hour, as after any pass at night.
+      const again = Date.now() + 60 * 60_000;
       expect(await state.storage.get(SLEEP_NEXT_AT_KEY)).toBe(again);
       expect(await state.storage.getAlarm()).toBeLessThanOrEqual(again);
       expect(await state.storage.getAlarm()).not.toBeNull();
@@ -342,14 +342,14 @@ describe("the store's alarm", () => {
       for (let index = 0; index < 6; index += 1) {
         waits.push((await failAgain()) / 60_000);
       }
-      // 15 minutes, doubling, never more than four hours.
-      expect(waits).toEqual([15, 30, 60, 120, 240, 240]);
+      // An hour, doubling, never more than four hours.
+      expect(waits).toEqual([60, 120, 240, 240, 240, 240]);
       // A pass that completes (no phone told anything: nothing to arm) starts the count again.
       failing.is = false;
       await failAgain();
       failing.is = true;
       await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now());
-      expect((await failAgain()) / 60_000).toBe(15);
+      expect((await failAgain()) / 60_000).toBe(60);
     });
   });
 });

@@ -121,7 +121,7 @@ describe("a night of automatic sleep on a cold store", () => {
     await runInDurableObject(freshStore(), async (warm: UserStore, state) => {
       await warm.append(history(60), { now: new Date().toISOString() });
       /**
-      A store as production runs it between alarms 15 minutes apart: a new instance each time,
+      A store as production runs it between alarms and uploads minutes apart: a new instance each time,
       nothing in memory, the same storage.
       */
       const cold = (): UserStore => new UserStore(state, env);
@@ -149,7 +149,7 @@ describe("a night of automatic sleep on a cold store", () => {
         const known = uses.filter((use) => use.endAt <= (told.until ?? now));
         await cold().addUsage({ ...told, uses: known }, now);
       };
-      // The phone tells at 20:55 (sleep then looks every 15 minutes until noon).
+      // The phone tells at 20:55 (sleep then looks every hour until noon).
       await upload(msk("20:55"));
       const { cost } = meterSql(state.storage);
       // An upload every 15 minutes from 21:10 until 09:40, alarms firing in between.
