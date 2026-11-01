@@ -27,6 +27,37 @@ const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
   task: Timer,
 };
 
+/** The line's start: the assistant reads it first, so it is named "see the actions" (an icon only). */
+const ReviewButton = ({
+  isDim,
+  isDisabled,
+  onPress,
+}: {
+  readonly isDim: boolean;
+  readonly isDisabled: boolean;
+  readonly onPress: () => void;
+}) => {
+  const t = useT();
+  const { palette } = useTheme();
+  return (
+    <Tooltip label={t("assistant.review")} showsOnTap={false}>
+      <Pressable
+        accessibilityLabel={t("assistant.review")}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled }}
+        className={cx(
+          "h-11 w-11 items-center justify-center rounded-lg bg-accent active:opacity-80",
+          isDim && "opacity-50",
+        )}
+        disabled={isDisabled}
+        onPress={onPress}
+      >
+        <Play color={palette.accentFg} fill={palette.accentFg} size={16} />
+      </Pressable>
+    </Tooltip>
+  );
+};
+
 /**
 "What are you doing?" first reads actions; the owner approves before anything is written.
 */
@@ -95,19 +126,11 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           returnKeyType="go"
           value={text}
         />
-        <Pressable
-          accessibilityLabel={t("assistant.review")}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: typed === "" || pending.busy }}
-          className={cx(
-            "h-11 w-11 items-center justify-center rounded-lg bg-accent active:opacity-80",
-            typed === "" && "opacity-50",
-          )}
-          disabled={typed === "" || pending.busy}
+        <ReviewButton
+          isDim={typed === ""}
+          isDisabled={typed === "" || pending.busy}
           onPress={start}
-        >
-          <Play color={palette.accentFg} fill={palette.accentFg} size={16} />
-        </Pressable>
+        />
       </View>
     </View>
   );

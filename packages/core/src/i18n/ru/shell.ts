@@ -32,6 +32,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "account.unknown": "Неизвестный запрос.",
   "account.notYours": "Этот запрос вам не принадлежит.",
   "nav.main": "Основное",
+  "nav.signedInAs": "Вы вошли как {name}",
   "login.title": "Вход в Pace",
   "login.subtitle": "Ваши задачи и время — в своём темпе.",
   "login.endedElsewhere": "Вы вышли: этот сеанс завершили на другом устройстве, или он истёк.",

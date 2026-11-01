@@ -6,6 +6,7 @@ import { useT } from "#app/app-state.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import { useFeed } from "./use-feed.ts";
 
@@ -22,26 +23,28 @@ export const NotificationBell = ({
   const router = useRouter();
   const { palette } = useTheme();
   const { model } = useFeed();
+  const label =
+    model.unread > 0
+      ? t("notifications.openUnread", { count: model.unread })
+      : t("notifications.open");
   return (
-    <Pressable
-      accessibilityLabel={
-        model.unread > 0
-          ? t("notifications.openUnread", { count: model.unread })
-          : t("notifications.open")
-      }
-      accessibilityRole="button"
-      className={cx(
-        "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
-        variant === "surface" && "border border-line bg-surface",
-      )}
-      onPress={() => {
-        router.push("/notifications");
-      }}
-    >
-      <Bell color={palette.fg2} size={18} strokeWidth={1.75} />
-      <View className="absolute right-0.5 top-0.5">
-        <CountBadge count={model.unread} />
-      </View>
-    </Pressable>
+    <Tooltip label={label} showsOnTap={false}>
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        className={cx(
+          "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
+          variant === "surface" && "border border-line bg-surface",
+        )}
+        onPress={() => {
+          router.push("/notifications");
+        }}
+      >
+        <Bell color={palette.fg2} size={18} strokeWidth={1.75} />
+        <View className="absolute right-0.5 top-0.5">
+          <CountBadge count={model.unread} />
+        </View>
+      </Pressable>
+    </Tooltip>
   );
 };

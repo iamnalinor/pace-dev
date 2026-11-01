@@ -30,6 +30,7 @@ export const enShell = {
   "account.unknown": "Unknown confirmation.",
   "account.notYours": "This confirmation is not yours.",
   "nav.main": "Main",
+  "nav.signedInAs": "Signed in as {name}",
   "login.title": "Sign in to Pace",
   "login.subtitle": "Your tasks and time, at your own pace.",
   "login.endedElsewhere":
