@@ -6,6 +6,7 @@ import { addMinutesIso, newId, wallClockInstant } from "@pace/core";
 
 import type { UsageUpload } from "../src/user-store/cloud-data.ts";
 
+import { POOL_LEASE_KEY, POOL_NEXT_AT_KEY } from "../src/user-store/pool-retry-alarm.ts";
 import { UserStore } from "../src/user-store/user-store.ts";
 import { meterSql } from "./helpers.ts";
 
@@ -256,6 +257,66 @@ describe("the notification pool with nothing coming", () => {
         .exec("SELECT created_at FROM notifications WHERE kind = 'event_start'")
         .toArray();
       expect(announced).toEqual([{ created_at: flight.startAt }]);
+    });
+  });
+
+  it("starts its own times on a store main left with no pool time and no alarm", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const start = msk("08:00");
+      vi.setSystemTime(new Date(start));
+      const flight = {
+        endAt: addMinutesIso(start, 4 * 1440 + 240),
+        id: "ev-flight",
+        series: null,
+        startAt: addMinutesIso(start, 4 * 1440 + 120),
+        title: "Return flight",
+      };
+      await instance.append(
+        [envelope("settings.updated", { digestWindows: [], timezone: MOSCOW }, start)],
+        { now: start },
+      );
+      await instance.syncCalendar(copy(start, [flight]), start);
+      // main's last pass found nothing coming and deleted the alarm; main never wrote the key.
+      for (const key of [POOL_NEXT_AT_KEY, POOL_LEASE_KEY, "pool:failures"]) {
+        await state.storage.delete(key);
+      }
+      await state.storage.deleteAlarm();
+      // The new build: the phone sends the same copy every day, and nothing else happens.
+      for (let day = 1; day <= 4; day += 1) {
+        const now = addMinutesIso(start, day * 1440);
+        await fireDue(state, now);
+        vi.setSystemTime(new Date(now));
+        await new UserStore(state, deployed).syncCalendar(copy(now, [flight]), now);
+      }
+      await fireDue(state, addMinutesIso(flight.startAt, 1));
+      const announced = state.storage.sql
+        .exec("SELECT created_at FROM notifications WHERE kind = 'event_start'")
+        .toArray();
+      expect(announced).toEqual([{ created_at: flight.startAt }]);
+    });
+  });
+});
+
+describe("a write on a store main left with no pool time and no alarm", () => {
+  it("arms a pass at once, even when the pool finds nothing coming", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const start = msk("08:00");
+      vi.setSystemTime(new Date(start));
+      await instance.append(
+        [envelope("settings.updated", { digestWindows: [], timezone: MOSCOW }, start)],
+        { now: start },
+      );
+      await state.storage.delete(POOL_NEXT_AT_KEY);
+      await state.storage.deleteAlarm();
+      const now = msk("09:00");
+      vi.setSystemTime(new Date(now));
+      await new UserStore(state, deployed).append(
+        [envelope("settings.updated", { language: "ru" }, now)],
+        { now },
+      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(now));
+      await fireDue(state, now);
+      expect(await state.storage.get(POOL_NEXT_AT_KEY)).toBe(Date.parse(addMinutesIso(now, 1440)));
     });
   });
 });

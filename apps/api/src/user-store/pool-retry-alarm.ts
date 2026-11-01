@@ -21,7 +21,8 @@ const LEASE_MS = 5 * 60_000;
 Storage key of when the pool next wants a pass (epoch ms; `null` while a pass has taken it): the
 store's alarm also fires for sleep's looks and the assistant's queue, and a pass loads the whole
 log on a cold instance, so `alarm()` runs one only once this has come. A store from before the key
-has none, and passes at its next alarm.
+has none, and passes at its next alarm, armed at once by a write or an upload when it has none
+(`armIfPoolUnplanned`).
 */
 export const POOL_NEXT_AT_KEY = "pool:next-at";
 
@@ -40,14 +41,40 @@ const armPool = async (storage: DurableObjectStorage, at: number): Promise<void>
   await armEarliest(storage, at);
 };
 
+/**
+Arms the alarm at once on a store whose pool has neither a time nor any alarm: main's last pass
+deleted the alarm when nothing was coming and main never wrote the key, and a store just made or
+wiped has neither. Nothing would ever pass its pool (bug-lessons class 57): an unchanged calendar
+copy wakes nothing, and a write arms only what the pool finds coming. Any alarm already set passes
+the pool when it fires (no key reads as due), and that pass records the key, so after it this
+reads one value and arms nothing.
+*/
+export const armIfPoolUnplanned = async (
+  storage: DurableObjectStorage,
+  now: string,
+): Promise<void> => {
+  if ((await storage.get(POOL_NEXT_AT_KEY)) === undefined && (await storage.getAlarm()) === null) {
+    await storage.setAlarm(Date.parse(now));
+  }
+};
+
 /** Arms a retry without replacing an earlier alarm. */
 export const armRetry = async (storage: DurableObjectStorage, now: string): Promise<void> => {
   await armPool(storage, Date.parse(now) + RETRY_MS);
 };
 
-/** Arms a pass at `at` (an earlier one already armed stays). */
-export const armPass = async (storage: DurableObjectStorage, at: string): Promise<void> => {
-  await armPool(storage, Date.parse(at));
+/**
+After a write at `now`: arms the pass it calls for at `at` (an earlier one already armed stays),
+and one at once when the pool has no time and the store no alarm (`armIfPoolUnplanned`).
+*/
+export const armAfterWrite = async (
+  storage: DurableObjectStorage,
+  { at, now }: { readonly at: null | string; readonly now: string },
+): Promise<void> => {
+  if (at !== null) {
+    await armPool(storage, Date.parse(at));
+  }
+  await armIfPoolUnplanned(storage, now);
 };
 
 /**

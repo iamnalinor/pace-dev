@@ -35,7 +35,7 @@ import {
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
 import { answerInputs, answerRefusal, applyAnswer } from "./pool-answers.ts";
-import { armPass, armRetry, scheduleNextPass, takingPoolTime } from "./pool-retry-alarm.ts";
+import { armAfterWrite, armRetry, scheduleNextPass, takingPoolTime } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
 import { type Materialized, prepareBatch } from "./state.ts";
@@ -247,7 +247,8 @@ export class NotificationPool {
   /**
   After a write: notifications it settled (an event attended from Now's offer, an activity
   stopped) are taken back at once everywhere, and the alarm moves earlier if the pool now has
-  something due sooner (at once when something is due already).
+  something due sooner (at once when something is due already, or when the pool has no time and
+  the store no alarm at all: `armIfPoolUnplanned`).
   */
   async afterWrite(now: string): Promise<void> {
     const pass = await this.#pass(now);
@@ -255,9 +256,7 @@ export class NotificationPool {
       await this.#settle(settled.id, settled.resolution, { now, origin: "system" });
     }
     const at = pass.created.length > 0 ? now : pass.nextAt;
-    if (at !== null) {
-      await armPass(this.#host.ctx.storage, at);
-    }
+    await armAfterWrite(this.#host.ctx.storage, { at, now });
   }
 
   /**

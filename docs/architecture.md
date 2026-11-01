@@ -437,7 +437,9 @@ lease's wake runs it again, whether or not the runtime retries the alarm (class 
 that completed, that wake reads the gate and loads nothing. A failed pass runs again a minute
 on, doubling while passes keep failing, up to four hours (`pool:failures`; a pass that completes
 starts the count again), or sooner when a write asks for it; a store from before the key passes
-at its next alarm. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15
+at its next alarm, and one with no alarm at all (main deleted it when nothing was coming; a store
+just made or wiped has none) gets one at once from its next write or calendar copy, changed or
+not (`armIfPoolUnplanned`), so its pool starts its own times. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15
 minutes; a night's start is its last use and its end the morning's first, whenever a pass sees
 them, and each phone upload runs a pass, so the hour only delays a night while no phone uploads) and at the
 next 21:00 by day (`nextSleepCheckAt`).

@@ -3,7 +3,8 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import {
-  armPass,
+  armAfterWrite,
+  armIfPoolUnplanned,
   POOL_LEASE_KEY,
   POOL_NEXT_AT_KEY,
   poolAtAlarm,
@@ -157,7 +158,7 @@ describe("the pool's own time at the store's alarm", () => {
     await runInDurableObject(freshStore(), async (_instance, { storage }) => {
       await pass(storage, {
         during: async () => {
-          await armPass(storage, at(30));
+          await armAfterWrite(storage, { at: at(30), now: NOW });
         },
         nextAt: at(600),
         now: NOW,
@@ -186,7 +187,7 @@ describe("the pool's own time at the store's alarm", () => {
   it("re-arms on a person's write while a pass is cut short, and still passes at the lease's end", async () => {
     await runInDurableObject(freshStore(), async (_instance, { storage }) => {
       await cutShort(storage);
-      await armPass(storage, at(30));
+      await armAfterWrite(storage, { at: at(30), now: NOW });
       expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(30));
       // The write's later time does not hide the pass that died.
       expect(await hasPassedAt(storage, at(6))).toBe(true);
@@ -197,7 +198,7 @@ describe("the pool's own time at the store's alarm", () => {
     await runInDurableObject(freshStore(), async (_instance, { storage }) => {
       const failing = pass(storage, {
         during: async () => {
-          await armPass(storage, at(-1));
+          await armAfterWrite(storage, { at: at(-1), now: NOW });
           throw new Error("the pass broke");
         },
         nextAt: at(60),
@@ -242,6 +243,38 @@ describe("the pool's own time at the store's alarm", () => {
       await pass(storage, { nextAt: null, now });
       await expect(failingAt(storage, now)).rejects.toThrow("the pass broke");
       expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(Date.parse(now) + MINUTE);
+    });
+  });
+
+  it("arms at once a store with neither the pool's time nor any alarm, as main left one", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      await storage.deleteAlarm();
+      await armIfPoolUnplanned(storage, NOW);
+      expect(await storage.getAlarm()).toBe(ms(0));
+      expect(await hasPassedAt(storage, NOW)).toBe(true);
+      expect(await storage.get(POOL_NEXT_AT_KEY)).toBe(ms(24 * 60));
+      // The key is there now: an upload or a write arms nothing more.
+      await storage.deleteAlarm();
+      await armIfPoolUnplanned(storage, at(60));
+      expect(await storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it("leaves a store with an alarm to that alarm, which passes the pool with no key", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      await storage.setAlarm(ms(30));
+      await armIfPoolUnplanned(storage, NOW);
+      expect(await storage.getAlarm()).toBe(ms(30));
+      expect(await hasPassedAt(storage, at(30))).toBe(true);
+    });
+  });
+
+  it("leaves a pass that holds the pool's time alone", async () => {
+    await runInDurableObject(freshStore(), async (_instance, { storage }) => {
+      await cutShort(storage);
+      await storage.deleteAlarm();
+      await armIfPoolUnplanned(storage, NOW);
+      expect(await storage.getAlarm()).toBeNull();
     });
   });
 

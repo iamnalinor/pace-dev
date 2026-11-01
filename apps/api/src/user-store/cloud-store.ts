@@ -7,6 +7,7 @@ import type * as schema from "./schema.ts";
 import { createLogger } from "../shared/logger.ts";
 import * as cloud from "./cloud-data.ts";
 import { ruledSeriesChange, saveRuledSeries } from "./notification-pool.ts";
+import { armIfPoolUnplanned } from "./pool-retry-alarm.ts";
 import { PoolStore } from "./pool-store.ts";
 
 /**
@@ -31,7 +32,9 @@ export abstract class CloudStore extends PoolStore {
   it answers "every time" for (never announced as they start). The pool looks again only when
   something changed: the same copy again (every background run sends it) loads no log. A change
   is marked unplanned before its rows go in and unmarked once the pool has looked at it, so a copy
-  cut short in between is looked at with the next upload. Answers how many events came.
+  cut short in between is looked at with the next upload. The same copy on a store whose pool has
+  no time and no alarm (one main left) arms a pass at once (`armIfPoolUnplanned`). Answers how
+  many events came.
   */
   async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
     const { storage } = this.ctx;
@@ -48,6 +51,8 @@ export abstract class CloudStore extends PoolStore {
     if (isChanged || (await storage.get(UNPLANNED_KEY)) !== undefined) {
       await this.pool.afterWrite(now);
       await storage.delete(UNPLANNED_KEY);
+    } else {
+      await armIfPoolUnplanned(storage, now);
     }
     return upload.events.length;
   }
