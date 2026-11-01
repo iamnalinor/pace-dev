@@ -32,8 +32,11 @@ export const checkDurationProperty = (context: Context, node: Property): void =>
   }
 };
 
-/** `const BREATH_MS = 900;`: a named duration is still a raw one; it belongs in the motion tokens. */
-export const checkDurationDeclaration = (context: Context, node: VariableDeclarator): void => {
+/**
+`const BREATH_MS = 900;`: in a motion file (one importing reanimated) a named duration is still a
+raw one; it belongs in the motion tokens. Poll/debounce/timeout intervals elsewhere are behaviour.
+*/
+const checkDurationDeclaration = (context: Context, node: VariableDeclarator): void => {
   const declaration = (node as Rule.Node).parent as VariableDeclaration;
   if (
     declaration.kind === "const" &&
@@ -58,6 +61,7 @@ const checkSpring = (context: Context, call: CallExpression): void => {
 
 type MotionCallChecks = {
   call: (node: CallExpression) => void;
+  declarator: (node: VariableDeclarator) => void;
   importDeclaration: (node: ImportDeclaration) => void;
 };
 
@@ -65,6 +69,12 @@ type MotionCallChecks = {
 export const createMotionCallChecks = (context: Context): MotionCallChecks => {
   let isUsesReanimated = false;
   return {
+    // The same flag as setTimeout's: only files that animate with reanimated are motion files.
+    declarator(node) {
+      if (isUsesReanimated) {
+        checkDurationDeclaration(context, node);
+      }
+    },
     call(node) {
       const callee = calleeName(node);
       const method = methodName(node);

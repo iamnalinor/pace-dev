@@ -85,10 +85,22 @@ tester.run("no-raw-design-values", noRawDesignValues, {
       errors: [{ messageId: "rawDuration" }],
     },
     // Named durations.
-    { code: "const BREATH_MS = 900;", errors: [{ messageId: "rawDuration" }] },
-    { code: "export const DISSOLVE_MS = 750;", errors: [{ messageId: "rawDuration" }] },
-    { code: "const ENTER_DURATION = 200;", errors: [{ messageId: "rawDuration" }] },
-    { code: "const STAGGER_DELAY = 20;", errors: [{ messageId: "rawDuration" }] },
+    {
+      code: 'import { x } from "react-native-reanimated"; const BREATH_MS = 900;',
+      errors: [{ messageId: "rawDuration" }],
+    },
+    {
+      code: 'import { x } from "react-native-reanimated"; export const DISSOLVE_MS = 750;',
+      errors: [{ messageId: "rawDuration" }],
+    },
+    {
+      code: 'import { x } from "react-native-reanimated"; const ENTER_DURATION = 200;',
+      errors: [{ messageId: "rawDuration" }],
+    },
+    {
+      code: 'import { x } from "react-native-reanimated"; const STAGGER_DELAY = 20;',
+      errors: [{ messageId: "rawDuration" }],
+    },
     // Spring physics.
     {
       code: "const a = withSpring(1, { damping: 15, stiffness: 120, mass: 1 });",
@@ -160,6 +172,9 @@ tester.run("no-raw-design-values", noRawDesignValues, {
     'import { x } from "react-native"; const W = 250; setTimeout(go, W);',
     'import { x } from "react-native-reanimated"; setTimeout(go, delay); setTimeout(go, 0);',
     "const POLL = 5000; const SETTLE_MS = timing.settle; const MS = ms(3); let X_MS = 1;",
+    // Intervals outside motion files are behaviour, not design values.
+    "const POLL_INTERVAL_MS = 30_000; const SLOW_AFTER_MS = 4000; const RETRY_DELAY = 50;",
+    'import { x } from "react-native"; export const SAME_RETURN_MS = 1000;',
     // A repeat count is not a design value.
     "const a = withRepeat(x, -1, true);",
     'import { Button } from "#app/ui";',

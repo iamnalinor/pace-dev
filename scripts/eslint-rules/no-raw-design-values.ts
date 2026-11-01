@@ -4,11 +4,7 @@ import type { Expression, Literal, Property } from "estree";
 import { type Context, isNonZero, keyName, numericValue } from "./ast.ts";
 import { checkClasses } from "./class-checks.ts";
 import { isColorString, isNamedColorValue } from "./colors.ts";
-import {
-  checkDurationDeclaration,
-  checkDurationProperty,
-  createMotionCallChecks,
-} from "./motion-checks.ts";
+import { checkDurationProperty, createMotionCallChecks } from "./motion-checks.ts";
 
 /**
 Drives raw design values out of the app: colours (hex, `rgb()`/`hsl()`, CSS names on colour keys),
@@ -128,9 +124,7 @@ export const noRawDesignValues: Rule.RuleModule = {
       Property: (node) => {
         checkProperty(context, allowed, node);
       },
-      VariableDeclarator: (node) => {
-        checkDurationDeclaration(context, node);
-      },
+      VariableDeclarator: motion.declarator,
     };
   },
   meta: {
