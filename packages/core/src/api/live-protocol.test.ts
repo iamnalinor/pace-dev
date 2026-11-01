@@ -5,6 +5,7 @@ import {
   LIVE_MAX_IN_FLIGHT,
   LIVE_PAGE,
   LIVE_REQUEST_TIMEOUT_MS,
+  LIVE_SESSION_ENDED,
   LIVE_V1,
   LIVE_V2,
   LiveServerMessageSchema,
@@ -32,6 +33,11 @@ describe("the live socket's client messages", () => {
   it("names the subprotocols and the window the client keeps", () => {
     expect([LIVE_V1, LIVE_V2]).toEqual(["pace.v1", "pace.v2"]);
     expect([LIVE_PAGE, LIVE_REQUEST_TIMEOUT_MS, LIVE_MAX_IN_FLIGHT]).toEqual([200, 10_000, 4]);
+  });
+
+  it("closes a socket whose session ended with a code an app may send and receive", () => {
+    // 4000-4999 are the application's own (RFC 6455 §7.4.2); 4401 reads as "unauthorized".
+    expect(LIVE_SESSION_ENDED).toBe(4401);
   });
 
   it("reads a push with the body the HTTP push takes", () => {

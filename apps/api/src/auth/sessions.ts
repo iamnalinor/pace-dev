@@ -49,6 +49,8 @@ device it belongs to (whatever it sends is filed under that device).
 export type SessionAccess = {
   /** The session the bearer opened (its row in D1). */
   readonly sessionId: string;
+  /** When the session stops working (epoch ms); a live socket it opens ends then too. */
+  readonly expiresAt: number;
   readonly user: User;
   readonly scope: null | SessionScope;
   readonly device: DeviceIdentity | null;
@@ -122,6 +124,7 @@ export const findSession = async (
   const [row] = await db
     .select({
       sessionId: sessions.id,
+      expiresAt: sessions.expiresAt,
       lastSeenAt: sessions.lastSeenAt,
       scope: sessions.scope,
       name: sessions.name,
@@ -151,6 +154,7 @@ export const findSession = async (
   const scope = isScope(row.scope) ? row.scope : null;
   return {
     device: scope === null ? null : { id: usageDeviceOf(row) ?? row.sessionId, name: row.name },
+    expiresAt: row.expiresAt.getTime(),
     scope,
     sessionId: row.sessionId,
     user: row.user,
@@ -201,8 +205,4 @@ export const listSessions = async (
     name: row.name,
     usageDevice: usageDeviceOf({ ...row, sessionId: row.id }),
   }));
-};
-
-export const revokeSession = async (db: Db, token: string): Promise<void> => {
-  await db.delete(sessions).where(eq(sessions.tokenHash, await sha256Hex(token)));
 };

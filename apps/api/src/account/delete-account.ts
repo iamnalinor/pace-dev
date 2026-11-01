@@ -25,9 +25,14 @@ const revokeGrants = async (c: Context<AppEnv>, userId: string, cursor?: string)
   }
 };
 
-/** Only the Telegram callback (or the isolated test route) can call this. */
+/**
+Only the Telegram callback (or the isolated test route) can call this. The sessions go with the
+user (cascade), and so do their live sockets.
+*/
 export const deleteAccount = async (c: Context<AppEnv>, userId: string): Promise<void> => {
   await revokeGrants(c, userId);
-  await c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId)).wipe();
+  const store = c.env.USER_STORE.get(c.env.USER_STORE.idFromName(userId));
+  await store.wipe();
   await d1(c.env.DB).delete(users).where(eq(users.id, userId));
+  await store.endLiveSessions();
 };

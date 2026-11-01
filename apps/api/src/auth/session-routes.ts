@@ -82,7 +82,7 @@ export const mountSessionRoutes = (app: Hono<AppEnv>): void => {
     const userId = requireUser(c).id;
     const isRevoked = params.id.startsWith(MCP_PREFIX)
       ? await revokeGrant(c.env.OAUTH_KV, userId, params.id.slice(MCP_PREFIX.length))
-      : await deleteSession(d1(c.env.DB), userId, params.id);
+      : await deleteSession(d1(c.env.DB), { sessionId: params.id, userId }, userStoreOf(c));
     return isRevoked ? ok({ ok: true as const }) : err(SESSION_NOT_FOUND);
   });
   mount(app, endpoints.sessions.createAgent, async ({ body, c }) => {

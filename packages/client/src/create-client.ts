@@ -74,6 +74,7 @@ const liveChannelOf = (
   wiring: {
     readonly onChange: () => void;
     readonly onMessage: (message: unknown) => void;
+    readonly onSessionEnded: () => void;
     readonly token: () => string | undefined;
   },
 ): LiveChannel =>
@@ -83,6 +84,7 @@ const liveChannelOf = (
     deviceId: options.deviceId,
     onChange: wiring.onChange,
     onMessage: wiring.onMessage,
+    onSessionEnded: wiring.onSessionEnded,
     token: wiring.token,
   });
 
@@ -137,11 +139,21 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   token = auth.token;
   const { state, sync } = stateAndSync(options, api, now);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
-  const live = liveChannelOf(options, {
+  const live: LiveChannel = liveChannelOf(options, {
     onChange: () => {
       sync.soon();
     },
     onMessage: notices.onMessage,
+    // The server ended the socket's session: `me` signs out on its 401, so the app goes to
+    // sign-in; a session still good (an expiry the server misjudged) gets its socket back.
+    onSessionEnded: () => {
+      void (async (): Promise<void> => {
+        const checked = await auth.me();
+        if (checked.ok) {
+          live.start();
+        }
+      })();
+    },
     token: auth.token,
   });
   const actions = createActions({ clock, source: options.source, state });

@@ -1,10 +1,11 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { LiveServerMessageSchema, newId } from "@pace/core";
+import { endpoints, LIVE_SESSION_ENDED, LiveServerMessageSchema, newId } from "@pace/core";
 
+import { LIVE_EXPIRES_HEADER, LIVE_SESSION_HEADER } from "../src/shared/socket-auth.ts";
 import { replyCloseCode } from "../src/user-store/live-sockets.ts";
-import { api, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
+import { answerOf, api, call, json, loginAsDev, pushEvents, storeIdOf } from "./helpers.ts";
 
 type LiveMessage = ReturnType<typeof LiveServerMessageSchema.parse>;
 type Events = Extract<LiveMessage, { type: "events" }>;
@@ -65,6 +66,8 @@ type Inbox = {
   readonly until: <T extends LiveMessage["type"]>(
     type: T,
   ) => Promise<readonly [readonly (LiveMessage | string)[], Extract<LiveMessage, { type: T }>]>;
+  /** The code the socket closed with, or `null` when it is still open a second later. */
+  readonly closed: () => Promise<null | number>;
 };
 
 const read = (data: string): LiveMessage | string =>
@@ -73,6 +76,24 @@ const read = (data: string): LiveMessage | string =>
 const inboxOf = (socket: WebSocket): Inbox => {
   const queue: string[] = [];
   const waiters: ((data: string) => void)[] = [];
+  const closing: { code?: number; readonly waiters: ((code: number) => void)[] } = { waiters: [] };
+  socket.addEventListener("close", (event) => {
+    closing.code = event.code;
+    for (const waiter of closing.waiters.splice(0)) {
+      waiter(event.code);
+    }
+  });
+  const closed = async (): Promise<null | number> =>
+    closing.code ??
+    (await new Promise<null | number>((resolve) => {
+      const timer = setTimeout(() => {
+        resolve(null);
+      }, 1000);
+      closing.waiters.push((code) => {
+        clearTimeout(timer);
+        resolve(code);
+      });
+    }));
   socket.addEventListener("message", (message) => {
     const data = String(message.data);
     const waiter = waiters.shift();
@@ -119,7 +140,7 @@ const inboxOf = (socket: WebSocket): Inbox => {
     }
     throw new Error(`no ${type} message; got ${JSON.stringify(seen)}`);
   };
-  return { drain, next, socket, until };
+  return { closed, drain, next, socket, until };
 };
 
 /** Opens the live channel the way a browser does: the token rides in the subprotocols. */
@@ -159,6 +180,19 @@ const openV1 = async (token: string, device: string): Promise<Inbox> => {
     throw new Error("no socket");
   }
   return inboxOf(socket);
+};
+
+/** The session a token belongs to, as Settings lists it. */
+const sessionIdOf = async (token: string): Promise<string> => {
+  const { sessions } = await answerOf(endpoints.sessions.list, "/api/sessions", { token });
+  return sessions.find((session) => session.current)?.id ?? "";
+};
+
+/** Waits out a short session (real time: the store compares with the clock). */
+const wait = async (ms: number): Promise<void> => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 };
 
 const userStore = async (token: string) => {
@@ -413,5 +447,143 @@ describe("live sync channel, pace.v2", () => {
     const [, events] = await v2.until("events");
     expect(events).toMatchObject({ events: [], more: true, seq: before + 250, since: before });
     v2.socket.close();
+  });
+});
+
+describe("live sockets end with their session", () => {
+  it("closes a revoked session's sockets, v1 and v2, and keeps the others open", async () => {
+    const [ended, kept] = [await loginAsDev("1001"), await loginAsDev("1001")];
+    const endedV2 = await openV2(ended, "phone-1");
+    const endedV1 = await openV1(ended, "phone-2");
+    const keptV2 = await openV2(kept, "laptop-1");
+    const revoked = await call(`/api/sessions/${await sessionIdOf(ended)}`, {
+      method: "DELETE",
+      token: kept,
+    });
+    expect(revoked.status).toBe(200);
+    expect(await endedV2.closed()).toBe(LIVE_SESSION_ENDED);
+    expect(await endedV1.closed()).toBe(LIVE_SESSION_ENDED);
+    await pushEvents(kept, [event()]);
+    expect(eventsIn(await endedV2.drain())).toEqual([]);
+    expect(await endedV1.next()).toBeNull();
+    const [, events] = await keptV2.until("events");
+    expect(events.events).toHaveLength(1);
+    expect(await keptV2.closed()).toBeNull();
+    keptV2.socket.close();
+  });
+
+  it("closes the socket of a session ended with Not me", async () => {
+    const [intruder, owner] = [await loginAsDev("1001"), await loginAsDev("1001")];
+    const intruderV2 = await openV2(intruder, "phone-1");
+    const ownerV2 = await openV2(owner, "laptop-1");
+    const sessionId = await sessionIdOf(intruder);
+    const notice = await (await userStore(owner)).notify(
+      {
+        kind: "login",
+        payload: { country: "", ip: "", kind: "dev", name: "Dev login", sessionId },
+      },
+      new Date().toISOString(),
+    );
+    if (!notice.ok) {
+      throw new Error(notice.error.code);
+    }
+    const answered = await call(`/api/notifications/${notice.value.id}/resolve`, {
+      body: { from: "web", resolution: "revoked" },
+      token: owner,
+    });
+    expect(answered.status).toBe(200);
+    expect(await intruderV2.closed()).toBe(LIVE_SESSION_ENDED);
+    ownerV2.socket.send(JSON.stringify({ id: "p", since: 0, type: "pull" }));
+    const [, page] = await ownerV2.until("events");
+    expect(page.id).toBe("p");
+    ownerV2.socket.close();
+  });
+
+  it("closes the socket of a session that logs out", async () => {
+    const token = await loginAsDev("1001");
+    const socket = await openV2(token, "phone-1");
+    expect((await call("/api/auth/logout", { method: "POST", token })).status).toBe(200);
+    expect(await socket.closed()).toBe(LIVE_SESSION_ENDED);
+  });
+
+  it("closes every socket of an account that is deleted", async () => {
+    const [first, second] = [await loginAsDev("1002"), await loginAsDev("1002")];
+    const sockets = [await openV2(first, "phone-1"), await openV1(second, "laptop-1")];
+    expect((await call("/api/test/account", { method: "DELETE", token: first })).status).toBe(200);
+    for (const socket of sockets) {
+      expect(await socket.closed()).toBe(LIVE_SESSION_ENDED);
+    }
+  });
+
+  it("stops serving a socket whose session expired: no pull, no events", async () => {
+    const token = await loginAsDev("1001");
+    const store = await userStore(token);
+    // The Worker names the session and its expiry; here it expires in a moment.
+    const expiresAt = String(Date.now() + 300);
+    const openShort = async (device: string): Promise<Inbox> => {
+      const response = await store.fetch(
+        new Request(`https://pace-api.test/api/sync/live?device=${device}`, {
+          headers: {
+            [LIVE_EXPIRES_HEADER]: expiresAt,
+            [LIVE_SESSION_HEADER]: "short-session",
+            "Sec-WebSocket-Protocol": "pace.v2",
+            Upgrade: "websocket",
+          },
+        }),
+      );
+      const socket = response.webSocket;
+      if (socket === null) {
+        throw new Error("no socket");
+      }
+      socket.accept();
+      const inbox = inboxOf(socket);
+      expect(await inbox.next()).toEqual({ protocol: "pace.v2", type: "hello" });
+      return inbox;
+    };
+    const puller = await openShort("laptop-1");
+    const listener = await openShort("laptop-2");
+    await wait(400);
+    puller.socket.send(JSON.stringify({ id: "p", since: 0, type: "pull" }));
+    expect(await puller.closed()).toBe(LIVE_SESSION_ENDED);
+    expect(eventsIn(await puller.drain())).toEqual([]);
+    await pushEvents(token, [event()]);
+    expect(await listener.closed()).toBe(LIVE_SESSION_ENDED);
+    expect(eventsIn(await listener.drain())).toEqual([]);
+  });
+
+  it("takes the session from the Worker, never from the app's own headers", async () => {
+    const token = await loginAsDev("1001");
+    const response = await api.fetch(
+      new Request("https://pace-api.test/api/sync/live?device=phone-1", {
+        headers: {
+          [LIVE_EXPIRES_HEADER]: "1",
+          [LIVE_SESSION_HEADER]: "someone-else",
+          "Sec-WebSocket-Protocol": `pace.v2, pace.auth.${token}`,
+          Upgrade: "websocket",
+        },
+      }),
+    );
+    const socket = response.webSocket;
+    if (socket === null) {
+      throw new Error("no socket");
+    }
+    socket.accept();
+    const inbox = inboxOf(socket);
+    expect(await inbox.next()).toEqual({ protocol: "pace.v2", type: "hello" });
+    socket.send(JSON.stringify({ id: "p", since: 0, type: "pull" }));
+    const [, page] = await inbox.until("events");
+    expect(page.id).toBe("p");
+    socket.close();
+  });
+
+  it("refuses a socket no session was named for", async () => {
+    const token = await loginAsDev("1001");
+    const response = await (await userStore(token)).fetch(
+      new Request("https://pace-api.test/api/sync/live?device=phone-1", {
+        headers: { "Sec-WebSocket-Protocol": "pace.v2", Upgrade: "websocket" },
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect(response.webSocket).toBeNull();
   });
 });

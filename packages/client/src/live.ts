@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { PROTOCOL } from "@pace/core";
+import { LIVE_SESSION_ENDED, PROTOCOL } from "@pace/core";
 
 type SocketEvent = "close" | "message" | "open";
 
@@ -8,7 +8,7 @@ type SocketEvent = "close" | "message" | "open";
 export type SocketLike = {
   readonly addEventListener: (
     type: SocketEvent,
-    listener: (event: { readonly data?: unknown }) => void,
+    listener: (event: { readonly code?: unknown; readonly data?: unknown }) => void,
   ) => void;
   readonly send: (data: string) => void;
   readonly close: () => void;
@@ -30,6 +30,12 @@ export type LiveChannelOptions = {
   readonly onChange: () => void;
   /** Any other message the server sends (the notification pool's), parsed from JSON. */
   readonly onMessage?: (message: unknown) => void;
+  /**
+  The server closed the socket because its session ended (revoked, logged out, expired): the
+  channel stops reconnecting until it is started again (a reconnect would only be refused), and
+  the app checks its session.
+  */
+  readonly onSessionEnded?: () => void;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
   readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
@@ -99,8 +105,8 @@ const follow = (
   on: {
     readonly open: () => void;
     readonly changed: () => void;
-    readonly message: (message: unknown) => void;
-    readonly close: () => void;
+    readonly message?: ((message: unknown) => void) | undefined;
+    readonly close: (code: unknown) => void;
   },
 ): void => {
   socket.addEventListener("open", on.open);
@@ -112,10 +118,12 @@ const follow = (
     if (message.type === "changed") {
       on.changed();
     } else {
-      on.message(message);
+      on.message?.(message);
     }
   });
-  socket.addEventListener("close", on.close);
+  socket.addEventListener("close", ({ code }) => {
+    on.close(code);
+  });
 };
 
 /**
@@ -140,22 +148,21 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     current = socket;
     follow(socket, {
       changed: options.onChange,
-      message: (message) => {
-        options.onMessage?.(message);
-      },
-      close: () => {
+      message: options.onMessage,
+      close: (code) => {
         if (current !== socket) {
           return;
         }
         current = undefined;
         timers.clear();
         status.setState({ isConnected: false });
-        if (!isRunning) {
-          return;
+        if (isRunning && code === LIVE_SESSION_ENDED) {
+          isRunning = false;
+          options.onSessionEnded?.();
+        } else if (isRunning) {
+          failures += 1;
+          timers.retryIn(retryDelay(failures), connect);
         }
-
-        failures += 1;
-        timers.retryIn(retryDelay(failures), connect);
       },
       open: () => {
         failures = 0;
@@ -170,7 +177,6 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
       if (isRunning) {
         return;
       }
-
       isRunning = true;
       connect();
     },

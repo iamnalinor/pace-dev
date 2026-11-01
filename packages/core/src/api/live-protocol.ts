@@ -31,6 +31,13 @@ export const LIVE_REQUEST_TIMEOUT_MS = 10_000;
 /** How many socket requests a client keeps unanswered at once. */
 export const LIVE_MAX_IN_FLIGHT = 4;
 
+/**
+The close code of a live socket whose session ended (revoked, logged out, "Not me", expired): the
+app checks its session (a 401 signs it out) instead of reconnecting. 4000-4999 are the
+application's own codes (RFC 6455 §7.4.2); 4401 reads as "unauthorized".
+*/
+export const LIVE_SESSION_ENDED = 4401;
+
 /** The one error code of a socket message the server cannot read. */
 export const LIVE_BAD_REQUEST = "bad-request";
 

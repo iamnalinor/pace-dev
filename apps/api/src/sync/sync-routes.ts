@@ -7,7 +7,12 @@ import type { AppEnv } from "../shared/app-env.ts";
 import { requireUser } from "../shared/current-user.ts";
 import { mount, type Problem } from "../shared/mount.ts";
 import { isOutdatedClient, outdatedClient } from "../shared/protocol.ts";
-import { socketUser, tokenFromProtocols } from "../shared/socket-auth.ts";
+import {
+  LIVE_EXPIRES_HEADER,
+  LIVE_SESSION_HEADER,
+  socketSession,
+  tokenFromProtocols,
+} from "../shared/socket-auth.ts";
 
 /** Why a push was refused, as the client sees it (one entry per error code). */
 const PUSH_PROBLEMS: Readonly<Record<typeof STORE_CHANGED, Problem>> = {
@@ -29,7 +34,8 @@ once instead of polling; on `pace.v2` it sends the new events themselves and tak
 pulls (`LiveClientMessageSchema`, whose push body is `endpoints.sync.push.body` itself, run by the
 same store `push` and `list` as the HTTP routes below). Not an `endpoint()`: an upgrade
 is not a JSON call. The bearer comes in the subprotocols and the app's protocol in the `protocol`
-query, since a browser cannot set headers on a socket.
+query, since a browser cannot set headers on a socket. The store tags the socket with the session
+and closes it when the session ends (`deleteSession`) or expires.
 */
 const mountLiveRoute = (app: Hono<AppEnv>): void => {
   app.get("/api/sync/live", async (c) => {
@@ -39,15 +45,19 @@ const mountLiveRoute = (app: Hono<AppEnv>): void => {
     if (isOutdatedClient(c.req.query("protocol"))) {
       return outdatedClient(c);
     }
-    const user = await socketUser(
+    const session = await socketSession(
       c.env,
       tokenFromProtocols(c.req.header("Sec-WebSocket-Protocol") ?? null),
     );
-    if (user === null) {
+    if (session === null) {
       return c.json({ code: "auth/unauthorized", message: "Unauthorized" }, 401);
     }
-    const store = c.env.USER_STORE.get(c.env.USER_STORE.idFromName(user.id));
-    return await store.fetch(c.req.raw);
+    // The session rides to the store in headers set here, over anything the app sent.
+    const headers = new Headers(c.req.raw.headers);
+    headers.set(LIVE_SESSION_HEADER, session.sessionId);
+    headers.set(LIVE_EXPIRES_HEADER, String(session.expiresAt));
+    const store = c.env.USER_STORE.get(c.env.USER_STORE.idFromName(session.user.id));
+    return await store.fetch(new Request(c.req.raw.url, { headers }));
   });
 };
 

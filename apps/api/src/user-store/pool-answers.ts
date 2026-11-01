@@ -14,6 +14,7 @@ import {
 
 import { d1 } from "../shared/db/d1.ts";
 import { deleteSession } from "../shared/session-rows.ts";
+import { endLiveSessions } from "./live-sessions.ts";
 
 const at = (
   occurredAt: string,
@@ -77,16 +78,23 @@ before the notification is resolved, so a failure leaves it open to be pressed a
 export const applyAnswer = async (
   notification: PoolNotification,
   resolution: Resolution,
-  store: {
-    readonly env: { readonly DB: D1Database };
-    readonly ctx: { readonly id: { readonly name?: string | undefined } };
-  },
+  store: { readonly env: { readonly DB: D1Database }; readonly ctx: DurableObjectState },
 ): Promise<void> => {
   // The store is named after its user (`idFromName(userId)`).
   const userId = store.ctx.id.name;
-  if (resolution === "revoked" && userId !== undefined && notification.kind === "login") {
-    await deleteSession(d1(store.env.DB), userId, notification.payload.sessionId);
+  if (resolution !== "revoked" || userId === undefined || notification.kind !== "login") {
+    return;
   }
+  const live = {
+    endLiveSessions: (sessionId: string): void => {
+      endLiveSessions(store.ctx, sessionId);
+    },
+  };
+  await deleteSession(
+    d1(store.env.DB),
+    { sessionId: notification.payload.sessionId, userId },
+    live,
+  );
 };
 
 /**

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { endpoints, ParseResponseSchema } from "@pace/core";
+import { endpoints, LIVE_SESSION_ENDED, ParseResponseSchema } from "@pace/core";
+
+import type { SocketLike } from "./live.ts";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createPaceClient, type PaceClient } from "./create-client.ts";
@@ -17,6 +19,7 @@ import { createMemorySessionStore } from "./session.ts";
 const setup = async (
   routes: Readonly<Record<string, FakeRoute>> = {},
   storedToken?: string,
+  createSocket?: (url: string, protocols: readonly string[]) => SocketLike,
 ): Promise<{ readonly api: ReturnType<typeof createFakeFetch>; readonly client: PaceClient }> => {
   const session = createMemorySessionStore();
   if (storedToken !== undefined) {
@@ -25,6 +28,7 @@ const setup = async (
   const api = createFakeFetch({ ...emptySyncRoutes, "GET /api/me": () => fakeMe, ...routes });
   const client = createPaceClient({
     baseUrl: "https://api.test",
+    ...(createSocket !== undefined && { createSocket }),
     deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     fetch: api.fetch,
     now: () => "2026-10-06T12:00:00.000Z",
@@ -37,7 +41,70 @@ const setup = async (
   return { api, client };
 };
 
+type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
+
+/** One socket the client opens; the test plays the server's close. */
+const oneSocket = (): {
+  readonly create: (url: string, protocols: readonly string[]) => SocketLike;
+  readonly opened: () => number;
+  readonly emit: (type: string, event: { readonly code?: number }) => void;
+} => {
+  const listeners: { type: string; listener: Listener }[] = [];
+  let opened = 0;
+  return {
+    create: () => {
+      opened += 1;
+      return {
+        addEventListener: (type, listener) => {
+          listeners.push({ listener, type });
+        },
+        close: () => undefined,
+        send: () => undefined,
+      };
+    },
+    emit: (type, event) => {
+      for (const entry of listeners) {
+        if (entry.type === type) {
+          entry.listener(event);
+        }
+      }
+    },
+    opened: () => opened,
+  };
+};
+
 describe("createPaceClient", () => {
+  it("signs out when the server closes the live socket because the session ended", async () => {
+    const socket = oneSocket();
+    const me = { isRevoked: false };
+    const { client } = await setup(
+      { "GET /api/me": () => (me.isRevoked ? problem(401, "auth/unauthorized") : fakeMe) },
+      "tok",
+      socket.create,
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    client.live.start();
+    expect(socket.opened()).toBe(1);
+    socket.emit("open", {});
+    me.isRevoked = true;
+    socket.emit("close", { code: LIVE_SESSION_ENDED });
+    await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+    expect(socket.opened()).toBe(1);
+    client.live.stop();
+  });
+
+  it("opens the live socket again when its close was not the end of the session", async () => {
+    const socket = oneSocket();
+    const { client } = await setup({}, "tok", socket.create);
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    client.live.start();
+    socket.emit("open", {});
+    socket.emit("close", { code: LIVE_SESSION_ENDED });
+    await expect.poll(() => socket.opened()).toBe(2);
+    expect(client.auth.store.getState().status).toBe("signed-in");
+    client.live.stop();
+  });
+
   it("wires the state and the sync client on one store", async () => {
     const { api, client } = await setup({
       "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),

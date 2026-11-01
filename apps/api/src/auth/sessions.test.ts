@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { sha256Hex } from "../shared/crypto.ts";
 import { d1 } from "../shared/db/d1.ts";
 import { deleteSession } from "../shared/session-rows.ts";
-import { createSession, findSession, revokeSession } from "./sessions.ts";
+import { createSession, findSession } from "./sessions.ts";
 import { upsertTelegramUser } from "./users.ts";
 
 const NOW = Date.UTC(2026, 9, 6, 10);
@@ -19,6 +19,9 @@ const BROWSER = (userId: string) => ({
 });
 
 // Storage is shared within a test file, so every test gets its own user.
+/** A store with no live sockets to close. */
+const NO_SOCKETS = { endLiveSessions: (): void => undefined };
+
 const seedUser = async () =>
   await upsertTelegramUser(
     d1(env.DB),
@@ -46,6 +49,7 @@ describe("sessions", () => {
     expect(session.expiresAt).toBe(NOW + 90 * DAY);
     expect(await findSession(db, session.token, NOW + 89 * DAY)).toEqual({
       device: null,
+      expiresAt: session.expiresAt,
       scope: null,
       sessionId: session.id,
       user,
@@ -67,7 +71,7 @@ describe("sessions", () => {
     const user = await seedUser();
     const session = await createSession(db, BROWSER(user.id));
     expect(await findSession(db, "not-a-token", NOW)).toBeNull();
-    await revokeSession(db, session.token);
+    await deleteSession(db, { sessionId: session.id, userId: user.id }, NO_SOCKETS);
     expect(await findSession(db, session.token, NOW)).toBeNull();
   });
 
@@ -112,15 +116,25 @@ describe("sessions", () => {
     });
   });
 
-  it("deletes one of the person's sessions by id, and only theirs", async () => {
+  it("deletes one of the person's sessions by id, and only theirs, closing its sockets", async () => {
     const db = d1(env.DB);
     const user = await seedUser();
     const stranger = await seedUser();
     const session = await createSession(db, BROWSER(user.id));
-    expect(await deleteSession(db, stranger.id, session.id)).toBe(false);
+    const ended: string[] = [];
+    const live = {
+      endLiveSessions: (sessionId: string): void => {
+        ended.push(sessionId);
+      },
+    };
+    expect(
+      await deleteSession(db, { sessionId: session.id, userId: stranger.id }, NO_SOCKETS),
+    ).toBe(false);
     expect(await findSession(db, session.token, NOW)).not.toBeNull();
-    expect(await deleteSession(db, user.id, session.id)).toBe(true);
+    expect(await deleteSession(db, { sessionId: session.id, userId: user.id }, live)).toBe(true);
     expect(await findSession(db, session.token, NOW)).toBeNull();
-    expect(await deleteSession(db, user.id, session.id)).toBe(false);
+    // Already gone: its sockets are closed all the same (one may have opened in between).
+    expect(await deleteSession(db, { sessionId: session.id, userId: user.id }, live)).toBe(false);
+    expect(ended).toEqual([session.id, session.id]);
   });
 });

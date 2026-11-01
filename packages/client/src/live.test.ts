@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LIVE_SESSION_ENDED } from "@pace/core";
+
 import { createLiveChannel, liveUrl, type SocketLike } from "./live.ts";
 
 type FakeSocket = SocketLike & {
@@ -10,7 +12,8 @@ type FakeSocket = SocketLike & {
   /** What the server would do. */
   open: () => void;
   receive: (data: string) => void;
-  drop: () => void;
+  /** The connection goes, with the close code the server gave (none for a dropped network). */
+  drop: (code?: number) => void;
 };
 
 const fakeSockets = (): {
@@ -20,11 +23,14 @@ const fakeSockets = (): {
   const made: FakeSocket[] = [];
   return {
     create: (url, protocols) => {
-      const listeners = new Map<string, ((event: { readonly data?: unknown }) => void)[]>();
-      const emit = (type: string, data?: string): void => {
+      const listeners = new Map<
+        string,
+        ((event: { readonly code?: unknown; readonly data?: unknown }) => void)[]
+      >();
+      const emit = (type: string, event: { readonly code?: number; readonly data?: string }) => {
         const heard = listeners.get(type) ?? [];
         for (const listener of heard) {
-          listener({ data });
+          listener(event);
         }
       };
       const socket: FakeSocket = {
@@ -33,18 +39,18 @@ const fakeSockets = (): {
         },
         close: () => {
           socket.closed = true;
-          emit("close");
+          emit("close", {});
         },
         closed: false,
-        drop: () => {
-          emit("close");
+        drop: (code) => {
+          emit("close", code === undefined ? {} : { code });
         },
         open: () => {
-          emit("open");
+          emit("open", {});
         },
         protocols,
         receive: (data) => {
-          emit("message", data);
+          emit("message", { data });
         },
         send: (data) => {
           socket.sent.push(data);
@@ -154,6 +160,31 @@ describe("createLiveChannel", () => {
     sockets.made[2]?.drop();
     vi.advanceTimersByTime(120_000);
     expect(sockets.made).toHaveLength(3);
+  });
+
+  it("stops reconnecting when the server ends the socket's session, and says so", () => {
+    const sockets = fakeSockets();
+    const onSessionEnded = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: () => undefined,
+      onSessionEnded,
+      token: () => "tok",
+    });
+    live.start();
+    sockets.made[0]?.open();
+    sockets.made[0]?.drop(LIVE_SESSION_ENDED);
+    expect(onSessionEnded).toHaveBeenCalledTimes(1);
+    expect(live.status.getState().isConnected).toBe(false);
+    vi.advanceTimersByTime(120_000);
+    expect(sockets.made).toHaveLength(1);
+    // Started again (signed in anew, or the session turned out fine): it connects.
+    live.stop();
+    live.start();
+    expect(sockets.made).toHaveLength(2);
+    live.stop();
   });
 
   it("waits for a token instead of opening without one", () => {

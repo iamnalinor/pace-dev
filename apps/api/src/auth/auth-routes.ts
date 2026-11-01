@@ -20,8 +20,8 @@ import { createLogger } from "../shared/logger.ts";
 import { loginPayload, returnUrl } from "../shared/login-link.ts";
 import { type Handler, mount, type Problem } from "../shared/mount.ts";
 import { requestPlace, type RequestPlace } from "../shared/request-place.ts";
+import { deleteSession } from "../shared/session-rows.ts";
 import { storeOfUser, userStoreOf } from "../shared/user-store-of.ts";
-import { readBearer } from "./auth-middleware.ts";
 import { cachedAvatar, refreshAvatar } from "./avatar.ts";
 import {
   consumeNonce,
@@ -32,7 +32,7 @@ import {
   type NonceState,
 } from "./nonce.ts";
 import { mountSessionRoutes } from "./session-routes.ts";
-import { createSession, prepareSession, revokeSession, type SessionKind } from "./sessions.ts";
+import { createSession, prepareSession, type SessionKind } from "./sessions.ts";
 import { verifyTelegramLogin } from "./telegram-widget.ts";
 import { clientName } from "./user-agent.ts";
 import { findUserById, type TelegramProfile, upsertTelegramUser, type User } from "./users.ts";
@@ -311,9 +311,9 @@ export const mountAuthRoutes = (app: Hono<AppEnv>, telegramFetch: TelegramTransp
   });
   mount(app, endpoints.auth.noncePoll, pollNonce(telegramFetch));
   mount(app, endpoints.auth.logout, async ({ c }) => {
-    const bearer = readBearer(c.req.header("Authorization"));
-    if (bearer !== undefined) {
-      await revokeSession(d1(c.env.DB), bearer);
+    const sessionId = c.get("sessionId");
+    if (sessionId !== undefined) {
+      await deleteSession(d1(c.env.DB), { sessionId, userId: requireUser(c).id }, userStoreOf(c));
     }
     return ok({ ok: true as const });
   });

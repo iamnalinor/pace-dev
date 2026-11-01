@@ -2,8 +2,15 @@ import { DurableObject } from "cloudflare:workers";
 
 import { type Event, type KnownLiveServerMessage, LIVE_PAGE, LIVE_V1, LIVE_V2 } from "@pace/core";
 
-import { liveProtocolOf } from "../shared/socket-auth.ts";
+import { LIVE_EXPIRES_HEADER, LIVE_SESSION_HEADER, liveProtocolOf } from "../shared/socket-auth.ts";
 import { answerLiveMessage, type LiveStoreCalls } from "./live-messages.ts";
+import {
+  endLiveSessions,
+  isServed,
+  namedSession,
+  servedSockets,
+  sessionTags,
+} from "./live-sessions.ts";
 import { storeIdOf } from "./store-identity.ts";
 
 /** A device id is a tag on its socket; tags are short. */
@@ -23,18 +30,30 @@ const sendTo = (socket: WebSocket, message: KnownLiveServerMessage): void => {
 
 /**
 Accepts a live client as a hibernating WebSocket (no duration billed while it is quiet), tagged
-with the subprotocol it speaks and the device it serves, so that device is not told about its own
-writes. Tags are all a socket keeps: they survive hibernation, memory does not. A v2 socket hears
-`hello` first.
+with the subprotocol it speaks, the session that opened it (see `live-sessions.ts`) and the device
+it serves, so that device is not told about its own writes. Tags are all a socket keeps: they
+survive hibernation, memory does not. A v2 socket hears `hello` first. A request the Worker named
+no session for is refused: no socket outlives a session it cannot be tied to.
 */
 export const acceptLiveSocket = (ctx: DurableObjectState, request: Request): Response => {
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
     return new Response("Expected a WebSocket", { status: 426 });
   }
+  const session = namedSession(
+    request.headers.get(LIVE_SESSION_HEADER),
+    request.headers.get(LIVE_EXPIRES_HEADER),
+  );
+  if (session === null) {
+    return new Response("No session", { status: 401 });
+  }
   const protocol = liveProtocolOf(request.headers.get("Sec-WebSocket-Protocol"));
   const device = new URL(request.url).searchParams.get("device")?.slice(0, MAX_TAG) ?? "";
   const { 0: client, 1: server } = new WebSocketPair();
-  ctx.acceptWebSocket(server, device === "" ? [protocol] : [protocol, `${DEVICE_TAG}${device}`]);
+  ctx.acceptWebSocket(server, [
+    protocol,
+    ...sessionTags(session.sessionId, session.expiresAt),
+    ...(device === "" ? [] : [`${DEVICE_TAG}${device}`]),
+  ]);
   if (protocol === LIVE_V2) {
     sendTo(server, { protocol: LIVE_V2, type: "hello" });
   }
@@ -73,7 +92,7 @@ export const announceChange = async (ctx: DurableObjectState, change: LogChange)
     type: "events",
   };
   const announce = (protocol: string, message: KnownLiveServerMessage): void => {
-    for (const socket of ctx.getWebSockets(protocol)) {
+    for (const socket of servedSockets(ctx, protocol)) {
       const device = ctx
         .getTags(socket)
         .find((tag) => tag.startsWith(DEVICE_TAG))
@@ -91,7 +110,7 @@ export const announceChange = async (ctx: DurableObjectState, change: LogChange)
 /** Sends a message to every live client (a feed update: a notification new or resolved). */
 export const broadcast = (ctx: DurableObjectState, message: object): void => {
   const text = JSON.stringify(message);
-  for (const socket of ctx.getWebSockets()) {
+  for (const socket of servedSockets(ctx)) {
     try {
       socket.send(text);
     } catch {
@@ -133,18 +152,28 @@ export abstract class LiveStore extends DurableObject implements LiveStoreCalls 
     return acceptLiveSocket(this.ctx, request);
   }
 
+  /** Closes the live sockets of a session that ended, or of all when none is named. */
+  endLiveSessions(sessionId?: string): void {
+    endLiveSessions(this.ctx, sessionId);
+  }
+
   /**
   A request on a live socket, answered on it. A v1 socket asks nothing, so its messages go
-  unanswered as they always did (its `ping` never gets here: the runtime answers it unwoken).
+  unanswered as they always did (its `ping` never gets here: the runtime answers it unwoken). One
+  whose session expired is closed instead of answered.
   */
   override async webSocketMessage(socket: WebSocket, data: ArrayBuffer | string): Promise<void> {
-    if (!this.ctx.getTags(socket).includes(LIVE_V2)) {
+    if (!isServed(this.ctx, socket) || !this.ctx.getTags(socket).includes(LIVE_V2)) {
       return;
     }
     sendTo(socket, await answerLiveMessage(this, data, new Date().toISOString()));
   }
 
   override webSocketClose(socket: WebSocket, code: number): void {
-    socket.close(replyCloseCode(code), "closing");
+    try {
+      socket.close(replyCloseCode(code), "closing");
+    } catch {
+      // The store closed it first (its session ended): the device's close only confirms it.
+    }
   }
 }
