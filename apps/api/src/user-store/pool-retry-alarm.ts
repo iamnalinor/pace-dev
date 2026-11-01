@@ -12,12 +12,24 @@ that finds nothing coming (no digest window, no event near) still looks again by
 const LOOK_AGAIN_MS = 24 * 60 * 60_000;
 
 /**
+How long a pass holds the pool: one whose isolate is reset while it works (a deploy, the CPU limit)
+never ends and never says so, and the alarm passes again once this has run out.
+*/
+const LEASE_MS = 5 * 60_000;
+
+/**
 Storage key of when the pool next wants a pass (epoch ms; `null` while a pass has taken it): the
 store's alarm also fires for sleep's looks and the assistant's queue, and a pass loads the whole
 log on a cold instance, so `alarm()` runs one only once this has come. A store from before the key
 has none, and passes at its next alarm.
 */
 export const POOL_NEXT_AT_KEY = "pool:next-at";
+
+/**
+Storage key of the lease of the pass running (the epoch ms it runs out at): written before the
+pass takes the pool's time and removed as it ends, so a pass cut short is found and run again.
+*/
+export const POOL_LEASE_KEY = "pool:lease";
 
 /** Asks for a pass at `at`, never later than one the pool already waits for. */
 const armPool = async (storage: DurableObjectStorage, at: number): Promise<void> => {
@@ -62,43 +74,71 @@ export const scheduleNextPass = async (
   return new Date(at).toISOString();
 };
 
+/** Removes the lease `lease` if it is still the one held (a later pass may hold its own). */
+const release = async (storage: DurableObjectStorage, lease: number): Promise<void> => {
+  if ((await storage.get<number>(POOL_LEASE_KEY)) === lease) {
+    await storage.delete(POOL_LEASE_KEY);
+  }
+};
+
 /**
-Runs a pass, which takes the pool's time: whatever asks for one while it runs (a write, a retry,
-its own next decision) arms it again. A pass that fails leaves the pool due without arming
-anything (the runtime retries the failed alarm with its own backoff), so the next alarm passes
-again.
+Runs a pass, which holds a lease and takes the pool's time: whatever asks for a pass while it runs
+(a write, a retry, its own next decision) arms it again, and the lease, written first, outlives a
+pass cut short. A pass that fails leaves the pool due without arming anything (the runtime
+retries the failed alarm with its own backoff), so the next alarm passes again.
 */
 export const takingPoolTime = async <T>(
   storage: DurableObjectStorage,
   { now, pass }: { readonly now: string; readonly pass: () => Promise<T> },
 ): Promise<T> => {
+  const lease = Date.parse(now) + LEASE_MS;
+  await storage.put(POOL_LEASE_KEY, lease);
   await storage.put(POOL_NEXT_AT_KEY, null);
   try {
-    return await pass();
+    const result = await pass();
+    await release(storage, lease);
+    return result;
   } catch (error) {
     const known = await storage.get<null | number>(POOL_NEXT_AT_KEY);
     if (known === null || known === undefined || known > Date.parse(now)) {
       await storage.put(POOL_NEXT_AT_KEY, Date.parse(now));
     }
+    await release(storage, lease);
     throw error;
   }
 };
 
 /**
-The pool's part of `alarm()`: a pass once its own time has come (or when it has none recorded);
-before that its time is armed again and nothing is read.
+When the pool is due (epoch ms): at once when no time is recorded (a store from before the key) or
+a time taken was never given back and no lease says a pass holds it; else at its own time, or when
+the lease of a pass cut short runs out, whichever is first.
+*/
+const dueAtOf = ({
+  known,
+  lease,
+}: {
+  readonly known: null | number | undefined;
+  readonly lease: number | undefined;
+}): number =>
+  known === undefined || (known === null && lease === undefined)
+    ? -Infinity
+    : Math.min(known ?? Infinity, lease ?? Infinity);
+
+/**
+The pool's part of `alarm()`: a pass once it is due (see `dueAtOf`); before that its time is armed
+again and nothing is read.
 */
 export const poolAtAlarm = async (
   storage: DurableObjectStorage,
   { now, pass }: { readonly now: string; readonly pass: () => Promise<unknown> },
 ): Promise<void> => {
-  const known = await storage.get<null | number>(POOL_NEXT_AT_KEY);
-  if (known === null) {
-    return;
+  const dueAt = dueAtOf({
+    known: await storage.get<null | number>(POOL_NEXT_AT_KEY),
+    lease: await storage.get<number>(POOL_LEASE_KEY),
+  });
+  if (dueAt <= Date.parse(now)) {
+    await pass();
+  } else {
+    await armEarliest(storage, dueAt);
   }
-  if (known !== undefined && known > Date.parse(now)) {
-    await armEarliest(storage, known);
-    return;
-  }
-  await pass();
 };

@@ -260,6 +260,33 @@ describe("the notification pool with nothing coming", () => {
   });
 });
 
+describe("a pool pass cut short", () => {
+  it("passes again once its lease runs out: the digest it was making is still delivered", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      await instance.runNotifications(msk("08:00"));
+      vi.setSystemTime(new Date(msk("09:00")));
+      // The isolate is reset while the 09:00 pass works (a deploy, the CPU limit): it never ends.
+      const cut = new UserStore(state, deployed);
+      await state.storage.deleteAlarm();
+      await new Promise<void>((resolve) => {
+        Object.defineProperty(cut, "derive", {
+          value: async () => {
+            resolve();
+            await new Promise<never>(() => undefined);
+          },
+        });
+        void cut.alarm();
+      });
+      // The runtime runs the alarm again within seconds, then the lease's alarm fires.
+      await fireAt(state, addMinutesIso(msk("09:00"), 0.05));
+      await fireDue(state, msk("09:10"));
+      expect(digests(state)).toHaveLength(1);
+    });
+  });
+});
+
 describe("the assistant's queue at the store's alarm", () => {
   it("loads no log for a text that is not due yet", async () => {
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
