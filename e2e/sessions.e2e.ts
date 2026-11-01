@@ -32,7 +32,14 @@ for (const size of SIZES) {
       const section = page.getByRole("group", { name: "Devices and sessions" });
       await expect(section.getByText("This device")).toBeVisible();
       await expectNoA11yViolations(page);
-
+      // The bottom of Settings (QA round 15 L6): the danger zone's openers match the account's
+      // actions, full width (one above the other) on a phone, side by side on a computer.
+      const isPhone = size.name === "phone";
+      const logout = await boxOf(page.getByRole("button", { name: "Log out" }));
+      const wipe = await boxOf(page.getByRole("button", { name: "Wipe data" }));
+      const remove = await boxOf(page.getByRole("button", { name: "Delete account" }));
+      expect(Math.abs(remove.width - logout.width) < 2).toBe(isPhone);
+      expect(Math.abs(wipe.y - remove.y) < 2).toBe(!isPhone);
       // The tab names the screen; the page's scheme follows the app's theme (QA round 15 L8, L14).
       await expect(page).toHaveTitle("Settings · Pace");
       await expect

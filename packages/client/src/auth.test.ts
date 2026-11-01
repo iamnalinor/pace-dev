@@ -50,6 +50,21 @@ describe("createAuth session", () => {
     expect(auth.token()).toBeUndefined();
     await expect(session.get()).resolves.toBeNull();
     expect(auth.store.getState().status).toBe("signed-out");
+    // The login card says why (QA round 15 L2): the session was ended elsewhere or expired.
+    expect(auth.store.getState().endedElsewhere).toBe(true);
+  });
+
+  it("forgets the next login's reason: a new session starts with nothing to explain", async () => {
+    const { auth } = await setup(
+      {
+        "GET /api/me": () => problem(401, "auth/unauthorized"),
+        "POST /api/auth/dev": () => ({ token: "fresh", user: fakeUser }),
+      },
+      "stale",
+    );
+    await auth.me();
+    await auth.loginWithDev("1001");
+    expect(auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
   it("me() caches the user", async () => {
@@ -228,6 +243,15 @@ describe("createAuth bot login", () => {
 });
 
 describe("createAuth logout", () => {
+  it("forgets a session the server already ended without asking it again (QA round 15 L2)", async () => {
+    const { auth, calls, session } = await setup({}, "stored");
+    await auth.forget();
+    expect(calls).toEqual([]);
+    expect(auth.token()).toBeUndefined();
+    await expect(session.get()).resolves.toBeNull();
+    expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
   it("calls the API and clears the session even when the call fails", async () => {
     const { auth, calls, session } = await setup(
       { "POST /api/auth/logout": () => problem(500, "boom") },

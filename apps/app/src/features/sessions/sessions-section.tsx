@@ -86,7 +86,8 @@ const ReadyList = ({
       focusAfter(row);
       return true;
     }
-    await auth.logout();
+    // The server ended it already: forgotten here, no logout to answer 401 (QA round 15 L2).
+    await auth.forget();
     router.replace("/login");
     return true;
   };

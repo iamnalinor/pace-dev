@@ -10,7 +10,7 @@ import { IS_DEV_LOGIN_ENABLED } from "../platform/api-base.ts";
 import { useServerInfo } from "../platform/server-store.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
-import { DevLoginForm, errorKey, Waiting } from "./login-parts.tsx";
+import { DevLoginForm, errorKey, SignedOutLine, Waiting } from "./login-parts.tsx";
 import { useBotLogin } from "./use-bot-login.ts";
 
 /** The Android app opens this page for its browser login and waits on `pace://auth`. */
@@ -117,6 +117,7 @@ export const LoginScreen = () => {
           <Text className="text-center font-sans text-[14px] text-muted">
             {t("login.subtitle")}
           </Text>
+          <SignedOutLine />
         </View>
         {isWaiting ? (
           <Waiting onCancel={bot.reset} onReopen={bot.reopen} />

@@ -10,7 +10,7 @@ import { serverStore, useServerInfo } from "../platform/server-store.ts";
 import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
 import { PaceLogo } from "../ui/logo.tsx";
-import { DevLoginForm, errorKey, Waiting } from "./login-parts.tsx";
+import { DevLoginForm, errorKey, SignedOutLine, Waiting } from "./login-parts.tsx";
 import { useBotLogin } from "./use-bot-login.ts";
 
 const AUTH_RETURN_URL = "pace://auth";
@@ -115,6 +115,7 @@ export const LoginScreen = () => {
       <View className="items-center gap-2">
         <PaceLogo heading={t("login.title")} wordmark={t("app.name")} />
         <Text className="text-center font-sans text-[14px] text-muted">{t("login.subtitle")}</Text>
+        <SignedOutLine />
       </View>
       {isWaiting ? (
         <Waiting onCancel={bot.reset} onReopen={bot.reopen} />

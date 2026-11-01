@@ -9,7 +9,7 @@ import type { Auth, BotLogin } from "@pace/client";
 import type * as CoreActual from "@pace/core";
 
 import { fakeUser } from "@pace/client/testing";
-import { ok, type t } from "@pace/core";
+import { ok, t } from "@pace/core";
 
 import type * as DeviceIdActual from "../platform/device-id.ts";
 
@@ -48,7 +48,10 @@ const mockAuth = {
   resumeBotLogin: jest.fn(),
   startBotLogin: jest.fn(),
 };
-const mockStatus = { current: "signed-out" as "signed-in" | "signed-out" };
+const mockStatus = {
+  current: "signed-out" as "signed-in" | "signed-out",
+  endedElsewhere: false,
+};
 const mockPending = {
   current: null as null | { readonly nonce: string; readonly expiresAt: number },
 };
@@ -67,7 +70,12 @@ jest.mock("./bot-login-pending.ts", () => ({
 }));
 
 jest.mock("#app/app-state.tsx", () => ({
-  useAuth: () => ({ auth: mockAuth, status: mockStatus.current, user: null }),
+  useAuth: () => ({
+    auth: mockAuth,
+    endedElsewhere: mockStatus.endedElsewhere,
+    status: mockStatus.current,
+    user: null,
+  }),
   useT: () => {
     const { t: translate } = jest.requireActual<typeof CoreActual>("@pace/core");
     return (key: Parameters<typeof t>[1], params?: Parameters<typeof t>[2]) =>
@@ -80,6 +88,7 @@ const auth = mockAuth as unknown as jest.Mocked<Auth> & typeof mockAuth;
 beforeEach(() => {
   jest.clearAllMocks();
   mockStatus.current = "signed-out";
+  mockStatus.endedElsewhere = false;
   mockPending.current = null;
 });
 
@@ -91,6 +100,17 @@ const renderScreen = async (): Promise<Awaited<ReturnType<typeof render>>> =>
   );
 
 describe("LoginScreen", () => {
+  it("says why when the session was ended elsewhere (QA round 15 L2)", async () => {
+    mockStatus.endedElsewhere = true;
+    await renderScreen();
+    expect(screen.getByText(t("en", "login.endedElsewhere"))).toBeOnTheScreen();
+  });
+
+  it("says nothing of the kind on a plain visit", async () => {
+    await renderScreen();
+    expect(screen.queryByText(t("en", "login.endedElsewhere"))).toBeNull();
+  });
+
   it("signs in through the dev route with the typed Telegram id", async () => {
     auth.loginWithDev.mockResolvedValue(ok(fakeUser));
     await renderScreen();

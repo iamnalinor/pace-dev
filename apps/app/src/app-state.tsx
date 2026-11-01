@@ -223,12 +223,14 @@ export const usePace = (): PaceRuntime => {
 
 export const useAuth = (): {
   readonly auth: Auth;
+  /** Signed out because the server no longer knew the session: the login card says so. */
+  readonly endedElsewhere: boolean;
   readonly status: AuthState["status"];
   readonly user: null | User;
 } => {
   const { auth } = usePace();
-  const { status, user } = useStore(auth.store);
-  return { auth, status, user };
+  const { endedElsewhere, status, user } = useStore(auth.store);
+  return { auth, endedElsewhere: endedElsewhere === true, status, user };
 };
 
 /**

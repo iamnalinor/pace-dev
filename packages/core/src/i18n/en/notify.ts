@@ -73,4 +73,6 @@ export const enNotify = {
     "Google: not available, this server uses a different Firebase project.",
   "settings.push.unavailable": "{method} is not available right now.",
   "settings.notifications.hint": "Where each kind of notification goes.",
+  "settings.push.web":
+    "In a browser, notifications wait under the bell; the browser itself shows none.",
 } as const;

@@ -50,6 +50,15 @@ jest.mock("#app/platform/device.ts", (): unknown => ({
 jest.mock("#app/features/settings/export-row.tsx", (): unknown =>
   jest.requireActual("#app/features/settings/export-row.web.tsx"),
 );
+/** The files the browser was handed. */
+const mockDownloads = jest.fn<Promise<void>, [unknown, string]>(async () => {
+  await Promise.resolve();
+});
+jest.mock("#app/platform/xlsx.web.ts", (): unknown => ({
+  downloadXlsx: async (sheets: unknown, fileName: string) => {
+    await mockDownloads(sheets, fileName);
+  },
+}));
 
 /** 10:39 on Oct 13 in Moscow, the account's zone. */
 const NOW = "2026-10-13T07:39:00.000Z";
@@ -352,7 +361,14 @@ describe("Settings → Devices and sessions", () => {
 
   it("signs out and goes to the login card when the session ended is this device's", async () => {
     const server = sessionsServer(ALL);
-    const runtime = await renderSettings(server.routes);
+    const logouts = { count: 0 };
+    const runtime = await renderSettings({
+      ...server.routes,
+      "POST /api/auth/logout": () => {
+        logouts.count += 1;
+        return { ok: true };
+      },
+    });
     const row = await screen.findByLabelText("Chrome on macOS");
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
     expect(within(row).getByText("End this session? This device signs out.")).toBeOnTheScreen();
@@ -362,6 +378,8 @@ describe("Settings → Devices and sessions", () => {
     });
     expect(server.deleted).toEqual(["01CHROME"]);
     expect(runtime.auth.token()).toBeUndefined();
+    // The server ended it already: no logout that would answer 401 (QA round 15 L2).
+    expect(logouts.count).toBe(0);
   });
 
   it("says so quietly when a revoke fails, and keeps the row", async () => {
@@ -679,6 +697,26 @@ describe("Settings' order", () => {
     ]);
     expect(settingsOutline()).not.toContain("Permissions");
     expect(screen.queryByText(/Excel file/u)).toBeNull();
+  });
+
+  it("says how the web gets notifications, where the phone has its method picker (QA round 15 L12)", async () => {
+    mockDevice.isPhone = false;
+    await renderSettings(sessionsServer([THIS_BROWSER]).routes);
+    expect(
+      await screen.findByText(
+        "In a browser, notifications wait under the bell; the browser itself shows none.",
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it("says what Export data downloaded (QA round 15 L6)", async () => {
+    mockDevice.isPhone = false;
+    await renderSettings(sessionsServer([THIS_BROWSER]).routes);
+    await fireEvent.press(await screen.findByRole("button", { name: "Export data" }));
+    await waitFor(() => {
+      expect(mockDownloads).toHaveBeenCalledWith(expect.anything(), "pace-2026-10-13.xlsx");
+    });
+    expect(await screen.findByText("Downloaded pace-2026-10-13.xlsx")).toBeOnTheScreen();
   });
 });
 
