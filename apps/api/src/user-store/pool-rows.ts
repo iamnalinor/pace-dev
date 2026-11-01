@@ -1,6 +1,6 @@
 import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
 
 import {
   err,
@@ -154,17 +154,31 @@ export const listNotifications = async (
   };
 };
 
-/** Marks notifications read (the ones named, or all); one already read keeps its time. */
-export const markRead = async (
-  db: Db,
-  which: { readonly all: true } | { readonly ids: readonly string[] },
-  now: string,
-): Promise<void> => {
+/**
+Which notifications to mark read: the ones named, or all. `reader` is the session reading: its
+own sign-in notice is left unread (see `isOwnSignIn`).
+*/
+export type ReadWhich = ({ readonly all: true } | { readonly ids: readonly string[] }) & {
+  readonly reader?: string | undefined;
+};
+
+/** Marks notifications read; one already read keeps its time. */
+export const markRead = async (db: Db, which: ReadWhich, now: string): Promise<void> => {
   const unread = isNull(notifications.readAt);
+  const ownSignIn =
+    which.reader === undefined
+      ? undefined
+      : or(ne(notifications.kind, "login"), ne(notifications.ref, which.reader));
   await db
     .update(notifications)
     .set({ readAt: now })
-    .where("all" in which ? unread : and(unread, inArray(notifications.id, [...which.ids])));
+    .where(
+      and(
+        unread,
+        ownSignIn,
+        "all" in which ? undefined : inArray(notifications.id, [...which.ids]),
+      ),
+    );
 };
 
 /** Settles a notification (read along with it); `false` when it was settled already. */

@@ -1,9 +1,11 @@
 import {
   type ActivityOverrunPayload,
   calendarAttend,
+  canResolveAs,
   type CoreState,
   type EventInput,
   type EventStartPayload,
+  isOwnSignIn,
   newId,
   type PoolNotification,
   type Resolution,
@@ -85,4 +87,20 @@ export const applyAnswer = async (
   if (resolution === "revoked" && userId !== undefined && notification.kind === "login") {
     await deleteSession(d1(store.env.DB), userId, notification.payload.sessionId);
   }
+};
+
+/**
+Why an answer is refused before anything is written: not an answer this kind takes, or the
+session a sign-in notice reports answering that notice itself (it could otherwise put away the
+one message that tells the person about it).
+*/
+export const answerRefusal = (
+  notification: PoolNotification,
+  resolution: Resolution,
+  sessionId: string | undefined,
+): "notification/mismatch" | "notification/own-sign-in" | undefined => {
+  if (isOwnSignIn(notification, sessionId)) {
+    return "notification/own-sign-in";
+  }
+  return canResolveAs(notification.kind, resolution) ? undefined : "notification/mismatch";
 };

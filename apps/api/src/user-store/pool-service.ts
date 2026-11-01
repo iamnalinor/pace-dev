@@ -2,7 +2,6 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import {
   addMinutesIso,
-  canResolveAs,
   type CoreState,
   err,
   type Event,
@@ -35,7 +34,7 @@ import {
   savePoolMemory,
 } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
-import { answerInputs, applyAnswer } from "./pool-answers.ts";
+import { answerInputs, answerRefusal, applyAnswer } from "./pool-answers.ts";
 import { armRetry, scheduleNextPass } from "./pool-retry-alarm.ts";
 import * as rows from "./pool-rows.ts";
 import { hasPendingAfterWithdraw } from "./pool-withdraw.ts";
@@ -284,10 +283,7 @@ export class NotificationPool {
   }
 
   /** Marks notifications read; open clients update their badge. */
-  async read(
-    which: { readonly all: true } | { readonly ids: readonly string[] },
-    now: string,
-  ): Promise<void> {
+  async read(which: rows.ReadWhich, now: string): Promise<void> {
     await rows.markRead(this.#host.db, which, now);
     broadcast(this.#host.ctx, { type: "read" });
   }
@@ -308,8 +304,9 @@ export class NotificationPool {
     if (found?.notification.resolvedAt !== null) {
       return found === undefined ? err({ code: "notification/not-found" }) : ok(found.notification);
     }
-    if (!canResolveAs(found.notification.kind, resolution)) {
-      return err({ code: "notification/mismatch" });
+    const refusal = answerRefusal(found.notification, resolution, meta.sessionId);
+    if (refusal !== undefined) {
+      return err({ code: refusal });
     }
     const written = await this.#write(found.notification, resolution, meta);
     if (!written.ok) {

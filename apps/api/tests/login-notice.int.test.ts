@@ -47,8 +47,46 @@ const MESSAGING: ReadonlySet<string> = new Set([
   "sendMessage",
 ]);
 const ids = { next: 500 };
+/** Telegram's answer to `answerCallbackQuery` when set: a refusal no redelivery changes. */
+const callbackRefusal = { isOn: false };
+/** What each message shows now, by its id, as Telegram keeps it. */
+const shownText = new Map<number, string>();
 
 const methodsSent = (): readonly string[] => sent.map((entry) => entry.method);
+
+/** A refusal as the Bot API answers one. */
+const refusal = (description: string): Response =>
+  Response.json({ description, error_code: 400, ok: false }, { status: 400 });
+
+/** Why Telegram would refuse this call, if it would: the switch above, or an edit changing nothing. */
+const refusalOf = (method: string, body: Record<string, unknown>): Response | undefined => {
+  if (method === "answerCallbackQuery" && callbackRefusal.isOn) {
+    return refusal("Bad Request: query is too old and response timeout expired");
+  }
+  const shown = shownText.get(Number(body["message_id"]));
+  return method === "editMessageText" && shown !== undefined && shown === body["text"]
+    ? refusal("Bad Request: message is not modified: specified new message content is the same")
+    : undefined;
+};
+
+/** Telegram taking a call: recorded, the shown text kept, a sent message given its id. */
+const accepted = (method: string, body: Record<string, unknown>): Response => {
+  ids.next += 1;
+  if (MESSAGING.has(method)) {
+    sent.push({ body, messageId: ids.next, method });
+  }
+  if (method === "sendMessage" || method === "editMessageText") {
+    const id = method === "sendMessage" ? ids.next : Number(body["message_id"]);
+    shownText.set(id, String(body["text"]));
+  }
+  const message = {
+    chat: { id: body["chat_id"], type: "private" },
+    date: Math.floor(Date.now() / 1000),
+    message_id: ids.next,
+    text: body["text"],
+  };
+  return Response.json({ ok: true, result: method === "sendMessage" ? message : true });
+};
 
 beforeEach(() => {
   sent.length = 0;
@@ -63,26 +101,12 @@ beforeEach(() => {
       string,
       unknown
     >;
-    ids.next += 1;
-    if (MESSAGING.has(method)) {
-      sent.push({ body, messageId: ids.next, method });
-    }
-    return Response.json({
-      ok: true,
-      result:
-        method === "sendMessage"
-          ? {
-              chat: { id: body["chat_id"], type: "private" },
-              date: Math.floor(Date.now() / 1000),
-              message_id: ids.next,
-              text: body["text"],
-            }
-          : true,
-    });
+    return refusalOf(method, body) ?? accepted(method, body);
   });
 });
 
 afterEach(() => {
+  callbackRefusal.isOn = false;
   vi.restoreAllMocks();
 });
 
@@ -175,6 +199,12 @@ const start = (text: string) => ({
     text,
   },
 });
+
+/** `/start` typed in a group the bot is in. */
+const startInGroup = (text: string) => {
+  const update = start(text);
+  return { message: { ...update.message, chat: { id: -100_777, title: "Team", type: "group" } } };
+};
 
 /** A press on a button of the message `messageId`, which shows `text`. */
 const press = (data: string, message: { readonly messageId: number; readonly text: string }) => ({
@@ -394,6 +424,51 @@ describe("a deep-link sign-in", () => {
 });
 
 /** A deep-link sign-in with its notice in place: the session, the token and the message. */
+describe("a deep-link sign-in outside a private chat", () => {
+  it("is not taken from a group: the reply says so and nothing is bound", async () => {
+    await adminOf(String(ADA));
+    const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
+      body: { deviceName: "Pixel 9a" },
+    });
+    const response = await webhook(startInGroup(`/start login_${nonce}`));
+    expect(response.status).toBe(200);
+    expect(methodsSent()).toEqual(["sendMessage"]);
+    expect(sent[0]?.body).toEqual({
+      chat_id: -100_777,
+      text: "Open the login link in your private chat with me.",
+    });
+    const row = await env.DB.prepare("select user_id from login_nonces where nonce = ?")
+      .bind(nonce)
+      .first();
+    expect(row).toEqual({ user_id: null });
+  });
+
+  it("sends a fresh notice to the account's chat rather than edit a message of another chat", async () => {
+    await adminOf(String(ADA));
+    const userId = (await findUserIdByTelegramId(d1(env.DB), String(ADA))) ?? "";
+    const store = env.USER_STORE.get(env.USER_STORE.idFromName(userId));
+    const added = await store.notify(
+      {
+        kind: "login",
+        payload: {
+          country: "DE",
+          ip: SIGN_IN_IP,
+          kind: "app",
+          name: "Pixel",
+          sessionId: "s-foreign",
+        },
+      },
+      new Date().toISOString(),
+      { adoptTelegramMessage: { chatId: "-100777", messageId: 7 } },
+    );
+    expect(added.ok).toBe(true);
+    expect(methodsSent()).toEqual(["sendMessage"]);
+    expect(sent[0]?.body["chat_id"]).toBe(String(ADA));
+    const id = added.ok ? added.value.id : "";
+    expect((await telegramCopyOf(id)).chat).toBe(String(ADA));
+  });
+});
+
 const signedIn = async () => {
   const admin = await adminOf(String(ADA));
   const { nonce, reply } = await deepLink();
@@ -435,6 +510,78 @@ describe("Not me", () => {
     expect(methodsSent()).toEqual(["answerCallbackQuery"]);
     expect(sent[0]?.body["show_alert"]).toBeUndefined();
     expect(await loginNoticeOf(admin, sessionId)).toEqual(resolved);
+  });
+
+  it("ends the session once when pressed twice at once, both presses answered without error", async () => {
+    const { admin, message, notice, sessionId } = await signedIn();
+    const responses = await Promise.all([
+      webhook(press(`nr:${notice.id}`, message)),
+      webhook(press(`nr:${notice.id}`, message)),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect(sent.filter((entry) => entry.method === "editMessageText")).toHaveLength(1);
+    expect(sent.some((entry) => entry.body["show_alert"] === true)).toBe(false);
+    expect(shownText.get(message.messageId)).toBe(`${message.text}\n\nSession ended`);
+    expect(await sessionRow(sessionId)).toBeNull();
+    expect((await loginNoticeOf(admin, sessionId)).resolution).toBe("revoked");
+  });
+
+  it("answers the webhook 200 when Telegram refuses for good, so the press is not redelivered forever", async () => {
+    const { message, notice, sessionId } = await signedIn();
+    callbackRefusal.isOn = true;
+    const response = await webhook(press(`nr:${notice.id}`, message));
+    expect(response.status).toBe(200);
+    expect(await sessionRow(sessionId)).toBeNull();
+  });
+
+  it("cannot be put away by the session it reports, so Not me still ends that session", async () => {
+    const { admin, message, notice, sessionId, token } = await signedIn();
+    for (const resolution of ["read", "revoked"]) {
+      const refused = await call(`/api/notifications/${notice.id}/resolve`, {
+        body: { resolution },
+        token,
+      });
+      expect(refused.status).toBe(403);
+      expect(await readJson(refused)).toMatchObject({ code: "notification/own-sign-in" });
+    }
+    expect((await call("/api/notifications/read", { body: { all: true }, token })).status).toBe(
+      200,
+    );
+    expect(
+      (await call("/api/notifications/read", { body: { ids: [notice.id] }, token })).status,
+    ).toBe(200);
+    const untouched = await loginNoticeOf(admin, sessionId);
+    expect(untouched).toMatchObject({ readAt: null, resolution: null });
+    expect(methodsSent()).not.toContain("deleteMessage");
+
+    await webhook(press(`nr:${notice.id}`, message));
+    expect(await sessionRow(sessionId)).toBeNull();
+  });
+
+  it("is not pushed to the phone of the session it reports", async () => {
+    const admin = await adminOf(String(ADA));
+    const phone = await loginAsDev(String(ADA));
+    for (const token of [admin, phone]) {
+      await call("/api/push/subscription", { body: { method: "poll" }, method: "PUT", token });
+    }
+    const phoneSession = await currentSessionId(phone);
+    const userId = (await findUserIdByTelegramId(d1(env.DB), String(ADA))) ?? "";
+    await env.USER_STORE.get(env.USER_STORE.idFromName(userId)).notify(
+      {
+        kind: "login",
+        payload: { country: "", ip: "", kind: "dev", name: "Dev login", sessionId: phoneSession },
+      },
+      new Date().toISOString(),
+    );
+    const shownTo = async (token: string) =>
+      (await answerOf(endpoints.notifications.poll, "/api/push/poll", { token })).entries.filter(
+        (entry) =>
+          entry.type === "show" &&
+          entry.notification?.kind === "login" &&
+          entry.notification.payload.sessionId === phoneSession,
+      );
+    expect(await shownTo(phone)).toEqual([]);
+    expect(await shownTo(admin)).toHaveLength(1);
   });
 
   it("ends nothing twice when the session was revoked in Settings first, and still says so", async () => {

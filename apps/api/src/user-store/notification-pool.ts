@@ -3,6 +3,7 @@ import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import {
   INITIAL_POOL_MEMORY,
   isChannelOn,
+  isOwnSignIn,
   type PoolMemory,
   type PoolNotification,
   type Settings,
@@ -95,19 +96,18 @@ export const saveRuledSeries = async (
 type Adopted = NotifyOptions["adoptTelegramMessage"];
 
 /**
-Puts the message in the chat: the adopted one edited into place when there is one and Telegram
-takes the edit, else a new one (the adopted message is gone, say). Where it ended up; a `null`
-message id when Telegram took neither.
+Puts the message in the account's chat: the adopted one edited into place when it is a message of
+that chat and Telegram takes the edit, else a new one (the adopted message is gone, say, or in
+another chat, whose members must never see where the person signed in from). Its id; `null` when
+Telegram took neither.
 */
 const placeInChat = async (
   target: TelegramTarget,
   { adopted, chatId, message }: { adopted: Adopted; chatId: string; message: OutgoingMessage },
-): Promise<{ readonly chatId: string; readonly messageId: null | number }> => {
-  return adopted !== undefined &&
-    (await wasTelegramMessageEdited(target, { ...adopted, ...message }))
-    ? adopted
-    : { chatId, messageId: await sendTelegramMessage(target, chatId, message) };
-};
+): Promise<null | number> =>
+  adopted?.chatId === chatId && (await wasTelegramMessageEdited(target, { ...adopted, ...message }))
+    ? adopted.messageId
+    : await sendTelegramMessage(target, chatId, message);
 
 const sendToTelegram = async (
   deps: PoolDeps,
@@ -133,10 +133,10 @@ const sendToTelegram = async (
     now: deps.now,
     webOrigin: deps.webOrigin,
   });
-  const placed = await placeInChat(couriers.telegram, { adopted, chatId, message });
-  const { messageId } = placed;
+  // The copy and the delivery log name the same chat: the account's (an adopted message is one).
+  const messageId = await placeInChat(couriers.telegram, { adopted, chatId, message });
   await setTelegramCopy(deps.db, notification.id, {
-    chatId: placed.chatId,
+    chatId,
     messageId,
     sentAt: messageId === null ? null : deps.now,
     state: messageId === null ? "failed" : "sent",
@@ -267,8 +267,11 @@ const pushToDevices = async (deps: PoolDeps, notification: PoolNotification): Pr
   }
   const subscriptions = await subscriptionsOf(deps.binding, deps.userId, Date.parse(deps.now));
   const message = { ...phoneContent(notification, deps.settings, deps.now), notification };
+  // A sign-in's notice never goes to the session it reports (see `isOwnSignIn`).
   for (const subscription of subscriptions) {
-    await pushToDevice(deps, message, subscription);
+    if (!isOwnSignIn(notification, subscription.sessionId)) {
+      await pushToDevice(deps, message, subscription);
+    }
   }
 };
 

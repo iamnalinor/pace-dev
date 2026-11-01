@@ -1,7 +1,8 @@
 import type { UserFromGetMe } from "grammy/types";
 
-import { Bot, type Context } from "grammy";
+import { Bot, type Context, GrammyError } from "grammy";
 
+import { createLogger } from "../shared/logger.ts";
 import { type LoginFrom, readLoginPayload, returnUrl } from "../shared/login-link.ts";
 import { inlineKeyboardButton, type TelegramTransport } from "../shared/telegram-api.ts";
 import { answerOfCode, type Assistant, type BotReply } from "./assistant.ts";
@@ -57,6 +58,7 @@ export const REPLIES = {
   returnToPace: "Return to Pace",
   notAllowed: "Not allowed",
   linkExpired: "This login link has expired. Open Pace and try again.",
+  privateOnly: "Open the login link in your private chat with me.",
   welcome: "Hi! This is the Pace bot. Log in from the app to connect it.",
 } as const;
 
@@ -112,6 +114,39 @@ const answerAccountButton = async (
   await ctx.editMessageText(answer.text);
 };
 
+/** Telegram's refusal of an edit that would leave the message as it is (read by its body). */
+const NOT_MODIFIED = "message is not modified";
+
+const isNotModified = (error: unknown): boolean =>
+  error instanceof GrammyError &&
+  error.error_code === 400 &&
+  error.description.includes(NOT_MODIFIED);
+
+/**
+Runs an edit; an edit refused because the message already shows exactly that (two presses at once
+both edit to the same text) is what was wanted, so it counts as done.
+*/
+const editTolerantly = async (edit: () => Promise<unknown>): Promise<void> => {
+  try {
+    await edit();
+  } catch (error) {
+    if (!isNotModified(error)) {
+      throw error;
+    }
+  }
+};
+
+/**
+A refusal by Telegram that no redelivery can change (a 4xx other than rate limiting: a query too
+old to answer, a message gone). The webhook answers 200 for it, logged, so Telegram does not
+redeliver the update forever; anything else fails the webhook and Telegram retries it.
+*/
+const isPermanentRefusal = (error: unknown): boolean =>
+  error instanceof GrammyError &&
+  error.error_code >= 400 &&
+  error.error_code < 500 &&
+  error.error_code !== 429;
+
 /**
 What the pressed message becomes: a notification keeps its text with the answer below it (the
 buttons go); a preview is replaced by the result. `null` when the notification shows that answer
@@ -151,7 +186,9 @@ const wasPressedMessageEdited = async (
     return false;
   }
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText(...replyOf(message));
+  await editTolerantly(async () => {
+    await ctx.editMessageText(...replyOf(message));
+  });
   return true;
 };
 
@@ -200,8 +237,9 @@ const attachAssistant = (
 };
 
 /**
-A deep-link login at `/start`: replied to first, bound after with the reply's ids in the same
-write, so the login notice can take that reply over and the person gets one message, not two.
+A deep-link login at `/start`, in the person's private chat only: replied to first, bound after
+with the reply's ids in the same write, so the login notice can take that reply over and the
+person gets one message, not two.
 A bind that fails after all (the link opened twice at once, or just expired) takes the reply back
 to "expired".
 */
@@ -210,6 +248,11 @@ const startLogin = async (
   deps: BotDeps,
   login: { readonly nonce: string; readonly from: LoginFrom },
 ): Promise<void> => {
+  if (ctx.chat.type !== "private") {
+    // Not bound: its notice would be edited into this chat, for every member to read.
+    await ctx.reply(REPLIES.privateOnly);
+    return;
+  }
   const peeked = await deps.peekLogin(login.nonce);
   if (peeked !== "ok" || ctx.from === undefined) {
     await ctx.reply(loginReply(peeked === "ok" ? "not-found" : peeked));
@@ -237,6 +280,19 @@ export const createBot = (deps: BotDeps): Bot => {
       // grammY types the option as the platform's global fetch (Bun's adds `preconnect`); it only ever calls it.
       fetch: deps.fetch as typeof fetch,
     },
+  });
+  // First in the chain: grammY's own error handler only serves long polling, not webhooks.
+  bot.use(async (_ctx, next) => {
+    try {
+      await next();
+    } catch (error) {
+      if (!isPermanentRefusal(error)) {
+        throw error;
+      }
+      createLogger("info").warn("Telegram refused a bot reply for good", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
   bot.use(async (ctx, next) => {
     if (ctx.from === undefined) {

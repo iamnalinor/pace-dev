@@ -137,6 +137,20 @@ export const ALL_ANSWERS: readonly Answer[] = [...new Set(Object.values(ANSWERS)
 export const isAnswer = (value: string): value is Answer =>
   (ALL_ANSWERS as readonly string[]).includes(value);
 
+/**
+Whether a notification is the sign-in notice of the session `sessionId` itself. That session may
+not answer it, read it or be shown it: a stranger who got in through a deep link the person opened
+would otherwise put away the one notice that tells the person (the feed offers it no buttons, the
+server refuses, no push goes to it).
+*/
+export const isOwnSignIn = (
+  notification: NewNotification | PoolNotification,
+  sessionId: string | undefined,
+): boolean =>
+  notification.kind === "login" &&
+  sessionId !== undefined &&
+  notification.payload.sessionId === sessionId;
+
 /** Whether a person may settle a notification of `kind` this way. */
 export const canResolveAs = (kind: NotificationKind, resolution: Resolution): boolean =>
   resolution === "read" || (ANSWERS[kind] as readonly Resolution[]).includes(resolution);

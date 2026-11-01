@@ -246,9 +246,18 @@ the Telegram copy is deleted.
 */
 export type AnswerOrigin = "app" | "system" | "telegram" | "web";
 
-export type ResolveMeta = { readonly origin: AnswerOrigin; readonly now: string };
+export type ResolveMeta = {
+  readonly origin: AnswerOrigin;
+  readonly now: string;
+  /** The session answering over HTTP: it may not answer its own sign-in notice. */
+  readonly sessionId?: string | undefined;
+};
 
-export type ResolveErrorCode = "notification/mismatch" | "notification/not-found" | ApplyErrorCode;
+export type ResolveErrorCode =
+  | "notification/mismatch"
+  | "notification/not-found"
+  | "notification/own-sign-in"
+  | ApplyErrorCode;
 
 /** Why an answer was refused: no such notification, not an answer for its kind, or the write failed. */
 export type ResolveError = { readonly code: ResolveErrorCode };

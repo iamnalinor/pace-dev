@@ -7,6 +7,7 @@ import {
   ANSWERS,
   canResolveAs,
   isAnswer,
+  isOwnSignIn,
   RESOLUTIONS,
 } from "./pool.ts";
 
@@ -36,5 +37,23 @@ describe("the answers", () => {
     expect(canResolveAs("activity_overrun", "revoked")).toBe(false);
     expect(isAnswer("revoked")).toBe(true);
     expect(ANSWERABLE_KINDS).toEqual(["login", "event_start", "activity_overrun"]);
+  });
+});
+
+describe("isOwnSignIn", () => {
+  const login = {
+    kind: "login" as const,
+    payload: { country: "", ip: "", kind: "app", name: "Pixel", sessionId: "s-1" },
+  };
+
+  it("is the sign-in notice of that very session, nothing else", () => {
+    expect(isOwnSignIn(login, "s-1")).toBe(true);
+    expect(isOwnSignIn(login, "s-2")).toBe(false);
+    expect(isOwnSignIn(login, undefined)).toBe(false);
+    const digest = {
+      kind: "deadline_digest" as const,
+      payload: { slot: "2026-10-06T06:00:00.000Z", tasks: [] },
+    };
+    expect(isOwnSignIn(digest, "s-1")).toBe(false);
   });
 });

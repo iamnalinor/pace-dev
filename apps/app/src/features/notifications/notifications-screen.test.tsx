@@ -227,6 +227,29 @@ describe("NotificationsScreen", () => {
     );
   });
 
+  it("offers no Not me on this session's own sign-in, which only the person's other devices answer", async () => {
+    const thisSession = {
+      city: null,
+      country: "DE",
+      createdAt: 1,
+      current: true,
+      id: "s",
+      ip: SIGN_IN_IP,
+      kind: "browser",
+      lastDataAt: null,
+      lastSeenAt: 1,
+      name: "Chrome on macOS",
+    };
+    const { runtime } = await feedRuntime([login], {
+      "GET /api/sessions": () => ({ sessions: [thisSession] }),
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await screen.findByText(en("notifications.login", { name: "Chrome on macOS" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: en("notify.action.revoked") })).toBeNull();
+    });
+  });
+
   it("says a refused answer did not go through and keeps the buttons", async () => {
     const { runtime } = await feedRuntime([overrun], {
       "POST /api/notifications/n-overrun/resolve": () =>

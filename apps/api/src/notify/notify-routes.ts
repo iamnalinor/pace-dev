@@ -17,6 +17,10 @@ const RESOLVE_PROBLEMS: Readonly<Record<ResolveErrorCode, Omit<Problem, "code">>
   "event/not-found": { message: "The answer could not be written", status: 409 },
   "notification/mismatch": { message: "That answer does not fit this notification", status: 422 },
   "notification/not-found": { message: "No such notification", status: 404 },
+  "notification/own-sign-in": {
+    message: "A sign-in cannot be answered by the session it reports",
+    status: 403,
+  },
   "preset/unknown": { message: "The answer could not be written", status: 409 },
   "retro/before-created": { message: "The answer could not be written", status: 409 },
   "retro/future": { message: "The answer could not be written", status: 409 },
@@ -103,7 +107,11 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
   });
 
   mount(app, endpoints.notifications.read, async ({ body, c }) => {
-    await userStoreOf(c).readNotifications(body, new Date().toISOString());
+    // The caller's own sign-in notice stays unread: it is the person's, not that session's.
+    await userStoreOf(c).readNotifications(
+      { ...body, reader: c.get("sessionId") },
+      new Date().toISOString(),
+    );
     return ok({ ok: true as const });
   });
 
@@ -111,6 +119,7 @@ export const mountNotifyRoutes = (app: Hono<AppEnv>): void => {
     const result = await userStoreOf(c).resolveNotification(params.id, body.resolution, {
       now: new Date().toISOString(),
       origin: body.from,
+      sessionId: c.get("sessionId"),
     });
     return result.ok ? ok({ notification: result.value }) : err(resolveProblem(result.error.code));
   });

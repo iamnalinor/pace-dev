@@ -115,6 +115,7 @@ export {
   type DigestTask,
   type EventStartPayload,
   isAnswer,
+  isOwnSignIn,
   type LiveNotice,
   LiveNoticeSchema,
   type LoginPayload,

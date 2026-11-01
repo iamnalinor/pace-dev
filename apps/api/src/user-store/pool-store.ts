@@ -2,6 +2,7 @@ import type { NewNotification, PoolNotification, Resolution, Result } from "@pac
 
 import type { ResolveError, ResolveMeta } from "../shared/contract.ts";
 import type { Couriers, PoolNotifyOptions } from "./notification-pool.ts";
+import type { ReadWhich } from "./pool-rows.ts";
 import type { AnswerMeta, NotificationPool, Polled } from "./pool-service.ts";
 
 import { LiveStore } from "./live-sockets.ts";
@@ -42,10 +43,7 @@ export abstract class PoolStore extends LiveStore {
   }
 
   /** Marks notifications read; open clients update their badge. */
-  async readNotifications(
-    which: { readonly all: true } | { readonly ids: readonly string[] },
-    now: string,
-  ): Promise<void> {
+  async readNotifications(which: ReadWhich, now: string): Promise<void> {
     await this.pool.read(which, now);
   }
 
