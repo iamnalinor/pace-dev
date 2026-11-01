@@ -51,11 +51,16 @@ export type SleepDecision =
   | { readonly kind: "reopen"; readonly activityId: string; readonly stopEventId: string }
   | { readonly kind: "stop"; readonly activityId: string; readonly at: string };
 
+/** A Rest-class activity the person keeps (a running one has no end yet). */
+export type Rest = { readonly startAt: string; readonly endAt: null | string };
+
 export type Known = {
   readonly knownUntil: string;
   readonly usesFrom: string;
   readonly uses: readonly Interval[];
   readonly zone: string;
+  /** The person's Rest-class activities that start before `knownUntil`. */
+  readonly rests: readonly Rest[];
 };
 
 /** A spell awake and the rest after it: until the next spell, or as far as use is known. */
@@ -101,7 +106,7 @@ export const rested = (uses: readonly Interval[], knownUntil: string): readonly 
 };
 
 /** A start automatic sleep chose and nobody moved: the rules may stop it short and discard it. */
-const isRulesStart = (sleep: SleepActivity): boolean =>
+export const isRulesStart = (sleep: SleepActivity): boolean =>
   sleep.isAutoStart && !sleep.isStartAmendedByPerson;
 
 /**
@@ -145,12 +150,30 @@ const hasAutoStopIn = (sleep: SleepActivity, spell: Interval): boolean =>
 /**
 Walks the spells awake after a sleep's start: one at an automatic stop the person undid stays
 inside (they said they were asleep, so its minutes are not taken off), so does a wake-up; the
-first other spell ends the sleep at its start.
+first other spell ends the sleep at its start, unless a rest the person logged ends it first.
 */
+/**
+Where a rest the person logged ends an automatic sleep: at the start of the first one that runs
+after the sleep's start (at the sleep's start for one already running then), the same whether
+it was logged before the sleep opened or after. A person's own sleep is theirs to end.
+*/
+const restLimitOf = (sleep: SleepActivity, known: Known): null | string =>
+  isRulesStart(sleep)
+    ? (known.rests
+        .filter((rest) => rest.endAt === null || rest.endAt > sleep.startAt)
+        .map((rest) => laterOf(rest.startAt, sleep.startAt))
+        .toSorted((a, b) => a.localeCompare(b))
+        .at(0) ?? null)
+    : null;
+
 const walk = (sleep: SleepActivity, known: Known): Walk => {
   const spells = rested(usesInside(sleep, known.uses), known.knownUntil);
+  const limit = restLimitOf(sleep, known);
   const from = (index: number, awake: number, isReopening: boolean): Walk => {
     const spell = spells[index];
+    if (limit !== null && (spell === undefined || limit < spell.startAt)) {
+      return { awake, end: { at: limit, isFinal: true }, isReopening };
+    }
     if (spell === undefined) {
       return { awake, end: null, isReopening };
     }
