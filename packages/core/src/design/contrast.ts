@@ -33,3 +33,69 @@ export const contrastRatio = (hexA: string, hexB: string): null | number => {
   const lb = relativeLuminance(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 };
+
+const RGBA = /^rgba?\(([^)]*)\)$/i;
+
+const hex2 = (value: number): string => Math.round(value).toString(16).padStart(2, "0");
+
+/** `rgb(r, g, b)` / `rgba(r, g, b, a)` → channels and alpha; `null` for anything else. */
+const parseRgba = (text: string): null | { alpha: number; rgb: Rgb } => {
+  const parts = RGBA.exec(text)?.[1]
+    ?.split(",")
+    .map((part) => Number(part.trim()));
+  const [r, g, b, alpha = 1] = parts ?? [];
+  return r === undefined ||
+    g === undefined ||
+    b === undefined ||
+    [r, g, b, alpha].some((value) => Number.isNaN(value))
+    ? null
+    : { alpha: Math.min(1, alpha), rgb: { r, g, b } };
+};
+
+/**
+`top` laid over the opaque `bottom` as the browser composites it, as `#rrggbb` (lower case, each
+channel rounded). `top` is `#rgb`, `#rrggbb` or `rgb()`/`rgba()`; an unparsable colour gives `""`,
+which no contrast check passes.
+*/
+export const composite = (top: string, bottom: string): string => {
+  const base = parseHex(bottom);
+  const above = parseHex(top);
+  const wash = above === null ? parseRgba(top) : { alpha: 1, rgb: above };
+  if (base === null || wash === null) {
+    return "";
+  }
+  const { alpha, rgb } = wash;
+  const mix = (over: number, under: number): string => hex2(over * alpha + under * (1 - alpha));
+  return `#${mix(rgb.r, base.r)}${mix(rgb.g, base.g)}${mix(rgb.b, base.b)}`;
+};
+
+/** APCA 0.0.98G-4g luminance of a colour (soft-clamped near black). */
+const apcaLuminance = ({ r, g, b }: Rgb): number => {
+  const y =
+    0.2126729 * (r / 255) ** 2.4 + 0.7151522 * (g / 255) ** 2.4 + 0.072175 * (b / 255) ** 2.4;
+  return y > 0.022 ? y : y + (0.022 - y) ** 1.414;
+};
+
+/**
+APCA 0.0.98G-4g lightness contrast of `text` on `ground`, signed: positive for dark text on a
+lighter ground, negative for light text on a darker one (|Lc| 60 is body text's floor in the
+APCA table, 45 large or bold text). `0` for equal luminance or a colour that is not hex.
+*/
+export const apcaLc = (text: string, ground: string): number => {
+  const fg = parseHex(text);
+  const bg = parseHex(ground);
+  if (fg === null || bg === null) {
+    return 0;
+  }
+  const yText = apcaLuminance(fg);
+  const yGround = apcaLuminance(bg);
+  if (Math.abs(yGround - yText) < 0.0005) {
+    return 0;
+  }
+  if (yGround > yText) {
+    const sapc = (yGround ** 0.56 - yText ** 0.57) * 1.14;
+    return sapc < 0.1 ? 0 : (sapc - 0.027) * 100;
+  }
+  const sapc = (yGround ** 0.65 - yText ** 0.62) * 1.14;
+  return sapc > -0.1 ? 0 : (sapc + 0.027) * 100;
+};

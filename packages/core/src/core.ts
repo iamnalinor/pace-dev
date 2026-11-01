@@ -62,19 +62,7 @@ export {
   SyncPushOutputSchema,
 } from "./api/schemas/sync.ts";
 export * from "./automation.ts";
-export { contrastRatio, parseHex, relativeLuminance, type Rgb } from "./design/contrast.ts";
-export {
-  IMPORTANCE_COLORS,
-  type Palette,
-  type PaletteName,
-  type ProjectColorName,
-  type RadiusName,
-  STATUS_COLORS,
-  type ThemeName,
-  THEMES,
-  type Tokens,
-  tokens,
-} from "./design/tokens.ts";
+export * from "./design.ts";
 export {
   type Event,
   EVENT_TYPES,

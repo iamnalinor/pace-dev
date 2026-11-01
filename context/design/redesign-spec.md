@@ -237,7 +237,7 @@ structure is §3.1's; the B tables below stay as the documented alternate. The h
 | `label.primary/secondary/tertiary/quaternary` | `#12141C` / `#474C60` / `#646A80` / `#B4B8C7` | `#ECEEF4` / `#C3C7D5` / `#A0A5B9` / `#4A4F63` | secondary Lc 89 / −72; tertiary Lc 77 / −53 |
 | `outline` | `#878CA0` | `#767C93` | ≥ 3:1 on cell and app |
 | `accent` / `accent.on` / `accent.text` / `accent.pressed` | `#2E4AD6` / `#FFFFFF` / `#2E4AD6` / `#2640BC` | `#97A9FF` / `#0B0D14` / `#A6B5FF` / `#8498F7` | ink blue; on-accent 6.9:1 / 8.7:1 (Lc −88 / 60) |
-| `status.danger` (the red margin) | `#C3352B` | `#FF6F61` | now-line, overdue, Urgent, destructive; never decoration |
+| `status.danger` (the red margin) | `#C3352B` | `#FF8274` | now-line, overdue, Urgent, destructive; never decoration |
 | `status.warn` / `status.question` | `#B04A0C` / `#795300` | `#FF9B5E` / `#F2C275` | |
 | `status.success` | = `accent.text` | = `accent.text` | done is ink, as in a notebook |
 | `focus` | `#2E4AD6` | `#A6B5FF` | 2 px ring + 2 px offset |
