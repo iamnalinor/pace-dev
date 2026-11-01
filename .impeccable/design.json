@@ -713,31 +713,31 @@
       "dark-status-danger": {
         "role": "secondary",
         "displayName": "Red Margin (dark)",
-        "canonical": "oklch(71.5% 0.178 28.0)",
+        "canonical": "oklch(74.5% 0.155 27.9)",
         "tonalRamp": [
-          "#170604",
-          "#411511",
-          "#70261F",
-          "#A3382F",
-          "#D74D42",
-          "#EF8073",
-          "#FDB4AA",
-          "#FEE9E6"
+          "#160705",
+          "#3E1814",
+          "#6B2B25",
+          "#9B4037",
+          "#CD584C",
+          "#E6867A",
+          "#F7B7AE",
+          "#FCEAE7"
         ]
       },
       "dark-status-danger-quiet": {
         "role": "secondary",
         "displayName": "Red Margin Wash (dark)",
-        "canonical": "oklch(71.5% 0.178 28.0 / 0.15)",
+        "canonical": "oklch(74.5% 0.155 27.9 / 0.15)",
         "tonalRamp": [
-          "#170604",
-          "#411511",
-          "#70261F",
-          "#A3382F",
-          "#D74D42",
-          "#EF8073",
-          "#FDB4AA",
-          "#FEE9E6"
+          "#160705",
+          "#3E1814",
+          "#6B2B25",
+          "#9B4037",
+          "#CD584C",
+          "#E6867A",
+          "#F7B7AE",
+          "#FCEAE7"
         ]
       },
       "dark-status-warn": {
@@ -2209,7 +2209,7 @@
     ],
     "dos": [
       "**Do** keep ink blue (#2E4AD6 / #97A9FF) as the only interactive colour, with at most one filled ink element per screen at rest.",
-      "**Do** reserve Red Margin (#C3352B / #FF6F61) for the now-line, overdue, Urgent, destructive and errors.",
+      "**Do** reserve Red Margin (#C3352B / #FF8274) for the now-line, overdue, Urgent, destructive and errors.",
       "**Do** show a category as a 1 px line or small dot in its hue `stroke` with the name in `label-*`, and a project as a `sm` tag in hue `tint` + `ink`.",
       "**Do** put every number through a numeric role (tabular figures) and the core formatter, with non-breaking spaces in Russian.",
       "**Do** build screens as one `bg-app` ground with `bg-cell` groups (`lg`, 16) and inset separators.",

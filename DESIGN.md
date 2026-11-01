@@ -50,8 +50,8 @@ colors:
   dark-accent-text: "#A6B5FF"
   dark-accent-pressed: "#8498F7"
   dark-accent-quiet: "rgba(151, 169, 255, 0.16)"
-  dark-status-danger: "#FF6F61"
-  dark-status-danger-quiet: "rgba(255, 111, 97, 0.15)"
+  dark-status-danger: "#FF8274"
+  dark-status-danger-quiet: "rgba(255, 130, 116, 0.15)"
   dark-status-warn: "#FF9B5E"
   dark-status-warn-quiet: "rgba(255, 155, 94, 0.16)"
   dark-status-question: "#F2C275"
@@ -386,7 +386,7 @@ Every role exists in a light (`light-…`) and a dark (`dark-…`) token; compon
 - **Selection Ink** (`selection`): web text selection and the selected-row fill, always together with a non-colour marker (the leading 3 px bar or a checkmark).
 
 ### Secondary
-- **Red Margin** (light #C3352B / dark #FF6F61, `status-danger`): the now-line on Day, overdue and late times, the Urgent word, destructive actions and errors, the unsorted-Inbox count badge. Its wash (`status-danger-quiet`) fills the destructive button and danger notices.
+- **Red Margin** (light #C3352B / dark #FF8274, `status-danger`): the now-line on Day, overdue and late times, the Urgent word, destructive actions and errors, the unsorted-Inbox count badge. Its wash (`status-danger-quiet`) fills the destructive button and danger notices.
 
 ### Tertiary
 - **Burnt Orange** (#B04A0C / #FF9B5E, `status-warn`): "past expected" only: «Всё ещё занимаетесь?», the running line past its expected length. Wash `status-warn-quiet` for notices.
@@ -561,7 +561,7 @@ Durations 100 (press, hover) · 160 (fades, thumbs) · 220 (disclosure, toast, c
 
 ### Do:
 - **Do** keep ink blue (#2E4AD6 / #97A9FF) as the only interactive colour, with at most one filled ink element per screen at rest.
-- **Do** reserve Red Margin (#C3352B / #FF6F61) for the now-line, overdue, Urgent, destructive and errors.
+- **Do** reserve Red Margin (#C3352B / #FF8274) for the now-line, overdue, Urgent, destructive and errors.
 - **Do** show a category as a 1 px line or small dot in its hue `stroke` with the name in `label-*`, and a project as a `sm` tag in hue `tint` + `ink`.
 - **Do** put every number through a numeric role (tabular figures) and the core formatter, with non-breaking spaces in Russian.
 - **Do** build screens as one `bg-app` ground with `bg-cell` groups (`lg`, 16) and inset separators.
