@@ -86,7 +86,11 @@ describe("the sessions list", () => {
       { language: "en", now: NOW, zone: ZONE },
     );
     expect(rows.map((row) => row.id)).toEqual(["me", "new", "old", "mcp"]);
-    expect(rows[0]).toMatchObject({ isCurrent: true, meta: ["Browser", "This device"] });
+    // This device's row says where and when it signed in too, as the others do (QA 17 L2).
+    expect(rows[0]).toMatchObject({
+      isCurrent: true,
+      meta: ["Browser", "This device", "Germany", "1.2.3.4", "Signed in Oct 1, 13:00"],
+    });
     expect(rows[1]?.isCurrent).toBe(false);
   });
 
@@ -94,7 +98,13 @@ describe("the sessions list", () => {
     const placed = session({ city: "Berlin", country: "DE", ip: "1.2.3.4" });
     expect(metaOf(placed)).toEqual(["Browser", "Germany", "1.2.3.4", "Signed in Oct 1, 13:00"]);
     expect(metaOf(placed, "ru")).toEqual(["Браузер", "Германия", "1.2.3.4", "Вход 1 окт., 13:00"]);
-    expect(metaOf({ ...placed, current: true }, "ru")).toEqual(["Браузер", "Это устройство"]);
+    expect(metaOf({ ...placed, current: true }, "ru")).toEqual([
+      "Браузер",
+      "Это устройство",
+      "Германия",
+      "1.2.3.4",
+      "Вход 1 окт., 13:00",
+    ]);
     // Cloudflare's "T1" (Tor) is no region: shown as it came.
     expect(metaOf(session({ country: "T1" }))).toContain("T1");
   });

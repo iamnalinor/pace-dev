@@ -62,12 +62,9 @@ const lastDataText = (lastDataAt: null | string, context: SessionRowsContext): s
 
 /**
 When it came in: a computer or an AI app was added, the rest signed in. It tells same-name rows
-apart (several "My computer", dev logins); the current session needs no such line.
+apart (several "My computer", dev logins), and this device's row says it too (QA round 17 L2).
 */
 const sinceText = (session: Session, context: SessionRowsContext): readonly string[] => {
-  if (session.current) {
-    return [];
-  }
   const time = dayAndTime(new Date(session.createdAt).toISOString(), context);
   const isAdded = session.kind === "agent" || session.kind === "mcp";
   return [t(context.language, isAdded ? "sessions.added" : "sessions.signedIn", { time })];
@@ -75,12 +72,11 @@ const sinceText = (session: Session, context: SessionRowsContext): readonly stri
 
 /** Its kind in words, where it is, what it last sent (an app or an agent), when it came in. */
 const metaOf = (session: Session, context: SessionRowsContext): readonly string[] => {
-  const place = session.current
-    ? [t(context.language, "devices.thisDevice")]
-    : [
-        ...(session.country === null ? [] : [countryName(session.country, context.language)]),
-        ...(session.ip === null ? [] : [session.ip]),
-      ];
+  const place = [
+    ...(session.current ? [t(context.language, "devices.thisDevice")] : []),
+    ...(session.country === null ? [] : [countryName(session.country, context.language)]),
+    ...(session.ip === null ? [] : [session.ip]),
+  ];
   const isUsageSender = session.kind === "app" || session.kind === "agent";
   return [
     t(context.language, KIND_KEY[session.kind]),

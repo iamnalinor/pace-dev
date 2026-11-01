@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import { usePace, useT } from "#app/app-state.tsx";
+import { useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { PushedScreen } from "#app/screens/pushed-screen.tsx";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
@@ -12,6 +12,7 @@ import { EmptyState } from "#app/ui/empty-state.tsx";
 import { type DeliveryEntry, type ListedSessions, signInState } from "@pace/client";
 import { useSessions } from "@pace/client/react";
 import {
+  countryName,
   formatLeft,
   formatRelativeDay,
   type Language,
@@ -39,12 +40,17 @@ const SignInBody = ({
   readonly payload: SignInPayload;
 }) => {
   const t = useT();
+  const language = useLanguage();
   const { city, country, ip, name } = payload;
+  // The country in words, as Settings and the Telegram notice spell it (QA round 17 L2).
+  const place = [country === "" ? "" : countryName(country, language), city]
+    .filter((part) => part !== undefined && part !== "")
+    .join(", ");
   return (
     <View className="gap-0.5">
       <Line>{t("notifications.login", { name })}</Line>
       <Line tone="muted">
-        {[isOwn ? t("devices.thisDevice") : undefined, ip, city, country]
+        {[isOwn ? t("devices.thisDevice") : undefined, ip, place]
           .filter((part) => part !== undefined && part !== "")
           .join(" · ")}
       </Line>
