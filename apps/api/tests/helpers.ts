@@ -99,3 +99,43 @@ export const nonceLogin = async (
   await bindNonce(d1(env.DB), { nonce, now: Date.now(), userId });
   return (await json<{ token: string }>(`/api/auth/nonce/${nonce}`)).token;
 };
+
+/** What a store's SQL cost: whole-log loads, rows read and written, projection rows written. */
+export type SqlCost = {
+  readonly loads: number;
+  readonly rowsRead: number;
+  readonly rowsWritten: number;
+  readonly projectionRows: number;
+};
+
+/**
+Meters every statement a Durable Object runs from now on (drizzle calls `storage.sql.exec`), for
+cost tests: `cost()` sums the cursors' `rowsRead` / `rowsWritten` once their statements ran.
+*/
+export const meterSql = (storage: DurableObjectStorage): { readonly cost: () => SqlCost } => {
+  const { sql } = storage;
+  const exec = sql.exec.bind(sql);
+  const ran: { query: string; cursor: ReturnType<SqlStorage["exec"]> }[] = [];
+  Object.defineProperty(sql, "exec", {
+    configurable: true,
+    value: (query: string, ...bindings: unknown[]) => {
+      const cursor = exec(query, ...bindings);
+      ran.push({ cursor, query });
+      return cursor;
+    },
+  });
+  const written = (pattern: RegExp) =>
+    ran
+      .filter(({ query }) => pattern.test(query))
+      .reduce((sum, { cursor }) => sum + cursor.rowsWritten, 0);
+  return {
+    cost: () => ({
+      loads: ran.filter(({ query }) => /^select .* from "events" order by/u.test(query)).length,
+      projectionRows: written(
+        /^(?:insert into|delete from) "(?:tasks|subtasks|projects|presets)"/u,
+      ),
+      rowsRead: ran.reduce((sum, { cursor }) => sum + cursor.rowsRead, 0),
+      rowsWritten: written(/./u),
+    }),
+  };
+};

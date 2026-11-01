@@ -30,6 +30,7 @@ import type {
 } from "../shared/contract.ts";
 import type { Cooldowns } from "../shared/llm/llm.ts";
 
+import { versionOf } from "../shared/config.ts";
 import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import { CloudStore } from "./cloud-store.ts";
@@ -41,19 +42,11 @@ import * as log from "./log-queries.ts";
 import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
 import { NotificationPool } from "./pool-service.ts";
-import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
 import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
-import {
-  applyInOrder,
-  canApplyInOrder,
-  type Materialized,
-  prepareBatch,
-  rebuild,
-  toRpcState,
-  touchedBy,
-} from "./state.ts";
-import { openStore, resetStore, storeIdOf } from "./store-identity.ts";
+import { StateCache } from "./state-cache.ts";
+import { prepareBatch, toRpcState } from "./state.ts";
+import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -68,10 +61,10 @@ One instance per user (id = user id): the event log, the materialized state, the
 projections, decisions and alarms. Before the first request touches storage, a store from
 another epoch is emptied (see `STORE_EPOCH`) and migrations run. The state is cached in
 memory with the log sequence it was built at and rebuilt when the cache is stale or a batch
-cannot be applied in order.
+cannot be applied in order (`StateCache`).
 */
 export class UserStore extends CloudStore {
-  #cache: Materialized | undefined;
+  readonly #state: StateCache;
 
   readonly #pool: NotificationPool;
 
@@ -80,10 +73,15 @@ export class UserStore extends CloudStore {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { casing: "snake_case", schema });
+    this.#state = new StateCache({
+      build: `${versionOf(env.PACE_VERSION)}+${SCHEMA_TAG}`,
+      db: this.db,
+      storage: ctx.storage,
+    });
     this.#pool = new NotificationPool({
       chatId: async () => await this.chatId(),
       ctx,
-      current: async () => await this.#current(),
+      current: async () => await this.#state.current(),
       db: this.db,
       derive: async (now) => await this.derive(now),
       deviceId: SERVER_DEVICE_ID,
@@ -96,38 +94,18 @@ export class UserStore extends CloudStore {
     });
   }
 
-  /** The cached state, rebuilt from the log when the cache is missing or behind it. */
-  async #current(): Promise<Materialized> {
-    const seq = await log.latestSeq(this.db);
-    if (this.#cache?.seq === seq) {
-      return this.#cache;
-    }
-    const rebuilt = rebuild({ events: await log.loadLog(this.db), seq });
-    await rewriteProjections(this.db, rebuilt.state);
-    this.#cache = rebuilt;
-    return rebuilt;
-  }
-
   /**
   The one write path: inserts what is new (known ids are skipped), then folds the new
   events into the cache and the projections, incrementally when the batch is in order
   and from scratch otherwise.
   */
   async #insert(events: readonly Event[]): Promise<readonly Event[]> {
-    const before = await this.#current();
+    const before = await this.#state.current();
     const inserted = await log.insertNew(this.db, events, before.ids);
-    if (inserted.length === 0) {
-      return inserted;
-    }
-    const seq = await log.latestSeq(this.db);
-    await announceChange(this.ctx, { inserted, seq, since: before.seq });
-    if (canApplyInOrder(before, inserted)) {
-      const next = applyInOrder(before, inserted, seq);
-      await updateProjections(this.db, next.state, touchedBy(inserted));
-      this.#cache = next;
-    } else {
-      this.#cache = undefined;
-      await this.#current();
+    if (inserted.length > 0) {
+      const seq = await log.latestSeq(this.db);
+      await announceChange(this.ctx, { inserted, seq, since: before.seq });
+      await this.#state.fold(before, inserted, seq);
     }
     return inserted;
   }
@@ -149,7 +127,7 @@ export class UserStore extends CloudStore {
   same person from scratch and a device still holding the old copy drops it.
   */
   async wipe(): Promise<void> {
-    this.#cache = undefined;
+    this.#state.forget();
     await resetStore(this.db, this.ctx.storage);
   }
 
@@ -217,7 +195,7 @@ export class UserStore extends CloudStore {
   /** The materialized state as of `now`, with the system events due by then derived first. */
   async read(now: string): Promise<ReadResult> {
     await this.derive(now);
-    const current = await this.#current();
+    const current = await this.#state.current();
     return { state: toRpcState(current.state), seq: current.seq };
   }
 
@@ -232,14 +210,14 @@ export class UserStore extends CloudStore {
     meta: ApplyMeta,
   ): Promise<Result<ApplyResult, ApplyError>> {
     await this.derive(meta.now);
-    const prepared = prepareBatch(await this.#current(), inputs, meta);
+    const prepared = prepareBatch(await this.#state.current(), inputs, meta);
     if (!prepared.ok) {
       return prepared;
     }
     const inserted = await this.#insert(prepared.value.events);
     await this.derive(meta.now);
     await this.#pool.afterWrite(meta.now);
-    const current = await this.#current();
+    const current = await this.#state.current();
     return ok({
       events: inserted.map((event) => toStored(event)),
       state: toRpcState(current.state),
@@ -255,7 +233,7 @@ export class UserStore extends CloudStore {
     inputs: readonly EventInput[],
     meta: ApplyMeta,
   ): Promise<Result<DryRunResult, ApplyError>> {
-    const prepared = prepareBatch(await this.#current(), inputs, meta);
+    const prepared = prepareBatch(await this.#state.current(), inputs, meta);
     return prepared.ok
       ? ok({
           events: prepared.value.events.map((event) => toStored(event)),
@@ -298,10 +276,7 @@ export class UserStore extends CloudStore {
         },
         storage: this.ctx.storage,
         usageForSleep: async (from, at) => await this.usageForSleep(from, at),
-        zone: async () => {
-          const { state } = await this.#current();
-          return state.settings.timezone ?? notifier.SERVER_TZ;
-        },
+        zone: async () => await this.#state.zone(),
       },
       now,
     );
@@ -326,13 +301,13 @@ export class UserStore extends CloudStore {
   run in a transaction that always rolls back.
   */
   async querySql(sql: string): Promise<Result<SqlRows, SqlError>> {
-    await this.#current();
+    await this.#state.current();
     return runReadOnly(this.ctx.storage, sql);
   }
 
   /** The tables `querySql` can read and their CREATE statements. */
   async describeSchema(): Promise<readonly TableSchema[]> {
-    await this.#current();
+    await this.#state.current();
     return describeTables(this.ctx.storage);
   }
 
@@ -403,7 +378,7 @@ export class UserStore extends CloudStore {
   async derive(now: string): Promise<readonly string[]> {
     const made: string[] = [];
     for (const step of DERIVE_STEPS) {
-      const current = await this.#current();
+      const current = await this.#state.current();
       const events = step({ ...current.state, existingEventIds: current.ids, now });
       const appended = await this.#system(events, now);
       made.push(...appended.map((event) => event.id));

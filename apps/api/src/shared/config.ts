@@ -188,7 +188,7 @@ const apiOriginOf = (value: string | undefined): string | undefined => {
 };
 
 /** An unset or blank version is a build no deploy named. */
-const versionOf = (value: string | undefined): string => {
+export const versionOf = (value: string | undefined): string => {
   const version = value?.trim() ?? "";
   return version === "" ? "dev" : version;
 };

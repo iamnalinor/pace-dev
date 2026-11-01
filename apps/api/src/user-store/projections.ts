@@ -174,3 +174,37 @@ export const updateProjections = async (
   await deleteTouched(db, affected);
   await insertTouched(db, state, affected);
 };
+
+/** Storage key of what the projection rows mirror (`ProjectionMark`). */
+const MARK_KEY = "projections:mark";
+
+/**
+What the projection rows mirror: the state at the log's `seq`, as the build named `build` writes
+them (its version and the tables' newest migration), with that state's zone, the one setting a
+pass reads without materializing the log. Written after the rows, so a write cut short leaves a
+mark behind the log, and the next start rewrites them.
+*/
+export type ProjectionMark = {
+  readonly build: string;
+  readonly seq: number;
+  readonly timezone: null | string;
+};
+
+/** The mark the last projection write left, if any. */
+export const markOf = async (storage: DurableObjectStorage): Promise<ProjectionMark | undefined> =>
+  await storage.get<ProjectionMark>(MARK_KEY);
+
+/** Whether the rows mirror the log at `seq` as this build writes them. */
+export const isMarkedAt = (
+  mark: ProjectionMark | undefined,
+  at: Pick<ProjectionMark, "build" | "seq">,
+): mark is ProjectionMark => mark?.build === at.build && mark.seq === at.seq;
+
+/** Records that the rows now mirror `state` at `seq`. */
+export const saveMark = async (
+  storage: DurableObjectStorage,
+  { build, seq, state }: { build: string; seq: number; state: CoreState },
+): Promise<void> => {
+  const mark: ProjectionMark = { build, seq, timezone: state.settings.timezone };
+  await storage.put(MARK_KEY, mark);
+};

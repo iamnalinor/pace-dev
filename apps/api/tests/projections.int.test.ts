@@ -4,10 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import { type EventInput, newId } from "@pace/core";
 
-import type { UserStore } from "../src/user-store/user-store.ts";
-
 import * as schema from "../src/user-store/schema.ts";
-import { json, loginAsDev, storeIdOf } from "./helpers.ts";
+import { UserStore } from "../src/user-store/user-store.ts";
+import { json, loginAsDev, meterSql, storeIdOf } from "./helpers.ts";
 
 const byText = (a: unknown, b: unknown): number => String(a).localeCompare(String(b));
 
@@ -149,14 +148,40 @@ describe("projections", () => {
   });
 
   it("rebuilds from storage when the in-memory cache is empty", async () => {
-    const stub = freshStore();
     const taskId = newId();
-    await runInDurableObject(stub, async (instance: UserStore) => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
       await instance.append([taskCreated(taskId)], { now: NOW });
+      // A new instance, as after an eviction: nothing in memory (class 55).
+      const read = await new UserStore(state, env).read(NOW);
+      expect(Object.keys(read.state.tasks.byId)).toContain(taskId);
+      expect(read.seq).toBe(1);
     });
-    const read = await stub.read(NOW);
-    expect(Object.keys(read.state.tasks.byId)).toContain(taskId);
-    expect(read.seq).toBe(1);
+  });
+
+  it("writes no projection row on a cold start at the log's seq (class 55)", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      await instance.append([taskCreated(newId()), taskCreated(newId())], { now: NOW });
+      const { cost } = meterSql(state.storage);
+      const cold = new UserStore(state, env);
+      await cold.querySql("SELECT id FROM tasks");
+      expect(cost()).toMatchObject({ loads: 1, projectionRows: 0 });
+      expect(await cold.db.select().from(schema.subtasks)).toHaveLength(4);
+    });
+  });
+
+  it("rewrites every row once on the first cold start of another build", async () => {
+    const taskId = newId();
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      await instance.append([taskCreated(taskId)], { now: NOW });
+      // A row the new build would write otherwise (here: one lost).
+      await instance.db.delete(schema.subtasks);
+      const deployed = { ...env, PACE_VERSION: "v-next" };
+      await new UserStore(state, deployed).querySql("SELECT id FROM tasks");
+      expect(await instance.db.select().from(schema.subtasks)).toHaveLength(2);
+      const { cost } = meterSql(state.storage);
+      await new UserStore(state, deployed).querySql("SELECT id FROM tasks");
+      expect(cost().projectionRows).toBe(0);
+    });
   });
 
   it("rebuilds in canonical order when an event arrives with an earlier occurredAt", async () => {
