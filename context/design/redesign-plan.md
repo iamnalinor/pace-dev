@@ -352,6 +352,34 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
       `.slice(0, 1)` over display strings in `apps/app/src` (message points to the formatters).
 - [ ] **Step 5:** Commit.
 
+### Task 2.5: Instant response — the screen updates before the local write (owner, 2026-11-01)
+
+The owner reports that taps feel late on the phone. Measured on the web build at 4× CPU throttle
+(a mid-range phone): 140–360 ms from tap to the next frame (Event Timing API) for tab switch, filter
+chip, check-off, open row, back. Causes found in code:
+1. `packages/client/src/state.ts:213-216` — `persistLocal` awaits `eventStore.append` (SQLite on
+   Android, IndexedDB on the web) **before** `integrate` updates the store, so every action's visual
+   result waits for a disk transaction.
+2. react-native-web delays the pressed state 50 ms (`DEFAULT_PRESS_DELAY_MS`,
+   `react-native-web/dist/modules/usePressEvents/PressResponder.js:74`); NativeWind `active:` classes
+   need a React re-render to show; Android has no native ripple (fixed in Task 3.1).
+3. Check-off mounts the dust views in the same render as the fill (fixed in Task 5.2).
+
+**Files:** Modify `packages/client/src/state.ts` (+ `state.test.ts`), `packages/client/src/actions/*`
+only if they rely on the old order; Create `e2e/latency.e2e.ts`.
+**Interfaces:** `persistLocal(event)` integrates first, then appends; if the append rejects, the event
+is removed from `known`, the state is rebuilt without it, and the returned promise rejects with
+`"persist_failed"` so the action answers `Result` error and the UI shows its sentence.
+- [ ] Failing tests: client — with a deferred `eventStore.append`, the store version changes before
+      the append resolves; when the append rejects, the state returns to the previous version and the
+      action resolves `{ ok: false, error: "persist_failed" }` (bug-lessons 3: test pending →
+      resolved → refused); e2e `latency.e2e.ts` — with CDP CPU throttle 4×, Event Timing duration for
+      tap on a tab, a chip, a task check and a row is ≤ 100 ms (p75 of 5 taps each).
+- [ ] Implement; PASS; check `rebuild` cost: if `shouldRematerialize` triggers a full rebuild on a
+      plain local action, profile and fix (local actions append in order).
+- [ ] Bug-lessons: new class "The visible result of an action waits for its persistence"; sweep other
+      awaited writes before UI updates (settings, presets, sessions). Commit.
+
 ---
 
 ## Batch 3 — Primitives and components (PR "Design overhaul 2/7: the kit")
@@ -368,7 +396,12 @@ variants, `impeccable polish` on the gallery screenshots after the task. Each ta
 (state-layer CSS for `:focus-visible`, hover gating, forced colours).
 **Interfaces:** Produces `<Pressable role label selected disabled haptic="confirm|tick|longPress|reject" ripple="bounded|borderless" onPress onLongPress>`;
 `haptic(kind)`.
-- [ ] Failing tests: pressed state toggles on `pressIn`/`pressOut`; `disabled` blocks `onPress` and
+- [ ] Press feedback never waits for JS: Android `android_ripple` (native, shown by the platform
+      without a React render); web: `delayPressIn={0}` (react-native-web defaults to 50 ms) and the
+      pressed overlay drawn by CSS `:active` on the element, not by NativeWind `active:` state; the
+      lint rule bans `active:` classes outside `ui/pressable.tsx`.
+- [ ] Failing tests: pressed state toggles on `pressIn`/`pressOut`; the web Pressable passes
+      `delayPressIn={0}`; `disabled` blocks `onPress` and
       sets `accessibilityState.disabled`; `selected` sets `accessibilityState.selected`; Android
       preset passes `android_ripple` with `fill.3`; `haptic="confirm"` calls the haptics port once per
       press; a web snapshot has the focus-visible class.
