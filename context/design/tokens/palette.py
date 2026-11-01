@@ -257,6 +257,7 @@ def check(theme: str, t: dict) -> list[str]:
         ("focus / bg.app (UI 3:1)", t["focus"], t["bg"]["app"]),
         ("status.danger / bg.cell", t["status"]["danger"], t["bg"]["cell"]),
         ("status.warn / bg.cell", t["status"]["warn"], t["bg"]["cell"]),
+        ("status.danger / bg.app", t["status"]["danger"], t["bg"]["app"]),
     ]
     rows += [
         (name, wcag(from_hex(a), from_hex(b)), apca(from_hex(a), from_hex(b)))
@@ -271,14 +272,130 @@ def check(theme: str, t: dict) -> list[str]:
     return [theme] + [f"  {n:38} {r:5.2f}  Lc {lc}" for n, r, lc in rows]
 
 
-def main() -> None:
-    light = {**LIGHT, **TRANSLUCENT["light"], "hue": hue_family("light")}
-    dark = {**DARK, **TRANSLUCENT["dark"], "hue": hue_family("dark")}
-    (HERE / "palette-v2-lines.json").write_text(
+# Direction A · Тетрадь (the owner's choice, 2026-11-01): cool paper, ink-blue accent, red margin
+# as status only, the bright lime logo (owner, round 2).
+NOTEBOOK_LIGHT = {
+    "bg": {
+        "app": "#F4F5F9",
+        "cell": "#FFFFFF",
+        "elevated": "#FFFFFF",
+        "sidebar": "#ECEEF4",
+        "inset": "#F8F9FC",
+    },
+    "label": {
+        "primary": "#12141C",
+        "secondary": "#474C60",
+        "tertiary": "#646A80",
+        "quaternary": "#B4B8C7",
+    },
+    "outline": "#878CA0",
+    "accent": {
+        "default": "#2E4AD6",
+        "on": "#FFFFFF",
+        "text": "#2E4AD6",
+        "pressed": "#2640BC",
+    },
+    "status": {
+        "danger": "#C3352B",
+        "warn": "#B04A0C",
+        "question": "#795300",
+        "success": "#2E4AD6",
+    },
+    "focus": "#2E4AD6",
+    "logo": "#5E8C00",
+}
+NOTEBOOK_DARK = {
+    "bg": {
+        "app": "#0D0F15",
+        "cell": "#161922",
+        "elevated": "#1F2333",
+        "sidebar": "#0A0C11",
+        "inset": "#12141B",
+    },
+    "label": {
+        "primary": "#ECEEF4",
+        "secondary": "#C3C7D5",
+        "tertiary": "#A0A5B9",
+        "quaternary": "#4A4F63",
+    },
+    "outline": "#767C93",
+    "accent": {
+        "default": "#97A9FF",
+        "on": "#0B0D14",
+        "text": "#A6B5FF",
+        "pressed": "#8498F7",
+    },
+    "status": {
+        "danger": "#FF6F61",
+        "warn": "#FF9B5E",
+        "question": "#F2C275",
+        "success": "#A6B5FF",
+    },
+    "focus": "#A6B5FF",
+    "logo": "#C8F03C",
+}
+NOTEBOOK_TRANSLUCENT = {
+    "light": {
+        "fill": {
+            "1": "rgba(20, 28, 70, 0.04)",
+            "2": "rgba(20, 28, 70, 0.07)",
+            "3": "rgba(20, 28, 70, 0.11)",
+            "4": "rgba(20, 28, 70, 0.16)",
+        },
+        "separator": {"default": "rgba(20, 28, 70, 0.10)", "opaque": "#DFE1E9"},
+        "accentQuiet": "rgba(46, 74, 214, 0.10)",
+        "dangerQuiet": "rgba(195, 53, 43, 0.10)",
+        "warnQuiet": "rgba(214, 110, 20, 0.13)",
+        "selection": "rgba(46, 74, 214, 0.18)",
+        "grid": "rgba(46, 74, 214, 0.07)",
+        "scrim": "rgba(10, 12, 24, 0.32)",
+        "shadow": {
+            "card": "0 1px 2px rgba(20, 28, 70, 0.05)",
+            "overlay": "0 12px 32px rgba(20, 28, 70, 0.14), 0 2px 6px rgba(20, 28, 70, 0.06)",
+        },
+    },
+    "dark": {
+        "fill": {
+            "1": "rgba(190, 200, 255, 0.05)",
+            "2": "rgba(190, 200, 255, 0.08)",
+            "3": "rgba(190, 200, 255, 0.12)",
+            "4": "rgba(190, 200, 255, 0.18)",
+        },
+        "separator": {"default": "rgba(190, 200, 255, 0.10)", "opaque": "#262A37"},
+        "accentQuiet": "rgba(151, 169, 255, 0.16)",
+        "dangerQuiet": "rgba(255, 111, 97, 0.15)",
+        "warnQuiet": "rgba(255, 155, 94, 0.16)",
+        "selection": "rgba(151, 169, 255, 0.26)",
+        "grid": "rgba(150, 170, 255, 0.06)",
+        "scrim": "rgba(0, 0, 0, 0.55)",
+        "shadow": {
+            "card": "none",
+            "overlay": "0 0 0 1px rgba(190, 200, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5)",
+        },
+    },
+}
+
+
+def write(name: str, light: dict, dark: dict) -> list[str]:
+    (HERE / f"palette-v2-{name}.json").write_text(
         json.dumps({"light": light, "dark": dark}, indent=2) + "\n"
     )
     report = check("light", light) + check("dark", dark)
-    (HERE / "palette-v2-lines-contrast.txt").write_text("\n".join(report) + "\n")
+    (HERE / f"palette-v2-{name}-contrast.txt").write_text("\n".join(report) + "\n")
+    return report
+
+
+def main() -> None:
+    write(
+        "lines",
+        {**LIGHT, **TRANSLUCENT["light"], "hue": hue_family("light")},
+        {**DARK, **TRANSLUCENT["dark"], "hue": hue_family("dark")},
+    )
+    report = write(
+        "notebook",
+        {**NOTEBOOK_LIGHT, **NOTEBOOK_TRANSLUCENT["light"], "hue": hue_family("light")},
+        {**NOTEBOOK_DARK, **NOTEBOOK_TRANSLUCENT["dark"], "hue": hue_family("dark")},
+    )
     print("\n".join(report))
 
 

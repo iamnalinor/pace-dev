@@ -16,6 +16,7 @@ light
   focus / bg.app (UI 3:1)                 4.81  Lc 68.6
   status.danger / bg.cell                 6.57  Lc 80.9
   status.warn / bg.cell                   5.86  Lc 78.8
+  status.danger / bg.app                  5.86  Lc 73.0
   hue.red.ink / tint                      6.23  Lc 74.0
   hue.red.stroke / bg.app (UI 3:1)        3.80  Lc 0.0
   hue.orange.ink / tint                   6.17  Lc 74.1
@@ -60,6 +61,7 @@ dark
   focus / bg.app (UI 3:1)                 9.91  Lc -65.9
   status.danger / bg.cell                 6.82  Lc -51.5
   status.warn / bg.cell                   8.20  Lc -59.9
+  status.danger / bg.app                  7.47  Lc -52.4
   hue.red.ink / tint                      7.70  Lc -67.5
   hue.red.stroke / bg.app (UI 3:1)        7.17  Lc 0.0
   hue.orange.ink / tint                   7.69  Lc -67.8
