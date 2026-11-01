@@ -854,6 +854,12 @@ Only what spec §2 names for the chosen direction (A · Тетрадь).
 
 ---
 
+## Phase C delta (spec §13)
+
+Tasks listed in spec §13's table own the new surfaces Phase C added; each of those tasks reads its
+row. Bugs found by the delta review (export file name in UTC, 09-001 IPv6 under Revoke, Wipe ignoring
+Escape) get their bug-lessons entries in the task that fixes them.
+
 ## Batch sizes (rough)
 
 | Batch | PR | Tasks | Size |

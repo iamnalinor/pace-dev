@@ -2489,3 +2489,29 @@ Answer "defaults" to accept every recommended default.
 | Q10 | Baseline/golden screenshots in git | **goldens only for the focused subset (§9.4); the full matrix stays reproducible by script** · commit every re-shoot | **subset** | The baseline you asked to commit stays; later re-shoots don't add 50 MB per batch. |
 | Q11 | Update banner copy | **"A new version of Pace · Refresh page" / «Вышла новая версия Pace · Обновить страницу»** · your wording | **as given** | Restores your feedback-4 text and pins it with a test. |
 | Q12 | Phone time bar while something runs | **the four tiles stay visible; only the typed field folds under «Начать другое»; the whole bar folds only when the 40 % region budget is exceeded (small screens, zoom, keyboard, open proposals)** · keep today's fold of the whole bar | **tiles visible** | Switching stays at three taps (feedback-2, F-CMP-19); PRODUCT.md's fold description is updated. |
+
+---
+
+## 13. Phase C delta (re-baseline, 2026-11-01)
+
+Evidence: `context/design/reviews/09-phase-c-delta.md` (21 findings over the surfaces Phase C changed;
+re-shot matrix of the Phase C build in the session scratchpad). Status changes it found: **fixed** —
+F-CMP-03, F-CPY-02; **partly** — F-WEB-01 (titles exist but are generic: every task "Task · Pace",
+login "Sign in to Pace · Pace"), F-WEB-02, F-CMP-07, F-CMP-12, F-A11Y-07, F-A11Y-08, F-A11Y-19,
+F-DAT-02, F-DAT-11, F-WEB-06; **worse** — F-LAY-09 (Settings longer; Wipe/Delete now `secondary`,
+the opposite of F-CMP-07). These components and screens are added to the spec (each follows §3–§8):
+
+| New / changed surface | Spec rule | Plan task |
+|---|---|---|
+| `InlineConfirm` (Danger zone, session row, Not me — three layouts today, 09-003) | one component: question as a `status` line, `[Отмена] [Action destructive]` equal halves on phone, trailing on desktop, Escape cancels, focus to Cancel on open and back to the opener (bug-lessons 5) | 3.9 (new component), consumers in 4.10 / 4.11 |
+| Session row + Devices list (IPv6 under Revoke, 09-001; 16 rows ungrouped) | `ListRow` with the address `truncate-middle` + tooltip, `min-w-0` text column; rows grouped by kind (Phones · Computers · Browsers · AI apps) with counts | 4.11 |
+| Add a computer token steps (no primary button) | sheet with steps and a sticky footer primary «Готово» | 4.11 |
+| Sign-in notice in the feed (open / own / ended / resolved) | `ListRow` + `InlineConfirm` for Not me; copy names the session («Firefox на Windows, Германия»); one wording for a sign-in in the feed and in Settings | 4.10, 4.13 |
+| Outcome line after Attend/Skip and other answers (appears/disappears in one frame) | `Presence` fade 160 / 110, focusable status taking focus only if focus is nowhere | 4.3, 5.3 |
+| `Notice` (signed-out notice on login, zone banner, background hint) | one inline notice: icon + text + optional action, `status.*Quiet` tint, never a second tagline | 3.9 (component), 4.12 |
+| Battery step + BackgroundHint (Android) | onboarding step in the template; Settings › Permissions row; verify on hardware (OEM autostart page under the system dialog) | 4.12, spec §11 |
+| Notifications matrix "Web" column note | footnote under the matrix in `footnote` | 4.11 |
+| Toast with content (export file name) | file name `truncate-middle`, local date (not UTC) — bug, see bug-lessons | 3.7, 4.11 |
+| Focusable scroll region (Insights) | gets the `focus` ring like any focusable | 3.1 |
+| Page title pattern | «<entity or screen> · Pace» — task title, project name, «Вход · Pace» | 6.1 |
+| Automatic-sleep lines in the Assistant log | `ListRow` in Decisions with the rule's plain-words reason | 4.7 |
