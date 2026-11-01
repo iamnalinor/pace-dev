@@ -4,6 +4,7 @@ import {
   type Importance,
   newId,
   type Result,
+  seriesAnchor,
   seriesInstanceId,
   type SeriesSchedule,
   seriesStartProblem,
@@ -190,6 +191,9 @@ const recurringCreated = async (
   const startAt = form.startAt ?? deps.clock.now();
   const startTz = form.startTz ?? deps.clock.deviceTz;
   const due = form.dueAt === undefined ? null : { at: form.dueAt };
+  // The series counts from the chosen start, else from 00:00 today: the first instance starts
+  // now, the next ones at the start of their day, not at this minute (QA round 14 L10e).
+  const anchor = seriesAnchor(form.startAt, { at: startAt, tz: startTz });
   if (seriesStartProblem(form.recurrence, { due, start: { at: startAt, tz: startTz } }) !== null) {
     return err("action/invalid-input");
   }
@@ -206,7 +210,7 @@ const recurringCreated = async (
       payload: {
         seriesId,
         schedule: form.recurrence,
-        template: { ...payload, startAt, startTz, seriesId, seriesRevision: 0 },
+        template: { ...payload, startAt: anchor, startTz, seriesId, seriesRevision: 0 },
       },
     },
     form,
