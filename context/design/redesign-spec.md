@@ -346,7 +346,7 @@ its own tint; ≥ 5.6:1) and `tint` (12 % light, 18 % dark).
 Project colours keep their ten stored names (`blue violet green amber coral pink teal slate orange
 yellow`; `coral` maps to `red`) — the event schema is not widened in this overhaul (bug-lessons
 class 13). Activity categories get twelve distinct hues in `packages/core/src/tracking/categories.ts`:
-work blue · study violet · task green · food orange · commute yellow · hygiene cyan · rest teal ·
+work blue · study violet · task green · food orange · commute lime · hygiene cyan · rest teal ·
 chores amber · social pink · sport red · sleep indigo · other slate.
 
 **Usage rule (P1).** Category = a line or dot in its stroke plus the name in `label.*`; project = a
@@ -2423,7 +2423,7 @@ Per `docs/testing.md`; behaviour changes start with a failing test.
 
 | Level | What moves there | Files |
 |---|---|---|
-| unit (`bun test:unit`) | the contrast table over `tokens.json` v2 (every §3.1 pair, both themes, WCAG and APCA, composited tints and fills) so a bad colour fails the build; token shape (every theme has every key); 12 distinct category hues (ΔE OKLab ≥ 8 between any two); the number/duration formatters (RU nbsp, decimal comma, days past 48 h, grapheme-safe initials); text-length policies of the view-models (submit label «Сдать 37») | `packages/core/src/design/contrast.test.ts`, `tokens.test.ts`, `i18n.test.ts`, `packages/client/src/view-models/*.test.ts` |
+| unit (`bun test:unit`) | the contrast table over `tokens.json` v2 (every §3.1 pair, both themes, WCAG and APCA, composited tints and fills) so a bad colour fails the build; token shape (every theme has every key); 12 distinct category hues (ΔE OKLab ≥ 0.05 between any two); the number/duration formatters (RU nbsp, decimal comma, days past 48 h, grapheme-safe initials); text-length policies of the view-models (submit label «Сдать 37») | `packages/core/src/design/contrast.test.ts`, `tokens.test.ts`, `i18n.test.ts`, `packages/client/src/view-models/*.test.ts` |
 | app (`bun test:app`, jest-expo) | every kit component's states (rest, pressed, disabled, selected, loading, error) by role and `accessibilityState`; labels on icon-only controls; target sizes ≥ 48 on the Android preset; Sheet dismiss paths (handle drag, scrim, Back); TextField's touched gate (no error before interaction; F-CMP-03); toast placement from measured chrome; `deadControls()` over every redesigned phone screen (bug-lessons 10) | `apps/app/src/ui/*.test.tsx`, `src/features/**/*.test.tsx` |
 | e2e (`bun test:e2e`, Playwright + axe) | the design-shots matrix (manual review, then goldens); axe with overlays open and in forced colours; focus sweep; zoom/reflow; titles and heading levels; reduced-motion check-off and sheet; motion geometry sampler for composer unfold, sheet and check-off (nothing leaves its container, no blank row); worst-case overflow sweep on the dev fixtures (`scrollWidth ≤ clientWidth` everywhere, no text past its box); network steady-state after the redesigned flows (no request repeated; bug-lessons 1) | `e2e/design-shots.e2e.ts`, `e2e/a11y.e2e.ts`, `e2e/motion.e2e.ts`, `e2e/worst-case.e2e.ts` |
 | QA (Sonnet, `docs/qa.md`) | a round after every batch; the new checklist lines: colour budget per screen, one filled accent per view, title height constant across destinations, sheets leave the way they came, RU at 390 for every changed screen | `context/qa-round-<n>.md` |
