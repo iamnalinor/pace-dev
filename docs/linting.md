@@ -8,7 +8,7 @@ a forgotten migration cannot reach `main`.
 | Step | Tool | Catches |
 |---|---|---|
 | `lint:format` | **Biome** (formatter only), `biome format --write .` | formatting of TS/TSX/JS/JSON/CSS |
-| `lint:eslint` | **ESLint 10** + plugins, `--fix --max-warnings 0`, one process per workspace (`scripts/eslint-all.ts`, memory), cached in `.cache/eslint/<part>/` | bugs, unsafe types, complexity, conventions |
+| `lint:eslint` | **ESLint 10** + plugins, `--fix`, zero warnings (except the `pace/no-raw-design-values` ratchet below), one process per workspace (`scripts/eslint-all.ts`, memory), cached in `.cache/eslint/<part>/` | bugs, unsafe types, complexity, conventions |
 | `typecheck` | **tsc** (TypeScript 6, strictest) in six projects: root configs, `packages/core`, `packages/client`, `apps/api`, `apps/app`, `e2e` | type errors |
 | `lint:knip` | **knip** | unused files, exports, types and dependencies; missing dependencies |
 | `lint:dup` | **jscpd** (threshold 0, 50+ tokens) | copy-paste outside tests, generated code, the i18n catalogs |
@@ -62,7 +62,7 @@ TS 7 yet.
   classes, no `this`, no `throw`, `readonly` everywhere.
 - React (the app, phone and web): **@eslint-react** strict type-checked, **react-hooks** (incl. the
   React Compiler rules), **better-tailwindcss** (Tailwind v3 via `apps/app/tailwind.config.js` for NativeWind).
-- **pace/no-raw-design-values** (own plugin, `scripts/eslint-rules/`, `warn` in the app): raw colours, radii, font metrics, durations and Tailwind arbitrary values (`p-[13px]`) must come from the design tokens; the app part of `scripts/eslint-all.ts` tolerates only the baseline count (`DESIGN_VALUE_WARNINGS`), a ratchet to drive to zero.
+- **pace/no-raw-design-values** (own plugin, `scripts/eslint-rules/`, `warn` in the app): raw colours (hex, `rgb()`, CSS names), radii, font metrics, durations (`duration:`, `.duration(n)`, `withDelay`, `*_MS` constants, springs) and Tailwind arbitrary values (`p-[13px]`) must come from the design tokens. It is an exact ratchet: `scripts/eslint-all.ts` fails the app part when the warning count differs from `DESIGN_VALUE_WARNINGS`, above (a regression) or below (lower the constant to the new number); the plugin's `meta.version` is a hash of the rule sources, so editing a rule invalidates the eslint cache.
 - Tests: **@vitest/eslint-plugin**, **playwright** (e2e).
 - `eslint-config-prettier` turns off stylistic rules the formatter owns; `curly: all`
   and `no-unexpected-multiline` do not conflict with Biome and are re-enabled after it.
