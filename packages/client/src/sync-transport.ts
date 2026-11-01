@@ -2,7 +2,7 @@ import { type EndpointOutput, endpoints, type Event, newId, STORE_CHANGED } from
 
 import type { LiveChannel } from "./live.ts";
 
-import { type ApiClient, ApiError } from "./api-client.ts";
+import { type ApiClient, ApiError, ApiUnreachable } from "./api-client.ts";
 import { LiveUnavailable } from "./live-requests.ts";
 
 /*
@@ -34,17 +34,70 @@ export type SyncTransport = {
 const isStoreChanged = (error: unknown): boolean =>
   error instanceof ApiError && error.code === STORE_CHANGED;
 
+/**
+How long one HTTP sync call may go unanswered. Without it a stalled connection (a proxy holding
+the request, a phone network that drops it silently, Android's no-read-timeout default) held
+the run, `syncing` and the first-sync cover for good (QA round 17 review I2). A page of 200
+events comes back in well under a second; the socket has its own `LIVE_REQUEST_TIMEOUT_MS`, and
+only sync calls carry this (the assistant's parse may think longer).
+*/
+export const HTTP_SYNC_TIMEOUT_MS = 30_000;
+
+/** An HTTP sync call that got no answer in time: the server could not be reached. */
+export class SyncTimeout extends Error {
+  constructor() {
+    super("sync request timed out");
+    this.name = "SyncTimeout";
+  }
+}
+
+const withinTimeout = async <T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, HTTP_SYNC_TIMEOUT_MS);
+  try {
+    return await call(controller.signal);
+  } catch (error) {
+    throw controller.signal.aborted ? new SyncTimeout() : error;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+The run could not reach the server: no answer at all, or none in time. Only this reads as
+offline; a refusal, a page that breaks the contract or a full device store is an error the
+offline line must not explain away (QA round 17 review m3).
+*/
+export const isUnreachable = (error: unknown): boolean =>
+  error instanceof ApiUnreachable ||
+  error instanceof SyncTimeout ||
+  error instanceof LiveUnavailable;
+
 /** The HTTP routes: a `409 store/changed` is read as the value, any other failure thrown. */
 export const httpTransport = (api: ApiClient): SyncTransport => ({
   pull: async (since, limit) => {
-    const page = await api.call(endpoints.sync.pull, {
-      query: { limit: String(limit), since: String(since) },
-    });
+    const page = await withinTimeout(
+      async (signal) =>
+        await api.call(
+          endpoints.sync.pull,
+          { query: { limit: String(limit), since: String(since) } },
+          { signal },
+        ),
+    );
     return { ...page, since };
   },
   push: async (events, storeId) => {
     try {
-      return await api.call(endpoints.sync.push, { body: { events: [...events], storeId } });
+      return await withinTimeout(
+        async (signal) =>
+          await api.call(
+            endpoints.sync.push,
+            { body: { events: [...events], storeId } },
+            { signal },
+          ),
+      );
     } catch (error) {
       if (isStoreChanged(error)) {
         return STORE_CHANGED;

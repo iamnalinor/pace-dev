@@ -189,6 +189,7 @@ export const enShell = {
   "common.home": "Go home",
   "errors.offline": "You are offline. Changes will sync when you reconnect.",
   "sync.firstSync": "Syncing your data",
+  "sync.stillSyncing": "Still syncing your data…",
   "errors.llmUnavailable": "The assistant is unavailable right now. Try again in a moment.",
   "errors.notFound": "Not found.",
   "errors.pageNotFound": "Page not found",

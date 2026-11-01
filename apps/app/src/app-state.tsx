@@ -29,7 +29,29 @@ const POLL_OFFLINE_MS = 30_000;
 const POLL_LIVE_MS = 5 * 60_000;
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
-const LanguageReadyContext = createContext<null | string>(null);
+/**
+Which session's sync has finished: `ready` names the session whose last run succeeded (its
+account settings are safe to show), `ended` the one whose last run finished at all, failed
+included. A run of an earlier session never speaks for the current one (review m5).
+*/
+type SyncedSessions = { readonly ready: null | string; readonly ended: null | string };
+
+const NO_SYNCED_SESSION: SyncedSessions = { ended: null, ready: null };
+
+/** A run of `owner`'s session finished (`null`: signed out); a failed one keeps what was ready. */
+type OnSynced = (owner: null | string, isSynced: boolean) => void;
+
+const syncedAfter = (
+  previous: SyncedSessions,
+  owner: null | string,
+  isSynced: boolean,
+): SyncedSessions => {
+  const next =
+    owner === null ? NO_SYNCED_SESSION : { ended: owner, ready: isSynced ? owner : previous.ready };
+  // The same answer keeps the same object: a sync every few minutes redraws nothing.
+  return next.ended === previous.ended && next.ready === previous.ready ? previous : next;
+};
+const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 
 /**
 A signed-in start: this week's homework instances, a first sync, then the account's time
@@ -57,11 +79,11 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   runtime.live.start();
 };
 
-/** A successful sync makes account settings safe to show for that run's session. */
-const followSyncedLanguage = (
-  runtime: PaceRuntime,
-  onLanguageReady: (token: null | string) => void,
-): (() => void) => {
+/**
+A finished sync is told for the session that started it: a successful one makes the account's
+settings safe to show, any one ends the first-sync cover.
+*/
+const followSyncedLanguage = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { auth, sync } = runtime;
   let syncOwner = sync.status.getState().syncing ? runtime.api.currentSessionToken() : undefined;
   return sync.status.subscribe((current, previous) => {
@@ -69,27 +91,23 @@ const followSyncedLanguage = (
       syncOwner = runtime.api.currentSessionToken();
     }
     if (
-      syncOwner !== undefined &&
-      !current.syncing &&
-      previous.syncing &&
-      current.lastError === null &&
-      current.lastSyncAt !== null &&
-      runtime.api.isCurrentSession(syncOwner) &&
-      auth.store.getState().status === "signed-in"
+      syncOwner === undefined ||
+      current.syncing ||
+      !previous.syncing ||
+      !runtime.api.isCurrentSession(syncOwner) ||
+      auth.store.getState().status !== "signed-in"
     ) {
-      onLanguageReady(syncOwner);
+      return;
     }
+    onSynced(syncOwner, current.lastError === null && current.lastSyncAt !== null);
   });
 };
 
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
-const runSyncLoop = (
-  runtime: PaceRuntime,
-  onLanguageReady: (token: null | string) => void,
-): (() => void) => {
+const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { actions, auth, sync } = runtime;
   let activeSession = runtime.api.currentSessionToken();
-  const stopLanguageSync = followSyncedLanguage(runtime, onLanguageReady);
+  const stopLanguageSync = followSyncedLanguage(runtime, onSynced);
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
@@ -101,7 +119,7 @@ const runSyncLoop = (
         }
       })();
     } else {
-      onLanguageReady(null);
+      onSynced(null, false);
       sync.stop();
       runtime.live.stop();
     }
@@ -180,7 +198,7 @@ export const PaceProvider = ({
   readonly runtime?: PaceRuntime;
 }) => {
   const [runtime, setRuntime] = useState<null | PaceRuntime>(provided ?? null);
-  const [languageReadyToken, setLanguageReadyToken] = useState<null | string>(null);
+  const [synced, setSynced] = useState<SyncedSessions>(NO_SYNCED_SESSION);
   const origin = useServerOrigin(provided === undefined);
 
   useEffect(() => {
@@ -200,7 +218,12 @@ export const PaceProvider = ({
   }, [provided, origin]);
 
   useEffect(
-    () => (runtime === null ? undefined : runSyncLoop(runtime, setLanguageReadyToken)),
+    () =>
+      runtime === null
+        ? undefined
+        : runSyncLoop(runtime, (owner, isSynced) => {
+            setSynced((previous) => syncedAfter(previous, owner, isSynced));
+          }),
     [runtime],
   );
 
@@ -208,7 +231,7 @@ export const PaceProvider = ({
     <View className="flex-1 bg-bg" />
   ) : (
     <RuntimeContext value={runtime}>
-      <LanguageReadyContext value={languageReadyToken}>{children}</LanguageReadyContext>
+      <SyncedContext value={synced}>{children}</SyncedContext>
     </RuntimeContext>
   );
 };
@@ -260,15 +283,15 @@ server is never hidden for good.
 */
 export const useIsFirstSync = (): boolean => {
   const { status } = useAuth();
-  const { api, hooks, sync } = usePace();
-  const readyToken = use(LanguageReadyContext);
+  const { api, hooks } = usePace();
+  const { ended } = use(SyncedContext);
   const isLoading = hooks.useAppState((state) => state.status === "loading");
   const isEmpty = hooks.useAppState(
     (state) => state.status === "ready" && state.events.length === 0,
   );
-  const hasFailed = useStore(sync.status, (current) => current.lastError !== null);
-  const isLanguageReady = readyToken !== null && readyToken === api.currentSessionToken();
-  const isWaiting = status === "signed-in" && !isLanguageReady && !hasFailed;
+  // Only a run of this session ends it: an earlier session's failure still sits in `lastError`.
+  const hasEnded = ended !== null && ended === api.currentSessionToken();
+  const isWaiting = status === "signed-in" && !hasEnded;
   // Once read empty, the copy stays covered while its first pages arrive, until the sync ends; a
   // copy still being read from the device is covered only until it is read (local first).
   const [wasEmpty, setWasEmpty] = useState(false);
@@ -279,12 +302,18 @@ export const useIsFirstSync = (): boolean => {
   return isEmptyCopy || (isWaiting && isLoading);
 };
 
-/** Signed in and the last sync could not reach the server (QA round 17 M5). */
+/**
+Signed in and this session's last sync could not reach the server (QA round 17 M5); what an
+earlier session's sync found says nothing about this one (review m5).
+*/
 export const useIsOffline = (): boolean => {
   const { status } = useAuth();
-  const { sync } = usePace();
+  const { api, sync } = usePace();
+  const { ended } = use(SyncedContext);
   const isOnline = useStore(sync.status, (current) => current.online);
-  return status === "signed-in" && !isOnline;
+  return (
+    status === "signed-in" && !isOnline && ended !== null && ended === api.currentSessionToken()
+  );
 };
 
 export const useAppState = <T,>(selector: (state: ClientState) => T): T =>
@@ -295,7 +324,7 @@ export const useSettings = (): Settings => useAppState((state) => state.settings
 export const useLanguage = (): Language => {
   const { status } = useAuth();
   const { api } = usePace();
-  const readyToken = use(LanguageReadyContext);
+  const readyToken = use(SyncedContext).ready;
   const accountLanguage = useAppState((state) => state.settings.language);
   return status === "signed-in" && readyToken !== null && readyToken === api.currentSessionToken()
     ? accountLanguage

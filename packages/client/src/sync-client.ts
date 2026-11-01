@@ -4,9 +4,9 @@ import { err, type Event, ok, parseEvent, type Result, STORE_CHANGED } from "@pa
 
 import type { EventStore } from "./event-store.ts";
 import type { AppStateHandle } from "./state.ts";
-import type { PullPage, SyncTransport } from "./sync-transport.ts";
 
 import { ApiError } from "./api-client.ts";
+import { isUnreachable, type PullPage, type SyncTransport } from "./sync-transport.ts";
 import { SYNC_SCHEMA_VERSION, upgradeCursor } from "./sync-version.ts";
 
 export type SyncStatus = {
@@ -233,7 +233,7 @@ const runSync = async (
   } catch (error) {
     status.setState({
       lastError: describe(error),
-      online: error instanceof ApiError,
+      online: !isUnreachable(error),
       syncing: false,
     });
     return err(describe(error));

@@ -190,6 +190,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "common.home": "На главную",
   "errors.offline": "Нет сети. Изменения синхронизируются при подключении.",
   "sync.firstSync": "Синхронизируем данные",
+  "sync.stillSyncing": "Синхронизация ещё идёт…",
   "errors.llmUnavailable": "Ассистент сейчас недоступен. Попробуйте чуть позже.",
   "errors.notFound": "Не найдено.",
   "errors.pageNotFound": "Страница не найдена",

@@ -5,7 +5,7 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 
-import { FirstSyncCover, OfflineFrame } from "./sync-frame.tsx";
+import { FIRST_SYNC_COVER_MS, SyncFrame } from "./sync-frame.tsx";
 
 const EMPTY_PAGE = { events: [], more: false, seq: 0, storeId: FAKE_STORE_ID };
 
@@ -19,14 +19,12 @@ const heldPull = () => {
 };
 
 const App = () => (
-  <OfflineFrame>
-    <FirstSyncCover isBare={false}>
-      <Text>{en("now.empty")}</Text>
-    </FirstSyncCover>
-  </OfflineFrame>
+  <SyncFrame isBare={false}>
+    <Text>{en("now.empty")}</Text>
+  </SyncFrame>
 );
 
-describe("FirstSyncCover (QA round 17 M4)", () => {
+describe("the first-sync cover (QA round 17 M4)", () => {
   it("shows no empty copy while an empty copy waits for its first sync, then the screen", async () => {
     const pull = heldPull();
     const runtime = await createTestRuntime({
@@ -57,13 +55,14 @@ describe("FirstSyncCover (QA round 17 M4)", () => {
   it("gives way to the offline line when the first sync cannot reach the server (M5)", async () => {
     const runtime = await createTestRuntime({
       routes: {
+        ...DEV_LOGIN,
         "GET /api/sync/pull": () => {
           throw new TypeError("Failed to fetch");
         },
       },
       world: "empty",
     });
-    await runtime.auth.me();
+    await runtime.auth.loginWithDev("1");
     await renderScreen(<App />, runtime);
     expect(await screen.findByText(en("errors.offline"))).toBeOnTheScreen();
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
@@ -71,11 +70,82 @@ describe("FirstSyncCover (QA round 17 M4)", () => {
   });
 });
 
-describe("OfflineFrame (QA round 17 M5)", () => {
+describe("the first-sync cover's bound (QA round 17 review I2)", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("gives the app back with a still-syncing line when the first pull never answers", async () => {
+    jest.useFakeTimers();
+    const pull = heldPull();
+    const runtime = await createTestRuntime({
+      routes: { ...DEV_LOGIN, "GET /api/sync/pull": pull.route },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    await renderScreen(<App />, runtime);
+    expect(screen.getByRole("progressbar", { name: en("sync.firstSync") })).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(FIRST_SYNC_COVER_MS - 1);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("progressbar")).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+    expect(screen.getByText(en("sync.stillSyncing"))).toBeOnTheScreen();
+    // The pull answers at last: the line goes, the app stays.
+    await act(async () => {
+      pull.answer(EMPTY_PAGE);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(en("sync.stillSyncing"))).toBeNull();
+    });
+    expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+  });
+
+  it("covers the next sign-in's first sync though the last session's sync failed (review m5)", async () => {
+    const network = {
+      pull: (): Promise<unknown> => Promise.reject(new TypeError("Failed to fetch")),
+    };
+    const runtime = await createTestRuntime({
+      routes: {
+        ...DEV_LOGIN,
+        "GET /api/sync/pull": async () => await network.pull(),
+        "POST /api/auth/logout": () => ({ ok: true }),
+      },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    await renderScreen(<App />, runtime);
+    expect(await screen.findByText(en("errors.offline"))).toBeOnTheScreen();
+    const pull = heldPull();
+    network.pull = pull.route;
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    expect(
+      await screen.findByRole("progressbar", { name: en("sync.firstSync") }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(en("now.empty"))).toBeNull();
+    // Nothing from that session's sync says offline in this one yet.
+    expect(screen.queryByText(en("errors.offline"))).toBeNull();
+  });
+});
+
+describe("the offline line (QA round 17 M5)", () => {
   it("says the device is offline while the sync cannot reach the server, and clears once it can", async () => {
     const network = { isDown: true };
     const runtime = await createTestRuntime({
       routes: {
+        ...DEV_LOGIN,
         "GET /api/sync/pull": () => {
           if (network.isDown) {
             throw new TypeError("Failed to fetch");
@@ -84,7 +154,7 @@ describe("OfflineFrame (QA round 17 M5)", () => {
         },
       },
     });
-    await runtime.auth.me();
+    await runtime.auth.loginWithDev("1");
     await renderScreen(<App />, runtime);
     expect(await screen.findByText(en("errors.offline"))).toBeOnTheScreen();
     network.isDown = false;

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { CLIENT_OUTDATED, endpoint, endpoints, PROTOCOL, PROTOCOL_HEADER } from "@pace/core";
 
-import { ApiError, createApiClient } from "./api-client.ts";
+import { ApiError, ApiUnreachable, createApiClient } from "./api-client.ts";
 
 const jsonResponse = (status: number, body: unknown): Response =>
   Response.json(body, {
@@ -175,5 +175,20 @@ describe("createApiClient default transport", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("createApiClient when the server cannot be reached", () => {
+  it("says so apart from an answer the server gave, with the platform's words", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: async () => {
+        throw new TypeError("Network request failed");
+      },
+      token: () => undefined,
+    });
+    const call = api.call(endpoints.health, {});
+    await expect(call).rejects.toBeInstanceOf(ApiUnreachable);
+    await expect(call).rejects.toThrow("Network request failed");
   });
 });

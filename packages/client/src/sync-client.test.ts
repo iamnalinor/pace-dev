@@ -21,7 +21,7 @@ import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
-import { httpTransport } from "./sync-transport.ts";
+import { HTTP_SYNC_TIMEOUT_MS, httpTransport } from "./sync-transport.ts";
 import { SYNC_SCHEMA_VERSION } from "./sync-version.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
@@ -751,5 +751,83 @@ describe.each([
     );
     await expectOnlyTheFreshStore(context, { events: [remote], storeId: "store-b" });
     client.live.stop();
+  });
+});
+
+describe("createSyncClient's offline flag (QA round 17 review m3, I2)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("calls a run offline only when the server could not be reached", async () => {
+    const drift = await setup({ "GET /api/sync/pull": () => ({ events: "not a page" }) });
+    await drift.sync.syncNow();
+    expect(drift.sync.status.getState()).toMatchObject({ online: true, syncing: false });
+    expect(drift.sync.status.getState().lastError).not.toBeNull();
+
+    const store = createMemoryEventStore();
+    const full: EventStore = {
+      ...store,
+      append: async () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      },
+    };
+    const quota = await started(full, {
+      "GET /api/sync/pull": () => ({
+        events: [settingsEvent(newId(), at(9), { language: "ru" })],
+        more: false,
+        seq: 1,
+        storeId: STORE_ID,
+      }),
+    });
+    await quota.sync.syncNow();
+    expect(quota.sync.status.getState()).toMatchObject({
+      lastError: "The quota has been exceeded.",
+      online: true,
+    });
+
+    const unreachable = await setup({
+      "GET /api/sync/pull": () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    await unreachable.sync.syncNow();
+    expect(unreachable.sync.status.getState()).toMatchObject({
+      lastError: "Failed to fetch",
+      online: false,
+    });
+  });
+
+  it("gives up on an HTTP call that never answers, so a run cannot hold `syncing` for good", async () => {
+    vi.useFakeTimers();
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const signals: AbortSignal[] = [];
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // A connection that stalls: no answer until the caller aborts.
+      fetch: async (_input, init) =>
+        await new Promise<Response>((_resolve, reject) => {
+          const { signal } = init;
+          if (signal === null || signal === undefined) {
+            return;
+          }
+
+          signals.push(signal);
+          signal.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }),
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+    const run = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(HTTP_SYNC_TIMEOUT_MS - 1);
+    expect(sync.status.getState().syncing).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(run).resolves.toMatchObject({ ok: false });
+    expect(signals).toHaveLength(1);
+    expect(sync.status.getState()).toMatchObject({ online: false, syncing: false });
   });
 });
