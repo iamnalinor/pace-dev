@@ -94,6 +94,27 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await expect(page.getByText("Type something first.")).toHaveCount(0);
 });
 
+test("the form's close drops its draft: New task opens an empty form again (QA 14 L6)", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  await formByHand(page).click();
+  const form = taskForm(page);
+  const title = form.getByRole("textbox", { exact: true, name: "Title" });
+  await title.fill("Leftover");
+  await form.getByRole("radio", { name: "Every day" }).click();
+  await expect(form.getByRole("radio", { name: "Every day" })).toBeChecked();
+  await form.getByRole("button", { name: "Close" }).click();
+  await expect(form).toHaveCount(0);
+  await formByHand(page).click();
+  await expect(title).toHaveValue("");
+  await expect(form.getByRole("radio", { name: "Does not repeat" })).toBeChecked();
+  await expect(form.getByRole("button", { name: /^Create/u })).toBeDisabled();
+});
+
 /**
 Samples, frame by frame, where the form sits inside the card's clipping box while the card
 unfolds: the browser must not scroll the box to reveal the focused title, which would slide

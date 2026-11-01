@@ -125,13 +125,21 @@ describe("NowScreen on a wide window", () => {
     expect(line()).toHaveDisplayValue("renew the passport");
   });
 
-  it("shows a task picked while the form is open, the draft folded back into the line", async () => {
+  it("shows a task picked while the form is open: the form's draft goes, the line keeps its text", async () => {
     await renderScreen(<NowScreen />, await createTestRuntime());
     await fireEvent.changeText(line(), "renew the passport");
     await fireEvent.press(button("nav.newTask"));
+    await fireEvent.changeText(title(), "renew the passport at the embassy");
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
     await fireEvent.press(screen.getByText("Algebra HW 6"));
     expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
     expect(taskDetails()).toBeOnTheScreen();
     expect(line()).toHaveDisplayValue("renew the passport");
+    // Every way out of the form drops its draft (QA round 14 L6), not only the close.
+    await fireEvent.press(button("nav.newTask"));
+    expect(title()).toHaveDisplayValue("renew the passport");
+    expect(
+      screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
+    ).toBeOnTheScreen();
   });
 });

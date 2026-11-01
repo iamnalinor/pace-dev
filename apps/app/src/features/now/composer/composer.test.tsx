@@ -566,6 +566,48 @@ describe("Composer", () => {
     });
   });
 
+  it("drops the form's draft on its close: New task opens an empty form again (QA 14 L6)", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.changeText(title(), "Leftover");
+    await fireEvent.press(screen.getByRole("radio", { name: /Due: No deadline/u }));
+    await fireEvent.press(screen.getByRole("button", { name: /October 7/u }));
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
+    await fireEvent.press(button("form.addSubtask"));
+    await fireEvent.changeText(screen.getByPlaceholderText(en("form.addSubtask")), "half typed");
+    await fireEvent.press(button("common.close"));
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
+    });
+    expect(line()).toHaveDisplayValue("");
+    await fireEvent.press(button("nav.newTask"));
+    expect(title()).toHaveDisplayValue("");
+    expect(screen.getByRole("radio", { name: /Due: No deadline/u })).toBeOnTheScreen();
+    expect(
+      screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByDisplayValue("half typed")).toBeNull();
+    expect(button("form.create")).toBeDisabled();
+  });
+
+  it("keeps the line's own text on close but not the form's changes to it", async () => {
+    await renderComposer(await createTestRuntime());
+    await fireEvent.changeText(line(), "renew the passport");
+    await fireEvent.press(button("nav.newTask"));
+    await fireEvent.changeText(title(), "renew the passport today");
+    await fireEvent.press(screen.getByRole("radio", { name: en("form.repeat.daily") }));
+    await fireEvent.press(button("common.close"));
+    expect(line()).toHaveDisplayValue("renew the passport");
+    await waitFor(() => {
+      expect(screen.queryByLabelText(en("edit.taskTitle"))).toBeNull();
+    });
+    await fireEvent.press(button("nav.newTask"));
+    expect(title()).toHaveDisplayValue("renew the passport");
+    expect(
+      screen.getByRole("radio", { checked: true, name: en("form.repeat.none") }),
+    ).toBeOnTheScreen();
+  });
+
   it("adds typed subtasks to this week's homework from the form", async () => {
     const runtime = await createTestRuntime();
     await renderComposer(runtime);

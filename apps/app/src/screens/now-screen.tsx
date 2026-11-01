@@ -38,7 +38,8 @@ const PickedTask = ({
 /**
 On a wide window the picked task opens next to the list, as on the old web app, and so does
 the task form: while it is open the pane holds it, and closing it (or adding the task) brings
-the picked task back. Picking a task while the form is open folds the draft back into the line.
+the picked task back. Picking a task while the form is open closes it: its draft goes, the
+line keeps its text.
 */
 const NowSplit = ({
   isComposerFocused,

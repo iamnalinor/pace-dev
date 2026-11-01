@@ -51,6 +51,15 @@ const useDraft = (initialText: string, assistant: Assistant) => {
       setText(next);
       ai.reset();
     },
+    /**
+    Leaving the form drops what was set in it (QA round 14 L6): New task opens an empty form,
+    never an old draft without a word. The line keeps what was typed in the line itself.
+    */
+    discardForm: (): void => {
+      setEdits({});
+      setSubtaskDraft("");
+      ai.reset();
+    },
     reset: (): void => {
       setText("");
       setEdits({});
@@ -109,22 +118,29 @@ const useToInbox = (
   };
 };
 
-/** The form's place and the line's cursor: open, closed, and where the cursor goes back to. */
-const useFormState = (initialForm: FormOrigin | null) => {
+/**
+The form's place and the line's cursor: open, closed, and where the cursor goes back to. Every
+way out of the form (its close, Escape, a task picked instead) drops its draft: one rule.
+*/
+const useFormState = (initialForm: FormOrigin | null, discardDraft: () => void) => {
   const [form, setForm] = useState<FormOrigin | null>(initialForm);
   // Each time it grows, the cursor goes back to the line (after adding, or closing the form).
   const [lineFocus, setLineFocus] = useState(0);
+  const leave = (): void => {
+    if (form !== null) {
+      discardDraft();
+    }
+    setForm(null);
+  };
   return {
     /** Closes the form, the cursor back in the line. */
     close: (): void => {
-      setForm(null);
+      leave();
       setLineFocus((count) => count + 1);
     },
     form,
     /** Closes the form and leaves the cursor where it is (a task was picked instead). */
-    hide: (): void => {
-      setForm(null);
-    },
+    hide: leave,
     lineFocus,
     /** The cursor back in the line (the card it opened was dismissed). */
     refocus: (): void => {
@@ -223,7 +239,10 @@ const useFlowState = ({
     edits: withSubtaskDraft(edits, model, draft.subtaskDraft),
     text,
   });
-  const { close, form, hide, lineFocus, refocus, setForm } = useFormState(initialForm);
+  const { close, form, hide, lineFocus, refocus, setForm } = useFormState(
+    initialForm,
+    draft.discardForm,
+  );
   const done = resetAndClose(reset, close);
   const pending = usePendingActions("task", (createdTaskId) => {
     done();
