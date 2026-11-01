@@ -74,7 +74,7 @@ overlay, with a frequency budget.
   never a broken hole.
 - *This does not mean:* animating everything — keyboard navigation, list mounts, filter changes and
   day switches get no motion.
-- *Pace example:* checking a task fills the circle at once, the row dissolves and the list closes up
+- *Pace example:* checking a task fills the circle at once, the row fades and the list closes up
   in ≤ 300 ms in total.
 
 **P5 · One way per job, one place per thing.** One page template, one header per screen type, one
@@ -324,8 +324,7 @@ work blue · study violet · task green · food orange · commute yellow · hygi
 chores amber · social pink · sport red · sleep indigo · other slate.
 
 **Usage rule (P1).** Category = a line or dot in its stroke plus the name in `label.*`; project = a
-tag (tint + ink); importance = a word in `label.secondary` with weight, shown only when not Normal
-(Urgent gets `status.danger` ink); status = a word, except «В работе» / In progress, which is a tag in the indigo hue (owner, feedback-3) (F-COL-04).
+tag (tint + ink); importance = Urgent as a word in `status.danger`, Priority as a word in `label.primary` 600, Low with no word but the row's title in `label.secondary`, Normal shows nothing (Q3); status = a word, except «В работе» / In progress, which is a tag in the indigo hue (owner, feedback-3) (F-COL-04).
 A screen at rest shows at most one filled accent element.
 
 ### 3.2 Type
@@ -470,7 +469,7 @@ completion callback (F-MOT-03).
 | none | keyboard navigation and hotkeys, list mount, filter change, day/week switch content, typing, focus moves, sort | instant; no entering animations on rows |
 | reduced (100+/day) | check-off, start/stop/switch activity, tab switch, chip toggle | ≤ 220 ms, short travel or none, opacity-led |
 | standard | sheets, dialogs, popovers, disclosure, toast, route push, inspector open | `duration.lg`/`md` with paired exits |
-| delight | none in this overhaul beyond the check-off's dissolve (owner request, feedback-3), kept ≤ 300 ms | |
+| delight | none in this overhaul (the owner chose a plain fade for the check-off, Q2) | |
 
 ### 3.9 Component size tokens
 
@@ -2200,9 +2199,9 @@ animations" variant. Durations and easings are §3.8 tokens.
 | press (any control) | state layer | 100+ | ripple / fill on pointer-down, 0 ms | fade out | out 100 | exit | same | Android: `android_ripple` via the kit; web: overlay |
 | hover (web, hover pointer) | state layer | high | `fill.1` | fade | 100 / 70 | move | same | `@media (hover:hover)` only |
 | check a task | check circle | 100+ | fill + check stroke draw on pointer-down | — | 100 | enter | instant fill | haptic Confirm on Android |
-| check a task | row content | 100+ | — | dissolve: opacity 1→0, scale 1→0.98, a light particle pass (≤ 24 specks, transform-only, one layer) | 260 | exit | opacity fade 160, no particles | starts on press (optimistic); the store write does not gate it (bug-lessons 3) |
+| check a task | row content | 100+ | — | fade: opacity 1→0 (owner's choice, Q2) | 160 | exit | the same fade | starts on press (optimistic); the store write does not gate it (bug-lessons 3) |
 | check a task | rows below | 100+ | close up (layout) | — | 220 | move | instant | the same `RowList` transition on Android **and** web (F-MOT-02); next step on animation end, not a timer |
-| check a task | Undo toast | 100+ | slide 8 px + fade, starts with the dissolve | fade | 220 / 160 | enter / exit | fade only | anchored above the bottom chrome, never covering the next row's check |
+| check a task | Undo toast | 100+ | slide 8 px + fade, starts with the fade | fade | 220 / 160 | enter / exit | fade only | anchored above the bottom chrome, never covering the next row's check |
 | start / switch activity | running card | 100+ | the new row fades in at its place; time digits roll? **no** — they change instantly | old row fades | 160 / 110 | enter / exit | opacity only | haptic Clock_Tick |
 | stop activity | running card | 100+ | — | row collapses (height) | 220 | move | instant | |
 | time-bar unfold ("Start something else", phone) | time-bar panel | 10+/day | height + fade | reverse | 220 / 160 | enter / exit | opacity | max height = region budget (§3.3) |
@@ -2441,7 +2440,7 @@ this spec introduces. Use the Expo build, Chrome in a tab and the installed PWA,
 
 ## 12. Open questions for the owner
 
-**Owner answers, 2026-11-01** (round 1): Q1 → **A · Тетрадь**. Q2 → **a, strike-through** (leaning; demos of all three published to compare). Q3 → **a, hide Normal**, and mark "Low" (Необязательно) differently from Urgent/Priority so it draws no attention (three options shown in the accents demo; pending). Q4 → a. Q5 → a. Q6 → **b, modifier shortcuts** (see the browser caveat below; pending). Q7 → a. Q8 → a. Q9 → pending (demo published). Q10 → a. Q11 → a. Q12 → a, leaning (demo published). Logo: the owner prefers a bright logo; options in the accents demo (pending).
+**Owner answers, 2026-11-01** (round 1): Q1 → **A · Тетрадь**. Q2 → ~~a~~ **c, fade** (round 2, after the demos). Q3 → **a, hide Normal**; Low (Необязательно) has no word — **its title is drawn in `label.secondary`** (option в of the accents demo, round 2). Q4 → a. Q5 → a. Q6 → **b, modifier shortcuts** (see the browser caveat below; pending). Q7 → a. Q8 → a. Q9 → **a, no Material You** (round 2). Q10 → a. Q11 → a. Q12 → **a** (round 2). Logo → **the current lime logo** (grey + lime chevrons; on light backgrounds the deeper lime `#5E8C00`, on dark `#C8F03C`, so it does not blend in — feedback-2); the interface accent stays ink blue (round 2). Q6 → still open (Alt+N / Alt+F recommended).
 
 Demos (private artifacts; sources in `context/design/comps/demos/`): check-off a/b/c — https://claude.ai/artifact/XEftj2wtbmCVeTsfH6c2LP, https://claude.ai/artifact/9xe8ZPtaEHF5TDhN1d9XJ5, https://claude.ai/artifact/GNkXkPcMVk2h2p8vwbeddJ; Material You — https://claude.ai/artifact/NvUXXnTDvVTRNjuTA5JXEk; phone time bar — https://claude.ai/artifact/KLvpgUhDtYmQsLQHNo7Rha; accents, logo and low-importance marks — https://claude.ai/artifact/BSjfceFA52AasjsVm5vmyZ.
 

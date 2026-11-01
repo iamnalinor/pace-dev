@@ -168,6 +168,11 @@ e2e sweep above stands in for the scripted matrix here too.
 > - **Visual matrix**: look at each changed screen at 390 px and 1440 px with Russian text;
 >   wrapping, word collisions and layout can fail only in one combination, and the sweep cannot
 >   judge a layout that fits but reads wrong.
+> - **Responsiveness**: run the main taps (a tab, a filter chip, a check-off, opening a row, Back,
+>   a time-bar button) in a mobile context with touch on and the CPU throttled 4× (CDP
+>   `Emulation.setCPUThrottlingRate`); anything that takes over 100 ms from tap to the next frame
+>   (Event Timing API), or a control that shows nothing when pressed, is a finding
+>   (bug-lessons class 57).
 > - **Guest language and sideways content**: check signed-out pages with a Russian browser
 >   locale and verify the document language; on narrow screens, every sideways region needs
 >   a visible scroll cue and a keyboard focus target.
