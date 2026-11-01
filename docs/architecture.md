@@ -359,7 +359,9 @@ can deliver outside the app; a phone with a different Firebase project uses poll
 its own alarm time (a computer's uploads and other waits' alarms run no pass).
 A pass reads use on every device from 36 hours back and how far the phones have told
 (`usageForSleep`), builds the rules' input from the log with core's `sleepInputOf` (the same
-builder the rules' own tests use), decides with `decideSleep` and appends `sleepEvents` through
+builder the rules' own tests use: every effective activity, plus each instant the person recorded
+for a non-Rest activity, which counts as a use of no length, and where their live starts close a
+sleep), decides with `decideSleep` and appends `sleepEvents` through
 the system path (device `server`, deterministic `auto:sleep-…` ids, so passes are idempotent).
 Each decision that wrote an event goes to `decisions` (kind `sleep`, rule `sleep.open` /
 `sleep.stop` / `sleep.reopen` / `sleep.discard`, inputs: the instant, the zone, `knownUntil` and

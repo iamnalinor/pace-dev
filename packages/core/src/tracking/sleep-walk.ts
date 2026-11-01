@@ -73,8 +73,16 @@ export type Known = {
   readonly rests: readonly Rest[];
 };
 
-/** A spell awake and the rest after it: until the next spell, or as far as use is known. */
-type RestedSpell = Interval & { readonly restEnd: string; readonly isLast: boolean };
+/**
+A spell awake and the rest known after it: until the next spell or as far as use is known,
+whichever comes first. The rest is open while no spell known to come before `knownUntil` ends it
+(a spell after it, a person's recorded instant, ends it at most at `nextAt`).
+*/
+type RestedSpell = Interval & {
+  readonly restEnd: string;
+  readonly isOpen: boolean;
+  readonly nextAt: null | string;
+};
 
 /** Where a walk through a sleep's spells ended it, and whether more quiet could still undo that. */
 type SleepEnd = { readonly at: string; readonly isFinal: boolean };
@@ -108,11 +116,15 @@ export const knownUses = (
 
 export const rested = (uses: readonly Interval[], knownUntil: string): readonly RestedSpell[] => {
   const spells = awakeSpells(uses);
-  return spells.map((spell, index) => ({
-    ...spell,
-    isLast: index === spells.length - 1,
-    restEnd: spells[index + 1]?.startAt ?? knownUntil,
-  }));
+  return spells.map((spell, index) => {
+    const nextAt = spells[index + 1]?.startAt ?? null;
+    return {
+      ...spell,
+      isOpen: nextAt === null || nextAt > knownUntil,
+      nextAt,
+      restEnd: nextAt === null ? knownUntil : earlierOf(nextAt, knownUntil),
+    };
+  });
 };
 
 /** A start automatic sleep chose and nobody moved: the rules may stop it short and discard it. */
@@ -148,14 +160,15 @@ const isWakeInside = (spell: RestedSpell, sleep: SleepActivity, zone: string): b
   isWakeUp(spell, { endAt: spell.restEnd, startAt: spell.endAt }, zone) &&
   sleepNightOf(spell.startAt, zone) === sleepNightOf(sleep.startAt, zone);
 
-/** The last spell known could still turn out a wake-up once enough quiet after it is known. */
-const canStillBeWake = (spell: RestedSpell, sleep: SleepActivity, zone: string): boolean =>
-  spell.isLast &&
-  isWakeInside(
-    { ...spell, restEnd: addMinutesIso(spell.endAt, BACK_TO_SLEEP_MINUTES) },
-    sleep,
-    zone,
-  );
+/**
+A spell whose rest is still open could turn out a wake-up once enough quiet after it is known
+(as much as there can be before a spell known to come after it).
+*/
+const canStillBeWake = (spell: RestedSpell, sleep: SleepActivity, zone: string): boolean => {
+  const enough = addMinutesIso(spell.endAt, BACK_TO_SLEEP_MINUTES);
+  const restEnd = spell.nextAt === null ? enough : earlierOf(spell.nextAt, enough);
+  return spell.isOpen && isWakeInside({ ...spell, restEnd }, sleep, zone);
+};
 
 const hasAutoStopIn = (sleep: SleepActivity, spell: Interval): boolean =>
   sleep.isAutoStop && sleep.endAt !== null && isWithin(spell, sleep.endAt);
@@ -201,7 +214,8 @@ const walk = (sleep: SleepActivity, known: Known): Walk => {
   const limit = limitOf(sleep, known);
   const from = (index: number, awake: number, isReopening: boolean): Walk => {
     const spell = spells[index];
-    if (limit !== null && (spell === undefined || limit < spell.startAt)) {
+    // A limit at a spell's very start (a start of the person's is both) is where the sleep ends.
+    if (limit !== null && (spell === undefined || limit <= spell.startAt)) {
       return { awake, end: { at: limit, isFinal: true }, isReopening };
     }
     if (spell === undefined) {

@@ -73,6 +73,60 @@ describe("what automatic sleep reads from the log", () => {
     expect(flagsAfter({ endAt: later }, "system")).toEqual([false, false]);
   });
 
+  it("reads the instants the person recorded as ones they were awake, and where their starts close", () => {
+    const started = byPerson(1, at("22:00"), {
+      payload: { activityId: "work", category: "work", label: "Deploy" },
+      type: "activity.started",
+    });
+    const alongside = byPerson(2, at("22:10"), {
+      payload: { activityId: "music", alongside: true, category: "rest", label: "Music" },
+      type: "activity.started",
+    });
+    const stopped = byPerson(3, at("23:50"), {
+      payload: { activityId: "work" },
+      type: "activity.stopped",
+    });
+    const logged = byPerson(4, at("08:00"), {
+      payload: {
+        activityId: "read",
+        category: "study",
+        endAt: at("01:30"),
+        label: "Read",
+        startAt: at("01:00"),
+      },
+      type: "activity.logged",
+    });
+    const moved = byPerson(5, at("08:05"), {
+      payload: { activityId: "work", startAt: at("21:45") },
+      type: "activity.adjusted",
+    });
+    // Recorded and then deleted: not an instant they were awake.
+    const deleted = byPerson(6, at("02:00"), {
+      payload: { activityId: "oops", category: "work", label: "Oops" },
+      type: "activity.started",
+    });
+    const undone = byPerson(7, at("02:01"), {
+      payload: { targetId: deleted.id },
+      type: "event.revoked",
+    });
+    const log = [...night(), started, alongside, stopped, logged, moved, deleted, undone];
+    const knowledge = {
+      decidedUntil: null,
+      knownUntil: at("07:30"),
+      now: at("08:10"),
+      uses: [],
+      usesFrom: at("12:00"),
+      zone: MOSCOW,
+    };
+    const input = sleepInputOf(log, knowledge);
+    // The rules' own start and stop are not the person's; a rest of theirs (the music) bounds
+    // sleep by the rest rules instead.
+    expect(input.personMarks).toEqual(
+      ["21:45", "22:00", "23:50", "01:00", "01:30"].map((hhmm) => at(hhmm)),
+    );
+    expect(input.mainStarts).toEqual([at("22:00")]);
+  });
+
   it("carries what is known beside the log as it was given", () => {
     const knowledge = {
       decidedUntil: at("07:00"),
@@ -84,6 +138,8 @@ describe("what automatic sleep reads from the log", () => {
     };
     expect(sleepInputOf(night(), knowledge)).toMatchObject({
       ...knowledge,
+      mainStarts: [],
+      personMarks: [],
       personRevokedAutoStarts: [],
       revokedAutoStartIds: [],
     });

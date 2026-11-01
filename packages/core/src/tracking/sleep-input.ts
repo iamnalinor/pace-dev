@@ -3,6 +3,7 @@ import type { DeviceUse, SleepActivity, SleepInput } from "./sleep-auto.ts";
 
 import { isAutoSleepId, sleepNightOf } from "../ids.ts";
 import { effectiveEvents, materialize } from "../materialize/materializer.ts";
+import { isRestClass } from "./categories.ts";
 import { type Activity, INITIAL_TIME_STATE, type TimeState } from "./model.ts";
 import { timeReducer } from "./time-reducer.ts";
 
@@ -147,21 +148,76 @@ export const sleepActivitiesOf = (log: readonly Event[], since = ""): readonly S
   });
 };
 
+/** The activity an event of the person's records an instant of, and those instants. */
+const recordedBy = (event: Event): null | { activityId: string; instants: readonly string[] } => {
+  if (event.source === "system") {
+    return null;
+  }
+  if (event.type === "activity.started" || event.type === "activity.stopped") {
+    return { activityId: event.payload.activityId, instants: [event.occurredAt] };
+  }
+  if (event.type === "activity.logged") {
+    const { activityId, endAt, startAt } = event.payload;
+    return { activityId, instants: [startAt, endAt] };
+  }
+  return event.type === "activity.adjusted"
+    ? {
+        activityId: event.payload.activityId,
+        instants: [event.payload.startAt, event.payload.endAt].filter(
+          (instant): instant is string => instant !== undefined,
+        ),
+      }
+    : null;
+};
+
+/**
+The instants the person recorded they were at something: a start or a stop of theirs, a logged
+block's bounds, a bound they moved. Not the server's own, and not those of a rest or a sleep
+(Rest-class activities bound automatic sleep by their own rules: a sleep the person starts keeps
+the spell they started it from, a rest moves a start past its end).
+*/
+const personMarksOf = (effective: readonly Event[], state: TimeState): readonly string[] =>
+  effective
+    .flatMap((event) => {
+      const recorded = recordedBy(event);
+      const activity = recorded === null ? undefined : state.activities[recorded.activityId];
+      return recorded === null || activity === undefined || isRestClass(activity.category)
+        ? []
+        : recorded.instants;
+    })
+    .toSorted((a, b) => a.localeCompare(b));
+
+/** The person's live starts of a main activity (not alongside): each closes the one running. */
+const mainStartsOf = (effective: readonly Event[]): readonly string[] =>
+  effective
+    .filter(
+      (event): event is EventOf<"activity.started"> =>
+        event.type === "activity.started" &&
+        event.source !== "system" &&
+        event.payload.alongside !== true,
+    )
+    .map((event) => event.occurredAt)
+    .toSorted((a, b) => a.localeCompare(b));
+
 /** Automatic sleep starts in the log. */
 const autoStarts = (log: readonly Event[]) =>
   log.filter((event) => event.type === "activity.started" && isAutoSleepId(event.id));
 
 /**
 The rules' whole input from the person's log and what is known beside it: every effective
-activity, the automatic starts no longer in force, and those the person deleted with their night.
+activity, the instants the person recorded and where their starts close, the automatic starts no
+longer in force, and those the person deleted with their night.
 */
 export const sleepInputOf = (log: readonly Event[], knowledge: SleepKnowledge): SleepInput => {
-  const effectiveIds = new Set(effectiveEvents(log).map((event) => event.id));
+  const effective = effectiveEvents(log);
+  const effectiveIds = new Set(effective.map((event) => event.id));
   const personRevoked = revokedByPerson(log, effectiveIds);
   const revoked = autoStarts(log).filter((event) => !effectiveIds.has(event.id));
   return {
     ...knowledge,
     activities: sleepActivitiesOf(log, knowledge.usesFrom),
+    mainStarts: mainStartsOf(effective),
+    personMarks: personMarksOf(effective, materialize(log, timeReducer, INITIAL_TIME_STATE)),
     personRevokedAutoStarts: revoked
       .filter((event) => personRevoked.has(event.id))
       .map((event) => ({
