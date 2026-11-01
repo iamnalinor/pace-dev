@@ -116,6 +116,34 @@ describe("sleep ids", () => {
     expect(isAutoSleepId("01ARZ3NDEKTSV4RRFFQ69G5001")).toBe(false);
     expect(isAutoSleepId("auto:01ARZ3NDEKTSV4RRFFQ69G5001:missed")).toBe(false);
     expect(isAutoSleepId("hw:hw.algebra:2026-W41")).toBe(false);
+    // A reopen or a discard follows up an automatic sleep's own stop or start, nothing else.
+    expect(isAutoSleepId("auto:01ARZ3NDEKTSV4RRFFQ69G5001:reopen")).toBe(false);
+    expect(isAutoSleepId("auto:hw:hw.algebra:2026-W41:discard")).toBe(false);
+  });
+
+  it("gives a start in a minute whose id is used the next unused suffix (class 38)", () => {
+    const first = sleepStartId(NIGHT, at("01:10"));
+    const secondsLater = addMinutesIso(at("01:10"), 0.5);
+    expect(sleepStartId(NIGHT, secondsLater, [first])).toBe(`${first}-2`);
+    for (const id of [`${first}-2`, sleepDiscardId(`${first}-2`)]) {
+      expect(EventIdSchema.safeParse(id).success).toBe(true);
+      expect(isAutoSleepId(id)).toBe(true);
+    }
+  });
+
+  it("gives a stop again at an instant whose id is used the next unused suffix (class 38)", () => {
+    const start = sleepStartId(NIGHT, at("23:40"));
+    const first = sleepStopId(start, at("03:00"));
+    const second = sleepStopId(start, at("03:00"), [first]);
+    expect(second).toBe(`${first}-2`);
+    expect(sleepStopId(start, at("03:00"), [first, second])).toBe(`${first}-3`);
+    // A stop seconds away in the same minute gets its own id too.
+    const secondsLater = addMinutesIso(at("03:00"), 0.5);
+    expect(sleepStopId(start, secondsLater, [first])).toBe(`${first}-2`);
+    for (const id of [second, sleepReopenId(second)]) {
+      expect(EventIdSchema.safeParse(id).success).toBe(true);
+      expect(isAutoSleepId(id)).toBe(true);
+    }
   });
 });
 
@@ -404,6 +432,181 @@ describe("automatic sleep", () => {
     expect(sleepsIn(log)).toEqual([sleep("23:40", "03:00")]);
   });
 
+  it("stops again under a new id after a reopen a late upload undoes: edit, undo, edit (class 38)", () => {
+    const phone = [use("23:10", "23:40"), use("03:00", "03:06"), use("07:10", "07:25")];
+    const reopened = lastLog([], phone, ["00:30", "03:20", "04:40"]);
+    expect(sleepsIn(reopened)).toEqual([sleep("23:40", null)]);
+    // The laptop's 04:00 use arrives late: 03:00 was not a wake-up after all.
+    const late = [...phone, use("04:00", "04:10", "laptop")];
+    const again = step(reopened, { knownUntil: at("05:00"), uses: late });
+    expect(again.decisions).toEqual([stop("23:40", "03:00")]);
+    expect(again.events.map((event) => event.id)).toEqual([`${stopId("23:40", "03:00")}-2`]);
+    expect(sleepsIn(again.log)).toEqual([sleep("23:40", "03:00")]);
+    expect(step(again.log, { knownUntil: at("05:00"), uses: late }).decisions).toEqual([]);
+    expect(step(again.log, { knownUntil: at("07:30"), uses: late }).decisions).toEqual([]);
+  });
+
+  it("opens no other sleep in a night whose automatic sleep the person deleted", () => {
+    const uses = [use("20:40", "21:10"), use("22:05", "23:30"), use("07:00", "07:20")];
+    const opened = lastLog([], uses, ["22:00"]);
+    const deleted = [
+      ...opened,
+      byPerson(9, at("22:10"), { payload: { targetId: startId("21:10") }, type: "event.revoked" }),
+    ];
+    expect(step(deleted, { knownUntil: at("00:30"), uses }).decisions).toEqual([]);
+    expect(step(deleted, { knownUntil: at("07:30"), uses }).decisions).toEqual([]);
+    expect(sleepsIn(deleted)).toEqual([]);
+  });
+
+  it("treats an automatic sleep whose start the person moved as theirs", () => {
+    const uses = [use("23:10", "23:40"), use("01:00", "01:40")];
+    const opened = lastLog([], uses, ["00:30"]);
+    // Moved back into the person's own last use: they fell asleep reading at 23:20.
+    const moved = [
+      ...opened,
+      byPerson(9, at("00:40"), {
+        payload: { activityId: startId("23:40"), startAt: at("23:20") },
+        type: "activity.adjusted",
+      }),
+    ];
+    expect(step(moved, { knownUntil: at("00:50"), uses }).decisions).toEqual([]);
+    expect(sleepsIn(moved)).toEqual([sleep("23:20", null)]);
+    // A long wake ends it, and it is not discarded although it is short.
+    const woke = step(moved, { knownUntil: at("02:00"), uses });
+    expect(woke.decisions).toEqual([stop("23:40", "01:00")]);
+    expect(sleepsIn(woke.log)).toEqual([sleep("23:20", "01:00")]);
+    expect(step(woke.log, { knownUntil: at("02:00"), uses }).decisions).toEqual([]);
+  });
+
+  it("decides nothing about a sleep that started before the uses it is given", () => {
+    const night = [use("23:10", "23:40"), use("07:10", "07:25")];
+    const stopped = lastLog([], night, ["07:30"]);
+    expect(sleepsIn(stopped)).toEqual([sleep("23:40", "07:10")]);
+    const nextDay = { night: "2026-10-08" };
+    const afternoon = {
+      deviceId: "phone",
+      endAt: at("13:30", nextDay),
+      startAt: at("13:00", nextDay),
+    };
+    const later: Known = {
+      knownUntil: at("14:00", nextDay),
+      uses: [afternoon],
+      usesFrom: at("12:00", nextDay),
+    };
+    expect(step(stopped, later).decisions).toEqual([]);
+    // A use before the window is no ground for quiet after it: nothing opens before `usesFrom`.
+    const early: Known = {
+      knownUntil: at("23:00"),
+      uses: [use("21:00", "21:10")],
+      usesFrom: at("22:00"),
+    };
+    expect(step([], early).decisions).toEqual([]);
+  });
+
+  it("opens a sleep only after a rest the person recorded, and none over one", () => {
+    const rest = byPerson(1, at("22:30"), {
+      payload: { activityId: "rest", category: "rest", label: "Rest" },
+      type: "activity.started",
+    });
+    const restStop = byPerson(2, at("23:30"), {
+      payload: { activityId: "rest" },
+      type: "activity.stopped",
+    });
+    const tea = byPerson(4, at("23:40"), {
+      payload: {
+        activityId: "tea",
+        category: "rest",
+        endAt: at("22:35"),
+        label: "Tea",
+        startAt: at("22:25"),
+      },
+      type: "activity.logged",
+    });
+    const uses = [use("22:00", "22:20")];
+    expect(step([rest, restStop, tea], { knownUntil: at("00:30"), uses }).decisions).toEqual([
+      open("23:30"),
+    ]);
+    const logged = byPerson(3, at("08:00"), {
+      payload: {
+        activityId: "nap",
+        category: "rest",
+        endAt: at("02:30"),
+        label: "Rest",
+        startAt: at("02:00"),
+      },
+      type: "activity.logged",
+    });
+    expect(step([logged], { knownUntil: at("03:00"), uses }).decisions).toEqual([]);
+  });
+
+  it("opens no sleep whose night would run over a rest the person logged", () => {
+    const uses = [use("23:10", "23:40"), use("03:00", "03:06"), use("07:10", "07:25")];
+    const logged = byPerson(3, at("08:00"), {
+      payload: {
+        activityId: "lying-awake",
+        category: "rest",
+        endAt: at("04:30"),
+        label: "Rest",
+        startAt: at("04:00"),
+      },
+      type: "activity.logged",
+    });
+    // Without it, one sleep 23:40→07:10 with the 03:00 wake-up inside.
+    expect(step([], { knownUntil: at("07:30"), uses }).decisions).toEqual([
+      open("23:40"),
+      stop("23:40", "07:10"),
+    ]);
+    expect(step([logged], { knownUntil: at("07:30"), uses }).decisions).toEqual([]);
+  });
+
+  it("discards an automatic sleep a late upload shows was in use at its very start", () => {
+    const phone = [use("00:54", "01:10")];
+    const opened = step([], { knownUntil: at("01:55"), uses: phone });
+    expect(opened.decisions).toEqual([open("01:10")]);
+    // The laptop was still in use at 01:10: even a wake that may turn out short undoes the start.
+    const late = [...phone, use("01:10", "01:11", "laptop")];
+    const corrected = step(opened.log, { knownUntil: at("01:55"), uses: late });
+    expect(corrected.decisions).toEqual([stop("01:10", "01:10"), discard("01:10")]);
+    expect(step(corrected.log, { knownUntil: at("01:55"), uses: late }).decisions).toEqual([]);
+  });
+
+  it("opens a new start in a minute a discarded one used under its own id", () => {
+    // Opened at 21:10:00, discarded, then a late use moves the last use to 21:10:30.
+    const evening = [use("20:40", "21:10"), use("22:05", "22:30")];
+    const discarded = lastLog([], evening, ["22:00", "22:40"]);
+    expect(sleepsIn(discarded)).toEqual([]);
+    const moved = {
+      deviceId: "laptop",
+      endAt: addMinutesIso(at("21:10"), 0.5),
+      startAt: at("21:05"),
+    };
+    const uses = [use("20:40", "21:10"), moved, use("07:00", "07:10")];
+    const later = step(discarded, { knownUntil: at("07:30"), uses });
+    const id = `${startId("21:10")}-2`;
+    expect(later.decisions).toEqual([
+      { at: moved.endAt, kind: "open", night: NIGHT },
+      { activityId: id, at: at("07:00"), kind: "stop" },
+    ]);
+    expect(later.events.map((event) => event.id)).toEqual([id, sleepStopId(id, at("07:00"))]);
+    expect(sleepsIn(later.log)).toEqual([{ endAt: at("07:00"), startAt: moved.endAt }]);
+    expect(step(later.log, { knownUntil: at("07:30"), uses }).decisions).toEqual([]);
+  });
+
+  it("keeps one automatic stop in force when late use moves the end earlier", () => {
+    const phone = [use("23:00", "23:01"), use("00:01", "00:02")];
+    const first = step([], { knownUntil: at("00:02"), uses: phone });
+    expect(first.decisions).toEqual([open("23:01"), stop("23:01", "00:01")]);
+    // The laptop's 00:00 use arrives: the end moves a minute earlier, the 00:01 stop goes.
+    const late = [...phone, use("00:00", "00:01", "laptop")];
+    const moved = step(first.log, { knownUntil: at("00:02"), uses: late });
+    expect(moved.decisions).toEqual([reopen("23:01", "00:01"), stop("23:01", "00:00")]);
+    // Ninety quiet minutes later it was a wake-up: one reopen leaves the sleep running.
+    const woke = step(moved.log, { knownUntil: at("01:32"), uses: late });
+    expect(woke.decisions).toEqual([reopen("23:01", "00:00")]);
+    expect(sleepsIn(woke.log)).toEqual([sleep("23:01", null)]);
+    expect(step(woke.log, { knownUntil: at("01:32"), uses: late }).decisions).toEqual([]);
+  });
+
   it("does not stretch one sleep over the next day when the phone stays silent", () => {
     // Asleep at 23:40, the phone silent until 03:00 two nights later: that wake is another night's.
     const nextNight = { night: "2026-10-08" };
@@ -433,6 +636,7 @@ const SPAN = 36 * MINUTE;
 const base = (zone: string): string => wallClockInstant(DST_NIGHT, "18:00", zone);
 /** Any use on either device in the span... */
 const anyUse = fc.record({
+  delay: fc.integer({ max: 3, min: 0 }),
   device: fc.constantFrom("phone", "laptop"),
   length: fc.integer({ max: 50, min: 1 }),
   start: fc.integer({ max: SPAN, min: 0 }),
@@ -443,16 +647,38 @@ const nightStart = fc.oneof(
   fc.integer({ max: SPAN, min: 29 * MINUTE }),
 );
 const nightWake = fc.record({
-  device: fc.constant("phone"),
+  delay: fc.integer({ max: 3, min: 0 }),
+  device: fc.constantFrom("phone", "laptop"),
   length: fc.integer({ max: 35, min: 1 }),
   start: nightStart,
 });
 const usesArb = fc.array(fc.oneof(anyUse, nightWake), { maxLength: 25 });
-const toUses = (
-  zone: string,
-  raw: readonly { readonly device: string; readonly start: number; readonly length: number }[],
-): readonly DeviceUse[] =>
+type RawUse = {
+  readonly delay: number;
+  readonly device: string;
+  readonly start: number;
+  readonly length: number;
+};
+/**
+The uses known at pass `pass` of `offsets` (sorted): the phone's as far as `knownUntil`, a
+computer's only `delay` passes after the first pass that could have seen it (a late upload).
+*/
+const usesAt = ({
+  offsets,
+  pass,
+  raw,
+  zone,
+}: {
+  readonly zone: string;
+  readonly raw: readonly RawUse[];
+  readonly offsets: readonly number[];
+  readonly pass: number;
+}) =>
   raw
+    .filter(({ delay, device, start }) => {
+      const first = offsets.findIndex((offset) => offset > start);
+      return device === "phone" || (first !== -1 && first + delay <= pass);
+    })
     .map(({ device, length, start }) => ({
       deviceId: device,
       endAt: addMinutesIso(base(zone), start + length),
@@ -465,30 +691,39 @@ const instantOf = (decision: SleepDecision): null | string =>
   decision.kind === "open" || decision.kind === "stop" ? decision.at : null;
 
 describe("automatic sleep, properties", () => {
-  it("12. is idempotent, never decides past what is known, one sleep a night at most", () => {
+  it("12. is idempotent after every pass, late uploads included, and never past what is known", () => {
     fc.assert(
-      fc.property(fc.constantFrom(...ZONES), usesArb, knowledgeArb, (zone, raw, offsets) => {
-        const uses = toUses(zone, raw);
-        const knownUntils = offsets
-          .toSorted((a, b) => a - b)
-          .map((m) => addMinutesIso(base(zone), m));
-        // eslint-disable-next-line unicorn/no-array-reduce -- each upload is decided on the log the one before left
-        const log = knownUntils.reduce<readonly Event[]>((current, knownUntil) => {
-          const done = step(current, { knownUntil, uses, zone });
+      fc.property(fc.constantFrom(...ZONES), usesArb, knowledgeArb, (zone, raw, unsorted) => {
+        const offsets = unsorted.toSorted((a, b) => a - b);
+        const usesFrom = base(zone);
+        const pass = (current: readonly Event[], known: Known) => {
+          const done = step(current, { ...known, usesFrom, zone });
           for (const decision of done.decisions) {
             const instant = instantOf(decision);
-            expect(instant === null || instant <= knownUntil).toBe(true);
+            expect(instant === null || instant <= (known.knownUntil ?? "")).toBe(true);
           }
-          // Same input, same ids.
-          expect(step(current, { knownUntil, uses, zone }).events).toEqual(done.events);
+          // Same input, same ids; and nothing is decided again that the log already holds.
+          expect(step(current, { ...known, usesFrom, zone }).events).toEqual(done.events);
+          expect(step(done.log, { ...known, usesFrom, zone }).decisions).toEqual([]);
+          const nights = sleepsIn(done.log).map((each) => sleepNightOf(each.startAt, zone));
+          expect(new Set(nights).size).toBe(nights.length);
           return done.log;
-        }, []);
-        const last = knownUntils.at(-1) ?? null;
-        expect(step(log, { knownUntil: last, uses, zone }).decisions).toEqual([]);
-        const nights = sleepsIn(log).map((each) => sleepNightOf(each.startAt, zone));
-        expect(new Set(nights).size).toBe(nights.length);
+        };
+        // eslint-disable-next-line unicorn/no-array-reduce -- each upload is decided on the log the one before left
+        const log = offsets.reduce<readonly Event[]>(
+          (current, offset, index) =>
+            pass(current, {
+              knownUntil: addMinutesIso(base(zone), offset),
+              uses: usesAt({ offsets, pass: index, raw, zone }),
+            }),
+          [],
+        );
+        // Every upload in at last: it settles.
+        const all = usesAt({ offsets, pass: Infinity, raw, zone });
+        const knownUntil = addMinutesIso(base(zone), offsets.at(-1) ?? 0);
+        pass(log, { knownUntil, uses: all });
       }),
-      { numRuns: 300 },
+      { numRuns: 400 },
     );
   });
 
@@ -528,7 +763,16 @@ describe("automatic sleep, properties", () => {
           const lastEnd = filled.at(-1)?.endAt ?? from;
           const knownUntil = addMinutesIso(lastEnd, tail);
           expect(
-            decideSleep({ activities: [], knownUntil, now: knownUntil, uses: filled, zone }),
+            decideSleep({
+              activities: [],
+              knownUntil,
+              now: knownUntil,
+              personRevokedAutoStarts: [],
+              revokedAutoStartIds: [],
+              uses: filled,
+              usesFrom: from,
+              zone,
+            }),
           ).toEqual([]);
         },
       ),

@@ -1,5 +1,5 @@
 import { type Event, type EventInput, EventSchema } from "../events/event-schema.ts";
-import { isAutoSleepId } from "../ids.ts";
+import { isAutoSleepId, sleepNightOf } from "../ids.ts";
 import { effectiveEvents, materialize } from "../materialize/materializer.ts";
 import { event } from "../materialize/task-fixture.fake.ts";
 import { addMinutesIso, wallClockInstant } from "../time.ts";
@@ -83,42 +83,81 @@ const stopOf = (effective: readonly Event[], activityId: string, endAt: null | s
       event.occurredAt === endAt,
   );
 
+/** Ids of the events out of force that a non-system `event.revoked` targets. */
+const revokedByPerson = (log: readonly Event[]): ReadonlySet<string> => {
+  const effectiveIds = new Set(effectiveEvents(log).map((event) => event.id));
+  return new Set(
+    log
+      .filter((event) => event.source !== "system")
+      .map((event) => (event.type === "event.revoked" ? event.payload.targetId : ""))
+      .filter((id) => id !== "" && !effectiveIds.has(id)),
+  );
+};
+
 /**
 What Task 13 builds from the user's log: the effective activities, each with the event that
-started it and the one that stopped it, and the instants of automatic stops the person undid.
+started it and the one that stopped it, the automatic stops no longer in force (by id) and the
+instants of those the person undid, and whether the person moved the start.
 */
 export const sleepActivitiesOf = (log: readonly Event[]): readonly SleepActivity[] => {
   const effective = effectiveEvents(log);
   const effectiveIds = new Set(effective.map((event) => event.id));
-  const personRevoked = new Set(
-    log
-      .filter((event) => event.source !== "system")
-      .map((event) => (event.type === "event.revoked" ? event.payload.targetId : null)),
-  );
+  const personRevoked = revokedByPerson(log);
   const { activities } = materialize(log, timeReducer, INITIAL_TIME_STATE);
   return Object.values(activities).map((activity) => {
     const stop = stopOf(effective, activity.id, activity.endAt);
+    const revokedStops = log.filter(
+      (event) =>
+        event.type === "activity.stopped" &&
+        event.payload.activityId === activity.id &&
+        isAutoSleepId(event.id) &&
+        !effectiveIds.has(event.id),
+    );
     return {
       category: activity.category,
       endAt: activity.endAt,
       id: activity.id,
       isAutoStart: isAutoSleepId(activity.originEventId),
       isAutoStop: stop !== undefined && isAutoSleepId(stop.id),
-      personRevokedStopsAt: log
-        .filter(
-          (event) =>
-            event.type === "activity.stopped" &&
-            event.payload.activityId === activity.id &&
-            isAutoSleepId(event.id) &&
-            personRevoked.has(event.id) &&
-            !effectiveIds.has(event.id),
-        )
+      isStartAmendedByPerson: effective.some(
+        (event) =>
+          event.type === "activity.adjusted" &&
+          event.source !== "system" &&
+          event.payload.activityId === activity.id &&
+          event.payload.startAt !== undefined,
+      ),
+      personRevokedStopsAt: revokedStops
+        .filter((event) => personRevoked.has(event.id))
         .map((event) => event.occurredAt),
+      revokedAutoStopIds: revokedStops.map((event) => event.id),
       startAt: activity.startAt,
       startEventId: activity.originEventId,
       stopEventId: stop?.id ?? null,
     };
   });
+};
+
+/** Automatic sleep starts no longer in force, whoever revoked them. */
+export const revokedAutoStartIdsOf = (log: readonly Event[]): readonly string[] => {
+  const effectiveIds = new Set(effectiveEvents(log).map((event) => event.id));
+  return log
+    .filter((event) => event.type === "activity.started" && isAutoSleepId(event.id))
+    .map((event) => event.id)
+    .filter((id) => !effectiveIds.has(id));
+};
+
+/** Automatic sleep starts the person deleted (a non-system revocation in force), with their night. */
+export const personRevokedAutoStartsOf = (
+  log: readonly Event[],
+  zone: string,
+): SleepInput["personRevokedAutoStarts"] => {
+  const personRevoked = revokedByPerson(log);
+  return log
+    .filter(
+      (event) =>
+        event.type === "activity.started" && isAutoSleepId(event.id) && personRevoked.has(event.id),
+    )
+    .map((event) => ({ night: sleepNightOf(event.occurredAt, zone), startEventId: event.id }));
 };
 
 /**
@@ -141,6 +180,8 @@ export type Known = {
   readonly uses: readonly DeviceUse[];
   readonly knownUntil: null | string;
   readonly zone?: string;
+  /** Where the uses start being known; noon before the default night unless said. */
+  readonly usesFrom?: string;
 };
 
 export type Step = {
@@ -151,9 +192,19 @@ export type Step = {
 };
 
 /** One evaluation, as the Durable Object runs it: decide on the log, append the events. */
-export const step = (log: readonly Event[], { knownUntil, uses, zone = MOSCOW }: Known): Step => {
+export const step = (log: readonly Event[], known: Known): Step => {
+  const { knownUntil, uses, usesFrom = at("12:00"), zone = MOSCOW } = known;
   const now = knownUntil === null ? at("12:00") : addMinutesIso(knownUntil, 5);
-  const input: SleepInput = { activities: sleepActivitiesOf(log), knownUntil, now, uses, zone };
+  const input: SleepInput = {
+    activities: sleepActivitiesOf(log),
+    knownUntil,
+    now,
+    personRevokedAutoStarts: personRevokedAutoStartsOf(log, zone),
+    revokedAutoStartIds: revokedAutoStartIdsOf(log),
+    uses,
+    usesFrom,
+    zone,
+  };
   const decisions = decideSleep(input);
   const events = sleepEvents(decisions, input);
   return { decisions, events, input, log: appended(log, events, now) };

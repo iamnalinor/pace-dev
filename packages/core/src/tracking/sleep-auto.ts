@@ -1,44 +1,20 @@
 import type { EventInput } from "../events/event-schema.ts";
-import type { ActivityCategory } from "./model.ts";
 
 import { sleepDiscardId, sleepNightOf, sleepReopenId, sleepStartId, sleepStopId } from "../ids.ts";
-import { addMinutesIso, minutesBetween } from "../time.ts";
+import { minutesBetween } from "../time.ts";
 import { isRestClass } from "./categories.ts";
+import { bedtimeFloor, type Interval, isBedtime, REST_MIN_MINUTES } from "./phone-use.ts";
 import {
-  awakeSpells,
-  BACK_TO_SLEEP_MINUTES,
-  bedtimeFloor,
-  type Interval,
-  isBedtime,
-  isWakeUp,
-  laterOf,
-  REST_MIN_MINUTES,
-  SLEEP_MIN_MINUTES,
-} from "./phone-use.ts";
+  decideFor,
+  type DeviceUse,
+  type Known,
+  knownUses,
+  rested,
+  type SleepActivity,
+  type SleepDecision,
+} from "./sleep-walk.ts";
 
-/** A stretch someone used one of their devices: a phone's use interval, a computer's session. */
-export type DeviceUse = {
-  readonly deviceId: string;
-  readonly startAt: string;
-  readonly endAt: string;
-};
-
-/**
-An activity as automatic sleep reads it: the effective state (revoked events already gone),
-with the events that started and stopped it, whether automatic sleep wrote them, and the
-instants of automatic stops the person undid (they said they were still asleep).
-*/
-export type SleepActivity = {
-  readonly id: string;
-  readonly category: ActivityCategory;
-  readonly startAt: string;
-  readonly endAt: null | string;
-  readonly startEventId: string;
-  readonly stopEventId: null | string;
-  readonly isAutoStart: boolean;
-  readonly isAutoStop: boolean;
-  readonly personRevokedStopsAt: readonly string[];
-};
+export type { DeviceUse, SleepActivity, SleepDecision } from "./sleep-walk.ts";
 
 /** Use on every device, how far the phones' use is known (`null`: nothing is), the activities. */
 export type SleepInput = {
@@ -47,174 +23,22 @@ export type SleepInput = {
   readonly activities: readonly SleepActivity[];
   readonly now: string;
   readonly zone: string;
+  /** Where `uses` start: nothing before it is known, so nothing before it is decided. */
+  readonly usesFrom: string;
+  /** Ids of the automatic starts no longer in force (discarded, or deleted by the person). */
+  readonly revokedAutoStartIds: readonly string[];
+  /** Automatic starts the person deleted: their nights get no automatic sleep again. */
+  readonly personRevokedAutoStarts: readonly {
+    readonly startEventId: string;
+    readonly night: string;
+  }[];
 };
 
-export type SleepDecision =
-  | { readonly kind: "discard"; readonly activityId: string; readonly startEventId: string }
-  | { readonly kind: "open"; readonly at: string; readonly night: string }
-  | { readonly kind: "reopen"; readonly activityId: string; readonly stopEventId: string }
-  | { readonly kind: "stop"; readonly activityId: string; readonly at: string };
-
-type Known = {
-  readonly knownUntil: string;
-  readonly uses: readonly Interval[];
-  readonly zone: string;
-};
-
-/** A spell awake and the rest after it: until the next spell, or as far as use is known. */
-type RestedSpell = Interval & { readonly restEnd: string; readonly isLast: boolean };
-
-/** Where a walk through a sleep's spells ended it, and whether more quiet could still undo that. */
-type SleepEnd = { readonly at: string; readonly isFinal: boolean };
-
-type Walk = {
-  /** Minutes of the short wakes inside the sleep. */
-  readonly awake: number;
-  readonly end: null | SleepEnd;
-  /** A short wake inside the sleep covers its automatic stop: the stop goes. */
-  readonly isReopening: boolean;
-};
-
-/** Uses up to `knownUntil`, by start: later ones are not known yet, one still going ends there. */
-const knownUses = (uses: readonly DeviceUse[], knownUntil: string): readonly Interval[] =>
-  uses
-    .filter((use) => use.startAt < knownUntil && use.startAt < use.endAt)
-    .map((use) => ({
-      endAt: use.endAt < knownUntil ? use.endAt : knownUntil,
-      startAt: use.startAt,
-    }))
-    .toSorted((a, b) => a.startAt.localeCompare(b.startAt));
-
-const rested = (uses: readonly Interval[], knownUntil: string): readonly RestedSpell[] => {
-  const spells = awakeSpells(uses);
-  return spells.map((spell, index) => ({
-    ...spell,
-    isLast: index === spells.length - 1,
-    restEnd: spells[index + 1]?.startAt ?? knownUntil,
-  }));
-};
-
-/**
-The uses that happened inside a sleep. An automatic start claims quiet from that instant, so any
-use after it counts, even one a late upload shows already running then. A person's start is
-their word: the spell they started it from (pressing Sleep in Pace, the home screen after) is
-them going to bed, and only use after that spell counts (class 39).
-*/
-const usesInside = (sleep: SleepActivity, uses: readonly Interval[]): readonly Interval[] => {
-  const start = sleep.startAt;
-  if (sleep.isAutoStart) {
-    return uses
-      .filter((use) => use.endAt > start)
-      .map((use) => ({ endAt: use.endAt, startAt: laterOf(use.startAt, start) }));
-  }
-  const bed = awakeSpells(uses).find((spell) => spell.startAt <= start && start <= spell.endAt);
-  const after = bed?.endAt ?? start;
-  return uses.filter((use) => use.startAt > after);
-};
-
-const isWithin = (spell: Interval, instant: string): boolean =>
-  spell.startAt <= instant && instant <= spell.endAt;
-
-/** A wake-up inside this sleep: short, in its small hours, with the long rest after it known. */
-const isWakeInside = (spell: RestedSpell, sleep: SleepActivity, zone: string): boolean =>
-  isWakeUp(spell, { endAt: spell.restEnd, startAt: spell.endAt }, zone) &&
-  sleepNightOf(spell.startAt, zone) === sleepNightOf(sleep.startAt, zone);
-
-/** The last spell known could still turn out a wake-up once enough quiet after it is known. */
-const canStillBeWake = (spell: RestedSpell, sleep: SleepActivity, zone: string): boolean =>
-  spell.isLast &&
-  isWakeInside(
-    { ...spell, restEnd: addMinutesIso(spell.endAt, BACK_TO_SLEEP_MINUTES) },
-    sleep,
-    zone,
-  );
-
-const hasAutoStopIn = (sleep: SleepActivity, spell: Interval): boolean =>
-  sleep.isAutoStop && sleep.endAt !== null && isWithin(spell, sleep.endAt);
-
-/**
-Walks the spells awake after a sleep's start: one at an automatic stop the person undid stays
-inside (they said they were asleep, so its minutes are not taken off), so does a wake-up; the
-first other spell ends the sleep at its start.
-*/
-const walk = (sleep: SleepActivity, known: Known): Walk => {
-  const spells = rested(usesInside(sleep, known.uses), known.knownUntil);
-  const from = (index: number, awake: number, isReopening: boolean): Walk => {
-    const spell = spells[index];
-    if (spell === undefined) {
-      return { awake, end: null, isReopening };
-    }
-    if (sleep.personRevokedStopsAt.some((instant) => isWithin(spell, instant))) {
-      return from(index + 1, awake, isReopening);
-    }
-    if (isWakeInside(spell, sleep, known.zone)) {
-      const minutes = minutesBetween(spell.startAt, spell.endAt);
-      return from(index + 1, awake + minutes, isReopening || hasAutoStopIn(sleep, spell));
-    }
-    const isFinal = !canStillBeWake(spell, sleep, known.zone);
-    return { awake, end: { at: spell.startAt, isFinal }, isReopening };
-  };
-  return from(0, 0, false);
-};
-
-/** A sleep's decisions, and how it reads once they are applied (`null`: discarded). */
-type Outcome = {
-  readonly decisions: readonly SleepDecision[];
-  readonly after: null | SleepActivity;
-};
-
-/** Its automatic stop revoked after a short wake, and a stop where use ended it if none is there. */
-const reopenAndStop = (sleep: SleepActivity, walked: Walk): readonly SleepDecision[] => {
-  const { end, isReopening } = walked;
-  const reopen: readonly SleepDecision[] =
-    isReopening && sleep.stopEventId !== null
-      ? [{ activityId: sleep.id, kind: "reopen", stopEventId: sleep.stopEventId }]
-      : [];
-  if (end === null) {
-    return reopen;
-  }
-  const isStopped = sleep.stopEventId !== null && sleep.endAt === end.at;
-  const stop: readonly SleepDecision[] = isStopped
-    ? []
-    : [{ activityId: sleep.id, at: end.at, kind: "stop" }];
-  return [...reopen, ...stop];
-};
-
-/** An automatic start whose end is decided, with less than a sleep's minutes asleep in between. */
-const isTooShort = (sleep: SleepActivity, { awake, end }: Walk): boolean =>
-  sleep.isAutoStart &&
-  end?.isFinal === true &&
-  minutesBetween(sleep.startAt, end.at) - awake < SLEEP_MIN_MINUTES;
-
-/** Where the sleep ends once the decisions apply: at the new stop, open again, or as it was. */
-const endAfter = (sleep: SleepActivity, { end, isReopening }: Walk): null | string => {
-  if (end !== null) {
-    return end.at;
-  }
-  return isReopening ? null : sleep.endAt;
-};
-
-/**
-A running or automatically stopped sleep, walked again with what is known now: reopened after
-a short wake, stopped at the use that ended it, and when it was started automatically and
-came out shorter than a sleep, discarded. A person's stop and a person's start are never moved.
-*/
-const decideFor = (sleep: SleepActivity, known: Known): Outcome => {
-  const walked = walk(sleep, known);
-  const decisions = reopenAndStop(sleep, walked);
-  if (isTooShort(sleep, walked)) {
-    const discard: SleepDecision = {
-      activityId: sleep.id,
-      kind: "discard",
-      startEventId: sleep.startEventId,
-    };
-    return { after: null, decisions: [...decisions, discard] };
-  }
-  return { after: { ...sleep, endAt: endAfter(sleep, walked) }, decisions };
-};
-
-const isWalked = (activity: SleepActivity): boolean =>
-  activity.category === "sleep" && (activity.endAt === null || activity.isAutoStop);
+/** A sleep the rules follow: running or stopped by them, and started inside the known uses. */
+const isWalked = (activity: SleepActivity, usesFrom: string): boolean =>
+  activity.category === "sleep" &&
+  activity.startAt >= usesFrom &&
+  (activity.endAt === null || activity.isAutoStop);
 
 const isRunningAt = (activity: SleepActivity, now: string): boolean =>
   activity.startAt <= now && (activity.endAt === null || activity.endAt > now);
@@ -226,54 +50,81 @@ type Opening = {
 };
 
 /** A sleep automatic sleep would open at `at`, before anything is decided about it. */
-const newSleep = (at: string, night: string): SleepActivity => {
-  const id = sleepStartId(night, at);
+const newSleep = (at: string, night: string, used: readonly string[]): SleepActivity => {
+  const id = sleepStartId(night, at, used);
   return {
     category: "sleep",
     endAt: null,
     id,
     isAutoStart: true,
     isAutoStop: false,
+    isStartAmendedByPerson: false,
     personRevokedStopsAt: [],
+    revokedAutoStopIds: [],
     startAt: at,
     startEventId: id,
     stopEventId: null,
   };
 };
 
-/**
-Opens a sleep at the start of each long enough rest in bedtime, one a night: none in a night
-that has a sleep, none while a Rest-class activity runs. A rest whose sleep would be discarded
-as soon as it opened is passed over, so an upload that arrives late opens the real night at
-once; told as it happens, the same rest opens, then is stopped and discarded.
-*/
-const opens = (activities: readonly SleepActivity[], known: Known, now: string) => {
+/** The latest end of the recorded rests overlapping [at, until), or `at`: a sleep starts after them. */
+const pastRests = (at: string, until: string, rests: readonly Interval[]): string =>
+  rests
+    .filter((rest) => rest.startAt < until && rest.endAt > at)
+    .map((rest) => rest.endAt)
+    .toSorted((a, b) => a.localeCompare(b))
+    .at(-1) ?? at;
+
+const isOverRest = (from: string, to: string, rests: readonly Interval[]): boolean =>
+  rests.some((rest) => rest.startAt < to && rest.endAt > from);
+
+/** Where each rest long enough in bedtime would start a sleep: after any Rest the person recorded. */
+const candidatesIn = (known: Known, rests: readonly Interval[]): readonly string[] => {
   const { zone } = known;
-  const initial: Opening = {
-    decisions: [],
-    isBlocked: activities.some(
-      (activity) => isRestClass(activity.category) && isRunningAt(activity, now),
-    ),
-    nights: new Set(
-      activities
-        .filter((activity) => activity.category === "sleep")
-        .map((activity) => sleepNightOf(activity.startAt, zone)),
-    ),
-  };
-  const candidates = rested(known.uses, known.knownUntil)
-    .map((spell) => ({ at: bedtimeFloor(spell.endAt, zone), restEnd: spell.restEnd }))
+  return rested(known.uses, known.knownUntil)
+    .map((spell) => ({
+      at: pastRests(bedtimeFloor(spell.endAt, zone), spell.restEnd, rests),
+      restEnd: spell.restEnd,
+    }))
     .filter(
       ({ at, restEnd }) =>
         isBedtime(at, zone) && at < restEnd && minutesBetween(at, restEnd) >= REST_MIN_MINUTES,
-    );
+    )
+    .map(({ at }) => at);
+};
+
+/**
+Opens a sleep at the start of each long enough rest in bedtime, one a night: none in a night
+that has a sleep or whose automatic sleep the person deleted, none while a Rest-class activity
+runs, none over one the person recorded. A rest whose sleep would be discarded as soon as it
+opened is passed over, so an upload that arrives late opens the real night at once; told as it
+happens, the same rest opens, then is stopped and discarded.
+*/
+const opens = (activities: readonly SleepActivity[], known: Known, input: SleepInput) => {
+  const { now, personRevokedAutoStarts } = input;
+  const rests = activities.filter((activity) => isRestClass(activity.category));
+  // A running one blocks every opening; the ended ones bound where a sleep may lie.
+  const ended = rests
+    .filter((rest): rest is SleepActivity & { readonly endAt: string } => rest.endAt !== null)
+    .map(({ endAt, startAt }) => ({ endAt, startAt }));
+  const initial: Opening = {
+    decisions: [],
+    isBlocked: rests.some((rest) => isRunningAt(rest, now)),
+    nights: new Set([
+      ...rests
+        .filter((rest) => rest.category === "sleep")
+        .map((sleep) => sleepNightOf(sleep.startAt, known.zone)),
+      ...personRevokedAutoStarts.map((start) => start.night),
+    ]),
+  };
   // eslint-disable-next-line unicorn/no-array-reduce -- an opening takes its night from the rests after it
-  return candidates.reduce<Opening>((opening, { at }) => {
-    const night = sleepNightOf(at, zone);
+  return candidatesIn(known, ended).reduce<Opening>((opening, at) => {
+    const night = sleepNightOf(at, known.zone);
     if (opening.isBlocked || opening.nights.has(night)) {
       return opening;
     }
-    const { after, decisions } = decideFor(newSleep(at, night), known);
-    return after === null
+    const { after, decisions } = decideFor(newSleep(at, night, input.revokedAutoStartIds), known);
+    return after === null || isOverRest(at, after.endAt ?? known.knownUntil, ended)
       ? opening
       : {
           decisions: [...opening.decisions, { at, kind: "open", night }, ...decisions],
@@ -292,13 +143,10 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
   if (input.knownUntil === null) {
     return [];
   }
-  const known: Known = {
-    knownUntil: input.knownUntil,
-    uses: knownUses(input.uses, input.knownUntil),
-    zone: input.zone,
-  };
+  const bounds = { knownUntil: input.knownUntil, usesFrom: input.usesFrom };
+  const known: Known = { ...bounds, uses: knownUses(input.uses, bounds), zone: input.zone };
   const followed = input.activities
-    .filter((activity) => isWalked(activity))
+    .filter((activity) => isWalked(activity, input.usesFrom))
     .toSorted((a, b) => a.startAt.localeCompare(b.startAt))
     .map((sleep) => ({ outcome: decideFor(sleep, known), sleep }));
   const decided = new Map(followed.map(({ outcome, sleep }) => [sleep.id, outcome.after]));
@@ -307,10 +155,7 @@ export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
     const outcome = decided.has(activity.id) ? decided.get(activity.id) : activity;
     return outcome === null || outcome === undefined ? [] : [outcome];
   });
-  return [
-    ...followed.flatMap(({ outcome }) => outcome.decisions),
-    ...opens(after, known, input.now),
-  ];
+  return [...followed.flatMap(({ outcome }) => outcome.decisions), ...opens(after, known, input)];
 };
 
 const revoke = (id: string, targetId: string, now: string): EventInput => ({
@@ -322,10 +167,22 @@ const revoke = (id: string, targetId: string, now: string): EventInput => ({
   type: "event.revoked",
 });
 
-const toEvent = (decision: SleepDecision, now: string): EventInput => {
+/** The stop ids an activity already has, in force or revoked: a new stop must not reuse one. */
+const stopIdsOf = (input: SleepInput, activityId: string): readonly string[] => {
+  const activity = input.activities.find((each) => each.id === activityId);
+  return activity === undefined
+    ? []
+    : [
+        ...(activity.stopEventId === null ? [] : [activity.stopEventId]),
+        ...activity.revokedAutoStopIds,
+      ];
+};
+
+const toEvent = (decision: SleepDecision, input: SleepInput): EventInput => {
+  const { now } = input;
   switch (decision.kind) {
     case "open": {
-      const id = sleepStartId(decision.night, decision.at);
+      const id = sleepStartId(decision.night, decision.at, input.revokedAutoStartIds);
       return {
         id,
         occurredAt: decision.at,
@@ -337,7 +194,7 @@ const toEvent = (decision: SleepDecision, now: string): EventInput => {
     }
     case "stop": {
       return {
-        id: sleepStopId(decision.activityId, decision.at),
+        id: sleepStopId(decision.activityId, decision.at, stopIdsOf(input, decision.activityId)),
         occurredAt: decision.at,
         payload: { activityId: decision.activityId },
         precision: "approx",
@@ -363,4 +220,4 @@ followed up, so deciding again on the same input names the same events.
 export const sleepEvents = (
   decisions: readonly SleepDecision[],
   input: SleepInput,
-): readonly EventInput[] => decisions.map((decision) => toEvent(decision, input.now));
+): readonly EventInput[] => decisions.map((decision) => toEvent(decision, input));
