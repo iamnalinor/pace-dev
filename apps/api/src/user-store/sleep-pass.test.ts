@@ -280,7 +280,9 @@ describe("a pass cut short", () => {
       // directly has no catch, so the store is left as a reset leaves it).
       const cut: SleepHost = {
         ...host,
-        log: async () => { throw new Error("cut short"); },
+        log: async () => {
+          throw new Error("cut short");
+        },
       };
       await expect(runSleepPass(cut, dayLater)).rejects.toThrow("cut short");
       // The runtime runs the alarm again: sleep's look is still due, and the sleep is ended.

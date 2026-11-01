@@ -87,17 +87,23 @@ export const savePoolMemory = async (
 export const ruledSeriesOf = async (storage: DurableObjectStorage): Promise<readonly string[]> =>
   (await storage.get<readonly string[]>(RULES_KEY)) ?? [];
 
-/** Keeps the series answered "every time"; answers whether they changed. */
-export const didSaveRuledSeries = async (
+/** The series answered "every time" to keep, when they differ from those kept; else `undefined`. */
+export const ruledSeriesChange = async (
+  storage: DurableObjectStorage,
+  series: readonly string[] | undefined,
+): Promise<readonly string[] | undefined> => {
+  const next = series === undefined ? undefined : [...new Set(series)];
+  return next === undefined || JSON.stringify(next) === JSON.stringify(await ruledSeriesOf(storage))
+    ? undefined
+    : next;
+};
+
+/** Keeps the series answered "every time" (see `ruledSeriesChange`). */
+export const saveRuledSeries = async (
   storage: DurableObjectStorage,
   series: readonly string[],
-): Promise<boolean> => {
-  const next = [...new Set(series)];
-  if (JSON.stringify(next) === JSON.stringify(await ruledSeriesOf(storage))) {
-    return false;
-  }
-  await storage.put(RULES_KEY, next);
-  return true;
+): Promise<void> => {
+  await storage.put(RULES_KEY, series);
 };
 
 type Adopted = NotifyOptions["adoptTelegramMessage"];

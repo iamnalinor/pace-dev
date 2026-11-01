@@ -287,6 +287,38 @@ describe("a pool pass cut short", () => {
   });
 });
 
+describe("a phone's calendar copy cut short", () => {
+  it("is looked at by the pool with the next upload when the pool's look after its rows died", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const now = msk("22:00");
+      vi.setSystemTime(new Date(now));
+      await instance.append(history(3), { now });
+      const events = Array.from({ length: 4 }, (_, index) => event(index));
+      await new UserStore(state, deployed).syncCalendar(copy(now, events), now);
+      // One event moved; the rows go in, then the isolate is reset as the pool looks at them.
+      const moved = events.with(1, event(1, "Seminar moved"));
+      const cut = new UserStore(state, deployed);
+      Object.defineProperty(cut, "pool", {
+        get: () => ({
+          afterWrite: async () => {
+            throw new Error("cut short");
+          },
+        }),
+      });
+      await expect(cut.syncCalendar(copy(now, moved), now)).rejects.toThrow("cut short");
+      // The same copy fifteen minutes on: the pool looks now (one load), and not again after.
+      const later = addMinutesIso(now, 15);
+      vi.setSystemTime(new Date(later));
+      const next = meterSql(state.storage);
+      await new UserStore(state, deployed).syncCalendar(copy(later, moved), later);
+      expect(next.cost().loads).toBe(1);
+      const again = meterSql(state.storage);
+      await new UserStore(state, deployed).syncCalendar(copy(later, moved), later);
+      expect(again.cost().loads).toBe(0);
+    });
+  });
+});
+
 describe("the assistant's queue at the store's alarm", () => {
   it("loads no log for a text that is not due yet", async () => {
     await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
