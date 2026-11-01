@@ -1,8 +1,5 @@
 import type { MessageKey } from "@pace/core";
 
-/** The app's own name, after the screen's in the tab's title, alone where no screen is named. */
-const APP_NAME = "Pace";
-
 /** Each route's first segment and the title its screen shows. */
 const TITLES: Readonly<Record<string, MessageKey>> = {
   "": "nav.now",
@@ -35,8 +32,12 @@ export const routeTitleKey = (path: string): MessageKey | null => {
   return TITLES[first] ?? null;
 };
 
-/** "Settings · Pace": the browser tab and its history say which screen it is. */
+/**
+"Settings · Pace": the browser tab and its history say which screen it is, then the app's name
+(`app.name`, as the login card's wordmark), alone where no screen is named.
+*/
 export const documentTitle = (path: string, say: (key: MessageKey) => string): string => {
   const key = routeTitleKey(path);
-  return key === null ? APP_NAME : `${say(key)} · ${APP_NAME}`;
+  const app = say("app.name");
+  return key === null ? app : `${say(key)} · ${app}`;
 };

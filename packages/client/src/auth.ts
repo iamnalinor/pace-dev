@@ -239,6 +239,32 @@ const confirmationActions = (
   },
 });
 
+/**
+Fetches the signed-in user. A 401 signs out as "ended elsewhere", but only for the token the
+request carried and only while it is still the one in use: a 401 for a token this device has
+forgotten or replaced meanwhile (it ended its own session) says nothing about the session in use
+(fix round 1).
+*/
+const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User, string>> => {
+  const sent = session.token();
+  try {
+    // The answer carries the store id too; the sync confirms that on its own pulls.
+    const user = UserSchema.parse(await api.call(endpoints.me, {}));
+    session.store.setState({ status: "signed-in", user });
+    return ok(user);
+  } catch (error) {
+    if (
+      sent !== undefined &&
+      error instanceof ApiError &&
+      error.status === 401 &&
+      session.token() === sent
+    ) {
+      await session.signOut({ endedElsewhere: true });
+    }
+    return err(errorCode(error));
+  }
+};
+
 export const createAuth = (options: {
   readonly api: ApiClient;
   readonly session: SessionStore;
@@ -254,19 +280,7 @@ export const createAuth = (options: {
     }
   };
 
-  const me = async (): Promise<Result<User, string>> => {
-    try {
-      // The answer carries the store id too; the sync confirms that on its own pulls.
-      const user = UserSchema.parse(await api.call(endpoints.me, {}));
-      session.store.setState({ status: "signed-in", user });
-      return ok(user);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        await session.signOut({ endedElsewhere: true });
-      }
-      return err(errorCode(error));
-    }
-  };
+  const me = meOf(api, session);
 
   return {
     ...confirmationActions(api, session),

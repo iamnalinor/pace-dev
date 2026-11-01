@@ -368,6 +368,54 @@ describe("NotificationsScreen", () => {
     expect(isControl(back, notMe)).toBe(true);
   });
 
+  it("keeps one Not me confirm open at a time (fix round 1)", async () => {
+    const other = {
+      ...login,
+      createdAt: "2026-10-06T08:30:00.000Z",
+      id: "n-login-2",
+      payload: { ...login.payload, name: "Edge on Windows", sessionId: "s2" },
+    };
+    const { runtime } = await feedRuntime([login, other]);
+    await renderScreen(<NotificationsScreen />, runtime);
+    const first = await screen.findByTestId("notification-n-login");
+    const second = screen.getByTestId("notification-n-login-2");
+    await fireEvent.press(within(first).getByRole("button", { name: en("notify.action.revoked") }));
+    expect(within(first).getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    await fireEvent.press(
+      within(second).getByRole("button", { name: en("notify.action.revoked") }),
+    );
+    expect(within(second).getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    expect(within(first).queryByText(en("notifications.notMeConfirm"))).toBeNull();
+    expect(
+      within(first).getByRole("button", { name: en("notify.action.revoked") }),
+    ).toBeOnTheScreen();
+  });
+
+  it("hands focus to the status when a reload ends the session under an open confirm (fix round 1)", async () => {
+    const listed = { ids: ["me", "s"] };
+    const { runtime } = await feedRuntime([login], {
+      "GET /api/sessions": () => sessionsList(listed.ids)(),
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    expect(screen.getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    // Ended from another device meanwhile; a new sign-in notice makes the feed's list reload.
+    listed.ids = ["me"];
+    await act(async () => {
+      runtime.notifications.store.setState((state) => ({
+        ...state,
+        items: [
+          { ...login, id: "n-new", payload: { ...login.payload, sessionId: "me" } },
+          ...state.items,
+        ],
+      }));
+      await Promise.resolve();
+    });
+    const row = screen.getByTestId("notification-n-login");
+    expect(await within(row).findByText(en("notify.resolved.revoked"))).toBeOnTheScreen();
+    expect(textOf(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(en("notify.resolved.revoked"));
+  });
+
   it("marks this device's own sign-in as this device (QA round 15 L11)", async () => {
     const own = { ...login, payload: { ...login.payload, sessionId: "me" } };
     const { runtime } = await feedRuntime([own], { "GET /api/sessions": sessionsList(["me"]) });

@@ -168,6 +168,10 @@ const liveAndSync = (
     // The server ended the socket's session: `me` signs out on its 401, so the app goes to
     // sign-in; a session still good (an expiry the server misjudged) gets its socket back.
     onSessionEnded: () => {
+      // Forgotten here already (this device ended itself): nothing to check, no 401 to provoke.
+      if (auth.token() === undefined) {
+        return;
+      }
       void (async (): Promise<void> => {
         const checked = await auth.me();
         if (checked.ok) {

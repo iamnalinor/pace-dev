@@ -362,14 +362,27 @@ describe("Settings → Devices and sessions", () => {
   it("signs out and goes to the login card when the session ended is this device's", async () => {
     const server = sessionsServer(ALL);
     const logouts = { count: 0 };
+    // Whether the socket had rested when the DELETE reached the server.
+    const atDelete = { stopsBefore: -1 };
+    const stops = { count: 0 };
+    const deleteRoute = server.routes["DELETE /api/sessions/01CHROME"];
     const runtime = await renderSettings({
       ...server.routes,
+      "DELETE /api/sessions/01CHROME": (request) => {
+        atDelete.stopsBefore = stops.count;
+        return deleteRoute?.(request);
+      },
       "POST /api/auth/logout": () => {
         logouts.count += 1;
         return { ok: true };
       },
     });
     const row = await screen.findByLabelText("Chrome on macOS");
+    const { stop } = runtime.live;
+    jest.spyOn(runtime.live, "stop").mockImplementation(() => {
+      stops.count += 1;
+      stop();
+    });
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
     expect(within(row).getByText("End this session? This device signs out.")).toBeOnTheScreen();
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
@@ -380,6 +393,9 @@ describe("Settings → Devices and sessions", () => {
     expect(runtime.auth.token()).toBeUndefined();
     // The server ended it already: no logout that would answer 401 (QA round 15 L2).
     expect(logouts.count).toBe(0);
+    // The socket rested before the DELETE: the server's close of it cannot read as "elsewhere".
+    expect(atDelete.stopsBefore).toBe(1);
+    expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
   it("says so quietly when a revoke fails, and keeps the row", async () => {

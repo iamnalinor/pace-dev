@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { usePace, useT } from "#app/app-state.tsx";
@@ -161,11 +161,14 @@ const deliveryLines = (
 ];
 
 const Item = ({
+  asking,
   deliveries,
   item,
   listed,
   zoned,
 }: {
+  /** The feed's one open Not me confirm: its notice, and how to move it. */
+  readonly asking: { readonly id: null | string; readonly set: (id: null | string) => void };
   readonly item: PoolNotification;
   readonly deliveries: readonly DeliveryEntry[];
   readonly listed: ListedSessions;
@@ -187,7 +190,18 @@ const Item = ({
           {clockTime(item.createdAt, zoned.zone)}
         </Text>
       </View>
-      <Answers item={item} state={state} />
+      <Answers
+        isAsking={asking.id === item.id}
+        item={item}
+        onAsking={(isOpen) => {
+          if (isOpen) {
+            asking.set(item.id);
+          } else if (asking.id === item.id) {
+            asking.set(null);
+          }
+        }}
+        state={state}
+      />
       {deliveries
         .flatMap((entry) => deliveryLines(entry, t, zoned.zone))
         .map((line, index) => (
@@ -217,6 +231,9 @@ export const NotificationsScreen = () => {
   // list follows new and answered sign-ins.
   const sessions = useSessions(api);
   useSignInsChanged(sessions.reload);
+  // One Not me confirm open at a time: opening another closes it (as Settings' list does).
+  const [askingId, setAskingId] = useState<null | string>(null);
+  const asking = { id: askingId, set: setAskingId };
   const listed: ListedSessions = {
     current: sessions.sessions.find((session) => session.current)?.id,
     ids: new Set(sessions.sessions.map((session) => session.id)),
@@ -273,6 +290,7 @@ export const NotificationsScreen = () => {
             <View aria-label={label} role="list">
               {day.items.map((item) => (
                 <Item
+                  asking={asking}
                   deliveries={deliveries[item.id] ?? []}
                   item={item}
                   key={item.id}

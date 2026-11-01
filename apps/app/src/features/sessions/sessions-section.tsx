@@ -55,6 +55,7 @@ const ReadyList = ({
   const t = useT();
   const router = useRouter();
   const { auth } = useAuth();
+  const { live } = usePace();
   const { timezone } = useSettings();
   const { deviceTz, language, now } = useViewer();
   const [hasEndFailed, setHasEndFailed] = useState(false);
@@ -74,9 +75,17 @@ const ReadyList = ({
     moveFocus(next ?? afterLast.current);
   };
   const didEnd = async (row: Row): Promise<boolean> => {
+    // Ending this device: the socket rests first. The server closes it as the session ends, and
+    // the channel would read that as "ended elsewhere" and check `me` (a 401; fix round 1).
+    if (row.isCurrent) {
+      live.stop();
+    }
     try {
       await sessions.revoke(row.id);
     } catch {
+      if (row.isCurrent) {
+        live.start();
+      }
       // The row stays, its confirm open for another try; the line under the list says why.
       setHasEndFailed(true);
       return false;

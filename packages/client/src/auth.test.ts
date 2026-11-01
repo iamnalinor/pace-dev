@@ -67,6 +67,30 @@ describe("createAuth session", () => {
     expect(auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
+  it("a 401 answering a session this device already forgot changes nothing (fix round 1)", async () => {
+    // The device ended its own session: the server closed its socket, the socket asked `me`, and
+    // the 401 came back after `forget()`. The person did it here: no "ended elsewhere".
+    const held: { release?: () => void } = {};
+    const gate = new Promise<void>((resolve) => {
+      held.release = resolve;
+    });
+    const { auth } = await setup(
+      {
+        "GET /api/me": async () => {
+          await gate;
+          return problem(401, "auth/unauthorized");
+        },
+      },
+      "stored",
+    );
+    const asked = auth.me();
+    await auth.forget();
+    held.release?.();
+    await asked;
+    expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+    expect(auth.store.getState().endedElsewhere).toBeUndefined();
+  });
+
   it("me() caches the user", async () => {
     const { auth } = await setup({ "GET /api/me": () => fakeMe }, "ok");
     await expect(auth.me()).resolves.toEqual({ ok: true, value: fakeUser });

@@ -106,11 +106,16 @@ const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
 const retryDelay = (failures: number): number =>
   Math.min(RETRY_MIN_MS * 2 ** (failures - 1), RETRY_MAX_MS);
 
-/** The keep-alive (a ping, then its pong in time or `onQuiet`) and the pending reconnect. */
+/**
+The keep-alive (a ping, then its pong in time or `onQuiet`) and the pending reconnect. `onQuiet`
+hears how many sockets in a row went quiet without a pong, so a slow link or a proxy that drops
+text frames backs off instead of reconnecting every minute (fix round 1); a pong resets it.
+*/
 const createTimers = () => {
   let ping: ReturnType<typeof setInterval> | undefined;
   let pong: ReturnType<typeof setTimeout> | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
+  let quietStreak = 0;
   return {
     clear: (): void => {
       clearInterval(ping);
@@ -120,10 +125,13 @@ const createTimers = () => {
       pong = undefined;
       retry = undefined;
     },
-    keepAlive: (socket: SocketLike, onQuiet: () => void): void => {
+    keepAlive: (socket: SocketLike, onQuiet: (streak: number) => void): void => {
       ping = setInterval(() => {
         clearTimeout(pong);
-        pong = setTimeout(onQuiet, PONG_WAIT_MS);
+        pong = setTimeout(() => {
+          quietStreak += 1;
+          onQuiet(quietStreak);
+        }, PONG_WAIT_MS);
         socket.send("ping");
       }, PING_MS);
     },
@@ -131,6 +139,7 @@ const createTimers = () => {
     ponged: (): void => {
       clearTimeout(pong);
       pong = undefined;
+      quietStreak = 0;
     },
     retryIn: (delayMs: number, connect: () => void): void => {
       retry = setTimeout(connect, delayMs);
@@ -344,7 +353,9 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     line.use(socket);
     const opened = (): void => {
       failures = 0;
-      timers.keepAlive(socket, () => {
+      timers.keepAlive(socket, (streak) => {
+        // Each fresh socket that goes quiet again waits longer (`createTimers`).
+        failures = line.current() === socket ? streak - 1 : failures;
         line.goneQuiet(socket);
       });
       status.setState({ isConnected: true });

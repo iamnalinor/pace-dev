@@ -145,6 +145,69 @@ describe("createLiveChannel", () => {
     live.stop();
   });
 
+  it("keeps a socket whose pong comes late but in time (fix round 1)", () => {
+    const sockets = fakeSockets();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: () => undefined,
+      token: () => "tok",
+    });
+    live.start();
+    const [socket] = sockets.made;
+    socket?.open();
+    if (socket !== undefined) {
+      socket.answersPing = false;
+    }
+    vi.advanceTimersByTime(45_000 + PONG_WAIT_MS - 1);
+    socket?.receive("pong");
+    vi.advanceTimersByTime(30_000);
+    expect(live.status.getState().isConnected).toBe(true);
+    expect(sockets.made).toHaveLength(1);
+    live.stop();
+  });
+
+  it("waits longer each time a fresh socket goes quiet again, until a pong comes (fix round 1)", () => {
+    const sockets = fakeSockets();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: () => undefined,
+      token: () => "tok",
+    });
+    live.start();
+    /** The newest socket opens and never answers a ping: dropped one ping and 10 s later. */
+    const quietOnce = (): void => {
+      const socket = sockets.made.at(-1);
+      if (socket !== undefined) {
+        socket.answersPing = false;
+        socket.isHalfOpen = true;
+        socket.open();
+      }
+      vi.advanceTimersByTime(45_000 + PONG_WAIT_MS);
+    };
+    quietOnce();
+    vi.advanceTimersByTime(999);
+    expect(sockets.made).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sockets.made).toHaveLength(2);
+    // Quiet again right after it opened: the pause doubles instead of starting over.
+    quietOnce();
+    vi.advanceTimersByTime(1999);
+    expect(sockets.made).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(sockets.made).toHaveLength(3);
+    // A healthy socket (its pong comes) starts the count over.
+    sockets.made[2]?.open();
+    vi.advanceTimersByTime(45_000);
+    sockets.made[2]?.drop();
+    vi.advanceTimersByTime(1000);
+    expect(sockets.made).toHaveLength(4);
+    live.stop();
+  });
+
   it("stops reconnecting when the server ends the socket's session, and says so", () => {
     const sockets = fakeSockets();
     const onSessionEnded = vi.fn();

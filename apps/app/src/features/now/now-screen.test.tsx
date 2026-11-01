@@ -348,6 +348,47 @@ describe("NowBoard", () => {
     },
   );
 
+  it.each([
+    ["Attend", "✓ Attending"],
+    ["Skip", "Skipped"],
+  ])(
+    "with a second event right behind, %s hands focus to the outcome, never to the next card's buttons (fix round 1)",
+    async (button, outcome) => {
+      calendar.state.status = "granted";
+      calendar.state.events = [
+        {
+          allDay: false,
+          endDate: addMinutesIso(NOW, 95),
+          id: "ev-1",
+          startDate: addMinutesIso(NOW, 5),
+          title: "Seminar",
+        },
+        {
+          allDay: false,
+          endDate: addMinutesIso(NOW, 60),
+          id: "ev-2",
+          startDate: addMinutesIso(NOW, 10),
+          title: "Lab",
+        },
+      ];
+      const runtime = await createTestRuntime({
+        routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
+      });
+      await renderScreen(<Board />, runtime);
+      const card = await screen.findByLabelText("From your calendar");
+      expect(within(card).getByText("Seminar")).toBeOnTheScreen();
+      const pressed = within(card).getByRole("button", { name: button });
+      await fireEvent.press(pressed);
+      // The next event's card comes at once; the answered one's outcome takes the focus.
+      expect(await screen.findByText(`${outcome} · Seminar`)).toBeOnTheScreen();
+      const next = screen.getByLabelText("From your calendar");
+      expect(within(next).getByText("Lab")).toBeOnTheScreen();
+      expect(saidBy(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(`${outcome} · Seminar`);
+      // A new card, not the old one refilled: the button that held focus is gone with its event.
+      expect(within(next).getByRole("button", { name: button })).not.toBe(pressed);
+    },
+  );
+
   describe("Attend on an Android phone in Moscow (the owner's 13:47, a 12:15–15:20 colloquium)", () => {
     /** 13:47 in Moscow (UTC+3): what the phone's clock read in the owner's screenshot. */
     const AT = "2026-10-14T10:47:00.000Z";

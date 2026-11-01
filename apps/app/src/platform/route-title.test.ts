@@ -28,5 +28,9 @@ describe("the page title per route (QA round 11 L11, round 14 L10)", () => {
     expect(documentTitle("/somewhere-else", say)).toBe("Pace");
     // A trailing slash or a query names the same screen.
     expect(documentTitle("/week/", say)).toBe("Week · Pace");
+    // The app's name comes from the catalog, as everywhere else (fix round 1).
+    expect(documentTitle("/week", (key) => (key === "app.name" ? "Темп" : say(key)))).toBe(
+      "Week · Темп",
+    );
   });
 });

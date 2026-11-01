@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
+import { isFocusLost, moveFocus } from "#app/platform/move-focus.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
@@ -100,28 +101,74 @@ const useAnswer = (item: PoolNotification) => {
 };
 
 /**
+A settled notice's status. The answered button took focus with it: the status, which says the
+outcome, takes it on (`statusRef`, bug class 5); next to it a neighbour's "Not me" would be one
+stray key from ending a session. Without a `statusRef`, a Not me confirm was still open when the
+notice settled (ended elsewhere, found by a reload): the status takes what the confirm left, then
+`onTaken` closes it (fix round 1).
+*/
+const Settled = ({
+  onTaken,
+  statusRef,
+  text,
+}: {
+  readonly onTaken: () => void;
+  readonly statusRef: ((node: null | View) => void) | undefined;
+  readonly text: string;
+}) => (
+  <View
+    accessible
+    ref={
+      statusRef ??
+      ((node: null | View) => {
+        if (node === null) {
+          return;
+        }
+
+        if (isFocusLost()) {
+          moveFocus(node);
+        }
+        onTaken();
+      })
+    }
+    tabIndex={-1}
+  >
+    <Line tone="muted">{text}</Line>
+  </View>
+);
+
+/**
 The answer buttons of an open notification; the answer stays pending until the server has it.
 None on this session's own sign-in (`own`: only the person's other devices answer it), and a
-sign-in whose session already ended elsewhere says so instead (`ended`). Not me asks first.
+sign-in whose session already ended elsewhere says so instead (`ended`). Not me asks first; the
+feed keeps one such confirm open at a time (`isAsking`, `onAsking`), so Escape cancels the one in
+view and no other.
 */
 export const Answers = ({
+  isAsking,
   item,
+  onAsking,
   state,
 }: {
+  /** This notice's Not me confirm is the feed's open one. */
+  readonly isAsking: boolean;
   readonly item: PoolNotification;
+  /** Opens (true) or closes (false) this notice's confirm. */
+  readonly onAsking: (isOpen: boolean) => void;
   readonly state: "ended" | "open" | "own";
 }) => {
   const t = useT();
   const { focus, hasFailed, pending, send } = useAnswer(item);
-  const [isAsking, setIsAsking] = useState(false);
   const resolution = item.resolution ?? (state === "ended" ? "revoked" : null);
   if (resolution !== null) {
-    // The answered button took focus with it: its status, which says the outcome, takes it on
-    // (bug class 5). Next to it a neighbour's "Not me" would be one stray key from ending a session.
     return (
-      <View accessible ref={focus.statusRef()} tabIndex={-1}>
-        <Line tone="muted">{t(`notify.resolved.${resolution}`)}</Line>
-      </View>
+      <Settled
+        onTaken={() => {
+          onAsking(false);
+        }}
+        statusRef={isAsking ? undefined : focus.statusRef()}
+        text={t(`notify.resolved.${resolution}`)}
+      />
     );
   }
   const answers: readonly Answer[] = ANSWERS[item.kind];
@@ -136,7 +183,7 @@ export const Answers = ({
           isBusy={pending !== null}
           onCancel={() => {
             focus.toOpener("revoked");
-            setIsAsking(false);
+            onAsking(false);
           }}
           onEnd={() => {
             send("revoked");
@@ -157,7 +204,7 @@ export const Answers = ({
             onPress={() => {
               if (answer === "revoked") {
                 focus.toCancel();
-                setIsAsking(true);
+                onAsking(true);
                 return;
               }
               send(answer);
