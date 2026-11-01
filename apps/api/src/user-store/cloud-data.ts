@@ -264,7 +264,7 @@ const sleepUses = (
 
 /**
 What automatic sleep reads from `from` on: the phones' uses and the other devices' app sessions
-(see `sleepUseQueries`), by start; and how far that is known, the earliest `until` among the phones
+(see `sleepUses`), by start; and how far that is known, the earliest `until` among the phones
 that uploaded within a day (`null` when none did: nothing can be decided). A computer bounds
 nothing: switched off at night it stops sending.
 */
