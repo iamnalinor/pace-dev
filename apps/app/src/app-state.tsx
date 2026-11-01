@@ -49,6 +49,9 @@ const syncedAfter = (
 };
 const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 
+/** The dev gallery shows a subtree in the language its URL names, whatever the account says. */
+export const LanguageOverrideContext = createContext<Language | null>(null);
+
 /**
 A signed-in start: this week's homework instances, a first sync, then the account's time
 zone from the device when it has none yet (never "not set").
@@ -368,7 +371,11 @@ export const useLanguage = (): Language => {
   const { status } = useAuth();
   const { api } = usePace();
   const readyToken = use(SyncedContext).ready;
+  const override = use(LanguageOverrideContext);
   const accountLanguage = useAppState((state) => state.settings.language);
+  if (override !== null) {
+    return override;
+  }
   return status === "signed-in" && readyToken !== null && readyToken === api.currentSessionToken()
     ? accountLanguage
     : deviceLanguage();
