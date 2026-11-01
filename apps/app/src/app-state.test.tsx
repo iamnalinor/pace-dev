@@ -405,6 +405,31 @@ describe("PaceProvider", () => {
     });
   });
 
+  it("registers the background check even when a network step of the signed-in start fails", async () => {
+    const background = BackgroundTask as unknown as ReturnType<typeof createFakeBackgroundTask>;
+    background.registerTaskAsync.mockClear();
+    const { runtime } = await setup();
+    const refresh = jest
+      .spyOn(runtime.notifications, "refresh")
+      .mockRejectedValue(new Error("offline"));
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(background.registerTaskAsync).toHaveBeenCalledWith("pace.background-check", {
+        minimumInterval: 15,
+      });
+    });
+  });
+
   it("drops the local log, outbox, cursor and store id when a 401 signs the device out", async () => {
     const { eventStore, runtime } = await setup({
       "GET /api/me": () => problem(401, "auth/unauthorized"),

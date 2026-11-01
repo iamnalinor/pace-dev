@@ -37,6 +37,11 @@ zone from the device when it has none yet (never "not set").
 */
 const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   const { actions, auth, sync } = runtime;
+  if (IS_PHONE) {
+    // Every signed-in phone, before any network step (one failing must not skip it): it polls
+    // when its method is `poll`, and always uploads its usage.
+    void startBackgroundCheck();
+  }
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
@@ -46,10 +51,6 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
   if (auth.store.getState().status !== "signed-in") {
     return;
-  }
-  if (IS_PHONE) {
-    // Every signed-in phone: it polls when its method is `poll`, and always uploads its usage.
-    void startBackgroundCheck();
   }
 
   sync.start({ intervalMs: POLL_OFFLINE_MS });
@@ -92,7 +93,13 @@ const runSyncLoop = (
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
-      void bootstrap(runtime);
+      void (async () => {
+        try {
+          await bootstrap(runtime);
+        } catch {
+          // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
+        }
+      })();
     } else {
       onLanguageReady(null);
       sync.stop();

@@ -364,8 +364,8 @@ and "still doing X?"; sign-ins and digests always come.
 The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
 server offers it and the phone has a Google token, else polling (it fetches what waits for it;
 the open app does so at once on each live update). *Settings → Notifications* on the phone picks
-it by hand (*Automatic*, *Google*, *Background check (every ~15 min)* or *Only while the app is
-open*) and says which one the phone uses; a pick the server or the phone cannot take right now
+it by hand (*Automatic*, *Google*, *Background check (every ~15 min)* or *Only in the app*, where
+the phone shows none and the app's bell has them all) and says which one the phone uses; a pick the server or the phone cannot take right now
 falls back to the other, and is tried again later.
 
 **Without Firebase** (a phone without Google services, an APK built without

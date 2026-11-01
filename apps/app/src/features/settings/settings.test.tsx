@@ -189,12 +189,17 @@ describe("SettingsScreen", () => {
     });
     expect(option("Automatic")).toBeOnTheScreen();
     expect(option("Background check (every ~15 min)")).toBeOnTheScreen();
-    expect(option("Only while the app is open")).toBeOnTheScreen();
+    expect(option("Only in the app")).toBeOnTheScreen();
     await fireEvent.press(option("Background check (every ~15 min)"));
     expect(
       await screen.findByText(
         "Pace checks for notifications in the background about every 15 minutes, and at once while it is open.",
       ),
+    ).toBeOnTheScreen();
+    // Off on the phone: the open app shows none either, only its bell has them.
+    await fireEvent.press(option("Only in the app"));
+    expect(
+      await screen.findByText("This phone shows no notifications; they are all in the app's bell."),
     ).toBeOnTheScreen();
   });
 

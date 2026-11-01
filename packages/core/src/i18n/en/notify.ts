@@ -59,12 +59,12 @@ export const enNotify = {
   "settings.push.option.auto": "Automatic",
   "settings.push.option.fcm": "Google",
   "settings.push.option.poll": "Background check (every ~15 min)",
-  "settings.push.option.none": "Only while the app is open",
+  "settings.push.option.none": "Only in the app",
   "settings.push.fcm":
     "FCM sends them through Google's push service, including when Pace is closed.",
   "settings.push.poll":
     "Pace checks for notifications in the background about every 15 minutes, and at once while it is open.",
-  "settings.push.none": "This phone shows none; the bell still has them all.",
+  "settings.push.none": "This phone shows no notifications; they are all in the app's bell.",
   "settings.push.denied":
     "This phone shows none: notifications are not allowed (Settings → Permissions).",
   "settings.push.otherProject":
