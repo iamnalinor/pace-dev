@@ -14,3 +14,10 @@ export const moveFocus = (target: null | View, say?: string): void => {
     AccessibilityInfo.setAccessibilityFocus(node);
   }
 };
+
+/**
+Whether focus is nowhere: a control that held it was disabled or removed and the page took it.
+A phone has no such place (the screen reader's focus is not ours to read), so it counts as lost:
+the control that held it asks for it back.
+*/
+export const isFocusLost = (): boolean => true;

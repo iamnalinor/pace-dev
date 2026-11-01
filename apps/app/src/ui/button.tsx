@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react-native";
 import { createContext, type Ref, use, useCallback, useLayoutEffect, useRef } from "react";
 import { ActivityIndicator, Pressable, Text, type View } from "react-native";
 
-import { moveFocus } from "../platform/move-focus.ts";
+import { isFocusLost, moveFocus } from "../platform/move-focus.ts";
 import { cx } from "./cx.ts";
 import { ariaHotkey, formatHotkey, type Hotkey } from "./hotkeys.ts";
 import { useIsWide } from "./layout.ts";
@@ -124,8 +124,10 @@ type FocusMemory = { isFocused: boolean; isRestoring: boolean; node: null | View
 /**
 Keeps keyboard focus through a busy spell: a busy button is disabled, which drops focus to the
 page on the web (QA round 15 M4, bug class 5); one that had focus when it turned busy takes it
-back when it is pressable again (after a failure; a success usually removes it). Answers the
-pressable's focus handlers; the node comes with its focus event.
+back when it is pressable again (after a failure; a success usually removes it), but only if focus
+is still nowhere: one the person moved meanwhile stays put (a mouse click arms it too, and a later
+Space or Enter would press the button). Answers the pressable's focus handlers; the node comes with
+its focus event.
 */
 const useFocusThroughBusy = (isBusy: boolean) => {
   const memoryRef = useRef<FocusMemory>({ isFocused: false, isRestoring: false, node: null });
@@ -135,7 +137,9 @@ const useFocusThroughBusy = (isBusy: boolean) => {
       memory.isRestoring = memory.isFocused;
     } else if (memory.isRestoring) {
       memory.isRestoring = false;
-      moveFocus(memory.node);
+      if (isFocusLost()) {
+        moveFocus(memory.node);
+      }
     }
   }, [isBusy]);
   const onFocus = useCallback((event: { readonly currentTarget: unknown }) => {
