@@ -109,6 +109,18 @@ and submits from each; a new way in gets a row and a test that submits from it.
 | Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
 | Add a computer, Connect an AI app (Settings → Devices and sessions) | Settings at phone and desktop width; each OS; revoke and disconnect with the inline confirm | `features/sessions/sessions.test.tsx`, `e2e/sessions.e2e.ts` |
 
+## The design review matrix
+
+After a design batch (and before the next one is planned) re-shoot the screenshot matrix and
+compare it with the baseline in [`context/design/baseline/`](../context/design/baseline/):
+`DESIGN_SHOTS=.cache/shots/<batch> bun test:e2e e2e/design-shots.e2e.ts` against the running
+stack (about ten minutes; add `PLAYWRIGHT_CHROMIUM_EXECUTABLE` in a sandbox). Output is
+`<dir>/<group>/<name>--<viewport>-<theme>-<lang>.png` plus `manifest-<combo>.json`; every manifest
+must list only `login-server-picker` as missed (it is Android only), any other miss is a renamed
+control and the script needs the new label. `DESIGN_SHOTS_ONLY=states` and
+`DESIGN_SHOTS_STATES=day-gap-log,day-block-edit` re-shoot part of it. Shoot into `.cache/`
+(git-ignored); only a new baseline is committed under `context/design/baseline/`.
+
 ## Limits
 
 - The LLM is the fake provider: parsing findings need a check against the real model.

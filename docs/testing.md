@@ -129,6 +129,16 @@ Tests are in `e2e/*.e2e.ts`; `e2e/support/fixtures.ts` adds `expectNoA11yViolati
 (axe, WCAG 2.2 AA, fails on serious/critical). Every page gets a scan. Failures keep a
 trace and a screenshot; CI uploads `playwright-report/`.
 
+### The design review matrix
+
+`e2e/design-shots.e2e.ts` is not a test of behaviour: it shoots every route plus the sheets,
+dialogs, pickers, toasts, empty, loading, error and offline states and a keyboard-focus pass at
+1440×900 and 390×844, light and dark, English and Russian (8 combos, Telegram ids 3300–3315).
+It is off by default (the regular run skips it); `DESIGN_SHOTS=<dir>` turns it on, and
+`DESIGN_SHOTS_ONLY=<groups>` / `DESIGN_SHOTS_STATES=<names>` narrow it. A control it cannot find
+is listed in `<dir>/manifest-<combo>.json` instead of failing the run. See
+[qa.md](qa.md#the-design-review-matrix) for when to re-shoot it.
+
 - Browser: `bunx playwright install --with-deps chromium`, or set
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium` to use an installed one (sandboxes).
 - `E2E_BASE_URL=https://pace.nalinor.dev bun test:e2e` runs the suite against a deployed
