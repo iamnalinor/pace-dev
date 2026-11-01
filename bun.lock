@@ -61,6 +61,7 @@
         "@types/bun": "catalog:",
         "@types/node": "22.20.5",
         "drizzle-kit": "0.31.11",
+        "fast-check": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
         "wrangler": "catalog:",
