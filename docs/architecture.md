@@ -102,9 +102,11 @@ every device and the server produce the same event once:
 
 `EventIdSchema` accepts a ULID or `^(?:hw|auto|rep):\S+$`; the log stores an id once
 (`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op. The sync carries ids of at
-most `EVENT_ID_MAX` (64) characters: one built longer stays on the server and a client's pull
-leaves it out, so a deterministic id never nests another id whole (the sleep stop names its
-activity by a digest).
+most `EVENT_ID_MAX` (128) characters: one built longer stays on the server and a client's pull
+leaves it out. Follow-ups nest the id they follow (`auto:<instance>:missed` of an edited series's
+`rep:<series>:<revision>:<n>` is over 70, a sleep's reopen and discard nest its stop and start),
+so `ids.test.ts` checks every builder at its longest against the limit; the sleep stop names its
+activity by a digest instead, since an activity id may be as long as any id.
 
 ### Materialization rules
 
@@ -337,25 +339,32 @@ delivery per channel and device, and arms the Durable Object alarm for the next 
 The feed and open app update through the live socket. Telegram and a configured FCM project
 can deliver outside the app; a phone with a different Firebase project uses polling.
 
-**Automatic sleep** (`user-store/sleep-pass.ts`) runs after every usage upload and at the alarm.
+**Automatic sleep** (`user-store/sleep-pass.ts`) runs after every phone's usage upload and at
+its own alarm time (a computer's uploads and other waits' alarms run no pass).
 A pass reads use on every device from 36 hours back and how far the phones have told
 (`usageForSleep`), builds the rules' input from the log with core's `sleepInputOf` (the same
 builder the rules' own tests use), decides with `decideSleep` and appends `sleepEvents` through
 the system path (device `server`, deterministic `auto:sleep-…` ids, so passes are idempotent).
 Each decision that wrote an event goes to `decisions` (kind `sleep`, rule `sleep.open` /
 `sleep.stop` / `sleep.reopen` / `sleep.discard`, inputs: the instant, the zone, `knownUntil` and
-the spells awake around it); the assistant log words them through `decision-sleep.ts`. The
+the spells awake around it); the assistant log words them through `decision-system.ts`. The
 highest `knownUntil` a pass decided with is kept (key `sleep:decided-until`) and passed back, so
 less known later undoes nothing. The stored label `"Sleep"` is the server's; every screen shows
-an automatic sleep through `shownLabel` in the reader's language. Without a phone upload within
-a day nothing is decided and nothing armed.
+an automatic sleep through `shownLabel` in the reader's language, and the Day sheet sends back
+only what the person changed (times at the minute it shows them, the label against the shown
+one), so a save never makes the worded label or an unchanged time the person's. A pass loads the
+log only when what it decides on changed since the last one (a digest of the uses, `knownUntil`,
+`decidedUntil`, the log's `seq` and the zone, key `sleep:seen`). Without a phone upload within a
+day nothing is decided and nothing armed. A failed pass after an upload is logged; the upload is
+answered and the alarm tries again.
 
 **The alarm** is one per store and shared: the pool's next pass and delivery retries, the
 assistant's queue and automatic sleep each arm it through `armEarliest` (`user-store/alarm.ts`),
 which only ever moves it earlier, so none postpones another's earlier time. `alarm()` runs the
-pool, the queue and a sleep pass (a failure in one does not hold the others back and fails the
-alarm afterwards), and each arms its next time again; the runtime takes the alarm off as it
-fires. Sleep looks again every 15 minutes from 21:00 to noon in the person's zone and at the
+pool, the queue and sleep (a failure in one does not hold the others back and fails the alarm
+afterwards), and each arms its next time again; the runtime takes the alarm off as it fires.
+Sleep keeps its own time (`sleep:next-at`): it runs a pass only once that has come, and before
+that arms it again. It looks every 15 minutes from 21:00 to noon in the person's zone and at the
 next 21:00 by day (`nextSleepCheckAt`).
 
 **The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone

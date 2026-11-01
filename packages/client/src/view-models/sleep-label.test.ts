@@ -13,7 +13,7 @@ const SLEPT_AT = "2026-10-06T10:00:00.000Z";
 const AUTO = sleepStartId("2026-10-05", SLEPT_AT);
 
 /** The server's automatic sleep, still running, in an account read in `language`. */
-const world = async (language: "en" | "ru", label = AUTO_SLEEP_LABEL) => {
+const actionsWorld = async (language: "en" | "ru", label = AUTO_SLEEP_LABEL) => {
   const sleep: Event = {
     ...at(990, SLEPT_AT, {
       payload: { activityId: AUTO, category: "sleep", label },
@@ -27,8 +27,11 @@ const world = async (language: "en" | "ru", label = AUTO_SLEEP_LABEL) => {
     payload: { language },
     type: "settings.updated",
   });
-  return (await setupActions([...artboardEvents(), settings, sleep])).state.store.getState();
+  return await setupActions([...artboardEvents(), settings, sleep]);
 };
+
+const world = async (language: "en" | "ru", label = AUTO_SLEEP_LABEL) =>
+  (await actionsWorld(language, label)).state.store.getState();
 
 /** Every place an activity's label reaches the screen, for the automatic sleep. */
 const labelsIn = async (language: "en" | "ru", label?: string) => {
@@ -63,5 +66,28 @@ describe("automatic sleep's label on screen (class 42)", () => {
 
   it("shows a name the person gave it as they typed it", async () => {
     expect((await labelsIn("ru", "Тихий час")).bar).toBe("Тихий час");
+  });
+
+  it("never writes the shown name back: a category change keeps the stored label (class 42)", async () => {
+    const { actions, state } = await actionsWorld("ru");
+    const row = dayModel(state.store.getState(), null, ctx(NOW)).entries.find(
+      (entry) => entry.kind === "activity" && entry.row.activityId === AUTO,
+    );
+    if (row?.target.kind !== "edit") {
+      throw new Error("no automatic sleep on Day");
+    }
+    // The sheet opens with «Сон»; the person changes only the category.
+    const { label, startAt } = row.target;
+    expect(label).toBe("Сон");
+    const written = await actions.saveActivity(row.target, {
+      category: "rest",
+      endAt: null,
+      label,
+      startAt,
+    });
+    expect(written.ok && written.value.map((event) => event.payload)).toEqual([
+      { activityId: AUTO, category: "rest" },
+    ]);
+    expect(state.store.getState().time.activities[AUTO]?.label).toBe(AUTO_SLEEP_LABEL);
   });
 });

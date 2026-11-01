@@ -657,4 +657,44 @@ describe("time actions", () => {
     );
     expect(noEnd).toEqual({ error: "action/invalid-input", ok: false });
   });
+
+  it("sends only what the sheet changed, read at the minute it shows (times with seconds)", async () => {
+    const world = await setupActions();
+    // Automatic sleep's times carry seconds; the sheet shows and reads them to the minute.
+    const [startAt, endAt] = [
+      `${later(-120).slice(0, 17)}37.512Z`,
+      `${later(-50).slice(0, 17)}08.004Z`,
+    ];
+    const [event] = unwrap(
+      await world.actions.saveActivity(
+        { endAt, kind: "log", startAt },
+        { category: "study", endAt, label: "Lecture", startAt },
+      ),
+    );
+    const activityId = event?.type === "activity.logged" ? event.payload.activityId : "";
+    const target = {
+      activityId,
+      category: "study",
+      endAt,
+      kind: "edit",
+      label: "Lecture",
+      startAt,
+    } as const;
+    const shown = {
+      endAt: `${endAt.slice(0, 17)}00.000Z`,
+      startAt: `${startAt.slice(0, 17)}00.000Z`,
+    };
+    const renamed = unwrap(
+      await world.actions.saveActivity(target, { ...shown, category: "work", label: "Seminar" }),
+    );
+    expect(renamed.map((item) => item.type)).toEqual(["activity.labelled"]);
+    const moved = unwrap(
+      await world.actions.saveActivity(
+        { ...target, category: "work", label: "Seminar" },
+        { ...shown, category: "work", endAt: later(-40), label: "Seminar" },
+      ),
+    );
+    expect(moved.map((item) => item.payload)).toEqual([{ activityId, endAt: later(-40) }]);
+    expect(world.state.store.getState().time.activities[activityId]?.startAt).toBe(startAt);
+  });
 });

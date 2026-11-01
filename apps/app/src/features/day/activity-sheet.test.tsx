@@ -241,15 +241,23 @@ describe("moving a block's end", () => {
   });
 });
 
-/** The Day sheet on a logged 12:00–13:00 Moscow block, and the events a save writes. */
-const editSheet = async () => {
+/**
+The Day sheet on a logged 12:00–13:00 Moscow block (times with seconds when asked, as automatic
+sleep's are), opened with `label`, and the events a save writes.
+*/
+const editSheet = async ({
+  endAt = "2026-10-06T10:00:00.000Z",
+  label = "Team chat",
+  startAt = "2026-10-06T09:00:00.000Z",
+  stored = label,
+}: {
+  startAt?: string;
+  endAt?: string;
+  label?: string;
+  stored?: string;
+} = {}) => {
   const runtime = await createTestRuntime();
-  await runtime.actions.logPast({
-    category: "work",
-    endAt: "2026-10-06T10:00:00.000Z",
-    label: "Team chat",
-    startAt: "2026-10-06T09:00:00.000Z",
-  });
+  await runtime.actions.logPast({ category: "work", endAt, label: stored, startAt });
   const [activity] = Object.values(runtime.state.store.getState().time.activities);
   const before = runtime.state.store.getState().log.length;
   const onClose = jest.fn();
@@ -259,10 +267,10 @@ const editSheet = async () => {
       target={{
         activityId: activity?.id ?? "",
         category: "work",
-        endAt: "2026-10-06T10:00:00.000Z",
+        endAt,
         kind: "edit",
-        label: "Team chat",
-        startAt: "2026-10-06T09:00:00.000Z",
+        label,
+        startAt,
       }}
       zone="Europe/Moscow"
     />,
@@ -275,7 +283,7 @@ const editSheet = async () => {
     });
     return runtime.state.store.getState().log.slice(before);
   };
-  return { activityId: activity?.id ?? "", saved };
+  return { activityId: activity?.id ?? "", runtime, saved };
 };
 
 describe("what saving an edit sends", () => {
@@ -284,6 +292,36 @@ describe("what saving an edit sends", () => {
     await fireEvent.changeText(screen.getByLabelText("What"), "Standup");
     const written = await saved();
     expect(written.map((event) => event.type)).toEqual(["activity.labelled"]);
+  });
+
+  it("sends no boundary for times with seconds the sheet shows to the minute", async () => {
+    const { saved } = await editSheet({
+      endAt: "2026-10-06T10:00:08.004Z",
+      startAt: "2026-10-06T09:00:37.512Z",
+    });
+    await fireEvent.changeText(screen.getByLabelText("What"), "Standup");
+    expect((await saved()).map((event) => event.type)).toEqual(["activity.labelled"]);
+  });
+
+  it("sends the end alone when only the end of a block with seconds moved", async () => {
+    const { activityId, saved } = await editSheet({
+      endAt: "2026-10-06T10:00:08.004Z",
+      startAt: "2026-10-06T09:00:37.512Z",
+    });
+    await fireEvent.changeText(screen.getByLabelText("To"), "1330");
+    expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
+      ["activity.adjusted", { activityId, endAt: "2026-10-06T10:30:00.000Z" }],
+    ]);
+  });
+
+  it("keeps the stored name when the sheet showed it worded and only the category changed", async () => {
+    // Automatic sleep's stored "Sleep" opens worded («Сон» for a Russian reader).
+    const { activityId, runtime, saved } = await editSheet({ label: "Сон", stored: "Sleep" });
+    await fireEvent.press(screen.getByRole("radio", { name: "Rest" }));
+    expect((await saved()).map((event) => event.payload)).toEqual([
+      { activityId, category: "rest" },
+    ]);
+    expect(runtime.state.store.getState().time.activities[activityId]?.label).toBe("Sleep");
   });
 
   it("sends the end alone when only the end moved, never the start it did not touch", async () => {

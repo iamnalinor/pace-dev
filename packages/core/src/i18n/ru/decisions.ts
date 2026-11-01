@@ -39,8 +39,9 @@ export const ruDecisions: { readonly [K in keyof typeof enDecisions]: string } =
   "decisions.deferredInbox": "Оставлено заметкой во «Входящих»",
   "decisions.notificationSent": "Уведомление отправлено",
   "decisions.notificationHeld": "Уведомление придержано",
-  "decisions.sleep.open": "Сон начался в {time} (с тех пор телефоном не пользовались)",
-  "decisions.sleep.stop": "Сон закончился в {time} (взяли телефон)",
+  "decisions.sleep.open":
+    "Сон начался в {time} (с тех пор ни телефоном, ни компьютером не пользовались)",
+  "decisions.sleep.stop": "Сон закончился в {time} (воспользовались телефоном или компьютером)",
   "decisions.sleep.reopen": "Сон продолжился: короткое пробуждение в {time}",
   "decisions.sleep.discard": "Короткий отдых в {time} не был сном",
   "decisions.request": "Вы написали: «{text}»",

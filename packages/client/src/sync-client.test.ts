@@ -133,6 +133,22 @@ describe("createSyncClient pull", () => {
     await expect(store.listPending()).resolves.toEqual([]);
   });
 
+  it("keeps a pulled event whose server-made id is longer than 64 characters", async () => {
+    // An edited series's instance is `rep:<series>:<revision>:<n>`; its missed outcome nests it.
+    const id = `auto:rep:01ARZ3NDEKTSV4RRFFQ69G5FAA:01ARZ3NDEKTSV4RRFFQ69G5FAB:12:missed`;
+    expect(id.length).toBeGreaterThan(64);
+    const { state, sync } = await setup({
+      "GET /api/sync/pull": () => ({
+        events: [{ ...settingsEvent(id, at(9), { language: "ru" }), source: "system" }],
+        more: false,
+        seq: 1,
+        storeId: STORE_ID,
+      }),
+    });
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
+    expect(state.store.getState().settings.language).toBe("ru");
+  });
+
   it("skips pulled events that fail validation and still advances", async () => {
     const { state, store, sync } = await setup({
       "GET /api/sync/pull": () => ({

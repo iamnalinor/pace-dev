@@ -43,7 +43,7 @@ import * as parseQueue from "./parse-queue.ts";
 import { NotificationPool } from "./pool-service.ts";
 import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
-import { runSleepPass } from "./sleep-pass.ts";
+import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
 import {
   applyInOrder,
   canApplyInOrder,
@@ -292,6 +292,7 @@ export class UserStore extends CloudStore {
           return made;
         },
         log: async () => await log.loadLog(this.db),
+        seq: async () => await log.latestSeq(this.db),
         logDecisions: async (entries, at) => {
           await this.logDecisions(entries, at);
         },
@@ -362,7 +363,9 @@ export class UserStore extends CloudStore {
       async () => {
         await this.drainParses(now);
       },
-      async () => await this.sleepPass(now),
+      async () => {
+        await sleepAtAlarm(this.ctx.storage, { now, pass: async () => await this.sleepPass(now) });
+      },
     ]);
   }
 

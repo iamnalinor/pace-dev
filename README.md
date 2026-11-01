@@ -319,7 +319,8 @@ the native code and runs the JS logic against mocks).
   after 45 minutes with no use on any device from 21:00 on, ends when a device is used
   again, and continues as if never stopped after a short wake in the small hours. A rest
   shorter than 3 hours is not kept as sleep. The assistant log says each step ("Sleep
-  started at 23:40 (no phone use since)"); History undoes any of them.
+  started at 23:40 (no phone or computer used since)"). History lists every step; deleting
+  the sleep, or undoing a stop there, is respected and never written again.
 - **Phone time per block**: under each block on Day, "Phone 25m: YouTube, Telegram…"
   sums foreground app time inside it. It only shows where the time went: nothing is taken
   off the block.

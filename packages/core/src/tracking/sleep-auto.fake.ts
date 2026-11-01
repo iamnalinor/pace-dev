@@ -81,7 +81,7 @@ export { sleepActivitiesOf } from "./sleep-input.ts";
 /**
 The log after appending events, as the store does: an id already in the log writes nothing.
 Each event goes through the event schema and the sync's envelope, so an id or payload the log
-would refuse, or one a client's pull would leave out (an id over 64 characters), fails here.
+would refuse, or one a client's pull would leave out (an id past `EVENT_ID_MAX`), fails here.
 */
 export const appended = (
   log: readonly Event[],

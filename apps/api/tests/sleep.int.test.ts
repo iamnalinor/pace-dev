@@ -12,6 +12,7 @@ import {
 } from "@pace/core";
 
 import { nextSleepCheckAt } from "../src/user-store/alarm.ts";
+import { SLEEP_NEXT_AT_KEY } from "../src/user-store/sleep-pass.ts";
 import { answerOf, call, json, loginAsDev, nonceLogin, pushEvents } from "./helpers.ts";
 
 const MOSCOW = "Europe/Moscow";
@@ -101,6 +102,14 @@ const sleepDecisions = async (token: string) =>
   (await answerOf(endpoints.decisions.list, "/api/decisions?limit=50", { token })).decisions
     .filter((decision) => decision.kind === "sleep")
     .toReversed();
+
+/** Sleep's next look is due now, with the alarm set to fire for it (as the runtime would). */
+const sleepDueNow = async (store: Awaited<ReturnType<typeof storeOf>>): Promise<void> => {
+  await runInDurableObject(store, async (_instance, state) => {
+    await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now() - 1000);
+    await state.storage.setAlarm(Date.now() - 1000);
+  });
+};
 
 const alarmOf = async (store: Awaited<ReturnType<typeof storeOf>>) =>
   await runInDurableObject(store, async (_instance, state) => await state.storage.getAlarm());
@@ -201,21 +210,61 @@ describe("automatic sleep on the server", () => {
 
 describe("the store's alarm for automatic sleep", () => {
   it("looks again within 15 minutes at night, at 21:00 by day, and again after each alarm", async () => {
-    // No digest windows: nothing else the store waits on, so the alarm is sleep's own.
+    // No digest windows and a night already over (nothing running long): nothing else the store
+    // waits on, so the alarm is sleep's own.
     const { phone, store } = await phoneAccount("1002", { digestWindows: [] });
     expect(await alarmOf(store)).toBeNull();
     const before = new Date().toISOString();
-    await upload(phone, [["23:10", "23:40"]], "01:00");
+    await upload(
+      phone,
+      [
+        ["23:10", "23:40"],
+        ["07:10", "07:25"],
+      ],
+      "07:25",
+    );
     const after = new Date().toISOString();
     const armed = (await alarmOf(store)) ?? 0;
     expect(armed).toBeGreaterThanOrEqual(nextSleepCheckAt(before, MOSCOW));
     expect(armed).toBeLessThanOrEqual(nextSleepCheckAt(after, MOSCOW));
-    // The alarm takes itself off as it runs; the pass arms the next look again.
+    // An alarm before sleep's time (another wait's) runs no pass and leaves sleep's time armed.
+    await runDurableObjectAlarm(store);
+    expect(await alarmOf(store)).toBe(armed);
+    // At its own time the pass runs and arms the next look.
     const fired = new Date().toISOString();
+    await sleepDueNow(store);
     await runDurableObjectAlarm(store);
     const again = (await alarmOf(store)) ?? 0;
     expect(again).toBeGreaterThanOrEqual(nextSleepCheckAt(fired, MOSCOW));
     expect(again).toBeLessThanOrEqual(nextSleepCheckAt(new Date().toISOString(), MOSCOW));
+  });
+
+  it("decides on a computer's late use at sleep's own alarm, not at its upload or another alarm", async () => {
+    const { phone, store, token } = await phoneAccount("1001", { digestWindows: [] });
+    await upload(phone, [["23:10", "23:40"]], "05:00");
+    expect((await sleepLog(token)).map((event) => event.type)).toEqual(["activity.started"]);
+    // The laptop was used 03:00–03:40: the night ended then. Its upload alone decides nothing.
+    const computer = await answerOf(endpoints.sessions.createAgent, "/api/sessions/agents", {
+      body: { name: "Linux Mint" },
+      token,
+    });
+    const sessions = [{ app: "code", endAt: at("03:40"), startAt: at("03:00") }];
+    const body = { deviceId: "laptop", deviceName: "Linux Mint", sessions };
+    expect((await call("/api/usage/sessions", { body, token: computer.token })).status).toBe(200);
+    expect(await sleepLog(token)).toHaveLength(1);
+    // The assistant's retry two minutes on fires first: still no pass.
+    const now = new Date().toISOString();
+    const retryAt = new Date(Date.parse(now) + 2 * 60_000).toISOString();
+    await store.enqueueParse({ channel: "api", retryAt, text: "купить хлеб" }, now);
+    await runDurableObjectAlarm(store);
+    expect(await sleepLog(token)).toHaveLength(1);
+    // Sleep's own alarm decides on it.
+    await sleepDueNow(store);
+    await runDurableObjectAlarm(store);
+    expect((await sleepLog(token)).map((event) => [event.type, event.occurredAt])).toEqual([
+      ["activity.started", at("23:40")],
+      ["activity.stopped", at("03:00")],
+    ]);
   });
 
   it("keeps an earlier wait of the assistant's queue: nothing moves it later", async () => {

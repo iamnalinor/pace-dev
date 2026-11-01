@@ -86,10 +86,12 @@ export type EventType = (typeof EVENT_TYPES)[number];
 const SYSTEM_ID = /^(?:hw|auto|rep):\S+$/;
 
 /**
-The longest event id the sync carries (`SyncEventSchema`): a deterministic id built longer is
-stored by the server but never reaches a client, whose pull leaves it out.
+The longest event id the sync carries (`SyncEventSchema`). Server-made ids nest the ids they follow
+up (an edited series's instance is `rep:<series>:<revision>:<n>`, its missed outcome
+`auto:<instance>:missed`, over 70), and a pull leaves out any entry past this; every id builder
+is checked against it (`ids.test.ts`). Clients mint ULIDs only.
 */
-export const EVENT_ID_MAX = 64;
+export const EVENT_ID_MAX = 128;
 
 export const EventIdSchema = z.string().refine((value) => isUlid(value) || SYSTEM_ID.test(value), {
   message: "Expected a ULID or a deterministic system id",

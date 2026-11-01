@@ -10,7 +10,7 @@ import {
 
 import type { ActivityEntry, ActivityTarget } from "./activity-edit-types.ts";
 
-import { editInputs, moveChange } from "./activity-edit-inputs.ts";
+import { editInputs, labelChange, moveChange } from "./activity-edit-inputs.ts";
 import {
   type ActionDeps,
   type ActionError,
@@ -153,7 +153,7 @@ const saveEdit = async (
     return err("event/not-found");
   }
   const moved = moveChange(target, entry);
-  const isMoved = moved.startAt !== undefined || moved.endAt !== undefined;
+  const isMoved = Object.keys(moved).length > 0;
   const moveError = isMoved
     ? movementError(deps, moved, {
         endAt: moved.endAt ?? activity.endAt,
@@ -163,29 +163,19 @@ const saveEdit = async (
   if (moveError !== null) {
     return err(moveError);
   }
-  const isRenamed = shouldRelabel(target, entry);
-  if (isRenamed && hasUnknownTask(deps, entry.taskId)) {
+  const relabel = labelChange(target, entry);
+  if (hasUnknownTask(deps, relabel.taskId)) {
     return err("task/unknown");
   }
   return await emit(
     deps,
     editInputs(deps, {
       activityId: target.activityId,
-      entry,
       moved: isMoved ? moved : null,
-      isRenamed,
+      relabel: Object.keys(relabel).length > 0 ? relabel : null,
     }),
   );
 };
-
-const shouldRelabel = (
-  target: Extract<ActivityTarget, { kind: "edit" }>,
-  entry: ActivityEntry,
-): boolean =>
-  activityLabel(entry.label) !== target.label ||
-  entry.category !== target.category ||
-  (entry.expectMinutes !== undefined && entry.expectMinutes !== (target.expectMinutes ?? null)) ||
-  (entry.taskId !== undefined && entry.taskId !== (target.taskId ?? null));
 
 const saveActivity = async (
   deps: ActionDeps,

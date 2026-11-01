@@ -4,6 +4,7 @@ import type { CalendarEvent, UsageRow } from "@pace/core";
 
 import type * as schema from "./schema.ts";
 
+import { createLogger } from "../shared/logger.ts";
 import * as cloud from "./cloud-data.ts";
 import { saveRuledSeries } from "./notification-pool.ts";
 import { PoolStore } from "./pool-store.ts";
@@ -43,12 +44,22 @@ export abstract class CloudStore extends PoolStore {
   }
 
   /**
-  A device's app sessions (names and times only), a phone's uses and how far it read; automatic
-  sleep then decides on what it now knows.
+  A device's app sessions (names and times only), a phone's uses and how far it read. After a
+  phone's upload (what bounds every decision) automatic sleep decides on what it now knows; a
+  computer's use waits for that or for sleep's own alarm, so its 5-minute uploads read no log. A
+  pass that fails is logged and left to the alarm: the upload is stored and answered all the same.
   */
   async addUsage(upload: cloud.UsageUpload, now: string): Promise<number> {
     const stored = await cloud.addUsage({ db: this.db, storage: this.ctx.storage }, upload, now);
-    await this.sleepPass(now);
+    if (upload.isPhone) {
+      try {
+        await this.sleepPass(now);
+      } catch (error) {
+        createLogger("info").error("The sleep pass after an upload failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
     return stored;
   }
 

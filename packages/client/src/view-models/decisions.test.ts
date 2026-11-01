@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Decision, Event } from "@pace/core";
-
+import { AUTO_SLEEP_LABEL, type Decision, type Event, sleepStartId } from "@pace/core";
 import { artboardState, at, BOOKS_ID } from "@pace/core/testing";
 
 import { type DecisionView, decisionViews } from "./decisions.ts";
@@ -537,14 +536,14 @@ const sleepLines = (language: "en" | "ru") =>
 describe("automatic sleep in the log", () => {
   it("words each decision with its time in the person's zone, never the rule's key", () => {
     expect(sleepLines("en")).toEqual([
-      ["Sleep started at 23:40 (no phone use since)"],
-      ["Sleep ended at 07:10 (the phone was picked up)"],
+      ["Sleep started at 23:40 (no phone or computer used since)"],
+      ["Sleep ended at 07:10 (a phone or computer was used)"],
       ["Sleep continued: a short wake at 03:00"],
       ["A short rest at 21:10 was not sleep"],
     ]);
     expect(sleepLines("ru")).toEqual([
-      ["Сон начался в 23:40 (с тех пор телефоном не пользовались)"],
-      ["Сон закончился в 07:10 (взяли телефон)"],
+      ["Сон начался в 23:40 (с тех пор ни телефоном, ни компьютером не пользовались)"],
+      ["Сон закончился в 07:10 (воспользовались телефоном или компьютером)"],
       ["Сон продолжился: короткое пробуждение в 03:00"],
       ["Короткий отдых в 21:10 не был сном"],
     ]);
@@ -557,5 +556,22 @@ describe("automatic sleep in the log", () => {
     expect(logIn("en", [newer])[0]?.lines).toEqual(["sleep.merge at 2026-10-07T20:40:00.000Z"]);
     const broken = { ...slept("sleep.open", "x"), explanation: "Sleep opened" };
     expect(logIn("en", [broken])[0]?.lines).toEqual(["Sleep opened"]);
+  });
+
+  it("names automatic sleep in a reading about it in the reader's language", () => {
+    const auto = sleepStartId("2026-10-05", "2026-10-06T07:00:00.000Z");
+    const sleep: Event = {
+      ...at(990, "2026-10-06T07:00:00.000Z", {
+        payload: { activityId: auto, category: "sleep", label: AUTO_SLEEP_LABEL },
+        type: "activity.started",
+      }),
+      id: auto,
+      source: "system",
+    };
+    const offered = parsed(
+      { steps: [{ ...NO_STEP, activityId: auto, kind: "activity.delete" }], text: "удали сон" },
+      { rule: "parse.activity.delete" },
+    );
+    expect(ru(offered, [sleep]).lines).toEqual(["Предложено удалить «Сон» из дня"]);
   });
 });

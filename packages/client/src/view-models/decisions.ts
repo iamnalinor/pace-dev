@@ -10,6 +10,7 @@ import {
   type MessageKey,
   type ParseField,
   readDecisionInputs,
+  shownLabel,
   t,
   taskById,
 } from "@pace/core";
@@ -76,12 +77,21 @@ const stepsOf = (decision: Decision, inputs: DecisionInputs): Steps => {
 const known = (steps: Steps): readonly DecisionStep[] =>
   steps.filter((step): step is DecisionStep => step !== null);
 
+/** An activity's name as the reader sees it (automatic sleep's stored label worded, class 42). */
+const activityName = (
+  activityId: null | string,
+  { language, state }: Pick<Lookup, "language" | "state">,
+): string | undefined => {
+  const activity = activityId === null ? undefined : state.time.activities[activityId];
+  return activity === undefined ? undefined : shownLabel(activity, language);
+};
+
 /** What a step is about as it was named when read (its summary quotes it), else as it is now. */
-const subjectOf = (step: DecisionStep, { state }: Lookup, summary = ""): string =>
+const subjectOf = (step: DecisionStep, lookup: Lookup, summary = ""): string =>
   step.subject ??
   quoted(summary) ??
-  (step.taskId === null ? undefined : taskById(state.tasks, step.taskId)?.title) ??
-  (step.activityId === null ? undefined : state.time.activities[step.activityId]?.label) ??
+  (step.taskId === null ? undefined : taskById(lookup.state.tasks, step.taskId)?.title) ??
+  activityName(step.activityId, lookup) ??
   "…";
 
 const fieldList = (fields: readonly ParseField[], language: Language): string =>
