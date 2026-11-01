@@ -158,14 +158,30 @@ describe("projections", () => {
     });
   });
 
-  it("writes no projection row on a cold start at the log's seq (class 55)", async () => {
-    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
-      await instance.append([taskCreated(newId()), taskCreated(newId())], { now: NOW });
+  it("writes no projection row on a cold start of a versioned build at the mark (class 55)", async () => {
+    await runInDurableObject(freshStore(), async (_instance, state) => {
+      const deployed = { ...env, PACE_VERSION: "v1.4.0" };
+      await new UserStore(state, deployed).append([taskCreated(newId()), taskCreated(newId())], {
+        now: NOW,
+      });
       const { cost } = meterSql(state.storage);
-      const cold = new UserStore(state, env);
+      const cold = new UserStore(state, deployed);
       await cold.querySql("SELECT id FROM tasks");
       expect(cost()).toMatchObject({ loads: 1, projectionRows: 0 });
       expect(await cold.db.select().from(schema.subtasks)).toHaveLength(4);
+    });
+  });
+
+  it("rewrites every row on each cold start of a build without a version (`dev`)", async () => {
+    await runInDurableObject(freshStore(), async (_instance, state) => {
+      // A self-hosted deploy without PACE_VERSION may run newer code under the same name.
+      const { PACE_VERSION: _unset, ...unnamed } = env;
+      await new UserStore(state, unnamed).append([taskCreated(newId())], { now: NOW });
+      for (const start of [1, 2]) {
+        const { cost } = meterSql(state.storage);
+        await new UserStore(state, unnamed).querySql("SELECT id FROM tasks");
+        expect({ start, rows: cost().projectionRows > 0 }).toEqual({ start, rows: true });
+      }
     });
   });
 

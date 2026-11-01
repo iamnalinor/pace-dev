@@ -30,7 +30,7 @@ import type {
 } from "../shared/contract.ts";
 import type { Cooldowns } from "../shared/llm/llm.ts";
 
-import { versionOf } from "../shared/config.ts";
+import { UNNAMED_VERSION, versionOf } from "../shared/config.ts";
 import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import { CloudStore } from "./cloud-store.ts";
@@ -74,8 +74,10 @@ export class UserStore extends CloudStore {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { casing: "snake_case", schema });
+    const version = versionOf(env.PACE_VERSION);
     this.#state = new StateCache({
-      build: `${versionOf(env.PACE_VERSION)}+${SCHEMA_TAG}`,
+      build: `${version}+${SCHEMA_TAG}`,
+      isNamed: version !== UNNAMED_VERSION,
       db: this.db,
       storage: ctx.storage,
     });

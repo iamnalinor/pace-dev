@@ -30,7 +30,7 @@ A store's materialized state, cached in memory with the log sequence it was buil
 projection rows that mirror it. An instance starts with nothing in memory (production evicts one
 idle for a minute or two, so between alarms at night and phone uploads every one starts cold): a rebuild
 loads the log, but rewrites the rows only when their mark (`ProjectionMark`) is behind the log or
-from another build, and the zone is read from that mark without loading the log at all.
+from another build, or the build has no version (`dev`), and the zone is read from that mark without loading the log at all.
 */
 export class StateCache {
   #cache: Materialized | undefined;
@@ -48,16 +48,26 @@ export class StateCache {
   /** What writes the rows: the deploy's version and the tables' newest migration. */
   readonly #build: string;
 
+  /**
+  Whether the build has a version a deploy named: one without (`dev`, as a self-hosted deploy
+  without `PACE_VERSION`) may be newer code under the same name, so its cold starts rewrite every
+  row whatever the mark says.
+  */
+  readonly #isNamed: boolean;
+
   constructor({
     build,
     db,
+    isNamed,
     storage,
   }: {
     readonly build: string;
+    readonly isNamed: boolean;
     readonly db: Db;
     readonly storage: DurableObjectStorage;
   }) {
     this.#build = build;
+    this.#isNamed = isNamed;
     this.#db = db;
     this.#storage = storage;
   }
@@ -100,7 +110,7 @@ export class StateCache {
       return this.#cache;
     }
     const rebuilt = rebuild(await this.#logAt(seq));
-    if (!isMarkedAt(await markOf(this.#storage), { build: this.#build, seq })) {
+    if (!this.#isNamed || !isMarkedAt(await markOf(this.#storage), { build: this.#build, seq })) {
       await rewriteProjections(this.#db, rebuilt.state);
       await this.#mark(rebuilt);
     }

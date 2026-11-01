@@ -187,10 +187,13 @@ const apiOriginOf = (value: string | undefined): string | undefined => {
   return origin;
 };
 
+/** The version of a build no deploy named (`PACE_VERSION` unset or blank). */
+export const UNNAMED_VERSION = "dev";
+
 /** An unset or blank version is a build no deploy named. */
 export const versionOf = (value: string | undefined): string => {
   const version = value?.trim() ?? "";
-  return version === "" ? "dev" : version;
+  return version === "" ? UNNAMED_VERSION : version;
 };
 
 /**

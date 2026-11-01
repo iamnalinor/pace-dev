@@ -27,6 +27,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+A deployed build (`PACE_VERSION` set), whose projection rows a cold start keeps when they mirror
+the log; one without a version rewrites them on every cold start.
+*/
+const deployed = { ...env, PACE_VERSION: "v-test" };
+
 const freshStore = () => env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));
 
 type Raw = Record<string, unknown>;
@@ -94,7 +100,7 @@ const dueTomorrow = (): readonly Raw[] => [
 const fireAt = async (state: DurableObjectState, at: string): Promise<void> => {
   vi.setSystemTime(new Date(at));
   await state.storage.deleteAlarm();
-  await new UserStore(state, env).alarm();
+  await new UserStore(state, deployed).alarm();
 };
 
 const digests = (state: DurableObjectState) =>
@@ -124,7 +130,7 @@ describe("a night of automatic sleep on a cold store", () => {
       A store as production runs it between alarms and uploads minutes apart: a new instance each time,
       nothing in memory, the same storage.
       */
-      const cold = (): UserStore => new UserStore(state, env);
+      const cold = (): UserStore => new UserStore(state, deployed);
       /** Fires every alarm due by `until`, as the runtime does: taken off, then run. */
       const fireDue = async (until: string): Promise<void> => {
         for (;;) {
@@ -201,7 +207,7 @@ describe("the notification pool at the store's alarm", () => {
       await instance.append(dueTomorrow(), { now: msk("08:00") });
       await instance.runNotifications(msk("08:00"));
       vi.setSystemTime(new Date(msk("09:00")));
-      const failing = new UserStore(state, env);
+      const failing = new UserStore(state, deployed);
       Object.defineProperty(failing, "derive", {
         value: async () => {
           throw new Error("the pass broke");
@@ -229,7 +235,7 @@ describe("the assistant's queue at the store's alarm", () => {
       const { cost } = meterSql(state.storage);
       vi.setSystemTime(new Date(msk("22:15")));
       await state.storage.deleteAlarm();
-      await new UserStore(state, env).alarm();
+      await new UserStore(state, deployed).alarm();
       expect(cost().loads).toBe(0);
       expect(await state.storage.getAlarm()).toBeLessThanOrEqual(Date.parse(retryAt));
     });
@@ -243,17 +249,17 @@ describe("a phone's calendar copy on a cold store", () => {
       vi.setSystemTime(new Date(now));
       await instance.append(history(3), { now });
       const events = Array.from({ length: 12 }, (_, index) => event(index));
-      await instance.syncCalendar(copy(now, events), now);
+      await new UserStore(state, deployed).syncCalendar(copy(now, events), now);
       // Fifteen minutes on, the phone sends the same calendar over a range moved with its clock.
       const later = addMinutesIso(now, 15);
       vi.setSystemTime(new Date(later));
       const same = meterSql(state.storage);
-      await new UserStore(state, env).syncCalendar(copy(later, events), later);
+      await new UserStore(state, deployed).syncCalendar(copy(later, events), later);
       expect(same.cost()).toMatchObject({ loads: 0, rowsWritten: 0 });
       // One event renamed: its row alone is written again, and the pool looks at it.
       const renamed = meterSql(state.storage);
       const changed = events.with(3, event(3, "Seminar moved"));
-      await new UserStore(state, env).syncCalendar(copy(later, changed), later);
+      await new UserStore(state, deployed).syncCalendar(copy(later, changed), later);
       expect(renamed.cost().loads).toBe(1);
       expect(renamed.cost().rowsWritten).toBeLessThanOrEqual(6);
       const titles = (

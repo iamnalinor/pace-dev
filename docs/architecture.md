@@ -350,7 +350,8 @@ alarms and uploads at night start with nothing in memory. The projection rows th
 mark (key `projections:mark`: the log `seq`, the build that wrote them, as `PACE_VERSION` plus
 the newest DO migration, and the state's zone), written after them: a cold rebuild at the marked
 `seq` and build loads the log but writes no row, and a deploy or a write cut short rewrites every
-row once. Automatic sleep reads the zone from the mark while it is current, without loading the
+row once. A build without `PACE_VERSION` (`dev`) may be newer code under the same name, so its
+every cold start rewrites every row (`docs/self-hosting.md` says to set it). Automatic sleep reads the zone from the mark while it is current, without loading the
 log. The log as last loaded is kept in step with what goes in, so a pass that reads it and then
 writes, or a write out of order, does not load it again. After every
 append (a client's sync push, an `apply`) and before every read and every `apply`,

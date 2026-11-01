@@ -66,7 +66,8 @@ server at the latest release.
      ```
      and for the web app, `EXPO_PUBLIC_API_URL=https://<your api> EXPO_PUBLIC_TELEGRAM_BOT=<bot>
      bun run --cwd apps/app build:web && bun run --cwd apps/app deploy:web`. `PACE_VERSION` is
-     what `GET /api/instance` reports (`dev` when unset).
+     what `GET /api/instance` reports (`dev` when unset). Set it on every deploy: a server
+     without it rewrites its SQL projections on every cold start (as often as every alarm).
 6. **Telegram**: in BotFather, `/setdomain` → your web origin's host, so the Login Widget may run
    there (a bot has one widget domain). The deploy workflow sets the webhook; by hand, call
    `https://api.telegram.org/bot<token>/setWebhook` with
