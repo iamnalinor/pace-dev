@@ -33,6 +33,12 @@ come, and arms it again when another wait's earlier alarm fired first.
 */
 export const SLEEP_NEXT_AT_KEY = "sleep:next-at";
 
+/**
+Storage key of the `decidedUntil` the last pass without a fresh phone ended the running sleeps at:
+the same again (an older app's uploads keep nothing fresh) reads nothing.
+*/
+const ENDED_AT_KEY = "sleep:ended-at";
+
 /** Storage key of how far the last pass's decisions hold (`Held`): a pass within it loads nothing. */
 const HELD_KEY = "sleep:held";
 
@@ -263,19 +269,20 @@ One pass of automatic sleep over the person's store at `now`: reads use from 36 
 how far the phones have told, and unless the last pass that read the log still holds (`isHeld`),
 decides on the log as it stands (`decideSleep`), appends the events through the system path and
 logs each decision that wrote one, with what it relied on. Keeps the highest `knownUntil` it
-decided with, and arms the next look. Without a phone that uploaded within a day nothing is
-decided and nothing is armed: its next upload starts again. Answers the ids written. (A use that
+decided with, and arms the next look. Without a phone that uploaded within a day, the rules' running
+sleeps end where knowledge ended (once) and nothing is armed: its next upload starts again.
+Answers the ids written. (A use that
 leaves the 36 hours is not a change: it only ever concerns a night long decided.)
 */
 export const runSleepPass = async (host: SleepHost, now: string): Promise<readonly string[]> => {
   const usesFrom = addMinutesIso(now, -USES_FOR_MINUTES);
   const { knownUntil, uses } = await host.usageForSleep(usesFrom, now);
-  if (knownUntil === null) {
-    await host.storage.delete(SLEEP_NEXT_AT_KEY);
-    return [];
-  }
   const zone = await host.zone();
   const decidedUntil = (await host.storage.get<string>(DECIDED_UNTIL_KEY)) ?? null;
+  if (knownUntil === null) {
+    await host.storage.delete(SLEEP_NEXT_AT_KEY);
+    return await endWhereKnown(host, { decidedUntil, now, uses, usesFrom, zone });
+  }
   const decidedOn = { decidedOn: laterOf(knownUntil, decidedUntil), uses, zone };
   const isSame = await isHeld(await host.storage.get<Held>(HELD_KEY), {
     ...decidedOn,
@@ -286,6 +293,36 @@ export const runSleepPass = async (host: SleepHost, now: string): Promise<readon
     : await decideAndHold(host, { decidedOn, decidedUntil, knownUntil, now, usesFrom });
   await keepDecidedUntil(host.storage, knownUntil);
   await armNextLook(host.storage, now, zone);
+  return made;
+};
+
+/**
+A pass with no phone fresh: the rules end their running sleeps where knowledge ended (see core's
+`decideSleep`), once for each `decidedUntil`. Nothing is armed: the next phone upload starts again.
+*/
+const endWhereKnown = async (
+  host: SleepHost,
+  {
+    decidedUntil,
+    now,
+    uses,
+    usesFrom,
+    zone,
+  }: {
+    decidedUntil: null | string;
+    now: string;
+    uses: readonly DeviceUse[];
+    usesFrom: string;
+    zone: string;
+  },
+): Promise<readonly string[]> => {
+  if (decidedUntil === null || decidedUntil === (await host.storage.get(ENDED_AT_KEY))) {
+    return [];
+  }
+  const log = await host.log();
+  const input = sleepInputOf(log, { decidedUntil, knownUntil: null, now, uses, usesFrom, zone });
+  const made = await decideOn(host, { input, log, now });
+  await host.storage.put(ENDED_AT_KEY, decidedUntil);
   return made;
 };
 

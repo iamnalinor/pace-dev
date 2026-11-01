@@ -259,6 +259,7 @@ const knownOf = (input: SleepInput, knownUntil: string): Known => {
   const { usesFrom } = input;
   const decidedOn = laterOf(knownUntil, input.decidedUntil ?? knownUntil);
   const unbounded: Known = {
+    endsBy: null,
     knownUntil: decidedOn,
     rests: [],
     usesFrom,
@@ -300,14 +301,28 @@ export const planOf = (input: SleepInput, knownUntil: string): SleepPlan => {
 };
 
 /**
+Once no phone has told anything for a day (`knownUntil` null), a running sleep of the rules' own
+ends where knowledge ended (`decidedUntil`), the last instant its quiet was known, and goes when
+that leaves it short; whatever the 36 hours of use still reach. A sleep of the person's is theirs.
+A phone that tells again later walks it as usual: a later first use moves the stop there.
+*/
+const endedWhereKnown = (input: SleepInput, lastKnown: string): readonly SleepDecision[] => {
+  const known: Known = { ...knownOf(input, lastKnown), endsBy: lastKnown };
+  return input.activities
+    .filter((activity) => isRulesSleep(activity) && activity.endAt === null)
+    .flatMap((sleep) => decideFor(sleep, known).decisions);
+};
+
+/**
 What automatic sleep does with what is known: walks the sleeps it follows (reopen, stop,
 discard), keeps those it owns only while deciding afresh would open the same ones, and opens
 the rest. Nothing is decided without the phones' use (`knownUntil` null), nothing from use
-after `knownUntil`, nothing before `usesFrom`.
+after `knownUntil`, nothing before `usesFrom`; once the phones have told nothing for a day, the
+rules' running sleeps end where knowledge ended (`endedWhereKnown`).
 */
 export const decideSleep = (input: SleepInput): readonly SleepDecision[] => {
   if (input.knownUntil === null) {
-    return [];
+    return input.decidedUntil === null ? [] : endedWhereKnown(input, input.decidedUntil);
   }
   const { fresh, known, others, owned, personNights } = planOf(input, input.knownUntil);
   const { mainStarts, usesFrom } = input;

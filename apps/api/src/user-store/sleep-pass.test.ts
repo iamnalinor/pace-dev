@@ -89,7 +89,7 @@ describe("one pass of automatic sleep", () => {
 /** A store's side of the pass with a log that keeps what the pass writes (`seq` moves with it). */
 const keepingHost = (
   storage: DurableObjectStorage,
-  usage: { knownUntil: string; uses: DeviceUse[] },
+  usage: { knownUntil: null | string; uses: DeviceUse[] },
 ) => {
   const calls = { logs: 0 };
   const log: Event[] = [];
@@ -177,6 +177,30 @@ describe("a pass that loads nothing it can decide nothing on", () => {
       usage.knownUntil = msk("21:30", "08");
       await runSleepPass(host, msk("21:35", "08"));
       expect(calls.logs).toBe(3);
+    });
+  });
+});
+
+describe("a pass once the phones have told nothing for a day", () => {
+  it("ends the running sleep where knowledge ended, once, and arms nothing", async () => {
+    await runInDurableObject(freshStore(), async (_instance, state) => {
+      const usage: { knownUntil: null | string; uses: DeviceUse[] } = {
+        knownUntil: msk("05:00"),
+        uses: [phoneUse("23:10", "23:40")],
+      };
+      const { calls, host, log } = keepingHost(state.storage, usage);
+      await runSleepPass(host, msk("05:05"));
+      expect(log.map((event) => event.type)).toEqual(["activity.started"]);
+      // The phone died: a day on, no phone is fresh.
+      usage.knownUntil = null;
+      const dayLater = new Date(Date.parse(msk("05:05")) + 24 * 3_600_000).toISOString();
+      expect(await runSleepPass(host, dayLater)).toHaveLength(1);
+      expect(log.at(-1)).toMatchObject({ occurredAt: msk("05:00"), type: "activity.stopped" });
+      expect(await state.storage.get(SLEEP_NEXT_AT_KEY)).toBeUndefined();
+      // An older app's uploads keep nothing fresh: the log is not read again for them.
+      const reads = calls.logs;
+      await runSleepPass(host, dayLater);
+      expect(calls.logs).toBe(reads);
     });
   });
 });

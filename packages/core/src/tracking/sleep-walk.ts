@@ -71,6 +71,11 @@ export type Known = {
   readonly zone: string;
   /** The person's Rest-class activities that have started by `now`. */
   readonly rests: readonly Rest[];
+  /**
+  Where knowledge ended for good (the phones have told nothing for a day): no sleep the rules
+  started runs past it. `null` while phones tell.
+  */
+  readonly endsBy: null | string;
 };
 
 /**
@@ -195,11 +200,15 @@ export const isClosedByStart = (
   sleep.endAt !== null && sleep.stopEventId === null && !sleep.isEndAmendedByPerson;
 
 /**
-The first instant the sleep cannot run past: a rest of the person's, or where another activity's
-start closed it (which no walk moves).
+The first instant the sleep cannot run past: a rest of the person's, where another activity's
+start closed it (which no walk moves), or for the rules' own, where knowledge ended for good.
 */
 const limitOf = (sleep: SleepActivity, known: Known): null | string =>
-  [...restLimitOf(sleep, known), ...(isClosedByStart(sleep) ? [sleep.endAt] : [])]
+  [
+    ...restLimitOf(sleep, known),
+    ...(isClosedByStart(sleep) ? [sleep.endAt] : []),
+    ...(known.endsBy !== null && isRulesStart(sleep) ? [laterOf(known.endsBy, sleep.startAt)] : []),
+  ]
     .toSorted((a, b) => a.localeCompare(b))
     .at(0) ?? null;
 

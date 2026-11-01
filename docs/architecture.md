@@ -381,8 +381,10 @@ decided for good and only new use came after what it knew. Phone uploads therefo
 few times a night, not every 15 minutes. The usage reads go through end indexes
 (`phone_uses_end_idx`, `usage_sessions_end_idx`, `calendar_events_end_idx`), so a pass, the pool's
 calendar read and the usage list read the rows of their window, never all history (nothing is
-pruned: the owner keeps the data). Without a phone upload within a day nothing is decided and
-nothing armed. A failed pass is logged and never fails what ran it: after an
+pruned: the owner keeps the data). Without a phone upload within a day nothing new is decided
+and nothing armed, but an automatic sleep still running ends where knowledge ended (the highest
+`knownUntil` decided with), and goes when that leaves it short: a dead or signed-out phone never
+leaves a sleep open for days. A phone that tells again later walks it as usual. A failed pass is logged and never fails what ran it: after an
 upload the upload is answered, at the alarm sleep looks again in 15 minutes.
 
 **The alarm** is one per store and shared: the pool's next pass and delivery retries, the

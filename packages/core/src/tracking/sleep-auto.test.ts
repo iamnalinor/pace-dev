@@ -1076,6 +1076,54 @@ describe("automatic sleep", () => {
     expect(sleepsIn(moved.log)).toEqual(sleepsIn(once.log));
   });
 
+  it("ends an automatic sleep where knowledge ended once no phone has told anything for a day", () => {
+    const uses = [use("23:10", "23:40"), use("03:00", "03:06")];
+    const opened = lastLog([], uses, ["01:00", "05:00"]);
+    expect(sleepsIn(opened)).toEqual([sleep("23:40", null)]);
+    // The phone went quiet for good after telling 05:00: a day later nothing is fresh.
+    const dayLater = at("05:30", { night: "2026-10-08" });
+    const silent: Known = { decidedUntil: at("05:00"), knownUntil: null, now: dayLater, uses };
+    const closed = step(opened, silent);
+    expect(closed.decisions).toEqual([stop("23:40", "05:00")]);
+    expect(sleepsIn(closed.log)).toEqual([sleep("23:40", "05:00")]);
+    expect(step(closed.log, silent).decisions).toEqual([]);
+    // Told only until 01:00: too short for a night's sleep, it goes.
+    const early = lastLog([], uses, ["01:00"]);
+    const short = step(early, { ...silent, decidedUntil: at("01:00") });
+    expect(short.decisions).toEqual([stop("23:40", "01:00"), discard("23:40")]);
+  });
+
+  it("leaves a sleep the person started, and one already ended, when the phones go quiet", () => {
+    const uses = [use("22:50", "23:00")];
+    const silent: Known = {
+      decidedUntil: at("05:00"),
+      knownUntil: null,
+      now: at("06:00", { night: "2026-10-08" }),
+      uses,
+    };
+    expect(step([personSleep("23:00")], silent).decisions).toEqual([]);
+    const ended = lastLog([], [use("23:10", "23:40"), use("07:10", "07:25")], ["07:30"]);
+    expect(step(ended, { ...silent, decidedUntil: at("07:30") }).decisions).toEqual([]);
+    // Nothing was ever decided: nothing to end at.
+    expect(step([], { ...silent, decidedUntil: null }).decisions).toEqual([]);
+  });
+
+  it("ends a sleep the 36 hours of use no longer reach once the phones go quiet", () => {
+    const uses = [use("23:10", "23:40")];
+    const opened = lastLog([], uses, ["01:00"]);
+    // The phone told until 13:00 the next day, then nothing: a day after that the sleep's start
+    // is out of the window the pass reads.
+    const told = at("13:00", { night: "2026-10-08" });
+    const silent: Known = {
+      decidedUntil: told,
+      knownUntil: null,
+      now: addMinutesIso(told, 24 * 60 + 10),
+      uses: [],
+      usesFrom: addMinutesIso(told, -12 * 60),
+    };
+    expect(step(opened, silent).decisions).toEqual([{ ...stop("23:40", "01:00"), at: told }]);
+  });
+
   it("does not stretch one sleep over the next day when the phone stays silent", () => {
     // Asleep at 23:40, the phone silent until 03:00 two nights later: that wake is another night's.
     const nextNight = { night: "2026-10-08" };
