@@ -1,6 +1,6 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   type DeviceUse,
@@ -12,7 +12,12 @@ import {
 
 import type { UserStore } from "./user-store.ts";
 
-import { DECIDED_UNTIL_KEY, runSleepPass, type SleepHost } from "./sleep-pass.ts";
+import {
+  DECIDED_UNTIL_KEY,
+  runSleepPass,
+  SLEEP_NEXT_AT_KEY,
+  type SleepHost,
+} from "./sleep-pass.ts";
 
 const freshStore = () => env.USER_STORE.get(env.USER_STORE.idFromName(crypto.randomUUID()));
 
@@ -194,6 +199,35 @@ describe("a usage upload", () => {
       };
       await expect(instance.addUsage(upload, NOW)).resolves.toBe(1);
       expect((await instance.usageForSleep("2099-10-07T12:00:00.000Z", NOW)).uses).toHaveLength(1);
+    });
+  });
+});
+
+describe("the store's alarm", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps its other work and sleep's next look when the sleep pass fails", async () => {
+    // Far ahead of the real clock: nothing armed here is due for the runtime (class 54).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2099-10-07T22:30:00.000Z"));
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      Object.defineProperty(instance, "sleepPass", {
+        value: async () => {
+          await Promise.reject(new Error("the pass broke"));
+        },
+      });
+      const now = new Date().toISOString();
+      // The assistant's queue has a retry due now, and sleep's look is due too.
+      await instance.enqueueParse({ channel: "api", retryAt: now, text: "купить хлеб" }, now);
+      await state.storage.put(SLEEP_NEXT_AT_KEY, Date.now());
+      await expect(instance.alarm()).resolves.toBeUndefined();
+      // Sleep looks again in 15 minutes, as after any pass at night.
+      const again = Date.now() + 15 * 60_000;
+      expect(await state.storage.get(SLEEP_NEXT_AT_KEY)).toBe(again);
+      expect(await state.storage.getAlarm()).toBeLessThanOrEqual(again);
+      expect(await state.storage.getAlarm()).not.toBeNull();
     });
   });
 });

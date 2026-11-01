@@ -21,6 +21,7 @@ import {
 import type { DecisionEntry } from "../shared/contract.ts";
 import type { SleepUsage } from "./cloud-data.ts";
 
+import { createLogger } from "../shared/logger.ts";
 import { armEarliest, nextSleepCheckAt } from "./alarm.ts";
 
 /** Storage key of the highest `knownUntil` a pass decided with: less known later undoes nothing. */
@@ -313,9 +314,14 @@ const decideAndHold = async (
   return made;
 };
 
+/** How soon sleep looks again after a pass that failed (as after any pass at night). */
+const RETRY_MINUTES = 15;
+
 /**
 Sleep's part of `alarm()`: a pass once its own time has come; before that (another wait's alarm
-fired first and took sleep's time with it) its time is armed again and nothing is read.
+fired first and took sleep's time with it) its time is armed again and nothing is read. A pass
+that fails is logged and looked at again in 15 minutes: it never fails the alarm, whose retries
+would run the pool and the queue again for it.
 */
 export const sleepAtAlarm = async (
   storage: DurableObjectStorage,
@@ -325,5 +331,18 @@ export const sleepAtAlarm = async (
   if (nextAt === undefined) {
     return;
   }
-  await (nextAt <= Date.parse(now) ? pass() : armEarliest(storage, nextAt));
+  if (nextAt > Date.parse(now)) {
+    await armEarliest(storage, nextAt);
+    return;
+  }
+  try {
+    await pass();
+  } catch (error) {
+    createLogger("info").error("The sleep pass at the alarm failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    const retryAt = Date.parse(now) + RETRY_MINUTES * 60_000;
+    await storage.put(SLEEP_NEXT_AT_KEY, retryAt);
+    await armEarliest(storage, retryAt);
+  }
 };
