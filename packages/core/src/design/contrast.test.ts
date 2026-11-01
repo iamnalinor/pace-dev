@@ -221,6 +221,7 @@ describe("composite", () => {
 
 const TARGETS: Readonly<Record<ContrastTarget, { lc: number; ratio: number }>> = {
   text: { ratio: 4.5, lc: 75 },
+  meta: { ratio: 4.5, lc: 60 },
   textSmall: { ratio: 4.5, lc: 50 },
   large: { ratio: 3, lc: 45 },
   ui: { ratio: 3, lc: 0 },

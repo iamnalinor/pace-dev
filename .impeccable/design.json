@@ -668,16 +668,16 @@
       "dark-accent-text": {
         "role": "primary",
         "displayName": "Ink Text (dark)",
-        "canonical": "oklch(78.9% 0.107 274.9)",
+        "canonical": "oklch(80.3% 0.099 275.1)",
         "tonalRamp": [
           "#090A13",
-          "#1F2339",
-          "#383F64",
-          "#535D92",
-          "#707DC1",
-          "#95A1DA",
-          "#BDC7F2",
-          "#E9EEFF"
+          "#1F2338",
+          "#393F62",
+          "#545D8F",
+          "#727DBD",
+          "#96A1D6",
+          "#BEC7EF",
+          "#EAEEFE"
         ]
       },
       "dark-accent-pressed": {
@@ -743,16 +743,16 @@
       "dark-status-warn": {
         "role": "tertiary",
         "displayName": "Burnt Orange (dark)",
-        "canonical": "oklch(78.1% 0.142 50.8)",
+        "canonical": "oklch(80.6% 0.126 52.8)",
         "tonalRamp": [
-          "#140803",
-          "#3A1C09",
-          "#653311",
-          "#934B19",
-          "#C36525",
-          "#DC9063",
-          "#F5BB99",
-          "#FEEADF"
+          "#130904",
+          "#371E0C",
+          "#613618",
+          "#8D4F24",
+          "#BB6B32",
+          "#D5946A",
+          "#F0BD9E",
+          "#FCEBE0"
         ]
       },
       "dark-status-warn-quiet": {
@@ -788,31 +788,31 @@
       "dark-status-success": {
         "role": "primary",
         "displayName": "Done Ink (dark)",
-        "canonical": "oklch(78.9% 0.107 274.9)",
+        "canonical": "oklch(80.3% 0.099 275.1)",
         "tonalRamp": [
           "#090A13",
-          "#1F2339",
-          "#383F64",
-          "#535D92",
-          "#707DC1",
-          "#95A1DA",
-          "#BDC7F2",
-          "#E9EEFF"
+          "#1F2338",
+          "#393F62",
+          "#545D8F",
+          "#727DBD",
+          "#96A1D6",
+          "#BEC7EF",
+          "#EAEEFE"
         ]
       },
       "dark-focus": {
         "role": "primary",
         "displayName": "Focus Ink (dark)",
-        "canonical": "oklch(78.9% 0.107 274.9)",
+        "canonical": "oklch(80.3% 0.099 275.1)",
         "tonalRamp": [
           "#090A13",
-          "#1F2339",
-          "#383F64",
-          "#535D92",
-          "#707DC1",
-          "#95A1DA",
-          "#BDC7F2",
-          "#E9EEFF"
+          "#1F2338",
+          "#393F62",
+          "#545D8F",
+          "#727DBD",
+          "#96A1D6",
+          "#BEC7EF",
+          "#EAEEFE"
         ]
       },
       "dark-logo": {
@@ -1868,7 +1868,7 @@
       },
       {
         "name": "focus-ring",
-        "value": "0 0 0 2px <bg>, 0 0 0 4px #2E4AD6 (dark #A6B5FF)",
+        "value": "0 0 0 2px <bg>, 0 0 0 4px #2E4AD6 (dark #ACBAFF)",
         "purpose": "Focus-visible ring: 2 px with a 2 px offset following the element's radius; Highlight in forced colours."
       }
     ],
