@@ -320,6 +320,119 @@ describe("createSyncClient store id", () => {
   });
 });
 
+/** The ids and store of every push the server got. */
+const pushesOf = (calls: ReturnType<typeof createFakeFetch>["calls"]) =>
+  calls
+    .filter((call) => call.path === "/api/sync/push")
+    .map((call) => call.body as { events: readonly Event[]; storeId: string })
+    .map(({ events, storeId }) => ({ ids: events.map((event) => event.id), storeId }));
+
+describe("createSyncClient: a write while the first pull is under way (QA round 17 decision 3)", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+  const later = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAB", at(9, 1), { language: "ru" });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** The app's change written while a pull is held: a time-zone pick, on the empty copy. */
+  const writeDuring = async (state: AppStateHandle): Promise<string> => {
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: { timezone: "Europe/Berlin" },
+      type: "settings.updated",
+    });
+    return state.store.getState().events.at(-1)?.id ?? "";
+  };
+
+  it("keeps a write made while the first pull is held and pushes it after, naming the confirmed store", async () => {
+    const held = Promise.withResolvers<null>();
+    const { calls, state, store, sync } = await setup({
+      "GET /api/sync/pull": async ({ url }) => {
+        if (url.searchParams.get("since") === "0") {
+          await held.promise;
+          return { events: [remote], more: false, seq: 1, storeId: STORE_ID };
+        }
+        return { ...EMPTY_PAGE, seq: 2 };
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    await expect(store.getStoreId()).resolves.toBeNull();
+    const run = sync.syncNow();
+    const written = await writeDuring(state);
+    held.resolve(null);
+
+    await expect(run).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 1 } });
+    expect(pushesOf(calls)).toEqual([{ ids: [written], storeId: STORE_ID }]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(state.store.getState().events.map((event) => event.id)).toEqual(
+      expect.arrayContaining([remote.id, written]),
+    );
+  });
+
+  it("keeps it too when the sync timeout cuts the first pull midway, and the next run carries on", async () => {
+    vi.useFakeTimers();
+    let isCut = true;
+    const sinces: (null | string)[] = [];
+    const fake = createFakeFetch({
+      "GET /api/sync/pull": async ({ url }) => {
+        const since = url.searchParams.get("since");
+        sinces.push(since);
+        if (since === "0") {
+          return { events: [remote], more: true, seq: 1, storeId: STORE_ID };
+        }
+        if (since === "1" && isCut) {
+          // The second page never comes: the connection stalls until the run gives up.
+          await new Promise(() => undefined);
+        }
+        return since === "1"
+          ? { events: [later], more: false, seq: 2, storeId: STORE_ID }
+          : { ...EMPTY_PAGE, seq: 3 };
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // As a platform fetch does, an abort rejects the request however far it got.
+      fetch: async (input, init) =>
+        await Promise.race([
+          fake.fetch(input, init),
+          new Promise<never>((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }),
+        ]),
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+
+    const first = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const written = await writeDuring(state);
+    await vi.advanceTimersByTimeAsync(HTTP_SYNC_TIMEOUT_MS);
+    await expect(first).resolves.toEqual({ error: "sync request timed out", ok: false });
+    expect(pushesOf(fake.calls)).toEqual([]);
+    // The first page was kept: its store is confirmed and the cursor stands after it.
+    await expect(store.getStoreId()).resolves.toBe(STORE_ID);
+    await expect(store.getCursor()).resolves.toBe(1);
+    await expect(store.listPending()).resolves.toHaveLength(1);
+
+    isCut = false;
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 1 } });
+    // Carried on from the first page's cursor: nothing pulled twice, nothing dropped.
+    expect(sinces).toEqual(["0", "1", "1", "2"]);
+    expect(pushesOf(fake.calls)).toEqual([{ ids: [written], storeId: STORE_ID }]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(state.store.getState().events.map((event) => event.id)).toEqual(
+      expect.arrayContaining([remote.id, later.id, written]),
+    );
+  });
+});
+
 describe("createSyncClient after an update that reads more of the log", () => {
   const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
   // Older clients refused ids past 64 characters and moved their cursor past such events.
