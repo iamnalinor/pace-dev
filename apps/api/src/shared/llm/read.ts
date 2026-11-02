@@ -18,8 +18,19 @@ import {
   withSummary,
 } from "@pace/core";
 
+import type { HealthMemory } from "./health-store.ts";
+
 import { type Cooldowns, type LlmError, type ParseProvider, runParse } from "./llm.ts";
 import { buildParsePrompt } from "./prompt.ts";
+
+/**
+What every read asks with: the configured providers and the health memory all users share, kept
+together so no caller reads without the memory (the app's parse, the bot, the deferred queue).
+*/
+export type Models = {
+  readonly providers: readonly ParseProvider[];
+  readonly health: HealthMemory;
+};
 
 /** What a message is about and what to do with it, each action with its summary. */
 export type Reading = {
@@ -59,7 +70,7 @@ activities under aliases, the answer is mapped back through them and checked aga
 and each action gets its summary. Nothing is written.
 */
 export const readMessage = async (
-  providers: readonly ParseProvider[],
+  models: Models,
   text: string,
   options: World & {
     readonly domain: RequestDomain;
@@ -81,8 +92,9 @@ export const readMessage = async (
     state,
     ...(options.thread !== undefined && { thread: options.thread }),
   });
-  const answer = await runParse(providers, prompt, {
+  const answer = await runParse(models.providers, prompt, {
     cooldowns,
+    health: models.health,
     ...(options.deadlineMs !== undefined && { deadlineMs: options.deadlineMs }),
     ...(options.clock !== undefined && { now: options.clock }),
   });

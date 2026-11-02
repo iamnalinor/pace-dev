@@ -14,6 +14,7 @@ import type { Config } from "../shared/config.ts";
 
 import { requireUser } from "../shared/current-user.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
+import { llmHealthOf } from "../shared/llm/health-store.ts";
 import { availability, type ParseProvider } from "../shared/llm/llm.ts";
 import { readByRules, readMessage } from "../shared/llm/read.ts";
 import { mount } from "../shared/mount.ts";
@@ -69,7 +70,8 @@ export const mountParseRoutes = (
     const now = new Date().toISOString();
     const store = storeOf(c);
     const { state } = await store.read(now);
-    const read = await readMessage(providersOf(c.get("config")), body.text, {
+    const models = { health: llmHealthOf(c.env), providers: providersOf(c.get("config")) };
+    const read = await readMessage(models, body.text, {
       cooldowns: await store.llmCooldowns(now),
       // A person waits on a spinner: past this the rules answer instead.
       deadlineMs: APP_READ_DEADLINE_MS,

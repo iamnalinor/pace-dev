@@ -14,6 +14,8 @@ export type RaceOptions<F> = {
   readonly onFailure: (index: number, failure: F) => void;
   /** The whole race ends lost after this long (a webhook must answer in time); none by default. */
   readonly deadlineMs?: number;
+  /** Positions of probes: the attempt after one starts alongside it at once, not after the hedge. */
+  readonly probes?: ReadonlySet<number>;
 };
 
 /** Why a race was lost: every attempt failed, or the deadline came first. */
@@ -92,10 +94,12 @@ class HedgedRace<T, F> {
 
   /** The hedge (start the next one) and give-up (cancel this one) timers, and their stops. */
   private startTimers(
+    index: number,
     controller: AbortController,
     link: Link,
   ): { readonly stopHedge: () => void; readonly stopAll: () => void } {
-    const hedge = setTimeout(link.handOff, this.options.hedgeAfterMs);
+    const isProbe = this.options.probes?.has(index) === true;
+    const hedge = setTimeout(link.handOff, isProbe ? 0 : this.options.hedgeAfterMs);
     const giveUp = setTimeout(() => {
       controller.abort(new Error(`no answer in ${String(this.options.giveUpAfterMs)} ms`));
     }, this.options.giveUpAfterMs);
@@ -137,7 +141,7 @@ class HedgedRace<T, F> {
       },
       isHandedOff: false,
     };
-    const timers = this.startTimers(controller, link);
+    const timers = this.startTimers(index, controller, link);
     const run = async (): Promise<void> => {
       // The first token stops the hedge only; the give-up timer still bounds the whole answer.
       // An attempt should return its failure; one that throws still counts as failed.
@@ -157,7 +161,8 @@ class HedgedRace<T, F> {
 
 /**
 A hedged race: the first attempt starts; when one fails, or has not started answering within
-`hedgeAfterMs`, the next starts alongside it, and so on down the list. The first success wins
+`hedgeAfterMs` (a probe: at once), the next starts alongside it, and so on down the list. The
+first success wins
 and cancels the rest; lost when every attempt failed or `deadlineMs` passed first.
 */
 export const hedgedRace = async <T, F>(

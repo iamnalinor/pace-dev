@@ -2,24 +2,28 @@ import type { z } from "zod";
 
 import {
   type generateText,
-  jsonSchema,
-  type JSONSchema7,
   type LanguageModel,
   NoObjectGeneratedError,
   Output,
-  type Schema,
   streamText,
-  zodSchema,
 } from "ai";
 
 import { err, type ModelOutput, ModelOutputSchema, ok, type Result } from "@pace/core";
 
+import type { HealthMemory } from "./health-store.ts";
 import type { ParsePrompt } from "./prompt.ts";
 
 import { createLogger } from "../logger.ts";
-import { isSchemaRefusal, messageOf, refusedAnswers, retryAtOf } from "./failure.ts";
+import { type AnswerCheck, answerCheck, parsedJson } from "./answer-check.ts";
+import {
+  isSchemaRefusal,
+  messageOf,
+  refusedAnswers,
+  retryAtOf,
+  unwellReasonOf,
+} from "./failure.ts";
+import { type Health, orderByHealth, type Verdict } from "./health.ts";
 import { hedgedRace, type Lost, type Won } from "./race.ts";
-import { clampToJsonSchema, fillAbsent, lenientJsonSchema } from "./schema-fit.ts";
 
 const log = createLogger("info");
 
@@ -52,6 +56,8 @@ export type ParseAnswer = Answer<ModelOutput>;
 
 type RunOptions = {
   readonly cooldowns?: Cooldowns;
+  /** The providers' health every user shares: who to ask last, and where this call's outcomes go. */
+  readonly health?: HealthMemory;
   readonly now?: () => number;
   /** How long a provider may stay silent (no first token) before the next one is asked too. */
   readonly hedgeAfterMs?: number;
@@ -87,41 +93,6 @@ export const availability = (
   return { available: isAvailable, retryAt: isAvailable ? null : (cooling.at(0) ?? null) };
 };
 
-/**
-What a model's answer must pass, the one check for every way an answer arrives (the stream, or an
-endpoint's refusal that carries it): the keys left out filled as "does not apply", the values
-clamped to the limits, then all of `schema`.
-*/
-type AnswerCheck<T> = {
-  /** What the model is shown: the schema without length limits, its answer checked by `check`. */
-  readonly shown: Schema<T>;
-  readonly check: (value: unknown) => Promise<z.ZodSafeParseResult<T>>;
-};
-
-const answerCheck = <T>(schema: z.ZodType<T>): AnswerCheck<T> => {
-  const strict = zodSchema(schema).jsonSchema;
-  const check = async (value: unknown): Promise<z.ZodSafeParseResult<T>> => {
-    const filled = fillAbsent(value, await strict);
-    const clamped = clampToJsonSchema(filled, await strict);
-    if (JSON.stringify(filled) !== JSON.stringify(value)) {
-      log.info("llm: keys the answer left out read as empty");
-    }
-    if (JSON.stringify(clamped) !== JSON.stringify(filled)) {
-      log.info("llm: answer cut to the schema's limits");
-    }
-    return schema.safeParse(clamped);
-  };
-  const shown = jsonSchema<T>(async () => lenientJsonSchema(await strict) as JSONSchema7, {
-    validate: async (value) => {
-      const parsed = await check(value);
-      return parsed.success
-        ? { success: true, value: parsed.data }
-        : { error: parsed.error, success: false };
-    },
-  });
-  return { check, shown };
-};
-
 /** Stream parts that mean the model has started answering. */
 const FIRST_TOKEN_PARTS: ReadonlySet<string> = new Set([
   "reasoning-delta",
@@ -130,16 +101,14 @@ const FIRST_TOKEN_PARTS: ReadonlySet<string> = new Set([
 ]);
 
 type Failure =
-  | { readonly kind: "failed"; readonly retryAt: null | string; readonly message: string }
+  | {
+      readonly kind: "failed";
+      readonly retryAt: null | string;
+      readonly message: string;
+      /** Why the provider could not serve anyone (`unwellReasonOf`); `null` for this request only. */
+      readonly unwell: null | string;
+    }
   | { readonly kind: "invalid"; readonly message: string };
-
-const parsedJson = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
 
 /**
 A failed call as the race sees it. An endpoint that refused its own model's answer on its schema
@@ -154,7 +123,12 @@ const failedAnswer = async <T>(
     return err({ kind: "invalid", message: messageOf(error) });
   }
   if (!isSchemaRefusal(error)) {
-    return err({ kind: "failed", message: messageOf(error), retryAt: retryAtOf(error, now()) });
+    return err({
+      kind: "failed",
+      message: messageOf(error),
+      retryAt: retryAtOf(error, now()),
+      unwell: unwellReasonOf(error),
+    });
   }
   for (const text of refusedAnswers(error, streamed)) {
     const parsed = await check.check(parsedJson(text));
@@ -214,16 +188,35 @@ const askOne = async <T>(args: AskArgs<T>): Promise<Result<T, Failure>> => {
 
 /** What a read ran into: the providers it may ask, the limits met, the soonest one back. */
 class ReadOutcome {
+  /** Each position asked: when (the isolate's clock) and whether it has started answering. */
+  private readonly asked = new Map<number, { readonly at: number; hasSpoken: boolean }>();
+  /** The positions that failed, with what each failure showed about the provider's health. */
+  private readonly failed = new Map<number, null | string>();
+  /** The providers not resting, in the order to ask them (`orderByHealth`). */
   readonly ready: readonly ParseProvider[];
+  /** Positions in `ready` of probes: providers back from a penalty, asked with the next at once. */
+  readonly probes: ReadonlySet<number>;
   readonly limited: Record<string, string> = {};
   retryAt: null | string = null;
   /** Every failure so far was an answer out of shape (and no provider was resting). */
   isEveryAnswerInvalid: boolean;
 
   /** The providers not resting at `now`; the resting ones only say when they are back. */
-  constructor(providers: readonly ParseProvider[], cooldowns: Cooldowns, now: string) {
+  constructor(
+    providers: readonly ParseProvider[],
+    world: { readonly cooldowns: Cooldowns; readonly health: Health; readonly now: string },
+  ) {
+    const { cooldowns, health, now } = world;
     const isResting = (provider: ParseProvider): boolean => (cooldowns[provider.name] ?? "") > now;
-    this.ready = providers.filter((provider) => !isResting(provider));
+    const order = orderByHealth(
+      providers.filter((provider) => !isResting(provider)),
+      health,
+      now,
+    );
+    this.ready = order.ordered;
+    this.probes = new Set(
+      this.ready.keys().filter((index) => order.probes.has(this.ready[index]?.name ?? "")),
+    );
     for (const provider of providers) {
       if (isResting(provider)) {
         this.retryAt = earliest(this.retryAt, cooldowns[provider.name] ?? null);
@@ -233,10 +226,20 @@ class ReadOutcome {
     this.isEveryAnswerInvalid = this.ready.length === providers.length && this.ready.length > 0;
   }
 
-  /** A failed provider: logged, and a rate limit remembered with when it is back. */
+  /** The provider at `index` is asked now; the returned call marks its first token. */
+  start(index: number): () => void {
+    const attempt = { at: Date.now(), hasSpoken: false };
+    this.asked.set(index, attempt);
+    return () => {
+      attempt.hasSpoken = true;
+    };
+  }
+
+  /** A failed provider: logged, a rate limit remembered with when it is back, an outage noted. */
   noteFailure(index: number, failure: Failure): void {
     const name = this.ready[index]?.name ?? "?";
     log.warn("llm: provider failed", { kind: failure.kind, provider: name, why: failure.message });
+    this.failed.set(index, failure.kind === "failed" ? failure.unwell : null);
     if (failure.kind !== "failed") {
       return;
     }
@@ -247,6 +250,27 @@ class ReadOutcome {
 
     this.limited[name] = failure.retryAt;
     this.retryAt = earliest(this.retryAt, failure.retryAt);
+  }
+
+  /**
+  What the race showed about each provider asked: the winner answered; a failure said it is
+  unwell; one still silent past `hedgeAfterMs` when the race ended was slow. The rest (an answer
+  out of shape, a rate limit, one asked too late to judge) say nothing.
+  */
+  verdicts(won: Result<Won<unknown>, Lost>, hedgeAfterMs: number): readonly Verdict[] {
+    const ended = Date.now();
+    return [...this.asked].flatMap(([index, attempt]): Verdict[] => {
+      const provider = this.ready[index]?.name ?? "?";
+      if (won.ok && won.value.index === index) {
+        return [{ outcome: "ok", provider, why: "" }];
+      }
+      if (this.failed.has(index)) {
+        const unwell = this.failed.get(index) ?? null;
+        return unwell === null ? [] : [{ outcome: "unwell", provider, why: unwell }];
+      }
+      const isSilent = !attempt.hasSpoken && ended - attempt.at >= hedgeAfterMs;
+      return isSilent ? [{ outcome: "slow", provider, why: "slow" }] : [];
+    });
   }
 
   /** The race's result as the read's answer. */
@@ -265,33 +289,47 @@ class ReadOutcome {
 Asks the providers for an answer of `schema`'s shape, in priority order but hedged: the next
 provider is asked as well when the current one fails, or has not started answering (first
 token) within `hedgeAfterMs`; the first valid answer wins and the others are cancelled.
-A provider known to be rate limited (`cooldowns`) is skipped until its time. When every one
-fails, the error says when the soonest will be back. Both outcomes report the limits this call
-ran into, for the caller to remember.
+A provider known to be rate limited (`cooldowns`) is skipped until its time. One the shared
+`health` memory has under penalty is asked last, and what this call showed about each provider
+is told back to it. When every one fails, the error says when the soonest will be back. Both
+outcomes report the limits this call ran into, for the caller to remember.
 */
 export const runStructured = async <T>(
   providers: readonly ParseProvider[],
   prompt: ParsePrompt,
   options: RunOptions & { readonly schema: z.ZodType<T> },
 ): Promise<Result<Answer<T>, LlmError>> => {
-  const { cooldowns = {}, now = Date.now, schema } = options;
-  const outcome = new ReadOutcome(providers, cooldowns, new Date(now()).toISOString());
+  const { cooldowns = {}, health, hedgeAfterMs = HEDGE_AFTER_MS, now = Date.now, schema } = options;
+  const at = new Date(now()).toISOString();
+  const outcome = new ReadOutcome(providers, {
+    cooldowns,
+    health: health === undefined ? {} : await health.read(),
+    now: at,
+  });
   const check = answerCheck(schema);
   const won = await hedgedRace(
     outcome.ready.map(
-      (provider) =>
-        async ({ onFirstToken, signal }: { onFirstToken: () => void; signal: AbortSignal }) =>
-          await askOne({ check, now, onFirstToken, prompt, provider, signal }),
+      (provider, index) =>
+        async ({ onFirstToken, signal }: { onFirstToken: () => void; signal: AbortSignal }) => {
+          const spoke = outcome.start(index);
+          const firstToken = (): void => {
+            spoke();
+            onFirstToken();
+          };
+          return await askOne({ check, now, onFirstToken: firstToken, prompt, provider, signal });
+        },
     ),
     {
       giveUpAfterMs: GIVE_UP_AFTER_MS,
-      hedgeAfterMs: HEDGE_AFTER_MS,
       ...options,
+      hedgeAfterMs,
       onFailure: (index, failure: Failure) => {
         outcome.noteFailure(index, failure);
       },
+      probes: outcome.probes,
     },
   );
+  await health?.record(outcome.verdicts(won, hedgeAfterMs), at);
   return outcome.answerOf(won);
 };
 

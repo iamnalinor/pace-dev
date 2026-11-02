@@ -1,6 +1,7 @@
 /**
 What a provider's failed call says, sorted once for everything that acts on it: the race (try the
-next one), the rate limits (rest it) and the log.
+next one), the rate limits (rest it for this person), the health memory every user shares (ask it
+last for a while) and the log.
 */
 
 const DEFAULT_RETRY_MS = 60_000;
@@ -93,3 +94,25 @@ export const refusedAnswers = (error: unknown, streamed: string): readonly strin
   [bodyErrorOf(error)["failed_generation"], fieldsOf(error)["failed_generation"], streamed].filter(
     (text): text is string => typeof text === "string" && text.trim() !== "",
   );
+
+/** Statuses that say the provider cannot serve anyone now: a model it no longer has, a timeout. */
+const UNWELL_STATUSES: ReadonlySet<number> = new Set([404, 408, 410]);
+
+/**
+What a failed call (not an answer out of shape) says about the provider, for the health memory
+every user shares: the short reason when the provider could not serve anyone (a 5xx, 404, 408 or
+410, a timeout, a dropped connection), `null` when the failure is about this request, this key
+or this answer: a 400 or 422 over the request, a schema refusal, a rate limit or a refused key,
+which rest the provider for this person already. The reason holds no secret: a status, or the
+start of the error's own message.
+*/
+export const unwellReasonOf = (error: unknown): null | string => {
+  if (isSchemaRefusal(error)) {
+    return null;
+  }
+  const status = statusOf(error);
+  if (status === null) {
+    return textOf(error).slice(0, 80);
+  }
+  return status >= 500 || UNWELL_STATUSES.has(status) ? String(status) : null;
+};

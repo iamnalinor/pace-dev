@@ -31,6 +31,7 @@ import type {
 import type { Cooldowns } from "../shared/llm/llm.ts";
 
 import { UNNAMED_VERSION, versionOf } from "../shared/config.ts";
+import { llmHealthOf } from "../shared/llm/health-store.ts";
 import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
 import { CloudStore } from "./cloud-store.ts";
@@ -381,7 +382,13 @@ export class UserStore extends CloudStore {
   can undo it) or the text goes to the Inbox; one still out of reach waits for the next try.
   */
   async drainParses(now: string): Promise<void> {
-    await parseQueue.drainQueue({ env: this.env, now, storage: this.ctx.storage, store: this });
+    await parseQueue.drainQueue({
+      env: this.env,
+      health: llmHealthOf(this.env),
+      now,
+      storage: this.ctx.storage,
+      store: this,
+    });
   }
 
   /**
