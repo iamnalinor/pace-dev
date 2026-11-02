@@ -89,7 +89,6 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "presets.archivedBadge": "Удалён",
   "presets.notFound": "Такого пресета нет.",
   "presets.name": "Название",
-  "presets.id": "Идентификатор",
   "presets.extends": "Наследует",
   "presets.nameRequired": "Дайте пресету название.",
   "presets.archive": "Удалить пресет",

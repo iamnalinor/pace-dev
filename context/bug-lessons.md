@@ -653,6 +653,28 @@ The same rule applies when a previously successful channel is no longer configur
   said it, and once said it is read as said, refused in the usual words if it cannot be. Test the
   answer the guess never gives (Friday for a weekend block), not only the guesses.
 
+### 81. A key the system needs asked of the person
+- **Bug.** QA round 18 L4: New preset showed a bare "Id" field next to Name (filled from the name
+  in Latin letters only, so a Russian name left it empty and Save failed with "bad id"), and the
+  form opened with nothing focused.
+- **Missed because.** The form test typed an English name and read the id back; it asserted the
+  field existed. Nobody typed a Russian name, and nobody asked why a person should see it.
+- **Rule.** Ids, slugs and keys are made by the system (`freePresetId`: from the name, Russian
+  spelt in Latin letters, numbered past a taken or reserved one) and never shown as a field; a form
+  for a new thing puts the cursor in its first field where there is a keyboard (class 71). Test
+  with a name in the owner's language and a second thing of the same name.
+
+### 82. A name taken from the kind of screen where the thing it shows is known
+- **Bug.** QA round 18 L8: every `/task/<id>` tab was "Task · Pace", every project "Projects ·
+  Pace", the new preset form "Presets · Pace": a browser history and the PWA switcher listed eight
+  identical rows.
+- **Missed because.** The title was a pure function of the route's first segment, and its test
+  checked one title per route kind.
+- **Rule.** A label for one thing (a tab title, a notification, a share sheet, a back button's
+  name) says that thing in the person's own words, never translated (`subjectName`), and falls
+  back to the kind only while it cannot be found. Test it with a thing whose name is a word of the
+  catalog ("Settings") and one in another script.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -902,3 +924,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 19 L7: Presets' "Start from" row drew Homework as chosen before anything was: the actions were radio chips with a remembered value ("hw") | 72 (a control's look says what it does: actions drawn as a choice, one of them as already made) | yes: the other chip rows are real choices with a value the form keeps (project filter, the close sheet's times and precision, give-up outcomes, the preset form's fields); "Start from" was the only row of actions | `ActionChip` (a button in the unselected look); the presets test finds no radio in the row and opens the new preset from a button |
 | 2026-11-02 | Found by this round's full e2e run (and reproduced 4 of 4 on the base commit 8e84369 here, so not new): the route sweep failed "/no-such-page: sidebar missing" (once also /decisions): after a reload the first-sync cover hides the app while the device's copy is read, and the sweep's "text stopped changing" poll could settle on the cover's own words and count no sidebar | 20 (a test judges the screen before what it waits for has reached it: here the cover, which is stable text too) | yes: the tooltip sweep, the other one that reloads route after route, already waits for every progressbar to go before it looks; the overlay sweep loads once and moves in the app | the sweep waits for the cover's progressbar to go before it settles; 12/12 runs of both sweeps on this round's build, 4/4 desktop on the base build |
 | 2026-11-02 | Round 6 (owner, QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00 could not be cut back to Friday from the Day sheet; the end field read a clock only and the day was guessed near the old end | 80 (new) | yes: the other typed times carry their day (the close sheet's and the date field's typed date and time) or are a time of day by nature (presets' deadline and recurrence, quiet hours); the Day sheet was the only clock read on a guessed day | `fromDay`/`toDay` in `ActivityForm` and a day row for each time in the sheet (`day-choices.tsx`: shown for a block across days, behind "Other days" otherwise); `readDraft` tests (Friday 23:00 saved, red before; Friday 19:00 and a day before the start refused as `day.badRange`; a start on its chosen day; a new block's chosen end never read past midnight) and sheet tests (cut back to Friday, start moved to Saturday, a one-day block's next day) |
+| 2026-11-02 | QA round 18 L4: New preset asked for a bare "Id" (empty for a Russian name, so Save failed) and opened with nothing focused | 81 (new) | yes: the other forms that create things (task, project, activity) make their ids with `newId()` and show none; the preset form was the only one with a typed key | `freePresetId` (the name's slug, Russian spelt in Latin letters, accents dropped, numbered past a taken, archived, default or reserved `new` id; client tests); the Id field and its catalog key gone; Name focused on a new preset where there is a keyboard; app tests: no Id field, Name focused, a Russian name saved as `algebra`, a second one as `algebra-2` (both red before) |
+| 2026-11-02 | QA round 18 L8: every task, project and the new preset form had the kind's name as the tab title ("Task · Pace" eight times in the history) | 82 (new) | yes: the pushed screens' own headers already name the thing (task title, project name, preset label); the document title was the only label taken from the route's kind | `routeSubject` + `subjectName` (task title and project name verbatim, a default preset in the reader's language), `documentTitle` names the thing and says "New preset" for `/presets/new`, the kind only while the thing cannot be found; route-title tests including a task called "Settings" and a Russian preset name (red before) |

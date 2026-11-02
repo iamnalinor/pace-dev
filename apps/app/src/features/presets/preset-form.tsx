@@ -7,7 +7,8 @@ import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { definitionIssues, inheritedOf, type PresetDraft, slugify } from "@pace/client";
+import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
+import { definitionIssues, freePresetId, inheritedOf, type PresetDraft } from "@pace/client";
 import { byPresetOrder, presetById, presetLabel, resolvePreset } from "@pace/core";
 
 import { ChoiceChips } from "./choice-chips.tsx";
@@ -16,7 +17,11 @@ import { PresetSections } from "./preset-sections.tsx";
 
 const NO_ISSUES: ReadonlySet<string> = new Set();
 
-/** Name, id (typed once, for a new preset) and the parent; a default preset has no parent. */
+/**
+Name and the parent; a default preset has no parent. The id is never typed: a new preset gets one
+from its name when saved (QA round 18 L4), and a new one opens with the cursor in Name where
+there is a keyboard to type with (bug class 71).
+*/
 const Identity = ({
   draft,
   isNew,
@@ -28,7 +33,6 @@ const Identity = ({
 }) => {
   const t = useT();
   const language = useLanguage();
-  const [isIdTouched, setIsIdTouched] = useState(false);
   const presets = useAppState((state) => state.presets);
   const parents = Object.values(presets.byId)
     .filter(
@@ -42,23 +46,13 @@ const Identity = ({
   return (
     <View className="mx-4 gap-3 rounded-xl border border-line bg-surface p-3.5">
       <TextField
+        autoFocus={isNew && !IS_TOUCH_BROWSER}
         label={t("presets.name")}
         onChangeText={(name) => {
-          onDraft({ ...draft, name, ...(isNew && !isIdTouched && { id: slugify(name) }) });
+          onDraft({ ...draft, name });
         }}
         value={draft.name}
       />
-      {isNew ? (
-        <TextField
-          autoCapitalize="none"
-          label={t("presets.id")}
-          onChangeText={(id) => {
-            setIsIdTouched(true);
-            onDraft({ ...draft, id });
-          }}
-          value={draft.id}
-        />
-      ) : null}
       {parent === null ? null : (
         <View className="gap-1.5">
           <Text className="font-sans text-[12px] text-muted">{t("presets.extends")}</Text>
@@ -172,7 +166,8 @@ export const PresetForm = ({
       setProblem(t("presets.nameRequired"));
       return;
     }
-    const input = { ...draft, id: draft.id.trim(), name: draft.name.trim() };
+    const name = draft.name.trim();
+    const input = { ...draft, id: isNew ? freePresetId(presets, name) : draft.id, name };
     const result = isNew ? await actions.createPreset(input) : await actions.updatePreset(input);
     setIssues(
       !result.ok && result.error === "preset/invalid-definition"

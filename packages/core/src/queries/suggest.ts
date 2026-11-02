@@ -69,7 +69,8 @@ const CYRILLIC: Readonly<Record<string, string>> = {
 
 const normalize = (text: string): string => text.toLowerCase().replaceAll("ё", "е");
 
-const fold = (word: string): string =>
+/** Lowercase, with Russian letters spelt in Latin ones (`Алгебра` → `algebra`). */
+export const foldToLatin = (word: string): string =>
   normalize(word).replaceAll(/\p{Script=Cyrillic}/gu, (char) => CYRILLIC[char] ?? char);
 
 const tokensOf = (text: string): readonly string[] =>
@@ -93,8 +94,8 @@ Two words are the same when one starts with the other and the shared part is lon
 or when only a short ending differs ("алгебре", "algebra").
 */
 const isSameWord = (token: string, word: string): boolean => {
-  const a = fold(token);
-  const b = fold(word);
+  const a = foldToLatin(token);
+  const b = foldToLatin(word);
   const isLongEnough = Math.min(a.length, b.length) >= STEM_LENGTH;
   const sharedNeeded = Math.max(STEM_LENGTH + 1, Math.max(a.length, b.length) - ENDING_SLACK);
   return isLongEnough && (a.startsWith(b) || b.startsWith(a) || commonPrefix(a, b) >= sharedNeeded);

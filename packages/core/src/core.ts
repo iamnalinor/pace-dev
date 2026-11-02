@@ -236,7 +236,7 @@ export {
   type ProjectView,
   projectView,
 } from "./queries/project-view.ts";
-export { suggestFor, type Suggestion } from "./queries/suggest.ts";
+export { foldToLatin, suggestFor, type Suggestion } from "./queries/suggest.ts";
 export {
   estimateMinutesOf,
   type SubmitPreview,
