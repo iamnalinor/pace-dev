@@ -31,8 +31,8 @@ server at the latest release.
    bunx wrangler d1 create pace
    bunx wrangler kv namespace create OAUTH_KV
    ```
-   The same namespace also keeps the assistant's memory of which LLM provider is down (one small
-   key, written only when that changes); nothing else to create for it.
+   The assistant's memory of which LLM provider is down is a small Durable Object (`LlmHealth`)
+   declared in `wrangler.jsonc`; the first deploy creates it, nothing to create by hand.
 3. **Edit `apps/api/wrangler.jsonc`**: the D1 `database_id` and the KV `id` from step 2, the
    `routes` custom domain (your API host, or remove `routes` to use `*.workers.dev`), and the
    `vars`:
