@@ -5,7 +5,7 @@ import type { AiState } from "@pace/client/react";
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Chip } from "#app/ui/chip.tsx";
+import { ActionChip, Chip } from "#app/ui/chip.tsx";
 import { answerText } from "@pace/core";
 
 type Props = {
@@ -66,6 +66,29 @@ const Reading = ({
   );
 };
 
+/** Why no model read the line, in the words for its reason (bug class 99). */
+const unreadText = (
+  state: Extract<AiState, { readonly status: "unavailable" }>,
+  { deviceTz, t }: { readonly deviceTz: string; readonly t: ReturnType<typeof useT> },
+): string => {
+  switch (state.reason) {
+    case "limited": {
+      return state.retryAt === null
+        ? t("composer.aiUnavailableSoon")
+        : t("composer.aiUnavailable", { time: clockTime(state.retryAt, deviceTz) });
+    }
+    case "unreachable": {
+      return t("composer.aiFailed");
+    }
+    case "unreadable": {
+      return t("composer.aiUnreadable");
+    }
+    case "off": {
+      return t("composer.aiOff");
+    }
+  }
+};
+
 /** What the assistant made of the line: what to check, its questions, or why it could not. */
 export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
   const t = useT();
@@ -92,13 +115,11 @@ export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
       return (
         <View className="items-start gap-1.5 px-1 pt-2">
           <Text className="font-sans text-[12px] text-fg">
-            {state.retryAt === null
-              ? t("composer.aiUnavailableSoon")
-              : t("composer.aiUnavailable", { time: clockTime(state.retryAt, viewer.deviceTz) })}
+            {unreadText(state, { deviceTz: viewer.deviceTz, t })}
           </Text>
-          <Chip onPress={onLater} selected={false}>
-            {t("composer.aiLater")}
-          </Chip>
+          {state.canReadLater ? (
+            <ActionChip onPress={onLater}>{t("composer.aiLater")}</ActionChip>
+          ) : null}
         </View>
       );
     }

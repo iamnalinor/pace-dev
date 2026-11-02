@@ -256,9 +256,39 @@ describe("client.assistant", () => {
         status: "unavailable",
       }),
     });
-    expect(await client.assistant.read("что-то")).toEqual({ retryAt, status: "unavailable" });
+    // A server older than `reason`: it kept a text for later only with a time to wait for.
+    expect(await client.assistant.read("что-то")).toEqual({
+      canReadLater: true,
+      reason: "limited",
+      retryAt,
+      status: "unavailable",
+    });
     const broken = await setup({ "POST /api/parse": () => problem(500, "internal") });
     expect(await broken.client.assistant.read("что-то")).toEqual({ status: "failed" });
+  });
+
+  it("passes on why no model read it, and whether the server can keep it for later (bug class 99)", async () => {
+    const answerFor = (reason: string | undefined) => (): object => ({
+      confidence: 1,
+      domain: "task",
+      actions: [],
+      ...(reason !== undefined && { reason }),
+      retryAt: null,
+      status: "unavailable",
+    });
+    const outcomes = await Promise.all(
+      [undefined, "unreachable", "unreadable", "off", "tired"].map(async (reason) => {
+        const { client } = await setup({ "POST /api/parse": answerFor(reason) });
+        return await client.assistant.read("что-то");
+      }),
+    );
+    expect(outcomes).toEqual([
+      { canReadLater: false, reason: "unreachable", retryAt: null, status: "unavailable" },
+      { canReadLater: true, reason: "unreachable", retryAt: null, status: "unavailable" },
+      { canReadLater: false, reason: "unreadable", retryAt: null, status: "unavailable" },
+      { canReadLater: false, reason: "off", retryAt: null, status: "unavailable" },
+      { canReadLater: false, reason: "unreachable", retryAt: null, status: "unavailable" },
+    ]);
   });
 
   it("offers a labelled rule action when the parse request itself fails", async () => {

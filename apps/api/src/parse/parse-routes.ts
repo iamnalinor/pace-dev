@@ -1,12 +1,14 @@
 import type { Context, Hono } from "hono";
 
 import {
+  canReadLater,
   type CoreState,
   endpoints,
   newId,
   ok,
   type ParseRequestBody,
   type ParseResponse,
+  type ParseUnavailableReason,
 } from "@pace/core";
 
 import type { AppEnv } from "../shared/app-env.ts";
@@ -32,22 +34,33 @@ they can. `GET /api/llm/status`: can the assistant read now?
 const storeOf = (c: Context<AppEnv>) =>
   c.env.USER_STORE.get(c.env.USER_STORE.idFromName(requireUser(c).id));
 
-/** No model can answer: logged, the rules' reading, and kept for later when the caller asked to defer. */
+/**
+No model can answer: logged, the rules' reading, and why. Kept for later when the caller asked to
+defer and a model may read it then (`canReadLater`: resting, or down with no time said, read at
+the queue's next try); never when every model answered out of shape or none is configured, which
+waiting would not change (bug class 99).
+*/
 const unavailable = async (
   store: ReturnType<typeof storeOf>,
   request: ParseRequestBody,
-  world: { readonly state: CoreState; readonly now: string; readonly retryAt: null | string },
+  world: {
+    readonly state: CoreState;
+    readonly now: string;
+    readonly retryAt: null | string;
+    readonly reason: ParseUnavailableReason;
+  },
 ): Promise<ParseResponse> => {
-  const { now, retryAt } = world;
+  const { now, reason, retryAt } = world;
   const decisionId = newId();
   await store.logDecisions(
     [{ ...parseDecision(request.text, "api", { retryAt, status: "unavailable" }), id: decisionId }],
     now,
   );
   const rules = readByRules(request.text, request.domain, world);
-  if (retryAt === null || request.defer !== true) {
+  if (!canReadLater(reason) || request.defer !== true) {
     // The rules' reading can still be approved or dismissed: the answer names its decision.
-    return { ...rules, actions: [...rules.actions], decisionId, retryAt, status: "unavailable" };
+    const actions = [...rules.actions];
+    return { ...rules, actions, decisionId, reason, retryAt, status: "unavailable" };
   }
   await store.enqueueParse(
     { channel: "api", domain: request.domain, retryAt, text: request.text },
@@ -85,9 +98,7 @@ export const mountParseRoutes = (
     });
     await store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
     if (!read.ok) {
-      return ok(
-        withLegacyName(await unavailable(store, body, { now, retryAt: read.error.retryAt, state })),
-      );
+      return ok(withLegacyName(await unavailable(store, body, { ...read.error, now, state })));
     }
     const { confidence, domain, output, actions, provider, questions, rejected } = read.value;
     // Readings while typing come every pause: only the ones the person acts on are logged.

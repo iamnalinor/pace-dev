@@ -251,6 +251,7 @@ const useFlowState = ({
     }
   });
   const add = useAddTask(toAdd, form === "assistant", done);
+  const keptForLater = resetAndClose(pending.discard, done);
   return {
     add,
     ai,
@@ -283,7 +284,8 @@ const useFlowState = ({
     lineFocus,
     model,
     onText,
-    readLater: useReadLater(async () => await ai.readLater(text, onReading), done),
+    // Kept on the server: the rules' preview goes with the line.
+    readLater: useReadLater(async () => await ai.readLater(text, onReading), keptForLater),
     setEdits,
     setSubtaskDraft: draft.setSubtaskDraft,
     subtaskDraft: draft.subtaskDraft,

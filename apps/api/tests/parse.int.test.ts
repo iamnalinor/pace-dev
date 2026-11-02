@@ -20,6 +20,8 @@ import {
   type RequestDomain,
 } from "@pace/core";
 
+import type { ParseProvider } from "../src/shared/llm/llm.ts";
+
 import { createApp } from "../src/app.ts";
 import { fakeParseModel } from "../src/shared/llm/fake-model.ts";
 import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
@@ -145,6 +147,35 @@ const callLimited = async (
 const parseLimited = async (token: string, body: object): Promise<ParseResponse> => {
   const init = { body: JSON.stringify(body), method: "POST" };
   return asAnswered(await readJson(await callLimited(token, "/api/parse", init)));
+};
+
+/** `POST /api/parse` on a Worker whose models are `providers`. */
+const parseWith = async (
+  providers: readonly ParseProvider[],
+  token: string,
+  body: object,
+): Promise<ParseResponse> => {
+  const app = createApp({
+    fetch: async () => {
+      throw new Error("no network in tests");
+    },
+    parseProviders: () => providers,
+    telegramFetch: async () => {
+      throw new Error("no network in tests");
+    },
+  });
+  const ctx = createExecutionContext();
+  const response = await app.fetch(
+    new Request("https://pace-api.test/api/parse", {
+      body: JSON.stringify(body),
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      method: "POST",
+    }),
+    env,
+    ctx,
+  );
+  await waitOnExecutionContext(ctx);
+  return asAnswered(await readJson(response));
 };
 
 type Pulled = { events: { type: string; payload: Record<string, unknown> }[] };
@@ -463,30 +494,46 @@ describe("POST /api/parse: auto", () => {
 describe("POST /api/parse: no model", () => {
   it("offers a schema-valid rule action without a configured endpoint", async () => {
     const token = await loginAsDev("1002");
-    const app = createApp({
-      fetch: async () => {
-        throw new Error("no network in tests");
-      },
-      parseProviders: () => [],
-      telegramFetch: async () => {
-        throw new Error("no network in tests");
-      },
-    });
-    const ctx = createExecutionContext();
-    const response = await app.fetch(
-      new Request("https://pace-api.test/api/parse", {
-        body: JSON.stringify({ defer: true, domain: "activity", text: "ем" }),
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        method: "POST",
-      }),
-      env,
-      ctx,
-    );
-    await waitOnExecutionContext(ctx);
-    const answer = asAnswered(await readJson(response));
+    const answer = await parseWith([], token, { defer: true, domain: "activity", text: "ем" });
     expect(answer).toMatchObject({
       actions: [{ category: "food", kind: "activity.start", label: "ем" }],
       retryAt: null,
+      status: "unavailable",
+    });
+  });
+
+  it("says why no model read it, and keeps a text for later only when a model may read it then (bug class 99)", async () => {
+    const token = await loginAsDev("1002");
+    const down = await parseWith(
+      [{ model: fakeParseModel(() => ({ unavailableWith: 500 })), name: "down" }],
+      token,
+      { text: "позвонить в банк" },
+    );
+    expect(down).toMatchObject({ reason: "unreachable", retryAt: null, status: "unavailable" });
+    const garbled = [{ model: fakeParseModel(() => ({ domain: "nope" }) as never), name: "odd" }];
+    expect(await parseWith(garbled, token, { text: "позвонить в банк" })).toMatchObject({
+      reason: "unreadable",
+      status: "unavailable",
+    });
+    expect(await parseLimited(token, { text: "позвонить маме" })).toMatchObject({
+      reason: "limited",
+    });
+    // Kept: the providers may be back soon (none said when); the queue reads it at its next try.
+    const kept = await parseWith(
+      [{ model: fakeParseModel(() => ({ unavailableWith: 500 })), name: "down" }],
+      token,
+      { defer: true, text: "оплатить связь" },
+    );
+    expect(kept).toMatchObject({ actions: [], retryAt: null, status: "queued" });
+    await drainLater(token);
+    expect(await titled(token, "оплатить связь")).toHaveLength(1);
+    // Not kept: every model answered out of shape, and would again; nor with no model at all.
+    expect(await parseWith(garbled, token, { defer: true, text: "купить хлеб" })).toMatchObject({
+      reason: "unreadable",
+      status: "unavailable",
+    });
+    expect(await parseWith([], token, { defer: true, text: "купить хлеб" })).toMatchObject({
+      reason: "off",
       status: "unavailable",
     });
   });

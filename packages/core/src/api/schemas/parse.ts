@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ParseDomainSchema } from "../../actions/kinds.ts";
 import { ActionSchema } from "../../actions/schema.ts";
 import { ParseQuestionSchema } from "../../parse/schema.ts";
+import { knownOrNull } from "../tolerant.ts";
 
 /**
 The field a message was typed into: the task line, the activity line, or `auto` (the bot's one
@@ -32,6 +33,22 @@ export type ParseRequest = z.input<typeof ParseRequestSchema>;
 
 /** A request as the server reads it, the field filled in. */
 export type ParseRequestBody = z.output<typeof ParseRequestSchema>;
+
+/**
+Why no model read a text: providers resting with a time they are back (`limited`); none answered
+and none said when (`unreachable`: down, timed out); every one answered out of shape
+(`unreadable`: asking again later reads it no better); no model on this server (`off`). The
+server keeps a text to read later (`defer`) only when `limited` or `unreachable`.
+*/
+export const PARSE_UNAVAILABLE_REASONS = ["limited", "unreachable", "unreadable", "off"] as const;
+
+export type ParseUnavailableReason = (typeof PARSE_UNAVAILABLE_REASONS)[number];
+
+const UnavailableReasonSchema = knownOrNull(z.enum(PARSE_UNAVAILABLE_REASONS));
+
+/** Whether a text no model read now can wait on the server for one that can. */
+export const canReadLater = (reason: ParseUnavailableReason): boolean =>
+  reason === "limited" || reason === "unreachable";
 
 /** Questions as the client reads them: a newer server may add keys (the model's own stay strict). */
 const AnsweredQuestionSchema = z.object(ParseQuestionSchema.shape);
@@ -69,6 +86,11 @@ export const ParseResponseSchema = z.discriminatedUnion("status", [
     status: z.literal("unavailable"),
     ...answer,
     retryAt: z.iso.datetime().nullable(),
+    /**
+    Why no model read it (bug class 99); `null` from a server older than the key, or for a
+    reason this client has no word for.
+    */
+    reason: UnavailableReasonSchema,
   }),
   z.object({ status: z.literal("queued"), ...answer, retryAt: z.iso.datetime().nullable() }),
 ]);

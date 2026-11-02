@@ -8,7 +8,14 @@ import {
   streamText,
 } from "ai";
 
-import { err, type ModelOutput, ModelOutputSchema, ok, type Result } from "@pace/core";
+import {
+  err,
+  type ModelOutput,
+  ModelOutputSchema,
+  ok,
+  type ParseUnavailableReason,
+  type Result,
+} from "@pace/core";
 
 import type { HealthMemory } from "./health-store.ts";
 import type { ParsePrompt } from "./prompt.ts";
@@ -44,6 +51,23 @@ export type LlmError = {
   readonly retryAt: null | string;
   /** The providers this call found rate limited, to skip until then. */
   readonly limited: Cooldowns;
+  /** Why no model read it, as the parse answer says it (bug class 99). */
+  readonly reason: ParseUnavailableReason;
+};
+
+/** Why a read no model answered failed: no model, every answer out of shape, a rest, or none of these. */
+const reasonOf = (read: {
+  readonly hasProviders: boolean;
+  readonly isHopeless: boolean;
+  readonly retryAt: null | string;
+}): ParseUnavailableReason => {
+  if (!read.hasProviders) {
+    return "off";
+  }
+  if (read.isHopeless) {
+    return "unreadable";
+  }
+  return read.retryAt === null ? "unreachable" : "limited";
 };
 
 /** A structured answer: what the model said, which provider said it, the limits met on the way. */
@@ -201,6 +225,8 @@ class ReadOutcome {
   retryAt: null | string = null;
   /** Every failure so far was an answer out of shape (and no provider was resting). */
   isEveryAnswerInvalid: boolean;
+  /** Some provider is configured (resting or not). */
+  readonly hasProviders: boolean;
 
   /** The providers not resting at `now`; the resting ones only say when they are back. */
   constructor(
@@ -223,6 +249,7 @@ class ReadOutcome {
         this.retryAt = earliest(this.retryAt, cooldowns[provider.name] ?? null);
       }
     }
+    this.hasProviders = providers.length > 0;
     // A provider resting now may read it later: then no text is hopeless.
     this.isEveryAnswerInvalid = this.ready.length === providers.length && this.ready.length > 0;
   }
@@ -277,7 +304,12 @@ class ReadOutcome {
       return ok({ limited, provider, result: won.value.value });
     }
     const isHopeless = this.isEveryAnswerInvalid && won.error === "failed";
-    return err({ code: isHopeless ? "llm/invalid-output" : "llm/unavailable", limited, retryAt });
+    return err({
+      code: isHopeless ? "llm/invalid-output" : "llm/unavailable",
+      limited,
+      reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, retryAt }),
+      retryAt,
+    });
   }
 }
 

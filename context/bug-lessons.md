@@ -804,19 +804,6 @@ The same rule applies when a previously successful channel is no longer configur
   an action's lists). Test each kind of key left out: the one it may fill (kept), the one it may
   not (refused, and the next provider answers).
 
-### 98. An outside service's words copied into a log or a shared record, the person's words with them
-- **Bug.** Review of round 6-C (M5): a failed call was logged with the start of the endpoint's
-  body, and a schema refusal's body quotes the model's whole answer (`failed_generation`), which
-  copies the person's message; the health memory every user shares stored the first 80
-  characters of an error's message as the penalty's `reason`.
-- **Missed because.** The log line and the reason were written for diagnosis and tested with
-  error bodies that say nothing about the person ("Service Unavailable").
-- **Rule.** What an outside service says goes into a log or a shared record only as its status,
-  its code and type, and its message with any field that echoes our request removed
-  (`withoutGenerations`); a shared record stores a category from a closed list (`HealthReason`),
-  never free text. Test the log line with a body that quotes the person's words and assert they
-  are absent.
-
 ### 96. A state whose only way out is a verdict the surrounding mechanism can cancel
 - **Bug.** Review of round 6-C (C1): a provider back from its penalty was probed (asked with the
   next one at once) until a read judged it. A healthy provider slower than its partner never was:
@@ -845,6 +832,36 @@ The same rule applies when a previously successful channel is no longer configur
   cache a change the writer did not confirm, and a writer that cannot be reached is logged as an
   error while the read goes on with the default. Test with two writers at once against the real
   object, and count storage writes over a long simulated day.
+
+### 98. An outside service's words copied into a log or a shared record, the person's words with them
+- **Bug.** Review of round 6-C (M5): a failed call was logged with the start of the endpoint's
+  body, and a schema refusal's body quotes the model's whole answer (`failed_generation`), which
+  copies the person's message; the health memory every user shares stored the first 80
+  characters of an error's message as the penalty's `reason`.
+- **Missed because.** The log line and the reason were written for diagnosis and tested with
+  error bodies that say nothing about the person ("Service Unavailable").
+- **Rule.** What an outside service says goes into a log or a shared record only as its status,
+  its code and type, and its message with any field that echoes our request removed
+  (`withoutGenerations`); a shared record stores a category from a closed list (`HealthReason`),
+  never free text. Test the log line with a body that quotes the person's words and assert they
+  are absent.
+
+### 99. A failure's reason dropped at a boundary, so the remedy offered is one that cannot work
+- **Bug.** Review of round 6-C (I4): the parse answer said only `unavailable` and a `retryAt`. A
+  read whose every model answered out of shape, and one whose models were all down with no time
+  said, both came back with `retryAt: null`: the app read both as "out of requests for now" and
+  offered "Read it when it's back", which the server refused to queue without a time, so each
+  press asked the models again to the same end. The bot said "AI is unavailable" for an answer
+  it simply could not read.
+- **Missed because.** The server knew the reason (`llm/invalid-output` against `llm/unavailable`)
+  and its tests checked it; the answer the client reads had no field for it, and the client's
+  tests drew each status with a time, never the case with none.
+- **Rule.** When a failure has kinds that call for different remedies, the reason crosses every
+  boundary to the screen as a closed value read tolerantly (`reason`, `knownOrNull`), with one
+  rule for what may be offered (`canReadLater`, `unreadOf`), and a remedy is shown only where the
+  other side will act on it; after it is used, the screen settles (offered once, the network
+  quiet). Test each reason end to end: the server's answer, the bot's words, the app's words,
+  and the count of requests after the remedy is pressed.
 
 ## Log
 
@@ -1128,3 +1145,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Review of round 6-C, C1: a probe that was healthy but slower than its hedge partner was cancelled with no verdict and stayed a probe for good: every read asked two providers and the order flipped | 96 (new) | yes: the probe is the health memory's one state that waits for a verdict (a penalty ends by its clock, a first slow answer by the next one); the verdicts now come from one pure `verdictOf`, so a first token counts for any provider asked (a first-slow note is cleared by it too) | `health-run.test.ts`: a probe that sent a first token and lost the race is cleared; a probe cancelled before its first token goes back to its place and the next read asks one provider (both red before); a probe silent past the hedge while another answered is penalised again; `health.test.ts`: an unjudged probe keeps its strikes and is no probe after; the fake model can pause after its first token (`restAfterMs`) |
 | 2026-11-02 | Review of round 6-C, M1: a read lost to its deadline counted every provider still silent as slow, though nobody had answered to compare them with | 76 (the slowness rule could not tell "outwaited by another" from "the read ran out") | yes: slowness is the one verdict judged against another provider; failures are judged on their own | `health-run.test.ts`: a read lost to its deadline with two silent providers leaves the health memory empty (red before) |
 | 2026-11-02 | Review of round 6-C, I2, M2, M3: the shared health memory was one KV value read, changed and written back by any isolate (lost updates, an edge cache resurrecting a cleared record, the OAuth namespace's write quota, a first slow answer written too); M4: the app's and the bot's reads waited on saving it before answering | 97 (new) | yes: the health memory was the only state many users' requests change in KV (the OAuth library's own keys are written per grant; every per-person state is in the person's Durable Object); the parse queue's drain already runs in the person's object and now calls the health object from there | the `LlmHealth` Durable Object (migration `v2`, binding `LLM_HEALTH`) applies records one after another and writes storage only when who is asked first changes; a first slow answer and a probe put back stay in memory; the isolate keeps its 15 s cache, never caches a record the object did not save, and logs an unreachable object as an error while the read asks in the configured order; the route and the bot save after the response (`inBackground` → `waitUntil`). Tests: `health-keeper.test.ts` (a penalty written once, a first slow answer not written, two records at once both kept, a storage failure rejects and keeps no unsaved state, a fake day of 720 reads with a flapping and a slow-ish provider: 153 changes of order, 146 storage writes, one storage read); `health-store.test.ts` against the real object in workerd (two isolates recording at once keep both penalties; one object call per cache window; no call for a read that changes nothing; an unreachable object logs errors and reads `{}`; `inBackground` hands the save to `waitUntil`); `llm-health.int.test.ts` counts the object's storage writes through the real route (one). The new modules' tests were written first and failed on the missing modules |
+| 2026-11-02 | Review of round 6-C, I4: an answer out of shape (and every provider down with no time) read in the app as "out of requests" with a "Read it when it's back" that asked the models again on each press; the bot said "AI is unavailable" for a message it could not read. Found on the way: the composer never offered that chip at all (its only way in was the chip itself; the reachable path is the rules' preview card, which had no such offer), and the chip was drawn as a radio (QA round 19 L7's `ActionChip` is the button for it) | 99 (new), 1 (the server's and the client's rule for "can it wait" were separate: the server queued only with a time, the client offered it always) | yes: every screen that shows an unavailable reading: the composer's preview card and status line, the time bar's card (the copy, no offer: an activity is not read later), the bot's preview, a revision and a domain choice; the client's local fallback (our server unreachable) sends no reason | contract first: `reason` on the `unavailable` answer (`PARSE_UNAVAILABLE_REASONS`, read with `knownOrNull`), `canReadLater`; the server keeps a `defer`red text for `limited` and `unreachable` (no time: read at the queue's next try) and never for `unreadable` or `off`; the client's one rule `unreadOf` (an older server: from `retryAt`); new copy `assistant.rulesUsedUnreadable`, `composer.aiUnreadable`, `composer.aiOff`, `bot.rulesPreviewUnreadable`, `bot.correctionUnreadable` (EN and RU). Tests (all red before): core `parse.test.ts` (each reason, an older server's and an unknown one as `null`); `parse.int.test.ts` (each reason through the route; a deferred text with providers down is queued and written at the next drain; an unreadable or model-less one is not); `preview.test.ts` (the bot's words for a preview and a correction); client `create-client.test.ts` (reason and `canReadLater` per answer); app `composer.test.tsx` (one press keeps the line, the card goes, two requests in all after 300 ms; an unreadable reading offers nothing; a press the server could not keep says why and the offer is gone) |

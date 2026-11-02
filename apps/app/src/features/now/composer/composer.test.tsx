@@ -80,6 +80,15 @@ const PARSED = parsed(
   ["estimateMinutes"],
 );
 
+/** No model read the line: the rules' reading, and why. */
+const unavailable = (reason: string) => {
+  const { provider: _provider, ...rest } = parsed({
+    sourceText: "оплатить связь",
+    title: "оплатить связь",
+  });
+  return { ...rest, reason, retryAt: null, status: "unavailable" };
+};
+
 /** The assistant's answer with its questions. */
 const withQuestions = (questions: readonly unknown[]) => ({ ...PARSED, questions });
 
@@ -482,6 +491,72 @@ describe("Composer", () => {
     expect(
       await screen.findByText(en("decisions.done.task.create", { subject: "синк по дашборду" })),
     ).toBeOnTheScreen();
+  });
+
+  it("keeps a line for later with one press when the models are down, then goes quiet (bug class 99)", async () => {
+    const bodies: unknown[] = [];
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/parse": ({ body }) => {
+          bodies.push(body);
+          return bodies.length === 1
+            ? unavailable("unreachable")
+            : { ...unavailable("unreachable"), actions: [], status: "queued" };
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "оплатить связь");
+    await enter();
+    expect(await screen.findByText(en("assistant.rulesUsed"))).toBeOnTheScreen();
+    await fireEvent.press(button("composer.aiLater"));
+    expect(await screen.findByText(en("composer.aiQueuedSoon"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("assistant.rulesUsed"))).toBeNull();
+    expect(line()).toHaveDisplayValue("");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(bodies).toEqual([
+      { domain: "task", text: "оплатить связь", thread: [] },
+      { defer: true, domain: "task", text: "оплатить связь" },
+    ]);
+  });
+
+  it("says it could not read this one, and offers no reading later, when every model answered out of shape", async () => {
+    let calls = 0;
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/parse": () => {
+          calls += 1;
+          return unavailable("unreadable");
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "оплатить связь");
+    await enter();
+    expect(await screen.findByText(en("assistant.rulesUsedUnreadable"))).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: en("composer.aiLater") })).toBeNull();
+    expect(calls).toBe(1);
+  });
+
+  it("says why when the server could not keep the line after all, and does not offer it again", async () => {
+    const bodies: unknown[] = [];
+    const runtime = await createTestRuntime({
+      routes: {
+        "POST /api/parse": ({ body }) => {
+          bodies.push(body);
+          return unavailable(bodies.length === 1 ? "unreachable" : "unreadable");
+        },
+      },
+    });
+    await renderComposer(runtime);
+    await fireEvent.changeText(line(), "оплатить связь");
+    await enter();
+    await fireEvent.press(await screen.findByRole("button", { name: en("composer.aiLater") }));
+    expect(await screen.findByText(en("composer.aiUnreadable"))).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: en("composer.aiLater") })).toBeNull();
+    expect(bodies).toHaveLength(2);
   });
 
   it("opens an empty form without blaming the title, and asks for one once it was typed away (QA round 14 L6)", async () => {

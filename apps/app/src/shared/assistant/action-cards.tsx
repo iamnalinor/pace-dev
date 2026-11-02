@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
+import type { Unread } from "@pace/client";
+
 import { useAppState, useLanguage, useT } from "#app/app-state.tsx";
 import { Questions } from "#app/shared/assistant/questions.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { KeyHint } from "#app/ui/button.tsx";
+import { ActionChip } from "#app/ui/chip.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -47,7 +50,36 @@ type Props = {
   readonly onFollowup: (text: string) => void;
   /** The assistant's questions about what stays unclear: an option or a correction answers them. */
   readonly questions?: readonly ParseQuestion[];
-  readonly source?: "parsed" | "unavailable";
+  /** Why no model read it, for the rules' reading; `null` (or none) for the model's own. */
+  readonly unread?: null | Unread;
+  /** "Read it when it's back": offered only when the server can keep the text (`canReadLater`). */
+  readonly onLater?: (() => void) | undefined;
+};
+
+/**
+Over the rules' reading: why no model read it (bug class 99), and "Read it when it's back" where
+the server can keep the text for a model that may read it later.
+*/
+const RulesNote = ({
+  onLater,
+  unread,
+}: {
+  readonly unread: Unread;
+  readonly onLater: (() => void) | undefined;
+}) => {
+  const t = useT();
+  return (
+    <View className="items-start gap-1.5">
+      <Text className="font-sans text-[13px] leading-5 text-muted">
+        {t(
+          unread.reason === "unreadable" ? "assistant.rulesUsedUnreadable" : "assistant.rulesUsed",
+        )}
+      </Text>
+      {onLater !== undefined && unread.canReadLater ? (
+        <ActionChip onPress={onLater}>{t("composer.aiLater")}</ActionChip>
+      ) : null}
+    </View>
+  );
 };
 
 const NO_QUESTIONS: readonly ParseQuestion[] = [];
@@ -148,10 +180,10 @@ export const ActionCards = ({
   onApprove,
   onCancel,
   onFollowup,
+  onLater,
   questions = NO_QUESTIONS,
-  source,
+  unread = null,
 }: Props) => {
-  const t = useT();
   const canApprove = !busy && actions.length > 0;
   const approve = (): void => {
     if (canApprove) {
@@ -163,11 +195,7 @@ export const ActionCards = ({
   useHotkey(HOTKEYS.escape, onCancel);
   return (
     <View className="gap-3 rounded-xl border border-line bg-surface p-3">
-      {source === "unavailable" ? (
-        <Text className="font-sans text-[13px] leading-5 text-muted">
-          {t("assistant.rulesUsed")}
-        </Text>
-      ) : null}
+      {unread === null ? null : <RulesNote onLater={onLater} unread={unread} />}
       {actions.map((action, index) => (
         <ActionCard action={action} key={`${action.kind}:${String(index)}`} />
       ))}

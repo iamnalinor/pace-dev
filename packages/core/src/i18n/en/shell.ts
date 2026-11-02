@@ -246,6 +246,8 @@ export const enShell = {
     "This Telegram account is not linked to Pace yet. Open Pace and log in with the bot first.",
   "bot.preview": "The assistant will create this task:",
   "bot.rulesPreview": "AI is unavailable. This suggestion uses simple rules.",
+  "bot.rulesPreviewUnreadable":
+    "The assistant couldn't read this one. This suggestion uses simple rules.",
   "bot.readAsTask": "I read this as a task. Choose what you meant.",
   "bot.readAsActivity": "I read this as an activity. Choose what you meant.",
   "bot.domainTask": "Task",
@@ -253,6 +255,8 @@ export const enShell = {
   "bot.tooManyCorrections": "This thread is full. Approve or cancel, then start a new request.",
   "bot.correctionUnavailable":
     "The assistant could not revise this yet. Your previous actions are still pending.",
+  "bot.correctionUnreadable":
+    "The assistant couldn't read this correction. Your previous actions are still pending.",
   "bot.addTo": "Add to {title}",
   "bot.accept": "Approve",
   "bot.toInbox": "To Inbox",

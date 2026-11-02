@@ -160,6 +160,10 @@ export const enInput = {
   "composer.aiQueuedSoon": "Saved: the assistant reads it as soon as it is back and adds it.",
   "composer.aiFailed":
     "The assistant could not be reached: the rules filled in the form. Check it before adding.",
+  "composer.aiUnreadable":
+    "The assistant couldn't read this one: the rules filled in the form. Check it before adding.",
+  "composer.aiOff":
+    "This server has no assistant: the rules filled in the form. Check it before adding.",
   "composer.aiQuestion": "Answer to add it to the line",
   "parseField.title": "title",
   "parseField.category": "category",
@@ -216,6 +220,8 @@ export const enInput = {
   "assistant.reading": "The assistant is reading…",
   "assistant.rulesUsed":
     "Assistant unavailable. These actions come from local rules; check them before approving.",
+  "assistant.rulesUsedUnreadable":
+    "The assistant couldn't read this one. These actions come from local rules; check them before approving.",
   "assistant.couldNotRead": "The assistant could not read this. Try again.",
   "assistant.couldNotRevise":
     "The assistant could not revise these actions. Your previous preview is still here.",

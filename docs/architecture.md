@@ -367,6 +367,14 @@ is no reading, bug class 95), lengths clamped, then the zod schema. An
 endpoint that checks its model's answer itself and refuses it is read for that answer (bug class
 85); failing ours too, it is an answer out of shape, not an outage.
 
+When no model reads a text, the parse answer is the rules' reading with a `reason`
+(`PARSE_UNAVAILABLE_REASONS`): `limited` (resting, with a time), `unreachable` (down or silent,
+no time said), `unreadable` (every model answered out of shape) or `off` (no model configured).
+`defer` keeps the text on the server only for `limited` and `unreachable` (`canReadLater`; with
+no time it is read at the queue's next try, then every five minutes for a day); the app offers
+"Read it when it's back" only then, once, and says "couldn't read this one" for `unreadable`, as
+the bot does (bug class 99). An older server sends no reason: the client reads it from `retryAt`.
+
 On Day, the time bar offers Calendar, Task, Chores and Rest, plus a typed activity; Now
 shows a compact row for what is running. A computer can contribute foreground-app and
 idle-time observations through the scoped token and the Python agent described in

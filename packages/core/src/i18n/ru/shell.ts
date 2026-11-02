@@ -246,6 +246,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "bot.notLinked": "Этот Telegram ещё не связан с Pace. Откройте Pace и войдите через бота.",
   "bot.preview": "Ассистент создаст задачу:",
   "bot.rulesPreview": "ИИ сейчас недоступен. Это предложение составлено по простым правилам.",
+  "bot.rulesPreviewUnreadable":
+    "Ассистент не смог разобрать это сообщение. Это предложение составлено по простым правилам.",
   "bot.readAsTask": "Я понял это как задачу. Выберите нужный вариант.",
   "bot.readAsActivity": "Я понял это как активность. Выберите нужный вариант.",
   "bot.domainTask": "Задача",
@@ -254,6 +256,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
     "В этой цепочке уже слишком много уточнений. Подтвердите или отмените её и начните новую.",
   "bot.correctionUnavailable":
     "Ассистент пока не смог уточнить ответ. Прежние действия всё ещё ждут подтверждения.",
+  "bot.correctionUnreadable":
+    "Ассистент не смог разобрать уточнение. Прежние действия всё ещё ждут подтверждения.",
   "bot.addTo": "Добавить в {title}",
   "bot.accept": "Подтвердить",
   "bot.toInbox": "Во входящие",

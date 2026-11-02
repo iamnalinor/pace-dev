@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { blankModelAction, type EventInput, type ModelOutput } from "@pace/core";
+import { blankModelAction, type EventInput, type ModelOutput, t } from "@pace/core";
 import { artboardState, NOW, REPLY_ID } from "@pace/core/testing";
 
 import type { BotStoreApi, DecisionAnswer, DecisionEntry, JsonValue } from "../shared/contract.ts";
@@ -11,7 +11,7 @@ import type { BotReply, Turn } from "./turn.ts";
 import { echoReply, fakeParseModel } from "../shared/llm/fake-model.ts";
 import { memoryHealth } from "../shared/llm/health-store.ts";
 import { PREVIEW_ACTIONS } from "./preview-buttons.ts";
-import { choosePreview, preview } from "./preview.ts";
+import { choosePreview, followupPreview, preview } from "./preview.ts";
 
 /** The providers with a health memory of their own, as the bot's reads take them. */
 const modelsOf = (providers: readonly ParseProvider[]): Models => ({
@@ -95,6 +95,42 @@ describe("the bot's preview", () => {
         }),
       ],
     ]);
+  });
+});
+
+/** The language the bot answers in for the test state. */
+const LANGUAGE = artboardState(NOW).settings.language;
+
+describe("the bot when no model read the message (bug class 99)", () => {
+  const garbled = modelsOf([
+    { model: fakeParseModel(() => ({ domain: "nope" }) as never), name: "odd" },
+  ]);
+  const down = modelsOf([
+    { model: fakeParseModel(() => ({ unavailableWith: 500 })), name: "down" },
+  ]);
+
+  it("says it could not read this one when every model answered out of shape, unavailable otherwise", async () => {
+    const { store } = memoryStore();
+    const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+    const unreadable = await preview(turn, garbled, "купить кабель");
+    expect(unreadable.text.startsWith(t(LANGUAGE, "bot.rulesPreviewUnreadable"))).toBe(true);
+    const unavailable = await preview(turn, down, "купить кабель");
+    expect(unavailable.text.startsWith(t(LANGUAGE, "bot.rulesPreview"))).toBe(true);
+  });
+
+  it("says the same of a correction it could not read", async () => {
+    const { store } = memoryStore();
+    const turn: Turn = { now: NOW, state: artboardState(NOW), store };
+    const shown = await preview(
+      turn,
+      modelsOf([{ model: fakeParseModel(echoReply), name: "fake" }]),
+      "купить кабель",
+    );
+    const id = shown.pendingId ?? "";
+    const unreadable = await followupPreview(turn, garbled, { id, text: "на завтра" });
+    expect(unreadable?.text).toBe(t(LANGUAGE, "bot.correctionUnreadable"));
+    const unavailable = await followupPreview(turn, down, { id, text: "на завтра" });
+    expect(unavailable?.text).toBe(t(LANGUAGE, "bot.correctionUnavailable"));
   });
 });
 

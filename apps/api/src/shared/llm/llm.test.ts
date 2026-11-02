@@ -117,6 +117,7 @@ describe("runParse", () => {
       error: {
         code: "llm/unavailable",
         limited: { backup: "2026-10-06T12:00:30.000Z", compatible: "2026-10-06T12:02:00.000Z" },
+        reason: "limited",
         retryAt: "2026-10-06T12:00:30.000Z",
       },
       ok: false,
