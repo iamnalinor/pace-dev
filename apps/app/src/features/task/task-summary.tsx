@@ -185,7 +185,9 @@ export const TaskSummary = ({
               void Linking.openURL(view.link?.url ?? "");
             }}
           >
-            <Text className="font-sans text-caption font-normal text-label-secondary">{view.link.url} ↗</Text>
+            <Text className="font-sans text-caption font-normal text-label-secondary">
+              {view.link.url} ↗
+            </Text>
           </Pressable>
         )}
         <TaskTags category={view.category} tags={view.tags} />

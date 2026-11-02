@@ -102,7 +102,9 @@ const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
       accessibilityRole="toolbar"
       className="gap-2 rounded-xl border border-separator bg-cell p-4"
     >
-      <Text className="font-sans text-caption font-normal text-label-tertiary">{t("presets.startFrom")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("presets.startFrom")}
+      </Text>
       <View className="flex-row flex-wrap gap-2">
         {choices.map((preset) => (
           <ActionChip

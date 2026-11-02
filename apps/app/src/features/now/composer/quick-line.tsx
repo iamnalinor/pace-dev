@@ -123,7 +123,10 @@ const LineButton = ({
         onPress={onPress}
       >
         <View
-          className={cx("h-10 w-10 items-center justify-center rounded-pill", isAccent && "bg-accent")}
+          className={cx(
+            "h-10 w-10 items-center justify-center rounded-pill",
+            isAccent && "bg-accent",
+          )}
         >
           {isBusy ? (
             <ActivityIndicator color={iconColor} size="small" />

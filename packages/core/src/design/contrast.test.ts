@@ -78,9 +78,9 @@ const TARGETS: Readonly<Record<ContrastTarget, { lc: number; ratio: number }>> =
   ui: { ratio: 3, lc: 0 },
 };
 
-/** `role` laid at `alpha` over `ground`, as an element faded by its opacity is drawn. */
-const faded = (theme: (typeof THEMES)[number], role: "label.quaternary", ground: string, alpha: number) => {
-  const solid = composite(color(theme, role), ground).slice(1);
+/** A placeholder bar (`label.quaternary`) laid at `alpha` over `ground`, as its opacity draws it. */
+const faded = (theme: (typeof THEMES)[number], ground: string, alpha: number): string => {
+  const solid = composite(color(theme, "label.quaternary"), ground).slice(1);
   const [r, g, b] = [0, 2, 4].map((at) => Number.parseInt(solid.slice(at, at + 2), 16));
   return composite(`rgba(${r}, ${g}, ${b}, ${alpha})`, ground);
 };
@@ -94,7 +94,7 @@ describe("placeholder rows", () => {
           const ground = composite(color(theme, background), "#ffffff");
           return {
             background,
-            ratio: contrastRatio(faded(theme, "label.quaternary", ground, PLACEHOLDER_DIM), ground) ?? 0,
+            ratio: contrastRatio(faded(theme, ground, PLACEHOLDER_DIM), ground) ?? 0,
           };
         })
         .filter(({ ratio }) => ratio < 1.5);

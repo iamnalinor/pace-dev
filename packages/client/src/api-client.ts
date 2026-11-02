@@ -139,10 +139,7 @@ export const createApiClient = (options: {
 }): ApiClient => {
   const doFetch: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
   /** The token a call sends; none for a call that needs one once the session ended (it throws). */
-  const credentialFor = (
-    endpoint: EndpointShape,
-    callOptions: CallOptions,
-  ): string | undefined => {
+  const credentialFor = (endpoint: EndpointShape, callOptions: CallOptions): string | undefined => {
     const credential = callOptions.credential ?? options.token();
     if (credential === undefined && endpoint.auth && options.sessionEnded?.() === true) {
       throw new ApiError(401, UNAUTHORIZED, "Not signed in");

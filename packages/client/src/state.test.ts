@@ -395,7 +395,7 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     await held.writes[0]?.resolve();
     await flush();
     held.writes[1]?.reject();
-    await expect(ingested).rejects.toThrow("persist_failed");
+    await expect(ingested).rejects.toThrow("QuotaExceededError");
     expect(local.value()).toMatchObject({ ok: true });
     // On the disk through its own write: it stays, on screen and in the log.
     expect(state.store.getState().events.map((event) => event.id)).toEqual([id]);
@@ -419,14 +419,14 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     expect(state.store.getState().log).toEqual([copy]);
   });
 
-  it("takes remote events back and rejects the ingest when the local store refuses them", async () => {
+  it("takes remote events back and rejects the ingest with the store's own error when the local store refuses them (bug-lessons 99)", async () => {
     const { held, state } = await heldSetup();
     const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { timezone: "UTC" });
     const ingested = state.ingest([remote]);
     await flush();
     expect(state.store.getState().settings.timezone).toBe("UTC");
     held.writes[0]?.reject();
-    await expect(ingested).rejects.toThrow("persist_failed");
+    await expect(ingested).rejects.toThrow("QuotaExceededError");
     expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
     // Not kept, so the next pull (the cursor did not move) brings it in again.
     held.release();

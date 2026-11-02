@@ -1,8 +1,9 @@
 import { type ReactNode, useRef } from "react";
 import { Text, View } from "react-native";
 
-import { Chip } from "./chip.tsx";
 import type { TagColor } from "./color.tsx";
+
+import { Chip } from "./chip.tsx";
 
 export type RadioChoice<T extends string> = {
   readonly value: T;

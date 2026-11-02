@@ -109,7 +109,9 @@ export const ActionChip = ({
     onPress={onPress}
   >
     <View className={cx("h-8 flex-row items-center rounded-pill px-3", chipFill(null, false))}>
-      <Text className={cx("font-sans text-caption font-normal", chipText(null, false))}>{children}</Text>
+      <Text className={cx("font-sans text-caption font-normal", chipText(null, false))}>
+        {children}
+      </Text>
     </View>
   </Pressable>
 );

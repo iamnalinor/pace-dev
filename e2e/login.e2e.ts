@@ -2,8 +2,8 @@ import type { Request } from "@playwright/test";
 
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
-import { documentGround, rgb } from "./support/theme-colors.ts";
 import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
+import { documentGround, rgb } from "./support/theme-colors.ts";
 
 test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await resetAccount(DEV_TELEGRAM_ID);

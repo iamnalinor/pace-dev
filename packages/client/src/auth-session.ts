@@ -77,6 +77,14 @@ const notesOf = (
   },
 });
 
+/** A session that began: no word of an earlier one's end is left. */
+const signedIn = (user: null | User): AuthState => ({
+  endedElsewhere: undefined,
+  endedInAnotherTab: undefined,
+  status: "signed-in",
+  user,
+});
+
 /** The in-memory token (read synchronously by the API client) mirrored to the session store. */
 export const createSession = (
   sessionStore: SessionStore,
@@ -91,12 +99,7 @@ export const createSession = (
       cached = token;
       hasEnded = false;
       await sessionStore.set(token);
-      store.setState({
-        endedElsewhere: undefined,
-        endedInAnotherTab: undefined,
-        status: "signed-in",
-        user: null,
-      });
+      store.setState(signedIn(null));
     },
     ready: (async (): Promise<void> => {
       cached = (await sessionStore.get()) ?? undefined;
@@ -107,12 +110,7 @@ export const createSession = (
       cached = granted.token;
       hasEnded = false;
       await sessionStore.set(granted.token);
-      store.setState({
-        endedElsewhere: undefined,
-        endedInAnotherTab: undefined,
-        status: "signed-in",
-        user: granted.user,
-      });
+      store.setState(signedIn(granted.user));
       return granted.user;
     },
     ...notesOf(notes),

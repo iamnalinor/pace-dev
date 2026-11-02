@@ -30,7 +30,10 @@ export type LocalLog = {
   readonly has: (id: string) => boolean;
   /** Shows the events at once, then writes them; a refused write takes them back. */
   readonly persistLocal: (events: readonly Event[]) => Persisted;
-  /** The same for the server's events (unknown ids only), written as synced. */
+  /**
+  The same for the server's events (unknown ids only), written as synced. A store that refuses
+  them rejects with its own error, after taking them back.
+  */
   readonly persistRemote: (events: readonly Event[]) => Persisted;
   /** Reads the whole log from the store again, once the writes in flight have settled. */
   readonly reload: () => Promise<void>;
@@ -225,14 +228,16 @@ const persistRemoteWith =
       try {
         await eventStore.append(batch);
         await eventStore.markSynced(ids);
-      } catch {
+      } catch (error) {
         // Not stored, so not kept (the cursor did not move, the next pull brings them again);
         // an adopted id whose own local write landed is on the disk and stays.
         memory.rollback([
           ...fresh.map((event) => event.id),
           ...adopted.map((event) => event.id).filter((id) => notOnDisk.has(id)),
         ]);
-        return err("persist_failed");
+        // The store's own words go on to the sync's status ("The quota has been exceeded."):
+        // a bare `persist_failed` there says nothing a person could act on (bug-lessons 99).
+        throw error;
       }
       for (const id of ids) {
         notOnDisk.delete(id);

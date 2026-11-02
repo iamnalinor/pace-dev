@@ -70,7 +70,9 @@ const RetryNow = () => {
         backOnline(runtime);
       }}
     >
-      <Text className="font-sans text-footnote font-medium text-label-primary underline">{t("sync.retry")}</Text>
+      <Text className="font-sans text-footnote font-medium text-label-primary underline">
+        {t("sync.retry")}
+      </Text>
     </Pressable>
   );
 };
@@ -149,7 +151,9 @@ const FirstSyncPlaceholder = () => {
   return (
     <View className="flex-1 items-center bg-app px-4" style={{ paddingTop: insets.top + 32 }}>
       <View className="w-full max-w-content gap-4">
-        <Text className="font-sans text-callout text-label-secondary">{t("sync.firstSyncLine")}</Text>
+        <Text className="font-sans text-callout text-label-secondary">
+          {t("sync.firstSyncLine")}
+        </Text>
         <Skeleton label={t("sync.firstSync")} rows={6} />
       </View>
     </View>

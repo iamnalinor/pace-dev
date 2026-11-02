@@ -142,7 +142,9 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
     <>
       <View className="flex-row items-center gap-2 px-2">
         <PaceMark size={22} />
-        <Text className="flex-1 font-sans text-body font-semibold text-label-primary">{t("app.name")}</Text>
+        <Text className="flex-1 font-sans text-body font-semibold text-label-primary">
+          {t("app.name")}
+        </Text>
         <NotificationBell variant="plain" />
       </View>
       {/* Who is signed in, on a line of its own: beside the logo and the bell it had 23 px (QA 17 M6). */}
@@ -155,7 +157,10 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
           className="mb-3 flex-row items-center gap-2 px-2"
         >
           <UserAvatar size={24} />
-          <Text className="min-w-0 flex-1 font-sans text-footnote text-label-secondary" numberOfLines={1}>
+          <Text
+            className="min-w-0 flex-1 font-sans text-footnote text-label-secondary"
+            numberOfLines={1}
+          >
             {owner}
           </Text>
         </View>
