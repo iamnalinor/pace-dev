@@ -300,6 +300,18 @@ describe("formatRelativeDay", () => {
   });
 });
 
+describe("a notification switch's name (QA round 17 review m10)", () => {
+  it("names the kind and the channel the same way in both languages, never «in Phone»", () => {
+    const named = (language: "en" | "ru") =>
+      t(language, "notify.switch", {
+        channel: t(language, "notify.channel.app"),
+        kind: t(language, "notify.kind.event_start"),
+      });
+    expect(named("en")).toBe(`${t("en", "notify.kind.event_start")}: Phone`);
+    expect(named("ru")).toBe(`${t("ru", "notify.kind.event_start")}: Телефон`);
+  });
+});
+
 describe("page header dates", () => {
   it("spells the weekday out in the eyebrow, on the zone's calendar", () => {
     expect(formatEyebrow("2026-10-08T12:00:00.000Z", "Europe/Moscow", "en")).toBe(

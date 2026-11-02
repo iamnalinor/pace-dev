@@ -1,11 +1,11 @@
 import { act, screen, waitFor } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { AppState, Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 
-import { FIRST_SYNC_COVER_MS, SyncFrame } from "./sync-frame.tsx";
+import { backOnline, FIRST_SYNC_COVER_MS, SyncFrame } from "./sync-frame.tsx";
 
 const EMPTY_PAGE = { events: [], more: false, seq: 0, storeId: FAKE_STORE_ID };
 
@@ -165,4 +165,32 @@ describe("the offline line (QA round 17 M5)", () => {
       expect(screen.queryByText(en("errors.offline"))).toBeNull();
     });
   });
+});
+
+describe("back on the network (QA round 17 review m9)", () => {
+  const shown = Object.getOwnPropertyDescriptor(AppState, "currentState");
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (shown !== undefined) {
+      Object.defineProperty(AppState, "currentState", shown);
+    }
+  });
+
+  it.each([
+    ["visible", "active", 1],
+    ["hidden", "background", 0],
+  ] as const)(
+    "in a %s tab syncs at once, and starts the socket only when seen",
+    async (_name, state, starts) => {
+      const runtime = await createTestRuntime({ routes: DEV_LOGIN });
+      await runtime.auth.loginWithDev("1");
+      // React Native's Jest setup makes `currentState` a mock function; the platform gives a string.
+      Object.defineProperty(AppState, "currentState", { configurable: true, value: state });
+      const start = jest.spyOn(runtime.live, "start").mockImplementation(() => undefined);
+      const sync = jest.spyOn(runtime.sync, "syncNow");
+      backOnline(runtime);
+      expect(start).toHaveBeenCalledTimes(starts);
+      expect(sync).toHaveBeenCalledTimes(1);
+    },
+  );
 });

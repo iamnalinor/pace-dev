@@ -226,7 +226,7 @@ test("the bell counts what is unread, the feed answers and reads well", async ({
   await expect(page.getByRole("button", { name: "Yes, still" })).toHaveCount(0);
   await page.goto("/settings");
   await expect(page.getByText("Where each kind of notification goes.")).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Sign-ins in Web" })).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Sign-ins: Web" })).toBeChecked();
   await expectNoA11yViolations(page);
 });
 

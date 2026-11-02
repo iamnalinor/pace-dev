@@ -1,7 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { AppState, Text, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { PaceRuntime } from "#app/runtime.ts";
 import type { MessageKey } from "@pace/core";
 
 import { useAuth, useIsFirstSync, useIsOffline, usePace, useT } from "#app/app-state.tsx";
@@ -72,18 +73,26 @@ const stripMessage = ({
   return isOverdue ? "sync.stillSyncing" : null;
 };
 
-/** Back on the network: the socket and the sync start again at once. */
-const useIsDeviceOfflineWithReconnect = (): boolean => {
-  const { live, sync } = usePace();
-  const { auth } = useAuth();
-  const reconnect = useCallback(() => {
-    if (auth.store.getState().status !== "signed-in") {
-      return;
-    }
+/**
+Back on the network: the sync runs at once, and the socket starts again only in a tab the person
+sees. A hidden tab's socket rests (the app's visibility rule): it starts when the tab is shown.
+*/
+export const backOnline = ({ auth, live, sync }: PaceRuntime): void => {
+  if (auth.store.getState().status !== "signed-in") {
+    return;
+  }
+  if (AppState.currentState === "active") {
     live.stop();
     live.start();
-    void sync.syncNow();
-  }, [auth, live, sync]);
+  }
+  void sync.syncNow();
+};
+
+const useIsDeviceOfflineWithReconnect = (): boolean => {
+  const runtime = usePace();
+  const reconnect = useCallback(() => {
+    backOnline(runtime);
+  }, [runtime]);
   return useIsDeviceOffline(reconnect);
 };
 

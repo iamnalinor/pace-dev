@@ -32,7 +32,7 @@ export const enNotify = {
   "notify.channel.telegram": "Telegram",
   "notify.channel.app": "Phone",
   "notify.channel.web": "Web",
-  "notify.switch": "{kind} in {channel}",
+  "notify.switch": "{kind}: {channel}",
   "notifications.title": "Notifications",
   "notifications.open": "Notifications",
   "notifications.openUnread": "Notifications, {count} unread",

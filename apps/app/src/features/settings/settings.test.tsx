@@ -135,7 +135,7 @@ describe("SettingsScreen", () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     // A table's rows hold cells: each switch sits in one (axe aria-required-children on the web).
-    const switches = screen.getAllByRole("switch", { name: /^Sign-ins in |^Deadline digest in / });
+    const switches = screen.getAllByRole("switch", { name: /^Sign-ins: |^Deadline digest: / });
     expect(switches).toHaveLength(6);
     expect(new Set(switches.map((item) => roleAbove(item)))).toEqual(new Set(["cell"]));
     const digestOnWeb = screen.getByLabelText(
