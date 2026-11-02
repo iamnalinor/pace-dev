@@ -117,8 +117,10 @@ const LineButton = ({
         aria-busy={isBusy}
         aria-disabled={disabled}
         // A 44px target around the 40px circle (hitSlop does nothing on the web, QA round 18 L6);
-        // side by side they touch, and above and below they reach into the card's padding.
-        className="-my-0.5 h-hit-web w-hit-web items-center justify-center active:opacity-70"
+        // side by side they touch. It takes its whole height in the row, which is as tall (one
+        // line and its padding): a reach into the card's padding is clipped by the unfolding
+        // card, so a press there would miss.
+        className="h-hit-web w-hit-web items-center justify-center active:opacity-70"
         disabled={disabled || isBusy}
         onPress={onPress}
       >

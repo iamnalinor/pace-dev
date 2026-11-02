@@ -110,9 +110,12 @@ const withIds = (url: string, seeded: LivedIn): string => {
 /**
 Every screen a signed-in person reads data on, from the router's folder (QA rounds 18 M5, 19 M1
 and 20 M1 each fixed the screens the last round named, and the next round found another: bug-lessons
-class 90). Signing in and the walk-through send a signed-in person on.
+class 90). Signing in and the walk-through send a signed-in person on. The dev gallery
+(`/dev/gallery`, never in a release build) draws fixtures, not the account's data, by design.
 */
-const DATA_URLS = screenUrls(STAND_IN_IDS).filter((url) => !isBare(url));
+const DATA_URLS = screenUrls(STAND_IN_IDS).filter(
+  (url) => !isBare(url) && !url.startsWith("/dev/"),
+);
 
 /** The switches and choices the page draws, as `role:name`. */
 const drawnChoices = async (page: Page): Promise<readonly string[]> =>

@@ -126,7 +126,7 @@ test.describe("tap targets at 390 (QA round 18 L6)", () => {
     const toggle = page.getByRole("switch").first();
     await toggle.scrollIntoViewIfNeeded();
     const isBefore = await toggle.isChecked();
-    // Just outside the drawn switch (its 32 px track), inside its 48 px target.
+    // Just outside the drawn switch (its 32 px track), inside its 48 px target (8 px each side).
     const track = toggle.getByTestId("switch-track");
     const { height, width, x, y } = (await track.boundingBox()) ?? {
       height: 0,
@@ -134,9 +134,9 @@ test.describe("tap targets at 390 (QA round 18 L6)", () => {
       x: 0,
       y: 0,
     };
-    await page.mouse.click(x + width / 2, y - 8);
+    await page.mouse.click(x + width / 2, y - 6);
     await expect(toggle).toBeChecked({ checked: !isBefore });
-    await page.mouse.click(x + width / 2, y + height + 8);
+    await page.mouse.click(x + width / 2, y + height + 6);
     await expect(toggle).toBeChecked({ checked: isBefore });
   });
 });

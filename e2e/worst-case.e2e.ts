@@ -41,6 +41,9 @@ flex row never shrinks (tags, labels, chips, long words and addresses). F-DAT-07
 ellipsizes carries neither `data-text-policy="truncate"` nor its full value.
 */
 const REALISTIC: readonly Known[] = [
+  // At 320 the footer holds Focus, Submit and main's "another time or outcome" button (QA round 20
+  // L3): Submit's label and its hotkey no longer fit (Task 4.5 rebuilds the footer).
+  { finding: "F-DAT-01", match: /: (Сдать|Submit) 1( (и|and) 2)?Ctrl\+Enter$/u },
   { finding: "F-DAT-02", match: /: (Домашка по алгебре 6|Algebra homework 6)$/u },
   { finding: "F-DAT-02", match: /: (Алгебра|Algebra)$/u },
   { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
@@ -53,9 +56,6 @@ const KNOWN: Readonly<Record<(typeof SETS)[number], readonly Known[]>> = {
     { finding: "F-DAT-01", match: /: (Сдать|Submit) 1, 2, 3/u },
     { finding: "F-DAT-02", match: /: \d+\. (Междисциплинарная|Interdisciplinary)/u, scrolls: true },
     { finding: "F-DAT-02", match: /: (Чтение предложений|Reading the committee)/u },
-    { finding: "F-DAT-02", match: /: (Рабочий ноутбук|Work laptop)/u },
-    { finding: "F-DAT-02", match: /: 2001:0db8/u },
-    { finding: "F-DAT-02", match: /: https:\/\/example\.com\/storage/u },
     { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
     { finding: "F-DAT-07", match: /: 🍽️ Обед/u },
     { finding: "F-DAT-07", match: /: 🌿 Bartholomew/u },

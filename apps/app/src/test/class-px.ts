@@ -5,9 +5,11 @@ type Scale = "size" | "spacing";
 /** Which generated scale a class prefix reads (tailwind.config.js: sizes for h/w, spacing for p/m/gap). */
 const SCALE = {
   h: "size",
+  left: "spacing",
   pb: "spacing",
   pt: "spacing",
   py: "spacing",
+  right: "spacing",
   w: "size",
 } as const satisfies Readonly<Record<string, Scale>>;
 

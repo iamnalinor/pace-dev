@@ -168,12 +168,36 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
   );
 };
 
+/** The notification row, in a list as on the Notifications screen. */
+const NotificationSection = ({ data }: { readonly data: GalleryData }) => {
+  const t = useT();
+  const notification = signInNotification(data);
+  return (
+    <Section title="dev.gallery.section.notification">
+      {notification === null ? (
+        <Text className="font-sans text-subhead font-normal text-label-secondary">
+          {t("dev.gallery.nothing")}
+        </Text>
+      ) : (
+        <View aria-label={t("dev.gallery.section.notification")} role="list">
+          <NotificationItem
+            asking={{ id: null, set: NOTHING }}
+            deliveries={[]}
+            item={notification}
+            listed={{ current: undefined, ids: new Set(), loadedAt: null }}
+            zoned={{ language: data.language, now: GALLERY_NOW, zone: GALLERY_ZONE }}
+          />
+        </View>
+      )}
+    </Section>
+  );
+};
+
 /** The sidebar's header, settings, counts, sessions, inbox, the toast and the notification row. */
 export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
   const t = useT();
   const sessions = sessionRows(data);
   const cards = inboxCards(data);
-  const notification = signInNotification(data);
   return (
     <>
       <Section title="dev.gallery.section.sidebar">
@@ -223,27 +247,18 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
             {t("dev.gallery.nothing")}
           </Text>
         ) : (
-          cards.map((card) => <CardView card={card} key={card.id} />)
+          // A card is a list item, as in the Inbox: it sits in a list here too (axe).
+          <View aria-label={t("nav.inbox")} className="gap-3" role="list">
+            {cards.map((card) => (
+              <CardView card={card} key={card.id} />
+            ))}
+          </View>
         )}
       </Section>
       <Section title="dev.gallery.section.toast">
         <Toasts data={data} />
       </Section>
-      <Section title="dev.gallery.section.notification">
-        {notification === null ? (
-          <Text className="font-sans text-subhead font-normal text-label-secondary">
-            {t("dev.gallery.nothing")}
-          </Text>
-        ) : (
-          <NotificationItem
-            asking={{ id: null, set: NOTHING }}
-            deliveries={[]}
-            item={notification}
-            listed={{ current: undefined, ids: new Set(), loadedAt: null }}
-            zoned={{ language: data.language, now: GALLERY_NOW, zone: GALLERY_ZONE }}
-          />
-        )}
-      </Section>
+      <NotificationSection data={data} />
     </>
   );
 };

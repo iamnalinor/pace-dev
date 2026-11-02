@@ -9,7 +9,7 @@ import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { MOSCOW, NOW } from "@pace/core/testing";
 
 import { BOTTOM_PX, dayLabel, LABELS_PX } from "./week-grid.tsx";
-import { laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
+import { COLUMN_INSET_PX, laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
 import { WeekScreen } from "./week-screen.tsx";
 
 /** 12:30–14:00 in Moscow today, with everything a phone's calendar can tell about it. */
@@ -193,6 +193,15 @@ describe("WeekScreen", () => {
     expect(drawn).toBeLessThanOrEqual(700 - classPx(hint, "h"));
   });
 
+  it("widens a phone's column by the insets its blocks keep, as the classes draw them (class 11, mirrors)", async () => {
+    await renderScreen(<WeekScreen />, await world());
+    await measure(700);
+    const [blocks] = await screen.findAllByTestId("week-blocks");
+    expect(blocks).toBeDefined();
+    const area = blocks as { readonly props: object };
+    expect(COLUMN_INSET_PX).toBe(classPx(area, "left") + classPx(area, "right"));
+  });
+
   it("shows the night hours when asked, from the header and in the settings", async () => {
     const runtime = await world();
     await renderScreen(<WeekScreen />, runtime);
@@ -258,7 +267,7 @@ describe("phoneColumnPx", () => {
     expect(phoneColumnPx(1, 72)).toBe(72);
     for (const lanes of [2, 3, 4]) {
       const width = phoneColumnPx(lanes, 72);
-      expect((width - 8) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
+      expect((width - COLUMN_INSET_PX) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
     }
   });
 });

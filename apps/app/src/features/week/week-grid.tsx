@@ -92,7 +92,7 @@ const UsageStrip = ({ hourPx, place, usage }: Grid & Pick<GridProps, "usage">) =
     const at = place(session);
     return at === null ? null : (
       <View
-        className="absolute left-0 w-1 bg-label-secondary opacity-40"
+        className="absolute left-0 w-0.5 bg-label-secondary opacity-40"
         key={`${session.deviceId}-${session.app}-${session.startAt}`}
         style={{ height: Math.max(1, px(at.height, hourPx)), top: px(at.top, hourPx) }}
       />
@@ -281,7 +281,8 @@ const DayColumn = ({
             style={{ top: px(nowMinutes, hourPx) }}
           />
         ) : null}
-        <View className="absolute bottom-0 left-2 right-0.5 top-0">
+        {/* The blocks clear the 2 px usage strip by 2 px, and the right edge by 2 (`COLUMN_INSET_PX`). */}
+        <View className="absolute bottom-0 left-1 right-0.5 top-0" testID="week-blocks">
           <DayItems
             grid={grid}
             laidOut={laidOut}
