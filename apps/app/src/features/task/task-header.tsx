@@ -11,7 +11,7 @@ import { inkClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
-import { useToast } from "#app/ui/toast.tsx";
+import { toastQuote, useToast } from "#app/ui/toast.tsx";
 
 /** Deletes the task at once and goes back; the toast's Undo brings it back. */
 const useDeleteTask = (view: TaskViewModel): (() => void) => {
@@ -29,7 +29,7 @@ const useDeleteTask = (view: TaskViewModel): (() => void) => {
       back();
       const [revocation] = result.value;
       toast.show({
-        message: t("task.deleted", { title: view.title }),
+        message: t("task.deleted", { title: toastQuote(view.title) }),
         ...(revocation !== undefined && {
           action: {
             label: t("common.undo"),

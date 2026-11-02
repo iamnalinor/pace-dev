@@ -13,6 +13,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { toastQuote } from "#app/ui/toast.tsx";
 import { type Actions, type Assistant, doneLines, type Unread, unreadOf } from "@pace/client";
 
 /** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
@@ -64,7 +65,10 @@ const approvalFeedback = ({
     ? undefined
     : {
         action: { label: t("common.undo"), onPress: undoWritten(written, actions, run) },
-        success: done.length === 0 ? t("assistant.approved") : done.join("; "),
+        success:
+          done.length === 0
+            ? t("assistant.approved")
+            : done.map((line) => toastQuote(line)).join("; "),
       };
 
 /** An answer worth showing as a preview; `null` when there is nothing to approve. */

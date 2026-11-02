@@ -300,6 +300,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "dev.gallery.section.counts": "Числа и длительности",
   "dev.gallery.section.sessions": "Строки сессий",
   "dev.gallery.section.inbox": "Входящие",
+  "dev.gallery.section.toast": "Всплывающее сообщение",
   "dev.gallery.section.notification": "Уведомление",
   "dev.gallery.section.taskHeader": "Шапка задачи",
   "dev.gallery.section.taskFooter": "Подвал задачи",

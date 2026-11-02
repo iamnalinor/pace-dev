@@ -1,7 +1,7 @@
 import * as fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { capitalize, initials, splitGraphemes } from "./initials.ts";
+import { capitalize, clipText, initials, splitGraphemes } from "./initials.ts";
 
 const FOX = "\u{1F98A}";
 
@@ -197,5 +197,24 @@ describe("without regular-expression property escapes", () => {
       { numRuns: 200 },
     );
     expect(rejected).toHaveBeenCalled();
+  });
+});
+
+describe("clipText", () => {
+  it("keeps a text that fits, and ends a longer one with an ellipsis inside the limit", () => {
+    expect(clipText("Buy milk", 8)).toBe("Buy milk");
+    expect(clipText("Buy milk tomorrow", 8)).toBe("Buy mil…");
+    expect(splitGraphemes(clipText("Домашка по алгебре номер шесть", 10))).toHaveLength(10);
+  });
+
+  it("never cuts an emoji or a letter from its marks", () => {
+    const family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+    expect(clipText(`${FOX}${family}${FOX}`, 2)).toBe(`${FOX}…`);
+    fc.assert(
+      fc.property(fc.string({ unit: "grapheme" }), fc.integer({ max: 40, min: 1 }), (text, max) => {
+        const clipped = clipText(text, max);
+        return isWellFormed(clipped) && splitGraphemes(clipped).length <= max;
+      }),
+    );
   });
 });

@@ -20,6 +20,7 @@ import { ColorTag, IMPORTANCE_HUES } from "#app/ui/color.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
+import { ToastCard, toastQuote } from "#app/ui/toast.tsx";
 import { openTasksLabel } from "@pace/client";
 import { formatCount, formatDuration, type MessageKey } from "@pace/core";
 
@@ -167,7 +168,45 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
   );
 };
 
-/** The sidebar's header, settings, counts, sessions, inbox and the notification row. */
+/**
+The toast at its narrowest (docked in the sidebar's column) and at a phone's width: the refusal
+sentence of a rolled-back tap whole (QA round 18 R18-01), and a done task quoted short with Undo.
+The overflow sweep reads every line of it.
+*/
+const Toasts = ({ data }: { readonly data: GalleryData }) => {
+  const t = useT();
+  const [task] = data.tasks;
+  const toasts = [
+    { message: t("actionError.persist_failed") },
+    ...(task === undefined
+      ? []
+      : [
+          {
+            action: { label: t("common.undo"), onPress: NOTHING },
+            message: t("now.doneToast", { title: toastQuote(task.title) }),
+          },
+        ]),
+  ];
+  return (
+    <View className="gap-3" testID="gallery-toasts">
+      {["w-sidebar-inner", "w-full max-w-toast-max"].map((width) => (
+        <View className="gap-3" key={width}>
+          {toasts.map((toast) => (
+            <ToastCard
+              className={width}
+              isDocked={width === "w-sidebar-inner"}
+              key={toast.message}
+              onDone={NOTHING}
+              toast={toast}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/** The sidebar's header, settings, counts, sessions, inbox, the toast and the notification row. */
 export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
   const t = useT();
   const sessions = sessionRows(data);
@@ -224,6 +263,9 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
         ) : (
           cards.map((card) => <CardView card={card} key={card.id} />)
         )}
+      </Section>
+      <Section title="dev.gallery.section.toast">
+        <Toasts data={data} />
       </Section>
       <Section title="dev.gallery.section.notification">
         {notification === null ? (

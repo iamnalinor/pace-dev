@@ -49,6 +49,15 @@ export const splitGraphemes = (text: string): string[] => {
     : Array.from(text.matchAll(cluster), (found) => found[0]);
 };
 
+/**
+A text cut to at most `max` graphemes, its end replaced by `…` when it was longer: a value from
+data quoted in a sentence (a task title in a toast) without the sentence ever being cut.
+*/
+export const clipText = (text: string, max: number): string => {
+  const graphemes = splitGraphemes(text);
+  return graphemes.length <= max ? text : `${graphemes.slice(0, max - 1).join("")}…`;
+};
+
 /** From U+1F000 on lie the emoji planes (the fallback's idea of a pictograph). */
 const FIRST_EMOJI_PLANE_POINT = 0x1_f0_00;
 

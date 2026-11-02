@@ -873,12 +873,12 @@ PRODUCT principle 2); Cancel exists only in confirmations.
 - **Fixes.** F-A11Y-01, F-COL-03, F-WEB-08, F-LAY-09.
 
 #### 4.2.30 `toast.tsx` — **rewrite** (placement rule 4.1.4)
-- **Anatomy.** `Surface level="elevated"`, `radius.lg`, padding `space.3` / `space.4`; message `type.callout` `label.primary` (`clamp(2)`) · [action `Button plain sm`, `accent.text`, e.g. «Вернуть»] · dismiss `IconButton` (`X` `icon.control`, labelled «Закрыть»). Compact width = viewport − 2 × `gutter`; expanded max `inspector.width`. The old `inverse` look and the sidebar dock go.
+- **Anatomy.** `Surface level="elevated"`, `radius.lg`, padding `space.3` / `space.4`; message `type.callout` `label.primary` (`wrap`: the whole sentence, never clamped — spec 4.1.2 rule 3; a value from data quoted in it is cut at its slot to 48 graphemes by `toastQuote`, QA round 18 R18-01) · [action `Button plain sm`, `accent.text`, e.g. «Вернуть»] · dismiss `IconButton` (`X` `icon.control`, labelled «Закрыть»). Compact width = viewport − 2 × `gutter`; expanded max `inspector.width`. The old `inverse` look and the sidebar dock go.
 - **States.** The action and dismiss buttons carry the state layer; the message is not pressable or focusable (F-A11Y-14). No error variant (refusals are inline).
 - **Phone / desktop / Android.** Compact: also dismissed by a horizontal swipe. Offsets from measured chrome and `env(safe-area-inset-bottom)` (F-CMP-12).
 - **Motion.** §6 toast (8 px rise + fade 220, exit fade + 4 px drop 160; reduced fade) through `Presence`; §6 check a task (Undo toast) starts with the dissolve.
 - **A11y.** `role="status"` polite, announced once; timer pauses on hover/focus (WCAG 2.2.1).
-- **Worst case.** A 300-char task title in «Готово: ‹title›» clamps to 2 lines (the 3-line clamp showed half a 4th line); the action never wraps under the text.
+- **Worst case.** A 300-char task title in «Готово: ‹title›» is quoted as its first 47 graphemes and `…` (about two lines in the narrowest toast), the sentence around it whole; the longest refusal («Не удалось сохранить это на устройстве, поэтому ничего не изменилось. Попробуйте снова.») reads in full at the narrowest width (the 3-line clamp cut it, R18-01; `e2e/worst-case.e2e.ts` reads every line of the gallery's toasts); the action never wraps under the text.
 - **Fixes.** F-CMP-12, F-MOT-11, F-A11Y-14, F-A11Y-02, F-CPY-02, F-CPY-03, F-COL-08.
 
 #### 4.2.31 `tooltip.tsx` (+ `.web.tsx`) — **rewrite**

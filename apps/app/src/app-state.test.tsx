@@ -406,6 +406,65 @@ describe("PaceProvider", () => {
     expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
   });
 
+  it("after Log out the network goes quiet: only the logout names the session, nothing goes without one (QA round 18 R18-02)", async () => {
+    const { api, runtime } = await setup();
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("sync")).toHaveTextContent("synced");
+    });
+    const before = api.calls.length;
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    await act(async () => {
+      // Whatever the sign-out sets off (the wipe, the loop's last tick, a foreground return).
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    // The server check (`/api/instance`) is public and names no one.
+    const named = api.calls.slice(before).filter((call) => call.path !== "/api/instance");
+    expect(named.map((call) => [call.path, call.headers["authorization"]])).toEqual([
+      ["/api/auth/logout", "Bearer tok_dev"],
+    ]);
+    expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
+  });
+
+  it("a session refused at start asks nothing more once it is signed out (QA round 18 R18-02)", async () => {
+    const { api, runtime } = await setup({
+      "GET /api/me": () => problem(401, "auth/unauthorized"),
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    const after = api.calls.length;
+    await act(async () => {
+      runtime.sync.soon();
+      await runtime.notifications.refresh();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    expect(api.calls.slice(after)).toEqual([]);
+    // A remote end is still told as one: the login card explains it.
+    expect(runtime.auth.store.getState().endedElsewhere).toBe(true);
+  });
+
   it("starts the background check once signed in, and stops it on logout", async () => {
     const background = BackgroundTask as unknown as ReturnType<typeof createFakeBackgroundTask>;
     background.registerTaskAsync.mockClear();

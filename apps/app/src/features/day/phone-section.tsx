@@ -11,7 +11,7 @@ import { isAttendableNow } from "#app/shared/tracking/calendar-today.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { useToast } from "#app/ui/toast.tsx";
+import { toastQuote, useToast } from "#app/ui/toast.tsx";
 import { type DayEntry, type DayRow, isCalendarRun } from "@pace/client";
 import { formatDuration } from "@pace/core";
 
@@ -169,7 +169,10 @@ const CalendarRow = ({
                   actions.startCalendar(event),
                   action === undefined
                     ? undefined
-                    : { action, success: t("phone.attendedDone", { title: event.title }) },
+                    : {
+                        action,
+                        success: t("phone.attendedDone", { title: toastQuote(event.title) }),
+                      },
                 );
               }}
               variant="ghost"

@@ -26,6 +26,8 @@ const setup = async (
   const api = createApiClient({
     baseUrl: "https://api.test",
     fetch: fake.fetch,
+    // Wired as `createPaceClient` wires it.
+    sessionEnded: () => auth.hasEnded(),
     token: () => auth.token(),
   });
   const auth = createAuth({ api, session });
@@ -282,6 +284,40 @@ describe("createAuth logout", () => {
     expect(calls).toEqual([]);
     expect(auth.token()).toBeUndefined();
     await expect(session.get()).resolves.toBeNull();
+    expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
+  it("forgets the token before it tells the server: only the logout carries it, and the reason is the person's own (QA round 18 R18-02)", async () => {
+    const seen: { token?: string | undefined; status?: string } = {};
+    const held: { release?: () => void } = {};
+    const { auth, calls, session } = await setup(
+      {
+        "GET /api/me": () => problem(401, "auth/unauthorized"),
+        "POST /api/auth/logout": async () => {
+          seen.token = auth.token();
+          seen.status = auth.store.getState().status;
+          await new Promise<void>((resolve) => {
+            held.release = resolve;
+          });
+          return { ok: true };
+        },
+      },
+      "stored",
+    );
+    const loggingOut = auth.logout();
+    await vi.waitFor(() => {
+      expect(held.release).toBeDefined();
+    });
+    // Signed out here before the server ends the session: the socket's 4401, a sync or a
+    // session check set off meanwhile has no token to send and nothing to call "ended elsewhere".
+    expect(seen).toEqual({ status: "signed-out", token: undefined });
+    await expect(session.get()).resolves.toBeNull();
+    await expect(auth.me()).resolves.toEqual({ error: "auth/unauthorized", ok: false });
+    held.release?.();
+    await loggingOut;
+    expect(calls.map((call) => [call.path, call.headers["authorization"]])).toEqual([
+      ["/api/auth/logout", "Bearer stored"],
+    ]);
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
   });
 

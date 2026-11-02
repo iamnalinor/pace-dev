@@ -420,6 +420,36 @@ The same rule applies when a previously successful channel is no longer configur
   - On 4401 the client stops reconnecting and checks its session (`me`), so a 401 signs it out.
   - Test: revoke from each path while a socket is open (`live.int.test.ts`: Settings, Not me, logout, expiry, forged headers).
   - Sweep: the live socket is the only channel that outlasts a request. MCP and the OAuth tokens are checked per request, and agent tokens cannot open a socket.
+- **Instance (QA round 18 R18-02), the client side: a device that ends its own session keeps
+  using it.** Log out told the server first and forgot the token after: the server ends the session
+  and closes its socket (4401) before it answers, so a socket close, a sync or a session check set
+  off in that gap went out with the revoked token, and a check's 401 called the person's own sign-out
+  "ended elsewhere". After the sign-out the wipe re-rendered Now and Day, whose calendar reads (and,
+  on a start with a revoked token, the bootstrap's pull and notification fetch) went out with no
+  token at all: each a 401 and a console error. Ending "This device" from the list had been fixed
+  for the socket (fix round 1 of QA round 15: the socket rests first); Log out was not swept with
+  it. The reported "ended on another device" after a reload was the QA script's: its init script
+  put the revoked token back on every load. **Missed because** the logout tests had no socket and
+  no screen mounted, the e2e logout checked only the URL and the heading, and no test counted the
+  requests after a sign-out. **Rule.** A device forgets its session before it tells the server
+  (`logout`: sign out locally, then `POST /api/auth/logout` with the token it had, through
+  `call(…, { credential })`); and once a session of this device has ended (`auth.hasEnded()`: by
+  hand, from the list, by a 401), a call whose contract needs one (`auth: true`, the flag the
+  Worker's `mount` guards with) is not sent without a token: the API client answers it with the
+  server's own 401 `auth/unauthorized` locally. (A device that never had a session reaches no
+  screen that makes such calls: the route gate. The app's screen tests render signed-in screens on
+  a signed-out runtime, so the stricter "never without a token" would need that fixture rebuilt.) Server side traced: `deleteSession` still closes the
+  sockets and answers the logout; the logout route still needs the bearer; nothing else changed.
+  **Sweep.** Every way a session ends here: Log out (fixed), ending this device from the list (the
+  socket rests first, then `forget`), account deletion and a remote revoke (`forget` / `me`'s 401,
+  local only); after a session ended, every call that needs one stops in the client (the
+  calendar reads, the sync, the notification feed, usage). **Guard.** Client tests: the logout carries the old token
+  and is the only request after it, the device is signed out before it leaves, a 4401 during it
+  checks nothing; once the session ended, a call needing one is not sent; app tests: after Log out only
+  the logout names the session, a start refused by a 401 asks nothing more; e2e (`login.e2e.ts`):
+  after Log out on a lived-in account no request names the session but the logout, no 4xx, no
+  console error, and a reload shows no "ended elsewhere"; `loginViaApi` puts the token in once per
+  tab and `docs/qa.md` tells QA scripts to do the same.
 
 ### 49. Text a client chose shown as what the server saw
 - **Bug.** Review of the sign-in notices (phase C, Task 5): a deep-link nonce is minted by whoever asks for it, with any `deviceName`. Someone who gets a person to open their link would get a session on that person's account, and a notice that opened with "You signed in from Pixel 9a" would vouch for it in words the stranger chose.
@@ -1035,6 +1065,26 @@ The same rule applies when a previously successful channel is no longer configur
 - **Bug.** Review 05 (break-ui, F-DAT-01/02/07): React Native gives every View `flexShrink: 0`, so a project name, an activity label or an address from data runs past its box or under a control, a truncated text shows its full value nowhere, and a label built from a list (the submit button) grows with the list. Task 1.4's sweep found the same break in the running tag, the sidebar header and the Week labels on realistic data, not only on the worst case.
 - **Missed because.** Every fixture was short, one language and one width; the design-shots matrix looks at screenshots, not at boxes.
 - **Rule.** Text from data yields (spec 4.1.2) and every truncation says so with `data-text-policy="truncate"` and its full value. The guard is `e2e/worst-case.e2e.ts` over the dev gallery (`/dev/gallery`, fixtures in `packages/core/src/testing/worst-case.ts`): every overflowing element must be in its `KNOWN` list with a finding id, and an entry that no longer matches fails, so the task that fixes a break deletes the entry. A new component or screen gets a gallery section in the same change.
+- **Instance (QA round 18 R18-01): a clamp meant for data cut a sentence of the UI.** The toast
+  clamped its whole message to three lines (`numberOfLines={3}`, there for a quoted task title), and
+  on a computer it docks in the sidebar's ~200 px column: the sentence Task 2.5 added for a refused
+  write («Не удалось сохранить это на устройстве, поэтому ничего не изменилось. Попробуйте снова.»,
+  five lines there) lost its end, the one sentence that says why a tap was taken back. **Missed
+  because** every refusal test read the sentence from the tree (`getByText`), which holds every word
+  whatever the clamp; the gallery had no toast, and the overflow sweep measured width only, never
+  text cut off at the bottom. **Rule.** A limit belongs to a value from data, never to the sentence
+  around it (spec 4.1.2 rule 3): UI text wraps in full, a quoted value is cut at its slot
+  (`toastQuote`: 48 graphemes, by grapheme through core's `clipText`). **Sweep.** Every toast that
+  quotes data now quotes it short (a done task, a deleted task, an attended event, the assistant's
+  approval lines); the export file name (generated, short) and the crash path (needed in full) stay
+  whole; every toast sentence of its own shows whole (`actionError.*`, `settings.push.notSaved`,
+  `notifications.failedAction`, `phone.ruleSaved`, `crash.saved`). Other UI copy under a line limit,
+  owned by their kit tasks (spec 4.1.2: chrome labels wrap to two lines): the tab labels
+  (`tab-bar.tsx`, Task 3.10), the time-bar tile labels (`time-bar.tsx`, Task 4.2), Insights' row
+  names (Task 4.9). **Guard.** `toast.test.tsx` (no line limit on the message; the three longest
+  sentences in both languages; `toastQuote` length), the gallery's Toast section at the docked and
+  the phone width, and `e2e/worst-case.e2e.ts`, which fails any toast line cut off at the bottom
+  (never a known break).
 
 ### 59. Locale formatting by hand
 - **Bug.** Design review 05 (F-CPY-04): Insights showed «3.3» and «0.0» in Russian (`toFixed(1)`), a count of 1 284 read «1284» (`String(count)`), Russian durations were «23 ч 58 м» (a breaking space, «м» reads as metres) and `formatDuration` never rolled hours into days («Оценка 168 ч») while `formatLeft` did. The catalog held «15 минут» and «2,5 ч» with plain spaces, so a unit could land alone at the start of a line.
@@ -1385,3 +1435,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Batch 1+2 close-out, full e2e: Week at 390 px scrolled once the night hours were on (`week.e2e.ts:183`). Root cause: Task 2.2 rounded the day-names row and gutter `h-7`/`pt-7` → `h-8`/`pt-8` and left `LABELS_PX = 28`, so the fit counted 4 px that were drawn (680 in 676). The two-line header was not the cause: it wraps at 390 px before the migration too (142 px tall then, 144 now). Missed because the jest fit test repeated the arithmetic with the same constant, and since Task 2.2 tasks ran only e2e subsets (smoke, route-sweep, worst-case, latency, notifications, time), never `week.e2e.ts` | 11 (mirrors) | yes: every `*_PX`/height constant in `apps/app` against the class it restates: the composer's `MAX_INPUT_HEIGHT` assumed 24 px lines (fixed: 8 × the `callout` line + `py-3`, from `typeRole`), its minimum, Week's `BOTTOM_PX` (the hint row's `h-6`) and the toast's `TAB_BAR_HEIGHT` (72 still clears the 69 px bar) hold | `classPx`/`classLinePx` (`apps/app/src/test/class-px.ts`); Week "fits the whole day as drawn" and composer "eight lines" app tests; the full `bun test:e2e` line in docs/qa.md (step 4) and the plan's batch checklist |
 | 2026-11-02 | Batch 1+2 close-out, full e2e: axe colour-contrast on the selected task row (`composer.e2e.ts:27`, `journeys.e2e.ts:58`): tertiary meta 4.30 / 3.96:1 and the green tag 4.18:1 on `fill.3`. Root cause: Task 2.2 mapped `bg-raised` → `fill.3` by name; the meta line on it was never a measured pair. Missed because `USED_PAIRS` had no selected-row ground and no two-layer pair, and the e2e files that open a task beside the list did not run after Task 2.2 (subsets only) | 61 | yes: every `fill.3` ground that carries text (sidebar current, Insights tiles, the server facts, presets, code boxes, questions, the project picker: primary or secondary only, measured) and every translucent ground (`accent.quiet`: all ≥ 4.5:1; dark `accent.text` on it over elevated is Lc 59.4, one short of the meta tier, left for the chip rebuild); the OAuth client card (tertiary + warning on `fill.3`) is now `bg-cell` | `SELECTED_ROW_FILL` and its pairs (each meta role, every hue's tag, `between`) plus the neutral tag on `fill.4` in `USED_PAIRS`; `task-row.test.tsx`; the client-card case in `oauth.test.tsx`; the full-e2e checklist line |
 | 2026-11-02 | Review of the batch 1+2 visual fix: a leading icon kept its unselected colour on a chosen (solid accent) chip (1.2-2.7:1); the slider lost its keyboard ring to `input:focus`; Space did not toggle the drawn switch (library default); the switch target was 32 px | 61 (icon, hit target), 62 (new: Space, ring cascade) | yes: every `leading=` caller (3, now a function of the chip's colour), every radio/checkbox/switch `Pressable` (10), every `outline` rule in `global.css` | `chip.test.tsx` (icon colour per state, 48 target), `switch-row.test.tsx` (48 target, inset), `space-press.web.test.ts`, `focus-ring.test.ts`, `e2e/keyboard.e2e.ts` |
+| 2026-11-02 | QA round 18 R18-01: the "could not save, nothing changed" sentence was cut after three lines in the toast (~200 px docked in the sidebar, RU) | 58 | yes: every toast that quotes data (quoted short) and every toast sentence of its own (shown whole); other UI copy under a line limit listed with its owning task | `toast.test.tsx` (no line limit, the three longest sentences EN/RU, `toastQuote`); gallery Toast section; `worst-case.e2e.ts` fails a toast line cut off at the bottom |
+| 2026-11-02 | QA round 18 R18-02: Log out told the server before forgetting the token (a 4401 close, sync or check in the gap used the revoked token, a 401 could read as "ended elsewhere"); after sign-out, screens and the bootstrap sent calls with no token (401s, console errors); the reload notice came from the QA script re-adding the token | 48 (client side) | yes: every way a session ends (logout fixed; this-device revoke, deletion, remote revoke already local-first); after a session ended, every call needing one stops in the client | client tests (logout order, 4401 during logout, no call after the session ended, explicit credential); app tests (quiet network after Log out, refused start asks nothing more); `login.e2e.ts` network-quiet Log out with reload; `loginViaApi` once per tab; `docs/qa.md` line |

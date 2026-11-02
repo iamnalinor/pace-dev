@@ -1,7 +1,9 @@
 import { act, render, screen } from "@testing-library/react-native";
 import { useEffect } from "react";
 
-import { ToastProvider, useToast } from "./toast.tsx";
+import { splitGraphemes, t } from "@pace/core";
+
+import { TOAST_QUOTE_GRAPHEMES, ToastProvider, toastQuote, useToast } from "./toast.tsx";
 
 const Shows = ({ message }: { readonly message: string }) => {
   const toast = useToast();
@@ -45,5 +47,39 @@ describe("ToastProvider", () => {
       jest.advanceTimersByTime(5100);
     });
     expect(screen.getByText(LONG)).toBeOnTheScreen();
+  });
+});
+
+describe("the toast's words (QA round 18 R18-01)", () => {
+  // The sentences a toast says on its own, longest first: a refused tap and the refusals beside it.
+  const SENTENCES = [
+    "actionError.persist_failed",
+    "settings.push.notSaved",
+    "notifications.failedAction",
+  ] as const;
+
+  it.each(["en", "ru"] as const)(
+    "shows a sentence of its own in full, never cut (%s)",
+    async (language) => {
+      for (const key of SENTENCES) {
+        const message = t(language, key);
+        const view = await render(
+          <ToastProvider>
+            <Shows message={message} />
+          </ToastProvider>,
+        );
+        // UI text wraps and is never truncated (spec 4.1.2 rule 3): no line limit on the message.
+        expect(screen.getByText(message).props["numberOfLines"]).toBeUndefined();
+        await view.unmount();
+      }
+    },
+  );
+
+  it("quotes a value from data short, so the sentence around it stays whole", () => {
+    const title = "Междисциплинарная ".repeat(20).trim();
+    const quoted = toastQuote(title);
+    expect(splitGraphemes(quoted)).toHaveLength(TOAST_QUOTE_GRAPHEMES);
+    expect(quoted.endsWith("…")).toBe(true);
+    expect(toastQuote("Buy milk")).toBe("Buy milk");
   });
 });

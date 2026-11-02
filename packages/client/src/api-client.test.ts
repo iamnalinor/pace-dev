@@ -54,6 +54,41 @@ describe("createApiClient", () => {
     });
   });
 
+  it("once the session ended, never sends a call that needs one: it fails here as the server would (QA round 18 R18-02)", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { status: "ok" }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      sessionEnded: () => true,
+      token: () => undefined,
+    });
+    const call = client.call(endpoints.sync.pull, { query: { since: "0" } });
+    await expect(call).rejects.toBeInstanceOf(ApiError);
+    await expect(call).rejects.toMatchObject({ code: "auth/unauthorized", status: 401 });
+    // The same contract flag the Worker mounts its guard from (`mount`): a public call still goes.
+    await client.call(endpoints.health, {});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/health", expect.anything());
+  });
+
+  it("sends a call with the credential it is given, whatever the session in use (a logout after the device forgot it)", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { ok: true }));
+    const client = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: fetchMock,
+      token: () => undefined,
+    });
+    await client.call(endpoints.auth.logout, {}, { credential: "ending" });
+    expect(fetchMock).toHaveBeenCalledWith("https://api.test/api/auth/logout", {
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer ending",
+        "X-Pace-Protocol": "1",
+      },
+      method: "POST",
+    });
+  });
+
   it("turns error bodies into ApiError with the server's code", async () => {
     const client = createApiClient({
       baseUrl: "https://api.test",
@@ -115,8 +150,9 @@ describe("createApiClient", () => {
 });
 
 describe("createApiClient request shaping", () => {
+  // Public, so it is sent without a session: what is pinned here is the URL and the body.
   const bodyEndpoint = endpoint({
-    auth: true,
+    auth: false,
     body: z.object({ title: z.string() }),
     method: "POST",
     output: z.object({ id: z.string() }),

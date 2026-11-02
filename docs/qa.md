@@ -116,7 +116,10 @@ e2e sweep above stands in for the scripted matrix here too.
 > `ALLOWED_TELEGRAM_IDS` list with ids of your own; the web with `EXPO_PUBLIC_API_URL` and
 > `EXPO_PUBLIC_DEV_LOGIN=1`, `build:web` then `serve:web dist 4173`. Sign in and seed as
 > `e2e/support/login.ts` and `e2e/support/seed.ts` (`seedLivedIn`: a Russian lived-in account) do;
-> also use a fresh English account.
+> also use a fresh English account. Put the token in once per tab, as `loginViaApi` does (an init
+> script guarded by a `sessionStorage` mark): an init script runs again on every reload and
+> navigation, so after a Log out it signs the revoked token back in, and the 401s and the "ended
+> on another device" line that follow are the script's, not the app's (QA round 18 R18-02).
 >
 > **This is round <n>, an <intermediate | release> round.** What changed since round <n−1>:
 > <the changed screens, flows and rules, from `git diff --stat` by feature folder>. The fixes of

@@ -69,6 +69,11 @@ type Overflow = {
   readonly gallery: boolean;
   /** Text wider than its box, with what it says. */
   readonly texts: readonly string[];
+  /**
+  Words a toast cut off at the bottom (a line clamp, a fixed height): a toast's sentence is shown
+  whole, only a quoted value from data is short (QA round 18 R18-01). Never a known break.
+  */
+  readonly clipped: readonly string[];
 };
 
 /**
@@ -99,7 +104,19 @@ const measure = async (page: Page): Promise<Overflow> =>
     const innermost = wider.filter((element) =>
       wider.every((other) => other === element || !element.contains(other)),
     );
+    const clipped = [
+      ...document.querySelectorAll<HTMLElement>('[data-testid="gallery-toasts"] *'),
+    ].filter(
+      (element) =>
+        element.textContent.trim() !== "" &&
+        element.clientHeight > 0 &&
+        element.scrollHeight > element.clientHeight + 1,
+    );
     return {
+      clipped: clipped.map(
+        (element) =>
+          `${String(element.scrollHeight)}>${String(element.clientHeight)}: ${element.textContent.trim().slice(0, 60)}`,
+      ),
       gallery: root !== null && root.scrollWidth > root.clientWidth + 1,
       page: document.documentElement.scrollWidth > window.innerWidth,
       texts: innermost.map(
@@ -156,6 +173,7 @@ const judge = (
     matched,
     unexpected: [
       ...found.filter(({ entry }) => entry === undefined).map(({ text }) => `${key} ${text}`),
+      ...overflow.clipped.map((text) => `${key} toast cut off ${text}`),
       ...[`${key} scrolls sideways`].filter(
         () => (overflow.gallery || overflow.page) && !isScrollExplained,
       ),

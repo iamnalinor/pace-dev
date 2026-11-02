@@ -298,6 +298,7 @@ export const enShell = {
   "dev.gallery.section.counts": "Counts and durations",
   "dev.gallery.section.sessions": "Session rows",
   "dev.gallery.section.inbox": "Inbox",
+  "dev.gallery.section.toast": "Toast",
   "dev.gallery.section.notification": "Notification",
   "dev.gallery.section.taskHeader": "Task header",
   "dev.gallery.section.taskFooter": "Task footer",

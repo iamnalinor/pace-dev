@@ -58,6 +58,12 @@ export type Auth = {
   /** Resolves once the stored token is loaded. */
   readonly ready: Promise<void>;
   readonly token: () => string | undefined;
+  /**
+  Whether this device's session ended since it started (signed out by hand, from the list, by a
+  401 or a refused adopted token) and no new one began: the API client then sends nothing that
+  needs a session (QA round 18 R18-02).
+  */
+  readonly hasEnded: () => boolean;
   /** Errors are the API's code (`auth/not-allowed`, ...) or `network`. */
   readonly loginWithTelegram: (payload: TelegramLogin) => Promise<Result<User, string>>;
   readonly loginWithDev: (telegramId: string) => Promise<Result<User, string>>;
@@ -68,7 +74,10 @@ export type Auth = {
   readonly startBotLogin: (from: "app" | "web", device?: LoginDevice) => Promise<BotLogin>;
   /** Rebuilds the poller for a nonce held by a login page across a reload. */
   readonly resumeBotLogin: (nonce: string) => BotLoginPoll;
-  /** Tells the server, then forgets the token even when the server could not be reached. */
+  /**
+  Forgets the token, then tells the server with it (even when the server cannot be reached, the
+  device stays signed out): nothing else is sent with the session once the person signed out.
+  */
   readonly logout: () => Promise<void>;
   /**
   Ends this device's own session from its device list: `revoke` asks the server, then the token
@@ -299,16 +308,21 @@ export const createAuth = (options: {
       await login(async () => await api.call(endpoints.auth.telegram, { body: payload })),
     logout: async () => {
       const leaving = session.token();
-      // The note goes before the request: another tab's 401 can come before its answer.
-      if (leaving !== undefined) {
-        await session.leaveNote(leaving);
+      if (leaving === undefined) {
+        await session.signOut();
+        return;
       }
+      // The note goes before anything else: another tab's 401 can come before the answer.
+      await session.leaveNote(leaving);
+      // Forgotten here first, then the server is told with the token it had: once the server
+      // ends the session it closes this device's socket (4401) and answers anything else 401,
+      // and a check or a sync set off by that would read the person's own sign-out as "ended
+      // elsewhere" (QA round 18 R18-02). Signed out, the device sends nothing more with it.
+      await session.signOut();
       try {
-        await api.call(endpoints.auth.logout, {});
+        await api.call(endpoints.auth.logout, {}, { credential: leaving });
       } catch {
         // The session is dropped locally regardless; the server expires it on its own.
-      } finally {
-        await session.signOut();
       }
     },
     me,
@@ -318,6 +332,7 @@ export const createAuth = (options: {
       const created = await api.call(endpoints.auth.nonceCreate, { body: device, query: { from } });
       return { ...created, waitForToken: waitForToken(api, session, created.nonce) };
     },
+    hasEnded: session.hasEnded,
     store: session.store,
     token: session.token,
   };

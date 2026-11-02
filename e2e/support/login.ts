@@ -66,11 +66,17 @@ export const loginViaApi = async (
 ): Promise<{ readonly token: string }> => {
   await resetAccount(telegramId);
   const { token } = await createDevSession(telegramId);
+  // Once per tab, as a person signs in once: an init script runs again on every reload, and a
+  // token put back after the app's own Log out signed a revoked session in again (QA round 18).
   await page.addInitScript(
-    ({ key, value }) => {
+    ({ key, marker, value }) => {
+      if (sessionStorage.getItem(marker) !== null) {
+        return;
+      }
+      sessionStorage.setItem(marker, "1");
       localStorage.setItem(key, value);
     },
-    { key: SESSION_KEY, value: token },
+    { key: SESSION_KEY, marker: "pace.e2e.signed-in", value: token },
   );
   return { token };
 };

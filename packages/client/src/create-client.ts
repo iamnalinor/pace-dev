@@ -263,12 +263,16 @@ const sessionCheck = (
   };
 };
 
-/** The API client and the auth it reads its token from, each 401 of it checking the session. */
+/**
+The API client and the auth it reads: the token (synchronously, on every request) and whether this
+device's session has ended; each 401 of it checks the session.
+*/
 const apiAndAuth = (
   options: PaceClientOptions,
 ): { readonly api: ApiClient; readonly auth: Auth } => {
   // The API client reads the token synchronously, so it is wired before auth exists.
   const wiring = {
+    hasEnded: (): boolean => false,
     heard: (_credential: string, _endpoint: EndpointShape): void => undefined,
     token: (): string | undefined => undefined,
   };
@@ -278,10 +282,12 @@ const apiAndAuth = (
     onUnauthorized: (credential, endpoint) => {
       wiring.heard(credential, endpoint);
     },
+    sessionEnded: () => wiring.hasEnded(),
     token: () => wiring.token(),
   });
   const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
   wiring.token = auth.token;
+  wiring.hasEnded = auth.hasEnded;
   wiring.heard = sessionCheck(auth, api);
   return { api, auth };
 };

@@ -1,6 +1,7 @@
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
 import { documentGround, rgb } from "./support/theme-colors.ts";
+import { pushAsClient, seedLivedIn, ulid } from "./support/seed.ts";
 
 test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await resetAccount(DEV_TELEGRAM_ID);
@@ -38,6 +39,90 @@ test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/u);
   // Logout drops the local copy of the log, the language with it: the card is in English again.
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+});
+
+test("after Log out the network goes quiet: no request names the session, nothing is refused, a reload explains nothing (QA round 18 R18-02)", async ({
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  // A lived-in account (calendar, notifications, a running activity), read in English.
+  await seedLivedIn(token);
+  const at = new Date().toISOString();
+  const english = await pushAsClient(token, [
+    {
+      deviceId: "e2e-seed",
+      id: ulid(Date.now()),
+      occurredAt: at,
+      payload: { language: "en" },
+      precision: "exact",
+      recordedAt: at,
+      source: "web",
+      type: "settings.updated",
+    },
+  ]);
+  expect(english.ok).toBe(true);
+  const after: { readonly method: string; readonly path: string; readonly auth?: string }[] = [];
+  const refused: string[] = [];
+  const errors: string[] = [];
+  const watching = { isOn: false };
+  const pending = new Set<unknown>();
+  page.on("request", (request) => {
+    pending.add(request);
+    const { pathname } = new URL(request.url());
+    if (!watching.isOn || !pathname.startsWith("/api/")) {
+      return;
+    }
+    const auth = request.headers()["authorization"];
+    after.push({ method: request.method(), path: pathname, ...(auth !== undefined && { auth }) });
+  });
+  page.on("requestfinished", (request) => {
+    pending.delete(request);
+  });
+  page.on("requestfailed", (request) => {
+    pending.delete(request);
+  });
+  page.on("response", (response) => {
+    if (watching.isOn && response.status() >= 400) {
+      refused.push(`${String(response.status())} ${response.url()}`);
+    }
+  });
+  page.on("console", (message) => {
+    if (watching.isOn && message.type() === "error") {
+      errors.push(message.text());
+    }
+  });
+  // Now and Day mounted first: their calendar reads, the sync loop and the socket all run.
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Day" }).click();
+  await expect(page.getByRole("heading", { name: "Day" })).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Settings" })
+    .click();
+  // The start has had its answers (sync, calendar, notifications): what follows is the sign-out's.
+  await expect.poll(() => pending.size).toBe(0);
+  watching.isOn = true;
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page).toHaveURL(/\/login$/u);
+  // Long enough for a socket close, a retry or a screen's refetch to show itself.
+  // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- a quiet network is the absence of requests over a window; no DOM condition marks it
+  await page.waitForTimeout(2000);
+  expect(after.filter((request) => request.auth !== undefined)).toEqual([
+    { auth: `Bearer ${token}`, method: "POST", path: "/api/auth/logout" },
+  ]);
+  // Only the public server check may follow, and it names no one.
+  expect(after.filter((request) => request.path !== "/api/instance").map((r) => r.path)).toEqual([
+    "/api/auth/logout",
+  ]);
+  expect(refused).toEqual([]);
+  expect(errors).toEqual([]);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+  await expect(page.getByText(/You were signed out/u)).toHaveCount(0);
+  expect(refused).toEqual([]);
+  expect(errors).toEqual([]);
 });
 
 test("the theme choice is kept per device and paints the page", async ({ page }) => {

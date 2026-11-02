@@ -93,6 +93,33 @@ describe("createPaceClient", () => {
     client.live.stop();
   });
 
+  it('a logout\'s own 4401 close checks nothing: no request after the logout, no "ended elsewhere" (QA round 18 R18-02)', async () => {
+    const socket = oneSocket();
+    const { api, client } = await setup(
+      {
+        "GET /api/me": () => fakeMe,
+        "POST /api/auth/logout": () => {
+          // The Worker closes the session's sockets before it answers (`deleteSession`).
+          socket.emit("close", { code: LIVE_SESSION_ENDED });
+          return { ok: true };
+        },
+      },
+      "tok",
+      socket.create,
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    client.live.start();
+    socket.emit("open", {});
+    const before = api.calls.length;
+    await client.auth.logout();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(api.calls.slice(before).map((call) => call.path)).toEqual(["/api/auth/logout"]);
+    expect(client.auth.store.getState()).toEqual({ status: "signed-out", user: null });
+    client.live.stop();
+  });
+
   it("opens the live socket again when its close was not the end of the session", async () => {
     const socket = oneSocket();
     const { client } = await setup({}, "tok", socket.create);
