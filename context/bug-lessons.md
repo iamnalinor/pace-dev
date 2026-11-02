@@ -717,6 +717,24 @@ The same rule applies when a previously successful channel is no longer configur
   line") skips when the same thing was just read and nothing was written since. Test it by counting
   a whole start's requests (the e2e first-load test: no URL twice, one pull since 0).
 
+### 90. A guard that names by hand the screens or sheets it covers
+- **Bug.** The first-sync guard listed its routes by hand: QA round 18 M5 fixed Now, round 19 M1
+  found Day and the Assistant log printing zeros, round 20 M1 found Settings and Presets drawing
+  defaults (and live switches that could write them over the account); each fix covered the screens
+  the last round named. The sheet-focus guard listed its sheets by hand too, and the first sweep
+  over a registry of every sheet found the one it lacked: a block's details on a phone's Week took
+  no focus at all (nothing in it to focus but the dim), so the keyboard stayed on the page behind
+  the dialog.
+- **Missed because.** A hand list covers the cases someone remembered when it was written; a new
+  screen or sheet, or one nobody connected to the rule, is never added, and the guard stays green.
+- **Rule.** A guard for an app-wide rule (first sync, focus, Escape, tooltips, the mechanical
+  matrix) loops over a list read from the source: the route files under `apps/app/app`
+  (`e2e/support/routes.ts`), the sheet registry (`apps/app/src/ui/sheet-names.ts`, which `Sheet`
+  requires a name from, a jest test keeping it equal to the sources, and the e2e failing on a
+  registered sheet it has no opener for). Where the loop cannot reach a case, it names it with the
+  reason (`NOT_ON_THE_WEB`, `BY_DESIGN`), never skips it silently. The rule's expectation must hold
+  for the instance with the least in it (a sheet with no field and no button).
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -983,3 +1001,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 20 L6 and L7: once Cancelled or Skipped was picked there was no way back to Done, and each of the close sheet's chips was a tab stop of its own | 21 (no way back from a mis-tap) and 5 | yes: the close sheet's three chip groups (outcome, time, precision) are one `RadioChips` each; the date picker's grid is another agent's this round | the outcome is one row (Done · Cancelled · Skipped); `RadioChips`: one tab stop per group, arrows move and choose; app tests |
 | 2026-11-02 | QA round 20 L9: the first load sent the log's first pull, the notification pool and today's calendar twice each | 79 (new) | yes: the start's other reads (`me` once, instances local, the phone's data only on a phone); the pool's other refresh callers (a live notice must always refresh, so the rule is only on the "back on the line" path) | the loop's first tick waits its interval right after a run that synced everything with nothing written since; the pool is not fetched again on the socket's connection within 5 s of a fetch; today's calendar shares one request in flight; unit, app and web tests; e2e counts a first load (no URL twice, one pull since 0) |
 | 2026-11-02 | e2e flakes of the composer journey ("composer adds lines and fills the form (desktop, dark)" timed out at 30 s with nothing failing, 4/8 under four workers per 6-B; a typed line once came out with characters moved, "dashboardsис", and `addTask` once in `time.e2e.ts`) | 20 (a test acts before the screen has settled) | yes: every caller of `addTask` and the journey's first line now type into a settled line; the typing race did not show in 72 runs (a probe typing right after load, 24 under four workers; the composer and time files, 3 × under four workers), so no app change: nothing in the composer resets its value while typing | `settledLine` (no first-sync cover or grey rows, the line editable) before typing, the typed value asserted before Enter (a race now fails at the step that has it), no reload after each task on a computer (the line stays and empties); the journey's limit is 60 s (about 20 s of real work under load); 16/16 and 87/87 green under four workers |
+| 2026-11-02 | Round 6-D sweep: a block's details on a phone's Week (the only sheet without a field or a button) took no keyboard focus, so it stayed on the page behind the dialog; the sheet-focus guard listed its sheets by hand and never opened this one. The guards for first sync and the QA matrix were hand lists of routes the same way (QA rounds 18 M5, 19 M1, 20 M1) | 90 (new) and 5 | yes: every `Sheet` now carries a registered name and the e2e opens each (13 ways into 10 sheets on the web; the server sheet is Android's only, named with its reason); the first-sync guard loops over every route file; the QA matrix (console, requests, raw keys, clipping, axe, a quiet network) runs over every route × width × theme × account in `route-sweep.e2e.ts` | a sheet with nothing else to focus starts on its own surface (`sheetStartStops`, unit test); `sheet-names.test.ts` keeps the registry equal to the sources; `sheet-focus.e2e.ts` fails on a registered sheet without an opener; `sync-state.e2e.ts` and `route-sweep.e2e.ts` read the routes from the router's folder |
+| 2026-11-02 | Round 6-D sweep: during the first sync of an empty copy, Week drew its night-hours switch (the same account value as Settings' "Show night hours", which QA round 20 M1 hid) from the default, live, so a tap wrote over a value the account had not sent yet | 62 (and 90: the round 20 fix covered the two screens the report named) | yes: every route's switches and choices drawn under a held first pull, listed by the new e2e loop: Settings' theme (this device's own choice, kept) and New task's form on a share (`/add`: its presets and projects are the built-in ones until the log arrives; left open for the owner, named in the test) | Week's switch keeps its place empty until the sync ends (app test in `first-sync-screens.test.tsx`); the e2e first-sync loop fails on any switch or choice drawn on any route while the log is away, bar the named ones |

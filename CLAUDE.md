@@ -50,9 +50,10 @@ build history) is in [context/](context/README.md).
   class of mistake it is; sweep the code for every other instance of that class and fix them in the
   same change; add the guard that catches the class from now on (property test, shared helper, e2e
   sweep, QA checklist line or lint rule). Write new code against the classes already listed there.
-- **Exploratory QA before every release and after UI changes**: launch a Sonnet agent that
+- **Exploratory QA: a full release round before every release, an intermediate round (scoped to
+  the changes) after UI changes and fix waves**: launch a Sonnet agent that
   clicks through the web build in a browser and writes `context/qa-round-<n>.md`
-  (procedure and prompt: [docs/qa.md](docs/qa.md)); in parallel, a code-review agent over
+  (both kinds, the procedure and the prompt: [docs/qa.md](docs/qa.md)); in parallel, a code-review agent over
   `git diff origin/main...HEAD`. Fix the findings (TDD), then run the next round until only
   cosmetic findings are left. Tests do not replace this pass.
 
