@@ -2,6 +2,8 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
+import type { SharedIn } from "#app/platform/shared-line.ts";
+
 import { useT } from "#app/app-state.tsx";
 import { ComposerProvider, useComposerFlow } from "#app/features/now/composer/composer-flow.tsx";
 import { ComposerPane } from "#app/features/now/composer/composer-pane.tsx";
@@ -89,18 +91,20 @@ const NowSplit = ({
 
 /**
 Now on a phone; on a wide window the list with the picked task (or the task form) beside it.
-`composeText` is a share (or New task, when empty) arriving on /add.
+`compose` is a share (or New task, when its text is empty) arriving on /add; the composer is
+keyed by its arrival, so each share fills the line, the same text again included.
 */
-export const NowScreen = ({ composeText }: { readonly composeText?: string | undefined }) => {
+export const NowScreen = ({ compose }: { readonly compose?: SharedIn | undefined }) => {
   const router = useRouter();
   const isWide = useIsWide();
   const [picked, setPicked] = useState<null | Picked>(null);
-  const isComposerFocused = composeText !== undefined;
+  const composeText = compose?.text;
+  const isComposerFocused = compose !== undefined;
   return (
     <ComposerProvider
       initialText={composeText}
       isFormInPane={isWide}
-      key={composeText ?? ""}
+      key={compose === undefined ? "now" : `share-${compose.seq}`}
       onCreatedTask={(taskId) => {
         if (isWide) {
           setPicked({ close: false, id: taskId });

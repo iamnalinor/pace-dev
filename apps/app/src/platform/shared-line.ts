@@ -13,3 +13,9 @@ export const sharedLine = (parts: readonly (null | string | undefined)[]): strin
     )
     .join(" ");
 };
+
+/**
+A share as the Add tab takes it: the line's text and which arrival it is (`seq` counts up with
+each share, so the composer, keyed by it, fills again even with the same text).
+*/
+export type SharedIn = { readonly seq: number; readonly text: string };

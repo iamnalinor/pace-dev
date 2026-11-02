@@ -1,7 +1,11 @@
 import type * as React from "react";
 
-import { act, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
+
+import { NowScreen } from "#app/screens/now-screen.tsx";
+import { en, renderScreen } from "#app/test/render.tsx";
+import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { useSharedIn } from "./shared-in.ts";
 
@@ -34,7 +38,7 @@ jest.mock("expo-share-intent", () => ({
   },
 }));
 
-const Line = () => <Text testID="line">{useSharedIn()}</Text>;
+const Line = () => <Text testID="line">{useSharedIn().text}</Text>;
 
 afterEach(() => {
   mockShare.intent = mockNothing;
@@ -68,5 +72,32 @@ describe("a share from Android's share sheet (QA round 17 round-3 sweep of C1)",
       }
     });
     expect(screen.getByTestId("line")).toHaveTextContent("Call the bank https://bank.example");
+  });
+});
+
+/** The Add tab as its route builds it: Now with the share in the composer. */
+const Add = () => <NowScreen compose={useSharedIn()} />;
+const line = () => screen.getByPlaceholderText(en("composer.placeholder"));
+
+/** Android's share sheet hands over "Buy milk" again: the library makes a new object for each. */
+const shareMilk = async () => {
+  await act(() => {
+    mockShare.intent = { text: "Buy milk", webUrl: null };
+    for (const listener of mockShare.listeners) {
+      listener();
+    }
+  });
+};
+
+describe("the same text shared twice (QA round 17 round-4 review R2)", () => {
+  it("fills the line again: each share is taken once per arrival, not per content", async () => {
+    await renderScreen(<Add />, await createTestRuntime());
+    await shareMilk();
+    expect(line()).toHaveDisplayValue("Buy milk");
+    expect(mockShare.intent).toBe(mockNothing);
+    // The task is added (the line empties), then the same text is shared again.
+    await fireEvent.changeText(line(), "");
+    await shareMilk();
+    expect(line()).toHaveDisplayValue("Buy milk");
   });
 });
