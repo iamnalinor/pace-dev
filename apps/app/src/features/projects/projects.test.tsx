@@ -43,15 +43,33 @@ describe("project forms", () => {
     );
   });
 
-  it("gives focus back to New project when its form closes (QA round 18 L9)", async () => {
-    await renderScreen(<ProjectsScreen />, await createTestRuntime());
-    await fireEvent.press(screen.getByRole("button", { name: en("projects.new") }));
-    mockMoveFocus.mockClear();
-    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
-    const [back] = mockMoveFocus.mock.calls[0] ?? [];
-    const opener = screen.getByRole("button", { name: en("projects.new") });
-    expect(isControl(back, opener)).toBe(true);
-  });
+  /** Each way the form closes: what is typed first, and the button that closes it. */
+  const closings: readonly (readonly [string, () => Promise<void>, () => string])[] = [
+    ["Cancel", () => Promise.resolve(), () => en("common.cancel")],
+    [
+      "Create",
+      async (): Promise<void> => {
+        await fireEvent.changeText(screen.getByLabelText(en("projects.name")), "Physics");
+      },
+      () => en("projects.create"),
+    ],
+  ];
+  it.each(closings)(
+    "gives focus back to New project when its form closes by %s (QA round 18 L9, fix round 5 V7)",
+    async (_way, fill, button) => {
+      await renderScreen(<ProjectsScreen />, await createTestRuntime());
+      await fireEvent.press(screen.getByRole("button", { name: en("projects.new") }));
+      await fill();
+      mockMoveFocus.mockClear();
+      await fireEvent.press(screen.getByRole("button", { name: button() }));
+      const opener = await screen.findByRole("button", { name: en("projects.new") });
+      await waitFor(() => {
+        expect(mockMoveFocus).toHaveBeenCalled();
+      });
+      const [back] = mockMoveFocus.mock.calls[0] ?? [];
+      expect(isControl(back, opener)).toBe(true);
+    },
+  );
 
   it("renames a project and archives it from its page", async () => {
     const runtime = await createTestRuntime();
