@@ -14,8 +14,8 @@ import {
 } from "@pace/client";
 
 import { claimFocus } from "../platform/claim-focus.ts";
+import { enterAtStop } from "../platform/enter-at-stop.ts";
 import { moveFocus } from "../platform/move-focus.ts";
-import { refuseFocus } from "../platform/refuse-focus.ts";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { KEYBOARD } from "./use-hotkey.tsx";
@@ -58,6 +58,7 @@ const DayCell = ({
   isStop,
   isToday,
   language,
+  onEnter,
   onPick,
   ref,
 }: {
@@ -69,6 +70,8 @@ const DayCell = ({
   readonly isStop: boolean;
   readonly isToday: boolean;
   readonly language: Language;
+  /** Focus landed on a day other than the stop (the web: `enterAtStop`). */
+  readonly onEnter?: ((event: object) => void) | undefined;
   readonly onPick: (date: string) => void;
   readonly ref?: Ref<View>;
 }) => (
@@ -84,9 +87,10 @@ const DayCell = ({
       isDisabled && "opacity-30",
     )}
     disabled={isDisabled}
-    // A sheet's focus trap walks every descendant (react-native-web's), past the tab index: the
-    // days other than the stop refuse it, so Shift+Tab into the grid lands on the stop.
-    {...(!isStop && refuseFocus !== undefined && { onFocus: refuseFocus })}
+    // A sheet's focus trap walks every descendant (react-native-web's), past the tab index: focus
+    // from outside the grid on a day other than the stop goes on to the stop, so Shift+Tab into
+    // the grid lands on it (round 7).
+    {...(!isStop && onEnter !== undefined && { onFocus: onEnter })}
     onPress={() => {
       onPick(cell.date);
     }}
@@ -185,6 +189,7 @@ const useRovingDays = ({
   const [wanted, setWanted] = useState(start);
   const stop = rovingDay(month, wanted, max);
   const stopCellRef = useRef<View>(null);
+  const gridRef = useRef<View>(null);
   useEffect(() => (KEYBOARD === null ? undefined : claimFocus(() => stopCellRef.current)), []);
   const shouldFocusRef = useRef(false);
   useEffect(() => {
@@ -205,7 +210,14 @@ const useRovingDays = ({
     setWanted(next);
     setMonth(monthOf(next));
   };
-  return { month, onKeyDown, setMonth, stop, stopCellRef };
+  const enter = enterAtStop;
+  const onEnter =
+    enter === undefined
+      ? undefined
+      : (event: object): void => {
+          enter(event, gridRef.current, stopCellRef.current);
+        };
+  return { gridRef, month, onEnter, onKeyDown, setMonth, stop, stopCellRef };
 };
 
 /**
@@ -233,7 +245,7 @@ export const Calendar = ({
   readonly max?: string;
   readonly marked?: ReadonlySet<string>;
 }) => {
-  const { month, onKeyDown, setMonth, stop, stopCellRef } = useRovingDays({
+  const { gridRef, month, onEnter, onKeyDown, setMonth, stop, stopCellRef } = useRovingDays({
     max,
     start: selected ?? today,
   });
@@ -241,7 +253,7 @@ export const Calendar = ({
     <View className="gap-2">
       <MonthHeader labels={labels} language={language} max={max} month={month} onMonth={setMonth} />
       <WeekdayRow language={language} />
-      <View className="gap-2" testID="calendar-days" {...{ onKeyDown }}>
+      <View className="gap-2" ref={gridRef} testID="calendar-days" {...{ onKeyDown }}>
         {monthGrid(month).map((week) => (
           <View className="flex-row gap-1" key={week[0]?.date}>
             {week.map((cell) => (
@@ -254,6 +266,7 @@ export const Calendar = ({
                 isToday={cell.date === today}
                 key={cell.date}
                 language={language}
+                onEnter={onEnter}
                 onPick={onPick}
                 {...(cell.date === stop && { ref: stopCellRef })}
               />
