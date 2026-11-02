@@ -61,6 +61,13 @@ describe("catalogs", () => {
     expect(sameAs("Undo", "common.undo")).toEqual([]);
   });
 
+  it("spell an ellipsis with its one character, never three full stops (QA round 19 L2)", () => {
+    const dotted = [...Object.entries(en), ...Object.entries(ru)]
+      .filter(([, text]) => text.includes("..."))
+      .map(([key]) => key);
+    expect(dotted).toEqual([]);
+  });
+
   it("have no empty messages", () => {
     const empty = [...Object.entries(en), ...Object.entries(ru)].filter(
       ([, text]) => text.trim() === "",

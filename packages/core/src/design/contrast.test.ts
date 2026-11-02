@@ -5,6 +5,7 @@ import {
   IMPORTANCE_COLORS,
   inkOf,
   type PaletteName,
+  PLACEHOLDER_DIM,
   type ProjectColorName,
   STATUS_COLORS,
   TAG_TINT,
@@ -103,6 +104,24 @@ describe("tokens", () => {
           }))
           .filter(({ ratio }) => ratio < 3),
       );
+      expect(failures).toEqual([]);
+    },
+  );
+
+  it.each(THEMES)(
+    "%s placeholder rows stand out from bg and surface at 1.5:1, even at the dim of their breath (QA 19 L2)",
+    (theme) => {
+      const palette = tokens[theme];
+      const failures = (["bg", "surface"] as const)
+        .map((background) => ({
+          background,
+          ratio:
+            contrastRatio(
+              wash(palette.placeholder, palette[background], PLACEHOLDER_DIM),
+              palette[background],
+            ) ?? 0,
+        }))
+        .filter(({ ratio }) => ratio < 1.5);
       expect(failures).toEqual([]);
     },
   );

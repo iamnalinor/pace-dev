@@ -7,6 +7,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { PLACEHOLDER_DIM } from "@pace/core";
+
 import { cx } from "./cx.ts";
 import { PLACEHOLDER_BREATH } from "./motion.ts";
 
@@ -27,7 +29,7 @@ export const Skeleton = ({
 }) => {
   const opacity = useSharedValue(1);
   useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.45, PLACEHOLDER_BREATH), -1, true);
+    opacity.value = withRepeat(withTiming(PLACEHOLDER_DIM, PLACEHOLDER_BREATH), -1, true);
   }, [opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
@@ -37,17 +39,17 @@ export const Skeleton = ({
         <View className="gap-1">
           {Array.from({ length: rows }, (_, index) => (
             <View className="min-h-14 flex-row items-center gap-3 py-2" key={index}>
-              <View className="h-8 w-8 rounded-full bg-track" />
+              <View className="h-8 w-8 rounded-full bg-placeholder" />
               <View className="flex-1 gap-2">
                 <View
                   className={cx(
-                    "h-3.5 rounded-full bg-track",
+                    "h-3.5 rounded-full bg-placeholder",
                     NAME_WIDTHS[index % NAME_WIDTHS.length],
                   )}
                 />
                 <View
                   className={cx(
-                    "h-3 rounded-full bg-track",
+                    "h-3 rounded-full bg-placeholder",
                     META_WIDTHS[index % META_WIDTHS.length],
                   )}
                 />

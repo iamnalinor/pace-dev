@@ -67,6 +67,7 @@ export {
   IMPORTANCE_COLORS,
   type Palette,
   type PaletteName,
+  PLACEHOLDER_DIM,
   type ProjectColorName,
   type RadiusName,
   STATUS_COLORS,
