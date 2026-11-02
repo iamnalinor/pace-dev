@@ -45,6 +45,8 @@ type KeyActions = {
 /**
 Enter reads the line, Alt+Enter sends it to the Inbox, Shift+Enter starts a new line; Escape
 dismisses the assistant's card (the line owns its keys, so the card's own Escape never fires).
+Enter on an empty line does nothing at all: the browser's line break is held back too, or the
+line grew into a tall empty box and the next text began with a line break (QA round 18 M2).
 */
 const onEnter =
   (isEmpty: boolean, keys: KeyActions) =>
@@ -57,11 +59,14 @@ const onEnter =
       keys.escape();
       return;
     }
-    if (isEmpty || native.key !== "Enter" || native.shiftKey === true) {
+    if (native.key !== "Enter" || native.shiftKey === true) {
       return;
     }
     // Handled here: the page's own ⌘↵ (a task's Done) stays out of the line.
     event.preventDefault();
+    if (isEmpty) {
+      return;
+    }
     if (native.altKey === true) {
       keys.toInbox();
     } else {
