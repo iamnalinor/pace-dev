@@ -2,7 +2,7 @@ import { Moon } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { useIsFirstSync, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackToToday } from "#app/shared/back-to-today.tsx";
 import { useBack } from "#app/shared/use-back.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
@@ -34,12 +34,20 @@ const monthDay = (date: string, zone: string, language: Language): string =>
     new Date(date),
   );
 
-/** The moon: the night hours (00–07) on the grid, or not; the same switch as in Settings. */
+/**
+The moon: the night hours (00–07) on the grid, or not; the same switch as in Settings, so the same
+rule: during the first sync of an empty copy the account's value is not known, and its place stays
+empty (no default drawn as the account's, no tap that writes over it; QA round 20 M1).
+*/
 const NightHoursToggle = () => {
   const t = useT();
   const { actions } = usePace();
   const { nightHours } = useSettings();
   const { palette } = useTheme();
+  const isFirstSync = useIsFirstSync();
+  if (isFirstSync) {
+    return <View className="h-11 w-11" />;
+  }
   const label = t("week.nightHours");
   return (
     <Tooltip label={label}>

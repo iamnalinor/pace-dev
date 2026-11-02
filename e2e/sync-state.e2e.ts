@@ -1,9 +1,12 @@
-import type { WebSocketRoute } from "@playwright/test";
+import type { Page, WebSocketRoute } from "@playwright/test";
 
 import { formByHand, nowTasks, taskForm } from "./support/composer.ts";
+import { EMPTY_COPY } from "./support/first-sync.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
-import { seedLivedIn } from "./support/seed.ts";
+import { isBare, screenUrls, STAND_IN_IDS } from "./support/routes.ts";
+import { settle } from "./support/screen-checks.ts";
+import { type LivedIn, seedLivedIn } from "./support/seed.ts";
 import { recordSyncTraffic, repeated } from "./support/sync-traffic.ts";
 
 /** The titles of the tasks created in the server's log of the account behind `token`. */
@@ -21,13 +24,6 @@ const serverTitles = async (token: string): Promise<readonly string[]> => {
     .filter((event) => event.type === "task.created")
     .map((event) => event.payload.title ?? "");
 };
-
-/**
-Final empty states and zero totals the screens show for a log that holds nothing, in either
-language (QA round 19 M1 added Day's and the Assistant log's).
-*/
-const EMPTY_COPY =
-  /Nothing to do right now|Сейчас дел нет|Nothing in the log yet|В журнале пока пусто|Nothing recorded|Нет данных|ничего не записано|Tracked 0m|Учтено 0/u;
 
 test("the first sync of an empty copy shows placeholders, never the empty states, then the account's language (QA 17 M4)", async ({
   page,
@@ -99,18 +95,75 @@ test("a first sync that outlasts the cover shows no final empty copy in either l
   expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
 });
 
-for (const path of ["/day", "/decisions"]) {
-  test(`${path} during a first sync that outlasts the cover shows no empty copy or zero total (QA 19 M1)`, async ({
+/** The first sync's cover lasts this long at most (`FIRST_SYNC_COVER_MS` in the app's sync frame). */
+const COVER_MS = 10_000;
+
+/** A URL of `screenUrls(STAND_IN_IDS)` with the seeded account's ids in. */
+const withIds = (url: string, seeded: LivedIn): string => {
+  const [, kind, id] = /^\/(task|project)\/(.+)$/u.exec(url) ?? [];
+  const key = (Object.keys(STAND_IN_IDS) as (keyof LivedIn)[]).find(
+    (name) => STAND_IN_IDS[name] === id,
+  );
+  return kind === undefined || key === undefined ? url : `/${kind}/${seeded[key]}`;
+};
+
+/**
+Every screen a signed-in person reads data on, from the router's folder (QA rounds 18 M5, 19 M1
+and 20 M1 each fixed the screens the last round named, and the next round found another: bug-lessons
+class 90). Signing in and the walk-through send a signed-in person on.
+*/
+const DATA_URLS = screenUrls(STAND_IN_IDS).filter((url) => !isBare(url));
+
+/** The switches and choices the page draws, as `role:name`. */
+const drawnChoices = async (page: Page): Promise<readonly string[]> =>
+  await page
+    .locator('[role="switch"], [role="radio"], [role="checkbox"]')
+    .evaluateAll((elements) =>
+      elements.map(
+        (element) =>
+          `${element.getAttribute("role") ?? ""}:${element.getAttribute("aria-label") ?? element.textContent}`,
+      ),
+    );
+
+/**
+Choices a screen may draw while the account's log is away, each with why, matched on `url role:name`.
+*/
+const NOT_ACCOUNT_VALUES: readonly { readonly match: RegExp; readonly why: string }[] = [
+  {
+    match: /^\/settings radio:(?:System|Light|Dark)$/u,
+    why: "the theme is this device's own choice, kept on the device, not in the account",
+  },
+  {
+    match: /^\/add radio:/u,
+    why: "open (round 6-D, for the owner): a share opens New task's form at once, its presets and projects the built-in ones until the log arrives",
+  },
+];
+
+for (const url of DATA_URLS) {
+  test(`${url} during a first sync that outlasts the cover shows no empty copy, zero total or account value and writes nothing (QA 19 M1, 20 M1)`, async ({
     page,
   }) => {
     test.setTimeout(60_000);
+    // A Russian account in an English browser, on a device with nothing local (new browser).
     const { token } = await loginViaApi(page);
-    await seedLivedIn(token);
+    const seeded = await seedLivedIn(token);
+    const pull = Promise.withResolvers<null>();
     await page.route("**/api/sync/pull**", async (route) => {
-      await new Promise((resolve) => {
-        setTimeout(resolve, 12_000);
-      });
+      await pull.promise;
       await route.continue();
+    });
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/sync/push")) {
+        writes.push(request.postData() ?? "");
+      }
+    });
+    page.on("websocket", (socket) => {
+      socket.on("framesent", ({ payload }) => {
+        if (String(payload).includes('"type":"push"')) {
+          writes.push(String(payload));
+        }
+      });
     });
     await page.addInitScript(() => {
       const seen: string[] = [];
@@ -121,22 +174,30 @@ for (const path of ["/day", "/decisions"]) {
         seen.push(body === null ? "" : body.innerText);
       }).observe(document, { characterData: true, childList: true, subtree: true });
     });
-    await page.goto(path);
-    await expect(page.getByRole("status").filter({ hasText: "Still syncing" })).toBeVisible({
-      timeout: 15_000,
-    });
-    // The app is given back with grey rows standing in for the screen's figures and lists.
-    await expect(
-      page.getByRole("progressbar", { name: "Loading your data…" }).first(),
-    ).toBeVisible();
-    // Every text shown while the log was not there yet (an empty "screen time" may be true later).
+    // The cover's ten seconds pass on the page's clock, not the test's.
+    await page.clock.install();
+    await page.goto(withIds(url, seeded));
+    await expect(page.getByRole("progressbar", { name: "Syncing your data" })).toBeVisible();
+    await page.clock.fastForward(COVER_MS + 1000);
+    const line = page.getByRole("status").filter({ hasText: "Still syncing" });
+    await expect(line).toBeVisible();
+    // The app is given back while the log is still away: what it draws then is judged.
+    await settle(page);
     const seen = await page.evaluate(
       () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
     );
     expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
-    await expect(page.getByRole("status").filter({ hasText: "Still syncing" })).toHaveCount(0, {
-      timeout: 20_000,
-    });
+    expect(writes).toEqual([]);
+    // No control draws a value the account has not sent yet (a switch, a choice).
+    expect(
+      (await drawnChoices(page)).filter((choice) =>
+        NOT_ACCOUNT_VALUES.every(({ match }) => !match.test(`${url} ${choice}`)),
+      ),
+    ).toEqual([]);
+    pull.resolve(null);
+    await expect(line).toHaveCount(0, { timeout: 20_000 });
+    // Once the account's data is in, nothing drawn from defaults is written over it (QA 20 M1).
+    expect(writes.filter((body) => body.includes("settings.updated"))).toEqual([]);
   });
 }
 
