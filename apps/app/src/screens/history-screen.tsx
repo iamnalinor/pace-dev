@@ -15,7 +15,7 @@ import { EmptyText } from "#app/ui/empty-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { addMinutesIso, EVENT_LABEL_KEYS } from "@pace/core";
+import { addMinutesIso } from "@pace/core";
 
 import { PushedScreen } from "./pushed-screen.tsx";
 
@@ -28,7 +28,7 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const run = useRunAction();
   const [isConfirming, setIsConfirming] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  const eventLabel = t(EVENT_LABEL_KEYS[entry.type]);
+  const eventLabel = t(entry.labelKey);
   const closeConfirmation = () => {
     if (!isBusy) {
       setIsConfirming(false);

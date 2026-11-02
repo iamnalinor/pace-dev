@@ -165,6 +165,7 @@ export const Button = ({
   hotkey,
   hotkeyMode = "global",
   icon: Icon,
+  label,
   onLongPress,
   onPress,
   ref,
@@ -177,6 +178,8 @@ export const Button = ({
   /** What a press does beyond the label (a long press, say), for screen readers. */
   readonly hint?: string;
   readonly icon?: LucideIcon;
+  /** The name said for it when the visible text is a short form of it (it must start with it). */
+  readonly label?: string;
   readonly hotkey?: Hotkey | undefined;
   readonly hotkeyMode?: "global" | "hint";
   readonly onPress: () => void;
@@ -195,6 +198,7 @@ export const Button = ({
   return (
     <Pressable
       accessibilityHint={hint}
+      {...(label !== undefined && { accessibilityLabel: label })}
       {...keyshortcuts}
       accessibilityRole="button"
       aria-busy={busy}

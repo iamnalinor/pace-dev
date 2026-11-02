@@ -36,6 +36,8 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "event.task.subtasks.added": "Подзадачи добавлены",
   "event.task.submitted": "Сдано",
   "event.task.closed": "Задача закрыта",
+  "event.task.cancelled": "Задача отменена",
+  "event.task.skipped": "Задача пропущена",
   "event.task.reopened": "Задача открыта снова",
   "event.task.importance.set": "Важность изменена",
   "event.task.project.set": "Проект изменён",

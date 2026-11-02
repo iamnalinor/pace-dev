@@ -505,18 +505,20 @@ describe("TaskScreen — work", () => {
     await trkScreen();
     await fireEvent.press(screen.getByRole("button", { name: en("task.doneOther") }));
     expect(screen.getByText(en("close.whenDone"))).toBeOnTheScreen();
-    // In its Done mode, with Cancelled and Skipped as buttons of their own.
+    // In its Done mode, with Cancelled and Skipped in sight as choices of the outcome.
     expect(screen.getByRole("button", { name: en("common.done") })).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("close.cancelled") })).toBeOnTheScreen();
-    expect(screen.getByRole("button", { name: en("close.skipped") })).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { name: en("close.cancelled") })).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeOnTheScreen();
   });
 
-  it("tells readers once that Done has another way in, naming the button beside it (round 6 M5)", async () => {
+  it("tells readers once what Done does (round 6 M5, QA round 20 L3)", async () => {
     await trkScreen();
     const done = screen.getByRole("button", { name: en("task.done") });
     // The phone's readers get the hint (the web drops it and describes Done by its tooltip).
     expect(done.props["accessibilityHint"]).toBe(en("task.doneHint"));
-    expect(en("task.doneHint")).toMatch(/button beside it/u);
+    // What Done does, and only that: the way to another time is a control of its own, the long
+    // press a shortcut nobody needs to be taught (QA round 20 L3).
+    expect(en("task.doneHint")).not.toMatch(/long press/iu);
   });
 
   it("says so when the task does not exist", async () => {

@@ -34,6 +34,8 @@ export const enLibrary = {
   "event.task.subtasks.added": "Subtasks added",
   "event.task.submitted": "Submitted",
   "event.task.closed": "Task closed",
+  "event.task.cancelled": "Task cancelled",
+  "event.task.skipped": "Task skipped",
   "event.task.reopened": "Task reopened",
   "event.task.importance.set": "Importance changed",
   "event.task.project.set": "Project changed",

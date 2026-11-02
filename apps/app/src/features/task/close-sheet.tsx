@@ -1,15 +1,12 @@
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
-import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Button } from "#app/ui/button.tsx";
-import { Chip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 
-import type { CloseMode } from "./close-model.ts";
-
+import { type CloseMode, initialMode } from "./close-model.ts";
 import { ClosePreview } from "./close-preview.tsx";
 import { GiveUpFields, OUTCOMES } from "./give-up-fields.tsx";
 import { type CloseForm, useCloseForm } from "./use-close-form.ts";
@@ -21,51 +18,56 @@ import { WhenPicker } from "./when-picker.tsx";
 const PrecisionRow = ({ form }: { readonly form: CloseForm }) => {
   const t = useT();
   return (
-    <OptionRow label={t("close.precision")}>
-      {([true, false] as const).map((isExact) => (
-        <Chip
-          key={String(isExact)}
-          onPress={() => {
-            form.setIsExact(isExact);
-          }}
-          selected={form.isExact === isExact}
-          tall
-        >
-          {t(isExact ? "close.exact" : "close.approx")}
-        </Chip>
-      ))}
-    </OptionRow>
+    <RadioChips
+      choices={[
+        { text: t("close.exact"), value: "exact" },
+        { text: t("close.approx"), value: "approx" },
+      ]}
+      label={t("close.precision")}
+      onChange={(precision) => {
+        form.setIsExact(precision === "exact");
+      }}
+      tall
+      value={form.isExact ? "exact" : "approx"}
+    />
   );
 };
 
+type Outcome = "cancelled" | "first" | "skipped";
+
 /**
-The way out of Done: "Close task as…" and each outcome as a button of its own, which turns the
-sheet to that outcome (QA round 19 M2: one grey caption read as a label, not a control).
+How the task ends, one choice in sight: Done (or Submit), Cancelled, Skipped. A choice made by
+mistake is undone in the same row, and the row stays where it is, so the focus on it stays in
+the sheet (QA round 19 M2, QA round 20 L6 and M2).
 */
-const OtherOutcomes = ({ form }: { readonly form: CloseForm }) => {
+const OutcomeRow = ({ form, view }: { readonly form: CloseForm; readonly view: TaskViewModel }) => {
   const t = useT();
+  const first = initialMode(view);
   return (
-    <OptionRow label={t("close.otherLabel")}>
-      {OUTCOMES.map((outcome) => (
-        <Button
-          key={outcome}
-          onPress={() => {
-            form.setOutcome(outcome);
-            form.setMode("other");
-          }}
-          variant="secondary"
-        >
-          {t(`close.${outcome}`)}
-        </Button>
-      ))}
-    </OptionRow>
+    <RadioChips
+      choices={[
+        { text: t(first === "submit" ? "close.submit" : "outcome.done"), value: "first" },
+        ...OUTCOMES.map((outcome) => ({ text: t(`close.${outcome}`), value: outcome })),
+      ]}
+      label={t("close.outcome")}
+      onChange={(next: Outcome) => {
+        if (next === "first") {
+          form.setMode(first);
+          return;
+        }
+        form.setOutcome(next);
+        form.setMode("other");
+      }}
+      tall
+      value={form.mode === "other" ? form.outcome : "first"}
+    />
   );
 };
 
 /**
 The Close artboard: when it happened (pills or an exact time), exactly or about then (two
 chips, so both choices are in sight),
-a preview of what gets recorded, and the way out ("Close task as…" Cancelled, Skipped).
+a preview of what gets recorded, with how it ends (Done, Cancelled, Skipped) on top.
 */
 export const CloseSheet = ({
   onClose,
@@ -109,11 +111,11 @@ export const CloseSheet = ({
       title={isSubmit ? submitTitle : t("close.closeTitle")}
       visible
     >
+      <OutcomeRow form={form} view={view} />
       {form.mode === "other" ? <GiveUpFields form={form} /> : null}
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
       <PrecisionRow form={form} />
       <ClosePreview form={form} view={view} />
-      {form.mode === "other" ? null : <OtherOutcomes form={form} />}
     </Sheet>
   );
 };

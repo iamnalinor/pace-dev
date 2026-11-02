@@ -70,7 +70,7 @@ export const enInput = {
   "close.whenSubmitted": "When did you submit?",
   "close.whenDone": "When was it done?",
   "close.whenClosed": "When did you close it?",
-  "close.pickExact": "Pick exact time",
+  "close.pickExact": "Pick a time",
   "close.precision": "How sure are you of the time?",
   "close.exact": "Exactly then",
   "close.approx": "About then",

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
@@ -38,7 +38,9 @@ export const Chip = ({
   label,
   leading,
   onPress,
+  ref,
   selected = false,
+  tabIndex,
   tall = false,
 }: {
   readonly children: string;
@@ -48,7 +50,11 @@ export const Chip = ({
   readonly label?: string;
   readonly leading?: ReactNode;
   readonly onPress: () => void;
+  /** The pressable itself, for a group that moves focus between its chips. */
+  readonly ref?: Ref<View>;
   readonly selected?: boolean;
+  /** In a group with one tab stop (`RadioChips`): 0 for the chosen chip, -1 for the others. */
+  readonly tabIndex?: -1 | 0;
   /** 36px with 13px text: the time pills of the close sheet. */
   readonly tall?: boolean;
 }) => (
@@ -58,6 +64,8 @@ export const Chip = ({
     aria-checked={selected}
     className={cx("justify-center active:opacity-80", tall ? "-my-1 h-11" : "-my-1.5 h-11")}
     onPress={onPress}
+    ref={ref}
+    {...(tabIndex !== undefined && { tabIndex })}
   >
     <View
       className={cx(

@@ -2,9 +2,11 @@ import {
   coreReducer,
   type CoreState,
   type Event,
+  EVENT_LABEL_KEYS,
   INITIAL_CORE_STATE,
   isCorrection,
   materializeAt,
+  type MessageKey,
   shownLabel,
   taskById,
 } from "@pace/core";
@@ -30,6 +32,8 @@ export type HistoryEntry = {
   /** Not a correction and not revoked: the undo button applies. */
   readonly revocable: boolean;
   readonly revokedBy: null | string;
+  /** What History calls it: the event's type, a closed task by how it ended (QA round 20 L8). */
+  readonly labelKey: MessageKey;
 };
 
 export type HistoryViewModel = {
@@ -86,6 +90,25 @@ const newestFirst = (a: Event, b: Event): number => {
   return keyA > keyB ? -1 : 1;
 };
 
+/** A closed task is named by how it ended; every other event by its type. */
+const labelKeyOf = (event: Event): MessageKey => {
+  if (event.type !== "task.closed") {
+    return EVENT_LABEL_KEYS[event.type];
+  }
+  switch (event.payload.outcome) {
+    case "cancelled":
+    case "cancelled_missed": {
+      return "event.task.cancelled";
+    }
+    case "skipped": {
+      return "event.task.skipped";
+    }
+    case "done": {
+      return "event.task.closed";
+    }
+  }
+};
+
 const entries = (state: HistorySource): readonly HistoryEntry[] => {
   const effective = new Set(state.events.map((event) => event.id));
   return state.log.toSorted(newestFirst).map((event) => {
@@ -107,6 +130,7 @@ const entries = (state: HistorySource): readonly HistoryEntry[] => {
       taskTitle: titleOf(state, event, taskId),
       revocable: !isCorrection(event) && isEffective,
       revokedBy,
+      labelKey: labelKeyOf(event),
     };
   });
 };

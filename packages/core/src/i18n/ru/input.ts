@@ -72,7 +72,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.whenSubmitted": "Когда вы сдали?",
   "close.whenDone": "Когда это было сделано?",
   "close.whenClosed": "Когда вы закрыли задачу?",
-  "close.pickExact": "Выбрать точное время",
+  "close.pickExact": "Выбрать время",
   "close.precision": "Насколько точно время?",
   "close.exact": "Точно тогда",
   "close.approx": "Примерно тогда",

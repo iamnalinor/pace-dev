@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 import type { QuickTime } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
-import { Chip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
@@ -51,7 +51,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
   );
 };
 
-/** The time pills, a calendar pill for an exact date and time, and the zone they are read in. */
+/** The time pills, "Pick a time" for an exact date and time, and the zone they are read in. */
 export const WhenPicker = ({
   deviceTz,
   form,
@@ -68,32 +68,24 @@ export const WhenPicker = ({
   const isCustom = form.choice === "custom";
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[12px] text-muted">{label}</Text>
-      <View className="flex-row flex-wrap gap-1.5">
-        {quickTimes.map((quick) => (
-          <Chip
-            key={quick.key}
-            onPress={() => {
-              form.choose(quick.key);
-            }}
-            selected={form.choice === quick.key}
-            tall
-          >
-            {t(`quickTime.${quick.key}`)}
-          </Chip>
-        ))}
-        <Chip
-          label={t("close.pickExact")}
-          leading={<CalendarDays color={isCustom ? palette.fg : palette.fg2} size={16} />}
-          onPress={() => {
-            form.choose("custom");
-          }}
-          selected={isCustom}
-          tall
-        >
-          {isCustom ? t("close.date") : ""}
-        </Chip>
-      </View>
+      <RadioChips
+        choices={[
+          ...quickTimes.map((quick) => ({
+            text: t(`quickTime.${quick.key}`),
+            value: quick.key,
+          })),
+          {
+            leading: <CalendarDays color={isCustom ? palette.fg : palette.fg2} size={16} />,
+            // Said as it is shown: the chip that opens the date and time (QA round 20 L5).
+            text: t("close.pickExact"),
+            value: "custom",
+          },
+        ]}
+        label={label}
+        onChange={form.choose}
+        tall
+        value={form.choice}
+      />
       {isCustom ? <TypedTime deviceTz={deviceTz} form={form} /> : null}
     </View>
   );
