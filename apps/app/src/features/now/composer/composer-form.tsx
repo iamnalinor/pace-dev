@@ -4,13 +4,12 @@ import { Pressable, Text, View } from "react-native";
 
 import { useAppState, useT } from "#app/app-state.tsx";
 import { isDeadlineChoiceValid } from "#app/shared/task-fields/deadline-choice.ts";
-import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { SubtaskList } from "#app/shared/task-fields/subtask-list.tsx";
 import { TaskFields, type TaskFormValues } from "#app/shared/task-fields/task-fields.tsx";
 import { Button } from "#app/ui/button.tsx";
-import { Chip } from "#app/ui/chip.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
@@ -34,6 +33,9 @@ const valuesOf = (model: ComposerModel): TaskFormValues => ({
   start: model.start,
   title: model.title,
 });
+
+/** The "Add to" row's choice of a task of its own, beside the homework instances. */
+const OWN_TASK = "own-task";
 
 /** A changed link: a blank one clears the link. */
 const linkEdit = (link: string | undefined): ComposerEdits =>
@@ -67,27 +69,17 @@ const TargetRow = ({
   }
   const current = model.target.kind === "instance" ? model.target.taskId : null;
   return (
-    <OptionRow label={t("form.addTo")}>
-      {model.instances.map((instance) => (
-        <Chip
-          key={instance.id}
-          onPress={() => {
-            onEdit({ targetTaskId: instance.id });
-          }}
-          selected={instance.id === current}
-        >
-          {instance.title}
-        </Chip>
-      ))}
-      <Chip
-        onPress={() => {
-          onEdit({ targetTaskId: null });
-        }}
-        selected={current === null}
-      >
-        {t("form.ownTask")}
-      </Chip>
-    </OptionRow>
+    <RadioChips
+      choices={[
+        ...model.instances.map((instance) => ({ text: instance.title, value: instance.id })),
+        { text: t("form.ownTask"), value: OWN_TASK },
+      ]}
+      label={t("form.addTo")}
+      onChange={(choice) => {
+        onEdit({ targetTaskId: choice === OWN_TASK ? null : choice });
+      }}
+      value={current ?? OWN_TASK}
+    />
   );
 };
 

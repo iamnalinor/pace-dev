@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime, type TestWorld } from "#app/test/runtime.ts";
@@ -483,6 +483,28 @@ describe("a time put on another day (round 6: a runaway block cut back)", () => 
     expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
       ["activity.adjusted", { activityId, endAt: "2026-10-02T20:00:00.000Z" }],
     ]);
+  });
+
+  it("makes each row of days one tab stop, the checked day, as a radio group (round 7 review 10)", async () => {
+    await editSheet(runaway);
+    const ends = within(screen.getByLabelText("End day"));
+    // The names of the row's tab stops: one, the checked day.
+    const stops = (): readonly unknown[] =>
+      ends
+        .getAllByRole("radio")
+        .filter((radio) => radio.props["tabIndex"] === 0)
+        .map((radio) => radio.props["accessibilityLabel"] as unknown);
+    expect(ends.getAllByRole("radio").length).toBeGreaterThan(2);
+    expect(stops()).toEqual(["Ends Sun · Oct 4"]);
+    await fireEvent.press(ends.getByRole("radio", { name: "Ends Fri · Oct 2" }));
+    expect(stops()).toEqual(["Ends Fri · Oct 2"]);
+    // The arrows move the choice (and the stop) inside the row.
+    await fireEvent(screen.getByLabelText("End day"), "keyDown", {
+      key: "ArrowRight",
+      preventDefault: () => undefined,
+    });
+    expect(ends.getByRole("radio", { name: "Ends Sat · Oct 3" })).toBeChecked();
+    expect(stops()).toEqual(["Ends Sat · Oct 3"]);
   });
 
   it("refuses an end on the chosen day before the start in the usual words", async () => {

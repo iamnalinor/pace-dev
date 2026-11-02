@@ -103,6 +103,15 @@ const bottomAbove = (footerHeight: number, isWide: boolean): number => {
   return (isWide ? 0 : TAB_BAR_HEIGHT) + footerHeight + FOOTER_GAP;
 };
 
+/** How far above the bottom edge a floating line sits: clear of the tab bar and any footer. */
+const FloatBottomContext = createContext(BASE_BOTTOM);
+
+/**
+Where a status that floats over the page sits (the offline pill): low, clear of the tab bar and
+of the screen's footer, as the toast does, so it covers no header control (round 7 review 3).
+*/
+export const useFloatBottom = (): number => use(FloatBottomContext);
+
 /**
 Where a toast docked in the sidebar sits: inside its 224 px column, at its foot, its action under
 the text so the text has the column's whole width (QA round 17 L5: beside the action it had a
@@ -165,6 +174,7 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   const { footerHeight, setFooter } = useFooters();
   const isWide = useIsWide();
   const [isDocked, setIsDocked] = useState(false);
+  const floatBottom = useMemo(() => bottomAbove(footerHeight, isWide), [footerHeight, isWide]);
   const hide = useCallback(() => {
     setToast(null);
   }, []);
@@ -188,20 +198,22 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   return (
     <ToastContext value={handle}>
       <FooterHeightContext value={setFooter}>
-        <SidebarDockContext value={setIsDocked}>
-          <View className="flex-1">
-            {children}
-            {toast === null ? null : (
-              <ToastBar
-                bottom={bottomAbove(footerHeight, isWide)}
-                isDocked={isWide && isDocked}
-                key={toast.id}
-                onDone={hide}
-                toast={toast}
-              />
-            )}
-          </View>
-        </SidebarDockContext>
+        <FloatBottomContext value={floatBottom}>
+          <SidebarDockContext value={setIsDocked}>
+            <View className="flex-1">
+              {children}
+              {toast === null ? null : (
+                <ToastBar
+                  bottom={bottomAbove(footerHeight, isWide)}
+                  isDocked={isWide && isDocked}
+                  key={toast.id}
+                  onDone={hide}
+                  toast={toast}
+                />
+              )}
+            </View>
+          </SidebarDockContext>
+        </FloatBottomContext>
       </FooterHeightContext>
     </ToastContext>
   );

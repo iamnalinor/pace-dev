@@ -19,15 +19,10 @@ import { deviceLanguage } from "./platform/device-language.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
+import { forgetLineDraft } from "./platform/shared-in.ts";
 import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
-
-/**
-How often the client pulls on its own. While the live channel is up the server says when
-something changed, so the poll is only a safety net; while it is down it polls as before.
-*/
-const POLL_OFFLINE_MS = 30_000;
-const POLL_LIVE_MS = 5 * 60_000;
+import { canStartSenders, POLL_LIVE_MS, POLL_OFFLINE_MS, startSenders } from "./senders.ts";
 
 const RuntimeContext = createContext<null | PaceRuntime>(null);
 /**
@@ -59,7 +54,7 @@ A signed-in start: this week's homework instances, a first sync, then the accoun
 zone from the device when it has none yet (never "not set").
 */
 const bootstrap = async (runtime: PaceRuntime, pool: Pool): Promise<void> => {
-  const { actions, auth, sync } = runtime;
+  const { actions, sync } = runtime;
   if (IS_PHONE) {
     // Every signed-in phone, before any network step (one failing must not skip it): it polls
     // when its method is `poll`, and always uploads its usage.
@@ -73,12 +68,7 @@ const bootstrap = async (runtime: PaceRuntime, pool: Pool): Promise<void> => {
   await startPhonePush(runtime);
   // Signed out meanwhile, or ending this device's session: no loop, no socket. Otherwise its
   // first tick pushes what the bootstrap added.
-  if (auth.store.getState().status !== "signed-in" || auth.isEnding()) {
-    return;
-  }
-
-  sync.start({ intervalMs: POLL_OFFLINE_MS });
-  runtime.live.start();
+  startSenders(runtime);
 };
 
 /**
@@ -156,6 +146,8 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
       void clearPresentedPoolNotifications(activeSession);
     }
     activeSession = undefined;
+    // The half-typed line was this account's: a share after the next sign-in is only the share.
+    forgetLineDraft();
     void dropLocalCopyIfOwned(runtime);
   });
   // The poll is a safety net while the server can say "changed" itself.
@@ -167,7 +159,8 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
     }
   });
   const subscription = AppState.addEventListener("change", (next) => {
-    if (auth.store.getState().status !== "signed-in") {
+    // Signed out, or ending this device's session: nothing to send, no socket to rest or start.
+    if (!canStartSenders(runtime)) {
       return;
     }
     if (next !== "active") {
@@ -306,31 +299,50 @@ export const useSync = (): {
 };
 
 /**
-Signed in on a copy that held nothing when this session's first sync began, until that sync has
-finished: the screens would show their final empty states, then the pulled log in the device's
-language, and only then the account's (QA round 17 M4). A copy that held the log is never
-covered; a failed sync ends it too (the offline strip says why), so a copy that cannot reach the
-server is never hidden for good.
+Signed in on a copy that held nothing when this session's sync began, until `isDone` (a run of
+this session ended, or one succeeded): once read empty, the copy stays covered while its first
+pages arrive; a copy still being read from the device is covered only until it is read (local
+first). A copy that held the log is never covered.
 */
-export const useIsFirstSync = (): boolean => {
+const useIsEmptyCopyUntil = (isDone: boolean): boolean => {
   const { status } = useAuth();
-  const { api, hooks } = usePace();
-  const { ended } = use(SyncedContext);
+  const { hooks } = usePace();
   const isLoading = hooks.useAppState((state) => state.status === "loading");
   const isEmpty = hooks.useAppState(
     (state) => state.status === "ready" && state.events.length === 0,
   );
-  // Only a run of this session ends it: an earlier session's failure still sits in `lastError`.
-  const hasEnded = ended !== null && ended === api.currentSessionToken();
-  const isWaiting = status === "signed-in" && !hasEnded;
-  // Once read empty, the copy stays covered while its first pages arrive, until the sync ends; a
-  // copy still being read from the device is covered only until it is read (local first).
+  const isWaiting = status === "signed-in" && !isDone;
   const [wasEmpty, setWasEmpty] = useState(false);
   const isEmptyCopy = isWaiting && (isEmpty || wasEmpty);
   if (wasEmpty !== isEmptyCopy) {
     setWasEmpty(isEmptyCopy);
   }
   return isEmptyCopy || (isWaiting && isLoading);
+};
+
+/**
+Signed in on a copy that held nothing when this session's first sync began, until that sync has
+finished: the screens would show their final empty states, then the pulled log in the device's
+language, and only then the account's (QA round 17 M4). A failed sync ends it too (the offline
+strip says why), so a copy that cannot reach the server is never hidden for good.
+*/
+export const useIsFirstSync = (): boolean => {
+  const { api } = usePace();
+  const { ended } = use(SyncedContext);
+  // Only a run of this session ends it: an earlier session's failure still sits in `lastError`.
+  return useIsEmptyCopyUntil(ended !== null && ended === api.currentSessionToken());
+};
+
+/**
+Whether the account's own values (its settings) are still unknown on an empty copy: until a run
+of this session has succeeded. Unlike `useIsFirstSync`, a failed first sync does not end it, or
+the defaults would show as the account's with live controls that write over them (round 7 review
+12, class 22); the rest of the app shows its real empty state meanwhile.
+*/
+export const useIsAccountUnknown = (): boolean => {
+  const { api } = usePace();
+  const { ready } = use(SyncedContext);
+  return useIsEmptyCopyUntil(ready !== null && ready === api.currentSessionToken());
 };
 
 /**

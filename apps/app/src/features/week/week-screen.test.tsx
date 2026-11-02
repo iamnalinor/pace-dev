@@ -6,7 +6,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
-import { phoneColumnPx } from "./week-grid.tsx";
+import { laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
 import { WeekScreen } from "./week-screen.tsx";
 
 /** 12:30–14:00 in Moscow today, with everything a phone's calendar can tell about it. */
@@ -183,6 +183,29 @@ describe("WeekScreen", () => {
     await renderScreen(<WeekScreen />, runtime);
     await fireEvent.press(await screen.findByRole("button", { name: /^Zero, / }));
     expect(await screen.findByText("Rest · 0m")).toBeOnTheScreen();
+  });
+});
+
+describe("a day with many lanes side by side on a phone (round 7 review 11)", () => {
+  it("caps the column's width: 20 and 100 lanes share a bounded column, never an endless one", () => {
+    for (const lanes of [20, 100, 150]) {
+      const width = phoneColumnPx(lanes, 72);
+      expect(Number.isFinite(width)).toBe(true);
+      expect(width).toBeGreaterThanOrEqual(72);
+      expect(width).toBeLessThanOrEqual(PHONE_COLUMN_MAX_PX);
+    }
+    // Up to the cap, every lane still keeps its 44 px.
+    expect(phoneColumnPx(4, 72)).toBeLessThanOrEqual(PHONE_COLUMN_MAX_PX);
+  });
+
+  it("gives every lane of 20 or 100 a width above nothing, inside the column", () => {
+    for (const lanes of [20, 100]) {
+      const last = laneStyle({ lane: lanes - 1, lanes });
+      const left = Number(last.left.replace("%", ""));
+      const width = Number(last.width.replace("%", ""));
+      expect(width).toBeGreaterThan(0);
+      expect(left + width).toBeLessThanOrEqual(100);
+    }
   });
 });
 

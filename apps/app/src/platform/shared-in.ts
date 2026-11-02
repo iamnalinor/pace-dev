@@ -63,3 +63,8 @@ export const useLineDraftNote = (text: string): void => {
     };
   }, [text]);
 };
+
+/** Forgets the Add tab's half-typed line on sign-out: it was the account's (round 7 review 4). */
+export const forgetLineDraft = (): void => {
+  draft.text = "";
+};

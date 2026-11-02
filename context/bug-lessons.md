@@ -716,24 +716,7 @@ The same rule applies when a previously successful channel is no longer configur
   what it asks), and a follow-up that exists to catch up ("the loop's first tick", "back on the
   line") skips when the same thing was just read and nothing was written since. Test it by counting
   a whole start's requests (the e2e first-load test: no URL twice, one pull since 0).
-### 85. An outside checker holds an answer to the letter of our schema, and its refusal reads as an outage
-- **Bug.** The LLM regression run of 2026-11-02 (`bun test:llm`): slot 3's endpoint answered "Generated
-  JSON does not match the expected schema … missing properties: 'outcome', 'label', 'start', 'end',
-  'expectMinutes'". Our schema already lists every key as required and nullable (strict mode takes
-  it); the endpoint runs that model best-effort, checks the answer itself and refuses it, and its
-  model had left out the activity keys of a task's action, which mean "does not apply". The refusal
-  was counted as a failed provider (`llm/unavailable`), and our own check would have refused the same
-  answer for the same missing keys.
-- **Missed because.** Every fake answer is built with `blankModelAction`, so every key is always
-  there; no fake ever played an endpoint that checks the answer itself, and the refusal arrives as a
-  stream error chunk with no status, which the code sorted with the outages.
-- **Rule.** An answer is read as leniently as its meaning allows, by one check for every way it
-  arrives (`answerCheck` in `llm.ts`): keys left out that mean "does not apply" are filled (null, or
-  an empty list; `fillAbsent`) before the strict check. An outside checker's refusal that carries the
-  payload (`failed_generation`, or what was streamed) goes through our own check before it counts as
-  a failure, and when it fails ours too it is an answer out of shape, never a provider down. What we
-  send is pinned against the strictest mode we may meet (every object's properties all `required`,
-  `additionalProperties: false`). Test doubles copy the real endpoint's refusal, body and chunk.
+
 ### 80. A field that reads half of a value and guesses the rest, with no way to say it
 - **Bug.** Round 6 (the owner, after QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00
   could not be cut back to Friday from the Day sheet. Its To field reads a clock time only; the day
@@ -777,6 +760,11 @@ The same rule applies when a previously successful channel is no longer configur
 - **Rule.** An address the app gives a person to use elsewhere is one the app has proven (the
   origin it talks to), not one a server reports about itself; a reported one is only a fallback
   for what the app cannot know (its web app). Test it with the two different.
+- **Rule corrected (round 7 review 1, class 102).** "Proven" is wrong for an address that is also
+  an identity: the MCP URL is the server's OAuth resource (`<API_ORIGIN>/mcp`), and an MCP client
+  refuses tokens for any other, so it is the server's own public API (`instance.apiOrigin`), with a
+  line saying it differs from the address in use; only a bearer-token address (the computer
+  agent's `--api`) keeps the one the app has reached.
 
 ### 84. A cost of using the screen that no test counts: tab stops, target size, a jump
 - **Bug.** QA round 19 L5: the date picker had a tab stop per day (30+ before "Next month") and
@@ -791,6 +779,83 @@ The same rule applies when a previously successful channel is no longer configur
   stays small); a status that comes and goes takes no room from the page (an overlay or a row kept
   for it). Guards: the e2e measures every visible control's hit box at 390, counts the date
   picker's tab stops, and measures the main heading's position across going offline.
+
+### 85. An outside checker holds an answer to the letter of our schema, and its refusal reads as an outage
+- **Bug.** The LLM regression run of 2026-11-02 (`bun test:llm`): slot 3's endpoint answered "Generated
+  JSON does not match the expected schema … missing properties: 'outcome', 'label', 'start', 'end',
+  'expectMinutes'". Our schema already lists every key as required and nullable (strict mode takes
+  it); the endpoint runs that model best-effort, checks the answer itself and refuses it, and its
+  model had left out the activity keys of a task's action, which mean "does not apply". The refusal
+  was counted as a failed provider (`llm/unavailable`), and our own check would have refused the same
+  answer for the same missing keys.
+- **Missed because.** Every fake answer is built with `blankModelAction`, so every key is always
+  there; no fake ever played an endpoint that checks the answer itself, and the refusal arrives as a
+  stream error chunk with no status, which the code sorted with the outages.
+- **Rule.** An answer is read as leniently as its meaning allows, by one check for every way it
+  arrives (`answerCheck` in `llm.ts`): keys left out that mean "does not apply" are filled (null, or
+  an empty list; `fillAbsent`) before the strict check. An outside checker's refusal that carries the
+  payload (`failed_generation`, or what was streamed) goes through our own check before it counts as
+  a failure, and when it fails ours too it is an answer out of shape, never a provider down. What we
+  send is pinned against the strictest mode we may meet (every object's properties all `required`,
+  `additionalProperties: false`). Test doubles copy the real endpoint's refusal, body and chunk.
+
+### 100. A refusal the platform reports as a plain failure, retried as an outage
+- **Bug.** CI run 41463968451 (round 6 M6's e2e): the session was ended while the visible tab's
+  socket was still connecting; the Worker refused the upgrade with HTTP 401, which a browser gives
+  the page as close code 1006, the same as a dropped network. The channel backed off and retried
+  (refused each time) and only its 30 s poll could find the 401, so the tab stayed on Settings past
+  the test's 15 s. Locally the socket was up before the end and heard the 4401 close.
+- **Missed because.** The tests closed a socket that had opened (4401, or a drop after it lived);
+  none closed one that never opened, and the e2e's order (socket up first) held on a fast machine.
+- **Rule.** Where the platform hides why something was refused (a WebSocket upgrade, a CORS error,
+  an opaque response), the first failure of a streak asks a request that can say it (a run, whose
+  401 checks the session, whose network failure shows the offline line) instead of retrying as an
+  outage; once per streak, so a dead server is not hammered (`onFailedToOpen`). Test the refusal
+  before the first success, not only after it.
+
+### 101. A helper shared by two callers, changed for one in another branch than the other's
+- **Bug.** CI run 41467537358: the date picker's Shift+Tab came back to today, not the moved day.
+  Round 6 M4 changed `refuseFocus` (the sheet dim's) to keep focus coming from inside the modal;
+  round 6-B, in a parallel branch, had the picker's other days use it to refuse the sheet trap's
+  walk. The trap walks back from the last control after focusing the first one, so every focus it
+  tries comes from inside the modal: merged, the selected day kept it. Not the clock: it failed on
+  any date (checked at Oct 14 and Nov 2).
+- **Missed because.** Each branch was green alone; the merge commit was pushed and its first full
+  e2e run was CI's. The helper's rule named its own case ("from outside the modal"), which was
+  true for the dim (the first control) and false for a control in the middle.
+- **Rule.** A helper keyed on what identifies one caller's case is not reused for another case;
+  the picker has its own (`enterAtStop`: focus from outside the grid goes on to the stop). After
+  merging parallel branches, run the full e2e on the merge before pushing it.
+
+### 102. An address bound to an identity handed out as a plain location
+- **Bug.** Round 7 review 1: Connect an AI app handed out `<reached origin>/mcp`, but the Worker's
+  protected resource is `<API_ORIGIN>/mcp`; a device reaching the server at another address (a LAN
+  IP, a proxy) gave MCP clients a URL whose resource they would reject.
+- **Missed because.** Class 83's rule ("the address the app has proven") was applied to every
+  address; the e2e reaches the Worker at its `API_ORIGIN`, so the two never differed there.
+- **Rule.** Tell an address that only locates (bearer tokens work at any) from one that names
+  (an OAuth resource, an issuer, a cookie's domain): the second is the server's own, said as it is.
+  Test across both sides: reached at one address, the URL handed out equals the resource the
+  server's metadata names (`oauth.int.test.ts`, `server-store.test.ts`).
+
+### 103. A person's unsent words kept by the device across a change of person
+- **Bug.** Round 7 review 4: the half-typed line (`pace.lineDraft`, the tab's sessionStorage)
+  outlived a sign-out; signed in as someone else, a share landed after the first person's text.
+- **Missed because.** The draft's tests asked whether it survives what it must (a route change, a
+  new page); none signed out between typing and sharing.
+- **Rule.** State kept for a person (drafts, caches, last choices) is forgotten when the person
+  changes (signed-in → signed-out, beside the local copy's drop) or keyed by the session. Test:
+  type, sign out, sign in as another, then the action that reads it.
+
+### 104. A request shared in flight with no bound and no owner in its key
+- **Bug.** Round 7 review 5: today's calendar read shares one request in flight by its range;
+  one that never settled was joined by every later read for good, and a read after signing in as
+  someone else could join the first person's request.
+- **Missed because.** The sharing test (class 79) had the request answer; nothing let it stall or
+  changed the session while it was out.
+- **Rule.** A shared in-flight request has a deadline (`withinDeadline`) and a key with everything
+  that changes its answer (the session too). Test a first call that never settles, on fake timers,
+  and a second call from another session.
 
 ## Log
 
@@ -1068,3 +1133,15 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 18 L6: at 390 the composer's icons were 36×36, the task's link row 15 px high, two side-by-side Week blocks 31 px wide and the switches 48×24 | 84 | partly: the four named kinds are fixed; the sweep's guard also showed rows of chips (the project filter, the preset form's choices) and the task row's check reach about 40 px where their 44 px boxes overlap a neighbour's in the next row, left as they are and named in the round's report | the composer's icons sit in 44 px boxes that touch, the link in a 44 px box reaching into the gaps around it, a phone's day column widens until each lane is 44 px (`phoneColumnPx`, the sideways scroll counts each day's width), a web switch has a 44 px reach drawn over it (`SWITCH_REACH_PX`); e2e `targets.e2e.ts` presses 21 px either side of each such control at 390 and fails on a neighbour or nothing, and flips a switch from just above and below it |
 | 2026-11-02 | QA round 18 L11: the offline line sat in the layout and pushed the page down 37 px mid-typing, in grey with no icon | 84 | yes: the other status that comes and goes at the top (still syncing) is the same strip; the update banner is a bar that stays once shown and the toasts already float | the strip is a pill floating over the top of the page (role status, an icon in the warning colour, the toast's surface and shadow), out of the layout; e2e: the main heading's box is the same before, during and after going offline at 390 and 1440, with no axe finding |
 | 2026-11-02 | Found by this round's full e2e run: the web switch's 44 px reach (QA round 18 L6) was drawn over the switch, so it took every press meant for the switch; Playwright could not click "Alongside what is running" (`time.e2e.ts:42`, phone and desktop) | 6 (an overlay placed over the control it serves: it covered an enabled control) | yes: the composer's icons, the task's link and the Week blocks grew their own boxes instead of drawing anything over them; the switch's reach was the only overlay of round 6 | the reach is drawn behind the switch (before it), so a press on the switch reaches the switch and one just above or below it the reach; `targets.e2e.ts` still finds the 44 px area by pressing around it, and `time.e2e.ts` clicks the switch itself (both pass at 390 and 1440) |
+| 2026-11-02 | CI run 41463968451: round 6 M6's e2e: a visible tab whose socket was still connecting when its session ended stayed signed in past 15 s (the refused upgrade read as a network failure; only the 30 s poll could find the 401) | 100 (new) | yes: the other refusals a platform hides: the HTTP calls read their 401 already (`sessionCheck`); the socket was the one channel that retried a refusal as an outage | `onFailedToOpen` (the first socket of a streak that never opens asks for a run, whose 401 signs out); live test (once per streak, red before) and client test (a refused socket signs out within seconds, red before); the e2e looped 10/10 with 2 workers |
+| 2026-11-02 | CI run 41467537358: the date picker's Shift+Tab came back to today, not the day moved to (merge of round 6 M4's `refuseFocus` with 6-B's picker) | 101 (new), 76 | yes: `refuseFocus` has one caller left (the dim, first in its modal, where its rule holds); the picker has its own helper; e2e real-clock sweep: the other `Date.now()` reads seed times relative to now (live, seed, notifications, time) or work in UTC (week); none asserts a weekday or a month edge | `enterAtStop` (unit tests); the e2e failed on both a pinned Oct 14 and Nov 2 before and passes after |
+| 2026-11-02 | Round 7 review 1: the MCP URL used the reached origin, the Worker's OAuth resource names `API_ORIGIN` | 102 (new), 83 corrected | yes: the other addresses handed out: the computer agent's `--api` (bearer, keeps the reached one), the login's web origin (the server's own already) | `ServerInfo.mcpUrl` and a line when the public address differs (EN, RU); app tests (red before) and a Worker test across both sides |
+| 2026-11-02 | Round 7 review 2: ending this device's session had no deadline: a hung DELETE held sync forever with nothing on screen, and the failure path restarted only the socket | 62 (a wait with no bound), 75 | yes: the hold itself waits for the run in flight at most 5 s and lets go after a minute on its own; the revoke of other sessions has the same deadline | revoke under `withinDeadline`; `sync.hold` bounded; the failure path releases and calls `startSenders`; app test with a DELETE that never settles (red before), client tests |
+| 2026-11-02 | Round 7 review 6: a `soon()` right after `start()` was overwritten by the async first tick | 60 | yes: `setInterval` and `soon` keep a sooner run already | the first tick goes in only when nothing is due sooner; client test (red before) |
+| 2026-11-02 | Round 7 review 8: the foreground return, Retry and the window focus started senders while this device ended its session; the held loop re-armed every 500 ms | 75 | yes: every starter (bootstrap, AppState, Retry, window focus, the end's failure path) asks `canStartSenders` | `senders.ts`; app test (red before); the held loop parks until the release (client test, red before) |
+| 2026-11-02 | Round 7 review 3: the offline pill lay over the header's Back, bell and task actions at 390; Retry was 33 px wide | 6, 84 | yes: the other floating line (the toast) already sits low; the still-syncing line is the same pill | the pill floats where the toast does (`useFloatBottom`); Retry has a 44 px box; e2e at 390 and 1440 (red before) |
+| 2026-11-02 | Round 7 review 4: the half-typed line outlived a sign-out | 103 (new) | yes: the other per-person state kept by a tab: the local copy (dropped already), presented notifications (cleared already) | `forgetLineDraft` on signed-in → signed-out (web and phone); tests (red before) |
+| 2026-11-02 | Round 7 review 5: today's calendar shared request could stall every later read and be joined across sessions | 104 (new) | yes: the other shared requests in flight (the sync's runs are serial with timeouts; the notification pool and `me` are not shared across calls) | `withinDeadline` and the session in the key; tests with a never-settling call and a second session (red before) |
+| 2026-11-02 | Round 7 review 9 and 10: `RadioChips` let arrows scroll the page and arrowing onto Cancelled took the cursor to Reason; the Day sheet's day chips were a tab stop each | 84, 5 | yes: every radio row of chips: the task fields' category, importance and project rows and the composer's "Add to" row were a stop per chip too and are now `RadioChips` (`OptionRow` removed) | arrows `preventDefault`, Reason only on a press (or opening on Cancelled); app tests (red before) |
+| 2026-11-02 | Round 7 review 11: `phoneColumnPx` grew without bound (100 lanes divided by zero) and lane widths went to 0 % or below | 84 | yes: the lane width (`laneStyle`) had the same edge | the column stops at 6 lanes' width, more lanes share it; tests at 20, 100 and 150 lanes (red before) |
+| 2026-11-02 | Round 7 review 12: after a failed first sync, Settings showed the defaults with live controls again | 22 | yes: Presets (its seed action writes) waits the same way; the other screens show their real empty state (as ruled) | `useIsAccountUnknown` (until a run of this session succeeded) behind `KnownAfterSync` and `FirstSyncBody isAccountBound`; app test for both (red before) |

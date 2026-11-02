@@ -1,4 +1,4 @@
-import { type Ref, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
 import type { ActivityForm, ActivityRange, ActivityTarget, FormPartProps } from "@pace/client";
@@ -6,23 +6,27 @@ import type { ActivityForm, ActivityRange, ActivityTarget, FormPartProps } from 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { fromWallClock, wallClock } from "#app/format/time.ts";
 import { moveFocus } from "#app/platform/move-focus.ts";
-import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
-import { ActionChip, Chip } from "#app/ui/chip.tsx";
+import { ActionChip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { formatShortDay } from "@pace/core";
 
 import { dayChoicesOf, isAcrossDays } from "./activity-draft.ts";
 
-/** One time's day: a chip per day it may be put on, the day it reads on now checked. */
+/**
+One time's day: a chip per day it may be put on, the day it reads on now checked. One tab stop,
+the arrows move the day, as every radio row (`RadioChips`, round 7 review 10).
+*/
 const DayRow = ({
-  checkedRef,
   days,
   label,
+  onCheckedNode,
   onChoose,
   spoken,
   value,
   zone,
 }: {
-  readonly checkedRef?: Ref<View>;
+  /** Hears the checked day's chip, for focus to move onto it. */
+  readonly onCheckedNode?: (node: null | View) => void;
   readonly days: readonly string[];
   readonly label: string;
   readonly onChoose: (day: string) => void;
@@ -31,29 +35,22 @@ const DayRow = ({
   readonly zone: string;
 }) => {
   const language = useLanguage();
+  const choices = days.map((day) => {
+    const shown = formatShortDay(
+      fromWallClock({ date: day, time: "12:00", tz: zone }) ?? `${day}T12:00:00.000Z`,
+      zone,
+      language,
+    );
+    return { label: spoken(shown), text: shown, value: day };
+  });
   return (
-    <OptionRow label={label}>
-      {days.map((day) => {
-        const shown = formatShortDay(
-          fromWallClock({ date: day, time: "12:00", tz: zone }) ?? `${day}T12:00:00.000Z`,
-          zone,
-          language,
-        );
-        return (
-          <Chip
-            key={day}
-            label={spoken(shown)}
-            onPress={() => {
-              onChoose(day);
-            }}
-            ref={day === value ? checkedRef : undefined}
-            selected={day === value}
-          >
-            {shown}
-          </Chip>
-        );
-      })}
-    </OptionRow>
+    <RadioChips
+      choices={choices}
+      label={label}
+      onChange={onChoose}
+      {...(onCheckedNode !== undefined && { onCheckedNode })}
+      value={value}
+    />
   );
 };
 
@@ -121,9 +118,11 @@ export const DayChoices = ({
         />
       ) : null}
       <DayRow
-        checkedRef={checkedEndRef}
         days={days.to}
         label={t("day.endDay")}
+        onCheckedNode={(node) => {
+          checkedEndRef.current = node;
+        }}
         onChoose={(toDay) => {
           patch({ toDay });
         }}

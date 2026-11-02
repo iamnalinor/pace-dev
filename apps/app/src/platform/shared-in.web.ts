@@ -57,6 +57,14 @@ export const useLineDraftNote = (text: string): void => {
   }, [text]);
 };
 
+/**
+Forgets the half-typed line on sign-out: it was the account's, and a share after the next sign-in
+(maybe as someone else) must not land after it (round 7 review 4, class 103).
+*/
+export const forgetLineDraft = (): void => {
+  keepDraft("");
+};
+
 const hand = (text: string): void => {
   handoff.arrivals += 1;
   handoff.waiting = { seq: handoff.arrivals, text };

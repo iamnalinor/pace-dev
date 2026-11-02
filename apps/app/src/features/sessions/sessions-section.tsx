@@ -6,6 +6,7 @@ import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { moveFocus } from "#app/platform/move-focus.ts";
 import { useOnReturn } from "#app/platform/on-return.ts";
+import { startSenders } from "#app/senders.ts";
 import { useSignInsChanged } from "#app/shared/notifications/use-sign-ins-changed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
@@ -50,20 +51,24 @@ logout to answer 401 (QA round 15 L2, round 6 M1). True once it ended and the lo
 const useEndThisDevice = (sessions: Sessions): ((id: string) => Promise<boolean>) => {
   const router = useRouter();
   const { auth } = useAuth();
-  const { live, sync } = usePace();
+  const runtime = usePace();
   return async (id) => {
-    live.stop();
-    const release = await sync.hold();
+    runtime.live.stop();
+    const release = await runtime.sync.hold();
     try {
+      // The revoke has its deadline (`REQUEST_DEADLINE_MS`): a DELETE that never comes back fails.
+      // One the server performed but whose answer was lost withdraws the note too: the other
+      // tabs later read the end as "another device". Accepted (round 7 review 13).
       await auth.endThisDevice(async () => {
         await sessions.revoke(id);
       });
     } catch {
-      live.start();
-      return false;
-    } finally {
       release();
+      // Kept: the sync loop runs again (released) and the socket with it, as a start leaves them.
+      startSenders(runtime);
+      return false;
     }
+    release();
     router.replace("/login");
     return true;
   };

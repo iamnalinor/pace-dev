@@ -19,6 +19,7 @@ import {
 } from "@pace/client";
 
 import { SidewaysDays } from "./sideways-days.tsx";
+import { laneStyle, phoneColumnPx } from "./week-lanes.ts";
 
 /** What a tap on the grid opens: a tracked block, or a calendar event. */
 export type Picked =
@@ -52,25 +53,6 @@ export const dayLabel = (date: string, zone: string, language: Language): string
 
 /** A block or an event is at least this tall: a two-minute one is still something to tap. */
 const MIN_TARGET_PX = 24;
-
-/** The room between side-by-side lanes, as a share of the column. */
-const LANE_GAP_PERCENT = 1;
-
-/** The column's edges the blocks keep clear of: the left rule and the usage strip, and the right. */
-const COLUMN_INSET_PX = 8;
-
-/** A thumb's target: on a phone each lane of a day is at least this wide (QA round 18 L6). */
-const LANE_TARGET_PX = 44;
-
-/**
-A phone's day column: `floorPx`, or wider for a day with side-by-side lanes, so each lane keeps a
-thumb's width (two lanes of the 72 px column were 31 px wide, QA round 18 L6).
-*/
-export const phoneColumnPx = (lanes: number, floorPx: number): number =>
-  Math.max(
-    floorPx,
-    Math.ceil(LANE_TARGET_PX / (1 / lanes - LANE_GAP_PERCENT / 100)) + COLUMN_INSET_PX,
-  );
 
 const px = (minutes: number, hourPx: number): number => (minutes / 60) * hourPx;
 
@@ -116,15 +98,6 @@ const UsageStrip = ({ hourPx, place, usage }: Grid & Pick<GridProps, "usage">) =
       />
     );
   });
-
-/** A lane's share of the column, as percentages (a hair of room between neighbours). */
-const laneStyle = ({
-  lane,
-  lanes,
-}: Lane): { readonly left: `${number}%`; readonly width: `${number}%` } => ({
-  left: `${(lane / lanes) * 100}%`,
-  width: `${100 / lanes - LANE_GAP_PERCENT}%`,
-});
 
 /** One thing on a day's column: a calendar event (outlined) or tracked time (filled). */
 type Item =

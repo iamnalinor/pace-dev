@@ -23,6 +23,7 @@ import type { createFakeBackgroundTask } from "./testing/background-task.fake.ts
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
+import { backOnline } from "./ui/sync-frame.tsx";
 
 const Probe = () => {
   const { status, user } = useAuth();
@@ -63,6 +64,15 @@ const setup = async (
   await runtime.state.ready;
   return { api, eventStore, runtime };
 };
+
+/** Every time the half-typed line's draft is forgotten (a sign-out, round 7 review 4). */
+const mockForgetLineDraft = jest.fn();
+jest.mock("./platform/shared-in.ts", (): unknown => ({
+  ...jest.requireActual<object>("./platform/shared-in.ts"),
+  forgetLineDraft: () => {
+    mockForgetLineDraft();
+  },
+}));
 
 /** The browser window's focus coming back, as the web stand-in hears it. */
 const mockWindowFocus = { listeners: new Set<() => void>() };
@@ -392,6 +402,8 @@ describe("PaceProvider", () => {
       expect(screen.getByTestId("title")).toHaveTextContent("Now");
     });
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    // The half-typed line goes with the account: a share after the next sign-in is only the share.
+    expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
   });
 
   it("starts the background check once signed in, and stops it on logout", async () => {
@@ -561,6 +573,53 @@ describe("the window's focus coming back while offline (QA round 20 L2)", () => 
       await Promise.resolve();
     });
     expect(api.pathsCalled("/api/sync/pull")).toHaveLength(after);
+  });
+});
+
+describe("every starter while this device ends its own session (round 7 review 8, class 75)", () => {
+  it("starts no socket and sends no run: foreground return, window focus, Retry", async () => {
+    const network = { isDown: true };
+    const { api, runtime } = await setup({
+      "GET /api/sync/pull": () => {
+        if (network.isDown) {
+          throw new TypeError("Failed to fetch");
+        }
+        return { events: [], more: false, seq: 0, storeId: "store-test" };
+      },
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().online).toBe(false);
+    });
+    network.isDown = false;
+    // Ending this device's session: its revoke is on its way.
+    void runtime.auth.endThisDevice(async () => {
+      await new Promise<never>(() => undefined);
+    });
+    await waitFor(() => {
+      expect(runtime.auth.isEnding()).toBe(true);
+    });
+    const starts = jest.spyOn(runtime.live, "start");
+    const before = api.pathsCalled("/api/sync/pull").length;
+    await act(async () => {
+      for (const [type, listener] of addEventListener.mock.calls) {
+        if (type === "change") {
+          listener("active");
+        }
+      }
+      for (const listener of mockWindowFocus.listeners) {
+        listener();
+      }
+      backOnline(runtime);
+      await Promise.resolve();
+    });
+    expect(starts).not.toHaveBeenCalled();
+    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(before);
   });
 });
 

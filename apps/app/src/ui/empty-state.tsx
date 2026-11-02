@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { Text, View } from "react-native";
 
-import { useIsFirstSync, useT } from "#app/app-state.tsx";
+import { useIsAccountUnknown, useIsFirstSync, useT } from "#app/app-state.tsx";
 
 import { Skeleton } from "./skeleton.tsx";
 
@@ -61,29 +61,38 @@ the screen is still loading its own answer from the server too.
 */
 export const FirstSyncBody = ({
   children,
+  isAccountBound = false,
   isWaiting = false,
 }: {
   readonly children: ReactNode;
+  /**
+  What it shows can change the account (the presets and their actions): it waits until a sync of
+  this session has succeeded, a failed one included (`KnownAfterSync`, round 7 review 12).
+  */
+  readonly isAccountBound?: boolean;
   readonly isWaiting?: boolean;
 }) => {
   const t = useT();
   const isFirstSync = useIsFirstSync();
-  return isFirstSync || isWaiting ? (
+  const isUnknown = useIsAccountUnknown();
+  if (!isWaiting && !(isAccountBound ? isUnknown : isFirstSync)) {
+    return <>{children}</>;
+  }
+  return (
     <View className="w-full px-5 py-2">
       <Skeleton label={t("sync.loadingData")} />
     </View>
-  ) : (
-    children
   );
 };
 
 /**
-A control showing one of the account's values (its language, a switch, digest times): until the
-first sync of an empty copy ends the value is not known, so a grey row stands in, never a default
-drawn as the account's own and never a control that would write over it (QA round 20 M1).
+A control showing one of the account's values (its language, a switch, digest times): until a
+sync of this session has succeeded on an empty copy the value is not known, so a grey row stands
+in, never a default drawn as the account's own and never a control that would write over it (QA
+round 20 M1); a failed first sync keeps it waiting (round 7 review 12).
 */
 export const KnownAfterSync = ({ children }: { readonly children: ReactNode }) => {
   const t = useT();
-  const isFirstSync = useIsFirstSync();
-  return isFirstSync ? <Skeleton label={t("sync.loadingData")} rows={1} /> : children;
+  const isUnknown = useIsAccountUnknown();
+  return isUnknown ? <Skeleton label={t("sync.loadingData")} rows={1} /> : children;
 };

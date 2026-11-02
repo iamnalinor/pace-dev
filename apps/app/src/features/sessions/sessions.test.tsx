@@ -410,6 +410,51 @@ describe("Settings → Devices and sessions", () => {
     expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
+  it("gives up ending this device when the server never answers: sync and socket come back (round 7 review 2)", async () => {
+    const calls = { deletes: 0, pulls: 0 };
+    const runtime = await signedIn({
+      "DELETE /api/sessions/01CHROME": async () => {
+        calls.deletes += 1;
+        return await new Promise<never>(() => undefined);
+      },
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: ALL }),
+      "GET /api/sync/pull": () => {
+        calls.pulls += 1;
+        return { events: [], more: false, seq: 0, storeId: "store-test" };
+      },
+    });
+    const starts = jest.spyOn(runtime.live, "start");
+    jest.useFakeTimers();
+    try {
+      await renderScreen(<SettingsScreen />, runtime);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      const row = screen.getByLabelText("Chrome on macOS");
+      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+      const startsBefore = starts.mock.calls.length;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't end the session. Try again.");
+      expect(runtime.auth.store.getState().status).toBe("signed-in");
+      expect(runtime.auth.isEnding()).toBe(false);
+      // The socket is back, and the sync loop runs again on its own (not only a socket).
+      expect(starts.mock.calls.length).toBeGreaterThan(startsBefore);
+      const pullsAfter = calls.pulls;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(31_000);
+      });
+      expect(calls.pulls).toBeGreaterThan(pullsAfter);
+      // The steady state: one DELETE, and the loop at its interval, not a burst.
+      expect(calls.deletes).toBe(1);
+      expect(calls.pulls - pullsAfter).toBeLessThanOrEqual(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("says so quietly when a revoke fails, and keeps the row", async () => {
     await renderSettings({
       "DELETE /api/sessions/01FIREFOX": () => problem(500, "server/error"),
@@ -691,8 +736,10 @@ describe("Settings → Devices and sessions", () => {
   });
 
   it("shows how to connect an AI app: the server's MCP URL and the steps per client", async () => {
-    // The server reports an API origin the app does not talk to (a Worker started on another
-    // port than its `API_ORIGIN`, QA round 18 L10): the URL is the one the app reaches.
+    // The server names another public API than the address the app reaches it at (a phone on the
+    // LAN, a Worker behind a proxy): MCP is OAuth-bound to that public one (`<API_ORIGIN>/mcp`, the
+    // Worker's protected resource), so the URL is it, and a line says the two differ (round 7
+    // review 1; QA round 18 L10's "the one in use" stays for the computer agent).
     const serverApi = "https://pace-api.example.dev";
     const usedApi = serverStore.getState().origin;
     expect(usedApi).not.toBe(serverApi);
@@ -704,8 +751,11 @@ describe("Settings → Devices and sessions", () => {
       expect(serverStore.getState().instance?.apiOrigin).toBe(serverApi);
     });
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
-    expect(await screen.findByText(`${usedApi}/mcp`)).toBeOnTheScreen();
-    expect(screen.queryByText(`${serverApi}/mcp`)).toBeNull();
+    expect(await screen.findByText(`${serverApi}/mcp`)).toBeOnTheScreen();
+    expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+    expect(
+      screen.getByText("This server's public address differs from the one this device uses."),
+    ).toBeOnTheScreen();
     // A phone has no clipboard module: the URL goes on through the share sheet.
     expect(screen.getByRole("button", { name: "Send the URL" })).toBeOnTheScreen();
     expect(screen.getByText("Claude")).toBeOnTheScreen();
@@ -718,8 +768,22 @@ describe("Settings → Devices and sessions", () => {
     // Leaving is the dim (or the cross, or Escape), as for every sheet.
     await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => {
-      expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+      expect(screen.queryByText(`${serverApi}/mcp`)).toBeNull();
     });
+  });
+
+  it("says nothing about the address when the server's public API is the one in use", async () => {
+    const usedApi = serverStore.getState().origin;
+    await renderSettings({
+      "GET /api/instance": () => ({ ...fakeInstance, apiOrigin: usedApi }),
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
+    });
+    await waitFor(() => {
+      expect(serverStore.getState().instance?.apiOrigin).toBe(usedApi);
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
+    expect(await screen.findByText(`${usedApi}/mcp`)).toBeOnTheScreen();
+    expect(screen.queryByText(/public address differs/u)).toBeNull();
   });
 });
 

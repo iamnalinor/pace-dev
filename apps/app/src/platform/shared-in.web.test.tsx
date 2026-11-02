@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { useState } from "react";
 import { TextInput } from "react-native";
 
-import { useHandedShare, useLineDraftNote, useSharedIn } from "./shared-in.web.ts";
+import { forgetLineDraft, useHandedShare, useLineDraftNote, useSharedIn } from "./shared-in.web.ts";
 
 type MockParams = { readonly text?: string };
 
@@ -176,6 +176,17 @@ describe("a blank share, or one over a half-typed line (QA round 19 L4)", () => 
     mockAddress.params = { text: "Buy milk" };
     await render(<App />);
     expect(screen.getByTestId("line")).toHaveDisplayValue("half typed\nBuy milk");
+  });
+
+  it("forgets what was typed once signed out: another account's share is only the share (round 7 review 4)", async () => {
+    const now = await render(<Now />);
+    await fireEvent.changeText(screen.getByTestId("line"), "the old account's note");
+    await now.unmount();
+    // Signed out (the line has gone with Now), then signed in as someone else, then a share.
+    forgetLineDraft();
+    mockAddress.params = { text: "Buy milk" };
+    await render(<App />);
+    expect(screen.getByTestId("line")).toHaveDisplayValue("Buy milk");
   });
 
   it("a blank share never wipes what was typed (QA 20 M3)", async () => {

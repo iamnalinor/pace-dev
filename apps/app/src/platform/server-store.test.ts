@@ -50,3 +50,39 @@ describe("the server's address the screens hand out (QA round 18 L10)", () => {
     });
   });
 });
+
+describe("the MCP URL the screens hand out (round 7 review 1)", () => {
+  it("is the server's own public API, the OAuth resource it issues tokens for, when it differs", () => {
+    // The Worker's protected resource is `${API_ORIGIN}/mcp` (apps/api/src/worker.ts): an MCP
+    // client refuses tokens for any other resource than the URL it was given.
+    const info = serverInfoOf({
+      instance: instance("https://pace.example.org"),
+      origin: "https://pace.lan:8443",
+      reason: null,
+      status: "ok",
+    });
+    expect(info.mcpUrl).toBe("https://pace.example.org/mcp");
+    // The computer agent's bearer tokens work at any address: it keeps the one this device uses.
+    expect(info.apiOrigin).toBe("https://pace.lan:8443");
+    expect(info.isPublicOriginOther).toBe(true);
+  });
+
+  it("is the address in use, with nothing to say, while the two agree or the server has not answered", () => {
+    const agreed = serverInfoOf({
+      instance: instance("https://pace.example.org"),
+      origin: "https://pace.example.org",
+      reason: null,
+      status: "ok",
+    });
+    expect(agreed.mcpUrl).toBe("https://pace.example.org/mcp");
+    expect(agreed.isPublicOriginOther).toBe(false);
+    const unknown = serverInfoOf({
+      instance: null,
+      origin: "https://pace.example.org",
+      reason: null,
+      status: "unknown",
+    });
+    expect(unknown.mcpUrl).toBe("https://pace.example.org/mcp");
+    expect(unknown.isPublicOriginOther).toBe(false);
+  });
+});

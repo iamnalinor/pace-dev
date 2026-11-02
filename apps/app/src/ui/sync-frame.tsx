@@ -8,9 +8,11 @@ import type { MessageKey } from "@pace/core";
 
 import { useAuth, useIsFirstSync, useIsOffline, usePace, useT } from "#app/app-state.tsx";
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
+import { canStartSenders } from "#app/senders.ts";
 
 import { Skeleton } from "./skeleton.tsx";
 import { useTheme } from "./theme-provider.tsx";
+import { useFloatBottom } from "./toast.tsx";
 
 /**
 How long the first sync may hide the app. A pull that never answers (a stalled connection, a
@@ -19,31 +21,33 @@ proxy holding the request) would otherwise hold the whole app, Log out included 
 export const FIRST_SYNC_COVER_MS = 10_000;
 
 /**
-A pill floating at the top: offline while the last sync could not reach the server (what is
-written stays on the device and goes out on reconnect, QA round 17 M5), or still syncing once
+A pill floating low over the page: offline while the last sync could not reach the server (what
+is written stays on the device and goes out on reconnect, QA round 17 M5), or still syncing once
 the first sync outlasts its cover. It floats over the page rather than sitting in the layout, so
 the page never moves under the person as it comes and goes (QA round 18 L11: a line in the layout
-pushed everything down 37 px mid-typing); a press goes through around it.
+pushed everything down 37 px mid-typing), and sits where the toast does, clear of the tab bar and
+the screen's footer: at the top it lay over the header's Back, bell and task actions (round 7
+review 3). A press goes through around it.
 */
 const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
   const t = useT();
   const { palette } = useTheme();
-  const insets = useSafeAreaInsets();
+  const bottom = useFloatBottom();
   const Icon = message === "errors.offline" ? CloudOff : RefreshCw;
   return (
     <View
-      className="absolute left-0 right-0 top-0 z-50 items-center px-4"
+      className="absolute left-0 right-0 items-center px-4"
       pointerEvents="box-none"
-      style={{ paddingTop: insets.top + 6 }}
+      style={{ bottom }}
     >
       <View
         accessibilityLiveRegion="polite"
-        className="max-w-xl flex-row items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 shadow-lg"
+        className="min-h-11 max-w-xl flex-row items-center gap-2 rounded-full border border-line bg-surface pl-3 pr-1 shadow-lg"
         role="status"
         testID="sync-strip"
       >
         <Icon aria-hidden color={palette.warn} size={16} strokeWidth={2} />
-        <Text className="shrink font-sans text-[13px] text-fg">{t(message)}</Text>
+        <Text className="shrink py-1.5 font-sans text-[13px] text-fg">{t(message)}</Text>
         {message === "errors.offline" ? <RetryNow /> : null}
       </View>
     </View>
@@ -52,7 +56,8 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
 
 /**
 Tries the server again now, rather than at the end of the backoff (up to a minute after the
-server is back, QA round 20 L2): the socket and a sync run, as on the way back online.
+server is back, QA round 20 L2): the socket and a sync run, as on the way back online. Its own
+box is a full 44 px target: react-native-web ignores `hitSlop` (round 7 review 3).
 */
 const RetryNow = () => {
   const t = useT();
@@ -60,8 +65,7 @@ const RetryNow = () => {
   return (
     <Pressable
       accessibilityRole="button"
-      className="active:opacity-70"
-      hitSlop={12}
+      className="min-h-11 min-w-11 items-center justify-center rounded-full px-3 active:opacity-70"
       onPress={() => {
         backOnline(runtime);
       }}
@@ -111,8 +115,10 @@ const stripMessage = ({
 Back on the network: the sync runs at once, and the socket starts again only in a tab the person
 sees. A hidden tab's socket rests (the app's visibility rule): it starts when the tab is shown.
 */
-export const backOnline = ({ auth, live, sync }: PaceRuntime): void => {
-  if (auth.store.getState().status !== "signed-in") {
+export const backOnline = (runtime: PaceRuntime): void => {
+  const { live, sync } = runtime;
+  // Not while this device ends its own session (class 75): it would 401 as "ended elsewhere".
+  if (!canStartSenders(runtime)) {
     return;
   }
   if (AppState.currentState === "active") {

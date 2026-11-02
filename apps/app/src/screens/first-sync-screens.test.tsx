@@ -122,6 +122,42 @@ describe("Settings and Presets during the first sync (QA round 20 M1)", () => {
     expect(screen.getByRole("button", { name: en("settings.logout") })).toBeOnTheScreen();
   });
 
+  it.each([
+    ["Settings", () => <SettingsScreen />, en("settings.language.en")],
+    ["Presets", () => <PresetsScreen />, en("presets.seedExamples")],
+  ] as const)(
+    "%s keeps waiting after a failed first pull, until one succeeds for this session (round 7 review 12)",
+    async (_name, ui, known) => {
+      const server = { isDown: true };
+      const runtime = await createTestRuntime({
+        routes: {
+          "GET /api/sessions": () => ({ sessions: [] }),
+          "GET /api/sync/pull": () => {
+            if (server.isDown) {
+              throw new TypeError("Failed to fetch");
+            }
+            return { events: [], more: false, seq: 0, storeId: "store-test" };
+          },
+          "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
+        },
+        world: "empty",
+      });
+      await runtime.auth.loginWithDev("1");
+      await renderScreen(ui(), runtime);
+      await act(async () => {
+        await runtime.sync.syncNow();
+      });
+      expect(runtime.sync.status.getState().online).toBe(false);
+      // The first sync ended (failed): the defaults are still not the account's, nothing to change.
+      expect(screen.queryByText(known)).toBeNull();
+      server.isDown = false;
+      await act(async () => {
+        await runtime.sync.syncNow();
+      });
+      expect(screen.getByText(known)).toBeOnTheScreen();
+    },
+  );
+
   it("Presets shows grey rows instead of the built-in list and its actions", async () => {
     await duringFirstSync(<PresetsScreen />);
     expect(screen.queryByText(en("presets.seedExamples"))).toBeNull();

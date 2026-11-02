@@ -1,6 +1,8 @@
 import { type ReactNode, useRef } from "react";
 import { Text, View } from "react-native";
 
+import type { ProjectColorName } from "@pace/core";
+
 import { Chip } from "./chip.tsx";
 
 export type RadioChoice<T extends string> = {
@@ -10,6 +12,8 @@ export type RadioChoice<T extends string> = {
   /** Spoken instead of the text when the text alone is ambiguous (or empty). */
   readonly label?: string;
   readonly leading?: ReactNode;
+  /** The chip's colour mark (a preset's, a project's, an importance's). */
+  readonly color?: null | ProjectColorName;
 };
 
 /** The keys that move the choice inside the group, and which way. */
@@ -20,24 +24,36 @@ const STEP: Readonly<Record<string, -1 | 1>> = {
   ArrowUp: -1,
 };
 
-type KeyLike = { readonly key?: string; readonly nativeEvent?: { readonly key?: string } };
+type KeyLike = {
+  readonly key?: string;
+  readonly nativeEvent?: { readonly key?: string };
+  readonly preventDefault?: () => void;
+};
+
+/** How a choice was made: a press (Enter, Space, a click or a tap) or an arrow moving through. */
+export type RadioVia = "arrow" | "press";
 
 /**
 A labelled radio group of chips with one tab stop, as a radio group is on the web: Tab reaches the
 chosen chip, the arrows choose the next or the previous one (wrapping) and take the focus with
-them (QA round 20 L7: one stop per chip).
+them (QA round 20 L7: one stop per chip), without scrolling the page as well (round 7 review 9).
+`onChange` hears how the choice was made, so a caller can act on a press and leave an arrow's
+choice alone (the close sheet's Reason takes the cursor only on a press).
 */
 export const RadioChips = <T extends string>({
   choices,
   label,
   onChange,
+  onCheckedNode,
   tall = false,
   value,
 }: {
+  /** Hears the chosen chip's node, for a caller that moves focus onto it. */
+  readonly onCheckedNode?: (node: null | View) => void;
   readonly choices: readonly RadioChoice<T>[];
   /** Shown over the chips and naming the group. */
   readonly label: string;
-  readonly onChange: (value: T) => void;
+  readonly onChange: (value: T, via: RadioVia) => void;
   readonly tall?: boolean;
   readonly value: T;
 }) => {
@@ -51,7 +67,8 @@ export const RadioChips = <T extends string>({
     if (next === undefined) {
       return;
     }
-    onChange(next.value);
+    event.preventDefault?.();
+    onChange(next.value, "arrow");
     (chipsRef.current.get(next.value) as unknown as null | { focus?: () => void })?.focus?.();
   };
   // react-native-web passes the key events to the DOM; React Native's types do not list them.
@@ -68,15 +85,19 @@ export const RadioChips = <T extends string>({
         {choices.map((choice) => (
           <Chip
             key={choice.value}
+            {...(choice.color !== undefined && { color: choice.color })}
             leading={choice.leading}
             onPress={() => {
-              onChange(choice.value);
+              onChange(choice.value, "press");
             }}
             ref={(node) => {
               if (node === null) {
                 chipsRef.current.delete(choice.value);
               } else {
                 chipsRef.current.set(choice.value, node);
+              }
+              if (choice.value === value) {
+                onCheckedNode?.(node);
               }
             }}
             selected={choice.value === value}

@@ -5,7 +5,7 @@ import type { RepeatChangeProblem } from "@pace/client";
 
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
-import { Chip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
 import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
 
@@ -14,7 +14,6 @@ import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 import { DatePanel } from "./date-field.tsx";
 import { DeadlineAndRepeat, DueBeforeStartNote } from "./deadline-and-repeat.tsx";
 import { EstimateOptions } from "./estimate-field.tsx";
-import { OptionRow } from "./option-row.tsx";
 import { TaskTextFields } from "./task-text-fields.tsx";
 import { useOutsidePress } from "./use-outside-press.ts";
 import { WhenChips } from "./when-chips.tsx";
@@ -82,7 +81,14 @@ const WhenFields = ({
   );
 };
 
-/** Category, importance and project as one-tap rows. */
+/** The project row's choices besides the projects: none, and a new one the assistant proposed. */
+const NO_PROJECT = "project:none";
+const NEW_PROJECT = "project:new";
+
+/**
+Category, importance and project as one-tap rows, each one tab stop with arrows (`RadioChips`,
+round 7 review 10's sweep).
+*/
 const ChoiceFields = ({
   onChange,
   options,
@@ -96,62 +102,57 @@ const ChoiceFields = ({
   const language = useLanguage();
   return (
     <>
-      <OptionRow label={t("composer.category")}>
-        {options.presets.map((preset) => (
-          <Chip
-            color={preset.color}
-            key={preset.id}
-            onPress={() => {
-              onChange({ presetId: preset.id });
-            }}
-            selected={preset.id === values.presetId}
-          >
-            {presetLabel(preset, language)}
-          </Chip>
-        ))}
-      </OptionRow>
-      <OptionRow label={t("edit.importance")}>
-        {ImportanceSchema.options.map((importance) => (
-          <Chip
-            color={IMPORTANCE_COLORS[importance]}
-            key={importance}
-            onPress={() => {
-              onChange({ importance });
-            }}
-            selected={importance === values.importance}
-          >
-            {t(`importance.${importance}`)}
-          </Chip>
-        ))}
-      </OptionRow>
-      <OptionRow label={t("composer.project")}>
-        <Chip
-          onPress={() => {
-            onChange({ newProjectName: null, projectId: null });
-          }}
-          selected={values.projectId === null && values.newProjectName === null}
-        >
-          {t("composer.noProject")}
-        </Chip>
-        {values.newProjectName === null ? null : (
-          <Chip onPress={() => undefined} selected>
-            {t("composer.newProject", { name: values.newProjectName })}
-          </Chip>
-        )}
-        {options.projects.map((project) => (
-          <Chip
-            color={project.color}
-            key={project.id}
-            label={t("composer.projectNamed", { name: project.name })}
-            onPress={() => {
-              onChange({ newProjectName: null, projectId: project.id });
-            }}
-            selected={project.id === values.projectId}
-          >
-            {project.name}
-          </Chip>
-        ))}
-      </OptionRow>
+      <RadioChips
+        choices={options.presets.map((preset) => ({
+          color: preset.color,
+          text: presetLabel(preset, language),
+          value: preset.id,
+        }))}
+        label={t("composer.category")}
+        onChange={(presetId) => {
+          onChange({ presetId });
+        }}
+        value={values.presetId}
+      />
+      <RadioChips
+        choices={ImportanceSchema.options.map((importance) => ({
+          color: IMPORTANCE_COLORS[importance],
+          text: t(`importance.${importance}`),
+          value: importance,
+        }))}
+        label={t("edit.importance")}
+        onChange={(importance) => {
+          onChange({ importance });
+        }}
+        value={values.importance}
+      />
+      <RadioChips
+        choices={[
+          { text: t("composer.noProject"), value: NO_PROJECT },
+          ...(values.newProjectName === null
+            ? []
+            : [
+                {
+                  text: t("composer.newProject", { name: values.newProjectName }),
+                  value: NEW_PROJECT,
+                },
+              ]),
+          ...options.projects.map((project) => ({
+            color: project.color,
+            label: t("composer.projectNamed", { name: project.name }),
+            text: project.name,
+            value: project.id,
+          })),
+        ]}
+        label={t("composer.project")}
+        onChange={(choice) => {
+          // The project the assistant proposed stays chosen until another is picked.
+          if (choice !== NEW_PROJECT) {
+            onChange({ newProjectName: null, projectId: choice === NO_PROJECT ? null : choice });
+          }
+        }}
+        value={values.projectId ?? (values.newProjectName === null ? NO_PROJECT : NEW_PROJECT)}
+      />
     </>
   );
 };

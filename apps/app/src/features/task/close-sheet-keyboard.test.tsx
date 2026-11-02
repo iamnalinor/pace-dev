@@ -31,4 +31,18 @@ describe("CloseSheet with a keyboard (QA round 20 M2)", () => {
     expect(mockFocusField).toHaveBeenCalledTimes(1);
     expect(mockFocusField.mock.calls[0]?.[0]).not.toBeNull();
   });
+
+  it("keeps the focus in the outcome row when the arrows move onto Cancelled: Reason only on a press (round 7 review 9)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now: "2026-10-10T10:00:00.000Z" });
+    await renderScreen(<TaskScreen id={TRK_ID} openClose />, runtime);
+    mockFocusField.mockClear();
+    const outcome = screen.getByLabelText(en("close.outcome"));
+    const prevented = jest.fn();
+    // react-native-web hands the key to the group; the arrow must not scroll the sheet too.
+    await fireEvent(outcome, "keyDown", { key: "ArrowRight", preventDefault: prevented });
+    expect(screen.getByLabelText(en("close.reason"))).toBeOnTheScreen();
+    expect(prevented).toHaveBeenCalledTimes(1);
+    // Still exploring the choices: the arrows can go on to Skipped and back to Done.
+    expect(mockFocusField).not.toHaveBeenCalled();
+  });
 });

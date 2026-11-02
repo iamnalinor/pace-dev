@@ -1,6 +1,7 @@
 import type { PaceRuntime } from "./runtime.ts";
 
 import { onWindowFocus } from "./platform/window-focus.ts";
+import { canStartSenders } from "./senders.ts";
 
 /** How long a fetch of the notification pool counts as current: no second one a moment later. */
 const POOL_FRESH_MS = 5000;
@@ -33,9 +34,11 @@ export const poolOf = (runtime: PaceRuntime): Pool => {
 Back in the window while the offline line shows: the server is tried at once, not at the end of
 the backoff (QA round 20 L2). Online, a focus asks for nothing. Answers the way to stop.
 */
-export const retryOnWindowFocus = ({ auth, live, sync }: PaceRuntime): (() => void) =>
+export const retryOnWindowFocus = (runtime: PaceRuntime): (() => void) =>
   onWindowFocus(() => {
-    if (auth.store.getState().status !== "signed-in" || sync.status.getState().online) {
+    const { live, sync } = runtime;
+    // Not while this device ends its own session (class 75), nor when online.
+    if (!canStartSenders(runtime) || sync.status.getState().online) {
       return;
     }
     live.stop();

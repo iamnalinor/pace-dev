@@ -1,3 +1,4 @@
+import { withinDeadline } from "@pace/client";
 import { addDaysIn, addMinutesIso, endpoints, type MessageKey, startOfDayIn } from "@pace/core";
 
 import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
@@ -7,14 +8,19 @@ const RECENT_MINUTES = 15;
 
 type CalendarEvents = Awaited<ReturnType<typeof listDay>>;
 
+/** One day's events; a request that never answers fails at `REQUEST_DEADLINE_MS` (class 104). */
 const listDay = async (api: CalendarSource["api"], from: string, to: string) => {
-  const { events } = await api.call(endpoints.calendar.list, { query: { from, to } });
+  const { events } = await withinDeadline(
+    async (signal) => await api.call(endpoints.calendar.list, { query: { from, to } }, { signal }),
+  );
   return events;
 };
 
 /**
-A day's request still on its way, by its range: the time bar and the calendar prompt read today
-together as the app opens, and they share one request (QA round 20 L9: two identical ones).
+A day's request still on its way, by its session and range: the time bar and the calendar prompt
+read today together as the app opens, and they share one request (QA round 20 L9: two identical
+ones). It has a deadline, so one that stalls is not joined by every later read for good, and a
+read of another session never joins it (round 7 review 5).
 */
 const asking = new Map<string, Promise<CalendarEvents>>();
 
@@ -23,7 +29,7 @@ const dayEvents = async (
   from: string,
   to: string,
 ): Promise<CalendarEvents> => {
-  const key = `${from}/${to}`;
+  const key = `${api.currentSessionToken() ?? ""}/${from}/${to}`;
   const shared = asking.get(key) ?? listDay(api, from, to);
   asking.set(key, shared);
   try {

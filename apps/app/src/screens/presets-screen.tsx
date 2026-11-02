@@ -13,8 +13,9 @@ export const PresetsScreen = () => {
       <Text className="mx-5 mb-3 font-sans text-[12px] text-muted">
         {t("settings.presets.hint")}
       </Text>
-      {/* The account's presets, and what may be added to them, wait for its first sync (QA 20 M1). */}
-      <FirstSyncBody>
+      {/* The account's presets, and what may be added to them, wait for a sync of this session to
+      succeed (QA 20 M1, round 7 review 12). */}
+      <FirstSyncBody isAccountBound>
         <PresetsList />
       </FirstSyncBody>
     </PushedScreen>
