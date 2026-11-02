@@ -1,7 +1,7 @@
 import type { LiveNotice } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
-import type { SessionStore } from "./session.ts";
+import type { SessionStore, SignOutNotes } from "./session.ts";
 
 import { type Actions, createActions } from "./actions/actions.ts";
 import { type ApiClient, createApiClient } from "./api-client.ts";
@@ -60,6 +60,8 @@ export type PaceClientOptions = {
   /** The other tabs sharing this store (a browser profile's), told of every change to it. */
   readonly peers?: PeerTabs | undefined;
   readonly session: SessionStore;
+  /** The note a tab that logs out leaves the other tabs of its browser profile (the web only). */
+  readonly signOutNotes?: SignOutNotes | undefined;
   readonly source: "app" | "web";
   readonly store: EventStore;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
@@ -240,7 +242,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
     ...(options.fetch !== undefined && { fetch: options.fetch }),
     token: () => token(),
   });
-  const auth = createAuth({ api, session: options.session });
+  const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
   token = auth.token;
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
   const { closePeers, live, state, sync } = liveAndSync(options, {

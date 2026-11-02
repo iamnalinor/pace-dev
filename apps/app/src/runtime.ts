@@ -5,6 +5,7 @@ import {
   type EventStore,
   type InstanceError,
   type PaceClient,
+  type PaceClientOptions,
   type SessionStore,
 } from "@pace/client";
 import { type AppHooks, createAppHooks } from "@pace/client/react";
@@ -17,6 +18,7 @@ import { createPeerTabs } from "./platform/peer-tabs.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
 import { markClientOutdated } from "./platform/server-store.ts";
 import { readServer } from "./platform/server.ts";
+import { createSignOutNotes } from "./platform/sign-out-notes.ts";
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -69,6 +71,18 @@ const watchingProtocol =
     return response;
   };
 
+/**
+Where the session is kept, with the note a tab that logs out leaves the profile's other tabs; a
+store a test hands in is nobody else's, so it shares no note.
+*/
+const sessionOf = (
+  provided: SessionStore | undefined,
+  baseUrl: string,
+): Pick<PaceClientOptions, "session" | "signOutNotes"> =>
+  provided === undefined
+    ? { session: createSecureSessionStore(baseUrl), signOutNotes: createSignOutNotes() }
+    : { session: provided, signOutNotes: undefined };
+
 /** Builds the client stack on the platform adapters; options override them (tests). */
 export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceRuntime> => {
   // A store a test hands in is nobody else's.
@@ -88,7 +102,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     fetch: watched,
     ...(options.now !== undefined && { now: options.now }),
     peers: createPeerTabs(local.isShared),
-    session: options.session ?? createSecureSessionStore(baseUrl),
+    ...sessionOf(options.session, baseUrl),
     // The event log tells which shell a change came from.
     source: IS_PHONE ? "app" : "web",
     store: eventStore,

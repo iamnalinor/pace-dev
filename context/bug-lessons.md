@@ -578,6 +578,22 @@ The same rule applies when a previously successful channel is no longer configur
   it with no user action at all: take the dependency away, wait for the status, bring it back, wait
   for it to clear, and count the requests meanwhile.
 
+### 69. A reason inferred from something found missing in shared state
+- **Bug.** Fix round 5 V1 (and CI run 41400987398): the sign-in card said "You signed out in another
+  tab." whenever a 401 found the browser's shared session store empty. Other things empty it: a
+  second tab hearing the same revoke from another device a moment earlier, storage the browser
+  blocks (always empty), and the log-out itself, whose tab cleared the store only once the server
+  answered (the first tab's 401 came before that and said "another device" in CI).
+- **Missed because.** The one test cleared the shared store by hand, which reads the same in all
+  those cases; no test had two tabs hear one revoke, a store that keeps nothing, or a log-out whose
+  answer was still on its way.
+- **Rule.** A reason told to the person (who ended it, where, why) comes from a positive signal the
+  actor leaves *before* it acts (here a note with a mark of the token, written by the tab that logs
+  out before its request goes), never from shared state found empty or changed, which many actors
+  and failures produce. With no signal, say the default that is true in every case. Test it with
+  two actors sharing the state: the other cause first, a store that keeps nothing or fails, and the
+  real cause with its effect held mid-way.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -811,3 +827,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 18 L9: closing the New project form (Escape, Cancel, or Create) sent focus to the top of the page (the sidebar's bell), not back to the New project button the form had replaced | 5 (a control that replaces the one holding focus hands it back when it goes: the form was the one inline swap not built on `useConfirmFocus`) | yes: the inline swaps are the confirms (all on `useConfirmFocus`), the preset delete confirm (same), and this form; the project page's edit form is a sheet, which returns focus to its opener itself | `projects.test.tsx`: Cancel on New project's form moves focus to the New project button (RED) |
 | 2026-11-02 | QA round 18 L12: Settings named a notification kind by its question ("Still doing…?: Telegram", «Всё ещё…?: Телефон») | 42 (the notification's own words used as a setting's name) | yes: the other kinds are named as things (Sign-ins, Deadline digest, Event starting); the question stays in the notification itself (`notify.title.activity_overrun`, the body) | `settings.test.tsx`: the switch reads "Activity check: Telegram" and no switch name is a question (RED) |
 | 2026-11-02 | Found by this round's full e2e runs (2 of ~100 tests per run; never seen on the round's start in 128 runs): `addTask` on a phone right after a fresh sign-in sometimes clicked Approve while the assistant's card was still unfolding. Instrumented: the button got its press-in, never its press; Playwright's scroll-into-view had scrolled the card's overflow-hidden box to reveal the still-clipped button, the box scrolled back as it grew (scroll events moved the button 110 px), and the click landed on the card. This round's first-sync changes moved that click into the unfold more often | 5 (an overflow-hidden box scrolled during an animation; the test acted on a control a person could not yet see) | yes: every e2e Approve click (`addTask`, the assistant, composer, live and time bar tests) now goes through `approve()`, which waits until no clipping box hides or scrolls the button; the other unfolding card (the composer's form) is only typed into, which needs no pointer | `e2e/support/composer.ts` `approve()`; the fresh-sign-in add looped 160 times: 0 failures (3 in 160 before) |
+| 2026-11-02 | Fix round 5 V1 (CI run 41400987398 failed on it): "You signed out in another tab." was inferred from the shared session store found empty, so two tabs revoked from another device, blocked storage and a log-out still waiting for its answer all said the wrong thing (the CI test lost the race the other way); a store read failing inside the 401 handler also made `me()` reject (V9) | 69 (new) | yes: the other places that read the shared session store to explain something: none left (`isStored` was the only one; Settings, the sessions list and the background API read it only for the token). `forget()` (this browser's own row ended in Devices) leaves the note too, after the fact, so a tab that hears first falls back to "another device"; the store's clear on sign-out no longer throws out of `me()` | `SignOutNotes` port (localStorage on the web, none in the app, so never "another tab" there); auth tests with two tabs on one store: revoke heard by both, blocked storage, failing stores, a log-out held mid-way; e2e: a revoke from another device with two tabs open says "another device" in both |

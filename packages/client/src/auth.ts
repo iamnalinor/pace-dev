@@ -10,9 +10,8 @@ import {
   UserSchema,
 } from "@pace/core";
 
-import type { SessionStore } from "./session.ts";
-
 import { type ApiClient, ApiError } from "./api-client.ts";
+import { noteMark, type SessionStore, type SignOutNotes, tryStore } from "./session.ts";
 
 export type AuthState = {
   readonly status: "loading" | "signed-in" | "signed-out";
@@ -24,8 +23,9 @@ export type AuthState = {
   */
   readonly endedElsewhere?: true | undefined;
   /**
-  Signed out because another tab of this browser signed out (its shared store no longer holds the
-  session): the login card says that instead (QA round 18 L3). Absent otherwise.
+  Signed out because another tab of this browser logged out: the login card says that instead
+  (QA round 18 L3). Only on that tab's word (a note it leaves before its log-out goes out), never
+  inferred from a store found empty (fix round 5 V1). Absent otherwise.
   */
   readonly endedInAnotherTab?: true | undefined;
 };
@@ -155,14 +155,19 @@ type Session = {
   (`endedElsewhere`), or another tab of this browser signed out (`endedInAnotherTab`).
   */
   readonly signOut: (reason?: SignOutReason) => Promise<void>;
-  /** Whether the device's shared store still holds `token` (another tab may have dropped it). */
-  readonly isStored: (token: string) => Promise<boolean>;
+  /**
+  Whether another tab of this browser logged `token` out (it left its note first); false when
+  there is no word of it, or no way to read one.
+  */
+  readonly isLoggedOutInAnotherTab: (token: string) => Promise<boolean>;
+  /** Leaves that note for `token` before this tab logs it out; nothing when it cannot. */
+  readonly leaveNote: (token: string) => Promise<void>;
   /** Remembers a token whose user is not known yet. */
   readonly adopt: (token: string) => Promise<void>;
 };
 
 /** The in-memory token (read synchronously by the API client) mirrored to the session store. */
-const createSession = (sessionStore: SessionStore): Session => {
+const createSession = (sessionStore: SessionStore, notes: SignOutNotes | undefined): Session => {
   const store = createStore<AuthState>(() => ({ status: "loading", user: null }));
   let cached: string | undefined;
   return {
@@ -191,10 +196,22 @@ const createSession = (sessionStore: SessionStore): Session => {
       });
       return granted.user;
     },
-    isStored: async (token) => (await sessionStore.get()) === token,
+    isLoggedOutInAnotherTab: async (token) =>
+      notes !== undefined &&
+      (await tryStore(async () => await notes.read(), null)) === noteMark(token),
+    leaveNote: async (token) => {
+      if (notes !== undefined) {
+        await tryStore(async () => {
+          await notes.leave(noteMark(token));
+        }, undefined);
+      }
+    },
     signOut: async (reason) => {
       cached = undefined;
-      await sessionStore.clear();
+      // A store that fails to forget still leaves this tab signed out.
+      await tryStore(async () => {
+        await sessionStore.clear();
+      }, undefined);
       store.setState({
         endedElsewhere: reason !== undefined && "endedElsewhere" in reason ? true : undefined,
         endedInAnotherTab: reason !== undefined && "endedInAnotherTab" in reason ? true : undefined,
@@ -261,8 +278,16 @@ const confirmationActions = (
   finishAccountDeletion: async () => {
     await session.signOut();
   },
-  /** The server ended the session already: no logout to send. */
+  /**
+  The server ended the session already: no logout to send. The person ended it here, so the
+  other tabs are told it was this browser (after the fact: a tab whose 401 comes first says
+  another device).
+  */
   forget: async () => {
+    const ended = session.token();
+    if (ended !== undefined) {
+      await session.leaveNote(ended);
+    }
     await session.signOut();
   },
 });
@@ -287,9 +312,12 @@ const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User
       error.status === 401 &&
       session.token() === sent
     ) {
-      // Another tab of this browser signed out: the shared store forgot the session already.
+      // "Another tab" only on its note: a store found empty proves nothing (another tab heard
+      // the same 401 first, blocked storage, a log-out whose answer is still on its way).
       await session.signOut(
-        (await session.isStored(sent)) ? { endedElsewhere: true } : { endedInAnotherTab: true },
+        (await session.isLoggedOutInAnotherTab(sent))
+          ? { endedInAnotherTab: true }
+          : { endedElsewhere: true },
       );
     }
     return err(errorCode(error));
@@ -299,9 +327,11 @@ const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User
 export const createAuth = (options: {
   readonly api: ApiClient;
   readonly session: SessionStore;
+  /** Shared with the other tabs of the browser profile; absent in the app (one process). */
+  readonly notes?: SignOutNotes | undefined;
 }): Auth => {
   const { api } = options;
-  const session = createSession(options.session);
+  const session = createSession(options.session, options.notes);
 
   const login = async (grant: () => Promise<Granted>): Promise<Result<User, string>> => {
     try {
@@ -328,6 +358,11 @@ export const createAuth = (options: {
     loginWithTelegram: async (payload) =>
       await login(async () => await api.call(endpoints.auth.telegram, { body: payload })),
     logout: async () => {
+      const leaving = session.token();
+      // The note goes before the request: another tab's 401 can come before its answer.
+      if (leaving !== undefined) {
+        await session.leaveNote(leaving);
+      }
       try {
         await api.call(endpoints.auth.logout, {});
       } catch {

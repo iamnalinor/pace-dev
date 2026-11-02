@@ -1,8 +1,8 @@
-import type { Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 
 import { approve, nowTasks } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
-import { createDevSession, freshTelegramId, resetAccount } from "./support/login.ts";
+import { API_URL, createDevSession, freshTelegramId, resetAccount } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
 
 /** Same key as apps/app/src/platform/secure-session.ts. */
@@ -148,14 +148,15 @@ test("a task added in one tab shows in a second tab of the same profile, and tha
   await context.close();
 });
 
-test('a log-out in another tab of the same browser says so, not "another device" (QA 18 L3)', async ({
-  browser,
-}) => {
+/**
+Two tabs of one browser profile signed into one session, as a sign-in leaves it (the first load
+of each tab only): the first on Now, the second on Settings.
+*/
+const twoTabsSignedIn = async (browser: Browser) => {
   const telegramId = freshTelegramId();
   await resetAccount(telegramId);
   const { token } = await createDevSession(telegramId);
   const context = await browser.newContext({ viewport: { height: 900, width: 1440 } });
-  // The session as a sign-in leaves it, for the first load of each tab only.
   await context.addInitScript(
     ({ key, value }) => {
       if (sessionStorage.getItem("seeded") !== null) {
@@ -172,12 +173,49 @@ test('a log-out in another tab of the same browser says so, not "another device"
   await expect(first.getByRole("heading", { name: "Now" })).toBeVisible();
   const second = await context.newPage();
   await second.goto("/settings");
+  await expect(second.getByRole("button", { name: "Log out" })).toBeVisible();
+  return { context, first, second, telegramId };
+};
+
+const ANOTHER_TAB = "You signed out in another tab.";
+const ANOTHER_DEVICE = /ended on another device/u;
+
+test('a log-out in another tab of the same browser says so, not "another device" (QA 18 L3)', async ({
+  browser,
+}) => {
+  const { context, first, second } = await twoTabsSignedIn(browser);
   await second.getByRole("button", { name: "Log out" }).click();
   await expect(second).toHaveURL(/\/login$/u);
   await expect(first).toHaveURL(/\/login$/u, { timeout: 15_000 });
-  await expect(
-    first.getByRole("status").filter({ hasText: "You signed out in another tab." }),
-  ).toBeVisible();
+  await expect(first.getByRole("status").filter({ hasText: ANOTHER_TAB })).toBeVisible();
   await expect(first.getByText(/another device/u)).toHaveCount(0);
+  await context.close();
+});
+
+test('a session ended from another device says "another device" in every open tab (fix round 5 V1)', async ({
+  browser,
+}) => {
+  const { context, first, second, telegramId } = await twoTabsSignedIn(browser);
+  // Another device of the account ends the browser's session from its own list.
+  const { token: elsewhere } = await createDevSession(telegramId);
+  const headers = { Authorization: `Bearer ${elsewhere}` };
+  const listed = await fetch(`${API_URL}/api/sessions`, { headers });
+  const { sessions } = (await listed.json()) as {
+    readonly sessions: readonly { readonly current: boolean; readonly id: string }[];
+  };
+  const browserSessions = sessions.filter((session) => !session.current);
+  expect(browserSessions).toHaveLength(1);
+  for (const session of browserSessions) {
+    const ended = await fetch(`${API_URL}/api/sessions/${encodeURIComponent(session.id)}`, {
+      headers,
+      method: "DELETE",
+    });
+    expect(ended.ok).toBe(true);
+  }
+  for (const tab of [first, second]) {
+    await expect(tab).toHaveURL(/\/login$/u, { timeout: 15_000 });
+    await expect(tab.getByRole("status").filter({ hasText: ANOTHER_DEVICE })).toBeVisible();
+    await expect(tab.getByText(ANOTHER_TAB)).toHaveCount(0);
+  }
   await context.close();
 });

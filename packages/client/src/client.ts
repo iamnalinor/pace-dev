@@ -74,7 +74,12 @@ export {
   parseLiveNotice,
 } from "./notifications.ts";
 export { type PeerTabs, type StoreChange } from "./peer-tabs.ts";
-export { createMemorySessionStore, type SessionStore } from "./session.ts";
+export {
+  createMemorySessionStore,
+  createMemorySignOutNotes,
+  type SessionStore,
+  type SignOutNotes,
+} from "./session.ts";
 export {
   type AppState,
   type AppStateHandle,

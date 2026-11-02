@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "./api-client.ts";
 import { type Auth, createAuth } from "./auth.ts";
 import { createFakeFetch, fakeMe, type FakeRoute, fakeUser, problem } from "./fake-fetch.fake.ts";
-import { createMemorySessionStore, type SessionStore } from "./session.ts";
+import {
+  createMemorySessionStore,
+  createMemorySignOutNotes,
+  type SessionStore,
+  type SignOutNotes,
+} from "./session.ts";
 
 const setup = async (
   routes: Readonly<Record<string, FakeRoute>>,
@@ -89,22 +94,6 @@ describe("createAuth session", () => {
     await asked;
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
     expect(auth.store.getState().endedElsewhere).toBeUndefined();
-  });
-
-  it('a 401 for a session another tab of this browser signed out says so, not "elsewhere" (QA 18 L3)', async () => {
-    // Tab B logged out: the server ended the session and the shared store forgot it. Tab A still
-    // holds the token in memory; its socket closes, it asks `me` and gets the 401.
-    const { auth, session } = await setup(
-      { "GET /api/me": () => problem(401, "auth/unauthorized") },
-      "shared",
-    );
-    await session.clear();
-    await auth.me();
-    expect(auth.store.getState()).toEqual({
-      endedInAnotherTab: true,
-      status: "signed-out",
-      user: null,
-    });
   });
 
   it("me() caches the user", async () => {
@@ -374,5 +363,181 @@ describe("adoptToken", () => {
     expect(auth.token()).toBeUndefined();
     await expect(session.get()).resolves.toBeNull();
     expect(auth.store.getState().status).toBe("signed-out");
+  });
+});
+
+/**
+Two tabs of one browser profile: one shared session store and one shared sign-out note (the
+profile's localStorage), each tab with its own auth holding the token in memory. `revoked`: the
+server no longer knows the token (every `me` answers 401 once it is set).
+*/
+const twoTabs = async (
+  options: { readonly session?: SessionStore; readonly notes?: SignOutNotes } = {},
+) => {
+  const session = options.session ?? createMemorySessionStore();
+  const notes = options.notes ?? createMemorySignOutNotes();
+  const server = { revoked: false };
+  const held: { release?: () => void } = {};
+  const logoutGate = new Promise<void>((resolve) => {
+    held.release = resolve;
+  });
+  const routes: Readonly<Record<string, FakeRoute>> = {
+    "GET /api/me": () => (server.revoked ? problem(401, "auth/unauthorized") : fakeMe),
+    // The server ends the session at once; its answer is held until the test releases it.
+    "POST /api/auth/logout": async () => {
+      server.revoked = true;
+      await logoutGate;
+      return { ok: true };
+    },
+  };
+  const tab = (): Auth => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: createFakeFetch(routes).fetch,
+      token: () => auth.token(),
+    });
+    const auth = createAuth({ api, notes, session });
+    return auth;
+  };
+  await session.set("shared");
+  const first = tab();
+  const second = tab();
+  await Promise.all([first.ready, second.ready]);
+  return {
+    first,
+    releaseLogout: () => held.release?.(),
+    second,
+    server,
+  };
+};
+
+describe('createAuth: "another tab" only on a log-out in another tab (QA 18 L3, fix round 5 V1)', () => {
+  it("says another tab for a log-out in another tab, even while that log-out's answer is on its way", async () => {
+    const { first, releaseLogout, second, server } = await twoTabs();
+    // The second tab logs out; the server ends the session before its answer comes back, and the
+    // first tab's socket closes and asks `me` meanwhile (CI run 41400987398).
+    const leaving = second.logout();
+    await vi.waitFor(() => {
+      expect(server.revoked).toBe(true);
+    });
+    await first.me();
+    expect(first.store.getState()).toEqual({
+      endedInAnotherTab: true,
+      status: "signed-out",
+      user: null,
+    });
+    releaseLogout();
+    await leaving;
+    expect(second.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
+  it("says another tab when another tab ended this browser's own session from its device list", async () => {
+    const { first, second, server } = await twoTabs();
+    // Settings → Devices → this browser's row: the server ended it, then the tab forgets it.
+    server.revoked = true;
+    await second.forget();
+    await first.me();
+    expect(first.store.getState().endedInAnotherTab).toBe(true);
+  });
+
+  it("says another device to both tabs when the session was ended from another device", async () => {
+    const { first, second, server } = await twoTabs();
+    server.revoked = true;
+    // The second tab hears first and forgets the session in the shared store.
+    await second.me();
+    await first.me();
+    for (const tab of [first, second]) {
+      expect(tab.store.getState()).toEqual({
+        endedElsewhere: true,
+        status: "signed-out",
+        user: null,
+      });
+    }
+  });
+
+  it("says another device where the browser keeps nothing (blocked storage)", async () => {
+    const blocked: SessionStore = {
+      clear: async () => {
+        await Promise.resolve();
+      },
+      get: async () => null,
+      set: async () => {
+        await Promise.resolve();
+      },
+    };
+    const notes: SignOutNotes = {
+      leave: async () => {
+        await Promise.resolve();
+      },
+      read: async () => null,
+    };
+    const { first, server } = await twoTabs({ notes, session: blocked });
+    await first.adoptToken("in-memory");
+    server.revoked = true;
+    await first.me();
+    expect(first.store.getState().endedElsewhere).toBe(true);
+    expect(first.store.getState().endedInAnotherTab).toBeUndefined();
+  });
+
+  it("says another device, and does not throw, when the device's stores fail to read (V9)", async () => {
+    // A keystore that answers at startup and fails afterwards (SecureStore read errors).
+    const memory = createMemorySessionStore();
+    const failing = { isBroken: false };
+    const session: SessionStore = {
+      clear: async () => {
+        if (failing.isBroken) {
+          throw new Error("keystore");
+        }
+        await memory.clear();
+      },
+      get: async () => {
+        if (failing.isBroken) {
+          throw new Error("keystore");
+        }
+        return await memory.get();
+      },
+      set: memory.set,
+    };
+    const notes: SignOutNotes = {
+      leave: async () => {
+        await Promise.reject(new Error("keystore"));
+      },
+      read: async () => {
+        throw new Error("keystore");
+      },
+    };
+    const { first, server } = await twoTabs({ notes, session });
+    failing.isBroken = true;
+    server.revoked = true;
+    await expect(first.me()).resolves.toEqual({ error: "auth/unauthorized", ok: false });
+    expect(first.token()).toBeUndefined();
+    expect(first.store.getState()).toEqual({
+      endedElsewhere: true,
+      status: "signed-out",
+      user: null,
+    });
+  });
+
+  it("logs out even when the note cannot be left", async () => {
+    const notes: SignOutNotes = {
+      leave: async () => {
+        await Promise.reject(new Error("keystore"));
+      },
+      read: async () => null,
+    };
+    const { releaseLogout, second } = await twoTabs({ notes });
+    releaseLogout();
+    await second.logout();
+    expect(second.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
+  it("keeps no token in the note, only a mark of it", async () => {
+    const notes = createMemorySignOutNotes();
+    const { releaseLogout, second } = await twoTabs({ notes });
+    releaseLogout();
+    await second.logout();
+    const note = await notes.read();
+    expect(note).not.toBeNull();
+    expect(note).not.toContain("shared");
   });
 });
