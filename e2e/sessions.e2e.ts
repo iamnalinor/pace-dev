@@ -207,3 +207,24 @@ for (const size of SIZES) {
     });
   });
 }
+
+test("Escape cancels Wipe's and Delete's first confirm and gives focus back (QA 18 L1)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await loginViaApi(page);
+  await page.goto("/settings");
+  for (const [opener, action] of [
+    ["Wipe data", "Wipe — confirm in Telegram"],
+    ["Delete account", "Delete — confirm in Telegram"],
+  ] as const) {
+    await page.getByRole("button", { name: opener }).focus();
+    await page.keyboard.press("Enter");
+    const confirm = page.getByRole("button", { name: action });
+    await expect(page.getByRole("button", { exact: true, name: /^Cancel/u })).toBeFocused();
+    // As the Devices revoke confirm and the sheets take it.
+    await page.keyboard.press("Escape");
+    await expect(confirm).toHaveCount(0);
+    await expect(page.getByRole("button", { name: opener })).toBeFocused();
+  }
+});

@@ -37,7 +37,14 @@ export const SheetActions = ({
     <View className="flex-row gap-2">
       {isConfirmation ? (
         <View className="flex-1">
-          <Button onPress={onCancel} ref={cancelRef} variant="secondary" width="fill">
+          {/* Escape cancels, as it closes the sheets and the Devices confirm (QA round 18 L1). */}
+          <Button
+            hotkey={HOTKEYS.escape}
+            onPress={onCancel}
+            ref={cancelRef}
+            variant="secondary"
+            width="fill"
+          >
             {cancelLabel}
           </Button>
         </View>
