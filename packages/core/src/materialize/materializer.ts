@@ -1,5 +1,6 @@
 import { type Event, type EventOf, EventSchema } from "../events/event-schema.ts";
 import { sortEvents } from "../events/sort.ts";
+import { inBatch } from "./transient.ts";
 
 export type Reducer<S> = (state: S, event: Event) => S;
 
@@ -9,10 +10,16 @@ type Amendment = EventOf<"event.amended">;
 export const isCorrection = (event: Event): event is Amendment | Revocation =>
   event.type === "event.amended" || event.type === "event.revoked";
 
-/** Left fold over events: the one place `reduce` is the honest name for the job. */
+/**
+Left fold over events: the one place `reduce` is the honest name for the job. It runs as one
+batch, so the reducers' maps are written in place and a rebuild costs time linear in the log
+(`transient.ts`, bug-lessons class 55).
+*/
 const fold = <S>(events: readonly Event[], reducer: Reducer<S>, initial: S): S =>
-  // eslint-disable-next-line unicorn/no-array-reduce -- a fold is what a materializer is
-  events.reduce((state, event) => reducer(state, event), initial);
+  inBatch(() =>
+    // eslint-disable-next-line unicorn/no-array-reduce -- a fold is what a materializer is
+    events.reduce((state, event) => reducer(state, event), initial),
+  );
 
 const groupByTarget = <T extends Amendment | Revocation>(
   corrections: readonly T[],

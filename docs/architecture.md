@@ -131,6 +131,13 @@ Reducers are `(state, event) => state` and pure. `settings-reducer.ts` is the fi
 the `notificationChannels` switches on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
+A full rebuild costs time linear in the log (bug-lessons class 55): `materialize` and
+`materializeAt` fold as one batch (`materialize/transient.ts`), in which a reducer's map writes
+(`assoc`, `putById`) copy a map once and then write that copy in place, and a subset of a map is
+read through a kept index (`keysWhere`), never by scanning the map per event. Outside a batch
+(the incremental `apply`) the same calls copy, and the batch's maps are frozen before it answers,
+so callers only ever hold immutable state. `materialize-cost.test.ts` holds the budget.
+
 High-volume phone facts (the calendar copy, app usage) are **not** events. They have
 their own tables in the Durable Object (`calendar_events`, `usage_sessions`, and `phone_uses`:
 when a phone was really in use, which automatic sleep reads instead of its app sessions),

@@ -1,6 +1,8 @@
 import type { Event, EventOf } from "../events/event-schema.ts";
 import type { Reducer } from "../materialize/materializer.ts";
 
+import { putById as put } from "../materialize/transient.ts";
+
 export type Series = {
   readonly id: string;
   readonly template: EventOf<"series.created">["payload"]["template"];
@@ -32,21 +34,16 @@ export const activeSeriesOf = (state: SeriesState, seriesId: null | string): Ser
 const created = (state: SeriesState, event: EventOf<"series.created">): SeriesState => {
   const { seriesId, schedule, template } = event.payload;
   return seriesById(state, seriesId) === undefined
-    ? {
-        byId: {
-          ...state.byId,
-          [seriesId]: {
-            id: seriesId,
-            schedule,
-            template,
-            revision: 0,
-            revisionKey: "0",
-            archived: false,
-            keepTaskId: null,
-            createdAt: event.occurredAt,
-          },
-        },
-      }
+    ? put(state, {
+        id: seriesId,
+        schedule,
+        template,
+        revision: 0,
+        revisionKey: "0",
+        archived: false,
+        keepTaskId: null,
+        createdAt: event.occurredAt,
+      })
     : state;
 };
 
@@ -56,30 +53,20 @@ const updated = (state: SeriesState, event: EventOf<"series.updated">): SeriesSt
     return state;
   }
   const revision = prior.revision + 1;
-  return {
-    byId: {
-      ...state.byId,
-      [prior.id]: {
-        ...prior,
-        schedule: event.payload.schedule,
-        template: { ...event.payload.template, seriesRevision: revision },
-        revision,
-        revisionKey: event.id,
-      },
-    },
-  };
+  return put(state, {
+    ...prior,
+    schedule: event.payload.schedule,
+    template: { ...event.payload.template, seriesRevision: revision },
+    revision,
+    revisionKey: event.id,
+  });
 };
 
 const archived = (state: SeriesState, event: EventOf<"series.archived">): SeriesState => {
   const prior = seriesById(state, event.payload.seriesId);
   return prior === undefined || prior.archived
     ? state
-    : {
-        byId: {
-          ...state.byId,
-          [prior.id]: { ...prior, archived: true, keepTaskId: event.payload.keepTaskId ?? null },
-        },
-      };
+    : put(state, { ...prior, archived: true, keepTaskId: event.payload.keepTaskId ?? null });
 };
 
 export const seriesReducer: Reducer<SeriesState> = (state, event: Event): SeriesState => {
