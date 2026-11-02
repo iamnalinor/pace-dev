@@ -98,7 +98,7 @@ each line has its test added to the owning task.
 | `apps/app/src/ui/text-field.tsx`, `time-input.tsx` | field purpose, touched gate, labels |
 | `apps/app/src/ui/motion.ts` | presets from generated motion constants (spec §6) |
 | `apps/app/src/platform/document-*.web.tsx`, `public/theme-boot.js` | the web document layer (spec §7) |
-| `apps/app/app/dev/gallery.tsx` + `src/features/dev/*` | dev-only worst-case gallery (gated) |
+| `apps/app/app/dev/gallery.tsx` + `src/screens/gallery/*` | dev-only worst-case gallery (gated); description, link and the full sidebar are not rendered yet: later kit tasks add them |
 | `e2e/design-shots.e2e.ts`, `e2e/a11y.e2e.ts`, `e2e/motion.e2e.ts`, `e2e/worst-case.e2e.ts` | the matrix and the new sweeps |
 
 ---
@@ -212,7 +212,7 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
 - Create: `packages/core/src/testing/worst-case.ts` (fixtures: long Cyrillic titles up to schema
   max, one-letter, unbreakable URL, emoji-first name, RTL fragment, 37 subtasks, 99+ inbox, 23 h 59 m,
   0 m, 12 long project names, overlapping blocks, RU plural counts 1/2/5/11/21/22/25),
-  `apps/app/app/dev/gallery.tsx`, `apps/app/src/features/dev/gallery-screen.tsx`,
+  `apps/app/app/dev/gallery.tsx`, `apps/app/src/screens/gallery/gallery-screen.tsx` (+ `gallery-sections.tsx`, `gallery-models.ts`; under `screens/` because features may not import features; the description, link and full sidebar are not rendered yet: later kit tasks add them),
   `e2e/worst-case.e2e.ts`
 - Modify: `knip.jsonc` only if knip flags the route (it should not: route files are entries)
 

@@ -78,6 +78,7 @@ const GalleryBody = ({
   const data = galleryData(set, language);
   return (
     <Screen>
+      {/* `dataSet` is react-native-web's way to a `data-*` attribute (the e2e reads `data-set`); React Native's types do not know it. */}
       <View testID="worst-case-gallery" {...({ dataSet: { set } } as object)}>
         <View className="gap-2 px-5 pt-6">
           <Text accessibilityRole="header" className="font-sans text-xl font-semibold text-fg">
