@@ -32,7 +32,7 @@ export const RouteGate = ({
   }
   if (status === "loading" || (status === "signed-in" && isOnboarded === null)) {
     // A blank page of the app's own background, so nothing flashes while the session is read.
-    return <View className="flex-1 bg-bg" />;
+    return <View className="flex-1 bg-app" />;
   }
   if (status === "signed-out") {
     return <Redirect href="/login" />;

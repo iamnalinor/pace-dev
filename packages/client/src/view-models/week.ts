@@ -3,10 +3,10 @@ import {
   type ActivityCategory,
   addDaysIn,
   type CalendarEvent,
-  CATEGORY_COLORS,
+  CATEGORY_HUES,
   type CoreState,
   formatInZone,
-  type ProjectColorName,
+  type HueName,
   type QueryContext,
   shownLabel,
   startOfWeekIn,
@@ -24,7 +24,7 @@ export type WeekBlock = Placement & {
   readonly id: string;
   readonly label: string;
   readonly category: ActivityCategory;
-  readonly color: ProjectColorName;
+  readonly color: HueName;
   readonly startAt: string;
   readonly endAt: string;
   readonly minutes: number;
@@ -172,7 +172,7 @@ export const weekModel = (
         .map(({ place, segment }) => ({
           ...place,
           category: segment.category,
-          color: CATEGORY_COLORS[segment.category],
+          color: CATEGORY_HUES[segment.category],
           endAt: segment.endAt,
           id: `${segment.activityId}-${segment.startAt}`,
           isAlongside: segment.isAlongside,

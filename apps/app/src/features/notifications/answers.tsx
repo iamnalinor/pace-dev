@@ -18,7 +18,11 @@ export const Line = ({
   readonly tone?: "fg" | "muted";
 }) => (
   <Text
-    className={tone === "fg" ? "font-sans text-[15px] text-fg" : "font-sans text-[13px] text-muted"}
+    className={
+      tone === "fg"
+        ? "font-sans text-callout text-label-primary"
+        : "font-sans text-footnote text-label-secondary"
+    }
   >
     {children}
   </Text>
@@ -53,7 +57,7 @@ const NotMeConfirm = ({
     <View aria-label={question} className="gap-2" role="group">
       <Text
         accessibilityLiveRegion="polite"
-        className="font-sans text-[14px] text-fg"
+        className="font-sans text-subhead font-normal text-label-primary"
         role="status"
       >
         {question}
@@ -177,7 +181,7 @@ export const Answers = ({
   }
   if (isAsking) {
     return (
-      <View className="gap-1.5">
+      <View className="gap-2">
         <NotMeConfirm
           cancelRef={focus.cancelRef(t("notifications.notMeConfirm"))}
           isBusy={pending !== null}
@@ -194,7 +198,7 @@ export const Answers = ({
     );
   }
   return (
-    <View className="gap-1.5">
+    <View className="gap-2">
       <View className="flex-row flex-wrap gap-2">
         {answers.map((answer, index) => (
           <Button

@@ -28,8 +28,8 @@ export const NumberInput = ({
     <TextInput
       accessibilityLabel={label}
       className={cx(
-        "h-11 rounded-lg border bg-bg px-3 font-sans text-[15px] tabular-nums text-fg",
-        invalid ? "border-warn" : "border-line",
+        "h-hit-web rounded-lg border bg-app px-3 font-sans text-callout tabular-nums text-label-primary",
+        invalid ? "border-danger" : "border-outline",
       )}
       inputMode="decimal"
       onChangeText={(next) => {
@@ -40,7 +40,7 @@ export const NumberInput = ({
         }
       }}
       placeholder={placeholder}
-      placeholderTextColor={palette.muted}
+      placeholderTextColor={palette["label.tertiary"]}
       value={text}
     />
   );

@@ -40,8 +40,8 @@ const Fact = ({ label, value }: { readonly label: string; readonly value: string
     accessible
     className="flex-row items-baseline justify-between gap-3 py-2"
   >
-    <Text className="font-sans text-[13px] text-muted">{label}</Text>
-    <Text className="shrink text-right font-sans text-[15px] text-fg" selectable>
+    <Text className="font-sans text-footnote text-label-secondary">{label}</Text>
+    <Text className="shrink text-right font-sans text-callout text-label-primary" selectable>
       {value}
     </Text>
   </View>
@@ -51,7 +51,7 @@ const Fact = ({ label, value }: { readonly label: string; readonly value: string
 const Found = ({ instance }: { readonly instance: Instance }) => {
   const t = useT();
   return (
-    <View className="rounded-lg border border-line bg-raised px-3 py-1">
+    <View className="rounded-lg border border-separator bg-fill-3 px-3 py-1">
       <Fact label={t("server.name")} value={instance.name} />
       <Fact label={t("server.version")} value={instance.version} />
       <Fact label={t("server.bot")} value={`@${instance.botUsername}`} />

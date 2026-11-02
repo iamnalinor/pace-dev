@@ -23,12 +23,12 @@ const FIELD_KEYS: readonly (keyof PresetFields)[] = ["description", "link", "sta
 const Section = ({ children, title }: { readonly children: ReactNode; readonly title: string }) => (
   <View
     accessibilityLabel={title}
-    className="mx-4 mt-3 rounded-xl border border-line bg-surface px-3.5 pt-1"
+    className="mx-4 mt-3 rounded-xl border border-separator bg-cell px-4 pt-1"
     role="group"
   >
     <Text
       accessibilityRole="header"
-      className="pb-1 pt-2.5 font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted"
+      className="pb-1 pt-3 font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary"
     >
       {title}
     </Text>

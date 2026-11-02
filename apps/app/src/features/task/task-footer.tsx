@@ -54,8 +54,11 @@ export const TaskFooter = ({
   const padding = { paddingBottom: Math.max(insets.bottom, 12) + 8 };
   if (view.closed !== null) {
     return (
-      <View className="flex-row items-center gap-3 border-t border-line px-4 pt-3" style={padding}>
-        <Text className="flex-1 font-sans text-[13px] text-muted">
+      <View
+        className="flex-row items-center gap-3 border-t border-separator px-4 pt-3"
+        style={padding}
+      >
+        <Text className="flex-1 font-sans text-footnote text-label-secondary">
           {t("task.closedAs", { outcome: t(`outcome.${view.outcome ?? view.closed.outcome}`) })}
         </Text>
         <Button onPress={() => void run(actions.reopen(view.id))} variant="secondary">
@@ -66,7 +69,10 @@ export const TaskFooter = ({
   }
   const primary = view.primaryAction.kind === "submit" ? submitTitle : t("task.done");
   return (
-    <View className="flex-row items-center gap-2 border-t border-line px-4 pt-3" style={padding}>
+    <View
+      className="flex-row items-center gap-2 border-t border-separator px-4 pt-3"
+      style={padding}
+    >
       <View className="flex-1">
         <FocusButton view={view} />
       </View>

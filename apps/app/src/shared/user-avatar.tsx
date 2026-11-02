@@ -25,13 +25,10 @@ export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
     />
   ) : (
     <View
-      className="items-center justify-center rounded-full bg-accentQuiet"
+      className="items-center justify-center rounded-pill bg-accent-quiet"
       style={{ width: size, height: size }}
     >
-      <Text
-        className="font-sans font-semibold text-accentQuietFg"
-        style={{ fontSize: size * 0.38 }}
-      >
+      <Text className="font-sans font-semibold text-accent-text" style={{ fontSize: size * 0.38 }}>
         {initials}
       </Text>
     </View>

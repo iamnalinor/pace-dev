@@ -22,12 +22,12 @@ const Line = ({
   readonly value: string;
 }) => (
   <View className="flex-row justify-between gap-3" testID={`preview-${id}`}>
-    <Text className="font-sans text-[13px] text-muted">{label}</Text>
+    <Text className="font-sans text-footnote text-label-secondary">{label}</Text>
     <Text
       className={
         mono
-          ? "font-sans text-[12px] tabular-nums text-fg"
-          : "flex-shrink font-sans text-[13px] text-fg"
+          ? "font-sans text-caption font-normal tabular-nums text-label-primary"
+          : "flex-shrink font-sans text-footnote text-label-primary"
       }
     >
       {value}
@@ -57,7 +57,7 @@ export const ClosePreview = ({
     form.at !== null &&
     Math.floor(Date.parse(form.at) / 60_000) === Math.floor(Date.parse(now) / 60_000);
   return (
-    <View className="gap-1.5 rounded-lg bg-bg p-3">
+    <View className="gap-2 rounded-lg bg-app p-3">
       <Line id="outcome" label={t("close.outcome")} value={outcome} />
       {open.length === 0 ? null : (
         <Line id="open" label={t("close.stillOpen")} value={open.join(", ")} />

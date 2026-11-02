@@ -29,7 +29,7 @@ export const TimeInput = ({
     <TextInput
       accessibilityLabel={label}
       className={cx(
-        "h-11 rounded-lg border border-line bg-bg px-3 font-sans text-[15px] tabular-nums text-fg",
+        "h-hit-web rounded-lg border border-outline bg-app px-3 font-sans text-callout tabular-nums text-label-primary",
         className,
       )}
       inputMode="numeric"
@@ -45,7 +45,7 @@ export const TimeInput = ({
         }
       }}
       placeholder="00:00"
-      placeholderTextColor={palette.faint}
+      placeholderTextColor={palette["label.tertiary"]}
       ref={ref}
       value={text}
     />

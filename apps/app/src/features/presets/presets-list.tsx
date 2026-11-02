@@ -31,8 +31,8 @@ const Badge = ({
 }) => (
   <Text
     className={cx(
-      "rounded-sm px-1.5 py-0.5 font-sans text-[11px]",
-      isQuiet ? "text-muted" : "bg-raised text-fg2",
+      "rounded-sm px-2 py-0.5 font-sans text-caption2 font-normal",
+      isQuiet ? "text-label-tertiary" : "bg-fill-3 text-label-secondary",
     )}
   >
     {children}
@@ -59,10 +59,10 @@ const PresetRow = ({
   const resolved = resolvePreset(presets, preset.id);
   const name = presetLabel(preset, language);
   return (
-    <View className="min-h-14 flex-row items-center gap-1 border-b border-line">
+    <View className="min-h-row flex-row items-center gap-1 border-b border-separator">
       <Pressable
         accessibilityRole="link"
-        className="min-h-14 flex-1 flex-row items-center gap-2 px-1 active:opacity-70"
+        className="min-h-row flex-1 flex-row items-center gap-2 px-1 active:opacity-70"
         onPress={() => {
           router.push({ params: { id: preset.id }, pathname: "/presets/[id]" });
         }}
@@ -72,7 +72,7 @@ const PresetRow = ({
         </View>
         {preset.archived ? <Badge isQuiet>{t("presets.archivedBadge")}</Badge> : null}
         <Badge>{t(preset.builtIn ? "presets.builtIn" : "presets.yours")}</Badge>
-        <ChevronRight color={palette.faint} size={16} strokeWidth={1.75} />
+        <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
       </Pressable>
       <IconButton
         disabled={isFirst}
@@ -99,8 +99,10 @@ const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
   const router = useRouter();
   const [from, setFrom] = useState("hw");
   return (
-    <View className="gap-2 rounded-xl border border-line bg-surface p-3.5">
-      <Text className="font-sans text-[12px] text-muted">{t("presets.startFrom")}</Text>
+    <View className="gap-2 rounded-xl border border-separator bg-cell p-4">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("presets.startFrom")}
+      </Text>
       <ChoiceChips
         label={t("presets.startFrom")}
         labelOf={(id) => {

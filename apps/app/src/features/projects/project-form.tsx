@@ -41,7 +41,7 @@ export const ProjectForm = ({
     setProblem(result.ok ? null : errorText(t, result.error));
   };
   return (
-    <View className="gap-3 rounded-xl border border-line bg-surface p-3.5">
+    <View className="gap-3 rounded-xl border border-separator bg-cell p-4">
       <TextField
         label={t("projects.name")}
         onChangeText={(name) => {
@@ -68,7 +68,7 @@ export const ProjectForm = ({
         />
       )}
       {problem === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-subhead font-normal text-danger">
           {problem}
         </Text>
       )}

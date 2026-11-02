@@ -34,15 +34,15 @@ const SeriesRules = () => {
   return (
     <View
       accessibilityLabel={t("permissions.rules")}
-      className="gap-1 border-t border-line px-5 py-4"
+      className="gap-1 border-t border-separator px-5 py-4"
       role="group"
     >
-      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
+      <Text className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
         {t("permissions.rules")}
       </Text>
       {rules.map((rule) => (
         <View className="flex-row items-center gap-3" key={rule.series}>
-          <Text className="flex-1 font-sans text-[14px] text-fg">
+          <Text className="flex-1 font-sans text-subhead font-normal text-label-primary">
             {t(`permissions.rule.${rule.rule}`, { title: rule.title })}
           </Text>
           <Button
@@ -68,7 +68,9 @@ export const PermissionsScreen = () => {
   const { list, request } = usePermissions();
   return (
     <PushedScreen title={t("permissions.title")}>
-      <Text className="px-5 pb-3 font-sans text-[13px] text-muted">{t("permissions.hint")}</Text>
+      <Text className="px-5 pb-3 font-sans text-footnote text-label-secondary">
+        {t("permissions.hint")}
+      </Text>
       {(list ?? []).map((permission) => (
         <PermissionCard
           key={permission.id}

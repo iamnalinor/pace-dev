@@ -24,7 +24,7 @@ const DescriptionEditor = ({
 }) => {
   const t = useT();
   return (
-    <View className="mx-5 gap-3 rounded-xl border border-line bg-surface p-3.5">
+    <View className="mx-5 gap-3 rounded-xl border border-separator bg-cell p-4">
       <TextField
         autoFocus
         editable={!isSaving}
@@ -37,19 +37,19 @@ const DescriptionEditor = ({
       <View className="flex-row justify-end gap-2">
         <Pressable
           accessibilityRole="button"
-          className="min-h-11 justify-center rounded-lg px-4"
+          className="min-h-hit-web justify-center rounded-lg px-4"
           disabled={isSaving}
           onPress={onCancel}
         >
-          <Text className="font-sans text-[13px] text-fg2">{t("common.cancel")}</Text>
+          <Text className="font-sans text-footnote text-label-secondary">{t("common.cancel")}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          className="min-h-11 justify-center rounded-lg bg-accent px-4"
+          className="min-h-hit-web justify-center rounded-lg bg-accent px-4"
           disabled={isSaving}
           onPress={onSave}
         >
-          <Text className="font-sans text-[13px] font-semibold text-accentFg">
+          <Text className="font-sans text-footnote font-semibold text-accent-on">
             {t("common.save")}
           </Text>
         </Pressable>
@@ -106,7 +106,7 @@ export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
     <Pressable
       accessibilityLabel={t(hasDescription ? "task.editDescription" : "task.addDescription")}
       accessibilityRole="button"
-      className="mx-5 min-h-11 flex-row items-start gap-2 rounded-lg py-2"
+      className="mx-5 min-h-hit-web flex-row items-start gap-2 rounded-lg py-2"
       onPress={() => {
         setDraft(view.description ?? "");
         setIsEditing(true);
@@ -115,13 +115,13 @@ export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
       <Text
         className={
           hasDescription
-            ? "min-w-0 flex-1 font-sans text-[14px] leading-5 text-fg2"
-            : "min-w-0 flex-1 font-sans text-[14px] text-muted"
+            ? "min-w-0 flex-1 font-sans text-subhead font-normal text-label-secondary"
+            : "min-w-0 flex-1 font-sans text-subhead font-normal text-label-tertiary"
         }
       >
         {hasDescription ? view.description : t("task.addDescription")}
       </Text>
-      <Pencil color={palette.muted} size={15} strokeWidth={1.8} />
+      <Pencil color={palette["label.secondary"]} size={15} strokeWidth={1.8} />
     </Pressable>
   );
 };

@@ -14,12 +14,14 @@ import { PushedScreen } from "./pushed-screen.tsx";
 
 const Detail = ({
   children,
-  tone = "fg2",
+  tone = "plain",
 }: {
   readonly children: string;
-  readonly tone?: "fg2" | "warn";
+  readonly tone?: "plain" | "warn";
 }) => (
-  <Text className={`font-sans text-[13px] leading-5 ${tone === "warn" ? "text-warn" : "text-fg2"}`}>
+  <Text
+    className={`font-sans text-footnote ${tone === "warn" ? "text-warn" : "text-label-secondary"}`}
+  >
     {children}
   </Text>
 );
@@ -34,9 +36,9 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
   ].filter((part): part is string => part !== null);
   return (
     <>
-      <Text className="font-sans text-[15px] font-medium leading-5 text-fg">{title}</Text>
+      <Text className="font-sans text-callout font-medium text-label-primary">{title}</Text>
       {more.length === 0 ? null : (
-        <Text className="font-sans text-[15px] leading-5 text-fg">{more.join("\n")}</Text>
+        <Text className="font-sans text-callout text-label-primary">{more.join("\n")}</Text>
       )}
       {view.request === null ? null : (
         <Detail>{t("decisions.request", { text: view.request })}</Detail>
@@ -48,7 +50,9 @@ const RowBody = ({ view }: { readonly view: DecisionView }) => {
       {view.outcome === null ? null : <Detail>{view.outcome}</Detail>}
       {view.notFound === null ? null : <Detail tone="warn">{view.notFound}</Detail>}
       {view.note === null ? null : <Detail>{view.note}</Detail>}
-      <Text className="font-sans text-[12px] text-muted">{footer.join(" · ")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {footer.join(" · ")}
+      </Text>
     </>
   );
 };
@@ -60,14 +64,14 @@ const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
   const { palette } = useTheme();
   const { taskId } = view;
   return taskId === null ? (
-    <View className="gap-0.5 border-t border-line py-2.5">
+    <View className="gap-0.5 border-t border-separator py-3">
       <RowBody view={view} />
     </View>
   ) : (
     <Pressable
       accessibilityHint={t("decisions.open")}
       accessibilityRole="button"
-      className="flex-row items-center gap-3 border-t border-line py-2.5 active:opacity-70"
+      className="flex-row items-center gap-3 border-t border-separator py-3 active:opacity-70"
       onPress={() => {
         openTask(taskId);
       }}
@@ -75,7 +79,7 @@ const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
       <View className="flex-1 gap-0.5">
         <RowBody view={view} />
       </View>
-      <ChevronRight color={palette.faint} size={16} strokeWidth={1.75} />
+      <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
     </Pressable>
   );
 };
@@ -121,23 +125,25 @@ export const DecisionsScreen = () => {
       <View className="px-4 pb-3">
         <TextInput
           accessibilityLabel={t("decisions.search")}
-          className="min-h-11 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
+          className="min-h-hit-web rounded-lg border border-outline bg-cell px-3 font-sans text-callout text-label-primary"
           onChangeText={setQuery}
           onSubmitEditing={() => {
             setSearch(query);
           }}
           placeholder={t("decisions.search")}
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={palette["label.tertiary"]}
           returnKeyType="search"
           value={query}
         />
       </View>
       <View className="px-4">
         {loaded.status === "failed" ? (
-          <Text className="font-sans text-[13px] text-muted">{t("decisions.failed")}</Text>
+          <Text className="font-sans text-footnote text-label-secondary">
+            {t("decisions.failed")}
+          </Text>
         ) : null}
         {loaded.status === "loaded" && views.length === 0 ? (
-          <Text className="font-sans text-[13px] text-muted">
+          <Text className="font-sans text-footnote text-label-secondary">
             {search.trim() === ""
               ? t("decisions.empty")
               : t("decisions.noMatch", { query: search.trim() })}

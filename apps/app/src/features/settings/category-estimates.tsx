@@ -15,13 +15,15 @@ export const CategoryEstimates = () => {
   const [opened, setOpened] = useState<ActivityCategory | null>(null);
   return (
     <View className="gap-3">
-      <Text className="font-sans text-[12px] leading-5 text-muted">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("settings.categoryEstimates.hint")}
       </Text>
       {ACTIVITY_CATEGORIES.map((category) => (
-        <View className="gap-2 border-t border-line pt-2" key={category}>
+        <View className="gap-2 border-t border-separator pt-2" key={category}>
           <View className="flex-row flex-wrap items-center justify-between gap-2">
-            <Text className="font-sans text-[13px] text-fg">{t(`category.${category}`)}</Text>
+            <Text className="font-sans text-footnote text-label-primary">
+              {t(`category.${category}`)}
+            </Text>
             <EstimateChip
               fallback={CATEGORY_EXPECT[category]}
               isOpen={opened === category}

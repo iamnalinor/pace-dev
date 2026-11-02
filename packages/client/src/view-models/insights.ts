@@ -2,7 +2,7 @@ import {
   accountTz,
   type ActivityCategory,
   addDaysIn,
-  CATEGORY_COLORS,
+  CATEGORY_HUES,
   type CoreState,
   type EstimateRow,
   estimateVsTracked,
@@ -10,6 +10,7 @@ import {
   focusVsSleep,
   type Fragmentation,
   fragmentation,
+  type HueName,
   onTimeByProject,
   productiveHours,
   projectById,
@@ -25,7 +26,7 @@ export type InsightBar = {
   readonly key: null | string;
   /** The project's name; categories and "no project" are translated by the UI. */
   readonly name: null | string;
-  readonly color: null | ProjectColorName;
+  readonly color: HueName | null | ProjectColorName;
   readonly minutes: number;
   /** 0..1 of the largest bar, for drawing. */
   readonly share: number;
@@ -104,7 +105,7 @@ export const insightsModel = (
   return {
     byCategory: withShares(
       categories.map((row) => ({
-        color: CATEGORY_COLORS[row.category],
+        color: CATEGORY_HUES[row.category],
         key: row.category satisfies ActivityCategory,
         minutes: row.minutes,
         name: null,

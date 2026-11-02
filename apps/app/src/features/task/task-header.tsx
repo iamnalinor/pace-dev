@@ -116,21 +116,21 @@ export const TaskHeader = ({
           project: project?.name ?? t("task.noProject"),
         })}
         accessibilityRole="button"
-        className="h-11 flex-row items-center gap-1 active:opacity-70"
+        className="h-hit-web flex-row items-center gap-1 active:opacity-70"
         disabled={onProject === undefined}
         onPress={onProject}
       >
         <Text
           className={cx(
-            "font-sans text-[15px] font-medium",
-            project === null ? "text-fg2" : inkClass(project.color),
+            "font-sans text-callout font-medium",
+            project === null ? "text-label-secondary" : inkClass(project.color),
           )}
           numberOfLines={1}
         >
           {project?.name ?? t("task.noProject")}
         </Text>
         {onProject === undefined ? null : (
-          <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+          <ChevronDown color={palette["label.secondary"]} size={16} strokeWidth={2} />
         )}
       </Pressable>
     </BackHeader>

@@ -60,7 +60,7 @@ const OutcomeLine = ({
       role="status"
       tabIndex={-1}
     >
-      <Text className="font-sans text-[13px] text-muted">{text}</Text>
+      <Text className="font-sans text-footnote text-label-secondary">{text}</Text>
     </View>
   );
 };
@@ -101,12 +101,12 @@ const EventCard = ({
   return (
     <View
       aria-label={t("day.calendar")}
-      className="mx-4 mb-3 gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-3"
+      className="mx-4 mb-3 gap-3 rounded-xl border border-separator bg-cell px-4 py-3"
       role="region"
     >
       <View className="gap-0.5">
-        <Text className="font-sans text-[15px] font-medium text-fg">{event.title}</Text>
-        <Text className="font-sans text-[13px] tabular-nums text-muted">
+        <Text className="font-sans text-callout font-medium text-label-primary">{event.title}</Text>
+        <Text className="font-sans text-footnote tabular-nums text-label-secondary">
           {`${clockTime(event.startAt, deviceTz)}–${clockTime(event.endAt, deviceTz)}`}
         </Text>
       </View>

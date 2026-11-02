@@ -16,7 +16,10 @@ const NONE: readonly KeptSubtask[] = [];
 /** The row's bullet: a small open circle, like an unticked box (filled once sent). */
 const Bullet = ({ isSent = false }: { readonly isSent?: boolean }) => (
   <View
-    className={cx("h-3.5 w-3.5 rounded-full border-[1.5px] border-muted", isSent && "bg-muted")}
+    className={cx(
+      "h-4 w-4 rounded-pill border-stroke border-outline",
+      isSent && "bg-label-tertiary",
+    )}
   />
 );
 
@@ -40,7 +43,7 @@ const Row = ({
   const isShowsRemove = KEYBOARD === null || isHovered || isFocused;
   return (
     <View
-      className="min-h-9 flex-row items-center gap-2.5 pl-1"
+      className="min-h-10 flex-row items-center gap-3 pl-1"
       onPointerEnter={() => {
         setIsHovered(true);
       }}
@@ -50,17 +53,24 @@ const Row = ({
       role="listitem"
     >
       <Bullet isSent={isSent} />
-      <Text className={cx("flex-1 font-sans text-[14px]", isSent ? "text-muted" : "text-fg")}>
+      <Text
+        className={cx(
+          "flex-1 font-sans text-subhead font-normal",
+          isSent ? "text-label-secondary" : "text-label-primary",
+        )}
+      >
         {label}
       </Text>
       {isSent ? (
-        <Text className="font-sans text-[12px] text-muted">{t("task.subtaskSentLabel")}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
+          {t("task.subtaskSentLabel")}
+        </Text>
       ) : null}
       {onRemove === undefined ? null : (
         <Pressable
           accessibilityLabel={t("form.removeSubtask", { label })}
           accessibilityRole="button"
-          className="h-9 w-9 items-center justify-center rounded-md active:opacity-70"
+          className="h-10 w-10 items-center justify-center rounded-md active:opacity-70"
           onBlur={() => {
             setIsFocused(false);
           }}
@@ -70,7 +80,7 @@ const Row = ({
           onPress={onRemove}
           style={{ opacity: isShowsRemove ? 1 : 0 }}
         >
-          <X color={palette.muted} size={16} strokeWidth={2} />
+          <X color={palette["label.secondary"]} size={16} strokeWidth={2} />
         </Pressable>
       )}
     </View>
@@ -101,13 +111,15 @@ const AddSubtask = ({
       <Pressable
         accessibilityLabel={t("form.addSubtask")}
         accessibilityRole="button"
-        className="h-9 flex-row items-center gap-2 self-start rounded-md pr-2 active:opacity-70"
+        className="h-10 flex-row items-center gap-2 self-start rounded-md pr-2 active:opacity-70"
         onPress={() => {
           setIsOpenByPress(true);
         }}
       >
-        <Plus color={palette.muted} size={16} strokeWidth={2} />
-        <Text className="font-sans text-[14px] text-muted">{t("form.addSubtask")}</Text>
+        <Plus color={palette["label.secondary"]} size={16} strokeWidth={2} />
+        <Text className="font-sans text-subhead font-normal text-label-secondary">
+          {t("form.addSubtask")}
+        </Text>
       </Pressable>
     );
   }
@@ -116,13 +128,13 @@ const AddSubtask = ({
     setIsOpenByPress(false);
   };
   return (
-    <View className="min-h-9 flex-row items-center gap-2.5 pl-1">
+    <View className="min-h-10 flex-row items-center gap-3 pl-1">
       <Bullet />
       <TextInput
         {...entryFieldProps}
         accessibilityLabel={t("form.addSubtask")}
         autoFocus
-        className="h-9 flex-1 font-sans text-[14px] text-fg"
+        className="h-10 flex-1 font-sans text-subhead font-normal text-label-primary"
         onBlur={() => {
           if (draft.trim() === "") {
             close();
@@ -144,7 +156,7 @@ const AddSubtask = ({
           onDraftChange("");
         }}
         placeholder={t("form.addSubtask")}
-        placeholderTextColor={palette.muted}
+        placeholderTextColor={palette["label.tertiary"]}
         returnKeyType="next"
         value={draft}
       />
@@ -183,7 +195,9 @@ export const SubtaskList = ({
   const isEmpty = kept.length === 0 && items.length === 0;
   return (
     <View className="gap-1">
-      <Text className="font-sans text-[12px] text-muted">{t("form.subtasks")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("form.subtasks")}
+      </Text>
       {isEmpty ? null : (
         <View aria-label={t("form.subtasks")} role="list">
           {kept.map((subtask) => (

@@ -100,18 +100,18 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
   }, [botUsername, label]);
 
   return (
-    <View className="min-h-11 items-center justify-center gap-1">
+    <View className="min-h-hit-web items-center justify-center gap-1">
       {phase === "failed" ? (
-        <Text className="font-sans text-[13px] text-warn">{texts.failed}</Text>
+        <Text className="font-sans text-footnote text-danger">{texts.failed}</Text>
       ) : null}
       {phase === "loading" || phase === "slow" ? (
         <View className="flex-row items-center gap-2">
           <ActivityIndicator accessibilityLabel={texts.loading} size="small" />
-          <Text className="font-sans text-[13px] text-muted">{texts.loading}</Text>
+          <Text className="font-sans text-footnote text-label-secondary">{texts.loading}</Text>
         </View>
       ) : null}
       {phase === "slow" ? (
-        <Text className="font-sans text-[12px] text-muted">{texts.slow}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">{texts.slow}</Text>
       ) : null}
       <div data-testid="telegram-widget" ref={hostRef} style={{ display: "flex" }} />
     </View>

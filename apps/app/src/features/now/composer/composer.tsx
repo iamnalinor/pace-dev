@@ -72,7 +72,7 @@ const LineBlock = ({
         />
       )}
       {flow.pending.issue === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-[13px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-footnote text-danger">
           {t(flow.pending.issue)}
         </Text>
       )}
@@ -99,8 +99,8 @@ export const Composer = ({ isFocused = false }: { readonly isFocused?: boolean }
     // line rings it in the quiet accent.
     <View
       className={cx(
-        "mx-4 mb-3 rounded-xl border bg-surface px-1.5 py-1",
-        isLineInFocus && !isFormHere ? "border-accentQuiet" : "border-line",
+        "mx-4 mb-3 rounded-xl border bg-cell px-1 py-1",
+        isLineInFocus && !isFormHere ? "border-accent" : "border-outline",
       )}
     >
       <AnimatedHeight>

@@ -32,7 +32,7 @@ import {
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
-import { CalendarSection, EndedAtPrompt, UsageAccessHint, UsageLine } from "./phone-section.tsx";
+import * as Phone from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
 /** "of ~30m", when the block has an Expect. */
@@ -49,8 +49,9 @@ const targetText = (
 One line of the day's rhythm: the same height and the same time column for a block, a gap and
 "Log past activity", so the list reads as one timeline.
 */
-const ROW = "min-h-14 flex-row items-center gap-3 py-2 active:opacity-70";
-const TIME_COLUMN = "w-[104px] font-sans text-[12px] tabular-nums";
+const ROW = "min-h-row flex-row items-center gap-3 py-2 active:opacity-70";
+const TIME_COLUMN = cx(Phone.TIME_WIDTH, "font-sans text-caption font-normal tabular-nums");
+const LINE = "font-sans text-subhead font-normal";
 
 /** "14:06 – 14:40". */
 const rangeText = (startAt: string, end: string, zone: string): string =>
@@ -84,32 +85,32 @@ export const ActivityRow = ({
       className={ROW}
       onPress={onEdit}
     >
-      <Text className={cx(TIME_COLUMN, "text-muted")}>{range}</Text>
+      <Text className={cx(TIME_COLUMN, "text-label-secondary")}>{range}</Text>
       <View className="flex-1 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <ColorTag color={row.color}>{t(`category.${row.category}`)}</ColorTag>
           {row.showsLabel ? (
-            <Text className="font-sans text-[14px] font-medium text-fg" numberOfLines={1}>
+            <Text className="font-sans text-subhead text-label-primary" numberOfLines={1}>
               {row.label}
             </Text>
           ) : null}
-          {isWide ? <WhereSatLine compact isIndented={false} rows={satRows} /> : null}
+          {isWide ? <WhereSatLine compact rows={satRows} /> : null}
         </View>
       </View>
       <View className="items-end">
         <Text
           className={cx(
-            "font-sans text-[13px] tabular-nums",
-            row.isRunning ? "text-accentQuietText" : "text-fg",
+            "font-sans text-footnote tabular-nums",
+            row.isRunning ? "text-accent-text" : "text-label-primary",
           )}
         >
           {formatDuration(row.minutes, language)}
         </Text>
         {target === null ? null : (
-          <Text className="font-sans text-[11px] text-muted">{target}</Text>
+          <Text className="font-sans text-caption2 font-normal text-label-tertiary">{target}</Text>
         )}
       </View>
-      <Pencil color={palette.muted} size={16} strokeWidth={1.75} />
+      <Pencil color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
     </Pressable>
   );
 };
@@ -130,11 +131,11 @@ const TaskLine = ({ row }: { readonly row: DayRowProps["row"] }) => {
   // where each goes. Under a block named after the task, its label is that title (as stored).
   const title = "title" in link.text ? link.text.title : row.label;
   return (
-    <View className="flex-row pb-2 pl-[116px]">
+    <View className="flex-row pb-2">
       <Text
         accessibilityLabel={t("day.openTaskNamed", { title })}
         accessibilityRole="link"
-        className="min-h-6 shrink py-1 font-sans text-[12px] text-fg2 underline"
+        className="min-h-6 shrink py-1 font-sans text-caption font-normal text-label-secondary underline"
         numberOfLines={1}
         onPress={() => {
           openTask(link.id);
@@ -163,13 +164,13 @@ const GapRow = ({
   const { language } = useViewer();
   return (
     <Pressable accessibilityRole="button" className={ROW} onPress={onLog}>
-      <Text className={cx(TIME_COLUMN, "text-muted")}>
+      <Text className={cx(TIME_COLUMN, "text-label-secondary")}>
         {rangeText(gap.startAt, clockTime(gap.endAt, zone), zone)}
       </Text>
-      <Text className="flex-1 font-sans text-[13px] text-muted">
+      <Text className="flex-1 font-sans text-footnote text-label-secondary">
         {t("day.gap", { duration: formatDuration(gap.minutes, language) })}
       </Text>
-      <Text className="font-sans text-[13px] font-medium text-accentQuietText">
+      <Text className="font-sans text-footnote font-medium text-accent-text">
         {t("day.logGap")}
       </Text>
     </Pressable>
@@ -190,11 +191,11 @@ const LogPastRow = ({
     <View className="px-5">
       <Pressable
         accessibilityRole="button"
-        className={cx(ROW, hasDivider && "border-t border-line")}
+        className={cx(ROW, hasDivider && "border-t border-separator")}
         onPress={onPress}
       >
-        <Plus color={palette.fg2} size={16} strokeWidth={1.75} />
-        <Text className="font-sans text-[14px] text-fg2">{t("day.logPast")}</Text>
+        <Plus color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
+        <Text className={cx(LINE, "text-label-secondary")}>{t("day.logPast")}</Text>
       </Pressable>
     </View>
   );
@@ -232,10 +233,12 @@ const EntryRow = ({
         satRows={sat(entry.row.startAt, entry.row.endAt)}
         zone={zone}
       />
-      <TaskLine row={entry.row} />
-      <UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
-      {isWide ? null : <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />}
-      <EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
+      <Phone.UnderBlock>
+        <TaskLine row={entry.row} />
+        <Phone.UsageLine apps={phone.usageIn(entry.row.startAt, entry.row.endAt)} />
+        {isWide ? null : <WhereSatLine rows={sat(entry.row.startAt, entry.row.endAt)} />}
+        <Phone.EndedAtPrompt phone={phone} row={entry.row} zone={zone} />
+      </Phone.UnderBlock>
     </>
   );
 };
@@ -258,7 +261,7 @@ const Entries = ({
     {entries.map((entry, index) => (
       <Animated.View entering={ROW_ENTER} exiting={ROW_EXIT} key={entry.key} layout={ROW_LAYOUT}>
         {/* The hairline on a plain view: the web drops class names on animated ones. */}
-        <View className={cx(index > 0 && "border-t border-line")} testID="day-entry">
+        <View className={cx(index > 0 && "border-t border-separator")} testID="day-entry">
           <EntryRow entry={entry} onOpen={onOpen} phone={phone} sat={sat} zone={zone} />
         </View>
       </Animated.View>
@@ -271,8 +274,8 @@ const Totals = ({ day }: { readonly day: DayModel }) => {
   const t = useT();
   const { language } = useViewer();
   return (
-    <View className="flex-row flex-wrap items-center gap-1.5 px-5 pb-3">
-      <Text className="mr-1 font-sans text-[14px] text-fg">
+    <View className="flex-row flex-wrap items-center gap-2 px-5 pb-3">
+      <Text className={cx(LINE, "mr-1 text-label-primary")}>
         {t("day.tracked", { duration: formatDuration(day.trackedMinutes, language) })}
       </Text>
       {day.totals.map((total) => (
@@ -311,9 +314,9 @@ export const DayScreen = () => {
   return (
     <Screen header={header}>
       <Totals day={day} />
-      {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
+      {IS_PHONE && !phone.hasUsageAccess ? <Phone.UsageAccessHint /> : null}
       {day.entries.length === 0 ? (
-        <Text className="px-5 py-6 font-sans text-[14px] text-muted">{t("day.empty")}</Text>
+        <Text className={cx(LINE, "px-5 py-6 text-label-secondary")}>{t("day.empty")}</Text>
       ) : (
         <Entries entries={day.entries} onOpen={setSheet} phone={phone} sat={sat} zone={day.zone} />
       )}
@@ -323,7 +326,9 @@ export const DayScreen = () => {
           setSheet(day.logTarget);
         }}
       />
-      {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
+      {IS_PHONE ? (
+        <Phone.CalendarSection entries={day.entries} phone={phone} zone={day.zone} />
+      ) : null}
       <ScreenTimeSection date={day.date} key={day.date} zone={day.zone} />
       {sheet === null ? null : (
         <ActivitySheet

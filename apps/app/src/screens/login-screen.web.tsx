@@ -110,11 +110,11 @@ export const LoginScreen = () => {
   const message = errorMessage(t, error, bot.phase);
   const isWaiting = bot.phase.kind === "waiting";
   return (
-    <View className="flex-1 items-center justify-center bg-bg px-4">
-      <View className="w-full max-w-[400px] gap-6 rounded-2xl border border-line bg-surface px-6 py-8">
+    <View className="flex-1 items-center justify-center bg-app px-4">
+      <View className="w-full max-w-inspector gap-6 rounded-lg border border-separator bg-cell px-6 py-8">
         <View className="items-center gap-2">
           <PaceLogo heading={t("login.title")} wordmark={t("app.name")} />
-          <Text className="text-center font-sans text-[14px] text-muted">
+          <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
             {t("login.subtitle")}
           </Text>
           <SignedOutLine />
@@ -125,7 +125,10 @@ export const LoginScreen = () => {
           <LoginOptions bot={bot} onTelegram={onTelegram} />
         )}
         {message === null ? null : (
-          <Text accessibilityRole="alert" className="text-center font-sans text-[13px] text-warn">
+          <Text
+            accessibilityRole="alert"
+            className="text-center font-sans text-footnote text-danger"
+          >
             {message}
           </Text>
         )}

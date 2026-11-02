@@ -80,17 +80,17 @@ const Fact = ({
   return (
     <View className="flex-row items-start gap-3">
       <View className="pt-0.5">
-        <Icon color={palette.muted} size={16} strokeWidth={1.75} />
+        <Icon color={palette["label.secondary"]} size={16} strokeWidth={1.75} />
       </View>
       <View className="min-w-0 flex-1 gap-1">{children}</View>
     </View>
   );
 };
 
-const FACT_TEXT = "font-sans text-[14px] leading-5 text-fg";
+const FACT_TEXT = "font-sans text-subhead font-normal text-label-primary";
 /** A link in the quiet accent's text color, as the notes' links: one color only, no clash. */
-const LINK_TEXT = "text-accentQuietText underline";
-const LOCATION_TEXT = `font-sans text-[14px] leading-5 ${LINK_TEXT}`;
+const LINK_TEXT = "text-accent-text underline";
+const LOCATION_TEXT = `font-sans text-subhead font-normal ${LINK_TEXT}`;
 
 /** The notes' first lines, their web addresses tappable. */
 const Notes = ({ notes }: { readonly notes: NonNullable<EventDetails["notes"]> }) => {
@@ -116,7 +116,9 @@ const Notes = ({ notes }: { readonly notes: NonNullable<EventDetails["notes"]> }
         )}
       </Text>
       {notes.isCut ? (
-        <Text className="font-sans text-[12px] text-muted">{t("calendar.notesCut")}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
+          {t("calendar.notesCut")}
+        </Text>
       ) : null}
     </>
   );
@@ -199,7 +201,7 @@ const BlockFacts = ({
   const { taskId } = block;
   return (
     <View className="gap-1">
-      <Text className="font-sans text-[14px] text-fg">
+      <Text className="font-sans text-subhead font-normal text-label-primary">
         {[t(`category.${block.category}`), formatDuration(block.minutes, language)].join(" · ")}
       </Text>
       <ActivityApps endAt={block.endAt} startAt={block.startAt} zone={week.zone} />
@@ -263,7 +265,9 @@ export const PickedPane = ({
   if (picked === null) {
     return (
       <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-center font-sans text-[14px] text-muted">{t("week.pickHint")}</Text>
+        <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
+          {t("week.pickHint")}
+        </Text>
       </View>
     );
   }
@@ -277,12 +281,12 @@ const PickedPaneBody = ({ onClose, picked, week }: PickedProps) => {
     <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pb-10 pt-6">
       <View className="flex-row items-start gap-2">
         <View className="min-w-0 flex-1">
-          <Text accessibilityRole="header" className="font-sans text-[20px] font-semibold text-fg">
+          <Text accessibilityRole="header" className="font-sans text-title2 text-label-primary">
             {title}
           </Text>
-          <Text className="mt-1 font-sans text-[13px] text-muted">{when}</Text>
+          <Text className="mt-1 font-sans text-footnote text-label-secondary">{when}</Text>
         </View>
-        <View className="-mr-2 -mt-1.5">
+        <View className="-mr-2 -mt-2">
           <IconButton icon={X} label={t("common.close")} onPress={onClose} variant="plain" />
         </View>
       </View>

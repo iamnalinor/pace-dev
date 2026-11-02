@@ -26,6 +26,7 @@ import unicorn from "eslint-plugin-unicorn";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
+import { GENERATED_CLASSES } from "./scripts/design/generate-design.ts";
 import { plugin as pace } from "./scripts/eslint-rules/index.ts";
 
 /** Fails loudly if a plugin stops shipping a config we rely on (instead of silently linting less). */
@@ -89,6 +90,8 @@ export default defineConfig([
     "apps/app/android/",
     "apps/app/.expo/",
     "apps/app/expo-env.d.ts",
+    // Written by scripts/design/generate-design.ts; `bun lint` checks it is current instead.
+    "apps/app/src/ui/generated/",
     // Parallel agents' git worktrees: each is a whole checkout with its own config.
     ".claude/worktrees/",
   ]),
@@ -431,12 +434,13 @@ export default defineConfig([
     },
   },
   // Design values come from the tokens (spec §9.3). A warning, counted in
-  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error.
+  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error. A class
+  // outside GENERATED_CLASSES (the token scales and layout utilities) is off the scale.
   {
     files: APP,
     ignores: TESTS,
     plugins: { pace },
-    rules: { "pace/no-raw-design-values": "warn" },
+    rules: { "pace/no-raw-design-values": ["warn", { allowedClasses: GENERATED_CLASSES }] },
   },
   {
     files: APP_JS_CONFIGS,

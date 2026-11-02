@@ -31,14 +31,14 @@ export const NotificationBell = ({
       }
       accessibilityRole="button"
       className={cx(
-        "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
-        variant === "surface" && "border border-line bg-surface",
+        "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
+        variant === "surface" && "border border-outline bg-cell",
       )}
       onPress={() => {
         router.push("/notifications");
       }}
     >
-      <Bell color={palette.fg2} size={18} strokeWidth={1.75} />
+      <Bell color={palette["label.secondary"]} size={18} strokeWidth={1.75} />
       <View className="absolute right-0.5 top-0.5">
         <CountBadge count={model.unread} />
       </View>

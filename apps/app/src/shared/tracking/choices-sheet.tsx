@@ -104,15 +104,15 @@ const TaskSearch = ({
   // On a phone the keyboard would cover the list it narrows: it opens on a tap in the field.
   const isWide = useIsWide();
   return (
-    <View className="h-11 flex-row items-center gap-2 rounded-lg border border-line bg-bg px-3">
-      <Search color={palette.muted} size={16} />
+    <View className="h-hit-web flex-row items-center gap-2 rounded-lg border border-outline bg-app px-3">
+      <Search color={palette["label.secondary"]} size={16} />
       <TextInput
         accessibilityLabel={t("time.taskSearch")}
         autoFocus={isWide}
-        className="h-11 flex-1 font-sans text-[15px] text-fg"
+        className="h-hit-web flex-1 font-sans text-callout text-label-primary"
         onChangeText={onChange}
         placeholder={t("time.taskSearch")}
-        placeholderTextColor={palette.muted}
+        placeholderTextColor={palette["label.tertiary"]}
         returnKeyType="search"
         value={query}
       />
@@ -131,11 +131,13 @@ const StopRow = ({ onStop }: { readonly onStop: () => void }) => {
     <Pressable
       accessibilityLabel={t("time.stop")}
       accessibilityRole="button"
-      className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg bg-track px-3.5 active:opacity-70"
+      className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg bg-fill-4 px-4 active:opacity-70"
       onPress={onStop}
     >
-      <Square color={palette.fg} size={14} />
-      <Text className="font-sans text-[15px] font-medium text-fg">{t("time.stop")}</Text>
+      <Square color={palette["label.primary"]} size={14} />
+      <Text className="font-sans text-callout font-medium text-label-primary">
+        {t("time.stop")}
+      </Text>
     </Pressable>
   );
 };

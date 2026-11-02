@@ -12,10 +12,10 @@ export const Card = ({
 }) => (
   <View
     accessibilityLabel={title}
-    className="gap-3 rounded-xl border border-line bg-surface p-4"
+    className="gap-3 rounded-xl border border-separator bg-cell p-4"
     role="group"
   >
-    <Text accessibilityRole="header" className="font-sans text-[14px] font-medium text-fg">
+    <Text accessibilityRole="header" className="font-sans text-subhead text-label-primary">
       {title}
     </Text>
     {children}

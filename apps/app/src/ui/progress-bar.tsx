@@ -22,12 +22,12 @@ export const ProgressBar = ({
     aria-valuemax={PERCENT}
     aria-valuemin={0}
     aria-valuenow={Math.round(value * PERCENT)}
-    className="h-[3px] rounded-sm bg-track"
+    className="h-1 rounded-sm bg-fill-4"
   >
-    <View className="h-[3px] rounded-sm bg-fg" style={{ width: share(value) }} />
+    <View className="h-1 rounded-sm bg-label-primary" style={{ width: share(value) }} />
     {marker === null ? null : (
       <View
-        className="absolute -top-[3px] h-[9px] w-0.5 rounded-[1px] bg-accentQuietText"
+        className="absolute -top-1 h-2 w-0.5 rounded-xs bg-accent"
         style={{ left: share(marker) }}
       />
     )}

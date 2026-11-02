@@ -378,11 +378,11 @@ describe("SettingsScreen", () => {
     await fireEvent.press(screen.getByRole("button", { name: en("settings.deleteAccount") }));
     const remove = screen.getByRole("button", { name: en("settings.deleteAccount.confirm") });
     expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
-    expect(String(remove.props["className"])).toMatch(/border-warn/u);
+    expect(String(remove.props["className"])).toMatch(/border-danger/u);
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
-    expect(String(wipe.props["className"])).toMatch(/border-warn/u);
+    expect(String(wipe.props["className"])).toMatch(/border-danger/u);
   });
 
   it("keeps focus through Wipe's and Delete's first confirm: onto Cancel and back to the opener (bug class 5)", async () => {

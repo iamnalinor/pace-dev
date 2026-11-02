@@ -15,20 +15,23 @@ const AppRow = ({ app, max }: { readonly app: AppTime; readonly max: number }) =
   const { language } = useViewer();
   const percent = Math.max(4, Math.round((app.minutes / max) * 100));
   return (
-    <View className="gap-1.5 py-1.5">
+    <View className="gap-2 py-2">
       <View className="flex-row items-baseline gap-2">
-        <Text className="min-w-0 flex-1 font-sans text-[13px] text-fg" numberOfLines={1}>
+        <Text
+          className="min-w-0 flex-1 font-sans text-footnote text-label-primary"
+          numberOfLines={1}
+        >
           {app.app}
         </Text>
-        <Text className="font-sans text-[11px] text-muted" numberOfLines={1}>
+        <Text className="font-sans text-caption2 font-normal text-label-tertiary" numberOfLines={1}>
           {app.deviceNames.join(", ")}
         </Text>
-        <Text className="font-sans text-[12px] tabular-nums text-fg2">
+        <Text className="font-sans text-caption font-normal tabular-nums text-label-secondary">
           {formatDuration(app.minutes, language)}
         </Text>
       </View>
-      <View className="h-1 overflow-hidden rounded-full bg-line">
-        <View className="h-full rounded-full bg-accentQuiet" style={{ width: `${percent}%` }} />
+      <View className="h-1 overflow-hidden rounded-pill bg-fill-4">
+        <View className="h-full rounded-pill bg-accent-quiet" style={{ width: `${percent}%` }} />
       </View>
     </View>
   );
@@ -69,17 +72,20 @@ export const ActivityApps = ({
       : (session.kind === "app" || session.kind === "agent") && session.lastDataAt < end,
   );
   return (
-    <View className="gap-2 border-t border-line pt-4">
-      <Text accessibilityRole="header" className="font-sans text-[14px] font-semibold text-fg">
+    <View className="gap-2 border-t border-separator pt-4">
+      <Text
+        accessibilityRole="header"
+        className="font-sans text-subhead font-semibold text-label-primary"
+      >
         {t("day.appsDuring")}
       </Text>
       {apps.length === 0 ? (
-        <Text className="font-sans text-[13px] text-muted">{t("day.noApps")}</Text>
+        <Text className="font-sans text-footnote text-label-secondary">{t("day.noApps")}</Text>
       ) : (
         <AppList apps={apps} />
       )}
       {stale.map((session) => (
-        <Text className="font-sans text-[11px] text-muted" key={session.id}>
+        <Text className="font-sans text-caption2 font-normal text-label-tertiary" key={session.id}>
           {session.lastDataAt === null
             ? t("day.noDeviceData", { device: session.name })
             : t("day.dataUpTo", {
@@ -108,22 +114,25 @@ export const ScreenTimeSection = ({
   const report = screenTime(usage, date, zone);
   const shown = isExpanded ? report.apps : report.apps.slice(0, TOP_APPS);
   return (
-    <View className="mx-5 mt-5 gap-3 border-t border-line pb-8 pt-5">
+    <View className="mx-5 mt-5 gap-3 border-t border-separator pb-8 pt-5">
       <View className="flex-row items-baseline justify-between gap-3">
-        <Text accessibilityRole="header" className="font-sans text-[17px] font-semibold text-fg">
+        <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
           {t("day.screenTime")}
         </Text>
-        <Text className="font-sans text-[13px] tabular-nums text-fg2">
+        <Text className="font-sans text-footnote tabular-nums text-label-secondary">
           {formatDuration(report.totalMinutes, language)}
         </Text>
       </View>
       {report.devices.length === 0 ? (
-        <Text className="font-sans text-[13px] text-muted">{t("day.noApps")}</Text>
+        <Text className="font-sans text-footnote text-label-secondary">{t("day.noApps")}</Text>
       ) : (
         <>
           <View className="flex-row flex-wrap gap-x-4 gap-y-1">
             {report.devices.map((device) => (
-              <Text className="font-sans text-[12px] text-fg2" key={device.id}>
+              <Text
+                className="font-sans text-caption font-normal text-label-secondary"
+                key={device.id}
+              >
                 {t("day.deviceTime", {
                   device: device.name,
                   duration: formatDuration(device.minutes, language),
@@ -140,13 +149,13 @@ export const ScreenTimeSection = ({
                 setIsExpanded(!isExpanded);
               }}
             >
-              <Text className="font-sans text-[13px] text-accentQuietText">
+              <Text className="font-sans text-footnote text-accent-text">
                 {isExpanded ? t("day.showLess") : t("day.showAll", { count: report.apps.length })}
               </Text>
             </Pressable>
           ) : null}
           {report.apps.length > 0 ? (
-            <Text className="font-sans text-[11px] text-muted">
+            <Text className="font-sans text-caption2 font-normal text-label-tertiary">
               {t("day.firstLast", {
                 from: clockTime(
                   report.apps.map((app) => app.firstAt).toSorted((a, b) => a.localeCompare(b))[0] ??

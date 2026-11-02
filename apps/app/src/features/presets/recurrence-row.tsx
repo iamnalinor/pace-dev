@@ -39,8 +39,8 @@ const SlotFields = ({
 }) => {
   const language = useLanguage();
   return (
-    <View className="gap-1.5">
-      <Text className="font-sans text-[12px] text-muted">{dayLabel}</Text>
+    <View className="gap-2">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{dayLabel}</Text>
       <ChoiceChips
         label={dayLabel}
         labelOf={(day) => weekdayName(day, language)}
@@ -50,7 +50,7 @@ const SlotFields = ({
         value={slot.weekday}
         values={WEEKDAYS}
       />
-      <Text className="font-sans text-[12px] text-muted">{timeLabel}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{timeLabel}</Text>
       <TimeInput
         className="w-24"
         label={timeLabel}
@@ -90,7 +90,9 @@ const Schedule = ({
         timeLabel={t("presets.dueAt")}
       />
       {dueWeekOffset(recurrence) === 1 ? (
-        <Text className="font-sans text-[12px] text-question">{t("presets.dueNextWeek")}</Text>
+        <Text className="font-sans text-caption font-normal text-question">
+          {t("presets.dueNextWeek")}
+        </Text>
       ) : null}
       <TextField
         autoCapitalize="none"

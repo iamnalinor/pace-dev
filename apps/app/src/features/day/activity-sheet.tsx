@@ -25,7 +25,7 @@ import { useDraft } from "@pace/client/react";
 import {
   ACTIVITY_CATEGORIES,
   type ActivityCategory,
-  CATEGORY_COLORS,
+  CATEGORY_HUES,
   formatEyebrow,
   type MessageKey,
 } from "@pace/core";
@@ -54,12 +54,14 @@ const CategoryPicker = ({
 }) => {
   const t = useT();
   return (
-    <View className="gap-1.5">
-      <Text className="font-sans text-[12px] text-muted">{t("editor.category")}</Text>
-      <View accessibilityLabel={t("editor.category")} className="flex-row flex-wrap gap-1.5">
+    <View className="gap-2">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("editor.category")}
+      </Text>
+      <View accessibilityLabel={t("editor.category")} className="flex-row flex-wrap gap-2">
         {ACTIVITY_CATEGORIES.map((category) => (
           <Chip
-            color={CATEGORY_COLORS[category]}
+            color={CATEGORY_HUES[category]}
             key={category}
             onPress={() => {
               onChange(category);

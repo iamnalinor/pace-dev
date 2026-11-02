@@ -31,10 +31,14 @@ export const OverrideRow = ({
   const t = useT();
   const isDisabled = !isOverridden;
   return (
-    <View accessibilityLabel={label} className="gap-2 border-t border-line py-3" role="group">
+    <View accessibilityLabel={label} className="gap-2 border-t border-separator py-3" role="group">
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="flex-1 font-sans text-[14px] text-fg2">{label}</Text>
-        <Text className="font-sans text-[12px] text-muted">{t("presets.overrideShort")}</Text>
+        <Text className="flex-1 font-sans text-subhead font-normal text-label-secondary">
+          {label}
+        </Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
+          {t("presets.overrideShort")}
+        </Text>
         <PaceSwitch
           isOn={isOverridden}
           label={t("presets.override", { field: label })}
@@ -49,10 +53,14 @@ export const OverrideRow = ({
         {children({ disabled: isDisabled, invalid })}
       </View>
       {isDisabled ? (
-        <Text className="font-sans text-[12px] text-faint">{inheritedHint}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
+          {inheritedHint}
+        </Text>
       ) : null}
       {invalid ? (
-        <Text className="font-sans text-[12px] text-warn">{t("presets.checkValue")}</Text>
+        <Text className="font-sans text-caption font-normal text-danger">
+          {t("presets.checkValue")}
+        </Text>
       ) : null}
     </View>
   );

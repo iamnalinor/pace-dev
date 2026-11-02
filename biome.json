@@ -9,6 +9,7 @@
       "!**/worker-configuration.d.ts",
       "!apps/app/android",
       "!apps/app/.expo",
+      "!apps/app/src/ui/generated",
       "!!.claude/worktrees"
     ]
   },

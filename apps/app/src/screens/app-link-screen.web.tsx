@@ -23,11 +23,14 @@ export const AppLinkScreen = () => {
   const t = useT();
   const token = readToken();
   return (
-    <View className="flex-1 items-center justify-center bg-bg px-4">
-      <View className="w-full max-w-[400px] items-center gap-5 rounded-2xl border border-line bg-surface px-6 py-8">
+    <View className="flex-1 items-center justify-center bg-app px-4">
+      <View className="w-full max-w-inspector items-center gap-5 rounded-lg border border-separator bg-cell px-6 py-8">
         <PaceLogo heading={t("appLink.title")} wordmark={t("appLink.title")} />
         {token === null ? (
-          <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
+          <Text
+            accessibilityRole="alert"
+            className="font-sans text-subhead font-normal text-danger"
+          >
             {t("appLink.missing")}
           </Text>
         ) : (
@@ -40,7 +43,7 @@ export const AppLinkScreen = () => {
             >
               {t("appLink.open")}
             </Button>
-            <Text className="text-center font-sans text-[13px] text-muted">
+            <Text className="text-center font-sans text-footnote text-label-secondary">
               {t("appLink.fallback")}
             </Text>
           </>

@@ -41,9 +41,11 @@ export const ConnectAiSheet = ({
       title={t("connectAi.open")}
       visible={open}
     >
-      <Text className="font-sans text-[14px] leading-[20px] text-fg">{t("connectAi.intro")}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-primary">
+        {t("connectAi.intro")}
+      </Text>
       <View className="gap-2">
-        <Text className="font-sans text-[11px] uppercase tracking-[0.06em] text-muted">
+        <Text className="font-sans text-caption2 font-normal uppercase text-label-tertiary">
           {t("connectAi.url")}
         </Text>
         <CodeText>{url}</CodeText>
@@ -64,13 +66,18 @@ export const ConnectAiSheet = ({
       </View>
       {CLIENTS.map((client) => (
         <View className="gap-1" key={client.name}>
-          <Text accessibilityRole="header" className="font-sans text-[15px] font-semibold text-fg">
+          <Text
+            accessibilityRole="header"
+            className="font-sans text-callout font-semibold text-label-primary"
+          >
             {t(client.name)}
           </Text>
-          <Text className="font-sans text-[14px] leading-[20px] text-fg2">{t(client.steps)}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t(client.steps)}
+          </Text>
         </View>
       ))}
-      <Text className="font-sans text-[12px] leading-[17px] text-muted">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("connectAi.revokeHint")}
       </Text>
     </Sheet>

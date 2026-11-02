@@ -8,7 +8,7 @@ import type { MessageKey } from "@pace/core";
 import { usePace, useT } from "#app/app-state.tsx";
 import { ActionCards } from "#app/shared/assistant/action-cards.tsx";
 import { usePendingActions } from "#app/shared/assistant/use-pending-actions.ts";
-import { inkClass, OUTLINE } from "#app/ui/color.tsx";
+import { inkClass, outlineClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
@@ -26,6 +26,8 @@ const ICONS: Readonly<Record<TimeButtonView["id"], LucideIcon>> = {
   rest: Coffee,
   task: Timer,
 };
+
+const NOTE = "font-sans text-footnote";
 
 /**
 "What are you doing?" first reads actions; the owner approves before anything is written.
@@ -69,19 +71,19 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
         />
       )}
       {pending.busy && pending.pending === null ? (
-        <Text accessibilityLiveRegion="polite" className="font-sans text-[13px] text-muted">
+        <Text accessibilityLiveRegion="polite" className={cx(NOTE, "text-label-secondary")}>
           {t("assistant.reading")}
         </Text>
       ) : null}
       {pending.issue === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-[13px] text-warn">
+        <Text accessibilityRole="alert" className={cx(NOTE, "text-danger")}>
           {t(pending.issue)}
         </Text>
       )}
       <View className="flex-row items-center gap-2">
         <TextInput
           accessibilityLabel={t("time.whatDoing")}
-          className="h-11 flex-1 rounded-lg border border-line bg-surface px-3 font-sans text-[15px] text-fg"
+          className="h-hit-web flex-1 rounded-lg border border-outline bg-cell px-3 font-sans text-callout text-label-primary"
           maxLength={200}
           onChangeText={(next) => {
             onUse();
@@ -90,7 +92,7 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           }}
           onSubmitEditing={start}
           placeholder={t("time.whatDoing")}
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={palette["label.tertiary"]}
           ref={fieldRef}
           returnKeyType="go"
           value={text}
@@ -100,13 +102,13 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           accessibilityRole="button"
           accessibilityState={{ disabled: typed === "" || pending.busy }}
           className={cx(
-            "h-11 w-11 items-center justify-center rounded-lg bg-accent active:opacity-80",
+            "h-hit-web w-hit-web items-center justify-center rounded-lg bg-accent active:opacity-80",
             typed === "" && "opacity-50",
           )}
           disabled={typed === "" || pending.busy}
           onPress={start}
         >
-          <Play color={palette.accentFg} fill={palette.accentFg} size={16} />
+          <Play color={palette["accent.on"]} fill={palette["accent.on"]} size={16} />
         </Pressable>
       </View>
     </View>
@@ -130,15 +132,19 @@ const buttonLook = (
 ): { readonly box: string; readonly ink: string; readonly hintKey: MessageKey } => {
   if (button.isRunning) {
     return {
-      box: "border-accentQuiet bg-accentQuiet",
+      box: "border-accent bg-accent-quiet",
       hintKey: "time.buttonRunningHint",
-      ink: "font-medium text-accentQuietFg",
+      ink: "font-medium text-accent-text",
     };
   }
   return isGreyed
-    ? { box: "border-dashed border-line bg-surface", hintKey: "time.buttonHint", ink: "text-muted" }
+    ? {
+        box: "border-dashed border-outline bg-cell",
+        hintKey: "time.buttonHint",
+        ink: "text-label-secondary",
+      }
     : {
-        box: `bg-surface ${OUTLINE[button.color]}`,
+        box: `bg-cell ${outlineClass(button.color)}`,
         hintKey: "time.buttonHint",
         ink: inkClass(button.color),
       };
@@ -154,7 +160,8 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
   const label = t(button.labelKey);
   const Icon = ICONS[button.id];
   const look = buttonLook(button, unavailable !== undefined);
-  const restingColor = unavailable === undefined ? palette.fg2 : palette.muted;
+  const restingColor =
+    unavailable === undefined ? palette["label.secondary"] : palette["label.tertiary"];
   return (
     <View className="flex-1">
       {/* Greyed, it says why the moment the pointer is over it; a tap opens the picker, which says it too. */}
@@ -164,16 +171,16 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
           accessibilityLabel={button.isRunning ? t("time.buttonRunning", { label }) : label}
           accessibilityRole="button"
           className={cx(
-            "h-14 items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
+            "h-row items-center justify-center gap-0.5 rounded-xl border-2 px-1 active:opacity-80",
             look.box,
           )}
           onPress={() => {
             onTap(button);
           }}
         >
-          <Icon color={button.isRunning ? palette.accentQuietFg : restingColor} size={18} />
+          <Icon color={button.isRunning ? palette["accent.text"] : restingColor} size={18} />
           <Text
-            className={cx("text-center font-sans text-[12px] leading-[14px]", look.ink)}
+            className={cx("text-center font-sans text-caption font-normal", look.ink)}
             numberOfLines={1}
           >
             {label}
@@ -257,7 +264,7 @@ export const TimeBar = () => {
   return (
     <View
       accessibilityLabel={t("time.bar")}
-      className="gap-2 border-t border-line bg-bg px-3 pb-2.5 pt-2.5"
+      className="gap-2 border-t border-separator bg-app px-3 pb-3 pt-3"
       role="region"
     >
       {[...(running === null ? [] : [running]), ...alongside].map((item) => (

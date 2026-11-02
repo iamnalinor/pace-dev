@@ -42,19 +42,19 @@ export const ChoiceRow = ({
       // The check says it runs on the screen; the name says it to a screen reader.
       accessibilityLabel={isRunning ? t("time.buttonRunning", { label }) : label}
       accessibilityRole="button"
-      className="min-h-12 flex-row items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-2 active:opacity-70"
+      className="min-h-12 flex-row items-center gap-3 rounded-lg border border-outline bg-cell px-4 py-2 active:opacity-70"
       onPress={onPress}
     >
       <View className="flex-1 gap-1">
-        <Text className="font-sans text-[15px] text-fg" numberOfLines={2}>
+        <Text className="font-sans text-callout text-label-primary" numberOfLines={2}>
           {label}
         </Text>
         {children}
       </View>
       {aside === null ? null : (
-        <Text className="font-sans text-[13px] tabular-nums text-muted">{aside}</Text>
+        <Text className="font-sans text-footnote tabular-nums text-label-secondary">{aside}</Text>
       )}
-      {isRunning ? <Check color={palette.fg} size={16} /> : null}
+      {isRunning ? <Check color={palette["label.primary"]} size={16} /> : null}
     </Pressable>
   );
 };
@@ -81,5 +81,5 @@ export const ChoiceList = ({
 
 /** Quiet words where a list would be: why there is nothing to pick. */
 export const Nothing = ({ children }: { readonly children: string }) => (
-  <Text className="font-sans text-[14px] text-muted">{children}</Text>
+  <Text className="font-sans text-subhead font-normal text-label-secondary">{children}</Text>
 );

@@ -37,10 +37,14 @@ const Row = ({
   readonly children: React.ReactNode;
   readonly label: string;
 }) => (
-  <View accessibilityLabel={label} className="gap-2 border-b border-line px-5 py-4" role="group">
+  <View
+    accessibilityLabel={label}
+    className="gap-2 border-b border-separator px-5 py-4"
+    role="group"
+  >
     <Text
       accessibilityRole="header"
-      className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted"
+      className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary"
     >
       {label}
     </Text>

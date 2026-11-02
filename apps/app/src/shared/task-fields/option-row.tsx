@@ -10,9 +10,9 @@ export const OptionRow = ({
   readonly children: ReactNode;
   readonly label: string;
 }) => (
-  <View className="gap-1.5">
-    <Text className="font-sans text-[12px] text-muted">{label}</Text>
-    <View accessibilityLabel={label} className="flex-row flex-wrap gap-1.5" role="radiogroup">
+  <View className="gap-2">
+    <Text className="font-sans text-caption font-normal text-label-tertiary">{label}</Text>
+    <View accessibilityLabel={label} className="flex-row flex-wrap gap-2" role="radiogroup">
       {children}
     </View>
   </View>

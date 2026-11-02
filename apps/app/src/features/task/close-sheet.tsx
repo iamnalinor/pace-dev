@@ -93,12 +93,12 @@ export const CloseSheet = ({
       {form.mode === "other" ? null : (
         <Pressable
           accessibilityRole="button"
-          className="h-11 items-center justify-center"
+          className="h-hit-web items-center justify-center"
           onPress={() => {
             form.setMode("other");
           }}
         >
-          <Text className="font-sans text-[13px] text-muted">{t("close.other")}</Text>
+          <Text className="font-sans text-footnote text-label-secondary">{t("close.other")}</Text>
         </Pressable>
       )}
     </Sheet>

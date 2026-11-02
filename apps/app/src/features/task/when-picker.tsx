@@ -16,7 +16,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
   return (
     <View className="gap-2">
       <View className="flex-row gap-2">
-        <View className="flex-[3]">
+        <View className="flex-3">
           <TextField
             inputMode="numeric"
             label={t("close.date")}
@@ -27,7 +27,7 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
             value={form.typed.date}
           />
         </View>
-        <View className="flex-[2]">
+        <View className="flex-2">
           <TextField
             inputMode="numeric"
             label={t("close.time")}
@@ -39,11 +39,14 @@ const TypedTime = ({ deviceTz, form }: { readonly deviceTz: string; readonly for
           />
         </View>
       </View>
-      <Text className="font-sans text-[12px] text-muted">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("edit.inZone", { zone: deviceTz })}
       </Text>
       {form.at === null || form.problem !== null ? (
-        <Text accessibilityLiveRegion="polite" className="font-sans text-[12px] text-warn">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="font-sans text-caption font-normal text-danger"
+        >
           {t(form.problem === null ? "close.timeInvalid" : `actionError.${form.problem}`)}
         </Text>
       ) : null}
@@ -68,8 +71,8 @@ export const WhenPicker = ({
   const isCustom = form.choice === "custom";
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[12px] text-muted">{label}</Text>
-      <View className="flex-row flex-wrap gap-1.5">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{label}</Text>
+      <View className="flex-row flex-wrap gap-2">
         {quickTimes.map((quick) => (
           <Chip
             key={quick.key}
@@ -84,7 +87,12 @@ export const WhenPicker = ({
         ))}
         <Chip
           label={t("close.pickExact")}
-          leading={<CalendarDays color={isCustom ? palette.fg : palette.fg2} size={16} />}
+          leading={
+            <CalendarDays
+              color={isCustom ? palette["label.primary"] : palette["label.secondary"]}
+              size={16}
+            />
+          }
           onPress={() => {
             form.choose("custom");
           }}

@@ -23,13 +23,15 @@ const ActionCard = ({ action }: { readonly action: Action }) => {
   return (
     <View
       accessibilityLabel={action.summary}
-      className="gap-1 rounded-lg border border-line bg-bg px-3 py-2"
+      className="gap-1 rounded-lg border border-separator bg-app px-3 py-2"
       role="group"
     >
-      <Text className="font-sans text-[14px] leading-5 text-fg">{action.summary}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-primary">
+        {action.summary}
+      </Text>
       {lines.map((line) => (
         <Text
-          className={`font-sans text-[13px] leading-5 ${line.isDoubtful ? "text-warn" : "text-fg2"}`}
+          className={`font-sans text-footnote ${line.isDoubtful ? "text-warn" : "text-label-secondary"}`}
           key={line.label}
         >
           {detailText(line, language)}
@@ -75,22 +77,22 @@ const CorrectionRow = ({
     <View className={cx("flex-row gap-2", busy && "opacity-50")}>
       <TextInput
         accessibilityLabel={t("assistant.correct")}
-        className="min-h-11 flex-1 rounded-lg border border-line bg-bg px-3 font-sans text-fg"
+        className="min-h-hit-web flex-1 rounded-lg border border-outline bg-app px-3 font-sans text-label-primary"
         editable={!busy}
         onChangeText={setCorrection}
         onSubmitEditing={send}
         placeholder={t("assistant.correct")}
-        placeholderTextColor={palette.muted}
+        placeholderTextColor={palette["label.tertiary"]}
         value={correction}
       />
       <Pressable
         accessibilityLabel={t("assistant.sendCorrection")}
         accessibilityRole="button"
-        className="min-h-11 items-center justify-center rounded-lg border border-line px-3"
+        className="min-h-hit-web items-center justify-center rounded-lg border border-outline px-3"
         disabled={busy || correction.trim() === ""}
         onPress={send}
       >
-        <Text className="font-sans text-fg">↵</Text>
+        <Text className="font-sans text-label-primary">↵</Text>
       </Pressable>
     </View>
   );
@@ -115,26 +117,26 @@ const CardButtons = ({
         accessibilityLabel={t("assistant.approve")}
         accessibilityRole="button"
         className={cx(
-          "min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent px-3",
+          "min-h-hit-web flex-1 flex-row items-center justify-center gap-2 rounded-lg bg-accent px-3",
           !canApprove && "opacity-50",
         )}
         disabled={!canApprove}
         onPress={onApprove}
       >
-        <Text className="font-sans font-medium text-accentFg">{t("assistant.approve")}</Text>
+        <Text className="font-sans font-medium text-accent-on">{t("assistant.approve")}</Text>
         <KeyHint hotkey={HOTKEYS.enter} variant="primary" />
       </Pressable>
       <Pressable
         accessibilityLabel={t("common.cancel")}
         accessibilityRole="button"
         className={cx(
-          "min-h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line px-3",
+          "min-h-hit-web flex-row items-center justify-center gap-2 rounded-lg border border-outline px-3",
           busy && "opacity-50",
         )}
         disabled={busy}
         onPress={onCancel}
       >
-        <Text className="font-sans text-fg">{t("common.cancel")}</Text>
+        <Text className="font-sans text-label-primary">{t("common.cancel")}</Text>
         <KeyHint hotkey={HOTKEYS.escape} variant="secondary" />
       </Pressable>
     </View>
@@ -162,9 +164,9 @@ export const ActionCards = ({
   useHotkey(HOTKEYS.primary, approve);
   useHotkey(HOTKEYS.escape, onCancel);
   return (
-    <View className="gap-3 rounded-xl border border-line bg-surface p-3">
+    <View className="gap-3 rounded-xl border border-separator bg-cell p-3">
       {source === "unavailable" ? (
-        <Text className="font-sans text-[13px] leading-5 text-muted">
+        <Text className="font-sans text-footnote text-label-secondary">
           {t("assistant.rulesUsed")}
         </Text>
       ) : null}

@@ -15,8 +15,8 @@ export const OAuthScreen = () => {
   const { botUsername } = useServerInfo();
   return (
     <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerClassName="mx-auto min-h-full w-full max-w-[430px] justify-center px-4 py-8"
+      className="flex-1 bg-app"
+      contentContainerClassName="mx-auto min-h-full w-full max-w-inspector justify-center px-4 py-8"
     >
       <ConsentFlow
         authQuery={globalThis.location.search.slice(1)}

@@ -51,7 +51,7 @@ A switch is an invisible checkbox laid over its track (react-native-web): the ru
 hide where the keyboard is, so a switch keeps a ring of its own.
 */
 input[role="switch"]:focus-visible {
-  outline: 2px solid var(--pace-fg);
+  outline: 2px solid var(--pace-focus);
   outline-offset: 2px;
   border-radius: 999px;
 }
@@ -61,7 +61,7 @@ Tailwind's preflight paints an empty field's own text in its gray while the plac
 below the AA contrast; our fields color their placeholders themselves.
 */
 :is(input:placeholder-shown, textarea:placeholder-shown) {
-  color: var(--pace-fg);
+  color: var(--pace-label-primary);
 }
 
 /*
@@ -82,21 +82,21 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
   border-radius: 999px;
   background: linear-gradient(
     to right,
-    var(--pace-fg) 0 var(--pace-share),
-    var(--pace-track) var(--pace-share) 100%
+    var(--pace-label-primary) 0 var(--pace-share),
+    var(--pace-fill-4) var(--pace-share) 100%
   );
 }
 
 [data-pace-slider]::-moz-range-track {
   height: 8px;
   border-radius: 999px;
-  background: var(--pace-track);
+  background: var(--pace-fill-4);
 }
 
 [data-pace-slider]::-moz-range-progress {
   height: 8px;
   border-radius: 999px;
-  background: var(--pace-fg);
+  background: var(--pace-label-primary);
 }
 
 [data-pace-slider]::-webkit-slider-thumb {
@@ -104,21 +104,21 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
   width: 26px;
   height: 26px;
   margin-top: -9px;
-  border: 2px solid var(--pace-fg);
+  border: 2px solid var(--pace-label-primary);
   border-radius: 50%;
-  background: var(--pace-surface);
+  background: var(--pace-cell);
 }
 
 [data-pace-slider]::-moz-range-thumb {
   width: 22px;
   height: 22px;
-  border: 2px solid var(--pace-fg);
+  border: 2px solid var(--pace-label-primary);
   border-radius: 50%;
-  background: var(--pace-surface);
+  background: var(--pace-cell);
 }
 
 [data-pace-slider]:focus-visible {
-  outline: 2px solid var(--pace-fg);
+  outline: 2px solid var(--pace-focus);
   outline-offset: 2px;
   border-radius: 8px;
 }

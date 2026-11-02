@@ -12,6 +12,8 @@ export const EmptyState = ({
 }) => (
   <View className="flex-1 items-center justify-center gap-3 px-10">
     {icon}
-    <Text className="text-center font-sans text-[14px] leading-5 text-muted">{children}</Text>
+    <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
+      {children}
+    </Text>
   </View>
 );

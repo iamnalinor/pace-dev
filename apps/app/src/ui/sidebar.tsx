@@ -113,19 +113,19 @@ const SidebarLink = ({
       aria-current={isCurrent ? "page" : undefined}
       className={cx(
         "h-10 flex-row items-center gap-3 rounded-lg px-3 active:opacity-70",
-        isCurrent && "bg-raised",
+        isCurrent && "bg-fill-3",
       )}
       onPress={onPress}
     >
       <Icon
-        color={isCurrent ? palette.accentQuietText : palette.muted}
+        color={isCurrent ? palette["accent.text"] : palette["label.secondary"]}
         size={18}
         strokeWidth={STROKE}
       />
       <Text
         className={cx(
-          "flex-1 font-sans text-[14px]",
-          isCurrent ? "font-medium text-fg" : "text-fg2",
+          "flex-1 font-sans text-subhead font-normal",
+          isCurrent ? "font-medium text-label-primary" : "text-label-secondary",
         )}
       >
         {t(destination.label)}
@@ -141,10 +141,10 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
   return (
     <View className="mb-3 flex-row items-center gap-2 px-2">
       <PaceMark size={22} />
-      <Text className="font-sans text-[16px] font-semibold text-fg">{t("app.name")}</Text>
+      <Text className="font-sans text-body font-semibold text-label-primary">{t("app.name")}</Text>
       {owner === null ? null : <UserAvatar size={24} />}
       <Text
-        className="min-w-0 flex-1 text-right font-sans text-[13px] text-muted"
+        className="min-w-0 flex-1 text-right font-sans text-footnote text-label-secondary"
         numberOfLines={1}
       >
         {owner ?? ""}
@@ -178,7 +178,7 @@ export const Sidebar = () => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="w-56 gap-1 border-r border-line bg-bg px-3 pb-4 pt-5"
+      className="w-sidebar gap-1 border-r border-separator bg-app px-3 pb-4 pt-5"
       role="navigation"
     >
       <SidebarHeader owner={owner} />
@@ -188,10 +188,8 @@ export const Sidebar = () => {
         className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3 active:opacity-80"
         onPress={newTask}
       >
-        <Plus color={palette.accentFg} size={18} strokeWidth={STROKE} />
-        <Text className="flex-1 font-sans text-[14px] font-medium text-accentFg">
-          {t("nav.newTask")}
-        </Text>
+        <Plus color={palette["accent.on"]} size={18} strokeWidth={STROKE} />
+        <Text className="flex-1 font-sans text-subhead text-accent-on">{t("nav.newTask")}</Text>
         <KeyHint hotkey={HOTKEYS.newTask} variant="primary" />
       </Pressable>
       {DESTINATIONS.map((destination) => (

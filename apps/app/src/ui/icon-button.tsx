@@ -32,15 +32,19 @@ export const IconButton = ({
       accessibilityRole="button"
       aria-disabled={disabled}
       className={cx(
-        "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
-        variant === "surface" && "border border-line bg-surface",
-        variant === "raised" && "h-12 w-12 bg-raised",
+        "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
+        variant === "surface" && "border border-outline bg-cell",
+        variant === "raised" && "h-12 w-12 bg-fill-3",
         disabled && "opacity-40",
       )}
       disabled={disabled}
       onPress={onPress}
     >
-      <Icon color={variant === "plain" ? palette.fg2 : palette.fg} size={18} strokeWidth={1.75} />
+      <Icon
+        color={variant === "plain" ? palette["label.secondary"] : palette["label.primary"]}
+        size={18}
+        strokeWidth={1.75}
+      />
     </Pressable>
   );
 };

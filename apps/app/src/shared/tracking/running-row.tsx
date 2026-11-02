@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { ColorTag, PROJECT_FILL } from "#app/ui/color.tsx";
+import { ColorTag, fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { PulseDot } from "#app/ui/pulse-dot.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -19,18 +19,20 @@ const RunningMeta = ({ running }: { readonly running: RunningView }) => {
   const { language } = useViewer();
   return (
     <View className="flex-row flex-wrap items-center gap-2">
-      <PulseDot className={PROJECT_FILL[running.color]} />
+      <PulseDot className={fillClass(running.color)} />
       <ColorTag color={running.color}>{running.label}</ColorTag>
-      <Text className="font-sans text-[13px] tabular-nums text-fg">
+      <Text className="font-sans text-footnote tabular-nums text-label-primary">
         {formatDuration(running.minutes, language)}
       </Text>
       {running.expectMinutes === null ? null : (
-        <Text className="font-sans text-[12px] text-muted">
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
           {t("time.expectOf", { duration: formatDuration(running.expectMinutes, language) })}
         </Text>
       )}
       {running.isAlongside ? (
-        <Text className="font-sans text-[12px] text-muted">{t("time.alongsideTag")}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
+          {t("time.alongsideTag")}
+        </Text>
       ) : null}
     </View>
   );
@@ -49,15 +51,12 @@ export const RunningRow = ({ running }: { readonly running: RunningView }) => {
         <RunningMeta running={running} />
         {/* Its own line, so the bar does not move as the minutes grow. */}
         {statusKey === null ? null : (
-          <Text className="font-sans text-[12px] font-medium text-warn">{t(statusKey)}</Text>
+          <Text className="font-sans text-caption text-warn">{t(statusKey)}</Text>
         )}
         {running.share === null ? null : (
-          <View className="h-1 overflow-hidden rounded-full bg-track">
+          <View className="h-1 overflow-hidden rounded-pill bg-fill-4">
             <View
-              className={cx(
-                "h-full rounded-full",
-                isLong ? "bg-warn" : PROJECT_FILL[running.color],
-              )}
+              className={cx("h-full rounded-pill", isLong ? "bg-warn" : fillClass(running.color))}
               style={{ width: percent(running.share) }}
             />
           </View>
@@ -66,13 +65,13 @@ export const RunningRow = ({ running }: { readonly running: RunningView }) => {
       {isLong ? (
         <Pressable
           accessibilityRole="button"
-          className="h-11 justify-center rounded-lg border border-line px-3 active:opacity-70"
+          className="h-hit-web justify-center rounded-lg border border-outline px-3 active:opacity-70"
           onPress={() => {
             // Still going: the next ask moves on as far again; the Expect stays what it was.
             void run(actions.stillGoing(running.activityId));
           }}
         >
-          <Text className="font-sans text-[13px] text-fg">{t("time.stillYes")}</Text>
+          <Text className="font-sans text-footnote text-label-primary">{t("time.stillYes")}</Text>
         </Pressable>
       ) : null}
       <StopButton running={running} />
@@ -90,14 +89,14 @@ const StopButton = ({ running }: { readonly running: RunningView }) => {
     <Pressable
       accessibilityLabel={`${t("time.stop")}: ${running.label}`}
       accessibilityRole="button"
-      className="h-11 flex-row items-center gap-1.5 rounded-lg border border-line px-3 active:opacity-70"
+      className="h-hit-web flex-row items-center gap-2 rounded-lg border border-outline px-3 active:opacity-70"
       hitSlop={6}
       onPress={() => {
         void run(actions.stopActivity({ activityId: running.activityId }));
       }}
     >
-      <Square color={palette.fg} size={14} />
-      <Text className="font-sans text-[13px] text-fg">{t("time.stop")}</Text>
+      <Square color={palette["label.primary"]} size={14} />
+      <Text className="font-sans text-footnote text-label-primary">{t("time.stop")}</Text>
     </Pressable>
   );
 };

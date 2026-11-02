@@ -6,8 +6,9 @@ import type { RepeatChangeProblem } from "@pace/client";
 import { useLanguage, useT } from "#app/app-state.tsx";
 import { focusField } from "#app/platform/focus-field.ts";
 import { Chip } from "#app/ui/chip.tsx";
+import { IMPORTANCE_HUES } from "#app/ui/color.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { IMPORTANCE_COLORS, ImportanceSchema, presetLabel } from "@pace/core";
+import { ImportanceSchema, presetLabel } from "@pace/core";
 
 import type { TaskFormOptions, TaskFormValues } from "./task-form-types.ts";
 
@@ -113,7 +114,7 @@ const ChoiceFields = ({
       <OptionRow label={t("edit.importance")}>
         {ImportanceSchema.options.map((importance) => (
           <Chip
-            color={IMPORTANCE_COLORS[importance]}
+            color={IMPORTANCE_HUES[importance]}
             key={importance}
             onPress={() => {
               onChange({ importance });
@@ -199,7 +200,7 @@ export const TaskFields = ({
   }, [isTitleFocused]);
   return (
     <View
-      className="gap-3.5"
+      className="gap-4"
       onTouchStart={() => {
         setPanel(null);
         setIsFinalOpen(false);

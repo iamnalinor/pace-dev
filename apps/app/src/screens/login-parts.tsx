@@ -38,7 +38,7 @@ export const SignedOutLine = () => {
   return endedElsewhere ? (
     <Text
       accessibilityLiveRegion="polite"
-      className="text-center font-sans text-[13px] leading-[18px] text-fg2"
+      className="text-center font-sans text-footnote text-label-secondary"
       role="status"
     >
       {t("login.endedElsewhere")}
@@ -60,14 +60,14 @@ export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) 
     }
   };
   return (
-    <View className="gap-2 rounded-xl border border-line bg-surface p-4">
-      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
+    <View className="gap-2 rounded-xl border border-separator bg-cell p-4">
+      <Text className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
         {t("login.dev")}
       </Text>
       <TextInput
         accessibilityLabel={t("login.devId")}
         autoCapitalize="none"
-        className="h-12 rounded-md bg-raised px-3 font-sans text-[15px] tabular-nums text-fg"
+        className="h-12 rounded-md bg-fill-3 px-3 font-sans text-callout tabular-nums text-label-primary"
         keyboardType="number-pad"
         onChangeText={setTelegramId}
         placeholder={t("login.devId")}
@@ -98,8 +98,12 @@ export const Waiting = ({
   return (
     <View className="items-center gap-3">
       <ActivityIndicator accessibilityLabel={t("login.waiting")} />
-      <Text className="font-sans text-[15px] font-medium text-fg">{t("login.waiting")}</Text>
-      <Text className="text-center font-sans text-[13px] text-muted">{t("login.botHint")}</Text>
+      <Text className="font-sans text-callout font-medium text-label-primary">
+        {t("login.waiting")}
+      </Text>
+      <Text className="text-center font-sans text-footnote text-label-secondary">
+        {t("login.botHint")}
+      </Text>
       {onReopen === null ? null : (
         <Button onPress={onReopen} variant="secondary" width="fill">
           {t("login.openBotAgain")}

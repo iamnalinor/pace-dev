@@ -129,13 +129,13 @@ export const FoldedSection = ({
       <Pressable
         accessibilityRole="button"
         aria-expanded={isOpen}
-        className="mx-3 h-11 flex-row items-center gap-1.5 border-t border-line px-2 active:opacity-70"
+        className="mx-3 h-hit-web flex-row items-center gap-2 border-t border-separator px-2 active:opacity-70"
         onPress={() => {
           setIsOpen(!isOpen);
         }}
       >
-        <Text className="font-sans text-[13px] font-medium text-fg2">{`${title} · ${String(count)}`}</Text>
-        <Icon color={palette.muted} size={16} strokeWidth={2} />
+        <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${String(count)}`}</Text>
+        <Icon color={palette["label.secondary"]} size={16} strokeWidth={2} />
       </Pressable>
       {isOpen ? children : null}
     </View>

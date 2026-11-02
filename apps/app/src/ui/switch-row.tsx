@@ -3,7 +3,7 @@ import { Switch, Text, View } from "react-native";
 import { SWITCH_STYLE } from "./switch-size.ts";
 import { useTheme } from "./theme-provider.tsx";
 
-/** The native switch in Pace's colors: off, a light knob on a grey track; on, a white knob on the quiet indigo accent. */
+/** The native switch in Pace's colours: off, a cell knob on the outline track; on, on the accent. */
 export const PaceSwitch = ({
   isOn,
   label,
@@ -15,14 +15,14 @@ export const PaceSwitch = ({
 }) => {
   const { palette } = useTheme();
   // react-native-web colors the knob of an "on" switch with its own teal unless told otherwise.
-  const webKnob = { activeThumbColor: palette.accentQuietFg };
+  const webKnob = { activeThumbColor: palette["accent.on"] };
   return (
     <Switch
       accessibilityLabel={label}
       onValueChange={onChange}
       style={SWITCH_STYLE}
-      thumbColor={isOn ? palette.accentQuietFg : palette.surface}
-      trackColor={{ false: palette.muted, true: palette.accentQuiet }}
+      thumbColor={isOn ? palette["accent.on"] : palette["bg.cell"]}
+      trackColor={{ false: palette.outline, true: palette.accent }}
       value={isOn}
       {...webKnob}
     />
@@ -44,9 +44,9 @@ export const SwitchRow = ({
   return (
     <View className="flex-row items-center justify-between gap-4">
       <View className="flex-1">
-        <Text className="font-sans text-[14px] text-fg">{label}</Text>
+        <Text className="font-sans text-subhead font-normal text-label-primary">{label}</Text>
         {hint === undefined ? null : (
-          <Text className="font-sans text-[12px] text-muted">{hint}</Text>
+          <Text className="font-sans text-caption font-normal text-label-tertiary">{hint}</Text>
         )}
       </View>
       <PaceSwitch isOn={isOn} label={label} onChange={onChange} />

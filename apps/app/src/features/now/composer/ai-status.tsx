@@ -36,16 +36,16 @@ const Reading = ({
   return (
     <View className="gap-2 px-1">
       {doubtful.length > 0 ? (
-        <Text className="font-sans text-[12px] text-muted">
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
           {t("composer.aiCheck", { fields })}
         </Text>
       ) : null}
       {questions.map((question) => (
         <View className="gap-1" key={question.question}>
-          <Text className="font-sans text-[13px] text-fg">{question.question}</Text>
+          <Text className="font-sans text-footnote text-label-primary">{question.question}</Text>
           <View
             accessibilityLabel={t("composer.aiQuestion")}
-            className="flex-row flex-wrap gap-1.5"
+            className="flex-row flex-wrap gap-2"
             role="group"
           >
             {question.options.map((option) => (
@@ -78,20 +78,25 @@ export const AiStatus = ({ onAnswer, onLater, state }: Props) => {
     }
     case "reading": {
       return (
-        <Text accessibilityLiveRegion="polite" className="px-1 pt-2 font-sans text-[12px] text-fg">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="px-1 pt-2 font-sans text-caption font-normal text-label-primary"
+        >
           {t("composer.aiReadingStatus")}
         </Text>
       );
     }
     case "failed": {
       return (
-        <Text className="px-1 pt-2 font-sans text-[12px] text-muted">{t("composer.aiFailed")}</Text>
+        <Text className="px-1 pt-2 font-sans text-caption font-normal text-label-tertiary">
+          {t("composer.aiFailed")}
+        </Text>
       );
     }
     case "unavailable": {
       return (
-        <View className="items-start gap-1.5 px-1 pt-2">
-          <Text className="font-sans text-[12px] text-fg">
+        <View className="items-start gap-2 px-1 pt-2">
+          <Text className="font-sans text-caption font-normal text-label-primary">
             {state.retryAt === null
               ? t("composer.aiUnavailableSoon")
               : t("composer.aiUnavailable", { time: clockTime(state.retryAt, viewer.deviceTz) })}

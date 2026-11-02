@@ -61,18 +61,18 @@ const Tab = ({
     >
       <View>
         <Icon
-          color={isFocused ? palette.accentQuietText : palette.muted}
+          color={isFocused ? palette["accent.text"] : palette["label.secondary"]}
           size={ICON_SIZE}
           strokeWidth={STROKE}
         />
-        <View className="absolute -right-3 -top-1.5">
+        <View className="absolute -right-3 -top-2">
           <CountBadge count={count} />
         </View>
       </View>
       <Text
         className={cx(
-          "font-sans text-[11px]",
-          isFocused ? "font-medium text-accentQuietText" : "text-muted",
+          "font-sans text-caption2 font-normal",
+          isFocused ? "font-medium text-accent-text" : "text-label-secondary",
         )}
         numberOfLines={1}
       >
@@ -92,7 +92,7 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="flex-row border-t border-line bg-bg px-1 pt-1.5"
+      className="flex-row border-t border-separator bg-app px-1 pt-2"
       role="tablist"
       style={{ paddingBottom: Math.max(insets.bottom, 8) + 4 }}
     >

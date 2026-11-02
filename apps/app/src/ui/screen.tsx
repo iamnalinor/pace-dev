@@ -35,15 +35,15 @@ export const Screen = ({
   const [footerHeight, setFooterHeight] = useState(0);
   useLiftToastAbove(footer === undefined ? 0 : footerHeight, useIsScreenActive());
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
-      <View className="w-full max-w-[880px] flex-1 self-center">
+    <View className="flex-1 bg-app" style={{ paddingTop: insets.top }}>
+      <View className="w-full max-w-content-wide flex-1 self-center">
         {header}
         {fills ? (
           <View className="flex-1">{children}</View>
         ) : (
           <ScrollView
             className="flex-1"
-            contentContainerClassName="pb-24"
+            contentContainerClassName="pb-16"
             keyboardShouldPersistTaps="handled"
             {...(scrollLabel !== undefined && {
               "aria-label": scrollLabel,

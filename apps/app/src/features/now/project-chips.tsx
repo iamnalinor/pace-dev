@@ -22,7 +22,7 @@ export const ProjectChips = ({
   return (
     <ScrollView
       accessibilityLabel={t("now.filterByProject")}
-      contentContainerClassName="gap-1.5 px-4 pb-2"
+      contentContainerClassName="gap-2 px-4 pb-2"
       horizontal
       showsHorizontalScrollIndicator={false}
     >

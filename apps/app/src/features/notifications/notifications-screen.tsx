@@ -79,14 +79,16 @@ const Body = ({
           {item.payload.tasks.map((task) => (
             <Pressable
               accessibilityRole="link"
-              className="min-h-11 justify-center active:opacity-70"
+              className="min-h-hit-web justify-center active:opacity-70"
               key={task.taskId}
               onPress={() => {
                 router.push(`/task/${task.taskId}`);
               }}
             >
-              <Text className="font-sans text-[14px] text-fg">{task.title}</Text>
-              <Text className="font-sans text-[12px] tabular-nums text-muted">
+              <Text className="font-sans text-subhead font-normal text-label-primary">
+                {task.title}
+              </Text>
+              <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
                 {t("notifications.dueLeft", {
                   left: formatLeft(minutesBetween(zoned.now, task.dueAt), zoned.language),
                   when: dayClock(task.dueAt, zoned),
@@ -97,12 +99,12 @@ const Body = ({
           {item.payload.tasks.length > 1 ? (
             <Pressable
               accessibilityRole="link"
-              className="min-h-11 justify-center"
+              className="min-h-hit-web justify-center"
               onPress={() => {
                 router.push("/");
               }}
             >
-              <Text className="font-sans text-[13px] text-accentQuietText underline">
+              <Text className="font-sans text-footnote text-accent-text underline">
                 {t("notifications.openNow")}
               </Text>
             </Pressable>
@@ -178,7 +180,7 @@ export const Item = ({
   const state = signInState(item, listed);
   return (
     <View
-      className="gap-1.5 border-t border-line px-5 py-3"
+      className="gap-2 border-t border-separator px-5 py-3"
       role="listitem"
       testID={`notification-${item.id}`}
     >
@@ -186,7 +188,7 @@ export const Item = ({
         <View className="min-w-0 flex-1">
           <Body isOwn={state === "own"} item={item} zoned={zoned} />
         </View>
-        <Text className="font-sans text-[12px] tabular-nums text-muted">
+        <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
           {clockTime(item.createdAt, zoned.zone)}
         </Text>
       </View>
@@ -207,7 +209,7 @@ export const Item = ({
         .map((line, index) => (
           // Lines repeat (two devices, one minute): their place keeps them apart.
           // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
-          <Text className="font-sans text-[11px] text-muted" key={index}>
+          <Text className="font-sans text-caption2 font-normal text-label-tertiary" key={index}>
             {line}
           </Text>
         ))}
@@ -255,12 +257,12 @@ export const NotificationsScreen = () => {
       right={
         <Pressable
           accessibilityRole="link"
-          className="min-h-11 justify-center px-2 active:opacity-70"
+          className="min-h-hit-web justify-center px-2 active:opacity-70"
           onPress={() => {
             router.push("/decisions");
           }}
         >
-          <Text className="font-sans text-[13px] text-muted">
+          <Text className="font-sans text-footnote text-label-secondary">
             {t("notifications.assistantLog")}
           </Text>
         </Pressable>
@@ -283,7 +285,7 @@ export const NotificationsScreen = () => {
           <View key={day.day}>
             <Text
               accessibilityRole="header"
-              className="px-5 pb-1.5 pt-4 font-sans text-[11px] uppercase tracking-[0.06em] text-muted"
+              className="px-5 pb-2 pt-4 font-sans text-caption2 font-normal uppercase text-label-tertiary"
             >
               {label}
             </Text>

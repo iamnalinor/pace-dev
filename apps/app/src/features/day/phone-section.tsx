@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 
 import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
@@ -20,6 +20,20 @@ import { type DayPhone, isCalendarLogged, type NamedApp } from "./use-day-phone.
 /** How many apps a block's phone line names. */
 const TOP_APPS = 3;
 
+/** The width of Day's time column (the blocks' start and end). */
+export const TIME_WIDTH = "w-24";
+
+/**
+What sits under a block (its task, apps, prompts) starts at the block's words: a spacer as wide as
+the time column and the row's gap, so the indent follows the scale on every platform.
+*/
+export const UnderBlock = ({ children }: { readonly children: ReactNode }) => (
+  <View className="flex-row gap-3">
+    <View className={TIME_WIDTH} />
+    <View className="min-w-0 flex-1">{children}</View>
+  </View>
+);
+
 /** "Phone 23m: Telegram 15m, YouTube 8m" under a block, when the phone was used in it. */
 export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
   const t = useT();
@@ -33,7 +47,7 @@ export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {
     .map((app) => `${app.name} ${formatDuration(app.minutes, language)}`)
     .join(", ");
   return (
-    <Text className="pb-2 pl-[116px] font-sans text-[12px] text-muted" numberOfLines={2}>
+    <Text className="pb-2 font-sans text-caption font-normal text-label-tertiary" numberOfLines={2}>
       {t("phone.usage", { apps: named, duration: formatDuration(total, language) })}
     </Text>
   );
@@ -59,7 +73,7 @@ export const EndedAtPrompt = ({
   }
   const time = clockTime(pickupAt, zone);
   return (
-    <View className="pb-2 pl-[116px]">
+    <View className="pb-2">
       <Button
         onPress={() => {
           void run(actions.stopActivity({ at: pickupAt }));
@@ -128,17 +142,22 @@ const CalendarRow = ({
   );
   const everyTime = useEveryTime(phone, event);
   return (
-    <View className="flex-row items-center gap-2 border-t border-line py-2">
-      <Text className="w-[86px] font-sans text-[12px] tabular-nums text-muted">
+    <View className="flex-row items-center gap-2 border-t border-separator py-2">
+      <Text className="w-20 font-sans text-caption font-normal tabular-nums text-label-tertiary">
         {`${clockTime(event.startAt, zone)}–${clockTime(event.endAt, zone)}`}
       </Text>
-      <Text className="flex-1 font-sans text-[14px] text-fg" numberOfLines={2}>
+      <Text
+        className="flex-1 font-sans text-subhead font-normal text-label-primary"
+        numberOfLines={2}
+      >
         {event.title}
       </Text>
       {isStarted ||
       phone.calendar.isAttendedElsewhere(event) ||
       isCalendarLogged(entries, event) ? (
-        <Text className="font-sans text-[12px] text-muted">{t("phone.logged")}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
+          {t("phone.logged")}
+        </Text>
       ) : (
         <View className="flex-row">
           {isAttendableNow(event, now) && (
@@ -226,7 +245,7 @@ export const CalendarSection = ({
   }
   if (access === "denied") {
     return (
-      <Text className="mx-5 mt-4 font-sans text-[12px] text-muted">
+      <Text className="mx-5 mt-4 font-sans text-caption font-normal text-label-tertiary">
         {t("phone.calendarDenied")}
       </Text>
     );
@@ -236,7 +255,10 @@ export const CalendarSection = ({
   }
   return (
     <View accessibilityLabel={t("day.calendar")} className="mx-5 mt-4 gap-1" role="group">
-      <Text accessibilityRole="header" className="font-sans text-[13px] font-medium text-fg">
+      <Text
+        accessibilityRole="header"
+        className="font-sans text-footnote font-medium text-label-primary"
+      >
         {t("day.calendar")}
       </Text>
       {events.map((event) => (

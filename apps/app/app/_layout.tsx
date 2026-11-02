@@ -53,7 +53,7 @@ const Navigator = () => {
   useCrashNotice();
   return (
     <UpdateBanner>
-      <View className="flex-1 flex-row bg-bg">
+      <View className="flex-1 flex-row bg-app">
         <CrashContext />
         <DocumentLanguage />
         <DocumentHead />
@@ -68,7 +68,10 @@ const Navigator = () => {
               </IncompatibleGate>
             )}
             screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
-            screenOptions={{ contentStyle: { backgroundColor: palette.bg }, headerShown: false }}
+            screenOptions={{
+              contentStyle: { backgroundColor: palette["bg.app"] },
+              headerShown: false,
+            }}
           >
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="login" options={{ animation: "fade" }} />

@@ -39,7 +39,7 @@ export const EstimateChip = ({
   return (
     <Chip
       label={`${t("composer.estimate")}: ${text}`}
-      leading={<Clock color={palette.fg2} size={14} strokeWidth={1.75} />}
+      leading={<Clock color={palette["label.secondary"]} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >
@@ -69,8 +69,8 @@ const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) 
     <TextInput
       accessibilityLabel={t("form.estimateTyped")}
       className={cx(
-        "h-8 min-w-[120px] rounded-pill border px-3 font-sans text-[13px] text-fg",
-        text !== "" && minutes === null ? "border-warn" : "border-line",
+        "h-8 min-w-32 rounded-pill border px-3 font-sans text-footnote text-label-primary",
+        text !== "" && minutes === null ? "border-danger" : "border-outline",
       )}
       onChangeText={setText}
       onSubmitEditing={() => {
@@ -79,7 +79,7 @@ const TypedEstimate = ({ onEstimate }: { readonly onEstimate: (minutes: number) 
         }
       }}
       placeholder={t("form.estimateTyped")}
-      placeholderTextColor={palette.muted}
+      placeholderTextColor={palette["label.tertiary"]}
       returnKeyType="done"
       value={text}
     />
@@ -101,7 +101,7 @@ export const EstimateOptions = ({
   return (
     <View
       aria-label={t("composer.estimate")}
-      className="flex-row flex-wrap gap-1.5 px-1"
+      className="flex-row flex-wrap gap-2 px-1"
       role="radiogroup"
     >
       {ESTIMATES.filter((option) => minutes !== null || option !== fallback).map((option) => (

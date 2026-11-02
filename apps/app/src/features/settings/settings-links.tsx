@@ -20,16 +20,16 @@ const LinkRow = ({ hintKey, titleKey, to }: Entry) => {
   return (
     <Pressable
       accessibilityRole="link"
-      className="min-h-14 flex-row items-center gap-3 border-t border-line py-2 active:opacity-70"
+      className="min-h-row flex-row items-center gap-3 border-t border-separator py-2 active:opacity-70"
       onPress={() => {
         router.push(to);
       }}
     >
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-[15px] text-fg">{t(titleKey)}</Text>
-        <Text className="font-sans text-[12px] text-muted">{t(hintKey)}</Text>
+        <Text className="font-sans text-callout text-label-primary">{t(titleKey)}</Text>
+        <Text className="font-sans text-caption font-normal text-label-tertiary">{t(hintKey)}</Text>
       </View>
-      <ChevronRight color={palette.faint} size={16} strokeWidth={1.75} />
+      <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
     </Pressable>
   );
 };

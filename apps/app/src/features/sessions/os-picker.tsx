@@ -1,12 +1,11 @@
 import { Pressable, Text, View } from "react-native";
 import Svg, { Circle, Ellipse, Path } from "react-native-svg";
 
-import type { MessageKey } from "@pace/core";
-
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { COMPUTER_OSES, type ComputerOs } from "@pace/client";
+import { composite, type MessageKey } from "@pace/core";
 
 const NAME_KEY: Readonly<Record<ComputerOs, MessageKey>> = {
   linux: "devices.osLinux",
@@ -87,7 +86,7 @@ export const OsPicker = ({
   const t = useT();
   const { palette } = useTheme();
   return (
-    <View accessibilityLabel={t("devices.os")} className="flex-row gap-1.5" role="radiogroup">
+    <View accessibilityLabel={t("devices.os")} className="flex-row gap-2" role="radiogroup">
       {COMPUTER_OSES.map((os) => {
         const isChosen = os === value;
         return (
@@ -96,8 +95,8 @@ export const OsPicker = ({
             accessibilityRole="radio"
             aria-checked={isChosen}
             className={cx(
-              "h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border-2 px-2 active:opacity-80",
-              isChosen ? "border-accentQuiet bg-accentQuiet" : "border-line bg-surface",
+              "h-hit-web flex-1 flex-row items-center justify-center gap-2 rounded-lg border-2 px-2 active:opacity-80",
+              isChosen ? "border-accent bg-accent-quiet" : "border-outline bg-cell",
             )}
             key={os}
             onPress={() => {
@@ -106,14 +105,16 @@ export const OsPicker = ({
             ref={isChosen ? chosenRef : undefined}
           >
             <Mark
-              cutout={isChosen ? palette.accentQuiet : palette.surface}
-              ink={isChosen ? palette.accentQuietFg : palette.fg2}
+              cutout={
+                isChosen ? composite(palette.accentQuiet, palette["bg.cell"]) : palette["bg.cell"]
+              }
+              ink={isChosen ? palette["accent.text"] : palette["label.secondary"]}
               os={os}
             />
             <Text
               className={cx(
-                "font-sans text-[13px]",
-                isChosen ? "font-medium text-accentQuietFg" : "text-fg2",
+                "font-sans text-footnote",
+                isChosen ? "font-medium text-accent-text" : "text-label-secondary",
               )}
               numberOfLines={1}
             >

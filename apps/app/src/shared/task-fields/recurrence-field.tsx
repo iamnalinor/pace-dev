@@ -52,7 +52,7 @@ const RepeatKindPicker = ({
   );
   return (
     <View className="gap-2">
-      <View className="flex-row flex-wrap gap-1.5">
+      <View className="flex-row flex-wrap gap-2">
         <Chip
           onPress={() => {
             onChange(null);
@@ -112,7 +112,7 @@ const RepeatEndPicker = ({
   const zone = start?.tz ?? timezone ?? viewer.deviceTz;
   return (
     <View className="gap-2">
-      <View className="flex-row flex-wrap gap-1.5">
+      <View className="flex-row flex-wrap gap-2">
         <Chip
           onPress={() => {
             onChange({ ...value, until: undefined });
@@ -132,7 +132,7 @@ const RepeatEndPicker = ({
         </Chip>
       </View>
       {isOpen ? (
-        <View className="rounded-xl border border-line bg-bg p-3">
+        <View className="rounded-xl border border-separator bg-app p-3">
           <Calendar
             labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
             language={language}
@@ -171,7 +171,9 @@ export const RecurrenceField = ({
   const t = useT();
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[12px] text-muted">{t("form.repeat")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("form.repeat")}
+      </Text>
       <RepeatKindPicker onChange={onChange} value={value} />
       {value === null ? null : <RepeatEndPicker onChange={onChange} start={start} value={value} />}
       {problem === null || problem === "repeat/task-unknown" ? null : (

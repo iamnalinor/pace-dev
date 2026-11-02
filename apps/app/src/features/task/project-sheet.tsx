@@ -6,7 +6,7 @@ import type { ProjectColorName } from "@pace/core";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
-import { PROJECT_FILL } from "#app/ui/color.tsx";
+import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -34,20 +34,20 @@ const ChoiceRow = ({
       aria-checked={isCurrent}
       className={cx(
         "min-h-12 flex-row items-center gap-3 rounded-lg border px-3 active:opacity-70",
-        isCurrent ? "border-fg bg-raised" : "border-line",
+        isCurrent ? "border-label-primary bg-fill-3" : "border-outline",
       )}
       onPress={onChoose}
     >
       <View
         className={cx(
-          "size-2.5 rounded-pill",
-          choice.color === null ? "border border-muted" : PROJECT_FILL[choice.color],
+          "size-3 rounded-pill",
+          choice.color === null ? "border border-outline" : fillClass(choice.color),
         )}
       />
-      <Text className="flex-1 font-sans text-[15px] text-fg" numberOfLines={1}>
+      <Text className="flex-1 font-sans text-callout text-label-primary" numberOfLines={1}>
         {choice.name}
       </Text>
-      {isCurrent ? <Check color={palette.fg} size={18} /> : null}
+      {isCurrent ? <Check color={palette["label.primary"]} size={18} /> : null}
     </Pressable>
   );
 };

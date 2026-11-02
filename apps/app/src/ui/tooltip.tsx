@@ -30,8 +30,8 @@ const HostContext = createContext<Host | null>(null);
 
 /** The bubble itself: small, in the inverse colours, a line or two at most. */
 const Bubble = ({ label }: { readonly label: string }) => (
-  <View className="max-w-[260px] rounded-md bg-inverse px-2 py-1">
-    <Text className="font-sans text-[13px] leading-[18px] text-inverseFg">{label}</Text>
+  <View className="max-w-tooltip-max rounded-md bg-elevated px-2 py-1">
+    <Text className="font-sans text-footnote text-label-primary">{label}</Text>
   </View>
 );
 

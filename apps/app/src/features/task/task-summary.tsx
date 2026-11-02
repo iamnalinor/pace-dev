@@ -5,16 +5,15 @@ import type { TaskTag, TaskViewModel } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { inkClass, washClass } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
 import {
-  describeRepeatRule,
-  formatDuration,
-  IMPORTANCE_COLORS,
-  presetLabel,
-  type ProjectColorName,
-  STATUS_COLORS,
-} from "@pace/core";
+  IMPORTANCE_HUES,
+  inkClass,
+  STATUS_HUES,
+  type TagColor,
+  washClass,
+} from "#app/ui/color.tsx";
+import { cx } from "#app/ui/cx.ts";
+import { describeRepeatRule, formatDuration, presetLabel } from "@pace/core";
 
 const tagKey = (tag: TaskTag) => {
   switch (tag.kind) {
@@ -34,13 +33,13 @@ const tagKey = (tag: TaskTag) => {
 };
 
 /** Importance and a status under way are colored; the rest stays neutral. */
-const tagColor = (tag: TaskTag): null | ProjectColorName => {
+const tagColor = (tag: TaskTag): null | TagColor => {
   switch (tag.kind) {
     case "importance": {
-      return IMPORTANCE_COLORS[tag.importance];
+      return IMPORTANCE_HUES[tag.importance];
     }
     case "status": {
-      return STATUS_COLORS[tag.status];
+      return STATUS_HUES[tag.status];
     }
     case "outcome":
     case "submission": {
@@ -64,9 +63,11 @@ const Stat = ({
     accessible
     className="flex-1 gap-0.5"
   >
-    <Text className="font-sans text-[11px] text-muted">{label}</Text>
-    <Text className="font-sans text-[15px] tabular-nums text-fg">{value}</Text>
-    {note === undefined ? null : <Text className="font-sans text-[11px] text-faint">{note}</Text>}
+    <Text className="font-sans text-caption2 font-normal text-label-tertiary">{label}</Text>
+    <Text className="font-sans text-callout tabular-nums text-label-primary">{value}</Text>
+    {note === undefined ? null : (
+      <Text className="font-sans text-caption2 font-normal text-label-tertiary">{note}</Text>
+    )}
   </View>
 );
 
@@ -84,9 +85,9 @@ const TaskTags = ({
   const t = useT();
   const { language } = useViewer();
   return (
-    <View className="flex-row flex-wrap gap-1.5">
+    <View className="flex-row flex-wrap gap-2">
       <View className={cx("rounded-sm px-2 py-1", washClass(category.color))}>
-        <Text className={cx("font-sans text-[11px] font-medium", inkClass(category.color))}>
+        <Text className={cx("font-sans text-caption2 font-medium", inkClass(category.color))}>
           {presetLabel(category, language)}
         </Text>
       </View>
@@ -95,15 +96,15 @@ const TaskTags = ({
         return (
           <View
             className={cx(
-              "flex-row items-center gap-1.5 rounded-sm px-2 py-1",
-              color === null ? "bg-track" : washClass(color),
+              "flex-row items-center gap-2 rounded-sm px-2 py-1",
+              color === null ? "bg-fill-4" : washClass(color),
             )}
             key={tag.kind}
           >
             <Text
               className={cx(
-                "font-sans text-[11px]",
-                color === null ? "text-fg2" : cx("font-medium", inkClass(color)),
+                "font-sans text-caption2 font-normal",
+                color === null ? "text-label-secondary" : cx("font-medium", inkClass(color)),
               )}
             >
               {t(tagKey(tag))}
@@ -168,16 +169,13 @@ export const TaskSummary = ({
   return (
     <View className="gap-4 px-5">
       <View className="gap-2">
-        <Text
-          accessibilityRole="header"
-          className="font-sans text-[26px] font-semibold tracking-tight text-fg"
-        >
+        <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
           {view.title}
         </Text>
         {view.link === null ? null : (
           <Text
             accessibilityRole="link"
-            className="font-sans text-[12px] text-fg2"
+            className="font-sans text-caption font-normal text-label-secondary"
             onPress={() => {
               void Linking.openURL(view.link?.url ?? "");
             }}
@@ -187,7 +185,7 @@ export const TaskSummary = ({
         )}
         <TaskTags category={view.category} tags={view.tags} />
       </View>
-      <View className="gap-3 rounded-xl border border-line bg-surface p-3.5">
+      <View className="gap-3 rounded-xl border border-separator bg-cell p-4">
         <View className="flex-row gap-3">
           <Stat label={t("task.start")} value={start} />
           <Stat label={t("task.due")} value={due} />

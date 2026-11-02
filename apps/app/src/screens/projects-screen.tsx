@@ -22,13 +22,15 @@ const NewProject = () => {
     return (
       <Pressable
         accessibilityRole="button"
-        className="mb-3 h-11 flex-row items-center justify-center gap-2 rounded-lg border border-line active:opacity-70"
+        className="mb-3 h-hit-web flex-row items-center justify-center gap-2 rounded-lg border border-outline active:opacity-70"
         onPress={() => {
           setIsOpen(true);
         }}
       >
-        <Plus color={palette.fg} size={16} />
-        <Text className="font-sans text-[14px] text-fg">{t("projects.new")}</Text>
+        <Plus color={palette["label.primary"]} size={16} />
+        <Text className="font-sans text-subhead font-normal text-label-primary">
+          {t("projects.new")}
+        </Text>
       </Pressable>
     );
   }
@@ -69,7 +71,7 @@ export const ProjectsScreen = () => {
             accessibilityLabel={project.name}
             accessibilityRole="link"
             className={cx(
-              "mb-2 min-h-14 flex-row items-center gap-3 rounded-xl border px-4 active:opacity-70",
+              "mb-2 min-h-row flex-row items-center gap-3 rounded-xl border px-4 active:opacity-70",
               washClass(project.color),
             )}
             key={project.id}
@@ -78,11 +80,11 @@ export const ProjectsScreen = () => {
             }}
           >
             <Text
-              className={cx("flex-1 font-sans text-[15px] font-medium", inkClass(project.color))}
+              className={cx("flex-1 font-sans text-callout font-medium", inkClass(project.color))}
             >
               {project.name}
             </Text>
-            <Text className="font-sans text-[13px] tabular-nums text-fg2">
+            <Text className="font-sans text-footnote tabular-nums text-label-secondary">
               {openTasksLabel(language, project.open)}
             </Text>
           </Pressable>

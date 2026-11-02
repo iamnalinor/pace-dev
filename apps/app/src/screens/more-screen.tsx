@@ -41,14 +41,14 @@ const MoreRow = ({ href, icon: Icon, label }: Row) => {
     <Pressable
       accessibilityLabel={t(label)}
       accessibilityRole="link"
-      className="min-h-14 flex-row items-center gap-3 border-b border-line px-5 active:opacity-70"
+      className="min-h-row flex-row items-center gap-3 border-b border-separator px-5 active:opacity-70"
       onPress={() => {
         router.push(href);
       }}
     >
-      <Icon color={palette.muted} size={20} strokeWidth={1.75} />
-      <Text className="flex-1 font-sans text-[16px] text-fg">{t(label)}</Text>
-      <ChevronRight color={palette.faint} size={16} strokeWidth={1.75} />
+      <Icon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
+      <Text className="flex-1 font-sans text-body text-label-primary">{t(label)}</Text>
+      <ChevronRight color={palette["label.tertiary"]} size={16} strokeWidth={1.75} />
     </Pressable>
   );
 };
@@ -57,7 +57,10 @@ const MoreRow = ({ href, icon: Icon, label }: Row) => {
 const Owner = ({ name }: { readonly name: string }) => (
   <View className="mx-5 mb-3 flex-row items-center gap-3">
     <UserAvatar />
-    <Text className="min-w-0 flex-1 font-sans text-[18px] font-medium text-fg" numberOfLines={1}>
+    <Text
+      className="min-w-0 flex-1 font-sans text-headline font-medium text-label-primary"
+      numberOfLines={1}
+    >
       {name}
     </Text>
   </View>
@@ -73,7 +76,7 @@ export const MoreScreen = () => {
   return (
     <Screen header={<ScreenHeader title={t("nav.more")} />}>
       {owner === null ? null : <Owner name={owner} />}
-      <View className="border-t border-line">
+      <View className="border-t border-separator">
         {ROWS.map((row) => (
           <MoreRow key={row.label} {...row} />
         ))}

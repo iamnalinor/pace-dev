@@ -39,7 +39,7 @@ const Backdrop = ({
     <Pressable
       accessibilityLabel={closeLabel}
       accessibilityRole="button"
-      className="flex-1 bg-black/55"
+      className="flex-1 bg-scrim"
       onPress={onClose}
     />
   </Animated.View>
@@ -50,8 +50,8 @@ const GrabHandle = () => {
   const { palette } = useTheme();
   return (
     <View
-      className="mb-4 h-1 w-9 self-center rounded-sm"
-      style={{ backgroundColor: palette.faint }}
+      className="mb-4 h-1 w-10 self-center rounded-sm"
+      style={{ backgroundColor: palette["label.quaternary"] }}
     />
   );
 };
@@ -77,18 +77,18 @@ const SheetTitle = ({
     <View className="flex-1">
       <Text
         accessibilityRole="header"
-        className="font-sans text-[20px] font-semibold text-fg"
+        className="font-sans text-title2 text-label-primary"
         nativeID={titleId}
       >
         {title}
       </Text>
       {subtitle === undefined ? null : (
-        <Text className="mt-1 font-sans text-[13px] text-muted">{subtitle}</Text>
+        <Text className="mt-1 font-sans text-footnote text-label-secondary">{subtitle}</Text>
       )}
     </View>
     {isWide ? (
       // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low).
-      <View className="-mr-2 -mt-2.5">
+      <View className="-mr-2 -mt-3">
         <IconButton icon={X} label={closeLabel} onPress={onClose} variant="plain" />
       </View>
     ) : null}
@@ -112,13 +112,13 @@ const SheetBody = ({
   <>
     {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
     <ScrollView
-      className="mt-3 min-h-0 shrink overscroll-contain border-t border-line"
-      contentContainerClassName="gap-[18px] pt-[15px]"
+      className="mt-3 min-h-0 shrink overscroll-contain border-t border-separator"
+      contentContainerClassName="gap-5 pt-4"
       keyboardShouldPersistTaps="handled"
     >
       {children}
     </ScrollView>
-    {footer === undefined ? null : <View className="border-t border-line pt-3">{footer}</View>}
+    {footer === undefined ? null : <View className="border-t border-separator pt-3">{footer}</View>}
   </>
 );
 
@@ -194,10 +194,10 @@ export const Sheet = ({
               // The modal is the dialog already (react-native-web gives it the role); this is its surface.
               {...({ dataSet: { paceSurface: "sheet" } } as object)}
               className={cx(
-                "shrink overflow-hidden bg-surface px-5",
+                "shrink overflow-hidden bg-elevated px-5",
                 isWide
-                  ? "rounded-2xl border border-line pt-5 shadow-lg"
-                  : "rounded-t-[22px] border-t border-line pt-2.5",
+                  ? "rounded-lg border border-separator pt-5 shadow-lg"
+                  : "rounded-t-sheet border-t border-separator pt-3",
               )}
               style={{ paddingBottom: isWide ? 20 : Math.max(insets.bottom, 12) + 12 }}
             >

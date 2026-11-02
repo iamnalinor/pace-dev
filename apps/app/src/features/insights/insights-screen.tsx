@@ -7,7 +7,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
-import { PROJECT_FILL } from "#app/ui/color.tsx";
+import { fillClass } from "#app/ui/color.tsx";
 import { formatDuration, formatWeekRange } from "@pace/core";
 
 import { Card } from "./card.tsx";
@@ -44,16 +44,21 @@ const Bars = ({
             key={bar.key ?? "none"}
             role="group"
           >
-            <Text className="w-24 font-sans text-[12px] text-fg2" numberOfLines={1}>
+            <Text
+              className="w-24 font-sans text-caption font-normal text-label-secondary"
+              numberOfLines={1}
+            >
               {name}
             </Text>
-            <View className="h-2.5 flex-1 overflow-hidden rounded-r bg-track">
+            <View className="h-3 flex-1 overflow-hidden rounded-r-xs bg-fill-4">
               <View
-                className={`h-full rounded-r ${bar.color === null ? "bg-faint" : PROJECT_FILL[bar.color]}`}
+                className={`h-full rounded-r-xs ${bar.color === null ? "bg-label-quaternary" : fillClass(bar.color)}`}
                 style={{ width: barWidth(bar.share) }}
               />
             </View>
-            <Text className="font-sans text-[12px] tabular-nums text-fg">{value}</Text>
+            <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
+              {value}
+            </Text>
           </View>
         );
       })}
@@ -63,10 +68,15 @@ const Bars = ({
 
 const Row = ({ name, value }: { readonly name: string; readonly value: string }) => (
   <View className="flex-row justify-between gap-3">
-    <Text className="flex-1 font-sans text-[12px] text-fg2" numberOfLines={1}>
+    <Text
+      className="flex-1 font-sans text-caption font-normal text-label-secondary"
+      numberOfLines={1}
+    >
       {name}
     </Text>
-    <Text className="font-sans text-[12px] tabular-nums text-fg">{value}</Text>
+    <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
+      {value}
+    </Text>
   </View>
 );
 
@@ -102,7 +112,7 @@ export const InsightsScreen = () => {
       <View className="gap-3 px-5">
         {week.totalMinutes > 0 ? (
           <>
-            <Text className="font-sans text-[14px] text-fg">
+            <Text className="font-sans text-subhead font-normal text-label-primary">
               {t("insights.total", { duration: formatDuration(week.totalMinutes, language) })}
             </Text>
             <Bars
@@ -118,7 +128,9 @@ export const InsightsScreen = () => {
             <Patterns week={week} zone={deviceTz} />
           </>
         ) : (
-          <Text className="font-sans text-[14px] text-muted">{t("insights.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("insights.nothing")}
+          </Text>
         )}
         {week.onTime.length > 0 ? (
           <Card title={t("insights.onTime")}>

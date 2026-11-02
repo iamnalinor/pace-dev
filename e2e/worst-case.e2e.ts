@@ -42,7 +42,6 @@ ellipsizes carries neither `data-text-policy="truncate"` nor its full value.
 */
 const REALISTIC: readonly Known[] = [
   { finding: "F-DAT-02", match: /: (Домашка по алгебре 6|Algebra homework 6)$/u },
-  { finding: "F-DAT-07", match: /: (Анна|Anna)$/u },
   { finding: "F-DAT-02", match: /: (Алгебра|Algebra)$/u },
   { finding: "F-DAT-02", match: /: (Это не я|Not me)/u },
 ];

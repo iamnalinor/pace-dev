@@ -2,7 +2,7 @@ import { Text, View } from "react-native";
 
 import { useT } from "#app/app-state.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { PROJECT_FILL } from "#app/ui/color.tsx";
+import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import {
   focusSleepRows,
@@ -11,13 +11,13 @@ import {
   hourLabel,
   type InsightsModel,
 } from "@pace/client";
-import { CATEGORY_COLORS, formatDuration } from "@pace/core";
+import { CATEGORY_HUES, formatDuration } from "@pace/core";
 
 import { Card } from "./card.tsx";
 
 /** Focus is drawn in the work color, sleep in the sleep category's, as on Day. */
-const FOCUS_FILL = PROJECT_FILL[CATEGORY_COLORS.work];
-const SLEEP_FILL = PROJECT_FILL[CATEGORY_COLORS.sleep];
+const FOCUS_FILL = fillClass(CATEGORY_HUES.work);
+const SLEEP_FILL = fillClass(CATEGORY_HUES.sleep);
 
 const percent = (share: number): `${number}%` => `${Math.max(2, Math.round(share * 100))}%`;
 
@@ -39,20 +39,20 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
   return (
     <Card title={t("insights.hours")}>
       {hours.peak === null ? null : (
-        <Text className="font-sans text-[12px] text-fg2">
+        <Text className="font-sans text-caption font-normal text-label-secondary">
           {t("insights.hoursPeak", { from: hourLabel(hours.peak), to: hourLabel(hours.peak + 1) })}
         </Text>
       )}
       <View
         accessibilityLabel={described}
-        className="h-24 flex-row items-end gap-0.5 border-b border-line"
+        className="h-24 flex-row items-end gap-0.5 border-b border-separator"
         role="group"
       >
         {hours.minutes.map((minutes, hour) => (
           <View className="h-full flex-1 justify-end" key={hourLabel(hour)}>
             {minutes > 0 ? (
               <View
-                className={cx("w-full rounded-t", FOCUS_FILL)}
+                className={cx("w-full rounded-t-xs", FOCUS_FILL)}
                 style={{ height: percent(minutes / most) }}
               />
             ) : null}
@@ -61,7 +61,10 @@ const HoursChart = ({ hours }: { readonly hours: InsightsModel["hours"] }) => {
       </View>
       <View className="flex-row">
         {HOUR_TICKS.map((hour) => (
-          <Text className="flex-1 font-sans text-[11px] tabular-nums text-muted" key={hour}>
+          <Text
+            className="flex-1 font-sans text-caption2 font-normal tabular-nums text-label-tertiary"
+            key={hour}
+          >
             {hourLabel(hour)}
           </Text>
         ))}
@@ -84,12 +87,16 @@ const FragmentationCard = ({
         {tiles.map((tile) => (
           <View
             accessibilityLabel={`${t(tile.key)}: ${tile.value}`}
-            className="flex-1 gap-1 rounded-lg bg-raised p-3"
+            className="flex-1 gap-1 rounded-lg bg-fill-3 p-3"
             key={tile.key}
             role="group"
           >
-            <Text className="font-sans text-[11px] text-fg2">{t(tile.key)}</Text>
-            <Text className="font-sans text-[16px] tabular-nums text-fg">{tile.value}</Text>
+            <Text className="font-sans text-caption2 font-normal text-label-secondary">
+              {t(tile.key)}
+            </Text>
+            <Text className="font-sans text-numeric-value font-normal tabular-nums text-label-primary">
+              {tile.value}
+            </Text>
           </View>
         ))}
       </View>
@@ -98,9 +105,9 @@ const FragmentationCard = ({
 };
 
 const Bar = ({ fill, share }: { readonly fill: string; readonly share: number }) => (
-  <View className="h-2 overflow-hidden rounded-r bg-track">
+  <View className="h-2 overflow-hidden rounded-r-xs bg-fill-4">
     {share > 0 ? (
-      <View className={cx("h-full rounded-r", fill)} style={{ width: percent(share) }} />
+      <View className={cx("h-full rounded-r-xs", fill)} style={{ width: percent(share) }} />
     ) : null}
   </View>
 );
@@ -119,21 +126,29 @@ const FocusSleepCard = ({
     <Card title={t("insights.focusSleep")}>
       <View className="flex-row gap-3">
         <View className="w-10" />
-        <Text className="flex-1 font-sans text-[12px] text-fg2">{t("insights.sleepBefore")}</Text>
-        <Text className="flex-1 font-sans text-[12px] text-fg2">{t("insights.focus")}</Text>
+        <Text className="flex-1 font-sans text-caption font-normal text-label-secondary">
+          {t("insights.sleepBefore")}
+        </Text>
+        <Text className="flex-1 font-sans text-caption font-normal text-label-secondary">
+          {t("insights.focus")}
+        </Text>
       </View>
       {rows.map((row) => (
         <View className="flex-row gap-3" key={row.date}>
-          <Text className="w-10 font-sans text-[12px] text-fg2">{row.weekday}</Text>
+          <Text className="w-10 font-sans text-caption font-normal text-label-secondary">
+            {row.weekday}
+          </Text>
           <View className="flex-1 gap-1">
             <Bar fill={SLEEP_FILL} share={row.sleepShare} />
-            <Text className="font-sans text-[12px] tabular-nums text-fg">
+            <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
               {row.sleepText ?? t("insights.notLogged")}
             </Text>
           </View>
           <View className="flex-1 gap-1">
             <Bar fill={FOCUS_FILL} share={row.focusShare} />
-            <Text className="font-sans text-[12px] tabular-nums text-fg">{row.focusText}</Text>
+            <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">
+              {row.focusText}
+            </Text>
           </View>
         </View>
       ))}

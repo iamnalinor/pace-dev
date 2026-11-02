@@ -1,16 +1,16 @@
 import { Text, View } from "react-native";
 
 /**
-A small pill with a number, for what waits (the Inbox). It is neutral, in the quiet accent: lime
-is for the actions. Hidden at zero; the host names the count in its own accessibility label.
+A small pill with a number, for what waits (the Inbox), on the quiet accent: the filled accent is
+for the actions. Hidden at zero; the host names the count in its own accessibility label.
 */
 export const CountBadge = ({ count }: { readonly count: number }) =>
   count <= 0 ? null : (
     <View
-      className="h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accentQuiet px-1.5"
+      className="h-5 min-w-5 items-center justify-center rounded-pill bg-accent-quiet px-2"
       testID="count-badge"
     >
-      <Text className="font-sans text-[11px] font-medium tabular-nums text-accentQuietFg">
+      <Text className="font-sans text-caption2 font-medium tabular-nums text-accent-text">
         {count > 99 ? "99+" : count}
       </Text>
     </View>

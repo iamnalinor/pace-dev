@@ -123,8 +123,8 @@ const FormHeader = ({
       <Text
         accessibilityRole="header"
         className={cx(
-          "flex-1 font-sans font-semibold text-fg",
-          variant === "pane" ? "text-[20px]" : "pl-1 text-[15px]",
+          "flex-1 font-sans font-semibold text-label-primary",
+          variant === "pane" ? "text-title2 font-normal" : "pl-1 text-callout",
         )}
       >
         {title}
@@ -141,10 +141,10 @@ const FormHeader = ({
         <Pressable
           accessibilityLabel={t("common.close")}
           accessibilityRole="button"
-          className="h-11 w-11 items-center justify-center rounded-md active:opacity-70"
+          className="h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-70"
           onPress={onClose}
         >
-          <CloseIcon color={palette.muted} size={20} strokeWidth={1.75} />
+          <CloseIcon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
         </Pressable>
       </Tooltip>
     </View>
@@ -248,7 +248,7 @@ export const ComposerForm = ({
     <HotkeyLayer>
       <View
         accessibilityLabel={title}
-        className={variant === "pane" ? "gap-4" : "gap-3.5 p-2"}
+        className={variant === "pane" ? "gap-4" : "gap-4 p-2"}
         role="form"
       >
         <FormHeader

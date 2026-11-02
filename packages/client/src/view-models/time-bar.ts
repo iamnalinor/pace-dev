@@ -1,14 +1,14 @@
 import {
   type Activity,
   type ActivityCategory,
-  CATEGORY_COLORS,
+  CATEGORY_HUES,
   type CoreState,
+  type HueName,
   type Language,
   type MessageKey,
   type MessageParams,
   paceStatus,
   type PaceStatus,
-  type ProjectColorName,
   type QueryContext,
   remindAt,
   runningActivities,
@@ -33,7 +33,7 @@ export type TimeButtonView = {
   readonly kind: TimeButton["kind"];
   readonly labelKey: MessageKey;
   readonly category: ActivityCategory;
-  readonly color: ProjectColorName;
+  readonly color: HueName;
   readonly choices: readonly ChoiceView[];
   /** One of its choices is the main activity running now. */
   readonly isRunning: boolean;
@@ -43,7 +43,7 @@ export type RunningView = {
   readonly activityId: string;
   readonly label: string;
   readonly category: ActivityCategory;
-  readonly color: ProjectColorName;
+  readonly color: HueName;
   readonly taskId: null | string;
   readonly startAt: string;
   readonly minutes: number;
@@ -88,7 +88,7 @@ const runningView = (
   return {
     activityId: active.id,
     category: active.category,
-    color: CATEGORY_COLORS[active.category],
+    color: CATEGORY_HUES[active.category],
     expectMinutes: active.expectMinutes,
     isAlongside: active.isAlongside,
     label: shownLabel(active, language),
@@ -144,7 +144,7 @@ export const timeBarModel = (
       return {
         category: button.category,
         choices,
-        color: CATEGORY_COLORS[button.category],
+        color: CATEGORY_HUES[button.category],
         id: button.id,
         isRunning: isButtonRunning(button, main, choices),
         kind: button.kind,

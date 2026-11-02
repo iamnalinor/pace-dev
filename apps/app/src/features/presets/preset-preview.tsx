@@ -21,18 +21,18 @@ export const PresetPreview = ({ draft }: { readonly draft: PresetDraft }) => {
   return (
     <View
       accessibilityLabel={t("presets.preview")}
-      className="mx-4 mt-3 gap-2 rounded-xl border border-dashed border-line p-3"
+      className="mx-4 mt-3 gap-2 rounded-xl border border-dashed border-separator p-3"
       role="group"
     >
-      <Text className="font-sans text-[11px] uppercase tabular-nums tracking-[0.06em] text-muted">
+      <Text className="font-sans text-caption2 font-normal uppercase tabular-nums text-label-tertiary">
         {t("presets.preview")}
       </Text>
       <View className="flex-row gap-3">
-        <View className="mt-px h-[22px] w-[22px] rounded-full border-[1.5px] border-muted" />
-        <View className="min-w-0 flex-1 gap-[5px]">
+        <View className="mt-0.5 h-6 w-6 rounded-pill border-stroke border-outline" />
+        <View className="min-w-0 flex-1 gap-1">
           <Text
             className={cx(
-              "font-sans text-[15px] text-fg",
+              "font-sans text-callout text-label-primary",
               preview.importance === "nice_to_have" ? "font-normal" : "font-medium",
             )}
             numberOfLines={1}

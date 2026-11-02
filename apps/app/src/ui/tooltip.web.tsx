@@ -150,12 +150,8 @@ const Bubble = ({
       pointerEvents="none"
       style={[paletteVars(scheme), frameStyle(isVisible ? anchor : null, size)]}
     >
-      <View className="max-w-[260px] rounded-md bg-inverse px-2 py-1">
-        <Text
-          className="font-sans text-[13px] leading-[18px] text-inverseFg"
-          id={id}
-          role="tooltip"
-        >
+      <View className="max-w-tooltip-max rounded-md bg-elevated px-2 py-1">
+        <Text className="font-sans text-footnote text-label-primary" id={id} role="tooltip">
           {label}
         </Text>
       </View>

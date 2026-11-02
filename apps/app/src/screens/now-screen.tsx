@@ -24,7 +24,9 @@ const PickedTask = ({
   if (picked === null) {
     return (
       <View className="flex-1 items-center justify-center">
-        <Text className="font-sans text-[14px] text-muted">{t("now.pickTask")}</Text>
+        <Text className="font-sans text-subhead font-normal text-label-secondary">
+          {t("now.pickTask")}
+        </Text>
       </View>
     );
   }
@@ -66,8 +68,8 @@ const NowSplit = ({
       }}
       selectedId={flow.form === null ? (picked?.id ?? null) : null}
     >
-      <View className="flex-1 flex-row bg-bg">
-        <View className="w-[560px] max-w-[50%] border-r border-line">
+      <View className="flex-1 flex-row bg-app">
+        <View className="w-dialog max-w-1/2 border-r border-separator">
           <NowBoard isComposerFocused={isComposerFocused} />
         </View>
         <View className="flex-1">

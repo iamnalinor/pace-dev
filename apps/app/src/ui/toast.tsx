@@ -103,9 +103,9 @@ const bottomAbove = (footerHeight: number, isWide: boolean): number => {
   return (isWide ? 0 : TAB_BAR_HEIGHT) + footerHeight + FOOTER_GAP;
 };
 
-/** Where a toast docked in the sidebar sits: inside its 224 px column, at its foot. */
-const DOCKED = "bottom-4 left-3 w-[200px]";
-const FLOATING = "inset-x-4 mx-auto w-auto max-w-[480px]";
+/** Where a toast docked in the sidebar sits: inside its column (`w-sidebar-inner`), at its foot. */
+const DOCKED = "bottom-4 left-3 w-sidebar-inner";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-inspector-max";
 
 const ToastBar = ({
   bottom,
@@ -122,7 +122,7 @@ const ToastBar = ({
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
     className={cx(
-      "absolute flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg",
+      "absolute flex-row items-center gap-3 rounded-xl border border-separator bg-elevated py-1 pl-4 pr-1 shadow-lg",
       isDocked ? DOCKED : FLOATING,
     )}
     style={isDocked ? undefined : { bottom }}
@@ -130,21 +130,24 @@ const ToastBar = ({
   >
     {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
     <Pressable className="flex-1" onPress={onDone}>
-      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={3}>
+      <Text
+        className="py-3 font-sans text-subhead font-normal text-label-primary"
+        numberOfLines={3}
+      >
         {toast.message}
       </Text>
     </Pressable>
     {toast.action === undefined ? null : (
       <Pressable
         accessibilityRole="button"
-        className="h-11 justify-center rounded-md px-3 active:opacity-70"
+        className="h-hit-web justify-center rounded-md px-3 active:opacity-70"
         onPress={() => {
           // Closed first, so the action may show a toast of its own.
           onDone();
           toast.action?.onPress();
         }}
       >
-        <Text className="font-sans text-[14px] font-semibold text-accentText">
+        <Text className="font-sans text-subhead font-semibold text-accent-text">
           {toast.action.label}
         </Text>
       </Pressable>
