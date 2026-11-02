@@ -358,9 +358,12 @@ export const pushAsClient = async (
   });
 };
 
-/** Pushes the lived-in log for the account behind `token`; every event must be accepted. */
-export const seedLivedIn = async (token: string): Promise<LivedIn> => {
-  const now = Date.now();
+/**
+Pushes the lived-in log for the account behind `token`; every event must be accepted. Its times are
+relative to `now` (the wall clock by default): a test that reads a day or a week passes a fixed
+instant, and stands the page's clock there too (bug-lessons 9).
+*/
+export const seedLivedIn = async (token: string, now = Date.now()): Promise<LivedIn> => {
   const ids = {
     algebraId: ulid(now - 5 * DAY),
     doneTaskId: ulid(now - 5 * DAY + 1),

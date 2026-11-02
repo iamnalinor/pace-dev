@@ -3,6 +3,28 @@ import { Text } from "react-native";
 
 import { AnimatedHeight } from "./animated-height.tsx";
 
+/** The heights the box was asked to animate to. */
+const mockAnimatedTo = jest.fn<undefined, [number]>();
+jest.mock("react-native-reanimated", (): unknown => {
+  const actual = jest.requireActual<{
+    readonly default: unknown;
+    readonly withTiming: (to: number, ...rest: unknown[]) => unknown;
+  }>("react-native-reanimated");
+  return {
+    ...actual,
+    __esModule: true,
+    default: actual.default,
+    withTiming: (to: number, ...rest: unknown[]) => {
+      mockAnimatedTo(to);
+      return actual.withTiming(to, ...rest);
+    },
+  };
+});
+
+beforeEach(() => {
+  mockAnimatedTo.mockClear();
+});
+
 type Node = { readonly parent: Node | null; readonly props: { readonly style?: unknown } };
 
 const layout = (height: number) => ({
@@ -41,5 +63,18 @@ describe("AnimatedHeight", () => {
     // at (it would grow from nothing once shown, its content clipped meanwhile).
     await fireEvent(measuredView() as never, "layout", layout(0));
     expect(boxHeight()).toBeUndefined();
+  });
+
+  it("never animates to a 0 measured while hidden later, so it never grows from nothing on re-show", async () => {
+    await render(
+      <AnimatedHeight>
+        <Text>Line</Text>
+      </AnimatedHeight>,
+    );
+    await fireEvent(measuredView() as never, "layout", layout(56));
+    // Hidden again (`display: none`), then shown at a new height: only the real one is animated to.
+    await fireEvent(measuredView() as never, "layout", layout(0));
+    await fireEvent(measuredView() as never, "layout", layout(80));
+    expect(mockAnimatedTo.mock.calls).toEqual([[80]]);
   });
 });

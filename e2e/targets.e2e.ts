@@ -101,6 +101,19 @@ const screensOf = (openTaskId: string): readonly Measured[] => [
   { atLeast: 3, path: "/presets/hw", roles: ["switch"] },
 ];
 
+/**
+The instant the lived-in day is built around and the page's clock stands at: yesterday at 09:00 UTC
+(noon in Moscow), always past and far from midnight. Built on the wall clock, the day changed with
+the hour the suite ran: from about 22:30 to 23:00 UTC a seeded activity ended its first day at
+00:00 in Moscow, a sliver the Week draws at its minimum height past the column (bug-lessons 9;
+the drawing is Task 4.6's).
+*/
+const fixedNow = (): Date => {
+  const at = new Date(Date.now() - 24 * 60 * 60_000);
+  at.setUTCHours(9, 0, 0, 0);
+  return at;
+};
+
 test.describe("tap targets at 390 (QA round 18 L6)", () => {
   test.use({ viewport: { height: 844, width: 390 } });
 
@@ -108,7 +121,9 @@ test.describe("tap targets at 390 (QA round 18 L6)", () => {
     page,
   }) => {
     const { token } = await loginViaApi(page);
-    const { openTaskId } = await seedLivedIn(token);
+    const at = fixedNow();
+    await page.clock.setFixedTime(at);
+    const { openTaskId } = await seedLivedIn(token, at.getTime());
     for (const screen of screensOf(openTaskId)) {
       await page.goto(screen.path);
       await settled(page);

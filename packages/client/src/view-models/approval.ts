@@ -4,11 +4,6 @@ import { lookupOf, type World } from "./decision-lookup.ts";
 import { stepText } from "./decision-step-text.ts";
 
 /**
-What an approval did, one line per action in the log's past tense ("Created task “X”"), for the
-toast after Approve that said only "Done" (QA round 11 L3); a step this client cannot word keeps
-its summary.
-*/
-/**
 How a toast fits data into its sentences: `quote` shortens a name at its slot, `sentence` a whole
 stored summary (cut at a word, never inside one).
 */
@@ -19,6 +14,11 @@ export type ToastFit = {
 
 const AS_IS: ToastFit = { quote: (text) => text, sentence: (text) => text };
 
+/**
+What an approval did, one line per action in the log's past tense ("Created task “X”"), for the
+toast after Approve that said only "Done" (QA round 11 L3); a step this client cannot word keeps
+its summary.
+*/
 export const doneLines = (
   actions: readonly Action[],
   world: World,
@@ -41,8 +41,9 @@ const APPROVAL_NAMED = 2;
 
 /**
 The toast after Approve: the first two actions in words, each name quoted short at its slot (and
-a step it cannot word as its summary, cut at a word), then how many more; "Done" when there is nothing to name. A toast's words are shown
-whole, so the message itself is bounded here (fix round 1 of QA 22: ten actions ran to 25 lines).
+a step it cannot word as its summary, cut at a word), then how many more; "Done" when there is
+nothing to name. A toast's words are shown whole, so the message itself is bounded here (fix round
+1 of QA 22: ten actions ran to 25 lines).
 */
 export const approvalText = (actions: readonly Action[], world: World, fit: ToastFit): string => {
   const { language } = world;
