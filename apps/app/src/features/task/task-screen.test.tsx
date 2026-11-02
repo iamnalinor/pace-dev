@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -10,6 +10,28 @@ import { TaskScreen } from "./task-screen.tsx";
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+// jest renders the phone, where Space is no key; the web's handler is the one under test here.
+jest.mock("#app/ui/space-press.ts", (): unknown =>
+  jest.requireActual("#app/ui/space-press.web.ts"),
+);
+
+/**
+A Space key press on a control, as react-native-web passes it to the handler. The browser delivers
+keys to a disabled control it has focus on; RNTL's `fireEvent` would drop them, so the handler is
+called as the browser does.
+*/
+const pressSpace = async (control: ReturnType<typeof screen.getByRole>): Promise<void> => {
+  const target = {};
+  await act(() => {
+    (control.props["onKeyDown"] as (event: unknown) => void)({
+      currentTarget: target,
+      key: " ",
+      preventDefault: () => undefined,
+      target,
+    });
+  });
+};
 
 const hwScreen = async () => {
   const runtime = await createTestRuntime({ now: HW_VIEW_NOW });
@@ -29,6 +51,25 @@ describe("TaskScreen — homework", () => {
     expect(screen.getByRole("checkbox", { name: "Kronecker–Capelli" })).toBeOnTheScreen();
     expect(screen.getByRole("checkbox", { name: "Matrix rank" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Submit 3 and 4" })).toBeOnTheScreen();
+  });
+
+  it("marks a subtask solved on Space, and leaves a sent one as it is (a disabled control gets no action)", async () => {
+    const runtime = await hwScreen();
+    const solved = () => screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 4 }));
+    expect(solved()).toBeOnTheScreen();
+    // Control: Space on a pending subtask is a press.
+    await pressSpace(screen.getByRole("checkbox", { name: "Kronecker–Capelli" }));
+    await waitFor(() => {
+      expect(
+        screen.getByText(en("task.subtasksSummary", { sent: 2, solved: 5 })),
+      ).toBeOnTheScreen();
+    });
+    // A sent subtask is disabled: Space must not revoke its mark.
+    const unmark = jest.spyOn(runtime.actions, "unmarkSolved");
+    const mark = jest.spyOn(runtime.actions, "markSolved");
+    await pressSpace(screen.getByRole("checkbox", { name: "Matrix rank" }));
+    expect(unmark).not.toHaveBeenCalled();
+    expect(mark).not.toHaveBeenCalled();
   });
 
   it("focuses on the task from the footer and stops again", async () => {

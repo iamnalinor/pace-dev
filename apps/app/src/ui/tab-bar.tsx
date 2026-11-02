@@ -12,6 +12,7 @@ import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
+import { spacePress } from "./space-press.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
@@ -58,6 +59,7 @@ const Tab = ({
       aria-selected={isFocused}
       className="min-h-12 flex-1 items-center justify-center gap-0.5"
       onPress={onPress}
+      {...spacePress(onPress)}
     >
       <View>
         <Icon

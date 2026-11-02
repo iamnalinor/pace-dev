@@ -8,7 +8,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { MOSCOW, NOW } from "@pace/core/testing";
 
-import { dayLabel } from "./week-grid.tsx";
+import { BOTTOM_PX, dayLabel, LABELS_PX } from "./week-grid.tsx";
 import { laneStyle, PHONE_COLUMN_MAX_PX, phoneColumnPx } from "./week-lanes.ts";
 import { WeekScreen } from "./week-screen.tsx";
 
@@ -183,6 +183,9 @@ describe("WeekScreen", () => {
     };
     const dayName = screen.getByText(dayLabel(NOW, MOSCOW, "en"));
     const hint = screen.getByText(en("week.scrollHint")).parent as { readonly props: object };
+    // The room the fit subtracts is the room the classes draw: a class change shows here.
+    expect(LABELS_PX).toBe(classPx(dayName, "h"));
+    expect(BOTTOM_PX).toBe(classPx(hint, "h"));
     // The gutter's numbers start where the day names end.
     expect(classPx(gutter, "pt")).toBe(classPx(dayName, "h"));
     const drawn =

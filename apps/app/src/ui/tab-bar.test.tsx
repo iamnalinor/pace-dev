@@ -7,6 +7,9 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 
 import { TabBar } from "./tab-bar.tsx";
 
+// jest renders the phone, where Space is no key; the web's handler is the one under test here.
+jest.mock("./space-press.ts", (): unknown => jest.requireActual("./space-press.web.ts"));
+
 type Props = ComponentProps<typeof TabBar>;
 
 const ROUTES = ["index", "day", "inbox", "more", "add"] as const;
@@ -44,6 +47,20 @@ describe("TabBar", () => {
     ]);
     await fireEvent.press(screen.getByRole("tab", { name: en("nav.more") }));
     expect(navigate).toHaveBeenCalledWith("more", undefined);
+  });
+
+  it("opens a tab on Space as well as Enter (ARIA tabs; react-native-web ignores Space on role tab)", async () => {
+    const navigate = jest.fn();
+    await renderScreen(<TabBar {...propsAt("index", navigate)} />, await createTestRuntime());
+    const target = {};
+    const day = screen.getByRole("tab", { name: en("nav.day") });
+    (day.props["onKeyDown"] as (event: unknown) => void)({
+      currentTarget: target,
+      key: " ",
+      preventDefault: () => undefined,
+      target,
+    });
+    expect(navigate).toHaveBeenCalledWith("day", undefined);
   });
 
   it("puts the count of what waits on the Inbox tab only, and hides it at zero", async () => {

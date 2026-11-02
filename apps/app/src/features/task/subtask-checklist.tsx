@@ -62,7 +62,7 @@ const SubtaskItem = ({
       className="min-h-row flex-row items-center gap-3 border-b border-separator px-1 active:opacity-70"
       disabled={isSent}
       onPress={toggle}
-      {...spacePress(toggle)}
+      {...spacePress(toggle, isSent)}
     >
       <Mark state={subtask.state} />
       {/* A bare number label ("290") is the number itself: shown once, in the label. */}

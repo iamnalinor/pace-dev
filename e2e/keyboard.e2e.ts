@@ -82,3 +82,15 @@ test("the keyboard ring is the focus role on a switch and on the range slider", 
     width: "2px",
   });
 });
+
+test("Space opens a tab of the phone's bar, as Enter does", async ({ page }) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  await page.goto("/");
+  const day = page.getByRole("tab", { name: "Day" });
+  await expect(day).toBeVisible();
+  await day.focus();
+  await page.keyboard.press("Space");
+  await expect(page).toHaveURL(/\/day$/);
+  await expect(day).toHaveAttribute("aria-selected", "true");
+});

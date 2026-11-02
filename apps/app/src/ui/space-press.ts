@@ -10,4 +10,7 @@ export type SpacePress = {
 };
 
 /** The phone has no Space key to answer. */
-export const spacePress = (_onPress: (() => void) | undefined): SpacePress => ({});
+export const spacePress = (
+  _onPress: (() => void) | undefined,
+  _isDisabled = false,
+): SpacePress => ({});
