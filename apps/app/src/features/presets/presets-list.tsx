@@ -6,6 +6,7 @@ import { Pressable, Text, View } from "react-native";
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
+import { ActionChip } from "#app/ui/chip.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { IconButton } from "#app/ui/icon-button.tsx";
@@ -19,8 +20,6 @@ import {
   presetLabel,
   resolvePreset,
 } from "@pace/core";
-
-import { ChoiceChips } from "./choice-chips.tsx";
 
 const Badge = ({
   children,
@@ -92,28 +91,30 @@ const PresetRow = ({
   );
 };
 
-/** Picking a kind opens a new unsaved preset based on it. */
+/** Each kind opens a new unsaved preset based on it: actions in a row, none of them picked. */
 const NewPreset = ({ choices }: { readonly choices: readonly Preset[] }) => {
   const t = useT();
   const language = useLanguage();
   const router = useRouter();
-  const [from, setFrom] = useState("hw");
   return (
-    <View className="gap-2 rounded-xl border border-line bg-surface p-3.5">
+    <View
+      accessibilityLabel={t("presets.startFrom")}
+      accessibilityRole="toolbar"
+      className="gap-2 rounded-xl border border-line bg-surface p-3.5"
+    >
       <Text className="font-sans text-[12px] text-muted">{t("presets.startFrom")}</Text>
-      <ChoiceChips
-        label={t("presets.startFrom")}
-        labelOf={(id) => {
-          const preset = choices.find((choice) => choice.id === id);
-          return preset === undefined ? id : presetLabel(preset, language);
-        }}
-        onChange={(id) => {
-          setFrom(id);
-          router.push({ params: { from: id, id: "new" }, pathname: "/presets/[id]" });
-        }}
-        value={from}
-        values={choices.map((preset) => preset.id)}
-      />
+      <View className="flex-row flex-wrap gap-1.5">
+        {choices.map((preset) => (
+          <ActionChip
+            key={preset.id}
+            onPress={() => {
+              router.push({ params: { from: preset.id, id: "new" }, pathname: "/presets/[id]" });
+            }}
+          >
+            {presetLabel(preset, language)}
+          </ActionChip>
+        ))}
+      </View>
     </View>
   );
 };

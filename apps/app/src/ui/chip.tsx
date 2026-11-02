@@ -71,3 +71,26 @@ export const Chip = ({
     </View>
   </Pressable>
 );
+
+/**
+A chip that does something rather than being picked ("Start from: Homework" opens a new preset):
+a button in the unselected look, every one alike, so none reads as already chosen (QA round 19
+L7).
+*/
+export const ActionChip = ({
+  children,
+  onPress,
+}: {
+  readonly children: string;
+  readonly onPress: () => void;
+}) => (
+  <Pressable
+    accessibilityRole="button"
+    className="-my-1.5 h-11 justify-center active:opacity-80"
+    onPress={onPress}
+  >
+    <View className={cx("h-8 flex-row items-center rounded-pill px-3", chipFill(null, false))}>
+      <Text className={cx("font-sans text-[12px]", chipText(null, false))}>{children}</Text>
+    </View>
+  </Pressable>
+);
