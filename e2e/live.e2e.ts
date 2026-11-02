@@ -217,5 +217,16 @@ test('a session ended from another device says "another device" in every open ta
     await expect(tab.getByRole("status").filter({ hasText: ANOTHER_DEVICE })).toBeVisible();
     await expect(tab.getByText(ANOTHER_TAB)).toHaveCount(0);
   }
+  // The steady state: signed out, neither tab keeps knocking with the dead session.
+  const refused: string[] = [];
+  for (const tab of [first, second]) {
+    tab.on("response", (response) => {
+      if (response.status() === 401) {
+        refused.push(response.url());
+      }
+    });
+  }
+  await first.waitForTimeout(3000);
+  expect(refused).toEqual([]);
   await context.close();
 });

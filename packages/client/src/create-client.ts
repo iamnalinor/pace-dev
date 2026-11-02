@@ -1,4 +1,4 @@
-import type { LiveNotice } from "@pace/core";
+import { endpoints, type EndpointShape, type LiveNotice } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 import type { SessionStore, SignOutNotes } from "./session.ts";
@@ -226,6 +226,59 @@ const liveAndSync = (
 };
 
 /**
+Any call's 401 for the session in use asks `me` once whether it ended (`me` signs out on its own
+401). The live socket's close says so too, but a tab whose socket was not open when the session
+ended (hidden, still starting) is refused at the door on every reconnect and would stay signed in
+on a dead session (fix round 5 V1). `me`'s and the log-out's own 401s are their callers' to read.
+*/
+const sessionCheck = (
+  auth: Auth,
+  api: ApiClient,
+): ((credential: string, endpoint: EndpointShape) => void) => {
+  let checking: Promise<unknown> | undefined;
+  return (credential, endpoint) => {
+    if (
+      checking !== undefined ||
+      endpoint === endpoints.me ||
+      endpoint === endpoints.auth.logout ||
+      !api.isCurrentSession(credential)
+    ) {
+      return;
+    }
+    checking = (async () => {
+      try {
+        await auth.me();
+      } finally {
+        checking = undefined;
+      }
+    })();
+  };
+};
+
+/** The API client and the auth it reads its token from, each 401 of it checking the session. */
+const apiAndAuth = (
+  options: PaceClientOptions,
+): { readonly api: ApiClient; readonly auth: Auth } => {
+  // The API client reads the token synchronously, so it is wired before auth exists.
+  const wiring = {
+    heard: (_credential: string, _endpoint: EndpointShape): void => undefined,
+    token: (): string | undefined => undefined,
+  };
+  const api = createApiClient({
+    baseUrl: options.baseUrl,
+    ...(options.fetch !== undefined && { fetch: options.fetch }),
+    onUnauthorized: (credential, endpoint) => {
+      wiring.heard(credential, endpoint);
+    },
+    token: () => wiring.token(),
+  });
+  const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
+  wiring.token = auth.token;
+  wiring.heard = sessionCheck(auth, api);
+  return { api, auth };
+};
+
+/**
 Wires API client → auth → app state → sync → actions on the platform adapters: the one
 way a shell builds the client. A device that starts with a stored token refreshes its
 user right away.
@@ -235,15 +288,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   // `now` may be overridden on its own (the sync loop takes it too), so the clock follows it.
   const clock: Clock = { deviceTz: base.deviceTz, now: options.now ?? base.now };
   const { now } = clock;
-  // The API client reads the token synchronously, so it is wired before auth exists.
-  let token: () => string | undefined = () => undefined;
-  const api = createApiClient({
-    baseUrl: options.baseUrl,
-    ...(options.fetch !== undefined && { fetch: options.fetch }),
-    token: () => token(),
-  });
-  const auth = createAuth({ api, notes: options.signOutNotes, session: options.session });
-  token = auth.token;
+  const { api, auth } = apiAndAuth(options);
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
   const { closePeers, live, state, sync } = liveAndSync(options, {
     api,

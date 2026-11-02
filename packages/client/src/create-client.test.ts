@@ -105,6 +105,31 @@ describe("createPaceClient", () => {
     client.live.stop();
   });
 
+  it("signs out on any call's 401 for the session in use, when no socket heard the end (fix round 5 V1)", async () => {
+    // A tab whose socket was not open when the session was revoked (hidden, still starting): its
+    // reconnects are refused at the door, and only its HTTP calls hear the 401.
+    const server = { isRevoked: false };
+    const { api, client } = await setup(
+      {
+        "GET /api/me": () => (server.isRevoked ? problem(401, "auth/unauthorized") : fakeMe),
+        "GET /api/sync/pull": () =>
+          server.isRevoked
+            ? problem(401, "auth/unauthorized")
+            : { events: [], more: false, seq: 0, storeId: "store-test" },
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    server.isRevoked = true;
+    await client.sync.syncNow();
+    await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+    expect(client.auth.store.getState().endedElsewhere).toBe(true);
+    // One check of the session for that 401, not one per call or a loop on `me`'s own 401.
+    expect(api.pathsCalled("/api/me")).toHaveLength(2);
+    await client.sync.syncNow();
+    expect(api.pathsCalled("/api/me")).toHaveLength(2);
+  });
+
   it("wires the state and the sync client on one store", async () => {
     const { api, client } = await setup({
       "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),

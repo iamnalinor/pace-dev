@@ -113,6 +113,11 @@ export const createApiClient = (options: {
   readonly baseUrl: string;
   readonly fetch?: FetchLike;
   readonly token: () => string | undefined;
+  /**
+  A call that carried `credential` was answered 401: the session may have ended. Heard before the
+  call fails, with the endpoint it was.
+  */
+  readonly onUnauthorized?: (credential: string, endpoint: EndpointShape) => void;
 }): ApiClient => {
   const doFetch: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
   return {
@@ -146,6 +151,9 @@ export const createApiClient = (options: {
       };
       const response = await reach(doFetch, url, init);
       if (!response.ok) {
+        if (credential !== undefined && response.status === 401) {
+          options.onUnauthorized?.(credential, endpoint);
+        }
         throw await describeError(response);
       }
       return endpoint.output.parse(await readAnswer(response, init)) as EndpointOutput<
