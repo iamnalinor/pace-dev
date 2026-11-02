@@ -1,119 +1,69 @@
 import type { Page } from "@playwright/test";
 
-import { readdirSync } from "node:fs";
-import path from "node:path";
-
 import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
-import { type LivedIn, seedLivedIn } from "./support/seed.ts";
+import {
+  expectedLanding,
+  isBare,
+  isSidebarScreen,
+  screenUrls,
+  STAND_IN_IDS,
+} from "./support/routes.ts";
+import {
+  axeFaults,
+  clippedText,
+  rawKeys,
+  repeatsAfterSettle,
+  type ScreenWatch,
+  settle,
+  watchScreen,
+} from "./support/screen-checks.ts";
+import { seedLivedIn } from "./support/seed.ts";
 
 /**
-Opens every screen of the app on a lived-in account (Russian text, every event type), by a
-direct load, at phone and desktop width. A screen fails the sweep when the page throws or logs
-an error, renders nothing, shows the crash screen, or (on a desktop) loses the sidebar. The
-route list is read from `apps/app/app`, so a new screen is swept without anyone adding it.
+The mechanical matrix (it used to be scripted again by every exploratory QA round, docs/qa.md):
+every screen of the app, read from the router's folder so a new one is covered without anyone adding
+it, by a direct load, at phone and desktop width, in the light and the dark theme, on a lived-in
+Russian account (every event type, real-looking text) and on a fresh English one (the empty and
+first-run states). A screen fails when it throws or logs an error, a request fails or is refused,
+it renders nothing or the crash screen, it lands elsewhere, (on a desktop) it loses the sidebar,
+it shows a raw message key, its text does not fit, axe finds a serious violation, or once settled
+it sends anything twice.
 */
 
-const APP_DIR = path.resolve(import.meta.dirname, "../apps/app/app");
+const SIZES = [
+  { height: 844, isWide: false, name: "phone", width: 390 },
+  { height: 900, isWide: true, name: "desktop", width: 1440 },
+] as const;
+
+const THEMES = ["light", "dark"] as const;
+
+/** Who is signed in: their ids for the dynamic routes and what greets them. */
+const ACCOUNTS = [
+  {
+    name: "a lived-in Russian account",
+    prepare: async (token: string) => await seedLivedIn(token),
+  },
+  { name: "a fresh English account", prepare: async () => STAND_IN_IDS },
+] as const;
 
 /**
-Screens that are not meant to have the sidebar: signing in (and its way back) and the walk-through.
-A copy of `BARE_PATHS` in apps/app/src/auth/route-gate.tsx (e2e may not import from the app); keep
-the two lists the same.
+Faults that are the design, each with why: matched on `url: fault` of a screen (none may hide a
+fault on another screen).
 */
-const BARE = ["/login", "/auth", "/app/auth", "/app/login", "/onboarding", "/oauth"];
-
-const routeFiles = (): readonly string[] =>
-  readdirSync(APP_DIR, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => `/${path.relative(APP_DIR, path.join(entry.parentPath, entry.name))}`);
+const BY_DESIGN: readonly { readonly match: RegExp; readonly why: string }[] = [
+  {
+    match: /^\/week: ".*" is cut to \d+ px with an ellipsis$/u,
+    why: "the phone's week grid draws a block in a seventh of the width or less; its label is a hint, a tap opens the block's sheet that names it in full (week-grid.tsx)",
+  },
+];
 
 /** What is wrong with the sidebar, by whether the screen should have it. */
 const SIDEBAR_FAULT = ["shown on a bare screen", "missing"] as const;
 
-/**
-Where a signed-in direct load of `url` should stay (QA round 17 M2: Day and Inbox came back as `/`,
-so a reload landed on Now): its own address, except the screens that only send the person on.
-Signing in and the walk-through send a signed-in person on as well, and are not judged here.
-*/
-const expectedLanding = (size: string, url: string): null | string => {
-  if (BARE.some((bare) => url === bare || url.startsWith(`${bare}/`))) {
-    return null;
-  }
-  if (url === "/review") {
-    return "/inbox";
-  }
-  return url === "/more" && size === "desktop" ? "/" : url;
-};
-
-/** On a desktop every screen but signing in and the walk-through keeps the sidebar. */
-const isSidebarScreen = (size: string, url: string): boolean =>
-  size === "desktop" && BARE.every((bare) => url !== bare && !url.startsWith(`${bare}/`));
-
-/** A route file as the URLs that open it on the seeded account (none for layouts and hooks). */
-const urlsOf = (file: string, seeded: LivedIn): readonly string[] => {
-  const route = file
-    .replace(/\.tsx?$/u, "")
-    .replaceAll(/\/\([^)]+\)/gu, "")
-    .replace(/\/index$/u, "");
-  if (/(?:^|\/)_layout$|\+native-intent$/u.test(route)) {
-    return [];
-  }
-  if (route.endsWith("+not-found")) {
-    return ["/no-such-page"];
-  }
-  if (route === "/task/[id]") {
-    return [
-      `/task/${seeded.openTaskId}`,
-      `/task/${seeded.doneTaskId}`,
-      `/task/${seeded.repeatingTaskId}`,
-    ];
-  }
-  if (route === "/project/[id]") {
-    return [`/project/${seeded.algebraId}`];
-  }
-  if (route === "/presets/[id]") {
-    return ["/presets/hw.seeded"];
-  }
-  return [route === "" ? "/" : route];
-};
-
-const SIZES = [
-  { height: 844, name: "phone", width: 390 },
-  { height: 900, name: "desktop", width: 1440 },
-] as const;
-
-/** Errors the page reported while `run` ran: thrown exceptions and console.error lines. */
-const collectErrors = async (page: Page, run: () => Promise<void>): Promise<readonly string[]> => {
-  const errors: string[] = [];
-  const onError = (error: Error): void => {
-    errors.push(`pageerror: ${error.message}`);
-  };
-  const onConsole = (message: { type: () => string; text: () => string }): void => {
-    if (message.type() === "error") {
-      errors.push(`console: ${message.text()}`);
-    }
-  };
-  page.on("pageerror", onError);
-  page.on("console", onConsole);
-  await run();
-  page.off("pageerror", onError);
-  page.off("console", onConsole);
-  return errors;
-};
-
-/** Stand-ins for a dynamic route's id: signed out, nothing is read before the guard. */
-const SIGNED_OUT_IDS: LivedIn = {
-  algebraId: "01SIGNEDOUT00000000000000A",
-  doneTaskId: "01SIGNEDOUT00000000000000D",
-  openTaskId: "01SIGNEDOUT00000000000000O",
-  repeatingTaskId: "01SIGNEDOUT00000000000000R",
-};
-
 /** What is wrong with where a signed-out visit landed: anywhere but the login, for a guarded screen. */
 const landingFaults = (url: string, landed: string): readonly string[] => {
-  const isPublic =
-    url === "/no-such-page" || BARE.some((bare) => url === bare || url.startsWith(`${bare}/`));
+  const isPublic = url === "/no-such-page" || isBare(url);
   return isPublic || landed === "/login" ? [] : [`${url}: landed on ${landed}`];
 };
 
@@ -137,16 +87,19 @@ test("signed out, every screen but signing in lands on the login (bug class 7)",
   // The guard sits in one place (RouteGate in the root layout); a route moved to another folder
   // keeps it only if this holds for every route file, whatever navigator it lives in.
   test.setTimeout(120_000);
-  const urls = routeFiles().flatMap((file) => urlsOf(file, SIGNED_OUT_IDS));
+  const urls = screenUrls(STAND_IN_IDS);
   expect(urls.length).toBeGreaterThan(15);
   const failures: string[] = [];
+  const watch = watchScreen(page);
   for (const url of urls) {
-    const errors = await collectErrors(page, async () => {
-      await openSettled(page, url);
-    });
+    watch.reset();
+    await openSettled(page, url);
     const landed = new URL(page.url()).pathname;
+    // Signed out, the session check is refused by design: only errors count here.
+    const errors = watch.faults().filter((fault) => !fault.startsWith("refused: "));
     failures.push(...landingFaults(url, landed), ...errors.map((error) => `${url}: ${error}`));
   }
+  watch.stop();
   expect(failures).toEqual([]);
 });
 
@@ -160,60 +113,90 @@ test.describe("guest document language", () => {
   });
 });
 
-for (const size of SIZES) {
-  test.describe(`route sweep, ${size.name}`, () => {
-    test.use({ viewport: { height: size.height, width: size.width } });
+/** Everything wrong with the screen `url` opened on, once it has settled. */
+const screenFaults = async (
+  page: Page,
+  { isWide, url }: { readonly isWide: boolean; readonly url: string },
+): Promise<readonly string[]> => {
+  const crashes = await page.getByText(/^(?:Что-то сломалось|Something broke)$/u).count();
+  const sidebars = await page.getByRole("navigation", { name: /./u }).count();
+  // A signed-in person is sent on from the sign-in screens: judge where the page landed.
+  const landed = new URL(page.url()).pathname;
+  const isSidebarExpected = isSidebarScreen(isWide, landed);
+  const expected = expectedLanding(isWide, url);
+  return [
+    ...(expected === null || expected === landed ? [] : [`landed on ${landed}`]),
+    ...Array.from({ length: crashes }, () => "the crash screen"),
+    ...[`sidebar ${SIDEBAR_FAULT[Number(isSidebarExpected)] ?? ""}`].filter(
+      () => isSidebarExpected === (sidebars === 0),
+    ),
+    ...(await rawKeys(page)).map((key) => `raw message key "${key}"`),
+  ];
+};
 
-    test("every screen renders on a lived-in account", async ({ page }) => {
-      test.setTimeout(180_000);
-      const { token } = await loginViaApi(page);
-      const seeded = await seedLivedIn(token);
-      const urls = routeFiles().flatMap((file) => urlsOf(file, seeded));
-      expect(urls.length).toBeGreaterThan(15);
-      const failures: string[] = [];
-      for (const url of urls) {
-        const errors = await collectErrors(page, async () => {
-          await page.goto(url);
-          await expect
-            .poll(async () => (await page.locator("body").innerText()).trim().length, {
-              message: `${url} renders something`,
-            })
-            .toBeGreaterThan(10);
-          // A reload covers the app while the device's copy is read and its first sync runs (no
-          // sidebar under the cover): judged once the cover has given the app back.
-          await expect(
-            page.getByRole("progressbar", {
-              name: /^(?:Syncing your data|Синхронизируем данные)$/u,
-            }),
-          ).toHaveCount(0, { timeout: 15_000 });
-          // The sync pull lands and the screen re-renders with the seeded data: wait until the
-          // text stops changing.
-          const settled = { previous: "" };
-          await expect
-            .poll(async () => {
-              const text = await page.locator("body").innerText();
-              const isStable = text === settled.previous;
-              settled.previous = text;
-              return isStable;
-            })
-            .toBe(true);
-        });
-        const crashes = await page.getByText("Что-то сломалось").count();
-        const sidebars = await page.getByRole("navigation", { name: /./u }).count();
-        // A signed-in person is sent on from the sign-in screens: judge where the page landed.
-        const landed = new URL(page.url()).pathname;
-        const isSidebarExpected = isSidebarScreen(size.name, landed);
-        const expected = expectedLanding(size.name, url);
-        failures.push(
-          ...(expected === null || expected === landed ? [] : [`${url}: landed on ${landed}`]),
-          ...errors.map((error) => `${url}: ${error}`),
-          ...Array.from({ length: crashes }, () => `${url}: the crash screen`),
-          ...[`${url}: sidebar ${SIDEBAR_FAULT[Number(isSidebarExpected)] ?? ""}`].filter(
-            () => isSidebarExpected === (sidebars === 0),
-          ),
-        );
-      }
-      expect(failures).toEqual([]);
-    });
-  });
+/** One visit of the matrix: the screen, the window, the theme and the visit's watch. */
+type Visit = {
+  readonly isWide: boolean;
+  readonly theme: (typeof THEMES)[number];
+  readonly url: string;
+  /** Every URL the sweep visits: a screen that sends the person on to one is judged there. */
+  readonly urls: readonly string[];
+  readonly watch: ScreenWatch;
+};
+
+/** Opens the visit's screen, lets it settle and answers everything wrong with it. */
+const visitFaults = async (page: Page, visit: Visit): Promise<readonly string[]> => {
+  const { isWide, theme, url, urls, watch } = visit;
+  watch.reset();
+  await page.goto(url);
+  const unsettled = await settle(page);
+  const settledAt = watch.now();
+  const landing = await screenFaults(page, { isWide, url });
+  // A screen that sends the person on to another one in the list (the sign-in screens, Review):
+  // that one is judged on its own visit.
+  const landed = new URL(page.url()).pathname;
+  const looks =
+    landed !== url && urls.includes(landed)
+      ? []
+      : [
+          ...(await axeFaults(page, { isColourOnly: theme === "dark" })),
+          ...(await clippedText(page)),
+          ...(await repeatsAfterSettle(watch, settledAt)),
+        ];
+  return [...unsettled, ...landing, ...looks, ...watch.faults()]
+    .map((fault) => `${url}: ${fault}`)
+    .filter((fault) => BY_DESIGN.every(({ match }) => !match.test(fault)));
+};
+
+for (const size of SIZES) {
+  for (const theme of THEMES) {
+    for (const account of ACCOUNTS) {
+      test(`every screen on ${account.name}, ${size.name}, ${theme}`, async ({ page }) => {
+        test.setTimeout(240_000);
+        await page.setViewportSize({ height: size.height, width: size.width });
+        await page.addInitScript((value) => {
+          localStorage.setItem("pace.theme", value);
+        }, theme);
+        const { token } = await loginViaApi(page);
+        const urls = screenUrls(await account.prepare(token));
+        expect(urls.length).toBeGreaterThan(15);
+        // The device's first sync once, before the sweep: the screens are judged on a device that
+        // holds the account (the first sync itself is `sync-state.e2e.ts`'s), and the first visit
+        // is not judged while the app is still starting.
+        await page.goto("/");
+        await expect(
+          page.getByRole("navigation", { name: /./u }).or(page.getByRole("tablist")).first(),
+        ).toBeVisible({ timeout: 20_000 });
+        const failures: string[] = [];
+        const watch = watchScreen(page);
+        for (const url of urls) {
+          failures.push(
+            ...(await visitFaults(page, { isWide: size.isWide, theme, url, urls, watch })),
+          );
+        }
+        watch.stop();
+        expect(failures).toEqual([]);
+      });
+    }
+  }
 }
