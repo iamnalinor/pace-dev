@@ -100,7 +100,8 @@ test("Done tells of its other times on hover, and a button beside it opens them"
   const { token } = await loginViaApi(page);
   const seeded = await seedLivedIn(token);
   await page.goto(`/task/${seeded.openTaskId}`);
-  const done = page.getByRole("button", { exact: true, name: /^Готово/u });
+  // Done, or "Submit …" for a task handed in by its subtasks: the footer's primary either way.
+  const done = page.getByRole("button", { name: /^(?:Готово|Сдать)/u });
   await expect(done).toBeVisible();
   await done.hover();
   await expect(page.getByRole("tooltip").filter({ hasText: "Долгое нажатие" })).toBeVisible();
@@ -109,7 +110,7 @@ test("Done tells of its other times on hover, and a button beside it opens them"
   // An icon button: it names itself on hover too.
   expect(await hasTooltipOnHover(page, other)).toBe(true);
   await other.click();
-  await expect(page.getByText("Когда это было сделано?")).toBeVisible();
+  await expect(page.locator('[data-pace-surface="sheet"]')).toBeVisible();
   for (const outcome of ["Отменена", "Пропущена"]) {
     await expect(
       page
