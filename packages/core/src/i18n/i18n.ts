@@ -1,5 +1,6 @@
 import type { Language } from "./language.ts";
 
+import { formatCount, formatNumber } from "../format/numbers.ts";
 import { addDaysIn, minutesBetween, startOfDayIn } from "../time.ts";
 import { en } from "./en.ts";
 import { pluralCategory } from "./plural-rules.ts";
@@ -43,6 +44,15 @@ export const countryName = (code: string, language: Language): string => {
 };
 
 /**
+`{count}` is the one parameter name for a number of things shown to the person: a numeric one is
+written the way `formatCount` writes it (`1 284`), so no caller formats it by hand.
+*/
+const countGrouped = (language: Language, params: MessageParams | undefined) =>
+  typeof params?.["count"] === "number"
+    ? { ...params, count: formatCount(params["count"], language) }
+    : params;
+
+/**
 Looks up `key` in the language's catalog and fills `{name}` placeholders. A key the catalog
 lacks (only possible through a cast or an old client) reads as itself rather than taking the
 screen down with it.
@@ -50,7 +60,7 @@ screen down with it.
 export const t = (language: Language, key: MessageKey, params?: MessageParams): string =>
   interpolate(
     (catalogs[language] as Readonly<Partial<Record<string, string>>>)[key] ?? key,
-    params,
+    countGrouped(language, params),
   );
 
 export type PluralForms = {
@@ -63,6 +73,7 @@ export type PluralForms = {
 /** Chooses the CLDR plural form for `count` and fills `{count}` in it. */
 export const plural = (language: Language, count: number, forms: PluralForms): string => {
   const category = pluralCategory(language, count);
+  const shown = formatNumber(count, language);
   const chosen = (): string => {
     switch (category) {
       case "one": {
@@ -79,15 +90,29 @@ export const plural = (language: Language, count: number, forms: PluralForms): s
       }
     }
   };
-  return interpolate(chosen(), { count });
+  return interpolate(chosen(), { count: shown });
 };
+
+/**
+Number and unit stay together on one line: the unit follows its number after U+00A0 (Russian
+typesetting). The two pairs of a duration are joined by a plain space, so a long value can wrap
+between «2 ч» and «05 мин» and never inside one.
+*/
+const NBSP = "\u{A0}";
 
 const DURATION_UNITS: Readonly<
   Record<Language, { readonly d: string; readonly h: string; readonly m: string }>
 > = {
   en: { d: "d", h: "h", m: "m" },
-  ru: { d: " д", h: " ч", m: " м" },
+  ru: { d: `${NBSP}дн`, h: `${NBSP}ч`, m: `${NBSP}мин` },
 };
+
+/** Minutes after hours: `05` in Russian («2 ч 05 мин»), plain in English («2h 5m»). */
+const minutesAfterHours = (minutes: number, language: Language): string =>
+  language === "ru" ? String(minutes).padStart(2, "0") : String(minutes);
+
+/** Hours roll into days once a duration reaches this many minutes. */
+const DAYS_FROM = 48 * 60;
 
 /**
 Time left until a deadline, coarse: `1d 6h` from a day on, `5h 20m` under it, `0m` once
@@ -104,15 +129,23 @@ export const formatLeft = (minutes: number, language: Language): string => {
   return [`${days}${units.d}`, ...(hours > 0 ? [`${hours}${units.h}`] : [])].join(" ");
 };
 
-/** `90` → `1h 30m` / `1 ч 30 м`; `0` → `0m`. */
+/**
+`90` → `1h 30m` / `1 ч 30 мин`; `125` → `2h 5m` / `2 ч 05 мин`; `0` → `0m`. From 48 h on the
+hours roll into days and the minutes drop: `3d 4h` / `3 дн 4 ч`, `7d` / `7 дн`.
+*/
 export const formatDuration = (minutes: number, language: Language): string => {
   const total = Math.round(minutes);
+  if (total >= DAYS_FROM) {
+    return formatLeft(total, language);
+  }
+  const units = DURATION_UNITS[language];
   const hours = Math.floor(total / 60);
   const rest = total % 60;
-  const units = DURATION_UNITS[language];
   const parts = [
     ...(hours > 0 ? [`${hours}${units.h}`] : []),
-    ...(hours === 0 || rest > 0 ? [`${rest}${units.m}`] : []),
+    ...(hours === 0 || rest > 0
+      ? [`${hours > 0 ? minutesAfterHours(rest, language) : rest}${units.m}`]
+      : []),
   ];
   return parts.join(" ");
 };
@@ -179,7 +212,7 @@ const SPAN_UNITS: Readonly<
   >
 > = {
   en: { d: "d", h: "h", m: "m", mo: "mo" },
-  ru: { d: " д", h: " ч", m: " м", mo: " мес" },
+  ru: { d: `${NBSP}дн`, h: `${NBSP}ч`, m: `${NBSP}мин`, mo: `${NBSP}мес` },
 };
 
 const DAYS_PER_MONTH = 30;
@@ -211,9 +244,13 @@ export const formatSpan = (minutes: number, language: Language): string => {
   if (days >= 1) {
     return spanPair([days, units.d], [Math.floor((total % MINUTES_PER_DAY) / 60), units.h]);
   }
-  return total >= 60
-    ? spanPair([Math.floor(total / 60), units.h], [total % 60, units.m])
-    : `${total}${units.m}`;
+  if (total < 60) {
+    return `${total}${units.m}`;
+  }
+  const rest = total % 60;
+  return rest === 0
+    ? `${total / 60}${units.h}`
+    : `${Math.floor(total / 60)}${units.h} ${minutesAfterHours(rest, language)}${units.m}`;
 };
 
 /**

@@ -60,6 +60,13 @@ describe("catalogs", () => {
     expect(sameAs("Undo", "common.undo")).toEqual([]);
   });
 
+  it("bind a number to its unit with a no-break space in Russian (F-CPY-04)", () => {
+    const loose = Object.entries(ru).filter(([, text]) =>
+      /\d (?:мин|ч(?!\p{L})|час|сек|дн|мес|%)/u.test(text),
+    );
+    expect(loose.map(([key]) => key)).toEqual([]);
+  });
+
   it("have no empty messages", () => {
     const empty = [...Object.entries(en), ...Object.entries(ru)].filter(
       ([, text]) => text.trim() === "",
@@ -135,6 +142,12 @@ describe("t", () => {
     );
   });
 
+  it("writes a numeric {count} grouped, so no caller formats counts by hand", () => {
+    expect(t("ru", "meta.sent", { count: 1284 })).toBe("1\u{202F}284 отправлено");
+    expect(t("en", "meta.sent", { count: 1284 })).toBe("1,284 sent");
+    expect(t("en", "meta.sent", { count: "many" })).toBe("many sent");
+  });
+
   it("answers a key missing from the catalog with the key itself, never a throw", () => {
     expect(t("en", "no.such.key" as never)).toBe("no.such.key");
   });
@@ -179,7 +192,14 @@ describe("plural", () => {
     expect(plural("ru", 5, forms)).toBe("5 задач");
     expect(plural("ru", 21, forms)).toBe("21 задача");
     expect(plural("ru", 11, forms)).toBe("11 задач");
-    expect(plural("ru", 1.5, forms)).toBe("1.5 задачи");
+    expect(plural("ru", 1.5, forms)).toBe("1,5 задачи");
+  });
+
+  it("groups a long count the way formatCount does", () => {
+    expect(plural("ru", 1284, { one: "{count} задача", other: "{count} задач" })).toBe(
+      "1\u{202F}284 задач",
+    );
+    expect(plural("en", 1284, { one: "{count} task", other: "{count} tasks" })).toBe("1,284 tasks");
   });
 
   it("falls back to other when a form is missing", () => {
@@ -190,7 +210,7 @@ describe("plural", () => {
 describe("formatLeft", () => {
   it("shows days and hours from a day on, hours and minutes under it, nothing below zero", () => {
     expect(formatLeft(30 * 60 + 10, "en")).toBe("1d 6h");
-    expect(formatLeft(48 * 60, "ru")).toBe("2 д");
+    expect(formatLeft(48 * 60, "ru")).toBe("2\u{A0}дн");
     expect(formatLeft(5 * 60 + 20, "en")).toBe("5h 20m");
     expect(formatLeft(-5, "en")).toBe("0m");
   });
@@ -199,15 +219,35 @@ describe("formatLeft", () => {
 describe("formatDuration", () => {
   it("formats hours and minutes", () => {
     expect(formatDuration(90, "en")).toBe("1h 30m");
-    expect(formatDuration(90, "ru")).toBe("1 ч 30 м");
+    expect(formatDuration(90, "ru")).toBe("1\u{A0}ч 30\u{A0}мин");
+  });
+
+  it("pads the minutes after hours in Russian only: 2 ч 05 мин, 2h 5m", () => {
+    expect(formatDuration(125, "ru")).toBe("2\u{A0}ч 05\u{A0}мин");
+    expect(formatDuration(125, "en")).toBe("2h 5m");
+    expect(formatDuration(5, "ru")).toBe("5\u{A0}мин");
+  });
+
+  it("joins number and unit with U+00A0 and the two pairs with a plain space", () => {
+    const text = formatDuration(125, "ru");
+    expect(text.split(" ")).toEqual(["2\u{A0}ч", "05\u{A0}мин"]);
+  });
+
+  it("rolls hours into days from 48 h on, dropping minutes", () => {
+    expect(formatDuration(47 * 60 + 59, "en")).toBe("47h 59m");
+    expect(formatDuration(48 * 60, "en")).toBe("2d");
+    expect(formatDuration(3 * 24 * 60 + 4 * 60 + 30, "en")).toBe("3d 4h");
+    expect(formatDuration(3 * 24 * 60 + 4 * 60 + 30, "ru")).toBe("3\u{A0}дн 4\u{A0}ч");
+    expect(formatDuration(10_080, "ru")).toBe("7\u{A0}дн");
+    expect(formatDuration(10_080, "en")).toBe("7d");
   });
 
   it("omits empty parts", () => {
     expect(formatDuration(60, "en")).toBe("1h");
     expect(formatDuration(45, "en")).toBe("45m");
     expect(formatDuration(0, "en")).toBe("0m");
-    expect(formatDuration(0, "ru")).toBe("0 м");
-    expect(formatDuration(120, "ru")).toBe("2 ч");
+    expect(formatDuration(0, "ru")).toBe("0\u{A0}мин");
+    expect(formatDuration(120, "ru")).toBe("2\u{A0}ч");
   });
 
   it("rounds fractional minutes", () => {
@@ -223,12 +263,12 @@ describe("formatLate", () => {
     expect(formatLate(34.9, "en", false)).toBe("34m");
     expect(formatLate(2 * HOUR + 15, "en", false)).toBe("2h");
     expect(formatLate(DAY + 3 * HOUR + 40, "en", false)).toBe("1d 3h");
-    expect(formatLate(5 * HOUR + 59, "ru", false)).toBe("5 ч");
+    expect(formatLate(5 * HOUR + 59, "ru", false)).toBe("5\u{A0}ч");
   });
 
   it("never names minutes for a soft deadline", () => {
     expect(formatLate(20, "en", true)).toBe("<1h");
-    expect(formatLate(20, "ru", true)).toBe("<1 ч");
+    expect(formatLate(20, "ru", true)).toBe("<1\u{A0}ч");
     expect(formatLate(HOUR + 59, "en", true)).toBe("1h");
     expect(formatLate(3 * DAY + 2 * HOUR, "en", true)).toBe("3d 2h");
   });
@@ -255,9 +295,10 @@ describe("formatSpan", () => {
 
   it("uses the absolute value and the language's units", () => {
     expect(formatSpan(-(DAY + 3 * HOUR), "en")).toBe("1d 3h");
-    expect(formatSpan(6 * DAY + 12 * HOUR, "ru")).toBe("6 д 12 ч");
-    expect(formatSpan(40 * DAY, "ru")).toBe("1 мес 10 д");
-    expect(formatSpan(5, "ru")).toBe("5 м");
+    expect(formatSpan(6 * DAY + 12 * HOUR, "ru")).toBe("6\u{A0}дн 12\u{A0}ч");
+    expect(formatSpan(40 * DAY, "ru")).toBe("1\u{A0}мес 10\u{A0}дн");
+    expect(formatSpan(5, "ru")).toBe("5\u{A0}мин");
+    expect(formatSpan(2 * HOUR + 5, "ru")).toBe("2\u{A0}ч 05\u{A0}мин");
   });
 });
 

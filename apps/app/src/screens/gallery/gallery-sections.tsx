@@ -21,7 +21,7 @@ import { CountBadge } from "#app/ui/count-badge.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
 import { openTasksLabel } from "@pace/client";
-import { formatDuration, type MessageKey } from "@pace/core";
+import { formatCount, formatDuration, type MessageKey } from "@pace/core";
 
 import {
   dayRows,
@@ -186,7 +186,7 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
       <Section title="dev.gallery.section.counts">
         {data.pluralCounts.map((count) => (
           <Text className="font-sans text-subhead font-normal text-label-primary" key={count}>
-            {`${String(count)}: ${openTasksLabel(data.language, count)}`}
+            {`${formatCount(count, data.language)}: ${openTasksLabel(data.language, count)}`}
           </Text>
         ))}
         <Text className="font-sans text-subhead font-normal text-label-primary">

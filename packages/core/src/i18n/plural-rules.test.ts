@@ -46,7 +46,8 @@ describe("plural without Intl.PluralRules (Hermes)", () => {
   });
 
   it("still picks the Russian forms", () => {
-    vi.stubGlobal("Intl", { ...Intl, PluralRules: undefined });
+    // Everything else of Intl stays (the count is formatted by NumberFormat); only PluralRules goes.
+    vi.stubGlobal("Intl", Object.create(Intl, { PluralRules: { value: undefined } }));
     const forms = {
       few: "{count} задачи",
       many: "{count} задач",

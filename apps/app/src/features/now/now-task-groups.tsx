@@ -2,10 +2,11 @@ import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import { useT } from "#app/app-state.tsx";
+import { useLanguage, useT } from "#app/app-state.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { groupNowRows, type NowRow } from "@pace/client";
+import { formatCount } from "@pace/core";
 
 const PREVIEW_COUNT = 3;
 
@@ -18,6 +19,7 @@ const TaskGroup = ({
   readonly title: string;
 }) => {
   const t = useT();
+  const language = useLanguage();
   const { palette } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const canExpand = rows.length > PREVIEW_COUNT;
@@ -28,7 +30,7 @@ const TaskGroup = ({
         <Text className="font-sans text-footnote font-semibold text-label-secondary">{title}</Text>
         <View className="flex-row items-center gap-2">
           <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
-            {rows.length}
+            {formatCount(rows.length, language)}
           </Text>
           {canExpand ? (
             <Pressable

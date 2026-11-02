@@ -2,9 +2,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import type { Language } from "@pace/core";
-
 import { type CalendarDay, monthGrid, monthOf, shiftMonth } from "@pace/client";
+import { capitalize, type Language } from "@pace/core";
 
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
@@ -16,7 +15,7 @@ const WEEKDAY_SAMPLES = [1, 2, 3, 4, 5, 6, 7].map((day) => new Date(Date.UTC(202
 const monthTitle = (month: string, language: Language): string => {
   const date = new Date(`${month}-01T00:00:00Z`);
   const name = new Intl.DateTimeFormat(language, { month: "long", timeZone: "UTC" }).format(date);
-  return `${name.charAt(0).toLocaleUpperCase(language)}${name.slice(1)} ${month.slice(0, 4)}`;
+  return `${capitalize(name, language)} ${month.slice(0, 4)}`;
 };
 
 const dayLabel = (date: string, language: Language): string =>

@@ -5,9 +5,11 @@ import Animated from "react-native-reanimated";
 
 import type { NowRow } from "@pace/client";
 
+import { useLanguage } from "#app/app-state.tsx";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { formatCount } from "@pace/core";
 
 import { useOpenTask } from "./task-opener.tsx";
 import { TaskRow } from "./task-row.tsx";
@@ -119,6 +121,7 @@ export const FoldedSection = ({
   readonly title: string;
 }) => {
   const { palette } = useTheme();
+  const language = useLanguage();
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   if (count === 0) {
     return null;
@@ -134,7 +137,7 @@ export const FoldedSection = ({
           setIsOpen(!isOpen);
         }}
       >
-        <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${String(count)}`}</Text>
+        <Text className="font-sans text-footnote font-medium text-label-secondary">{`${title} · ${formatCount(count, language)}`}</Text>
         <Icon color={palette["label.secondary"]} size={16} strokeWidth={2} />
       </Pressable>
       {isOpen ? children : null}

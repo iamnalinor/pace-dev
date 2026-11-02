@@ -150,7 +150,7 @@ export const ruTime: { readonly [K in keyof typeof enTime]: string } = {
   "insights.hourValue": "{hour} · {duration}",
   "insights.fragmentation": "Насколько дробилось время",
   "insights.medianBlock": "Обычный блок фокуса",
-  "insights.shortShare": "Блоки фокуса короче 15 мин",
+  "insights.shortShare": "Блоки фокуса короче 15\u{A0}мин",
   "insights.switches": "Переключений в день",
   "insights.focusSleep": "Сон и фокус",
   "insights.sleepBefore": "Ночь перед",
