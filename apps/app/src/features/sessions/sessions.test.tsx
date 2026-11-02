@@ -11,6 +11,7 @@ import { isControl } from "#app/test/focus-target.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { REQUEST_DEADLINE_MS } from "@pace/client";
 import { fakeInstance, type FakeRoute, problem } from "@pace/client/testing";
 import { type Session, SessionsOutputSchema } from "@pace/core";
 
@@ -363,13 +364,15 @@ describe("Settings → Devices and sessions", () => {
     const server = sessionsServer(ALL);
     const logouts = { count: 0 };
     // Whether the socket had rested when the DELETE reached the server.
-    const atDelete = { stopsBefore: -1 };
+    const atDelete: { stopsBefore: number; sync?: unknown } = { stopsBefore: -1 };
     const stops = { count: 0 };
     const deleteRoute = server.routes["DELETE /api/sessions/01CHROME"];
     const runtime = await renderSettings({
       ...server.routes,
-      "DELETE /api/sessions/01CHROME": (request) => {
+      "DELETE /api/sessions/01CHROME": async (request) => {
         atDelete.stopsBefore = stops.count;
+        // Nothing of the sync goes out meanwhile: it would answer 401 once the session is gone.
+        atDelete.sync = await runtime.sync.syncNow();
         return deleteRoute?.(request);
       },
       "POST /api/auth/logout": () => {
@@ -395,6 +398,7 @@ describe("Settings → Devices and sessions", () => {
     expect(logouts.count).toBe(0);
     // The socket rested before the DELETE: the server's close of it cannot read as "elsewhere".
     expect(atDelete.stopsBefore).toBe(1);
+    expect(atDelete.sync).toEqual({ error: "stopped", ok: false });
     expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
@@ -509,6 +513,33 @@ describe("Settings → Devices and sessions", () => {
         );
       expect(labels).toEqual(["Cancel", "Revoke"]);
       await screen.unmount();
+    }
+  });
+
+  it("offers Try again when the list never comes, instead of grey rows for good (round 6, class 62)", async () => {
+    const calls = { count: 0 };
+    const runtime = await signedIn({
+      "GET /api/sessions": async () => {
+        calls.count += 1;
+        if (calls.count === 1) {
+          await new Promise<never>(() => undefined);
+        }
+        return SessionsOutputSchema.parse({ sessions: ALL });
+      },
+    });
+    jest.useFakeTimers();
+    try {
+      await renderScreen(<SettingsScreen />, runtime);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      });
+      await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByLabelText("Chrome on macOS")).toBeOnTheScreen();
+    } finally {
+      jest.useRealTimers();
     }
   });
 

@@ -7,6 +7,7 @@ export const ruDecisions: { readonly [K in keyof typeof enDecisions]: string } =
   "decisions.empty": "В журнале пока пусто.",
   "decisions.noMatch": "Ничего не нашлось по «{query}».",
   "decisions.failed": "Не удалось загрузить журнал.",
+  "decisions.retry": "Попробовать снова",
   "decisions.done.task.create": "Создана задача «{subject}»",
   "decisions.done.task.update": "Изменено «{subject}»: {fields}",
   "decisions.done.task.due": "Перенесён срок «{subject}»",

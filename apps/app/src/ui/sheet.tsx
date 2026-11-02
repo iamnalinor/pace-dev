@@ -32,7 +32,8 @@ const DIALOG_FRAME = {
 /**
 The dim behind: it fades in where it is, and a tap on it closes the sheet. It never holds keyboard
 focus (QA round 18 M1: it took the first focus and a second "Close" stop; QA round 19 L1: the
-modal's trap wrapped Shift+Tab onto it); where the cross is shown it
+modal's trap wrapped Shift+Tab onto it), while a screen reader may still move onto it (round 6
+M4); where the cross is shown it
 is hidden from assistive tech too, and on a phone's sheet (no cross) it stays the reader's way out.
 */
 const Backdrop = ({

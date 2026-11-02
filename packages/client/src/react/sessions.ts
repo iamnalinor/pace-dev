@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { endpoints, type Session } from "@pace/core";
 
 import { type ApiClient, ApiError } from "../api-client.ts";
+import { withinDeadline } from "../deadline.ts";
 
 /** A computer just connected: its agent token is shown this once. */
 export type NewAgent = { readonly id: string; readonly name: string; readonly token: string };
@@ -43,7 +44,10 @@ export const useSessions = (api: ApiClient): Sessions => {
     void (async () => {
       const askedAt = new Date().toISOString();
       try {
-        const { sessions } = await api.call(endpoints.sessions.list, {});
+        // A list that never comes ends as an error with Try again (bug class 62).
+        const { sessions } = await withinDeadline(
+          async (signal) => await api.call(endpoints.sessions.list, {}, { signal }),
+        );
         if (lifetime.isCurrent) {
           setLoaded({ loadedAt: askedAt, sessions, status: "ready" });
         }

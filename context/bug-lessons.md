@@ -669,6 +669,17 @@ The same rule applies when a previously successful channel is no longer configur
   the ending request (the DELETE route calls `syncNow()` and expects `stopped`) and by looping the
   e2e that counts every request answered after it.
 
+### 76. A guard that cannot tell the case it is for from the one it must leave alone
+- **Bug.** Round 6 review M4: the sheet's dim refused every focus (blurred to the page) to keep the
+  modal's focus trap from landing on it; a screen reader moving onto the dim from the sheet was
+  thrown to the page too.
+- **Missed because.** The guard was tested only with the case it was written for (Tab and Shift+Tab
+  in the e2e); nothing moved focus onto the dim the way a reader does.
+- **Rule.** A guard keys on what identifies its case (here where the focus came from: the trap
+  gives it from outside the modal, its opener or a focus bracket; a reader from inside the sheet),
+  not on the effect both cases share. Test both: the case it refuses and the one it must let
+  through (`refuse-focus.web.test.ts`, the e2e focuses the dim from the sheet and it stays).
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -921,3 +932,6 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Round 6 review M1: Devices → End on this browser's own row left the other tabs' note only after the revoke answered; a 401 heard meanwhile signed out first ("another device" in the other tabs, and in this tab its own note could read as "another tab") | 69 | yes: every way this browser ends its own session: log-out (note before, already), ending its row (now before, taken back if the revoke fails), finishing account deletion (M2, below) | `auth.endThisDevice(revoke)`: the note goes first, a 401 for the session being ended is this tab's own act, a failed revoke takes the note back (`SignOutNotes.withdraw`, which never removes a newer note); client tests for each and a web adapter test |
 | 2026-11-02 | Round 6 review M2: finishing account deletion signed out without a note, so the browser's other tabs said "another device" | 69 | yes (see M1) | client test: another tab's 401 after `finishAccountDeletion` says another tab |
 | 2026-11-02 | e2e flake `sessions.e2e.ts` "ending this device signs out…": the first sync's pull or push, and the session check its 401 set off, went out after the session-end request was answered (13/120 here before the fix) | 75 (new) | yes: the senders that can run while this device ends its session: the sync loop and its run in flight (held), the socket (rested), the signed-in bootstrap's loop and socket start (skipped while ending), the session check (its 401 for the session being ended changes nothing) | `sync.hold()` (unit test: waits for the run in flight, then nothing goes out until released); app test: the DELETE's own `syncNow()` gets `stopped`; the e2e looped 120/120 green |
+| 2026-11-02 | Round 6 review M4: the sheet's dim refused every focus, so a screen reader moving onto it from the sheet was thrown to the page | 76 (new) | yes: the dim is the one control that refuses focus; the other focus moves (`moveFocus`, the sheet's first-field focus) put focus on a target, never take it away | `refuseFocus` refuses only focus from outside its modal (the trap's opener or bracket); unit test of both cases; the e2e keeps Shift+Tab inside the sheet and keeps a focus moved onto the dim from the sheet |
+| 2026-11-02 | Round 6 review M5: Done's explanation still said only "Long press" though a visible button beside it now opens the same sheet, and it was given twice in code (tooltip and hint) | 72 | yes: Done is the only control with a long press | the copy names the button beside it (EN, RU); the comment says which reader gets which (the web drops `hint` and describes Done by its tooltip; the phone's reader gets the hint); app test |
+| 2026-11-02 | Round 6 review M7: the Assistant log's request had no deadline, so a stalled one kept the grey rows for good | 62 (a cover with no bound) | yes: every screen that waits on a request of its own: the Devices list and the consent page's client details had no deadline either and now have one; the sync is bounded since QA 17 I2; the usage and calendar ranges show no loading state | `withinDeadline` / `REQUEST_DEADLINE_MS` (15 s, the request aborted) shared by the three; the log and Devices end in their failure line with Try again, the consent page says it failed; app tests on fake timers with requests that never answer, for each |

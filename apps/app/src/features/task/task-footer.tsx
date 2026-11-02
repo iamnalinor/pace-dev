@@ -77,6 +77,9 @@ export const TaskFooter = ({
       {view.primaryAction.kind === "none" ? null : (
         <>
           <View className="flex-1">
+            {/* One explanation per reader, never two: a computer shows the tooltip on hover and
+            focus and describes Done by it (react-native-web drops `hint`); the phone's tooltip
+            does not show on a tap here, so its screen reader gets the hint. */}
             <Tooltip label={t("task.doneHint")} showsOnTap={false}>
               <Button
                 hint={t("task.doneHint")}

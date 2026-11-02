@@ -5,6 +5,7 @@ export const enDecisions = {
   "decisions.empty": "Nothing in the log yet.",
   "decisions.noMatch": "Nothing matches “{query}”.",
   "decisions.failed": "The log could not be loaded.",
+  "decisions.retry": "Try again",
   "decisions.done.task.create": "Created task “{subject}”",
   "decisions.done.task.update": "Changed “{subject}”: {fields}",
   "decisions.done.task.due": "Moved the deadline of “{subject}”",

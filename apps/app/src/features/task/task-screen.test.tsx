@@ -511,6 +511,14 @@ describe("TaskScreen — work", () => {
     expect(screen.getByRole("button", { name: en("close.skipped") })).toBeOnTheScreen();
   });
 
+  it("tells readers once that Done has another way in, naming the button beside it (round 6 M5)", async () => {
+    await trkScreen();
+    const done = screen.getByRole("button", { name: en("task.done") });
+    // The phone's readers get the hint (the web drops it and describes Done by its tooltip).
+    expect(done.props["accessibilityHint"]).toBe(en("task.doneHint"));
+    expect(en("task.doneHint")).toMatch(/button beside it/u);
+  });
+
   it("says so when the task does not exist", async () => {
     await renderScreen(<TaskScreen id="t-nope" />, await createTestRuntime());
     expect(screen.getByText(en("task.notFound"))).toBeOnTheScreen();

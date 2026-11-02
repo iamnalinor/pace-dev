@@ -30,6 +30,13 @@ const closeTabStops = async (page: Page): Promise<number> =>
       (elements) => elements.filter((element) => (element as HTMLElement).tabIndex >= 0).length,
     );
 
+/** Moves focus from where it is in the sheet onto the dim, as a screen reader does; whether it stays. */
+const isDimKeptFromSheet = async (page: Page): Promise<boolean> =>
+  await page.locator('[aria-modal="true"] [aria-label="Close"][tabindex="-1"]').evaluate((dim) => {
+    (dim as HTMLElement).focus();
+    return dim.ownerDocument.activeElement === dim;
+  });
+
 const timeBar = (page: Page) => page.getByRole("region", { name: "Time" });
 
 for (const size of SIZES) {
@@ -92,6 +99,7 @@ for (const size of SIZES) {
       ];
       const seen: { sheet: string; name: string; closeStops: number }[] = [];
       const wrapped: { sheet: string; isInSheet: boolean }[] = [];
+      const kept: { sheet: string; isOnDim: boolean }[] = [];
       for (const [sheet, open] of opens) {
         await open();
         await expect(page.locator(SURFACE)).toBeVisible();
@@ -101,6 +109,9 @@ for (const size of SIZES) {
         // Shift+Tab wraps inside the sheet, never onto the full-screen dim (QA 19 L1).
         await page.keyboard.press("Shift+Tab");
         wrapped.push({ isInSheet: (await focus(page)).isInSheet, sheet });
+        // A screen reader moving on from the sheet onto the dim keeps it there, never thrown to
+        // the page (round 6 M4).
+        kept.push({ isOnDim: await isDimKeptFromSheet(page), sheet });
         await page.keyboard.press("Escape");
         await expect(page.locator(SURFACE)).toHaveCount(0);
       }
@@ -113,6 +124,7 @@ for (const size of SIZES) {
         })),
       );
       expect(wrapped).toEqual(opens.map(([sheet]) => ({ isInSheet: true, sheet })));
+      expect(kept).toEqual(opens.map(([sheet]) => ({ isOnDim: true, sheet })));
     });
   });
 }

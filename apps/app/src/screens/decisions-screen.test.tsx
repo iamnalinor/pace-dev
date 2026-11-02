@@ -1,8 +1,9 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { REQUEST_DEADLINE_MS } from "@pace/client";
 import { BOOKS_ID } from "@pace/core/testing";
 
 import { DecisionsScreen } from "./decisions-screen.tsx";
@@ -77,6 +78,40 @@ describe("DecisionsScreen", () => {
       await screen.findByText(en("decisions.noMatch", { query: "nothing" })),
     ).toBeOnTheScreen();
     expect(screen.queryByText(en("decisions.empty"))).toBeNull();
+  });
+
+  it("gives up on a log that does not answer: a line and Try again, which loads it again (round 6 M7)", async () => {
+    const calls = { count: 0 };
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/decisions": async () => {
+          calls.count += 1;
+          if (calls.count === 1) {
+            // A request that stalls: no answer, no error, ever.
+            await new Promise<never>(() => undefined);
+          }
+          return { decisions: [notification] };
+        },
+      },
+    });
+    jest.useFakeTimers();
+    try {
+      await renderScreen(<DecisionsScreen />, runtime);
+      expect(screen.queryByText(en("decisions.failed"))).toBeNull();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      });
+      expect(screen.getByText(en("decisions.failed"))).toBeOnTheScreen();
+      expect(screen.queryByLabelText(en("sync.loadingData"))).toBeNull();
+      await fireEvent.press(screen.getByRole("button", { name: en("decisions.retry") }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText("Notification held back")).toBeOnTheScreen();
+      expect(calls.count).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("says what the assistant did with each message, in words, with what was typed", async () => {

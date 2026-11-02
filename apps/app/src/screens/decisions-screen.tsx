@@ -6,6 +6,7 @@ import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { zonedText } from "#app/format/time.ts";
 import { useOpenTask } from "#app/shared/task-opener.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
 import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { type DecisionView, decisionViews } from "@pace/client";
@@ -81,6 +82,21 @@ const DecisionRow = ({ view }: { readonly view: DecisionView }) => {
   );
 };
 
+/** The log could not load (or took too long): a quiet line and Try again under it. */
+const LogFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+  const t = useT();
+  return (
+    <View className="items-start">
+      <Text className="font-sans text-[13px] text-muted">{t("decisions.failed")}</Text>
+      <View className="-ml-4">
+        <Button onPress={onRetry} variant="ghost">
+          {t("decisions.retry")}
+        </Button>
+      </View>
+    </View>
+  );
+};
+
 /** How long typing in the search pauses before the log is searched. */
 const SEARCH_PAUSE_MS = 350;
 
@@ -135,9 +151,7 @@ export const DecisionsScreen = () => {
       </View>
       <FirstSyncBody isWaiting={loaded.status === "loading"}>
         <View className="px-4">
-          {loaded.status === "failed" ? (
-            <Text className="font-sans text-[13px] text-muted">{t("decisions.failed")}</Text>
-          ) : null}
+          {loaded.status === "failed" ? <LogFailed onRetry={loaded.reload} /> : null}
           {loaded.status === "loaded" && views.length === 0 ? (
             <Text className="font-sans text-[13px] text-muted">
               {search.trim() === ""
