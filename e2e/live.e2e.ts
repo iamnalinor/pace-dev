@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { nowTasks } from "./support/composer.ts";
+import { approve, nowTasks } from "./support/composer.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { createDevSession, freshTelegramId, resetAccount } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
@@ -35,7 +35,7 @@ const addTaskHere = async (page: Page, title: string): Promise<void> => {
   await line.pressSequentially(title);
   await line.press("Enter");
   await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
-  await page.getByRole("button", { name: "Approve" }).click();
+  await approve(page);
   await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
 };
 

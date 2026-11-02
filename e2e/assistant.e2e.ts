@@ -1,4 +1,4 @@
-import { nowTasks } from "./support/composer.ts";
+import { approve, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -14,7 +14,7 @@ test("the assistant reads a line, the task is added, the decision is logged", as
   await expect(page.getByText("The assistant will create “разобрать почту”")).toBeVisible();
   await expect(nowTasks(page).getByText("разобрать почту")).toHaveCount(0);
   await expectNoA11yViolations(page);
-  await page.getByRole("button", { name: "Approve" }).click();
+  await approve(page);
   await expect(line).toHaveValue("");
   await page.goto("/");
   await expect(nowTasks(page).getByText("разобрать почту")).toBeVisible();
@@ -69,7 +69,7 @@ test("an assistant question is answered with one click, by keyboard too", async 
   await correct.fill("urgent");
   await correct.press("Enter");
   await expect(page.getByText("The assistant will create “Съездить в банк”")).toBeVisible();
-  await page.getByRole("button", { name: "Approve" }).click();
+  await approve(page);
   await expect(line).toHaveValue("");
   await page.goto("/decisions");
   const row = page.getByRole("button", { name: /Created task “Съездить в банк”/u });
@@ -151,7 +151,7 @@ test("a rename card says the new name", async ({ page }) => {
   const line = page.getByRole("textbox", { name: "New task" });
   await line.pressSequentially("Aone");
   await line.press("Enter");
-  await page.getByRole("button", { name: "Approve" }).click();
+  await approve(page);
   await page.goto("/");
   await line.pressSequentially("rename task Aone to Atwo");
   await line.press("Enter");

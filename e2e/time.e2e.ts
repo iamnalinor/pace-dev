@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { addTask, nowTasks } from "./support/composer.ts";
+import { addTask, approve, nowTasks } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { controlsUnder } from "./support/geometry.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
@@ -118,8 +118,7 @@ for (const size of SIZES) {
       const typed = bar.getByRole("textbox", { name: "What are you doing?" });
       await typed.fill("Пошел в ЦСС, 20мин");
       await typed.press("Enter");
-      await expect(bar.getByRole("button", { name: "Approve" })).toBeVisible();
-      await bar.getByRole("button", { name: "Approve" }).click();
+      await approve(bar);
       await expect(bar.getByRole("button", { name: "Stop: Пошел в ЦСС" })).toBeVisible();
       await expect(bar.getByText(/of ~20m/u)).toBeVisible();
       await bar.getByRole("button", { name: "Stop: Пошел в ЦСС" }).click();

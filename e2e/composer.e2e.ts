@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { addTask, formByHand, nowTasks, taskForm } from "./support/composer.ts";
+import { addTask, approve, formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -72,7 +72,7 @@ test("a pasted message shows actions and is written only on Approve", async ({ p
   await expect(page.getByText(`The assistant will create “${message}”`)).toBeVisible();
   await expect(nowTasks(page).getByText(message)).toHaveCount(0);
   await expectNoA11yViolations(page);
-  await page.getByRole("button", { name: "Approve" }).click();
+  await approve(page);
   await page.goto("/");
   await expect(nowTasks(page).getByText(message)).toBeVisible();
 });
