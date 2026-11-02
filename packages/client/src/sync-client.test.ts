@@ -798,6 +798,63 @@ describe("createSyncClient's offline flag (QA round 17 review m3, I2)", () => {
     });
   });
 
+  it("calls a connection cut while a pull's body is read offline (round-3 review m-b)", async () => {
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: async () =>
+        ({
+          json: async () => {
+            throw new TypeError("network error");
+          },
+          ok: true,
+          status: 200,
+        }) as unknown as Response,
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: false });
+    expect(sync.status.getState()).toMatchObject({
+      lastError: "network error",
+      online: false,
+      syncing: false,
+    });
+  });
+
+  it("gives up on a pull whose body stalls midway, at the sync timeout", async () => {
+    vi.useFakeTimers();
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // The headers came; the body never ends until the caller aborts.
+      fetch: async (_input, init) =>
+        ({
+          json: async () =>
+            await new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => {
+                reject(new DOMException("The operation was aborted.", "AbortError"));
+              });
+            }),
+          ok: true,
+          status: 200,
+        }) as unknown as Response,
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+    const run = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(HTTP_SYNC_TIMEOUT_MS);
+    await expect(run).resolves.toMatchObject({ ok: false });
+    expect(sync.status.getState()).toMatchObject({
+      lastError: "sync request timed out",
+      online: false,
+      syncing: false,
+    });
+  });
+
   it("gives up on an HTTP call that never answers, so a run cannot hold `syncing` for good", async () => {
     vi.useFakeTimers();
     const store = createMemoryEventStore();

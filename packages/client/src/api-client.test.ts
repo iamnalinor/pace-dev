@@ -191,4 +191,33 @@ describe("createApiClient when the server cannot be reached", () => {
     await expect(call).rejects.toBeInstanceOf(ApiUnreachable);
     await expect(call).rejects.toThrow("Network request failed");
   });
+
+  it("says so for a connection cut while the answer's body is read (round-3 review m-b)", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // The headers came, then the connection dropped: the body read fails as the fetch would.
+      fetch: async () =>
+        ({
+          json: async () => {
+            throw new TypeError("network error");
+          },
+          ok: true,
+          status: 200,
+        }) as unknown as Response,
+      token: () => undefined,
+    });
+    const call = api.call(endpoints.health, {});
+    await expect(call).rejects.toBeInstanceOf(ApiUnreachable);
+    await expect(call).rejects.toThrow("network error");
+  });
+
+  it("does not call a body that is not JSON unreachable: the server answered", async () => {
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: async () => new Response("<html>a proxy's page</html>", { status: 200 }),
+      token: () => undefined,
+    });
+    const call = api.call(endpoints.health, {});
+    await expect(call).rejects.toBeInstanceOf(SyntaxError);
+  });
 });

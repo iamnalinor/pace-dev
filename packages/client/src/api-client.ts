@@ -88,6 +88,23 @@ const reach = async (doFetch: FetchLike, url: string, init: RequestInit): Promis
 };
 
 /**
+The answer's body. A connection cut while it is read fails as the fetch itself does (a
+`TypeError`, per the Fetch standard) and is `ApiUnreachable` too: the headers came, the answer did
+not (QA round 17 round-3 review m-b). A body that is not JSON (`SyntaxError`) is an answer, and one
+its caller gave up on (`AbortError`) is rethrown for the caller to read.
+*/
+const readAnswer = async (response: Response, init: RequestInit): Promise<unknown> => {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (init.signal?.aborted === true || !(error instanceof TypeError)) {
+      throw error;
+    }
+    throw new ApiUnreachable(error.message);
+  }
+};
+
+/**
 Typed HTTP client for the Pace API, driven by the shared endpoint contract. The bearer
 token is read on every request so a login or logout takes effect immediately; every request
 also says which protocol this build speaks (`X-Pace-Protocol`).
@@ -121,16 +138,19 @@ export const createApiClient = (options: {
         headers["Content-Type"] = "application/json";
       }
       const url = `${options.baseUrl}${withQuery(buildPath(endpoint.path, params), query)}`;
-      const response = await reach(doFetch, url, {
+      const init: RequestInit = {
         ...(body !== undefined && { body: JSON.stringify(body) }),
         headers,
         method: endpoint.method,
         ...(callOptions.signal !== undefined && { signal: callOptions.signal }),
-      });
+      };
+      const response = await reach(doFetch, url, init);
       if (!response.ok) {
         throw await describeError(response);
       }
-      return endpoint.output.parse(await response.json()) as EndpointOutput<typeof endpoint>;
+      return endpoint.output.parse(await readAnswer(response, init)) as EndpointOutput<
+        typeof endpoint
+      >;
     },
   };
 };
