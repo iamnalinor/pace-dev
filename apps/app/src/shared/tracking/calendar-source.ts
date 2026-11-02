@@ -1,5 +1,5 @@
 import { calendarAccess, calendarEvents } from "#app/platform/phone-calendar.ts";
-import { addDaysIn, addMinutesIso, startOfDayIn } from "@pace/core";
+import { addDaysIn, addMinutesIso, type MessageKey, startOfDayIn } from "@pace/core";
 
 import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
 
@@ -24,3 +24,7 @@ export const calendarToday = async ({ now, zone }: CalendarSource): Promise<Cale
     return { access: "denied", events: [] };
   }
 };
+
+/** Why the Calendar picker has nothing to pick on a phone: nothing on, or no access to look. */
+export const noEventsKey = (calendar: CalendarToday | null): MessageKey =>
+  calendar?.access === "granted" ? "time.calendarNone" : "phone.calendarAsk";

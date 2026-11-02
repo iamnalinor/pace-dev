@@ -1,4 +1,4 @@
-import { addDaysIn, addMinutesIso, endpoints, startOfDayIn } from "@pace/core";
+import { addDaysIn, addMinutesIso, endpoints, type MessageKey, startOfDayIn } from "@pace/core";
 
 import type { CalendarSource, CalendarToday } from "./calendar-today.ts";
 
@@ -24,3 +24,10 @@ export const calendarToday = async ({ api, now, zone }: CalendarSource): Promise
     return { access: "granted", events: [] };
   }
 };
+
+/**
+Why the Calendar picker has nothing to pick in a browser: nothing is on. There is no phone
+calendar here to set up or allow (QA round 19 L6: it offered "Calendar from the phone" and
+Android's settings).
+*/
+export const noEventsKey = (_calendar: CalendarToday | null): MessageKey => "time.calendarNone";
