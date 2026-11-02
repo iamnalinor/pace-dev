@@ -139,7 +139,7 @@ The classes so far are below. Each has its standing rule, and new code is writte
 - **Rule (offsets).** A negative margin that lets a hit target overhang its visual is half the
   difference of two sizes (`(target − visual) / 2`); it is chosen together with both sizes, never
   rounded on its own. Pick the target from the size tokens so the difference lands on the scale
-  (a 32 pill in a 48 target: `-my-2`), or centre the target in a box of the visual's size. Instance:
+  (a 32 pill in a 48 target: `-my-2`). Centring the target in a box of the visual's size works on the web only: Android does not deliver touches outside a parent's bounds, so the overhang there is dead (the close crosses on ≥ 1024 dp windows, open for Task 3.9). Instance:
   Task 2.2's rounding gave chips `-my-2` around a 32 pill in a 44 target, so each pill stuck out of
   its layout box by 2 px, and the progress marker sat 2 px off the bar's centre.
 
