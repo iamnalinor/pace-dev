@@ -6,6 +6,7 @@ import { addMinutesIso, newId, wallClockInstant } from "@pace/core";
 
 import type { UsageUpload } from "../src/user-store/cloud-data.ts";
 
+import { POOL_LEASE_KEY, POOL_NEXT_AT_KEY } from "../src/user-store/pool-retry-alarm.ts";
 import { UserStore } from "../src/user-store/user-store.ts";
 import { meterSql } from "./helpers.ts";
 
@@ -96,6 +97,22 @@ const dueTomorrow = (): readonly Raw[] => [
   ),
 ];
 
+/**
+Fires every alarm due by `until` as the runtime does (taken off, then run), each on a new instance:
+production evicts one idle for a minute or two.
+*/
+const fireDue = async (state: DurableObjectState, until: string): Promise<void> => {
+  for (;;) {
+    const at = await state.storage.getAlarm();
+    if (at === null || at > Date.parse(until)) {
+      return;
+    }
+    vi.setSystemTime(new Date(at));
+    await state.storage.deleteAlarm();
+    await new UserStore(state, deployed).alarm();
+  }
+};
+
 /** Fires the store's alarm at `at` as the runtime does (taken off, then run), on a new instance. */
 const fireAt = async (state: DurableObjectState, at: string): Promise<void> => {
   vi.setSystemTime(new Date(at));
@@ -131,18 +148,6 @@ describe("a night of automatic sleep on a cold store", () => {
       nothing in memory, the same storage.
       */
       const cold = (): UserStore => new UserStore(state, deployed);
-      /** Fires every alarm due by `until`, as the runtime does: taken off, then run. */
-      const fireDue = async (until: string): Promise<void> => {
-        for (;;) {
-          const at = await state.storage.getAlarm();
-          if (at === null || at > Date.parse(until)) {
-            return;
-          }
-          vi.setSystemTime(new Date(at));
-          await state.storage.deleteAlarm();
-          await cold().alarm();
-        }
-      };
       /** The phone's use over the night, which it tells as it ends. */
       const uses = [
         { endAt: msk("20:40"), startAt: msk("20:10") },
@@ -161,7 +166,7 @@ describe("a night of automatic sleep on a cold store", () => {
       // An upload every 15 minutes from 21:10 until 09:40, alarms firing in between.
       for (let quarter = 0; quarter <= 50; quarter += 1) {
         const now = addMinutesIso(msk("21:10"), quarter * 15);
-        await fireDue(now);
+        await fireDue(state, now);
         await upload(now);
       }
       const night = cost();
@@ -218,6 +223,297 @@ describe("the notification pool at the store's alarm", () => {
       // The runtime runs the failed alarm again.
       await fireAt(state, msk("09:01"));
       expect(digests(state)).toHaveLength(1);
+    });
+  });
+});
+
+describe("the notification pool with nothing coming", () => {
+  it("looks again within a day, so an event that comes into its calendar window is announced", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const start = msk("08:00");
+      vi.setSystemTime(new Date(start));
+      // No digest at all, and nothing within the three days of calendar a pass reads.
+      await instance.append(
+        [envelope("settings.updated", { digestWindows: [], timezone: MOSCOW }, start)],
+        { now: start },
+      );
+      await instance.runNotifications(start);
+      // The return flight, four days on at 10:00, on a copy the phone sends again unchanged.
+      const flight = {
+        endAt: addMinutesIso(start, 4 * 1440 + 240),
+        id: "ev-flight",
+        series: null,
+        startAt: addMinutesIso(start, 4 * 1440 + 120),
+        title: "Return flight",
+      };
+      for (let day = 0; day <= 4; day += 1) {
+        const now = addMinutesIso(start, day * 1440);
+        await fireDue(state, now);
+        vi.setSystemTime(new Date(now));
+        await new UserStore(state, deployed).syncCalendar(copy(now, [flight]), now);
+      }
+      await fireDue(state, addMinutesIso(flight.startAt, 1));
+      const announced = state.storage.sql
+        .exec("SELECT created_at FROM notifications WHERE kind = 'event_start'")
+        .toArray();
+      expect(announced).toEqual([{ created_at: flight.startAt }]);
+    });
+  });
+
+  it("starts its own times on a store main left with no pool time and no alarm", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const start = msk("08:00");
+      vi.setSystemTime(new Date(start));
+      const flight = {
+        endAt: addMinutesIso(start, 4 * 1440 + 240),
+        id: "ev-flight",
+        series: null,
+        startAt: addMinutesIso(start, 4 * 1440 + 120),
+        title: "Return flight",
+      };
+      await instance.append(
+        [envelope("settings.updated", { digestWindows: [], timezone: MOSCOW }, start)],
+        { now: start },
+      );
+      await instance.syncCalendar(copy(start, [flight]), start);
+      // main's last pass found nothing coming and deleted the alarm; main never wrote the key.
+      for (const key of [POOL_NEXT_AT_KEY, POOL_LEASE_KEY, "pool:failures"]) {
+        await state.storage.delete(key);
+      }
+      await state.storage.deleteAlarm();
+      // The new build: the phone sends the same copy every day, and nothing else happens.
+      for (let day = 1; day <= 4; day += 1) {
+        const now = addMinutesIso(start, day * 1440);
+        await fireDue(state, now);
+        vi.setSystemTime(new Date(now));
+        await new UserStore(state, deployed).syncCalendar(copy(now, [flight]), now);
+      }
+      await fireDue(state, addMinutesIso(flight.startAt, 1));
+      const announced = state.storage.sql
+        .exec("SELECT created_at FROM notifications WHERE kind = 'event_start'")
+        .toArray();
+      expect(announced).toEqual([{ created_at: flight.startAt }]);
+    });
+  });
+});
+
+describe("a write on a store main left with no pool time and no alarm", () => {
+  it("arms a pass at once, even when the pool finds nothing coming", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const start = msk("08:00");
+      vi.setSystemTime(new Date(start));
+      await instance.append(
+        [envelope("settings.updated", { digestWindows: [], timezone: MOSCOW }, start)],
+        { now: start },
+      );
+      await state.storage.delete(POOL_NEXT_AT_KEY);
+      await state.storage.deleteAlarm();
+      const now = msk("09:00");
+      vi.setSystemTime(new Date(now));
+      await new UserStore(state, deployed).append(
+        [envelope("settings.updated", { language: "ru" }, now)],
+        { now },
+      );
+      expect(await state.storage.getAlarm()).toBe(Date.parse(now));
+      await fireDue(state, now);
+      expect(await state.storage.get(POOL_NEXT_AT_KEY)).toBe(Date.parse(addMinutesIso(now, 1440)));
+    });
+  });
+});
+
+describe("a pool pass cut short", () => {
+  it("passes again once its lease runs out: the digest it was making is still delivered", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      await instance.runNotifications(msk("08:00"));
+      vi.setSystemTime(new Date(msk("09:00")));
+      // The isolate is reset while the 09:00 pass works (a deploy, the CPU limit): it never ends.
+      const cut = new UserStore(state, deployed);
+      await state.storage.deleteAlarm();
+      await new Promise<void>((resolve) => {
+        Object.defineProperty(cut, "derive", {
+          value: async () => {
+            resolve();
+            await new Promise<never>(() => undefined);
+          },
+        });
+        void cut.alarm();
+      });
+      // The runtime runs the alarm again within seconds, then the lease's alarm fires.
+      await fireAt(state, addMinutesIso(msk("09:00"), 0.05));
+      await fireDue(state, msk("09:10"));
+      expect(digests(state)).toHaveLength(1);
+    });
+  });
+});
+
+describe("a pool pass cut short and never run again by the runtime", () => {
+  it("runs at its lease's end: the digest it was making is still delivered", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      await instance.runNotifications(msk("08:00"));
+      vi.setSystemTime(new Date(msk("09:00")));
+      const cut = new UserStore(state, deployed);
+      await state.storage.deleteAlarm();
+      await new Promise<void>((resolve) => {
+        Object.defineProperty(cut, "derive", {
+          value: async () => {
+            resolve();
+            await new Promise<never>(() => undefined);
+          },
+        });
+        void cut.alarm();
+      });
+      // No retry from the runtime: only the alarm the pass set at its lease's end.
+      await fireDue(state, msk("09:10"));
+      expect(digests(state)).toHaveLength(1);
+    });
+  });
+});
+
+describe("the wake at a pool lease's end", () => {
+  it("loads no log after a pass that completed, and arms the pool's own time", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      await instance.runNotifications(msk("08:00"));
+      expect(await state.storage.getAlarm()).toBe(Date.parse(msk("08:05")));
+      const { cost } = meterSql(state.storage);
+      await fireAt(state, msk("08:05"));
+      expect(cost().loads).toBe(0);
+      expect(await state.storage.getAlarm()).toBe(Date.parse(msk("09:00")));
+    });
+  });
+});
+
+describe("a pool pass that keeps failing", () => {
+  it("runs again later and later, not at every lease's end", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      await instance.runNotifications(msk("08:00"));
+      // Every pass from 09:00 on breaks before it loads anything; each would load the log.
+      const passes: string[] = [];
+      const failing = new UserStore(state, deployed);
+      Object.defineProperty(failing, "derive", {
+        value: async () => {
+          passes.push(new Date().toISOString());
+          await Promise.reject(new Error("the pass broke"));
+        },
+      });
+      for (;;) {
+        const at = await state.storage.getAlarm();
+        if (at === null || at > Date.parse(addMinutesIso(msk("09:00"), 4 * 60))) {
+          break;
+        }
+        vi.setSystemTime(new Date(at));
+        await state.storage.deleteAlarm();
+        // A failed pass fails the alarm; the runtime would run it again (not simulated).
+        await Promise.allSettled([failing.alarm()]);
+      }
+      expect(passes).toEqual(
+        ["09:00", "09:01", "09:03", "09:07", "09:15", "09:31", "10:03", "11:07"].map((hhmm) =>
+          msk(hhmm),
+        ),
+      );
+    });
+  });
+});
+
+describe("a pool pass whose delivery fails and which then breaks", () => {
+  it("backs off as any failing pass does, not at the minute its own failed delivery asked for", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      vi.setSystemTime(new Date(msk("08:00")));
+      await instance.append(dueTomorrow(), { now: msk("08:00") });
+      // A seminar at 09:00 beside the digest: the 09:00 pass adds and delivers two notifications.
+      const seminar = { ...event(0), endAt: msk("10:30"), startAt: msk("09:00") };
+      await instance.syncCalendar(copy(msk("08:00"), [seminar]), msk("08:00"));
+      await instance.runNotifications(msk("08:00"));
+      // Telegram is down, and the delivery of a pass's second notification breaks (a bug in its
+      // message): the first one's failed copy has asked for a retry a minute on by then.
+      const down = {
+        apiRoot: "https://telegram.test",
+        fetch: async () => Response.json({ ok: false }, { status: 500 }),
+        token: "123456:TEST-TOKEN",
+      };
+      /** Whether this pass has already tried a notification's Telegram copy (its instant is now). */
+      const hasDeliveredNow = (): boolean =>
+        state.storage.sql
+          .exec(
+            "SELECT 1 FROM notification_deliveries WHERE method = 'telegram' AND attempted_at = ?",
+            new Date().toISOString(),
+          )
+          .toArray().length > 0;
+      const passes: string[] = [];
+      for (;;) {
+        const at = await state.storage.getAlarm();
+        if (at === null || at > Date.parse(addMinutesIso(msk("09:00"), 20))) {
+          break;
+        }
+        vi.setSystemTime(new Date(at));
+        await state.storage.deleteAlarm();
+        const failing = new UserStore(state, deployed);
+        Object.defineProperties(failing, {
+          chatId: {
+            value: async () =>
+              await (hasDeliveredNow()
+                ? Promise.reject(new Error("the message broke"))
+                : Promise.resolve("1002")),
+          },
+          derive: {
+            value: async (now: string) => {
+              passes.push(now);
+              return await UserStore.prototype.derive.call(failing, now);
+            },
+          },
+          runNotifications: {
+            value: async (now: string) =>
+              await UserStore.prototype.runNotifications.call(failing, now, {
+                push: { fcm: null },
+                telegram: down,
+              }),
+          },
+        });
+        // A failed pass fails the alarm; the runtime would run it again (not simulated).
+        await Promise.allSettled([failing.alarm()]);
+      }
+      expect(passes).toEqual(
+        ["09:00", "09:01", "09:03", "09:07", "09:15"].map((hhmm) => msk(hhmm)),
+      );
+    });
+  });
+});
+
+describe("a phone's calendar copy cut short", () => {
+  it("is looked at by the pool with the next upload when the pool's look after its rows died", async () => {
+    await runInDurableObject(freshStore(), async (instance: UserStore, state) => {
+      const now = msk("22:00");
+      vi.setSystemTime(new Date(now));
+      await instance.append(history(3), { now });
+      const events = Array.from({ length: 4 }, (_, index) => event(index));
+      await new UserStore(state, deployed).syncCalendar(copy(now, events), now);
+      // One event moved; the rows go in, then the isolate is reset as the pool looks at them.
+      const moved = events.with(1, event(1, "Seminar moved"));
+      const cut = new UserStore(state, deployed);
+      Object.defineProperty(cut, "pool", {
+        get: () => ({
+          afterWrite: async () => {
+            throw new Error("cut short");
+          },
+        }),
+      });
+      await expect(cut.syncCalendar(copy(now, moved), now)).rejects.toThrow("cut short");
+      // The same copy fifteen minutes on: the pool looks now (one load), and not again after.
+      const later = addMinutesIso(now, 15);
+      vi.setSystemTime(new Date(later));
+      const next = meterSql(state.storage);
+      await new UserStore(state, deployed).syncCalendar(copy(later, moved), later);
+      expect(next.cost().loads).toBe(1);
+      const again = meterSql(state.storage);
+      await new UserStore(state, deployed).syncCalendar(copy(later, moved), later);
+      expect(again.cost().loads).toBe(0);
     });
   });
 });

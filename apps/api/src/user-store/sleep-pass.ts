@@ -217,8 +217,10 @@ const passOn = async (host: SleepHost, now: string): Promise<readonly string[]> 
   const zone = await host.zone();
   const decidedUntil = (await host.storage.get<string>(DECIDED_UNTIL_KEY)) ?? null;
   if (knownUntil === null) {
+    const made = await endWhereKnown(host, { decidedUntil, now, uses, usesFrom, zone });
+    // Only once it has ended them: a pass cut short keeps its look due for the alarm's retry.
     await host.storage.delete(SLEEP_NEXT_AT_KEY);
-    return await endWhereKnown(host, { decidedUntil, now, uses, usesFrom, zone });
+    return made;
   }
   const decidedOn = { decidedOn: laterOf(knownUntil, decidedUntil), uses, zone };
   const isSame = await isHeld(held, { ...decidedOn, seq: await host.seq(), uses: read.uses });

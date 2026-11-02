@@ -6,8 +6,15 @@ import type * as schema from "./schema.ts";
 
 import { createLogger } from "../shared/logger.ts";
 import * as cloud from "./cloud-data.ts";
-import { didSaveRuledSeries } from "./notification-pool.ts";
+import { ruledSeriesChange, saveRuledSeries } from "./notification-pool.ts";
+import { armIfPoolUnplanned } from "./pool-retry-alarm.ts";
 import { PoolStore } from "./pool-store.ts";
+
+/**
+Storage key set while a change of a phone's calendar copy is written but not yet looked at by the
+pool (bug-lessons class 58): its rows alone would read as already planned to the next upload.
+*/
+const UNPLANNED_KEY = "calendar:unplanned";
 
 /**
 What the person's devices send beside the event log, as a user's store keeps it: the phone's
@@ -23,17 +30,31 @@ export abstract class CloudStore extends PoolStore {
   /**
   A phone's calendar over a range, replacing what that phone sent for it before, with the series
   it answers "every time" for (never announced as they start). The pool looks again only when
-  something changed: the same copy again (every background run sends it) loads no log.
+  something changed: the same copy again (every background run sends it) loads no log. A change
+  is marked unplanned before its rows go in and unmarked once the pool has looked at it, so a copy
+  cut short in between is looked at with the next upload. The same copy on a store whose pool has
+  no time and no alarm (one main left) arms a pass at once (`armIfPoolUnplanned`). Answers how
+  many events came.
   */
   async syncCalendar(upload: cloud.CalendarUpload, now: string): Promise<number> {
-    const { isChanged, stored } = await cloud.replaceCalendar(this.db, upload);
-    const isRuled =
-      upload.ruledSeries !== undefined &&
-      (await didSaveRuledSeries(this.ctx.storage, upload.ruledSeries));
-    if (isChanged || isRuled) {
-      await this.pool.afterWrite(now);
+    const { storage } = this.ctx;
+    const changes = await cloud.calendarChanges(this.db, upload);
+    const series = await ruledSeriesChange(storage, upload.ruledSeries);
+    const isChanged = changes.gone.length > 0 || changes.added.length > 0 || series !== undefined;
+    if (isChanged) {
+      await storage.put(UNPLANNED_KEY, true);
+      await cloud.writeCalendarChanges(this.db, changes);
+      if (series !== undefined) {
+        await saveRuledSeries(storage, series);
+      }
     }
-    return stored;
+    if (isChanged || (await storage.get(UNPLANNED_KEY)) !== undefined) {
+      await this.pool.afterWrite(now);
+      await storage.delete(UNPLANNED_KEY);
+    } else {
+      await armIfPoolUnplanned(storage, now);
+    }
+    return upload.events.length;
   }
 
   /** The calendar's events overlapping a range. */

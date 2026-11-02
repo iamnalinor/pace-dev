@@ -3,7 +3,7 @@ import {
   type ActionKind,
   addMinutesIso,
   type CoreState,
-  type DecisionStep,
+  deferredReadId,
   type EventBody,
   type EventInput,
   newId,
@@ -24,6 +24,7 @@ import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
 import { taskUrl } from "../shared/web-links.ts";
 import { armEarliest } from "./alarm.ts";
 import { telegramOf, webOriginOf } from "./notifier.ts";
+import { decisionOf } from "./parse-queue-decision.ts";
 
 /** A text to read once the assistant is back: kept in the store until then. */
 export type QueuedParse = {
@@ -125,10 +126,17 @@ const stampSystem = (bodies: readonly EventBody[], now: string): readonly EventI
   bodies.map((body) => ({ ...body, occurredAt: now, precision: "exact", source: "system" }));
 
 const toInbox = (item: QueuedParse, now: string): Exclude<Drained, { kind: "wait" }> => ({
-  inputs: stampSystem([inboxBody(item.text)], now),
+  inputs: stampSystem([inboxBody(item.text)], now).map((input) => ({
+    ...input,
+    id: deferredReadId(item.id, "inbox"),
+  })),
   item,
   kind: "inbox",
 });
+
+/** The reading's events, each named after the text's place in the queue (`deferredReadId`). */
+const namedAfter = (item: QueuedParse, inputs: readonly EventInput[]): readonly EventInput[] =>
+  inputs.map((input, index) => ({ ...input, id: deferredReadId(item.id, index) }));
 
 /**
 Every action planned in order, the text kept as the source of a task it adds to; `null`
@@ -189,7 +197,10 @@ export const drainOne = async (
   }
   const inputs = planAll(answer.value.actions, { now, state, text: item.text });
   return {
-    drained: inputs === null ? toInbox(item, now) : { inputs, item, kind: "done" },
+    drained:
+      inputs === null
+        ? toInbox(item, now)
+        : { inputs: namedAfter(item, inputs), item, kind: "done" },
     limited,
   };
 };
@@ -203,6 +214,8 @@ type DrainStore = {
     meta: { readonly deviceId: string; readonly now: string; readonly source: "system" },
   ) => Promise<Result<unknown, unknown>>;
   readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
+  /** One event of the log by id; `undefined` when there is none. */
+  readonly find: (id: string) => Promise<unknown>;
   /** The user's Telegram chat (see `chatFor`); none means nothing is told. */
   readonly chatId: () => Promise<string | undefined>;
 };
@@ -254,42 +267,6 @@ const tell = async (
   });
 };
 
-/** The tasks a text read later wrote, as the decision log keeps its steps. */
-const createdSteps = (written: readonly EventInput[]): readonly DecisionStep[] =>
-  written
-    .filter(
-      (input): input is Extract<EventInput, { readonly type: "task.created" }> =>
-        input.type === "task.created",
-    )
-    .map((input) => ({
-      activityId: null,
-      closeOutcome: null,
-      fields: [],
-      kind: "task.create",
-      renamedTo: null,
-      startAt: null,
-      subject: input.payload.title,
-      taskId: input.payload.taskId,
-    }));
-
-/** What became of a text read later: what it created (a row that opens the task), or the Inbox. */
-const decisionOf = (
-  item: QueuedParse,
-  { isDone, written }: { readonly isDone: boolean; readonly written: readonly EventInput[] },
-): DecisionEntry => {
-  const steps = isDone ? createdSteps(written) : [];
-  return {
-    explanation: isDone
-      ? "Read later, as asked when the assistant was out of requests."
-      : "Could not be read later; kept in the Inbox.",
-    inputs: { channel: item.channel, enqueuedAt: item.enqueuedAt, steps, text: item.text },
-    kind: "parse",
-    outcome: isDone ? "applied" : "inbox",
-    rule: "parse.deferred",
-    taskId: steps[0]?.taskId ?? null,
-  };
-};
-
 /** Writes what a drained text became; a reading that cannot be written falls back to the Inbox. */
 const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" }>) => {
   const written = await write(deps, drained.inputs);
@@ -304,6 +281,15 @@ const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" 
   await tell(deps, isDone, drained);
 };
 
+/**
+Whether a drain before this one wrote the text already (its reading or its Inbox entry), and was
+cut short before the queue was saved: the log, written with the events themselves, says so. What
+it would have told and logged after the write is not told again.
+*/
+const wasWritten = async ({ store }: DrainDeps, item: QueuedParse): Promise<boolean> =>
+  (await store.find(deferredReadId(item.id, 0))) !== undefined ||
+  (await store.find(deferredReadId(item.id, "inbox"))) !== undefined;
+
 /** One queued text at the alarm: `null` once settled, else the item to keep for later. */
 const drainItem = async (
   deps: DrainDeps,
@@ -313,6 +299,9 @@ const drainItem = async (
   const { now, storage } = deps;
   if (item.retryAt !== null && item.retryAt > now) {
     return item;
+  }
+  if (await wasWritten(deps, item)) {
+    return null;
   }
   const world = {
     cooldowns: await cooldownsOf(storage, now),

@@ -43,7 +43,7 @@ import {
 } from "./delivery-rows.ts";
 import { broadcast, broadcastBySession } from "./live-sockets.ts";
 import { phoneContent, telegramMessage } from "./notify-text.ts";
-import { setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
+import { findNotification, setTelegramCopy, type StoredNotification } from "./pool-rows.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -87,17 +87,23 @@ export const savePoolMemory = async (
 export const ruledSeriesOf = async (storage: DurableObjectStorage): Promise<readonly string[]> =>
   (await storage.get<readonly string[]>(RULES_KEY)) ?? [];
 
-/** Keeps the series answered "every time"; answers whether they changed. */
-export const didSaveRuledSeries = async (
+/** The series answered "every time" to keep, when they differ from those kept; else `undefined`. */
+export const ruledSeriesChange = async (
+  storage: DurableObjectStorage,
+  series: readonly string[] | undefined,
+): Promise<readonly string[] | undefined> => {
+  const next = series === undefined ? undefined : [...new Set(series)];
+  return next === undefined || JSON.stringify(next) === JSON.stringify(await ruledSeriesOf(storage))
+    ? undefined
+    : next;
+};
+
+/** Keeps the series answered "every time" (see `ruledSeriesChange`). */
+export const saveRuledSeries = async (
   storage: DurableObjectStorage,
   series: readonly string[],
-): Promise<boolean> => {
-  const next = [...new Set(series)];
-  if (JSON.stringify(next) === JSON.stringify(await ruledSeriesOf(storage))) {
-    return false;
-  }
-  await storage.put(RULES_KEY, next);
-  return true;
+): Promise<void> => {
+  await storage.put(RULES_KEY, series);
 };
 
 type Adopted = NotifyOptions["adoptTelegramMessage"];
@@ -314,18 +320,23 @@ export const deliverNew = async (
   }));
 };
 
-/** Open notifications whose latest copy failed and can be retried by a pool pass. */
+/**
+Whether a notification has a copy that failed and can be retried by a pool pass. It reads the
+copies as they stand in the store, never from a row read before: a delivery just made writes its
+outcome there, not into the caller's copy of the row (bug-lessons class 60).
+*/
 export const hasSendRetry = async (
   deps: PoolDeps,
-  stored: StoredNotification,
+  notification: PoolNotification,
 ): Promise<boolean> => {
-  if (stored.telegram.state === "failed") {
+  const current = await findNotification(deps.db, notification.id);
+  if (current?.telegram.state === "failed") {
     return true;
   }
-  if (deps.userId === undefined || !isChannelOn(deps.settings, stored.notification.kind, "app")) {
+  if (deps.userId === undefined || !isChannelOn(deps.settings, notification.kind, "app")) {
     return false;
   }
   const subscriptions = await subscriptionsOf(deps.binding, deps.userId, Date.parse(deps.now));
   const activeSessions = new Set(subscriptions.map((subscription) => subscription.sessionId));
-  return await hasFailedCopy(deps.db, stored.notification.id, activeSessions);
+  return await hasFailedCopy(deps.db, notification.id, activeSessions);
 };

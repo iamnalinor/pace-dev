@@ -110,10 +110,14 @@ export type SqlCost = {
 
 /**
 Meters every statement a Durable Object runs from now on (drizzle calls `storage.sql.exec`), for
-cost tests: `cost()` sums the cursors' `rowsRead` / `rowsWritten` once their statements ran.
+cost tests: `cost()` sums the cursors' `rowsRead` / `rowsWritten` once their statements ran, and
+`restore()` puts `sql.exec` back as it was, so a later meter does not count through this one.
 */
-export const meterSql = (storage: DurableObjectStorage): { readonly cost: () => SqlCost } => {
+export const meterSql = (
+  storage: DurableObjectStorage,
+): { readonly cost: () => SqlCost; readonly restore: () => void } => {
   const { sql } = storage;
+  const before = Object.getOwnPropertyDescriptor(sql, "exec");
   const exec = sql.exec.bind(sql);
   const ran: { query: string; cursor: ReturnType<SqlStorage["exec"]> }[] = [];
   Object.defineProperty(sql, "exec", {
@@ -137,5 +141,12 @@ export const meterSql = (storage: DurableObjectStorage): { readonly cost: () => 
       rowsRead: ran.reduce((sum, { cursor }) => sum + cursor.rowsRead, 0),
       rowsWritten: written(/./u),
     }),
+    restore: () => {
+      if (before === undefined) {
+        Reflect.deleteProperty(sql, "exec");
+      } else {
+        Object.defineProperty(sql, "exec", before);
+      }
+    },
   };
 };

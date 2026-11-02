@@ -117,7 +117,7 @@ The app under the sync line, and covered while it waits for its first sync.
 - Covered (sidebar included) while a signed-in copy that holds nothing waits for its first sync
   (QA round 17 M4): no final empty state ("Nothing to do right now") and no word in the device's
   language while the account's is not known yet. The app stays mounted, only not drawn, so no
-  navigator mounts late (bug class 57).
+  navigator mounts late (bug class 61).
 - The cover lasts `FIRST_SYNC_COVER_MS` at most: then the app is shown under a "still syncing"
   line, usable, until that sync ends (review I2).
 - The offline line while the last sync could not reach the server or the device says it has no

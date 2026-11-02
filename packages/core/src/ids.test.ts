@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 
 import { SyncEventSchema } from "./api/schemas/sync.ts";
 import { EVENT_ID_MAX } from "./events/event-schema.ts";
+import { compareEvents } from "./events/sort.ts";
 import {
   autoOutcomeId,
   createIdFactory,
+  deferredReadId,
   instanceId,
   isUlid,
   newId,
@@ -65,6 +67,31 @@ describe("isUlid", () => {
   });
 });
 
+describe("deferredReadId keeps a reading in the order it was planned (class 59)", () => {
+  // A reading's events share one `occurredAt`, so the canonical order is their ids'.
+  const at = "2026-10-07T09:00:00.000Z";
+  const part = fc.nat({ max: 999_999 });
+  const queued = newId(1);
+  const placed = (index: number) => ({ id: deferredReadId(queued, index), occurredAt: at });
+
+  it("puts event i before event j at one instant for every i < j", () => {
+    fc.assert(
+      fc.property(fc.tuple(part, part), ([first, second]) => {
+        fc.pre(first !== second);
+        const [i, j] = first < second ? [first, second] : [second, first];
+        expect(compareEvents(placed(i), placed(j))).toBe(-1);
+      }),
+    );
+  });
+
+  it("orders the eleventh event after the third", () => {
+    const ids = Array.from({ length: 12 }, (_, index) => deferredReadId(queued, index));
+    expect(
+      ids.toSorted((a, b) => compareEvents({ id: a, occurredAt: at }, { id: b, occurredAt: at })),
+    ).toEqual(ids);
+  });
+});
+
 describe("deterministic ids", () => {
   it("builds homework instance ids", () => {
     expect(instanceId("preset-1", "2026-W41")).toBe("hw:preset-1:2026-W41");
@@ -120,6 +147,8 @@ const idsOf = ({
     stop,
     sleepDiscardId(start),
     sleepReopenId(stop),
+    deferredReadId(task, index),
+    deferredReadId(task, "inbox"),
   ];
 };
 
@@ -145,7 +174,7 @@ describe("every deterministic id fits what the sync carries (class 12)", () => {
     task: ulid,
   });
 
-  it("holds for homework, series, outcome and automatic sleep ids at their longest", () => {
+  it("holds for homework, series, outcome, automatic sleep and read-later ids at their longest", () => {
     fc.assert(
       fc.property(world, (world) => {
         expect(idsOf(world).filter((id) => !isCarried(id))).toEqual([]);

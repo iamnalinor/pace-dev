@@ -75,16 +75,22 @@ const calendarTextOf = (row: CalendarRow): string =>
     row.attendeeCount,
   ]);
 
+/** What a phone's copy changes in the rows it keeps for the copy's range (`calendarChanges`). */
+export type CalendarChanges = {
+  readonly deviceId: string;
+  readonly gone: readonly CalendarRow[];
+  readonly added: readonly CalendarRow[];
+};
+
 /**
-A phone's calendar over a range: its earlier copy of that range goes, the new one comes in. The
-phone sends its copy with every background run (every 15 minutes or so), mostly unchanged, so only
-the rows that differ are deleted and written. Answers how many events came and whether any row
-changed.
+What a phone's calendar over a range changes: its earlier copy of that range goes, the new one
+comes in. The phone sends its copy with every background run (every 15 minutes or so), mostly
+unchanged, so only the rows that differ are deleted and written (`writeCalendarChanges`).
 */
-export const replaceCalendar = async (
+export const calendarChanges = async (
   db: Db,
   { deviceId, events, from, to }: CalendarUpload,
-): Promise<{ readonly stored: number; readonly isChanged: boolean }> => {
+): Promise<CalendarChanges> => {
   const { calendarEvents } = schema;
   const fresh = new Map<string, CalendarRow>();
   for (const event of events) {
@@ -103,6 +109,15 @@ export const replaceCalendar = async (
     .values()
     .filter((row) => old.get(calendarKeyOf(row)) !== calendarTextOf(row))
     .toArray();
+  return { added, deviceId, gone };
+};
+
+/** Deletes and writes the rows a copy changes (see `calendarChanges`). */
+export const writeCalendarChanges = async (
+  db: Db,
+  { added, deviceId, gone }: CalendarChanges,
+): Promise<void> => {
+  const { calendarEvents } = schema;
   for (const row of gone) {
     await db
       .delete(calendarEvents)
@@ -117,7 +132,6 @@ export const replaceCalendar = async (
   for (const row of added) {
     await db.insert(calendarEvents).values(row).onConflictDoNothing();
   }
-  return { isChanged: gone.length > 0 || added.length > 0, stored: events.length };
 };
 
 /**

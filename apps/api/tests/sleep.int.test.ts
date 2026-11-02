@@ -124,6 +124,12 @@ const fireAlarm = async (store: Store): Promise<void> => {
 const alarmOf = async (store: Store) =>
   await runInDurableObject(store, async (_instance, state) => await state.storage.getAlarm());
 
+const sleepNextAtOf = async (store: Store) =>
+  await runInDurableObject(
+    store,
+    async (_instance, state) => await state.storage.get<number>(SLEEP_NEXT_AT_KEY),
+  );
+
 describe("automatic sleep on the server", () => {
   it("opens the night at the last use and stops it at the morning's first, from the system", async () => {
     const { phone, token } = await phoneAccount("1001");
@@ -264,10 +270,12 @@ describe("automatic sleep and the person's own records, through the store", () =
 
 describe("the store's alarm for automatic sleep", () => {
   it("looks again within the hour at night, at 21:00 by day, and again after each alarm", async () => {
-    // No digest windows and a night already over (nothing running long): nothing else the store
-    // waits on, so the alarm is sleep's own.
+    // No digest windows and a night already over (nothing running long): once the pool has passed,
+    // nothing else the store waits on, so the alarm is sleep's own.
     const { phone, store } = await phoneAccount("1002", { digestWindows: [] });
-    expect(await alarmOf(store)).toBeNull();
+    // The pool has never passed (a store just made): its first pass is armed at once, so it
+    // starts its own times even with nothing coming (bug-lessons class 57).
+    expect(await alarmOf(store)).toBe(Date.parse(AFTERNOON));
     await upload(
       phone,
       [
@@ -276,10 +284,13 @@ describe("the store's alarm for automatic sleep", () => {
       ],
       "07:25",
     );
-    // 15:00: the next look is at 21:00.
+    // 15:00: sleep's next look is at 21:00, after the pool's first pass.
     const evening = Date.parse(wallClockInstant(NEXT_DAY, "21:00", MOSCOW));
-    expect(await alarmOf(store)).toBe(evening);
+    expect(await sleepNextAtOf(store)).toBe(evening);
+    expect(await alarmOf(store)).toBe(Date.parse(AFTERNOON));
     // An alarm before sleep's time (another wait's) runs no pass and leaves sleep's time armed.
+    // That one is the pool's first pass, then its lease's wake, which only reads the waits' times.
+    await fireAlarm(store);
     await fireAlarm(store);
     expect(await alarmOf(store)).toBe(evening);
     // At its own time, 23:50, the pass runs and arms the next look an hour on.
@@ -334,11 +345,14 @@ describe("the store's alarm for automatic sleep", () => {
 
   it("keeps the queue's earlier wait through a pass of the pool with nothing due", async () => {
     const { store } = await phoneAccount("1002", { digestWindows: [] });
+    // The pool's first pass, armed at once on a store that never passed (bug-lessons class 57).
+    await fireAlarm(store);
     const now = new Date().toISOString();
     const retryAt = new Date(Date.parse(now) + 2 * 60_000).toISOString();
     await store.enqueueParse({ channel: "api", retryAt, text: "купить хлеб" }, now);
     const run = await store.runNotifications(now);
-    expect(run.nextAt).toBeNull();
+    // Nothing is coming, so the pool looks again in a day (never "never": bug-lessons class 57).
+    expect(run.nextAt).toBe(new Date(Date.parse(now) + 24 * 3_600_000).toISOString());
     expect(await alarmOf(store)).toBe(Date.parse(retryAt));
   });
 
