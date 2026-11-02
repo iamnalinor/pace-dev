@@ -42,6 +42,10 @@ build history) is in [context/](context/README.md).
   goes into a `.web.tsx` sibling (the web build swaps it in, see `metro.config.js`) or the
   stand-ins in `src/platform/web/`; never `if (Platform.OS === "web")` for whole screens.
   Never import a `.web.tsx` file from its own base file (it would resolve to itself).
+- **Every new screen, flow, component or visual change follows [docs/design.md](docs/design.md)**:
+  read PRODUCT.md, DESIGN.md and the spec first, comp it, build only from tokens and the kit,
+  put every new colour pair in `pairs.ts`, try it in the worst-case gallery, shoot the matrix
+  (phone/desktop × light/dark × EN/RU) and review the shots with the design skills before the PR.
 - Code, comments and identifiers in English.
 - **Merge pull requests with squash only** (Dependabot's included), never a merge commit or a
   rebase merge.
