@@ -67,11 +67,14 @@ export {
   type DecisionResolveBody,
 } from "./api/schemas/notify.ts";
 export {
+  canReadLater,
+  PARSE_UNAVAILABLE_REASONS,
   type ParseRequest,
   type ParseRequestBody,
   ParseRequestSchema,
   type ParseResponse,
   ParseResponseSchema,
+  type ParseUnavailableReason,
   REQUEST_DOMAINS,
   type RequestDomain,
 } from "./api/schemas/parse.ts";

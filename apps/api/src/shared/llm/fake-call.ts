@@ -1,4 +1,4 @@
-import { APICallError } from "ai";
+import { APICallError, type LanguageModel } from "ai";
 
 /** Pieces of the scripted model (fake-model.ts): the errors a real provider throws, a cancellable wait. */
 
@@ -56,6 +56,85 @@ export const failureOf = (answer: object): APICallError | null => {
 };
 
 export const FINISH = { raw: "stop", unified: "stop" } as const;
+
+export const USAGE = {
+  inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
+  outputTokens: { reasoning: undefined, text: undefined, total: 50 },
+};
+
+/** A model object of the current provider specification (`LanguageModel` also admits ids). */
+export type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" }>;
+
+type Stream = Awaited<ReturnType<ModelObject["doStream"]>>["stream"];
+type StreamPart = Stream extends ReadableStream<infer Part> ? Part : never;
+
+/** What the scripted model streams: its text, and the error chunk it ends with, if any. */
+export type Streamed = { readonly text: string; readonly errorAfter?: object };
+
+/**
+The parts of the answer: as one text part; or its start and a dropped connection; or all of it
+and then an error chunk (an endpoint that checks the whole answer at its end and refuses it, or
+an error object sent in place of an answer).
+*/
+const partsOf = (
+  { errorAfter, text }: Streamed,
+  how: { readonly breaksMidStream: boolean },
+): readonly StreamPart[] => {
+  const opening: StreamPart = { type: "stream-start", warnings: [] };
+  if (how.breaksMidStream) {
+    return [
+      opening,
+      { id: "0", type: "text-start" },
+      { delta: text.slice(0, 10), id: "0", type: "text-delta" },
+      { error: new Error("connection reset"), type: "error" },
+    ];
+  }
+  // The first character goes alone, so a pause after the first token can come between.
+  const body: readonly StreamPart[] =
+    text === ""
+      ? []
+      : [
+          { id: "0", type: "text-start" },
+          { delta: text.slice(0, 1), id: "0", type: "text-delta" },
+          { delta: text.slice(1), id: "0", type: "text-delta" },
+        ];
+  const ending: readonly StreamPart[] =
+    errorAfter === undefined
+      ? [
+          { id: "0", type: "text-end" },
+          { finishReason: FINISH, type: "finish", usage: USAGE },
+        ]
+      : [{ error: { ...errorAfter }, type: "error" }];
+  return [opening, ...body, ...ending];
+};
+
+type StreamHow = {
+  readonly breaksMidStream: boolean;
+  /** How long it pauses after its first token before the rest of the answer, in ms. */
+  readonly restAfterMs: number;
+  readonly signal: AbortSignal | undefined;
+};
+
+/** The parts as a stream: up to the first token at once, the rest after `restAfterMs`. */
+export const streamOf = (streamed: Streamed, how: StreamHow): Stream => {
+  const parts = partsOf(streamed, how);
+  const firstToken = parts.findIndex((part) => part.type === "text-delta") + 1;
+  const pause = how.restAfterMs > 0 && firstToken > 0 ? firstToken : parts.length;
+  return new ReadableStream({
+    start: async (controller) => {
+      for (const part of parts.slice(0, pause)) {
+        controller.enqueue(part);
+      }
+      if (pause < parts.length) {
+        await sleep(how.restAfterMs, how.signal);
+      }
+      for (const part of parts.slice(pause)) {
+        controller.enqueue(part);
+      }
+      controller.close();
+    },
+  });
+};
 
 /** Waits `ms`, or rejects at once when the call is cancelled (as a real request would). */
 export const sleep = async (ms: number, signal?: AbortSignal): Promise<void> => {

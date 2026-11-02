@@ -1,4 +1,11 @@
-import { CLASSIFY_CONFIDENT, type Language, newId, type ParseRequestBody, t } from "@pace/core";
+import {
+  CLASSIFY_CONFIDENT,
+  type Language,
+  newId,
+  type ParseRequestBody,
+  type ParseUnavailableReason,
+  t,
+} from "@pace/core";
 
 import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
@@ -29,17 +36,22 @@ late answer makes Telegram send the update again (a second preview or revision).
 */
 const BOT_READ_DEADLINE_MS = 7000;
 
-/** No model answers: the bot still lets the person inspect and approve a rule-based action. */
+/**
+No model answers: the bot still lets the person inspect and approve a rule-based action, and says
+why: unavailable, or (every model answered out of shape) that it could not read this one.
+*/
 const unavailable = async (
   turn: Turn,
   {
     text,
     retryAt,
+    reason,
     domain,
     decisionIds = [],
   }: {
     readonly text: string;
     readonly retryAt: null | string;
+    readonly reason: ParseUnavailableReason;
     readonly domain: "activity" | "auto" | "task";
     readonly decisionIds?: readonly string[] | undefined;
   },
@@ -49,12 +61,18 @@ const unavailable = async (
     decisionIds: [...decisionIds, id],
     text,
     read: readByRules(text, domain, { now: turn.now, state: turn.state }),
-    isRuleBased: true,
+    unread: reason,
   });
 };
 
-const rulesPrefix = (language: Language, isRuleBased: boolean): string =>
-  isRuleBased ? `${t(language, "bot.rulesPreview")}\n\n` : "";
+/** The line over a rule-based preview: why no model read it (bug class 99). */
+const rulesPrefix = (language: Language, unread: null | ParseUnavailableReason): string => {
+  if (unread === null) {
+    return "";
+  }
+  const key = unread === "unreadable" ? "bot.rulesPreviewUnreadable" : "bot.rulesPreview";
+  return `${t(language, key)}\n\n`;
+};
 
 const actionText = (
   turn: Turn,
@@ -74,7 +92,7 @@ const previewOf = async (
     text,
     request = text,
     read,
-    isRuleBased = false,
+    unread = null,
     thread = [],
     decisionIds,
   }: {
@@ -82,13 +100,14 @@ const previewOf = async (
     readonly text: string;
     readonly request?: string;
     readonly read: Reading & { readonly questions?: ModelRead["questions"] };
-    readonly isRuleBased?: boolean;
+    /** Why no model read it, for a rule-based preview; `null` for the model's own. */
+    readonly unread?: null | ParseUnavailableReason;
     readonly thread?: NonNullable<ParseRequestBody["thread"]>;
   },
 ): Promise<BotReply> => {
   const { state, store } = turn;
   const { language } = state.settings;
-  const prefix = rulesPrefix(language, isRuleBased);
+  const prefix = rulesPrefix(language, unread);
   const canAccept =
     read.actions.length > 0 && planAll(turn, { actions: read.actions, text: request }).ok;
   const id = newId();
@@ -141,7 +160,8 @@ export const preview = async (turn: Turn, models: Models, text: string): Promise
   });
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
   if (!read.ok) {
-    return await unavailable(turn, { domain: "auto", retryAt: read.error.retryAt, text });
+    const { reason, retryAt } = read.error;
+    return await unavailable(turn, { domain: "auto", reason, retryAt, text });
   }
   const { output, actions, provider, rejected } = read.value;
   const id = await logReading(
@@ -212,7 +232,9 @@ export const followupPreview = async (
   });
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, turn.now);
   if (!read.ok) {
-    return plain(t(turn.state.settings.language, "bot.correctionUnavailable"));
+    const isUnreadable = read.error.reason === "unreadable";
+    const key = isUnreadable ? "bot.correctionUnreadable" : "bot.correctionUnavailable";
+    return plain(t(turn.state.settings.language, key));
   }
   // Taken now, after the read: an Approve or another answer pressed meanwhile already took it.
   return (await turn.store.recall(id)) === undefined
@@ -250,6 +272,7 @@ const chooseDomain = async (
     : await unavailable(turn, {
         decisionIds: pending.decisionIds,
         domain,
+        reason: read.error.reason,
         retryAt: read.error.retryAt,
         text: pending.text,
       });

@@ -41,7 +41,7 @@ export type {
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
-export type { AiOutcome, Assistant } from "./assistant.ts";
+export { type AiOutcome, type Assistant, type Unread, unreadOf } from "./assistant.ts";
 export {
   type AccountAction,
   type AccountConfirmation,

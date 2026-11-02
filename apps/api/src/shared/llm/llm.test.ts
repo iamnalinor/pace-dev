@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from "@pace/core";
 import { artboardState, at, ctx } from "@pace/core/testing";
 
+import { SCHEMA_REFUSAL } from "./fake-call.ts";
 import { echoParse, fakeParseModel } from "./fake-model.ts";
 import { availability, runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
@@ -116,6 +117,7 @@ describe("runParse", () => {
       error: {
         code: "llm/unavailable",
         limited: { backup: "2026-10-06T12:00:30.000Z", compatible: "2026-10-06T12:02:00.000Z" },
+        reason: "limited",
         retryAt: "2026-10-06T12:00:30.000Z",
       },
       ok: false,
@@ -404,6 +406,38 @@ describe("best-effort structured output (bug class 85)", () => {
     });
   });
 
+  it("refuses an answer with no actions or questions list: that is no reading, not nothing to do", async () => {
+    const { actions: _actions, ...noActions } = echoParse("x");
+    const { questions: _questions, ...noQuestions } = echoParse("x");
+    for (const terse of [noActions, noQuestions]) {
+      const result = await runParse(
+        [
+          { model: fakeParseModel(() => terse as never), name: "terse" },
+          { model: fakeParseModel(echoParse), name: "next" },
+        ],
+        prompt,
+      );
+      expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+    }
+  });
+
+  it("fills only an action's nullable keys, never a list it left out", async () => {
+    const output = echoParse("x");
+    const [action] = output.actions;
+    const { subtasks: _subtasks, ...withoutList } = action ?? {};
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({ ...output, actions: [withoutList] }) as never),
+          name: "terse",
+        },
+        { model: fakeParseModel(echoParse), name: "next" },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+  });
+
   it("reads the answer an endpoint refused on its own schema check, from the error's body", async () => {
     const result = await runParse(
       [
@@ -422,6 +456,24 @@ describe("best-effort structured output (bug class 85)", () => {
       [
         {
           model: fakeParseModel(() => ({ schemaRefused: withKeysLeftOut(), via: "stream" })),
+          name: "strict",
+        },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "strict" } });
+  });
+
+  it("reads the answer an endpoint refused in a stream chunk that carries the generation", async () => {
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({
+            streamsError: {
+              ...SCHEMA_REFUSAL,
+              failed_generation: JSON.stringify(withKeysLeftOut()),
+            },
+          })),
           name: "strict",
         },
       ],

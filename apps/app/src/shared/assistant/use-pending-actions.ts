@@ -13,7 +13,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { type Actions, type Assistant, doneLines } from "@pace/client";
+import { type Actions, type Assistant, doneLines, type Unread, unreadOf } from "@pace/client";
 
 /** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
 const MAX_THREAD = 5;
@@ -25,6 +25,8 @@ type Pending = {
   /** What the assistant asks about what stays unclear; answered by a correction. */
   readonly questions: readonly ParseQuestion[];
   readonly status: "parsed" | "unavailable";
+  /** Why no model read it (the rules' reading); `null` for the model's own. */
+  readonly unread: null | Unread;
   /** The decision-log rows of the conversation's readings, the last this one's. */
   readonly decisionIds: readonly string[];
 };
@@ -85,6 +87,7 @@ const pendingOf = (
         actions: answer.actions,
         questions: answer.questions ?? [],
         status: answer.status,
+        unread: answer.status === "unavailable" ? unreadOf(answer) : null,
       };
 
 /**

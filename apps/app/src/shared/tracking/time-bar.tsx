@@ -96,7 +96,7 @@ const TypedStart = ({ onUse }: { readonly onUse: () => void }) => {
           }}
           onFollowup={pending.followup}
           questions={pending.pending.questions}
-          source={pending.pending.status}
+          unread={pending.pending.unread}
         />
       )}
       {pending.busy && pending.pending === null ? (

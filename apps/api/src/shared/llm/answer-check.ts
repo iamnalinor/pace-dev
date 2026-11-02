@@ -9,8 +9,9 @@ const log = createLogger("info");
 
 /**
 What a model's answer must pass, the one check for every way an answer arrives (the stream, or an
-endpoint's refusal that carries it, bug class 85): the keys left out filled as "does not apply",
-the values clamped to the limits, then all of `schema`.
+endpoint's refusal that carries it, bug class 85): the nullable keys an action left out filled as
+"does not apply" (never a list, bug class 95), the values clamped to the limits, then all of
+`schema`.
 */
 export type AnswerCheck<T> = {
   /** What the model is shown: the schema without length limits, its answer checked by `check`. */
@@ -24,7 +25,7 @@ export const answerCheck = <T>(schema: z.ZodType<T>): AnswerCheck<T> => {
     const filled = fillAbsent(value, await strict);
     const clamped = clampToJsonSchema(filled, await strict);
     if (JSON.stringify(filled) !== JSON.stringify(value)) {
-      log.info("llm: keys the answer left out read as empty");
+      log.info("llm: nullable keys an action left out read as null");
     }
     if (JSON.stringify(clamped) !== JSON.stringify(filled)) {
       log.info("llm: answer cut to the schema's limits");

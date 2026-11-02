@@ -6,6 +6,7 @@ import { createApp } from "./app.ts";
 import { mcpHandler } from "./mcp/server.ts";
 import { mountOAuthRoutes } from "./oauth/oauth-routes.ts";
 
+export { LlmHealth } from "./shared/llm/health-object.ts";
 export { UserStore } from "./user-store/user-store.ts";
 
 /** The HTTP app plus the consent routes, which only make sense behind the provider. */

@@ -8,7 +8,14 @@ import {
   streamText,
 } from "ai";
 
-import { err, type ModelOutput, ModelOutputSchema, ok, type Result } from "@pace/core";
+import {
+  err,
+  type ModelOutput,
+  ModelOutputSchema,
+  ok,
+  type ParseUnavailableReason,
+  type Result,
+} from "@pace/core";
 
 import type { HealthMemory } from "./health-store.ts";
 import type { ParsePrompt } from "./prompt.ts";
@@ -20,9 +27,10 @@ import {
   messageOf,
   refusedAnswers,
   retryAtOf,
+  type UnwellReason,
   unwellReasonOf,
 } from "./failure.ts";
-import { type Health, orderByHealth, type Verdict } from "./health.ts";
+import { type Health, orderByHealth, type Verdict, verdictOf } from "./health.ts";
 import { hedgedRace, type Lost, type Won } from "./race.ts";
 
 const log = createLogger("info");
@@ -43,6 +51,23 @@ export type LlmError = {
   readonly retryAt: null | string;
   /** The providers this call found rate limited, to skip until then. */
   readonly limited: Cooldowns;
+  /** Why no model read it, as the parse answer says it (bug class 99). */
+  readonly reason: ParseUnavailableReason;
+};
+
+/** Why a read no model answered failed: no model, every answer out of shape, a rest, or none of these. */
+const reasonOf = (read: {
+  readonly hasProviders: boolean;
+  readonly isHopeless: boolean;
+  readonly retryAt: null | string;
+}): ParseUnavailableReason => {
+  if (!read.hasProviders) {
+    return "off";
+  }
+  if (read.isHopeless) {
+    return "unreadable";
+  }
+  return read.retryAt === null ? "unreachable" : "limited";
 };
 
 /** A structured answer: what the model said, which provider said it, the limits met on the way. */
@@ -106,7 +131,7 @@ type Failure =
       readonly retryAt: null | string;
       readonly message: string;
       /** Why the provider could not serve anyone (`unwellReasonOf`); `null` for this request only. */
-      readonly unwell: null | string;
+      readonly unwell: null | UnwellReason;
     }
   | { readonly kind: "invalid"; readonly message: string };
 
@@ -191,7 +216,7 @@ class ReadOutcome {
   /** Each position asked: when (the isolate's clock) and whether it has started answering. */
   private readonly asked = new Map<number, { readonly at: number; hasSpoken: boolean }>();
   /** The positions that failed, with what each failure showed about the provider's health. */
-  private readonly failed = new Map<number, null | string>();
+  private readonly failed = new Map<number, null | UnwellReason>();
   /** The providers not resting, in the order to ask them (`orderByHealth`). */
   readonly ready: readonly ParseProvider[];
   /** Positions in `ready` of probes: providers back from a penalty, asked with the next at once. */
@@ -200,6 +225,8 @@ class ReadOutcome {
   retryAt: null | string = null;
   /** Every failure so far was an answer out of shape (and no provider was resting). */
   isEveryAnswerInvalid: boolean;
+  /** Some provider is configured (resting or not). */
+  readonly hasProviders: boolean;
 
   /** The providers not resting at `now`; the resting ones only say when they are back. */
   constructor(
@@ -222,6 +249,7 @@ class ReadOutcome {
         this.retryAt = earliest(this.retryAt, cooldowns[provider.name] ?? null);
       }
     }
+    this.hasProviders = providers.length > 0;
     // A provider resting now may read it later: then no text is hopeless.
     this.isEveryAnswerInvalid = this.ready.length === providers.length && this.ready.length > 0;
   }
@@ -252,24 +280,19 @@ class ReadOutcome {
     this.retryAt = earliest(this.retryAt, failure.retryAt);
   }
 
-  /**
-  What the race showed about each provider asked: the winner answered; a failure said it is
-  unwell; one still silent past `hedgeAfterMs` when the race ended was slow. The rest (an answer
-  out of shape, a rate limit, one asked too late to judge) say nothing.
-  */
+  /** What the race showed about each provider asked (`verdictOf`). */
   verdicts(won: Result<Won<unknown>, Lost>, hedgeAfterMs: number): readonly Verdict[] {
     const ended = Date.now();
-    return [...this.asked].flatMap(([index, attempt]): Verdict[] => {
-      const provider = this.ready[index]?.name ?? "?";
-      if (won.ok && won.value.index === index) {
-        return [{ outcome: "ok", provider, why: "" }];
-      }
-      if (this.failed.has(index)) {
-        const unwell = this.failed.get(index) ?? null;
-        return unwell === null ? [] : [{ outcome: "unwell", provider, why: unwell }];
-      }
-      const isSilent = !attempt.hasSpoken && ended - attempt.at >= hedgeAfterMs;
-      return isSilent ? [{ outcome: "slow", provider, why: "slow" }] : [];
+    return [...this.asked].flatMap(([index, attempt]) => {
+      const verdict = verdictOf({
+        ...(this.failed.has(index) && { failure: this.failed.get(index) ?? null }),
+        hasSpoken: attempt.hasSpoken,
+        isOutwaited: won.ok && ended - attempt.at >= hedgeAfterMs,
+        isProbe: this.probes.has(index),
+        isWinner: won.ok && won.value.index === index,
+        provider: this.ready[index]?.name ?? "?",
+      });
+      return verdict === null ? [] : [verdict];
     });
   }
 
@@ -281,7 +304,12 @@ class ReadOutcome {
       return ok({ limited, provider, result: won.value.value });
     }
     const isHopeless = this.isEveryAnswerInvalid && won.error === "failed";
-    return err({ code: isHopeless ? "llm/invalid-output" : "llm/unavailable", limited, retryAt });
+    return err({
+      code: isHopeless ? "llm/invalid-output" : "llm/unavailable",
+      limited,
+      reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, retryAt }),
+      retryAt,
+    });
   }
 }
 

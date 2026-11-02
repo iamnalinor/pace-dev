@@ -14,25 +14,32 @@ import {
 } from "@pace/core";
 
 import { askReply } from "./fake-ask.ts";
-import { failureOf, FINISH, SCHEMA_REFUSAL, sleep } from "./fake-call.ts";
+import {
+  failureOf,
+  FINISH,
+  type ModelObject,
+  SCHEMA_REFUSAL,
+  sleep,
+  type Streamed,
+  streamOf,
+  USAGE,
+} from "./fake-call.ts";
 import { DOMAIN_LINES } from "./prompt.ts";
 
 /**
 What a scripted model does with a message: answer it, be rate limited, refuse its key, be down
 (a 5xx with no retry hint), or have its endpoint refuse the answer it generated on the
-endpoint's own schema check: in the error's body (`failed_generation`), or after streaming it.
+endpoint's own schema check: in the error's body (`failed_generation`), or after streaming it;
+or send an error object as a stream chunk instead of an answer (`streamsError`: copy a real
+endpoint's object, bug class 97).
 */
 export type FakeReply =
   | ModelOutput
   | { readonly rateLimitedFor: number }
   | { readonly refusedWith: 401 | 403 }
   | { readonly schemaRefused: unknown; readonly via: "body" | "stream" }
+  | { readonly streamsError: object }
   | { readonly unavailableWith: 500 | 502 | 503 | 504 };
-
-const USAGE = {
-  inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
-  outputTokens: { reasoning: undefined, text: undefined, total: 50 },
-};
 
 type PromptMessage = { readonly role: string; readonly content: unknown };
 
@@ -49,47 +56,14 @@ const systemOf = (prompt: readonly PromptMessage[]): string => {
   return typeof system?.content === "string" ? system.content : "";
 };
 
-/** A model object of the current provider specification (`LanguageModel` also admits ids). */
-type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" }>;
-
 export type FakeModelOptions = {
   /** How long the model "thinks" before its first token (or its error), in ms. */
   readonly firstTokenAfterMs?: number;
   /** Sends the start of its answer, then the stream breaks (a provider dropping mid-answer). */
   readonly breaksMidStream?: boolean;
+  /** How long it takes from its first token to the rest of its answer, in ms. */
+  readonly restAfterMs?: number;
 };
-
-type StreamPart = Awaited<ReturnType<ModelObject["doStream"]>>["stream"];
-
-/**
-The answer as one text part; or its start and a dropped connection; or all of it and then the
-endpoint's refusal of it as a chunk (an endpoint that checks the whole answer at its end).
-*/
-const streamOf = (
-  text: string,
-  how: { readonly breaksMidStream: boolean; readonly isRefusedAfter: boolean },
-): StreamPart =>
-  new ReadableStream({
-    start: (controller) => {
-      controller.enqueue({ type: "stream-start", warnings: [] });
-      controller.enqueue({ id: "0", type: "text-start" });
-      if (how.breaksMidStream) {
-        controller.enqueue({ delta: text.slice(0, 10), id: "0", type: "text-delta" });
-        controller.enqueue({ error: new Error("connection reset"), type: "error" });
-        controller.close();
-        return;
-      }
-      controller.enqueue({ delta: text, id: "0", type: "text-delta" });
-      if (how.isRefusedAfter) {
-        controller.enqueue({ error: { ...SCHEMA_REFUSAL }, type: "error" });
-        controller.close();
-        return;
-      }
-      controller.enqueue({ id: "0", type: "text-end" });
-      controller.enqueue({ finishReason: FINISH, type: "finish", usage: USAGE });
-      controller.close();
-    },
-  });
 
 /**
 A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the process.
@@ -98,25 +72,25 @@ the answer as one text part after `firstTokenAfterMs`, and honours an abort whil
 */
 export const fakeParseModel = (
   reply: (text: string, system: string) => FakeReply,
-  { breaksMidStream = false, firstTokenAfterMs = 0 }: FakeModelOptions = {},
+  { breaksMidStream = false, firstTokenAfterMs = 0, restAfterMs = 0 }: FakeModelOptions = {},
 ): LanguageModel => {
   /** The scripted answer as JSON text, after the wait; a scripted failure is thrown. */
   const answerTo = async ({
     abortSignal,
     prompt,
-  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<{
-    readonly text: string;
-    readonly isRefusedAfter: boolean;
-  }> => {
+  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<Streamed> => {
     await sleep(firstTokenAfterMs, abortSignal);
     const answer = reply(messageOf(prompt), systemOf(prompt));
     const failure = failureOf(answer);
     if (failure !== null) {
       throw failure;
     }
+    if ("streamsError" in answer) {
+      return { errorAfter: answer.streamsError, text: "" };
+    }
     return "schemaRefused" in answer
-      ? { isRefusedAfter: true, text: JSON.stringify(answer.schemaRefused) }
-      : { isRefusedAfter: false, text: JSON.stringify(answer) };
+      ? { errorAfter: SCHEMA_REFUSAL, text: JSON.stringify(answer.schemaRefused) }
+      : { text: JSON.stringify(answer) };
   };
   const model: ModelObject = {
     doGenerate: async (call) => {
@@ -129,8 +103,13 @@ export const fakeParseModel = (
       };
     },
     doStream: async (call) => {
-      const { isRefusedAfter, text } = await answerTo(call);
-      return { stream: streamOf(text, { breaksMidStream, isRefusedAfter }) };
+      return {
+        stream: streamOf(await answerTo(call), {
+          breaksMidStream,
+          restAfterMs,
+          signal: call.abortSignal,
+        }),
+      };
     },
     modelId: "fake-parse",
     provider: "fake",

@@ -1,11 +1,13 @@
 import {
   accountTz,
   actionsByRules,
+  canReadLater,
   type DecisionResolution,
   domainByRules,
   endpoints,
   type ParseRequestBody,
   type ParseResponse,
+  type ParseUnavailableReason,
   resolutionsOf,
   RULES_CONFIDENCE,
   withSummary,
@@ -18,12 +20,35 @@ import type { AppStateHandle } from "./state.ts";
 
 import { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 
+/** Why no model read a text, and whether the server can keep it for one that can later. */
+export type Unread = {
+  readonly reason: ParseUnavailableReason;
+  /** "Read it when it's back" would be kept, not asked again to the same end (bug class 99). */
+  readonly canReadLater: boolean;
+};
+
+/**
+The `unavailable` answer's reason, as one rule for every screen that shows it. A server older than
+`reason` (or one naming a reason this client does not know) kept a text for later only with a
+time to wait for: its reason is read from that time.
+*/
+export const unreadOf = (answer: {
+  readonly reason: null | ParseUnavailableReason;
+  readonly retryAt: null | string;
+}): Unread =>
+  answer.reason === null
+    ? {
+        canReadLater: answer.retryAt !== null,
+        reason: answer.retryAt === null ? "unreachable" : "limited",
+      }
+    : { canReadLater: canReadLater(answer.reason), reason: answer.reason };
+
 /** What asking the assistant to read a line came to. */
 export type AiOutcome =
+  | (Unread & { readonly status: "unavailable"; readonly retryAt: null | string })
   | { readonly status: "failed" }
   | { readonly status: "queued"; readonly retryAt: null | string }
-  | { readonly status: "read"; readonly reading: AiReading }
-  | { readonly status: "unavailable"; readonly retryAt: null | string };
+  | { readonly status: "read"; readonly reading: AiReading };
 
 export type Assistant = {
   /** Reads a task or activity request into pending actions without writing them. */
@@ -80,6 +105,8 @@ const localReading = (
     actions: actionsByRules(text, read, { ctx, state }).map((body) => withSummary(body, [], world)),
     confidence: domain === "auto" ? RULES_CONFIDENCE : 1,
     domain: read,
+    // Our own server could not be reached, which is not about its models.
+    reason: null,
     retryAt: null,
     status: "unavailable",
   };
@@ -105,9 +132,12 @@ export const createAssistant = (deps: AssistantDeps): Assistant => ({
           ...(options.draft === true && { draft: true }),
         },
       });
-      return answer.status === "parsed"
-        ? { reading: aiReading(answer), status: "read" }
-        : { retryAt: answer.retryAt, status: answer.status };
+      if (answer.status === "parsed") {
+        return { reading: aiReading(answer), status: "read" };
+      }
+      return answer.status === "queued"
+        ? { retryAt: answer.retryAt, status: "queued" }
+        : { ...unreadOf(answer), retryAt: answer.retryAt, status: "unavailable" };
     } catch {
       return { status: "failed" };
     }

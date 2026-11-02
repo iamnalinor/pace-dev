@@ -67,8 +67,10 @@ const LineBlock = ({
           }}
           onCancel={flow.dismiss}
           onFollowup={flow.pending.followup}
+          // Offered once: after a press the status line below says what came of it.
+          onLater={flow.ai.state.status === "idle" ? () => void flow.readLater() : undefined}
           questions={flow.pending.pending.questions}
-          source={flow.pending.pending.status}
+          unread={flow.pending.pending.unread}
         />
       )}
       {flow.pending.issue === null ? null : (

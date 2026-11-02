@@ -2,8 +2,8 @@
 The answer schema's length limits, kept in one place (bug class 12): the model is shown the schema
 without them (some endpoints refuse them, Gemini's OpenAI layer answers 400), and its answer is
 clamped to them before the strict check, so a seventh option or an empty one costs that item,
-not the whole answer. Keys the answer left out that mean "does not apply" are filled first
-(`fillAbsent`, bug class 85).
+not the whole answer. Nullable keys an action left out ("does not apply") are filled first
+(`fillAbsent`, bug classes 85 and 95).
 */
 
 const LENGTH_LIMITS: ReadonlySet<string> = new Set(["maxItems", "maxLength", "minLength"]);
@@ -77,30 +77,22 @@ const isNullable = (node: Node): boolean =>
   (Array.isArray(node.type) && node.type.includes("null")) ||
   (node.anyOf ?? []).some((option) => nodeOf(option).type === "null");
 
-/** What stands for "does not apply" in a field: null where it may be null, else an empty list. */
-const emptyOf = (field: unknown): unknown => {
-  const node = nodeOf(field);
-  if (isNullable(node)) {
-    return null;
-  }
-  return node.type === "array" ? [] : undefined;
-};
-
 const requiredOf = (node: Node): readonly string[] =>
   Array.isArray(node.required)
     ? node.required.filter((key): key is string => typeof key === "string")
     : [];
 
 /**
-`value` with every required key it left out set to what means "does not apply" (null, or an empty
-list), at any depth (bug class 85): a best-effort endpoint's model drops the keys it has nothing
-for, though the schema asks for all of them. A key with no such value stays missing, for the
-strict check to refuse.
+`value` with every required key it left out that may be null set to null ("does not apply"),
+below the root (bug class 85): a best-effort endpoint's model drops the keys it has nothing for,
+though the schema asks for all of them. A list is never filled, at the root least of all: an
+answer with no `actions` is no reading, not "nothing to do" (bug class 95). A key that may not be
+null stays missing, for the strict check to refuse.
 */
-export const fillAbsent = (value: unknown, schema: unknown): unknown => {
+export const fillAbsent = (value: unknown, schema: unknown, isRoot = true): unknown => {
   const node = branchFor(nodeOf(schema), value);
   if (Array.isArray(value)) {
-    return value.map((item: unknown) => fillAbsent(item, node.items));
+    return value.map((item: unknown) => fillAbsent(item, node.items, false));
   }
   if (!isRecord(value)) {
     return value;
@@ -108,12 +100,13 @@ export const fillAbsent = (value: unknown, schema: unknown): unknown => {
   const properties = node.properties ?? {};
   const kept = Object.entries(value).map(([key, item]) => [
     key,
-    Object.hasOwn(properties, key) ? fillAbsent(item, properties[key]) : item,
+    Object.hasOwn(properties, key) ? fillAbsent(item, properties[key], false) : item,
   ]);
-  const added = requiredOf(node)
-    .filter((key) => !Object.hasOwn(value, key))
-    .map((key) => [key, emptyOf(properties[key])] as const)
-    .filter(([, empty]) => empty !== undefined);
+  const added = isRoot
+    ? []
+    : requiredOf(node)
+        .filter((key) => !Object.hasOwn(value, key) && isNullable(nodeOf(properties[key])))
+        .map((key) => [key, null] as const);
   return Object.fromEntries([...kept, ...added]);
 };
 

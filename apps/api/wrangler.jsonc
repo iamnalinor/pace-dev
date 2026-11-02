@@ -37,9 +37,16 @@
   ],
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "79653b9423324ba89a917eae8a8278a3" }],
   "durable_objects": {
-    "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+    "bindings": [
+      { "name": "USER_STORE", "class_name": "UserStore" },
+      // The LLM providers' health, one object for the deployment (src/shared/llm/health-object.ts).
+      { "name": "LLM_HEALTH", "class_name": "LlmHealth" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserStore"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UserStore"] },
+    { "tag": "v2", "new_sqlite_classes": ["LlmHealth"] }
+  ],
   "dev": { "port": 8787 },
   "env": {
     "dev": {
@@ -65,7 +72,10 @@
       ],
       "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
       "durable_objects": {
-        "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+        "bindings": [
+          { "name": "USER_STORE", "class_name": "UserStore" },
+          { "name": "LLM_HEALTH", "class_name": "LlmHealth" }
+        ]
       }
     }
   }

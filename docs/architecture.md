@@ -334,25 +334,46 @@ Two memories decide who is asked:
   provider until its `retry-after` (a minute without one), a refused key (401/403) for an hour.
   A resting provider is skipped; when all rest, the error says when the soonest is back.
 - **Health, shared by every user and isolate** (`health.ts`, `health-store.ts`): a failure that
-  says the provider cannot serve anyone (a 5xx, 404, 408 or 410, a timeout, a dropped connection),
-  or being silent past the hedge twice in a row while another provider answered, moves it to the
-  end of the order for a minute, doubling with each failure in a row up to 30 minutes; a success
-  clears it. A failure about this request, key or answer (a 400 or 422, an endpoint's refusal of
-  its own model's answer, a rate limit, a refused key) does not count. Moved last, not left out:
-  with every provider under penalty the configured order stands. Once a penalty is over the
-  provider is back in its place as a probe: the next provider is asked alongside it at once, so
-  nobody waits on a provider that may still be down. The memory is one Workers KV value
-  (`llm:health` in the `OAUTH_KV` namespace, beside the OAuth library's `client:`/`grant:`/`token:`
-  keys). Each isolate trusts what it read for 15 s; a read writes only when it changes a record (a
-  new penalty, the first success after one), reading the value afresh just before. KV is
-  eventually consistent (about a minute between locations), so another location may ask a down
-  provider first once more in that minute: one wait, never a wrong answer. Each change is logged
-  once ("provider asked last" with its reason and until when, "provider back in its place").
+  says the provider cannot serve anyone (a 5xx, 404, 408 or 410, a dropped connection or the race
+  giving up, an in-stream error object whose code or type says server error or overload), or
+  being silent past the hedge twice in a row while another provider answered, moves it to the end
+  of the order for a minute, doubling with each failure in a row up to 30 minutes; a success
+  clears it. A failure about this request, key or answer (a 400 or 422, `invalid_request_error`,
+  a content filter, a context too long, an endpoint's refusal of its own model's answer, a rate
+  limit, a refused key, an error object that says nothing known) does not count; an in-stream
+  rate limit (`code: 429`, `rate_limit*`) rests the provider for this person until the time it
+  names (`failure.ts` sorts every failure once, by what it says: bug class 15). Moved last, not
+  left out: with every provider under penalty the configured order stands. Once a penalty is over
+  the provider is back in its place as a probe: the next provider is asked alongside it at once,
+  so nobody waits on a provider that may still be down. Its first token counts as recovery; a
+  probe the read ends before it can judge goes back to its place, strikes kept, so no later read
+  asks two providers for it (bug class 96). Silence counts as slow only when some provider
+  answered: a read lost to its deadline strikes nobody. The memory is kept by its own small
+  Durable Object (`LlmHealth`, one for the deployment, `idFromName("global")`, `health-object.ts`
+  and `health-keeper.ts`): one writer, so records sent at once all count, and its storage is
+  written only when who is asked first changes (a penalty, a recovery, a probe put back); a first
+  slow answer stays in its memory. Each isolate trusts what it read for 15 s and calls the object
+  only for a read that changes a record as it sees it; the app's and the bot's reads save after
+  the response (`waitUntil`), the deferred queue's drain awaits it. The object unreachable, the
+  read goes ahead in the configured order and the failure is logged as an error. The reason kept
+  is a category (`server-error`, `gone`, `timeout`, `dropped`, `slow`), never an endpoint's words,
+  and a logged failure leaves out the generation an endpoint quotes back (bug class 98). Each
+  change is logged once ("provider asked last" with its reason and until when, "provider back in
+  its place").
 
-An answer passes one check however it arrives (`answer-check.ts`): keys the model left out that
-mean "does not apply" are filled (null or an empty list), lengths clamped, then the zod schema. An
+An answer passes one check however it arrives (`answer-check.ts`): nullable keys an action left
+out, which mean "does not apply", are filled with null (never a list: an answer with no `actions`
+is no reading, bug class 95), lengths clamped, then the zod schema. An
 endpoint that checks its model's answer itself and refuses it is read for that answer (bug class
 85); failing ours too, it is an answer out of shape, not an outage.
+
+When no model reads a text, the parse answer is the rules' reading with a `reason`
+(`PARSE_UNAVAILABLE_REASONS`): `limited` (resting, with a time), `unreachable` (down or silent,
+no time said), `unreadable` (every model answered out of shape) or `off` (no model configured).
+`defer` keeps the text on the server only for `limited` and `unreachable` (`canReadLater`; with
+no time it is read at the queue's next try, then every five minutes for a day); the app offers
+"Read it when it's back" only then, once, and says "couldn't read this one" for `unreadable`, as
+the bot does (bug class 99). An older server sends no reason: the client reads it from `retryAt`.
 
 On Day, the time bar offers Calendar, Task, Chores and Rest, plus a typed activity; Now
 shows a compact row for what is running. A computer can contribute foreground-app and
