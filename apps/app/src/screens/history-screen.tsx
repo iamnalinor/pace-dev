@@ -93,7 +93,9 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
           title={t("history.undoConfirm")}
           visible
         >
-          <Text className="font-sans text-[14px] text-fg">{t("history.undoConfirmQuestion")}</Text>
+          <Text className="pb-4 font-sans text-[14px] leading-5 text-fg">
+            {t("history.undoConfirmQuestion")}
+          </Text>
         </Sheet>
       ) : null}
     </View>

@@ -68,6 +68,15 @@ describe("catalogs", () => {
     expect(dotted).toEqual([]);
   });
 
+  it("ask to undo an event by what it does, not by saying the undo cannot be undone (QA round 19 L3)", () => {
+    for (const language of LANGUAGES) {
+      expect(t(language, "history.undoConfirmQuestion")).not.toMatch(
+        /cannot be undone|нельзя отменить/u,
+      );
+    }
+    expect(t("en", "history.undoConfirmQuestion")).toMatch(/recalculated without it/u);
+  });
+
   it("have no empty messages", () => {
     const empty = [...Object.entries(en), ...Object.entries(ru)].filter(
       ([, text]) => text.trim() === "",

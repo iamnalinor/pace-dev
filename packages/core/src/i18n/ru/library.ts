@@ -22,7 +22,8 @@ export const ruLibrary: { readonly [K in keyof typeof enLibrary]: string } = {
   "history.events": "События",
   "history.eventsUntil": "События до {when}",
   "history.revoked": "Отменено",
-  "history.undoConfirmQuestion": "Отменить это событие? Это действие нельзя отменить.",
+  "history.undoConfirmQuestion":
+    "Отменить это событие? Всё, что оно изменило, пересчитается без него.",
   "history.undoConfirm": "Отменить событие",
   "history.emptyAt": "На тот момент в Pace ещё ничего не было.",
   "event.task.created": "Задача создана",

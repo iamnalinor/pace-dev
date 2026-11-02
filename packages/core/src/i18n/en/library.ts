@@ -20,7 +20,8 @@ export const enLibrary = {
   "history.events": "Events",
   "history.eventsUntil": "Events up to {when}",
   "history.revoked": "Undone",
-  "history.undoConfirmQuestion": "Undo this event? This cannot be undone.",
+  "history.undoConfirmQuestion":
+    "Undo this event? Everything it changed is recalculated without it.",
   "history.undoConfirm": "Undo event",
   "history.emptyAt": "Nothing in Pace yet at that moment.",
   "event.task.created": "Task created",
