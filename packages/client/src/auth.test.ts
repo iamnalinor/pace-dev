@@ -321,6 +321,54 @@ describe("createAuth logout", () => {
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
   });
 
+  it("a session check answered after the logout leaves the device signed out (fix round 1 of QA 18)", async () => {
+    const held: { release?: () => void } = {};
+    const { auth, session } = await setup(
+      {
+        "GET /api/me": async () => {
+          await new Promise<void>((resolve) => {
+            held.release = resolve;
+          });
+          return fakeMe;
+        },
+        "POST /api/auth/logout": () => ({ ok: true }),
+      },
+      "stored",
+    );
+    const checking = auth.me();
+    await vi.waitFor(() => {
+      expect(held.release).toBeDefined();
+    });
+    await auth.logout();
+    held.release?.();
+    // The answer was for the token the person just signed out of: it writes nothing.
+    await expect(checking).resolves.toEqual({ error: "session/changed", ok: false });
+    expect(auth.token()).toBeUndefined();
+    await expect(session.get()).resolves.toBeNull();
+    expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+    expect(auth.hasEnded()).toBe(true);
+  });
+
+  it("a new session after a sign-out is a session again: login and an adopted token (fix round 1 of QA 18)", async () => {
+    const { auth } = await setup(
+      {
+        "GET /api/me": () => fakeMe,
+        "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
+        "POST /api/auth/logout": () => ({ ok: true }),
+      },
+      "stored",
+    );
+    expect(auth.hasEnded()).toBe(false);
+    await auth.logout();
+    expect(auth.hasEnded()).toBe(true);
+    await auth.loginWithDev("1");
+    expect(auth.hasEnded()).toBe(false);
+    await auth.logout();
+    expect(auth.hasEnded()).toBe(true);
+    await auth.adoptToken("tok_web");
+    expect(auth.hasEnded()).toBe(false);
+  });
+
   it("calls the API and clears the session even when the call fails", async () => {
     const { auth, calls, session } = await setup(
       { "POST /api/auth/logout": () => problem(500, "boom") },
@@ -391,6 +439,32 @@ describe("adoptToken", () => {
     expect(auth.token()).toBeUndefined();
     await expect(session.get()).resolves.toBeNull();
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
+  });
+
+  it("an answer for a token the device dropped meanwhile changes nothing (fix round 1 of QA 18)", async () => {
+    const held: { release?: () => void } = {};
+    const { auth, session } = await setup({
+      "GET /api/me": async () => {
+        await new Promise<void>((resolve) => {
+          held.release = resolve;
+        });
+        return fakeMe;
+      },
+      "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
+      "POST /api/auth/logout": () => ({ ok: true }),
+    });
+    const adopting = auth.adoptToken("tok_web");
+    await vi.waitFor(() => {
+      expect(held.release).toBeDefined();
+    });
+    // Another login takes the device's place while the adopted token's check is on its way.
+    await auth.loginWithDev("1");
+    held.release?.();
+    await expect(adopting).resolves.toEqual({ error: "session/changed", ok: false });
+    // The newer session stays: neither the late answer nor its failure touched it.
+    expect(auth.token()).toBe("tok_dev");
+    await expect(session.get()).resolves.toBe("tok_dev");
+    expect(auth.store.getState().status).toBe("signed-in");
   });
 
   it("drops the token again when the user cannot be loaded", async () => {

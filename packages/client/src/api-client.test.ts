@@ -150,9 +150,8 @@ describe("createApiClient", () => {
 });
 
 describe("createApiClient request shaping", () => {
-  // Public, so it is sent without a session: what is pinned here is the URL and the body.
   const bodyEndpoint = endpoint({
-    auth: false,
+    auth: true,
     body: z.object({ title: z.string() }),
     method: "POST",
     output: z.object({ id: z.string() }),

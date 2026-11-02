@@ -25,6 +25,9 @@ export type SyncStatus = {
 
 export type SyncSummary = { readonly pulled: number; readonly pushed: number };
 
+/** A run's page belonged to a local copy that was wiped while it was on its way. */
+export const COPY_CHANGED = "sync/copy-changed";
+
 const PUSH_BATCH = 200;
 const PULL_LIMIT = 200;
 
@@ -109,15 +112,23 @@ Whether a page comes from the server store the local log belongs to. The first p
 empty cursor adopts the store's id. A different id (or a log pulled before ids existed)
 means the server's data was reset: the local copy is dropped (see `Reset`).
 */
-const isSameStore = async (
-  store: EventStore,
-  reset: Reset,
-  page: { readonly since: number; readonly storeId: string },
-): Promise<boolean> => {
+const isSameStore = async ({
+  ensureCopy,
+  page,
+  reset,
+  store,
+}: {
+  readonly store: EventStore;
+  readonly reset: Reset;
+  readonly page: { readonly since: number; readonly storeId: string };
+  /** Throws when the local copy the page was asked for is gone. */
+  readonly ensureCopy: () => void;
+}): Promise<boolean> => {
   const known = await store.getStoreId();
   if (known === page.storeId) {
     return true;
   }
+  ensureCopy();
   if (known === null && page.since === 0) {
     await store.setStoreId(page.storeId);
     return true;
@@ -129,17 +140,28 @@ const isSameStore = async (
 /**
 Applies one page of the server's log: the pull's pages and the live socket's alike. A page of
 another store drops the local copy instead (`null`); otherwise its valid events go in and the
-cursor moves to its `seq`.
+cursor moves to its `seq`. `copy` is the local copy the page was asked for (`state.copy()`).
 */
 const applyPage = async (
   { reset, state, store }: Run,
   page: PullPage,
+  copy: number,
 ): Promise<null | readonly Event[]> => {
-  if (!(await isSameStore(store, reset, page))) {
+  // Asked for a copy that was wiped since (a sign-out, another server): nothing of it is
+  // written into the fresh one, neither its store id, its events nor its cursor.
+  const ensureCopy = (): void => {
+    if (state.copy() !== copy) {
+      throw new Error(COPY_CHANGED);
+    }
+  };
+  ensureCopy();
+  if (!(await isSameStore({ ensureCopy, page, reset, store }))) {
     return null;
   }
   const events = validEvents(page.events);
+  ensureCopy();
   await state.ingest(events);
+  ensureCopy();
   await store.setCursor(page.seq);
   return events;
 };
@@ -148,8 +170,9 @@ const pullSince = async (run: Run): Promise<number> => {
   let pulled = 0;
   let isMore = true;
   while (isMore) {
+    const copy = run.state.copy();
     const page = await run.transport.pull(await run.store.getCursor(), PULL_LIMIT);
-    const events = await applyPage(run, page);
+    const events = await applyPage(run, page, copy);
     if (events === null) {
       // Dropped: start again from the fresh store's first event.
       pulled = 0;
@@ -222,9 +245,10 @@ export const runSync = async (
 /** Applies a live page that fits (one at a time, never during a run); true when a pull is needed. */
 export const shouldPullFor = async (deps: SyncDeps, page: PullPage): Promise<boolean> => {
   await deps.state.ready;
+  const copy = deps.state.copy();
   const fit = await fitOf(deps.store, page);
   if (fit === "apply") {
-    await applyPage({ ...deps, reset: createReset(deps.store, deps.state) }, page);
+    await applyPage({ ...deps, reset: createReset(deps.store, deps.state) }, page, copy);
   }
   return fit === "pull";
 };

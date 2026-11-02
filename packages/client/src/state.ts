@@ -111,6 +111,11 @@ export type AppStateHandle = {
   queue (a write still waiting is never made), and the state is empty.
   */
   readonly clear: () => Promise<void>;
+  /**
+  Which local copy is current, bumped the moment `clear` is called (before its turn in the
+  queue): a server page asked for one copy is never written into the next (fix round 1 of QA 18).
+  */
+  readonly copy: () => number;
 };
 
 const slice =
@@ -304,6 +309,7 @@ export const createAppState = (options: Options): AppStateHandle => {
   const { deviceId, now } = options;
   const store = createStore<AppState>(() => initialState(deviceId));
   const log = createLocalLog(options.store, store, FOLD);
+  let copies = 0;
   const ready = log.reload();
   const enqueue = createQueue(ready);
   const stage = createStage(log, enqueue, options);
@@ -333,10 +339,12 @@ export const createAppState = (options: Options): AppStateHandle => {
   return {
     ...externalChanges(log, enqueue, options.onStored),
     clear: async () => {
+      copies += 1;
       await enqueue(log.clear);
       // The other tabs share the store that was just emptied: they read it again.
       options.onStored?.({ kind: "reload" });
     },
+    copy: () => copies,
     dispatch,
     ready,
     revoke,

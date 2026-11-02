@@ -1,3 +1,5 @@
+import type { Request } from "@playwright/test";
+
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
 import { documentGround, rgb } from "./support/theme-colors.ts";
@@ -61,19 +63,19 @@ test("after Log out the network goes quiet: no request names the session, nothin
     },
   ]);
   expect(english.ok).toBe(true);
-  const after: { readonly method: string; readonly path: string; readonly auth?: string }[] = [];
-  const refused: string[] = [];
-  const errors: string[] = [];
-  const watching = { isOn: false };
+  // Everything is recorded with the wall-clock time it began; the press is stamped on the page
+  // itself, so a poll that went out just before it is never counted as the sign-out's.
+  const asked: { readonly request: Request; readonly path: string }[] = [];
+  const refused: { readonly at: number; readonly what: string }[] = [];
+  const errors: { readonly at: number; readonly text: string }[] = [];
+  const sockets: number[] = [];
   const pending = new Set<unknown>();
   page.on("request", (request) => {
     pending.add(request);
     const { pathname } = new URL(request.url());
-    if (!watching.isOn || !pathname.startsWith("/api/")) {
-      return;
+    if (pathname.startsWith("/api/")) {
+      asked.push({ path: pathname, request });
     }
-    const auth = request.headers()["authorization"];
-    after.push({ method: request.method(), path: pathname, ...(auth !== undefined && { auth }) });
   });
   page.on("requestfinished", (request) => {
     pending.delete(request);
@@ -82,14 +84,17 @@ test("after Log out the network goes quiet: no request names the session, nothin
     pending.delete(request);
   });
   page.on("response", (response) => {
-    if (watching.isOn && response.status() >= 400) {
-      refused.push(`${String(response.status())} ${response.url()}`);
+    if (response.status() >= 400) {
+      refused.push({ at: Date.now(), what: `${String(response.status())} ${response.url()}` });
     }
   });
   page.on("console", (message) => {
-    if (watching.isOn && message.type() === "error") {
-      errors.push(message.text());
+    if (message.type() === "error") {
+      errors.push({ at: Date.now(), text: message.text() });
     }
+  });
+  page.on("websocket", () => {
+    sockets.push(Date.now());
   });
   // Now and Day mounted first: their calendar reads, the sync loop and the socket all run.
   await page.goto("/");
@@ -100,29 +105,52 @@ test("after Log out the network goes quiet: no request names the session, nothin
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: "Settings" })
     .click();
-  // The start has had its answers (sync, calendar, notifications): what follows is the sign-out's.
+  // The start has had its answers (sync, calendar, notifications) and the socket is open.
   await expect.poll(() => pending.size).toBe(0);
-  watching.isOn = true;
-  await page.getByRole("button", { name: "Log out" }).click();
+  expect(sockets.length).toBeGreaterThan(0);
+  const logOut = page.getByRole("button", { name: "Log out" });
+  await logOut.evaluate((button) => {
+    button.addEventListener(
+      "pointerdown",
+      () => {
+        document.documentElement.dataset["pressedAt"] = String(Date.now());
+      },
+      { capture: true, once: true },
+    );
+  });
+  await logOut.click();
   await expect(page).toHaveURL(/\/login$/u);
   // Long enough for a socket close, a retry or a screen's refetch to show itself.
   // eslint-disable-next-line playwright/no-wait-for-timeout, sonarjs/no-fixed-wait-in-tests -- a quiet network is the absence of requests over a window; no DOM condition marks it
   await page.waitForTimeout(2000);
-  expect(after.filter((request) => request.auth !== undefined)).toEqual([
+  const pressedAt = Number(
+    await page.evaluate(() => globalThis.document.documentElement.dataset["pressedAt"]),
+  );
+  expect(pressedAt).toBeGreaterThan(0);
+  const after = asked
+    .filter(({ request }) => request.timing().startTime >= pressedAt)
+    .map(({ path, request }) => ({
+      auth: request.headers()["authorization"] ?? null,
+      method: request.method(),
+      path,
+    }));
+  expect(after.filter((request) => request.auth !== null)).toEqual([
     { auth: `Bearer ${token}`, method: "POST", path: "/api/auth/logout" },
   ]);
   // Only the public server check may follow, and it names no one.
   expect(after.filter((request) => request.path !== "/api/instance").map((r) => r.path)).toEqual([
     "/api/auth/logout",
   ]);
-  expect(refused).toEqual([]);
-  expect(errors).toEqual([]);
+  // No socket opens again with the ended session.
+  expect(sockets.filter((at) => at >= pressedAt)).toEqual([]);
+  expect(refused.filter(({ at }) => at >= pressedAt).map(({ what }) => what)).toEqual([]);
+  expect(errors.filter(({ at }) => at >= pressedAt).map(({ text }) => text)).toEqual([]);
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
   await expect(page.getByText(/You were signed out/u)).toHaveCount(0);
-  expect(refused).toEqual([]);
-  expect(errors).toEqual([]);
+  expect(refused.filter(({ at }) => at >= pressedAt).map(({ what }) => what)).toEqual([]);
+  expect(errors.filter(({ at }) => at >= pressedAt).map(({ text }) => text)).toEqual([]);
 });
 
 test("the theme choice is kept per device and paints the page", async ({ page }) => {

@@ -191,6 +191,39 @@ describe("createSyncClient pull", () => {
   });
 });
 
+describe("createSyncClient across a wipe", () => {
+  it("drops a page pulled for the copy a sign-out wiped meanwhile (fix round 1 of QA 18)", async () => {
+    const held: { release?: () => void } = {};
+    const { state, store, sync } = await setup({
+      "GET /api/sync/pull": async () => {
+        await new Promise<void>((resolve) => {
+          held.release = resolve;
+        });
+        return {
+          events: [settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" })],
+          more: false,
+          seq: 7,
+          storeId: STORE_ID,
+        };
+      },
+    });
+    const syncing = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(held.release).toBeDefined();
+    });
+    // The person logs out while the first page is on its way: the local copy is wiped.
+    await state.clear();
+    held.release?.();
+    const result = await syncing;
+    expect(result.ok).toBe(false);
+    // The old account's page never lands in the fresh copy: no events, no cursor, no store id.
+    expect(state.store.getState().events).toEqual([]);
+    await expect(store.listAll()).resolves.toEqual([]);
+    await expect(store.getCursor()).resolves.toBe(0);
+    await expect(store.getStoreId()).resolves.toBeNull();
+  });
+});
+
 describe("createSyncClient store id", () => {
   const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
 

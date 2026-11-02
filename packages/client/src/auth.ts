@@ -115,6 +115,9 @@ export type Auth = {
   readonly isSessionStored: () => Promise<boolean>;
 };
 
+/** A session check whose token is no longer the one in use when it is answered. */
+const SESSION_CHANGED = "session/changed";
+
 const errorCode = (error: unknown): string => (error instanceof ApiError ? error.code : "network");
 
 const sleep = async (ms: number, signal: AbortSignal | undefined): Promise<void> => {
@@ -248,6 +251,11 @@ const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User
   try {
     // The answer carries the store id too; the sync confirms that on its own pulls.
     const user = UserSchema.parse(await api.call(endpoints.me, {}));
+    // An answer for a token this device dropped or replaced meanwhile (a Log out while the check
+    // was on its way) writes nothing: it would sign a wiped device back in (fix round 1 of QA 18).
+    if (session.token() !== sent) {
+      return err(SESSION_CHANGED);
+    }
     session.store.setState({ status: "signed-in", user });
     return ok(user);
   } catch (error) {
@@ -295,7 +303,10 @@ export const createAuth = (options: {
     adoptToken: async (token) => {
       await session.adopt(token);
       const result = await me();
-      if (!result.ok) {
+      // Dropped (and never "ended elsewhere": it was no session yet) unless a login since then
+      // holds the device: that newer session stays.
+      const current = session.token();
+      if (!result.ok && (current === token || current === undefined)) {
         await session.signOut();
       }
       return result;

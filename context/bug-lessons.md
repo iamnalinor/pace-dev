@@ -450,6 +450,21 @@ The same rule applies when a previously successful channel is no longer configur
   after Log out on a lived-in account no request names the session but the logout, no 4xx, no
   console error, and a reload shows no "ended elsewhere"; `loginViaApi` puts the token in once per
   tab and `docs/qa.md` tells QA scripts to do the same.
+- **Fix round 1 of QA 18 (review): an answer that writes auth state checks the token it was sent
+  with.** With Log out signing out first, a session check (`me`) already on its way (the start-up
+  refresh, the 4401 check, `adoptToken`) answered 200 after the logout and set `signed-in` again,
+  with no token, on the wiped store: `me`'s failure branch compared the token, its success branch
+  did not. Now both apply only while `session.token()` is still the one sent (else
+  `session/changed`, nothing written), and `adoptToken` drops a refused token only while no newer
+  login holds the device. Sweep of every auth-state writer: `meOf` (both branches), `adoptToken`,
+  the 4401 handler (acts only on `me`'s answer), the logins (they mint a new token: writing it is
+  their purpose), `forget`/`finishAccountDeletion`/`logout` (local, no answer to wait for). The same
+  gap at the data layer: a first pull on its way at Log out wrote the old account's page, store id
+  and cursor into the wiped copy; a pull now remembers the local copy it asked for
+  (`state.copy()`, bumped the moment `clear` is called) and drops a page for a copy that is gone
+  (`sync-pages.ts`). Guards: `auth.test.ts` (a held `me` released after logout or after another
+  login changes nothing; `hasEnded` resets on login and adopt), `sync-client.test.ts` (a held first
+  pull released after `clear` writes nothing).
 
 ### 49. Text a client chose shown as what the server saw
 - **Bug.** Review of the sign-in notices (phase C, Task 5): a deep-link nonce is minted by whoever asks for it, with any `deviceName`. Someone who gets a person to open their link would get a session on that person's account, and a notice that opened with "You signed in from Pixel 9a" would vouch for it in words the stranger chose.
@@ -1085,6 +1100,13 @@ The same rule applies when a previously successful channel is no longer configur
   sentences in both languages; `toastQuote` length), the gallery's Toast section at the docked and
   the phone width, and `e2e/worst-case.e2e.ts`, which fails any toast line cut off at the bottom
   (never a known break).
+- **Fix round 1 of QA 18 (review).** Quoting whole lines broke the rule the instance set: the
+  approval toast clipped each done line (cutting the sentence and its closing quote) and listed up
+  to ten of them (about 25 lines in the dock, over the sidebar's links, class 6). The name is now
+  quoted at its slot inside the sentence (`doneLines(…, quote)` quotes the subject and the new name)
+  and the message names two actions and counts the rest (`approvalText`, «и ещё 3 действия», plural
+  in both languages); the gallery's Toast section carries a ten-action approval, so the overflow
+  sweep reads it.
 
 ### 59. Locale formatting by hand
 - **Bug.** Design review 05 (F-CPY-04): Insights showed «3.3» and «0.0» in Russian (`toFixed(1)`), a count of 1 284 read «1284» (`String(count)`), Russian durations were «23 ч 58 м» (a breaking space, «м» reads as metres) and `formatDuration` never rolled hours into days («Оценка 168 ч») while `formatLeft` did. The catalog held «15 минут» and «2,5 ч» with plain spaces, so a unit could land alone at the start of a line.
@@ -1437,3 +1459,5 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Review of the batch 1+2 visual fix: a leading icon kept its unselected colour on a chosen (solid accent) chip (1.2-2.7:1); the slider lost its keyboard ring to `input:focus`; Space did not toggle the drawn switch (library default); the switch target was 32 px | 61 (icon, hit target), 62 (new: Space, ring cascade) | yes: every `leading=` caller (3, now a function of the chip's colour), every radio/checkbox/switch `Pressable` (10), every `outline` rule in `global.css` | `chip.test.tsx` (icon colour per state, 48 target), `switch-row.test.tsx` (48 target, inset), `space-press.web.test.ts`, `focus-ring.test.ts`, `e2e/keyboard.e2e.ts` |
 | 2026-11-02 | QA round 18 R18-01: the "could not save, nothing changed" sentence was cut after three lines in the toast (~200 px docked in the sidebar, RU) | 58 | yes: every toast that quotes data (quoted short) and every toast sentence of its own (shown whole); other UI copy under a line limit listed with its owning task | `toast.test.tsx` (no line limit, the three longest sentences EN/RU, `toastQuote`); gallery Toast section; `worst-case.e2e.ts` fails a toast line cut off at the bottom |
 | 2026-11-02 | QA round 18 R18-02: Log out told the server before forgetting the token (a 4401 close, sync or check in the gap used the revoked token, a 401 could read as "ended elsewhere"); after sign-out, screens and the bootstrap sent calls with no token (401s, console errors); the reload notice came from the QA script re-adding the token | 48 (client side) | yes: every way a session ends (logout fixed; this-device revoke, deletion, remote revoke already local-first); after a session ended, every call needing one stops in the client | client tests (logout order, 4401 during logout, no call after the session ended, explicit credential); app tests (quiet network after Log out, refused start asks nothing more); `login.e2e.ts` network-quiet Log out with reload; `loginViaApi` once per tab; `docs/qa.md` line |
+| 2026-11-02 | Fix round 1 of QA 18: a session check answered after Log out signed the wiped device back in (`me` success branch ignored the token it was sent with); a first pull answered after Log out wrote the old account's page into the wiped copy; the approval toast clipped whole lines and listed up to ten | 48 (client side), 58 | yes: every auth-state writer; every page the sync applies (pull and live) | `auth.test.ts` held `me` after logout / after another login; `hasEnded` reset; `sync-client.test.ts` held first pull after `clear`; `approved.test.ts`; gallery ten-action approval toast in `worst-case.e2e.ts` |
+| 2026-11-02 | Fix round 1 of QA 18, full e2e: an Approve click right after the assistant's preview showed did nothing under load (`overlays.e2e.ts` phone, `live.e2e.ts`; the trace shows the preview's card still scrolling into place when the press landed) | 5 (a control clicked while it moves) | yes: every Approve click in e2e (`support/composer.ts`, `live`, `assistant`, `composer`, `time`) | `clickWhenSettled` in `e2e/support/geometry.ts`: clicks once the control's box held still for 120 ms |
