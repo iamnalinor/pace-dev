@@ -9,7 +9,7 @@ import { ComposerProvider, useComposerFlow } from "#app/features/now/composer/co
 import { ComposerPane } from "#app/features/now/composer/composer-pane.tsx";
 import { NowBoard } from "#app/features/now/now-screen.tsx";
 import { TaskScreen } from "#app/features/task/task-screen.tsx";
-import { forgetLineDraft, noteLineDraft } from "#app/platform/shared-in.ts";
+import { useLineDraftNote } from "#app/platform/shared-in.ts";
 import { TaskOpenerProvider, TaskPaneProvider } from "#app/shared/task-opener.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 
@@ -90,15 +90,11 @@ const NowSplit = ({
   );
 };
 
-/** Tells the share target what Now's line holds as it is typed (QA round 19 L4). */
+/** Tells the share target what the line holds as it is typed (QA round 19 L4, round 6 M3). */
 const LineDraftNote = () => {
-  const { text } = useComposerFlow();
-  useEffect(() => {
-    noteLineDraft(text);
-    return () => {
-      forgetLineDraft(text);
-    };
-  }, [text]);
+  const { model, text } = useComposerFlow();
+  // The line's text, or the title typed into an open New task form (the phone's bare Add tab).
+  useLineDraftNote(text.trim() === "" ? model.title : text);
   return null;
 };
 
@@ -113,7 +109,7 @@ export const NowScreen = ({
   opensForm = false,
 }: {
   readonly compose?: SharedIn | undefined;
-  /** Now at "/": its line tells the share target what it holds, to add a share after it. */
+  /** The line a share goes after (Now at "/" on the web, the Add tab on a phone) tells what it holds. */
   readonly notesLineDraft?: boolean;
   /** New task arriving on /add: the empty form opens at once. */
   readonly opensForm?: boolean;

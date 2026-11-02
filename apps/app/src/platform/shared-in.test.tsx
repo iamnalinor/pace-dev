@@ -3,10 +3,10 @@ import type * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 
-import { NowScreen } from "#app/screens/now-screen.tsx";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
+import AddRoute from "../../app/(tabs)/add.tsx";
 import { useSharedIn } from "./shared-in.ts";
 
 type MockIntent = { readonly text: null | string; readonly webUrl: null | string };
@@ -76,7 +76,7 @@ describe("a share from Android's share sheet (QA round 17 round-3 sweep of C1)",
 });
 
 /** The Add tab as its route builds it: Now with the share in the composer. */
-const Add = () => <NowScreen compose={useSharedIn()} />;
+const Add = AddRoute;
 const line = () => screen.getByPlaceholderText(en("composer.placeholder"));
 
 /** Android's share sheet hands over "Buy milk" again: the library makes a new object for each. */
@@ -99,5 +99,15 @@ describe("the same text shared twice (QA round 17 round-4 review R2)", () => {
     await fireEvent.changeText(line(), "");
     await shareMilk();
     expect(line()).toHaveDisplayValue("Buy milk");
+  });
+});
+
+describe("a share over what was typed in the Add tab (round 6 M3)", () => {
+  it("goes on a new line after what was typed in New task instead of replacing it", async () => {
+    await renderScreen(<Add />, await createTestRuntime());
+    // The bare Add tab is New task: the person types its title.
+    await fireEvent.changeText(screen.getByLabelText(en("edit.taskTitle")), "half typed");
+    await shareMilk();
+    expect(line()).toHaveDisplayValue("half typed\nBuy milk");
   });
 });

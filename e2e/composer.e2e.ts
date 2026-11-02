@@ -126,6 +126,46 @@ test("a blank share lands on Now at / with the line focused, like the others (QA
   await expect(page.getByRole("form", { name: "New task" })).toHaveCount(0);
 });
 
+/** Goes to `path` inside the page, as the router does (no new page). */
+const goInPage = async (page: Page, path: string): Promise<void> => {
+  await page.evaluate((to) => {
+    globalThis.history.pushState(null, "", to);
+    globalThis.dispatchEvent(new Event("popstate"));
+  }, path);
+};
+
+test.describe("a share over a half-typed line (QA 20 M3, round 6 M3)", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginViaApi(page);
+    await page.goto("/");
+    const line = page.getByRole("textbox", { name: "New task" });
+    await line.fill("half typed");
+    await expect(line).toHaveValue("half typed");
+  });
+
+  test("arriving in the page goes on a new line after it", async ({ page }) => {
+    await goInPage(page, "/add?text=Shared%20over%20typing");
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+    await expect(page.getByRole("textbox", { name: "New task" })).toHaveValue(
+      "half typed\nShared over typing",
+    );
+  });
+
+  test("arriving as a new page of the tab goes on a new line after it", async ({ page }) => {
+    await page.goto("/add?text=Shared%20over%20typing");
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+    await expect(page.getByRole("textbox", { name: "New task" })).toHaveValue(
+      "half typed\nShared over typing",
+    );
+  });
+
+  test("a blank one leaves it as it was", async ({ page }) => {
+    await goInPage(page, "/add?text=%20");
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+    await expect(page.getByRole("textbox", { name: "New task" })).toHaveValue("half typed");
+  });
+});
+
 test("a title typed into the empty form is added on Enter", async ({ page }) => {
   await loginViaApi(page);
   await page.goto("/");

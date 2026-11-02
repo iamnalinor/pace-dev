@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { type ArrivingShare, type SharedIn, sharedLine } from "./shared-line.ts";
+import { afterTyped, type ArrivingShare, type SharedIn, sharedLine } from "./shared-line.ts";
 
 /** A query value as one string (the router hands a repeated key over as a list). */
 const first = (value: readonly string[] | string | undefined): string | undefined =>
@@ -13,33 +13,48 @@ has it. Kept for the page's life, not in a screen: the share target and Now are 
 */
 const handoff = {
   arrivals: 0,
-  /** What Now's line holds as typed, so a share is added after it (QA round 19 L4). */
-  draft: "",
   listeners: new Set<() => void>(),
   waiting: null as null | SharedIn,
 };
 
+/** Where Now's half-typed line is kept: the tab's sessionStorage (a page of its own, else memory). */
+const DRAFT_KEY = "pace.lineDraft";
+const draftInMemory = { text: "" };
+
+const readDraft = (): string => {
+  try {
+    return globalThis.sessionStorage.getItem(DRAFT_KEY) ?? "";
+  } catch {
+    return draftInMemory.text;
+  }
+};
+
+const keepDraft = (text: string): void => {
+  draftInMemory.text = text;
+  try {
+    if (text === "") {
+      globalThis.sessionStorage.removeItem(DRAFT_KEY);
+    } else {
+      globalThis.sessionStorage.setItem(DRAFT_KEY, text);
+    }
+  } catch {
+    // Blocked storage: the page's memory keeps it for a share within the page.
+  }
+};
+
+/** Which route's line keeps the draft a share goes after: Now at "/" (the share target hands on there). */
+export const LINE_DRAFT_ROUTE: "add" | "index" = "index";
+
 /**
-Now's line tells what it holds as it is typed: a share arriving in the same page goes on a new
-line after it instead of replacing it (QA round 19 L4). `forget` from a line that goes away
-clears it, unless another line has noted its own since.
+Now's line tells what it holds as it is typed, and that stays when the line goes away: the share
+target reads it after "/" has gone (a route change in the page) or in a new page of the same tab
+(the installed app's share opens one), and puts the share on a new line after it (QA round 19 L4,
+QA round 20 M3, round 6 M3). An emptied line (a task added) leaves nothing.
 */
-export const noteLineDraft = (text: string): void => {
-  handoff.draft = text;
-};
-
-export const forgetLineDraft = (text: string): void => {
-  if (handoff.draft === text) {
-    handoff.draft = "";
-  }
-};
-
-/** The shared text after what was typed, on a line of its own. */
-const afterTyped = (typed: string, shared: string): string => {
-  if (typed.trim() === "") {
-    return shared;
-  }
-  return shared === "" ? typed : `${typed.trimEnd()}\n${shared}`;
+export const useLineDraftNote = (text: string): void => {
+  useEffect(() => {
+    keepDraft(text);
+  }, [text]);
 };
 
 const hand = (text: string): void => {
@@ -81,7 +96,7 @@ export const useSharedIn = (): ArrivingShare => {
       return;
     }
 
-    hand(afterTyped(handoff.draft, shared));
+    hand(afterTyped(readDraft(), shared));
     router.replace("/");
   }, [isShare, router, shared]);
   return { isNewTask: !isShare, seq: 0, text: shared };

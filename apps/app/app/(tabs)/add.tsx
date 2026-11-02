@@ -1,8 +1,14 @@
-import { useSharedIn } from "#app/platform/shared-in.ts";
+import { LINE_DRAFT_ROUTE, useSharedIn } from "#app/platform/shared-in.ts";
 import { NowScreen } from "#app/screens/now-screen.tsx";
 
 /** The Add tab and the share target: Now with the shared text already in the composer. */
 export default function AddRoute() {
   const shared = useSharedIn();
-  return <NowScreen compose={shared} opensForm={shared.isNewTask} />;
+  return (
+    <NowScreen
+      compose={shared}
+      notesLineDraft={LINE_DRAFT_ROUTE === "add"}
+      opensForm={shared.isNewTask}
+    />
+  );
 }

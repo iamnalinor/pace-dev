@@ -680,6 +680,21 @@ The same rule applies when a previously successful channel is no longer configur
   not on the effect both cases share. Test both: the case it refuses and the one it must let
   through (`refuse-focus.web.test.ts`, the e2e focuses the dim from the sheet and it stays).
 
+### 77. A hand-off between two screens tested with both mounted at once
+- **Bug.** QA round 20 M3 (and round 6 review M3): a share arriving in the page replaced Now's
+  half-typed line, and a blank one wiped it. Now's line noted its text for the share target and
+  took the note back when it unmounted; a route change unmounts "/" before the share target reads
+  the note, so the share was handed over alone (a blank one as an empty line), and a share that
+  opens a new page of the tab found no note at all.
+- **Missed because.** The unit test mounted the share target and Now side by side and called the
+  note function by hand, so the line never left before the read; nothing went through a route
+  change or a new page.
+- **Rule.** What one screen hands to the next outlives the screen that leaves: it is kept where the
+  next one will read it (here the tab's sessionStorage), and a screen's clean-up never clears it on
+  the way out; it is cleared by what makes it moot (the line emptied). Test a hand-off the way it
+  happens: the first screen typed into and unmounted, then the second mounted (and a fresh page
+  that has only the storage); the e2e types, then navigates in the page and by a new page.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -935,3 +950,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Round 6 review M4: the sheet's dim refused every focus, so a screen reader moving onto it from the sheet was thrown to the page | 76 (new) | yes: the dim is the one control that refuses focus; the other focus moves (`moveFocus`, the sheet's first-field focus) put focus on a target, never take it away | `refuseFocus` refuses only focus from outside its modal (the trap's opener or bracket); unit test of both cases; the e2e keeps Shift+Tab inside the sheet and keeps a focus moved onto the dim from the sheet |
 | 2026-11-02 | Round 6 review M5: Done's explanation still said only "Long press" though a visible button beside it now opens the same sheet, and it was given twice in code (tooltip and hint) | 72 | yes: Done is the only control with a long press | the copy names the button beside it (EN, RU); the comment says which reader gets which (the web drops `hint` and describes Done by its tooltip; the phone's reader gets the hint); app test |
 | 2026-11-02 | Round 6 review M7: the Assistant log's request had no deadline, so a stalled one kept the grey rows for good | 62 (a cover with no bound) | yes: every screen that waits on a request of its own: the Devices list and the consent page's client details had no deadline either and now have one; the sync is bounded since QA 17 I2; the usage and calendar ranges show no loading state | `withinDeadline` / `REQUEST_DEADLINE_MS` (15 s, the request aborted) shared by the three; the log and Devices end in their failure line with Try again, the consent page says it failed; app tests on fake timers with requests that never answer, for each |
+| 2026-11-02 | QA round 20 M3, round 6 review M3: a share arriving in the page replaced Now's half-typed line, a blank one wiped it, and a share opening a new page of the tab never found the typed text; on a phone a share replaced what was typed in the Add tab's New task | 77 (new) | yes: the other hand-offs between routes: the share itself (kept in the page's hand-off until Now takes it, already), the bot login's nonce and the account confirmation (kept in sessionStorage since class 29), the Telegram return (sessionStorage); the phone's Add tab now notes its own typed text (the line, or New task's title) | the draft is kept in the tab's sessionStorage and never cleared by the line leaving (`useLineDraftNote`), a blank share hands the typed text back; web tests unmount Now before the share target reads and start from storage alone; a native test types New task's title and shares over it; e2e: in-page share, new-page share and blank share over a typed line |

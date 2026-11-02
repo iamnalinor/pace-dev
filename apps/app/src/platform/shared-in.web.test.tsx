@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { useState } from "react";
 import { TextInput } from "react-native";
 
-import { noteLineDraft, useHandedShare, useSharedIn } from "./shared-in.web.ts";
+import { useHandedShare, useLineDraftNote, useSharedIn } from "./shared-in.web.ts";
 
 type MockParams = { readonly text?: string };
 
@@ -41,20 +41,21 @@ jest.mock("expo-router", () => ({
   }),
 }));
 
-/** A line that keeps what it was opened with, as the composer does, keyed by the share's arrival. */
-const Field = ({ initial }: { readonly initial: string }) => {
-  const [value, setValue] = useState(initial);
-  return <TextInput onChangeText={setValue} testID="line" value={value} />;
-};
 /** The share target: it takes the share from the address. */
 const Add = () => {
   useSharedIn();
   return null;
 };
+/** A line that keeps what it was opened with and tells the share target what it holds, as Now's does. */
+const NotedField = ({ initial }: { readonly initial: string }) => {
+  const [value, setValue] = useState(initial);
+  useLineDraftNote(value);
+  return <TextInput onChangeText={setValue} testID="line" value={value} />;
+};
 /** Now at "/", where the share lands. */
 const Now = () => {
   const share = useHandedShare();
-  return <Field initial={share?.text ?? ""} key={share?.seq ?? 0} />;
+  return <NotedField initial={share?.text ?? ""} key={share?.seq ?? 0} />;
 };
 const App = () => (
   <>
@@ -63,10 +64,30 @@ const App = () => (
   </>
 );
 
+/** The tab's sessionStorage, which the React Native test environment lacks. */
+const memoryStorage = (): Pick<Storage, "getItem" | "removeItem" | "setItem"> => {
+  const items = new Map<string, string>();
+  return {
+    getItem: (key) => items.get(key) ?? null,
+    removeItem: (key) => {
+      items.delete(key);
+    },
+    setItem: (key, value) => {
+      items.set(key, value);
+    },
+  };
+};
+
+beforeEach(() => {
+  Object.defineProperty(globalThis, "sessionStorage", {
+    configurable: true,
+    value: memoryStorage(),
+  });
+});
+
 afterEach(() => {
   mockAddress.params = {};
   mockAddress.path = "/add";
-  noteLineDraft("");
 });
 
 describe("a share to the installed web app (QA round 17 M3, QA round 18 L2)", () => {
@@ -132,10 +153,38 @@ describe("a blank share, or one over a half-typed line (QA round 19 L4)", () => 
 
   it("adds the shared text on a new line after what was typed, instead of replacing it", async () => {
     await render(<App />);
-    noteLineDraft("half typed");
+    await fireEvent.changeText(screen.getByTestId("line"), "half typed");
     await act(() => {
       mockGo("/add", { text: "Buy milk" });
     });
     expect(screen.getByTestId("line")).toHaveDisplayValue("half typed\nBuy milk");
+  });
+
+  it("keeps what was typed when Now's line goes away before the share target reads it (QA 20 M3)", async () => {
+    const now = await render(<Now />);
+    await fireEvent.changeText(screen.getByTestId("line"), "half typed");
+    // The route changes: "/" goes, /add comes with the share, then "/" again.
+    await now.unmount();
+    mockAddress.params = { text: "Buy milk" };
+    await render(<App />);
+    expect(screen.getByTestId("line")).toHaveDisplayValue("half typed\nBuy milk");
+  });
+
+  it("keeps what was typed across a new page in the same tab, as the installed app's share opens one (round 6 M3)", async () => {
+    // The page before left its half-typed line in the tab's sessionStorage, and nothing in memory.
+    globalThis.sessionStorage.setItem("pace.lineDraft", "half typed");
+    mockAddress.params = { text: "Buy milk" };
+    await render(<App />);
+    expect(screen.getByTestId("line")).toHaveDisplayValue("half typed\nBuy milk");
+  });
+
+  it("a blank share never wipes what was typed (QA 20 M3)", async () => {
+    await render(<App />);
+    await fireEvent.changeText(screen.getByTestId("line"), "typed X");
+    await act(() => {
+      mockGo("/add", { text: "  " });
+    });
+    expect(screen.getByTestId("line")).toHaveDisplayValue("typed X");
+    expect(mockAddress).toMatchObject({ params: {}, path: "/" });
   });
 });
