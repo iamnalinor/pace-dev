@@ -4,6 +4,18 @@ import { expect, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
 
+const DAY_MS = 24 * 60 * 60_000;
+
+/** The last 12:00 UTC at or before now: daytime in the lived-in account's zone, never ahead. */
+const lastMidday = (): number => {
+  const midday = new Date();
+  midday.setUTCHours(12, 0, 0, 0);
+  return Math.min(
+    midday.getTime(),
+    midday.getTime() - DAY_MS * Number(midday.getTime() > Date.now()),
+  );
+};
+
 /** A thumb's target on a phone (QA round 18 L6). */
 const TARGET_PX = 44;
 
@@ -112,15 +124,27 @@ test.describe("tap targets at 390 (QA round 18 L6)", () => {
   test("the composer's icons, the task's link, the Week blocks and the switches are 44 px targets", async ({
     page,
   }) => {
+    // Seeded and shown at a fixed midday, not at the real clock: run near midnight, the lived-in
+    // day's evening blocks split at the day's edge into slivers that crowd one Week column
+    // (bug class 54; QA round 18 L6's lane cap is a documented limit past six lanes).
+    const seededAt = lastMidday();
+    await page.clock.setFixedTime(seededAt + 30 * 60_000);
     const { token } = await loginViaApi(page);
-    const { openTaskId } = await seedLivedIn(token);
+    const { openTaskId } = await seedLivedIn(token, seededAt);
     for (const screen of screensOf(openTaskId)) {
       await page.goto(screen.path);
       await settled(page);
       await screen.prepare?.(page);
-      const { count, small } = await measure(page, screen);
+      // Polled: a typed line wakes the composer's buttons with a transition, and a control
+      // measured mid-transition reads as small (bug class 20). A real small target stays small.
+      await expect
+        .poll(async () => (await measure(page, screen)).small, {
+          message: screen.path,
+          timeout: 5000,
+        })
+        .toEqual([]);
+      const { count } = await measure(page, screen);
       expect(count, screen.path).toBeGreaterThanOrEqual(screen.atLeast);
-      expect(small, screen.path).toEqual([]);
     }
   });
 
