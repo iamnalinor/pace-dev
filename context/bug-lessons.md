@@ -728,8 +728,8 @@ The same rule applies when a previously successful channel is no longer configur
   there; no fake ever played an endpoint that checks the answer itself, and the refusal arrives as a
   stream error chunk with no status, which the code sorted with the outages.
 - **Rule.** An answer is read as leniently as its meaning allows, by one check for every way it
-  arrives (`answerCheck` in `llm.ts`): keys left out that mean "does not apply" are filled (null, or
-  an empty list; `fillAbsent`) before the strict check. An outside checker's refusal that carries the
+  arrives (`answerCheck` in `answer-check.ts`): nullable keys an action left out, which mean "does
+  not apply", are filled with null (`fillAbsent`; never a list, class 95) before the strict check. An outside checker's refusal that carries the
   payload (`failed_generation`, or what was streamed) goes through our own check before it counts as
   a failure, and when it fails ours too it is an answer out of shape, never a provider down. What we
   send is pinned against the strictest mode we may meet (every object's properties all `required`,
@@ -791,6 +791,18 @@ The same rule applies when a previously successful channel is no longer configur
   stays small); a status that comes and goes takes no room from the page (an overlay or a row kept
   for it). Guards: the e2e measures every visible control's hit box at 390, counts the date
   picker's tab stops, and measures the main heading's position across going offline.
+
+### 95. A lenient reader that fills the part carrying the meaning
+- **Bug.** Review of round 6-C (I3): `fillAbsent` filled every required list it found missing, at
+  any depth, the answer's own `actions` and `questions` included, so a model answer with no
+  `actions` key passed the check as "nothing to do" and won the race; the next provider, which
+  would have read the message, was cancelled.
+- **Missed because.** The class 85 tests left out only the keys that mean "does not apply" (an
+  action's activity fields); nothing left out a key whose absence means "no answer".
+- **Rule.** A lenient reading fills only parts whose empty value means the same as their absence
+  (a nullable field of an action: null), never a part that carries the answer (the root's lists,
+  an action's lists). Test each kind of key left out: the one it may fill (kept), the one it may
+  not (refused, and the next provider answers).
 
 ## Log
 
@@ -1068,3 +1080,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 18 L6: at 390 the composer's icons were 36×36, the task's link row 15 px high, two side-by-side Week blocks 31 px wide and the switches 48×24 | 84 | partly: the four named kinds are fixed; the sweep's guard also showed rows of chips (the project filter, the preset form's choices) and the task row's check reach about 40 px where their 44 px boxes overlap a neighbour's in the next row, left as they are and named in the round's report | the composer's icons sit in 44 px boxes that touch, the link in a 44 px box reaching into the gaps around it, a phone's day column widens until each lane is 44 px (`phoneColumnPx`, the sideways scroll counts each day's width), a web switch has a 44 px reach drawn over it (`SWITCH_REACH_PX`); e2e `targets.e2e.ts` presses 21 px either side of each such control at 390 and fails on a neighbour or nothing, and flips a switch from just above and below it |
 | 2026-11-02 | QA round 18 L11: the offline line sat in the layout and pushed the page down 37 px mid-typing, in grey with no icon | 84 | yes: the other status that comes and goes at the top (still syncing) is the same strip; the update banner is a bar that stays once shown and the toasts already float | the strip is a pill floating over the top of the page (role status, an icon in the warning colour, the toast's surface and shadow), out of the layout; e2e: the main heading's box is the same before, during and after going offline at 390 and 1440, with no axe finding |
 | 2026-11-02 | Found by this round's full e2e run: the web switch's 44 px reach (QA round 18 L6) was drawn over the switch, so it took every press meant for the switch; Playwright could not click "Alongside what is running" (`time.e2e.ts:42`, phone and desktop) | 6 (an overlay placed over the control it serves: it covered an enabled control) | yes: the composer's icons, the task's link and the Week blocks grew their own boxes instead of drawing anything over them; the switch's reach was the only overlay of round 6 | the reach is drawn behind the switch (before it), so a press on the switch reaches the switch and one just above or below it the reach; `targets.e2e.ts` still finds the 44 px area by pressing around it, and `time.e2e.ts` clicks the switch itself (both pass at 390 and 1440) |
+| 2026-11-02 | Review of round 6-C, I3: an answer with no `actions` key was filled to an empty list and won as "nothing to do" | 95 (new) | yes: `fillAbsent` is the one filler (`answerCheck` runs every way an answer arrives); it now fills only nullable keys below the root, so an action's missing lists are refused too; `clampToJsonSchema` only cuts what is there | `llm.test.ts`: an answer without `actions` or without `questions` is refused and the next provider answers; an action without `subtasks` is refused (both red before); the class 85 test (activity keys left out read as null) stays green |

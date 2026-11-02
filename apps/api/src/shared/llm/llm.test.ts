@@ -404,6 +404,38 @@ describe("best-effort structured output (bug class 85)", () => {
     });
   });
 
+  it("refuses an answer with no actions or questions list: that is no reading, not nothing to do", async () => {
+    const { actions: _actions, ...noActions } = echoParse("x");
+    const { questions: _questions, ...noQuestions } = echoParse("x");
+    for (const terse of [noActions, noQuestions]) {
+      const result = await runParse(
+        [
+          { model: fakeParseModel(() => terse as never), name: "terse" },
+          { model: fakeParseModel(echoParse), name: "next" },
+        ],
+        prompt,
+      );
+      expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+    }
+  });
+
+  it("fills only an action's nullable keys, never a list it left out", async () => {
+    const output = echoParse("x");
+    const [action] = output.actions;
+    const { subtasks: _subtasks, ...withoutList } = action ?? {};
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({ ...output, actions: [withoutList] }) as never),
+          name: "terse",
+        },
+        { model: fakeParseModel(echoParse), name: "next" },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+  });
+
   it("reads the answer an endpoint refused on its own schema check, from the error's body", async () => {
     const result = await runParse(
       [

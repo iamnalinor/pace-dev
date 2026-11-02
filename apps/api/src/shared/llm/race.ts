@@ -162,8 +162,7 @@ class HedgedRace<T, F> {
 /**
 A hedged race: the first attempt starts; when one fails, or has not started answering within
 `hedgeAfterMs` (a probe: at once), the next starts alongside it, and so on down the list. The
-first success wins
-and cancels the rest; lost when every attempt failed or `deadlineMs` passed first.
+first success wins and cancels the rest; lost when every attempt failed or `deadlineMs` passed first.
 */
 export const hedgedRace = async <T, F>(
   attempts: readonly Attempt<T, F>[],

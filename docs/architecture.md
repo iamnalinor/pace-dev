@@ -349,8 +349,9 @@ Two memories decide who is asked:
   provider first once more in that minute: one wait, never a wrong answer. Each change is logged
   once ("provider asked last" with its reason and until when, "provider back in its place").
 
-An answer passes one check however it arrives (`answer-check.ts`): keys the model left out that
-mean "does not apply" are filled (null or an empty list), lengths clamped, then the zod schema. An
+An answer passes one check however it arrives (`answer-check.ts`): nullable keys an action left
+out, which mean "does not apply", are filled with null (never a list: an answer with no `actions`
+is no reading, bug class 95), lengths clamped, then the zod schema. An
 endpoint that checks its model's answer itself and refuses it is read for that answer (bug class
 85); failing ours too, it is an answer out of shape, not an outage.
 
