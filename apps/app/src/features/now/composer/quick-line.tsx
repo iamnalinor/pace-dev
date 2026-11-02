@@ -107,23 +107,25 @@ const LineButton = ({
         accessibilityRole="button"
         aria-busy={isBusy}
         aria-disabled={disabled}
-        className={cx(
-          "h-9 w-9 items-center justify-center rounded-full active:opacity-70",
-          isLime && "bg-accent",
-        )}
+        // A 44px target around the 36px circle (hitSlop does nothing on the web, QA round 18 L6);
+        // side by side they touch, and above and below they reach into the card's padding.
+        className="-my-1 h-11 w-11 items-center justify-center active:opacity-70"
         disabled={disabled || isBusy}
-        hitSlop={4}
         onPress={onPress}
       >
-        {isBusy ? (
-          <ActivityIndicator color={iconColor} size="small" />
-        ) : (
-          <Icon
-            color={disabled ? palette.faint : iconColor}
-            size={18}
-            strokeWidth={isLime ? 2.25 : 1.75}
-          />
-        )}
+        <View
+          className={cx("h-9 w-9 items-center justify-center rounded-full", isLime && "bg-accent")}
+        >
+          {isBusy ? (
+            <ActivityIndicator color={iconColor} size="small" />
+          ) : (
+            <Icon
+              color={disabled ? palette.faint : iconColor}
+              size={18}
+              strokeWidth={isLime ? 2.25 : 1.75}
+            />
+          )}
+        </View>
       </Pressable>
     </Tooltip>
   );
@@ -250,7 +252,7 @@ export const QuickLine = ({
   const isEmpty = flow.text.trim() === "";
   const isIdle = isEmpty || isLocked;
   return (
-    <View className="flex-row items-end gap-0.5">
+    <View className="flex-row items-end">
       <View className="mb-1">
         <LineButton
           disabled={isLocked}
@@ -266,7 +268,7 @@ export const QuickLine = ({
         isLocked={isLocked}
         onFocusChange={onFocusChange}
       />
-      <View className="mb-1 flex-row gap-0.5">
+      <View className="mb-1 flex-row">
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.toInbox}

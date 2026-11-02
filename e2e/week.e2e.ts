@@ -293,3 +293,67 @@ test("a block of a few seconds sits beside the next one, never under it (QA 17 L
   expect(isSideBySide(chessAt, walkAt)).toBe(true);
   await expectNoA11yViolations(page);
 });
+
+test("narrow side-by-side blocks say their whole name on hover, and a 0-minute block opens (QA 18 L7)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  const { token } = await loginViaApi(page);
+  const day = 24 * 60 * 60_000;
+  const lastWednesday = new Date(Date.now() - day);
+  lastWednesday.setUTCDate(lastWednesday.getUTCDate() - ((lastWednesday.getUTCDay() + 4) % 7));
+  lastWednesday.setUTCHours(18, 0, 0, 0);
+  await page.clock.setFixedTime(lastWednesday);
+  const start = lastWednesday.getTime() - 3 * 60 * 60_000;
+  const minute = 60_000;
+  const at = (offsetMs: number): string => new Date(start + offsetMs).toISOString();
+  const event = (
+    { index, offsetMs }: { readonly index: number; readonly offsetMs: number },
+    type: string,
+    payload: object,
+  ) => ({
+    deviceId: "e2e-seed",
+    id: ulid(start + index * 10),
+    occurredAt: at(offsetMs),
+    payload,
+    precision: "exact",
+    recordedAt: at(offsetMs),
+    source: "web",
+    type,
+  });
+  const logged = (index: number, label: string, fromMinute: number) =>
+    event({ index, offsetMs: (fromMinute + 30) * minute }, "activity.logged", {
+      activityId: ulid(start + index * 10 + 1),
+      category: "work",
+      endAt: at((fromMinute + 30) * minute),
+      label,
+      startAt: at(fromMinute * minute),
+    });
+  const zero = ulid(start + 101);
+  const zeroAt = { offsetMs: 90 * minute };
+  // Four blocks over the same half hour (four lanes), and one started and stopped the same instant.
+  const pushed = await pushAsClient(token, [
+    logged(1, "Email the dean", 0),
+    logged(2, "Call the bank", 1),
+    logged(3, "Snack", 2),
+    logged(4, "Walk", 3),
+    event({ ...zeroAt, index: 10 }, "activity.started", {
+      activityId: zero,
+      category: "rest",
+      label: "Zero",
+    }),
+    event({ ...zeroAt, index: 11 }, "activity.stopped", { activityId: zero }),
+  ]);
+  expect(pushed.ok).toBe(true);
+  await page.goto("/week");
+  const email = page.getByRole("button", { name: /^Email the dean, / });
+  await expect(email).toBeVisible();
+  await email.hover();
+  await expect(page.getByText(/^Email the dean, \d\d:\d\d–\d\d:\d\d$/u)).toBeVisible();
+  // Drawn, a target, and it opens like any block.
+  const zeroBox = page.getByRole("button", { name: /^Zero, / });
+  expect((await zeroBox.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(24);
+  await zeroBox.click();
+  await expect(page.getByRole("region", { name: "Details" }).getByText("Zero")).toBeVisible();
+  await expectNoA11yViolations(page);
+});

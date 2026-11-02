@@ -15,6 +15,7 @@ import {
 
 import { claimFocus } from "../platform/claim-focus.ts";
 import { moveFocus } from "../platform/move-focus.ts";
+import { refuseFocus } from "../platform/refuse-focus.ts";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { KEYBOARD } from "./use-hotkey.tsx";
@@ -83,6 +84,9 @@ const DayCell = ({
       isDisabled && "opacity-30",
     )}
     disabled={isDisabled}
+    // A sheet's focus trap walks every descendant (react-native-web's), past the tab index: the
+    // days other than the stop refuse it, so Shift+Tab into the grid lands on the stop.
+    {...(!isStop && refuseFocus !== undefined && { onFocus: refuseFocus })}
     onPress={() => {
       onPick(cell.date);
     }}

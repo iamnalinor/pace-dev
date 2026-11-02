@@ -2,6 +2,8 @@ import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } fr
 import { createPortal } from "react-dom";
 import { type NativeSyntheticEvent, Text, View } from "react-native";
 
+import type { TooltipProps } from "./tooltip-props.ts";
+
 import { paletteVars } from "../platform/theme.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { type Box, placeTooltip, type Size, TAP_TOOLTIP_MS } from "./tooltip-place.ts";
@@ -172,14 +174,10 @@ runs) for a couple of seconds or until the next touch.
 */
 export const Tooltip = ({
   children,
+  isFilling = false,
   label,
   showsOnTap = true,
-}: {
-  readonly children: ReactNode;
-  readonly label: string | undefined;
-  /** False for a control whose tap changes the screen anyway (a bubble would be left behind). */
-  readonly showsOnTap?: boolean;
-}) => {
+}: TooltipProps) => {
   const id = useId();
   const wrapperRef = useRef<View>(null);
   const [shown, setShown] = useState<null | Shown>(null);
@@ -202,6 +200,7 @@ export const Tooltip = ({
   };
   return (
     <View
+      {...(isFilling && { className: "flex-1" })}
       onBlur={hide}
       onFocus={(event: NativeSyntheticEvent<unknown>) => {
         if (isKeyboardFocus(event.target)) {

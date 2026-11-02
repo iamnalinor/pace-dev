@@ -1,6 +1,7 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { CloudOff, RefreshCw } from "lucide-react-native";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { AppState, Text, View } from "react-native";
-import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 import type { MessageKey } from "@pace/core";
@@ -9,6 +10,7 @@ import { useAuth, useIsFirstSync, useIsOffline, usePace, useT } from "#app/app-s
 import { useIsDeviceOffline } from "#app/platform/device-offline.ts";
 
 import { Skeleton } from "./skeleton.tsx";
+import { useTheme } from "./theme-provider.tsx";
 
 /**
 How long the first sync may hide the app. A pull that never answers (a stalled connection, a
@@ -17,22 +19,32 @@ proxy holding the request) would otherwise hold the whole app, Log out included 
 export const FIRST_SYNC_COVER_MS = 10_000;
 
 /**
-A quiet line across the top: offline while the last sync could not reach the server (what is
+A pill floating at the top: offline while the last sync could not reach the server (what is
 written stays on the device and goes out on reconnect, QA round 17 M5), or still syncing once
-the first sync outlasts its cover. It sits in the layout, above the app, so it covers nothing;
-it takes the top safe area itself.
+the first sync outlasts its cover. It floats over the page rather than sitting in the layout, so
+the page never moves under the person as it comes and goes (QA round 18 L11: a line in the layout
+pushed everything down 37 px mid-typing); a press goes through around it.
 */
 const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
   const t = useT();
+  const { palette } = useTheme();
   const insets = useSafeAreaInsets();
+  const Icon = message === "errors.offline" ? CloudOff : RefreshCw;
   return (
     <View
-      accessibilityLiveRegion="polite"
-      className="border-b border-line bg-surface px-4 pb-2"
-      role="status"
-      style={{ paddingTop: insets.top + 8 }}
+      className="absolute left-0 right-0 top-0 z-50 items-center px-4"
+      pointerEvents="box-none"
+      style={{ paddingTop: insets.top + 6 }}
     >
-      <Text className="text-center font-sans text-sm text-muted">{t(message)}</Text>
+      <View
+        accessibilityLiveRegion="polite"
+        className="max-w-xl flex-row items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 shadow-lg"
+        role="status"
+        testID="sync-strip"
+      >
+        <Icon aria-hidden color={palette.warn} size={16} strokeWidth={2} />
+        <Text className="shrink font-sans text-[13px] text-fg">{t(message)}</Text>
+      </View>
     </View>
   );
 };
@@ -143,21 +155,14 @@ export const SyncFrame = ({
   const isOverdue = useHasLasted(isFirstSync, FIRST_SYNC_COVER_MS);
   const isCovered = isFirstSync && !isOverdue;
   const message = stripMessage({ isOffline, isOverdue });
-  const insets = useSafeAreaInsets();
-  const below = useMemo(
-    () => (message === null ? insets : { ...insets, top: 0 }),
-    [insets, message],
-  );
   return (
     <View className="flex-1 bg-bg">
+      {/* Out of the page while covered (not drawn, not read), yet mounted. */}
+      <View className="flex-1" style={isCovered ? HIDDEN : undefined}>
+        {children}
+      </View>
+      {isCovered ? <FirstSyncPlaceholder /> : null}
       {message === null ? null : <SyncStrip message={message} />}
-      <SafeAreaInsetsContext value={below}>
-        {/* Out of the page while covered (not drawn, not read), yet mounted. */}
-        <View className="flex-1" style={isCovered ? HIDDEN : undefined}>
-          {children}
-        </View>
-        {isCovered ? <FirstSyncPlaceholder /> : null}
-      </SafeAreaInsetsContext>
     </View>
   );
 };

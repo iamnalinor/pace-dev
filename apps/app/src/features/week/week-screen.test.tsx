@@ -6,6 +6,7 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { NOW } from "@pace/core/testing";
 
+import { phoneColumnPx } from "./week-grid.tsx";
 import { WeekScreen } from "./week-screen.tsx";
 
 /** 12:30–14:00 in Moscow today, with everything a phone's calendar can tell about it. */
@@ -172,5 +173,25 @@ describe("WeekScreen", () => {
       expect(screen.queryByText("00")).toBeNull();
     });
     expect(within(screen.getByTestId("week-body")).getByText("07")).toBeOnTheScreen();
+  });
+
+  it("draws a 0-minute block, which opens like any other (QA round 18 L7)", async () => {
+    const runtime = await world([]);
+    // Started and stopped at the same instant (the test world's clock stands still).
+    await runtime.actions.startActivity({ category: "rest", label: "Zero" });
+    await runtime.actions.stopActivity();
+    await renderScreen(<WeekScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: /^Zero, / }));
+    expect(await screen.findByText("Rest · 0m")).toBeOnTheScreen();
+  });
+});
+
+describe("phoneColumnPx", () => {
+  it("keeps the 72 px floor for one lane and gives every lane 44 px otherwise", () => {
+    expect(phoneColumnPx(1, 72)).toBe(72);
+    for (const lanes of [2, 3, 4]) {
+      const width = phoneColumnPx(lanes, 72);
+      expect((width - 8) * (1 / lanes - 0.01)).toBeGreaterThanOrEqual(44);
+    }
   });
 });

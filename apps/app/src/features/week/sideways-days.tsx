@@ -11,34 +11,38 @@ Monday of a week without today. `null` while the same week stays: the person's o
 kept (the calendar arriving must not pull it back).
 */
 export const sidewaysStart = ({
-  minColumnPx,
+  columnPx,
   scrolledWeek,
   week,
 }: {
   readonly week: Pick<WeekModel, "days" | "weekStart">;
   /** The week the days were last scrolled for; `null` before the first. */
   readonly scrolledWeek: null | string;
-  readonly minColumnPx: number;
-}): null | number =>
-  scrolledWeek === week.weekStart
-    ? null
-    : Math.max(0, week.days.findIndex((day) => day.isToday) - 1) * minColumnPx;
+  /** Each day's column width: a day with side-by-side blocks is wider. */
+  readonly columnPx: readonly number[];
+}): null | number => {
+  if (scrolledWeek === week.weekStart) {
+    return null;
+  }
+  const before = Math.max(0, week.days.findIndex((day) => day.isToday) - 1);
+  return columnPx.slice(0, before).reduce((sum, width) => sum + width, 0);
+};
 
 /** The phone's days, scrolled sideways once per week shown (see `sidewaysStart`). */
 export const SidewaysDays = ({
   children,
-  minColumnPx,
+  columnPx,
   week,
 }: {
   readonly children: ReactNode;
-  readonly minColumnPx: number;
+  readonly columnPx: readonly number[];
   readonly week: WeekModel;
 }) => {
   const t = useT();
   const scrollerRef = useRef<ScrollView>(null);
   const scrolledWeekRef = useRef<null | string>(null);
   const scrollToStart = (): void => {
-    const x = sidewaysStart({ minColumnPx, scrolledWeek: scrolledWeekRef.current, week });
+    const x = sidewaysStart({ columnPx, scrolledWeek: scrolledWeekRef.current, week });
     if (x === null || scrollerRef.current === null) {
       return;
     }

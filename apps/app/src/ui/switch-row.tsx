@@ -1,6 +1,6 @@
-import { Switch, Text, View } from "react-native";
+import { Pressable, Switch, Text, View } from "react-native";
 
-import { SWITCH_STYLE } from "./switch-size.ts";
+import { SWITCH_REACH_PX, SWITCH_STYLE } from "./switch-size.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 /** The native switch in Pace's colors: off, a light knob on a grey track; on, a white knob on the quiet indigo accent. */
@@ -17,15 +17,31 @@ export const PaceSwitch = ({
   // react-native-web colors the knob of an "on" switch with its own teal unless told otherwise.
   const webKnob = { activeThumbColor: palette.accentQuietFg };
   return (
-    <Switch
-      accessibilityLabel={label}
-      onValueChange={onChange}
-      style={SWITCH_STYLE}
-      thumbColor={isOn ? palette.accentQuietFg : palette.surface}
-      trackColor={{ false: palette.muted, true: palette.accentQuiet }}
-      value={isOn}
-      {...webKnob}
-    />
+    <View>
+      <Switch
+        accessibilityLabel={label}
+        onValueChange={onChange}
+        style={SWITCH_STYLE}
+        thumbColor={isOn ? palette.accentQuietFg : palette.surface}
+        trackColor={{ false: palette.muted, true: palette.accentQuiet }}
+        value={isOn}
+        {...webKnob}
+      />
+      {SWITCH_REACH_PX === null ? null : (
+        // Over the switch and reaching past it: a press anywhere on it flips the switch. The
+        // switch itself stays the control for the keyboard and screen readers.
+        <Pressable
+          aria-hidden
+          className="absolute left-0 right-0"
+          onPress={() => {
+            onChange(!isOn);
+          }}
+          style={{ bottom: -SWITCH_REACH_PX, top: -SWITCH_REACH_PX }}
+          tabIndex={-1}
+          testID="switch-reach"
+        />
+      )}
+    </View>
   );
 };
 
