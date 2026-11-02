@@ -685,6 +685,20 @@ The same rule applies when a previously successful channel is no longer configur
   origin it talks to), not one a server reports about itself; a reported one is only a fallback
   for what the app cannot know (its web app). Test it with the two different.
 
+### 84. A cost of using the screen that no test counts: tab stops, target size, a jump
+- **Bug.** QA round 19 L5: the date picker had a tab stop per day (30+ before "Next month") and
+  opened on "Previous month". QA round 18 L6: the composer's icons were 36×36, the task's link row
+  15 px high, narrow Week blocks 31 px wide and switches 24 px high at 390. QA round 18 L11: the
+  offline line pushed the page down 37 px mid-typing.
+- **Missed because.** The tests ask whether a control exists, has a name and works; none counts
+  what it costs to reach it (Tab presses, the size of the thing a thumb aims at) or whether the
+  page moves under the person when a status comes and goes.
+- **Rule.** A grid of like choices is one tab stop with arrow keys (roving tab index) and opens on
+  the chosen one; anything tapped is at least 44×44 at phone width (`hitSlop` where the drawing
+  stays small); a status that comes and goes takes no room from the page (an overlay or a row kept
+  for it). Guards: the e2e measures every visible control's hit box at 390, counts the date
+  picker's tab stops, and measures the main heading's position across going offline.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -937,3 +951,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 18 L4: New preset asked for a bare "Id" (empty for a Russian name, so Save failed) and opened with nothing focused | 81 (new) | yes: the other forms that create things (task, project, activity) make their ids with `newId()` and show none; the preset form was the only one with a typed key | `freePresetId` (the name's slug, Russian spelt in Latin letters, accents dropped, numbered past a taken, archived, default or reserved `new` id; client tests); the Id field and its catalog key gone; Name focused on a new preset where there is a keyboard; app tests: no Id field, Name focused, a Russian name saved as `algebra`, a second one as `algebra-2` (both red before) |
 | 2026-11-02 | QA round 18 L8: every task, project and the new preset form had the kind's name as the tab title ("Task · Pace" eight times in the history) | 82 (new) | yes: the pushed screens' own headers already name the thing (task title, project name, preset label); the document title was the only label taken from the route's kind | `routeSubject` + `subjectName` (task title and project name verbatim, a default preset in the reader's language), `documentTitle` names the thing and says "New preset" for `/presets/new`, the kind only while the thing cannot be found; route-title tests including a task called "Settings" and a Russian preset name (red before) |
 | 2026-11-02 | QA round 18 L10: "Connect an AI app" and "Add a computer" handed out the server's reported `apiOrigin` (a port the dev Worker was not on) instead of the origin the app talks to | 83 (new) | yes: the two screens are the only ones that hand out the API's address (both read `useServerInfo().apiOrigin`); the login's web origin stays the server's own on purpose (the token goes to that server) | `serverInfoOf` gives the origin in use; `server-store.test.ts` (a reported 8787 with the app on 8818, red before) and the sessions tests now serve an `/api/instance` whose origin differs from the app's |
+| 2026-11-02 | QA round 19 L5: the date picker had a tab stop per day and opened on "Previous month" | 84 (new) | yes: the one shared month view (`ui/calendar.tsx`) serves Day's "Pick a day", the task's dates and the repeat's end; the other grids of like choices (chips, swatches) are short rows Tab walks in a few stops | the month view is one tab stop (roving tab index; arrows, Home/End, Page Up/Down via `calendarKeyMove`, never past `max`), the picked day (else today) takes focus on opening where there is a keyboard (`claimFocus`, which outlasts the sheet's own first focus); client tests of the moves, app tests of the one stop and the focus (red before) |
