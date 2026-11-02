@@ -237,7 +237,17 @@ const timeTaps = async (
   return durations;
 };
 
-type Case = "check" | "chip" | "row" | "tab";
+type Case =
+  | "check"
+  | "chip"
+  | "dayStep"
+  | "logPast"
+  | "newTask"
+  | "picker"
+  | "row"
+  | "tab"
+  | "themeChip"
+  | "weekStep";
 
 /** A case's regression ceiling while a later task owns why it is over the budget. */
 type Ceiling = { readonly ms: number; readonly owner: string; readonly why: string };
@@ -260,6 +270,16 @@ const CEILINGS: Readonly<Partial<Record<Case, Ceiling>>> = {
   check: { ms: 310, owner: "Task 5.2", why: "the dust mounts in the check's own commit" },
   // Task 5.3 (route push) and Task 5.6 (render budget).
   row: { ms: 240, owner: "Task 5.3 / 5.6", why: "the task screen renders in the tap's commit" },
+  // QA round 18 (R18-09), measured after its fix (2026-11-02, one fresh build, the project alone
+  // five times, plus one run of these six alone on the same build): largest p75 day step 128,
+  // week step 208, Log past 168, theme chip 296, New task 216, picker 136 ms. Not profiled yet:
+  // the reasons are Task 5.6's to find; the "why" says what the tap renders.
+  dayStep: { ms: 160, owner: "Task 5.6", why: "Day renders the other date's list in the tap" },
+  weekStep: { ms: 260, owner: "Task 5.6", why: "Week lays out the other week's grid in the tap" },
+  logPast: { ms: 210, owner: "Task 5.6", why: "the sheet mounts its form in the tap's commit" },
+  themeChip: { ms: 370, owner: "Task 5.6", why: "a theme change re-renders every mounted screen" },
+  newTask: { ms: 270, owner: "Task 5.6", why: "the form mounts in the tap's commit" },
+  picker: { ms: 170, owner: "Task 5.6", why: "the picker sheet mounts in the tap's commit" },
 };
 
 /** Notes how far a case with a ceiling is from the budget, and who owns closing the gap. */
@@ -355,5 +375,164 @@ test.describe("a tap shows its result within 100 ms on a slow phone (p75 of 9)",
       };
     });
     expectWithinBudget("row", durations);
+  });
+});
+
+/** Goes somewhere by taps that are not timed, and waits for the page to be quiet there. */
+const go = async (page: Page, steps: readonly Locator[], ready: Locator): Promise<void> => {
+  for (const step of steps) {
+    await step.tap();
+  }
+  await expect(ready).toBeVisible();
+  await rest(page);
+};
+
+/**
+Stepping a period back and forth: the reset button shows away from the current one and goes on
+the way back, so each tap's result is the screen of the other period.
+*/
+const timeSteps = async (timeTap: TimeTap, page: Page, unit: "day" | "week") => {
+  const back = page.getByRole("button", { name: "Back to today" });
+  return await timeTaps(timeTap, (index) => {
+    const isBack = index % 2 === 0;
+    return {
+      check: async () => {
+        await expect(back).toHaveCount(isBack ? 1 : 0);
+      },
+      target: page.getByRole("button", { name: `${isBack ? "Previous" : "Next"} ${unit}` }),
+    };
+  });
+};
+
+/** Opening an overlay or a form: each tap opens it, an untimed Escape or close puts it away. */
+const timeOpens = async (
+  timeTap: TimeTap,
+  page: Page,
+  open: { readonly target: Locator; readonly shown: Locator; readonly close: () => Promise<void> },
+) =>
+  await timeTaps(timeTap, () => ({
+    check: async () => {
+      await expect(open.shown).toBeVisible();
+      await open.close();
+      await expect(open.shown).toHaveCount(0);
+      await rest(page);
+    },
+    target: open.target,
+  }));
+
+/**
+QA round 18 (R18-09): the other taps the person makes often, measured the same way. Their gaps
+are Task 5.6's (render budget) like the four above; each has a ceiling until then.
+*/
+test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)", () => {
+  test.describe.configure({ mode: "default" });
+
+  test("Day: previous and next day", async ({ page }) => {
+    const timeTap = await openNow(page);
+    const tabs = page.getByRole("tablist", { name: "Main" });
+    await go(
+      page,
+      [tabs.getByRole("tab", { exact: true, name: "Day" })],
+      page.getByRole("button", { name: "Previous day" }),
+    );
+    // The steps start on today: the reset is not there yet.
+    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    expectWithinBudget("dayStep", await timeSteps(timeTap, page, "day"));
+  });
+
+  test("Week: previous and next week", async ({ page }) => {
+    const timeTap = await openNow(page);
+    const tabs = page.getByRole("tablist", { name: "Main" });
+    await go(
+      page,
+      [
+        tabs.getByRole("tab", { exact: true, name: "More" }),
+        page.getByRole("link", { name: "Week" }),
+      ],
+      page.getByRole("button", { name: "Previous week" }),
+    );
+    await expect(page.getByRole("button", { name: "Back to today" })).toHaveCount(0);
+    expectWithinBudget("weekStep", await timeSteps(timeTap, page, "week"));
+  });
+
+  test("Day: opening Log past activity", async ({ page }) => {
+    const timeTap = await openNow(page);
+    const tabs = page.getByRole("tablist", { name: "Main" });
+    const target = page.getByRole("button", { name: "Log past activity" });
+    await go(page, [tabs.getByRole("tab", { exact: true, name: "Day" })], target);
+    const what = page.getByRole("textbox", { exact: true, name: "What" });
+    await expect(what).toHaveCount(0);
+    const durations = await timeOpens(timeTap, page, {
+      close: async () => {
+        await page.keyboard.press("Escape");
+      },
+      shown: what,
+      target,
+    });
+    expectWithinBudget("logPast", durations);
+  });
+
+  test("Settings: the theme chip", async ({ page }) => {
+    const timeTap = await openNow(page);
+    const tabs = page.getByRole("tablist", { name: "Main" });
+    await go(
+      page,
+      [
+        tabs.getByRole("tab", { exact: true, name: "More" }),
+        page.getByRole("link", { name: "Settings" }),
+      ],
+      page.getByRole("radio", { name: "Light" }),
+    );
+    const order = [
+      "Dark",
+      "Light",
+      "Dark",
+      "Light",
+      "Dark",
+      "Light",
+      "Dark",
+      "Light",
+      "Dark",
+      "Light",
+    ];
+    const durations = await timeTaps(timeTap, (index) => {
+      const chip = page.getByRole("radio", { exact: true, name: order[index] ?? "Light" });
+      return {
+        check: async () => {
+          await expect(chip).toBeChecked();
+        },
+        target: chip,
+      };
+    });
+    expectWithinBudget("themeChip", durations);
+  });
+
+  test("Now: opening the New task form", async ({ page }) => {
+    const timeTap = await openNow(page);
+    const form = page.getByRole("form", { name: "New task" });
+    await expect(form).toHaveCount(0);
+    const durations = await timeOpens(timeTap, page, {
+      close: async () => {
+        await form.getByRole("button", { name: "Close" }).tap();
+      },
+      shown: form,
+      target: page.getByRole("button", { exact: true, name: "New task" }).last(),
+    });
+    expectWithinBudget("newTask", durations);
+  });
+
+  test("Now: opening a time-bar picker", async ({ page }) => {
+    // Nothing runs on the seeded account, so the bar's tiles are out (no "Start something else").
+    const timeTap = await openNow(page);
+    const picker = page.getByRole("list", { name: "Rest" });
+    await expect(picker).toHaveCount(0);
+    const durations = await timeOpens(timeTap, page, {
+      close: async () => {
+        await page.keyboard.press("Escape");
+      },
+      shown: picker,
+      target: page.getByRole("button", { exact: true, name: "Rest" }),
+    });
+    expectWithinBudget("picker", durations);
   });
 });
