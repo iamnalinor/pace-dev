@@ -4,6 +4,7 @@ import { formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
+import { recordSyncTraffic, repeated } from "./support/sync-traffic.ts";
 
 /** The titles of the tasks created in the server's log of the account behind `token`. */
 const serverTitles = async (token: string): Promise<readonly string[]> => {
@@ -99,6 +100,7 @@ test("offline, a line says so; a task written meanwhile goes out on reconnect an
   page,
 }) => {
   const { token } = await loginViaApi(page);
+  const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
   const line = page.getByRole("status").filter({ hasText: "You are offline" });
@@ -115,6 +117,11 @@ test("offline, a line says so; a task written meanwhile goes out on reconnect an
   await expect(line).toHaveCount(0);
   // It reached the server: the server's own log holds it (a reload would read IndexedDB, review m6).
   await expect.poll(async () => await serverTitles(token)).toContain("Buy stamps offline");
+  // The steady state (fix round 5 V6): back online, nothing is sent again for the same change.
+  const after = await traffic.over(3000);
+  expect(after.frames.filter((frame) => frame.includes('"type":"push"'))).toEqual([]);
+  expect(after.calls.filter((call) => call.startsWith("POST"))).toEqual([]);
+  expect(repeated(after.calls)).toEqual([]);
 });
 
 test("a server gone while the tab sits idle: the line says offline without a write, and clears once it is back (QA 18 M4)", async ({
@@ -135,11 +142,16 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   await page.route(/\/api\//u, async (route) => {
     await (server.isDown ? route.abort("connectionrefused") : route.fallback());
   });
+  const traffic = recordSyncTraffic(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
   const line = page.getByRole("status").filter({ hasText: "You are offline" });
   await expect.poll(() => sockets.length).toBeGreaterThan(0);
   await expect(line).toHaveCount(0);
+  // An idle tab: its socket has been up a while (one cut at once is a flapping link, which backs
+  // off without a check, fix round 5 V2), and it sends nothing meanwhile.
+  const idle = await traffic.over(6000);
+  expect(idle.calls).toEqual([]);
 
   server.isDown = true;
   for (const socket of sockets.splice(0)) {
@@ -147,7 +159,14 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   }
   // Nothing written: the dropped socket alone has the app look, well before the 30 s poll.
   await expect(line).toBeVisible({ timeout: 5000 });
+  // While it is down, no storm: the reconnects back off 1, 2, 4 s, and so do the runs.
+  const down = await traffic.over(5000);
+  expect(down.calls.length).toBeLessThanOrEqual(4);
 
   server.isDown = false;
   await expect(line).toHaveCount(0, { timeout: 20_000 });
+  // Back: the network goes quiet, nothing asked twice (fix round 5 V6).
+  const back = await traffic.over(3000);
+  expect(back.calls.length).toBeLessThanOrEqual(1);
+  expect(repeated(back.calls)).toEqual([]);
 });
