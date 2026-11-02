@@ -51,6 +51,7 @@ const mockAuth = {
 const mockStatus = {
   current: "signed-out" as "signed-in" | "signed-out",
   endedElsewhere: false,
+  endedInAnotherTab: false,
 };
 const mockPending = {
   current: null as null | { readonly nonce: string; readonly expiresAt: number },
@@ -73,6 +74,7 @@ jest.mock("#app/app-state.tsx", () => ({
   useAuth: () => ({
     auth: mockAuth,
     endedElsewhere: mockStatus.endedElsewhere,
+    endedInAnotherTab: mockStatus.endedInAnotherTab,
     status: mockStatus.current,
     user: null,
   }),
@@ -89,6 +91,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockStatus.current = "signed-out";
   mockStatus.endedElsewhere = false;
+  mockStatus.endedInAnotherTab = false;
   mockPending.current = null;
 });
 
@@ -104,6 +107,13 @@ describe("LoginScreen", () => {
     mockStatus.endedElsewhere = true;
     await renderScreen();
     expect(screen.getByText(t("en", "login.endedElsewhere"))).toBeOnTheScreen();
+  });
+
+  it("says the person signed out in another tab, not on another device (QA round 18 L3)", async () => {
+    mockStatus.endedInAnotherTab = true;
+    await renderScreen();
+    expect(screen.getByText(t("en", "login.endedInAnotherTab"))).toBeOnTheScreen();
+    expect(screen.queryByText(t("en", "login.endedElsewhere"))).toBeNull();
   });
 
   it("says nothing of the kind on a plain visit", async () => {

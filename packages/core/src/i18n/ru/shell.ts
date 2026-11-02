@@ -36,6 +36,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "login.title": "Вход в Pace",
   "login.subtitle": "Ваши задачи и время — в своём темпе.",
   "login.endedElsewhere": "Вы вышли: этот сеанс завершили на другом устройстве, или он истёк.",
+  "login.endedInAnotherTab": "Вы вышли в другой вкладке.",
   "login.telegram": "Войти через Telegram",
   "login.openBot": "Открыть {bot} в Telegram",
   "login.waiting": "Ждём ответа от Telegram…",

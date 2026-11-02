@@ -23,6 +23,11 @@ export type AuthState = {
   expired): the login card says so. Absent otherwise; a new session clears it.
   */
   readonly endedElsewhere?: true | undefined;
+  /**
+  Signed out because another tab of this browser signed out (its shared store no longer holds the
+  session): the login card says that instead (QA round 18 L3). Absent otherwise.
+  */
+  readonly endedInAnotherTab?: true | undefined;
 };
 
 export type BotLoginError = "cancelled" | "not-allowed" | "timeout";
@@ -138,13 +143,20 @@ const pollOnce = async (api: ApiClient, nonce: string): Promise<Poll> => {
 
 type Granted = { readonly token: string; readonly user: User };
 
+type SignOutReason = { readonly endedElsewhere: true } | { readonly endedInAnotherTab: true };
+
 type Session = {
   readonly ready: Promise<void>;
   readonly store: StoreApi<AuthState>;
   readonly token: () => string | undefined;
   readonly signIn: (granted: Granted) => Promise<User>;
-  /** `endedElsewhere`: the server no longer knew the session (the login card says so). */
-  readonly signOut: (reason?: { readonly endedElsewhere: true }) => Promise<void>;
+  /**
+  Why, when the person did not sign out here: the server no longer knew the session
+  (`endedElsewhere`), or another tab of this browser signed out (`endedInAnotherTab`).
+  */
+  readonly signOut: (reason?: SignOutReason) => Promise<void>;
+  /** Whether the device's shared store still holds `token` (another tab may have dropped it). */
+  readonly isStored: (token: string) => Promise<boolean>;
   /** Remembers a token whose user is not known yet. */
   readonly adopt: (token: string) => Promise<void>;
 };
@@ -157,7 +169,12 @@ const createSession = (sessionStore: SessionStore): Session => {
     adopt: async (token) => {
       cached = token;
       await sessionStore.set(token);
-      store.setState({ endedElsewhere: undefined, status: "signed-in", user: null });
+      store.setState({
+        endedElsewhere: undefined,
+        endedInAnotherTab: undefined,
+        status: "signed-in",
+        user: null,
+      });
     },
     ready: (async (): Promise<void> => {
       cached = (await sessionStore.get()) ?? undefined;
@@ -166,13 +183,24 @@ const createSession = (sessionStore: SessionStore): Session => {
     signIn: async (granted) => {
       cached = granted.token;
       await sessionStore.set(granted.token);
-      store.setState({ endedElsewhere: undefined, status: "signed-in", user: granted.user });
+      store.setState({
+        endedElsewhere: undefined,
+        endedInAnotherTab: undefined,
+        status: "signed-in",
+        user: granted.user,
+      });
       return granted.user;
     },
+    isStored: async (token) => (await sessionStore.get()) === token,
     signOut: async (reason) => {
       cached = undefined;
       await sessionStore.clear();
-      store.setState({ endedElsewhere: reason?.endedElsewhere, status: "signed-out", user: null });
+      store.setState({
+        endedElsewhere: reason !== undefined && "endedElsewhere" in reason ? true : undefined,
+        endedInAnotherTab: reason !== undefined && "endedInAnotherTab" in reason ? true : undefined,
+        status: "signed-out",
+        user: null,
+      });
     },
     store,
     token: () => cached,
@@ -259,7 +287,10 @@ const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User
       error.status === 401 &&
       session.token() === sent
     ) {
-      await session.signOut({ endedElsewhere: true });
+      // Another tab of this browser signed out: the shared store forgot the session already.
+      await session.signOut(
+        (await session.isStored(sent)) ? { endedElsewhere: true } : { endedInAnotherTab: true },
+      );
     }
     return err(errorCode(error));
   }

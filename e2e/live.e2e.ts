@@ -147,3 +147,37 @@ test("a task added in one tab shows in a second tab of the same profile, and tha
   expect(sent.filter((frame) => frame !== "ping")).toEqual([]);
   await context.close();
 });
+
+test('a log-out in another tab of the same browser says so, not "another device" (QA 18 L3)', async ({
+  browser,
+}) => {
+  const telegramId = freshTelegramId();
+  await resetAccount(telegramId);
+  const { token } = await createDevSession(telegramId);
+  const context = await browser.newContext({ viewport: { height: 900, width: 1440 } });
+  // The session as a sign-in leaves it, for the first load of each tab only.
+  await context.addInitScript(
+    ({ key, value }) => {
+      if (sessionStorage.getItem("seeded") !== null) {
+        return;
+      }
+
+      sessionStorage.setItem("seeded", "1");
+      localStorage.setItem(key, value);
+    },
+    { key: SESSION_KEY, value: token },
+  );
+  const first = await context.newPage();
+  await first.goto("/");
+  await expect(first.getByRole("heading", { name: "Now" })).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("/settings");
+  await second.getByRole("button", { name: "Log out" }).click();
+  await expect(second).toHaveURL(/\/login$/u);
+  await expect(first).toHaveURL(/\/login$/u, { timeout: 15_000 });
+  await expect(
+    first.getByRole("status").filter({ hasText: "You signed out in another tab." }),
+  ).toBeVisible();
+  await expect(first.getByText(/another device/u)).toHaveCount(0);
+  await context.close();
+});

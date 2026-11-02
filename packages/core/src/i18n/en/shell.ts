@@ -35,6 +35,7 @@ export const enShell = {
   "login.subtitle": "Your tasks and time, at your own pace.",
   "login.endedElsewhere":
     "You were signed out: this session was ended on another device, or it expired.",
+  "login.endedInAnotherTab": "You signed out in another tab.",
   "login.telegram": "Continue with Telegram",
   "login.openBot": "Open {bot} in Telegram",
   "login.waiting": "Waiting for Telegram…",

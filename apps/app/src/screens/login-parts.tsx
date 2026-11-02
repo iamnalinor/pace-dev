@@ -30,20 +30,24 @@ export const errorKey = (phase: BotLoginPhase): MessageKey | undefined => {
 
 /**
 Why the login card is back, when the server ended the session (from another device's list, a
-Not me, or its expiry): a remote revoke otherwise signed out without a word (QA round 15 L2).
+Not me, or its expiry): a remote revoke otherwise signed out without a word (QA round 15 L2); or
+when another tab of this browser signed out.
 */
 export const SignedOutLine = () => {
   const t = useT();
-  const { endedElsewhere } = useAuth();
-  return endedElsewhere ? (
+  const { endedElsewhere, endedInAnotherTab } = useAuth();
+  // Another tab of this browser signing out is the person's own doing, here (QA round 18 L3).
+  const elsewhere = endedElsewhere ? "login.endedElsewhere" : null;
+  const reason = endedInAnotherTab ? "login.endedInAnotherTab" : elsewhere;
+  return reason === null ? null : (
     <Text
       accessibilityLiveRegion="polite"
       className="text-center font-sans text-[13px] leading-[18px] text-fg2"
       role="status"
     >
-      {t("login.endedElsewhere")}
+      {t(reason)}
     </Text>
-  ) : null;
+  );
 };
 
 export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) => {

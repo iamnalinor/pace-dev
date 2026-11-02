@@ -254,12 +254,20 @@ export const useAuth = (): {
   readonly auth: Auth;
   /** Signed out because the server no longer knew the session: the login card says so. */
   readonly endedElsewhere: boolean;
+  /** Signed out because another tab of this browser signed out (QA round 18 L3). */
+  readonly endedInAnotherTab: boolean;
   readonly status: AuthState["status"];
   readonly user: null | User;
 } => {
   const { auth } = usePace();
-  const { endedElsewhere, status, user } = useStore(auth.store);
-  return { auth, endedElsewhere: endedElsewhere === true, status, user };
+  const { endedElsewhere, endedInAnotherTab, status, user } = useStore(auth.store);
+  return {
+    auth,
+    endedElsewhere: endedElsewhere === true,
+    endedInAnotherTab: endedInAnotherTab === true,
+    status,
+    user,
+  };
 };
 
 /**

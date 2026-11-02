@@ -91,6 +91,22 @@ describe("createAuth session", () => {
     expect(auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
+  it('a 401 for a session another tab of this browser signed out says so, not "elsewhere" (QA 18 L3)', async () => {
+    // Tab B logged out: the server ended the session and the shared store forgot it. Tab A still
+    // holds the token in memory; its socket closes, it asks `me` and gets the 401.
+    const { auth, session } = await setup(
+      { "GET /api/me": () => problem(401, "auth/unauthorized") },
+      "shared",
+    );
+    await session.clear();
+    await auth.me();
+    expect(auth.store.getState()).toEqual({
+      endedInAnotherTab: true,
+      status: "signed-out",
+      user: null,
+    });
+  });
+
   it("me() caches the user", async () => {
     const { auth } = await setup({ "GET /api/me": () => fakeMe }, "ok");
     await expect(auth.me()).resolves.toEqual({ ok: true, value: fakeUser });
