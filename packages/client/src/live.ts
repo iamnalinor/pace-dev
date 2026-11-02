@@ -60,9 +60,10 @@ export type LiveChannelOptions = {
   */
   readonly onSessionEnded?: () => void;
   /**
-  A connected socket went (closed by the network or the server, or gone quiet), not stopped: the
-  app checks whether the server can still be reached, so a stale screen is told it is stale (QA
-  round 18 M4). Once per connection: the failed reconnects after it do not repeat it.
+  A socket that had lived (up `STABLE_MS`) went (closed by the network or the server, or gone
+  quiet), not stopped: the app checks whether the server can still be reached, so a stale screen
+  is told it is stale (QA round 18 M4). Once per connection: the failed reconnects after it do
+  not repeat it, nor do sockets cut soon after they open (a flapping link, fix round 5 V2).
   */
   readonly onDropped?: () => void;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
@@ -270,12 +271,15 @@ second. Every reconnect (to catch up on what was missed) and every v1 `changed` 
 on v2 the socket also carries requests (`request`: push and pull, answered by id) and brings new
 events as they land (`onEvents`). Polling and HTTP stay as the fallback while it is down.
 */
-/** Whether the channel should be connected, and how many reconnects in a row have failed. */
-type Run = { failures: number; isRunning: boolean };
+/**
+Whether the channel should be connected, how many reconnects in a row have failed (a socket that
+did not live `STABLE_MS` counts as one), and whether the socket in use has lived that long.
+*/
+type Run = { failures: number; hasLived: boolean; isRunning: boolean };
 
 /**
-The socket is gone: its requests fail, and it comes back unless its session ended. A connected
-socket that went while running is said to `onDropped`.
+The socket is gone: its requests fail, and it comes back unless its session ended. A socket that
+had lived and went while running is said to `onDropped`.
 */
 const whenClosed = (
   code: unknown,
@@ -289,7 +293,8 @@ const whenClosed = (
   },
 ): void => {
   const { connect, line, options, run, status, timers } = channel;
-  const wasConnected = status.getState().isConnected;
+  const { hasLived } = run;
+  run.hasLived = false;
   line.drop();
   timers.clear();
   status.setState({ isConnected: false });
@@ -299,7 +304,7 @@ const whenClosed = (
   } else if (run.isRunning) {
     run.failures += 1;
     timers.retryIn(retryDelay(run.failures), connect);
-    if (wasConnected) {
+    if (hasLived) {
       options.onDropped?.();
     }
   }
@@ -313,7 +318,7 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const line = createLine(() => {
     closed(undefined);
   });
-  const run: Run = { failures: 0, isRunning: false };
+  const run: Run = { failures: 0, hasLived: false, isRunning: false };
   const closed = (code: unknown): void => {
     whenClosed(code, { connect, line, options, run, status, timers });
   };
@@ -326,7 +331,15 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     const socket = createSocket(url, [LIVE_V2, LIVE_V1, `pace.auth.${token}`]);
     line.use(socket);
     const opened = (): void => {
-      run.failures = 0;
+      // The backoff is reset only once the socket has lived: a link that cuts it at once backs off.
+      timers.stableIn(() => {
+        if (line.current() !== socket) {
+          return;
+        }
+
+        run.failures = 0;
+        run.hasLived = true;
+      });
       timers.keepAlive(socket, (streak) => {
         // Each fresh socket that goes quiet again waits longer (`createTimers`).
         run.failures = line.current() === socket ? streak - 1 : run.failures;

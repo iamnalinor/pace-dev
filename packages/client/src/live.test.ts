@@ -10,7 +10,7 @@ import {
 
 import { fakeSockets, say } from "./fake-socket.fake.ts";
 import { LiveUnavailable } from "./live-requests.ts";
-import { PONG_WAIT_MS } from "./live-timers.ts";
+import { PONG_WAIT_MS, STABLE_MS } from "./live-timers.ts";
 import { createLiveChannel, liveUrl } from "./live.ts";
 
 describe("liveUrl", () => {
@@ -247,6 +247,7 @@ describe("createLiveChannel", () => {
     });
     live.start();
     sockets.made[0]?.open();
+    vi.advanceTimersByTime(STABLE_MS);
     sockets.made[0]?.drop();
     expect(onDropped).toHaveBeenCalledTimes(1);
     // The reconnects fail without ever opening: nothing more.
@@ -265,6 +266,39 @@ describe("createLiveChannel", () => {
     sockets.made[4]?.open();
     sockets.made[4]?.drop(LIVE_SESSION_ENDED);
     expect(onDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("backs off a socket cut soon after it opens, and says no drop for it (fix round 5 V2)", () => {
+    const sockets = fakeSockets();
+    const onDropped = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      onDropped,
+      token: () => "tok",
+    });
+    live.start();
+    // Let in and cut 100 ms on, again and again: 1 s, 2 s, 4 s between tries, as for a refusal.
+    for (const [index, wait] of [1000, 2000, 4000].entries()) {
+      sockets.made[index]?.open();
+      vi.advanceTimersByTime(100);
+      sockets.made[index]?.drop();
+      vi.advanceTimersByTime(wait - 1);
+      expect(sockets.made).toHaveLength(index + 1);
+      vi.advanceTimersByTime(1);
+      expect(sockets.made).toHaveLength(index + 2);
+    }
+    expect(onDropped).not.toHaveBeenCalled();
+    // One that stays up resets the backoff: its drop is said, and the next try comes after 1 s.
+    sockets.made[3]?.open();
+    vi.advanceTimersByTime(STABLE_MS);
+    sockets.made[3]?.drop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1000);
+    expect(sockets.made).toHaveLength(5);
+    live.stop();
   });
 
   it("waits for a token instead of opening without one", () => {

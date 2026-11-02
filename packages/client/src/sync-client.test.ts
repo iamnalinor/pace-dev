@@ -18,6 +18,7 @@ import {
 } from "./fake-fetch.fake.ts";
 import { say } from "./fake-socket.fake.ts";
 import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.ts";
+import { STABLE_MS } from "./live-timers.ts";
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
@@ -841,7 +842,8 @@ describe("createSyncClient over the live socket", () => {
     const { client, fake, network, server, socket } = await setupLive();
     // The safety poll while the socket is down; an idle tab writes nothing to send.
     client.sync.start({ intervalMs: 30_000 });
-    await vi.advanceTimersByTimeAsync(SOON_MS);
+    // A tab left open: its socket has been up a while (a socket cut at once is a flapping link).
+    await vi.advanceTimersByTimeAsync(STABLE_MS);
     expect(client.sync.status.getState().online).toBe(true);
 
     network.isDown = true;
@@ -859,6 +861,41 @@ describe("createSyncClient over the live socket", () => {
     server.connect();
     await vi.advanceTimersByTimeAsync(2 * SOON_MS);
     expect(client.sync.status.getState().online).toBe(true);
+    client.sync.stop();
+    client.live.stop();
+  });
+
+  it("backs off a socket that opens and is cut at once, without a pull for every cut (fix round 5 V2)", async () => {
+    vi.useFakeTimers();
+    const { client, fake, server } = await setupLive();
+    // Wired as the app wires it: the safety poll follows the socket (rare while up, 30 s while down).
+    client.sync.start({ intervalMs: 30_000 });
+    const stopFollowing = client.live.status.subscribe(({ isConnected }) => {
+      client.sync.setInterval(isConnected ? 300_000 : 30_000);
+    });
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    const pullsBefore = fake.pathsCalled("/api/sync").length;
+    const opensBefore = server.sockets.length;
+    // A flapping link for a minute: every socket the client opens gets in, and is cut 100 ms on.
+    let seen = server.sockets.at(-1);
+    for (let step = 0; step < 600; step += 1) {
+      const latest = server.sockets.at(-1);
+      if (latest !== seen) {
+        seen = latest;
+        server.connect();
+        await vi.advanceTimersByTimeAsync(100);
+        latest?.drop();
+      } else if (step === 0) {
+        latest?.drop();
+      }
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    const opens = server.sockets.length - opensBefore;
+    const pulls = fake.pathsCalled("/api/sync").length - pullsBefore;
+    // Reconnects after 1, 2, 4, 8, 16, 32 s (not every second), and no run for each short life.
+    expect(opens).toBeLessThanOrEqual(7);
+    expect(pulls).toBeLessThanOrEqual(8);
+    stopFollowing();
     client.sync.stop();
     client.live.stop();
   });
