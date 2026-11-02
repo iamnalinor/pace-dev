@@ -43,6 +43,8 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notifications.assistantLog": "Журнал ассистента",
   "notifications.digestTitle": "Сроки в ближайшие сутки",
   "notifications.openNow": "Открыть Now",
+  "notifications.notMeConfirm": "Завершить тот сеанс? Тот, кто им пользуется, сразу выйдет.",
+  "notifications.notMeEnd": "Завершить сеанс",
   "notifications.login": "Вход с {name}",
   "notifications.eventStart": "{title}, {from}–{to}",
   "notifications.overrun": "Всё ещё занимаетесь: {label}?",
@@ -72,4 +74,6 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "settings.push.otherProject": "Google недоступен: у этого сервера другой проект Firebase.",
   "settings.push.unavailable": "{method} сейчас недоступен.",
   "settings.notifications.hint": "Куда приходит каждый вид уведомлений.",
+  "settings.push.web":
+    "В браузере уведомления ждут под колокольчиком; сам браузер их не показывает.",
 };

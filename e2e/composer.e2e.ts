@@ -77,6 +77,39 @@ test("a pasted message shows actions and is written only on Approve", async ({ p
   await expect(nowTasks(page).getByText(message)).toBeVisible();
 });
 
+for (const [width, height, size] of [
+  [390, 844, "phone"],
+  [1440, 900, "desktop"],
+] as const) {
+  test(`a share to the installed web app lands in the line and stays at /add (${size}, QA 17 M3)`, async ({
+    page,
+  }) => {
+    // The manifest's share_target opens /add with the shared title, text and link in the query.
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto(
+      "/add?title=Article&text=https%3A%2F%2Fexample.com%2Fa%20a%20look%20at%20this&url=https%3A%2F%2Fexample.com%2Fa",
+    );
+    const line = page.getByRole("textbox", { name: "New task" });
+    await expect(line).toHaveValue("Article https://example.com/a a look at this");
+    // Taken once: the address drops the share, so a reload (or a return to the window) does not
+    // fill the line from it again and a second Enter cannot add it twice (review m11).
+    await expect.poll(() => new URL(page.url()).search).toBe("");
+    expect(new URL(page.url()).pathname).toBe("/add");
+    await expect(line).toHaveValue("Article https://example.com/a a look at this");
+    await line.press("Enter");
+    await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
+    // A reload finds no share left to fill in: /add opens as New task, nothing holds the text.
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+    expect(new URL(page.url()).search).toBe("");
+    const values = await page
+      .locator("input, textarea")
+      .evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value));
+    expect(values.filter((value) => value.includes("look at this"))).toEqual([]);
+  });
+}
+
 test("a title typed into the empty form is added on Enter", async ({ page }) => {
   await loginViaApi(page);
   await page.goto("/");
@@ -92,6 +125,27 @@ test("a title typed into the empty form is added on Enter", async ({ page }) => 
   await page.keyboard.press("Enter");
   await expect(nowTasks(page).getByText("Pay the rent")).toBeVisible();
   await expect(page.getByText("Type something first.")).toHaveCount(0);
+});
+
+test("the form's close drops its draft: New task opens an empty form again (QA 14 L6)", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "New task" })).toBeVisible();
+  await formByHand(page).click();
+  const form = taskForm(page);
+  const title = form.getByRole("textbox", { exact: true, name: "Title" });
+  await title.fill("Leftover");
+  await form.getByRole("radio", { name: "Every day" }).click();
+  await expect(form.getByRole("radio", { name: "Every day" })).toBeChecked();
+  await form.getByRole("button", { name: "Close" }).click();
+  await expect(form).toHaveCount(0);
+  await formByHand(page).click();
+  await expect(title).toHaveValue("");
+  await expect(form.getByRole("radio", { name: "Does not repeat" })).toBeChecked();
+  await expect(form.getByRole("button", { name: /^Create/u })).toBeDisabled();
 });
 
 /**

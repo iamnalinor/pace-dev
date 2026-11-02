@@ -7,7 +7,7 @@ const RECENT_MINUTES = 15;
 
 /**
 In a browser there is no calendar to read: today's events come from the copy the phone sends
-(Settings → Devices). Offline, or with nothing sent, there are none.
+(Settings → Devices and sessions). Offline, or with nothing sent, there are none.
 */
 export const calendarToday = async ({ api, now, zone }: CalendarSource): Promise<CalendarToday> => {
   const from = startOfDayIn(now, zone);

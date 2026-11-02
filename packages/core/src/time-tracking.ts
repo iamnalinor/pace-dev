@@ -1,5 +1,13 @@
 /** The time-tracking layer of @pace/core: activities, the time bar's buttons, the timeline. */
 export {
+  isAutoSleepId,
+  sleepDiscardId,
+  sleepNightOf,
+  sleepReopenId,
+  sleepStartId,
+  sleepStopId,
+} from "./ids.ts";
+export {
   type ButtonChoice,
   choiceById,
   TIME_BUTTONS,
@@ -21,6 +29,8 @@ export {
   CATEGORY_COLORS,
   CATEGORY_EXPECT,
   FOCUS_CATEGORIES,
+  isRestClass,
+  REST_CLASS,
 } from "./tracking/categories.ts";
 export {
   type Defaults,
@@ -57,16 +67,42 @@ export {
   SHORT_FOCUS_MINUTES,
 } from "./tracking/patterns.ts";
 export {
+  awakeSpells,
+  BACK_TO_SLEEP_MINUTES,
+  BEDTIME_FROM_HOUR,
+  BEDTIME_UNTIL_HOUR,
+  bedtimeFloor,
+  type Interval,
+  isBedtime,
+  isLockedAt,
+  isWakeUp,
+  NIGHT_UNTIL_HOUR,
+  type PhoneEvent,
+  phoneUses,
+  REST_MIN_MINUTES,
+  SLEEP_MIN_MINUTES,
+  WAKE_UP_MAX_MINUTES,
+  WAKE_UP_UNTIL_HOUR,
+} from "./tracking/phone-use.ts";
+export {
   type AppMinutes,
   appSessions,
   appUsage,
-  detectSleep,
-  type Interval,
-  type PhoneEvent,
   phonePickupAt,
   screenOnIntervals,
-  type SleepCandidate,
 } from "./tracking/phone.ts";
+export {
+  decideSleep,
+  type DeviceUse,
+  type SleepActivity,
+  type SleepDecision,
+  type SleepInput,
+} from "./tracking/sleep-auto.ts";
+export { sleepEvents } from "./tracking/sleep-events.ts";
+export { type SleepHorizon, sleepHorizon } from "./tracking/sleep-horizon.ts";
+export { sleepInputOf, type SleepKnowledge } from "./tracking/sleep-input.ts";
+export { AUTO_SLEEP_LABEL, shownLabel } from "./tracking/sleep-label.ts";
+export { readSleepDecision, type SleepLogInputs, sleepRuleOf } from "./tracking/sleep-log.ts";
 export { timeReducer } from "./tracking/time-reducer.ts";
 export {
   type Gap,

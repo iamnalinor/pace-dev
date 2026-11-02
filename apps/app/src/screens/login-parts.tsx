@@ -28,6 +28,24 @@ export const errorKey = (phase: BotLoginPhase): MessageKey | undefined => {
   }
 };
 
+/**
+Why the login card is back, when the server ended the session (from another device's list, a
+Not me, or its expiry): a remote revoke otherwise signed out without a word (QA round 15 L2).
+*/
+export const SignedOutLine = () => {
+  const t = useT();
+  const { endedElsewhere } = useAuth();
+  return endedElsewhere ? (
+    <Text
+      accessibilityLiveRegion="polite"
+      className="text-center font-sans text-[13px] leading-[18px] text-fg2"
+      role="status"
+    >
+      {t("login.endedElsewhere")}
+    </Text>
+  ) : null;
+};
+
 export const DevLoginForm = ({ onFailure }: { readonly onFailure: () => void }) => {
   const t = useT();
   const { auth } = useAuth();

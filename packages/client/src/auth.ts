@@ -18,6 +18,11 @@ export type AuthState = {
   readonly status: "loading" | "signed-in" | "signed-out";
   /** Known after a login or `me()`; `null` right after startup with a stored token. */
   readonly user: null | User;
+  /**
+  Signed out because the server no longer knew the session (ended on another device, or
+  expired): the login card says so. Absent otherwise; a new session clears it.
+  */
+  readonly endedElsewhere?: true | undefined;
 };
 
 export type BotLoginError = "cancelled" | "not-allowed" | "timeout";
@@ -73,6 +78,11 @@ export type Auth = {
   readonly resumeBotLogin: (nonce: string) => BotLoginPoll;
   /** Tells the server, then forgets the token even when the server could not be reached. */
   readonly logout: () => Promise<void>;
+  /**
+  Forgets the token without telling the server, which ended the session already (this device
+  revoked from its own list): a logout would only answer 401 (QA round 15 L2).
+  */
+  readonly forget: () => Promise<void>;
   /** The destructive action runs only after its Telegram button is confirmed. */
   readonly requestAccountConfirmation: (
     action: AccountAction,
@@ -133,7 +143,8 @@ type Session = {
   readonly store: StoreApi<AuthState>;
   readonly token: () => string | undefined;
   readonly signIn: (granted: Granted) => Promise<User>;
-  readonly signOut: () => Promise<void>;
+  /** `endedElsewhere`: the server no longer knew the session (the login card says so). */
+  readonly signOut: (reason?: { readonly endedElsewhere: true }) => Promise<void>;
   /** Remembers a token whose user is not known yet. */
   readonly adopt: (token: string) => Promise<void>;
 };
@@ -146,7 +157,7 @@ const createSession = (sessionStore: SessionStore): Session => {
     adopt: async (token) => {
       cached = token;
       await sessionStore.set(token);
-      store.setState({ status: "signed-in", user: null });
+      store.setState({ endedElsewhere: undefined, status: "signed-in", user: null });
     },
     ready: (async (): Promise<void> => {
       cached = (await sessionStore.get()) ?? undefined;
@@ -155,13 +166,13 @@ const createSession = (sessionStore: SessionStore): Session => {
     signIn: async (granted) => {
       cached = granted.token;
       await sessionStore.set(granted.token);
-      store.setState({ status: "signed-in", user: granted.user });
+      store.setState({ endedElsewhere: undefined, status: "signed-in", user: granted.user });
       return granted.user;
     },
-    signOut: async () => {
+    signOut: async (reason) => {
       cached = undefined;
       await sessionStore.clear();
-      store.setState({ status: "signed-out", user: null });
+      store.setState({ endedElsewhere: reason?.endedElsewhere, status: "signed-out", user: null });
     },
     store,
     token: () => cached,
@@ -193,6 +204,7 @@ const confirmationActions = (
   | "accountConfirmationStatus"
   | "cancelAccountConfirmation"
   | "finishAccountDeletion"
+  | "forget"
   | "requestAccountConfirmation"
 > => ({
   requestAccountConfirmation: async (action) => {
@@ -218,8 +230,40 @@ const confirmationActions = (
       return err(errorCode(error));
     }
   },
-  finishAccountDeletion: session.signOut,
+  finishAccountDeletion: async () => {
+    await session.signOut();
+  },
+  /** The server ended the session already: no logout to send. */
+  forget: async () => {
+    await session.signOut();
+  },
 });
+
+/**
+Fetches the signed-in user. A 401 signs out as "ended elsewhere", but only for the token the
+request carried and only while it is still the one in use: a 401 for a token this device has
+forgotten or replaced meanwhile (it ended its own session) says nothing about the session in use
+(fix round 1).
+*/
+const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User, string>> => {
+  const sent = session.token();
+  try {
+    // The answer carries the store id too; the sync confirms that on its own pulls.
+    const user = UserSchema.parse(await api.call(endpoints.me, {}));
+    session.store.setState({ status: "signed-in", user });
+    return ok(user);
+  } catch (error) {
+    if (
+      sent !== undefined &&
+      error instanceof ApiError &&
+      error.status === 401 &&
+      session.token() === sent
+    ) {
+      await session.signOut({ endedElsewhere: true });
+    }
+    return err(errorCode(error));
+  }
+};
 
 export const createAuth = (options: {
   readonly api: ApiClient;
@@ -236,19 +280,7 @@ export const createAuth = (options: {
     }
   };
 
-  const me = async (): Promise<Result<User, string>> => {
-    try {
-      // The answer carries the store id too; the sync confirms that on its own pulls.
-      const user = UserSchema.parse(await api.call(endpoints.me, {}));
-      session.store.setState({ status: "signed-in", user });
-      return ok(user);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        await session.signOut();
-      }
-      return err(errorCode(error));
-    }
-  };
+  const me = meOf(api, session);
 
   return {
     ...confirmationActions(api, session),

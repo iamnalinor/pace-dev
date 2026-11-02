@@ -30,9 +30,9 @@ export const enNotify = {
   "notify.kind.event_start": "Event starting",
   "notify.kind.activity_overrun": "Still doing…?",
   "notify.channel.telegram": "Telegram",
-  "notify.channel.app": "App",
+  "notify.channel.app": "Phone",
   "notify.channel.web": "Web",
-  "notify.switch": "{kind} in {channel}",
+  "notify.switch": "{kind}: {channel}",
   "notifications.title": "Notifications",
   "notifications.open": "Notifications",
   "notifications.openUnread": "Notifications, {count} unread",
@@ -41,6 +41,8 @@ export const enNotify = {
   "notifications.assistantLog": "Assistant log",
   "notifications.digestTitle": "Deadlines in the next day",
   "notifications.openNow": "Open Now",
+  "notifications.notMeConfirm": "End that session? Whoever uses it is signed out at once.",
+  "notifications.notMeEnd": "End session",
   "notifications.login": "Signed in from {name}",
   "notifications.eventStart": "{title}, {from}–{to}",
   "notifications.overrun": "Still doing {label}?",
@@ -71,4 +73,6 @@ export const enNotify = {
     "Google: not available, this server uses a different Firebase project.",
   "settings.push.unavailable": "{method} is not available right now.",
   "settings.notifications.hint": "Where each kind of notification goes.",
+  "settings.push.web":
+    "In a browser, notifications wait under the bell; the browser itself shows none.",
 } as const;

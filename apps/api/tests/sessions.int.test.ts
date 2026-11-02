@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { endpoints, type Session } from "@pace/core";
 
-import { bindNonce } from "../src/auth/nonce.ts";
 import { findUserIdByTelegramId } from "../src/auth/users.ts";
 import { d1 } from "../src/shared/db/d1.ts";
-import { answerOf, call, json, loginAsDev, readJson } from "./helpers.ts";
+import { answerOf, call, json, loginAsDev, nonceLogin, readJson } from "./helpers.ts";
 import { mcpCall, obtainToken } from "./oauth-flow.ts";
 
 /* eslint-disable sonarjs/no-hardcoded-ip -- the addresses Cloudflare reports are these tests' fixture */
@@ -59,14 +58,12 @@ const usage = (deviceId: string, endAt: string) => ({
 });
 
 /** A deep-link login from the app, named by the phone: the bot binds it, the app polls it. */
-const appLogin = async (telegramId: string, deviceId: string): Promise<string> => {
-  const { nonce } = await json<{ nonce: string }>("/api/auth/nonce?from=app", {
-    body: { deviceId, deviceName: "Pixel 9a" },
-    ...from("5.6.7.8", OKHTTP, { city: "Hamburg", country: "DE" }),
+const appLogin = async (telegramId: string, deviceId: string): Promise<string> =>
+  await nonceLogin(telegramId, {
+    deviceId,
+    from: "app",
+    request: from("5.6.7.8", OKHTTP, { city: "Hamburg", country: "DE" }),
   });
-  await bindNonce(d1(env.DB), { nonce, now: Date.now(), userId: await userIdOf(telegramId) });
-  return (await json<{ token: string }>(`/api/auth/nonce/${nonce}`)).token;
-};
 
 describe("GET /api/sessions", () => {
   it("lists the browsers, the app, the agents and the MCP apps, marking the caller's own", async () => {

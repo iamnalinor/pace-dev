@@ -1,4 +1,47 @@
-# Stage 8 — PR 1 final verification (2026-10-15)
+# Stage 8 — feedback round 4
+
+Feedback round 4 (`context/feedback-4.md`) shipped as three PRs: PR 1 (`v0.10.0`, #42), PR 2
+(`v0.11.0`, #44) and PR 3, the infrastructure part, called phase C. Phase C's plan is
+`phase-c-plan.md` (its Rulings section wins over the briefs); its controller's log, task briefs,
+reports and reviews stayed in the working checkout's `.superpowers/sdd/phase-c-plan/` (not
+committed; `progress.md` is the log, the plan's rulings and the bug-lessons rows carry what lasts).
+
+## Phase C (2026-11-01)
+
+**Part 1, merged as #47** (Tasks 1–9): self-hosting (`GET /api/instance`, `X-Pace-Protocol` with
+`426 client/outdated`, Change server on the Android login screen with the token bound to its
+server, the versions screen with only Log out, `docs/self-hosting.md`); one session system (kind,
+name and place on every session, `GET/DELETE /api/sessions` with MCP grants, sign-in notices in
+Telegram with "Not me", one message for a deep-link login, Devices and sessions inline in
+Settings); sync over the live socket (`pace.v2` push, pull and unasked events, v1 kept, one client
+code path with HTTP as fallback, sockets closed with their session); the background check every
+~15 minutes. QA rounds 15 and 16, bug classes 47–52.
+
+**Part 2, this PR** (Tasks 10–15 and the fix waves): the battery step only while the phone polls
+(Task 10); the phone uploads when it was really in use and how far it read (11); the pure
+automatic sleep rules (12) run in the user's store, the phone's sleep card gone, every step in the
+assistant log (13); the sync's id limit raised to 128 and a one-time re-pull from 0 on every
+installed client so the long-id events their cursor skipped arrive; QA rounds 14–16 leftovers
+(14, 15: among them ✕ drops the New task draft, and a series without a start begins its later
+instances at 00:00 of their day; a series made before keeps its creation minute until it is
+made again); the docs pass. The `sessions.label` contract (drop the column)
+is the next release's first migration (`TODO(sessions-label-contract)` in `docs/architecture.md`).
+
+**Left for the owner** (product calls, not decided here): kind groups in the sessions list (QA 15
+L16); whether an HTML 404 on `/api/instance` should block as "not a Pace server" (QA 16 L11).
+
+**Needs the owner** (cannot be verified in this environment):
+
+- an Android phone without Google services: background check delivery within ~15 minutes, the
+  battery exemption dialog and the maker's autostart page (`Battery.kt` is compiled only in CI's
+  APK job), Change server against a self-hosted URL, the versions screen against an older server;
+- a real Telegram login from a phone and from a browser: one message each, "Not me" ending it;
+- `PACE_VERSION` showing the tag in `GET /api/instance` after `deploy.yml`;
+- a week of production data replayed through the sleep rules (bug class 39: a day of frequent
+  use never yields a sleep);
+- the first start of the updated app on an existing install: one full re-pull, then normal pulls.
+
+## History: PR 1 final verification (2026-10-15)
 
 Feedback round 4 (`context/feedback-4.md`). The plan is `plan.md`; the controller's log of every
 dispatch, review, ruling and owner decision is `ledger.md`; each task's requirements are in

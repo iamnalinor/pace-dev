@@ -7,6 +7,7 @@ import type { ProjectColorName } from "@pace/core";
 import { useT } from "#app/app-state.tsx";
 import { errorText } from "#app/format/action-error.ts";
 import { Button } from "#app/ui/button.tsx";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 
 import { ColorSwatches } from "./color-swatches.tsx";
@@ -18,9 +19,14 @@ export type ProjectFormValues = {
   readonly description?: string;
 };
 
-/** Name, color (and description when editing), then Cancel / Save; refusals show inline. */
+/**
+Name, color (and description when editing), then Cancel / Save; refusals show inline. Opened
+by hand it takes the cursor in its name, Enter saves (an empty name says so) and Escape cancels
+(QA round 17 L6).
+*/
 export const ProjectForm = ({
   extra,
+  isNameFocused = false,
   initial,
   onCancel,
   onSave,
@@ -32,6 +38,8 @@ export const ProjectForm = ({
   readonly onCancel: () => void;
   /** Under the fields, left of the buttons (archive / restore). */
   readonly extra?: React.ReactNode;
+  /** Opened by a press that asked for it (New project): the cursor goes to the name. */
+  readonly isNameFocused?: boolean;
 }) => {
   const t = useT();
   const [values, setValues] = useState(initial);
@@ -43,6 +51,7 @@ export const ProjectForm = ({
   return (
     <View className="gap-3 rounded-xl border border-line bg-surface p-3.5">
       <TextField
+        autoFocus={isNameFocused}
         label={t("projects.name")}
         onChangeText={(name) => {
           setValues({ ...values, name });
@@ -74,7 +83,7 @@ export const ProjectForm = ({
       )}
       <View className="flex-row flex-wrap items-center justify-end gap-2">
         {extra === undefined ? null : <View className="mr-auto">{extra}</View>}
-        <Button onPress={onCancel} variant="ghost">
+        <Button hotkey={HOTKEYS.escape} onPress={onCancel} variant="ghost">
           {t("common.cancel")}
         </Button>
         <Button onPress={() => void save()}>{submitLabel}</Button>

@@ -240,3 +240,56 @@ test.describe("phone Week sideways navigation", () => {
     await expect(page.getByTestId("week-days")).toHaveAttribute("tabindex", "0");
   });
 });
+
+type Box = null | { readonly x: number; readonly width: number };
+
+/** Two boxes side by side: neither reaches into the other's columns. */
+const isSideBySide = (one: Box, other: Box): boolean =>
+  one !== null &&
+  other !== null &&
+  (one.x + one.width <= other.x || other.x + other.width <= one.x);
+
+test("a block of a few seconds sits beside the next one, never under it (QA 17 L8)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  const { token } = await loginViaApi(page);
+  // The page's clock stands on the last Wednesday at 15:00 UTC (not the real time of day: two hours
+  // before a Monday 00:30 is last week, class 9). Started and stopped within half a minute, then
+  // another activity five minutes later: both that day, two hours before.
+  const day = 24 * 60 * 60_000;
+  const lastWednesday = new Date(Date.now() - day);
+  lastWednesday.setUTCDate(lastWednesday.getUTCDate() - ((lastWednesday.getUTCDay() + 4) % 7));
+  lastWednesday.setUTCHours(15, 0, 0, 0);
+  await page.clock.setFixedTime(lastWednesday);
+  const start = lastWednesday.getTime() - 2 * 60 * 60_000;
+  const at = (offsetMs: number): string => new Date(start + offsetMs).toISOString();
+  const event = (offsetMs: number, type: string, payload: object) => ({
+    deviceId: "e2e-seed",
+    id: ulid(start + offsetMs + 10),
+    occurredAt: at(offsetMs),
+    payload,
+    precision: "exact",
+    recordedAt: at(offsetMs),
+    source: "web",
+    type,
+  });
+  const chess = ulid(start + 1);
+  const walk = ulid(start + 2);
+  const pushed = await pushAsClient(token, [
+    event(0, "activity.started", { activityId: chess, category: "rest", label: "chess" }),
+    event(20_000, "activity.stopped", { activityId: chess }),
+    event(5 * 60_000, "activity.started", { activityId: walk, category: "rest", label: "walk" }),
+    event(40 * 60_000, "activity.stopped", { activityId: walk }),
+  ]);
+  expect(pushed.ok).toBe(true);
+  await page.goto("/week");
+  const chessBox = page.getByRole("button", { name: /^chess, / });
+  const walkBox = page.getByRole("button", { name: /^walk, / });
+  await expect(chessBox).toBeVisible();
+  const [chessAt, walkAt] = [await chessBox.boundingBox(), await walkBox.boundingBox()];
+  expect(chessAt?.height ?? 0).toBeGreaterThanOrEqual(24);
+  // Side by side: the short one's drawn box and the next one do not overlap.
+  expect(isSideBySide(chessAt, walkAt)).toBe(true);
+  await expectNoA11yViolations(page);
+});

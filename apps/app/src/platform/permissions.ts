@@ -2,13 +2,21 @@ import * as Notifications from "expo-notifications";
 import { Linking } from "react-native";
 
 import { paceNative } from "../../modules/pace-native/index.ts";
+import { isBackgroundStepNeeded, type PushState } from "./notifications.ts";
 import { calendarAccess, requestCalendarAccess } from "./phone-calendar.ts";
 import { hasUsageAccess, openUsageAccessSettings } from "./phone-data.ts";
 
 /** Everything Pace may ask Android for, in the order it is explained and asked. */
-export const PERMISSION_IDS = ["notifications", "calendar", "usage"] as const;
+export const PERMISSION_IDS = ["notifications", "calendar", "usage", "background"] as const;
 
 export type PermissionId = (typeof PERMISSION_IDS)[number];
+
+/**
+The permissions to explain and ask for with this push method: the battery exemption only while
+the phone checks in the background (`isBackgroundStepNeeded`).
+*/
+export const permissionIdsFor = (push: Pick<PushState, "method">): readonly PermissionId[] =>
+  PERMISSION_IDS.filter((id) => id !== "background" || isBackgroundStepNeeded(push));
 
 /**
 `blocked`: refused for good, only the app's settings page can turn it on. A `settings` one is
@@ -57,6 +65,15 @@ const readOne = async (id: PermissionId): Promise<Permission> => {
         state: hasUsageAccess() ? "on" : "off",
       };
     }
+    case "background": {
+      // Android's own Allow/Deny dialog; its answer is known once the person is back.
+      return {
+        id,
+        kind: "dialog",
+        restricted: false,
+        state: paceNative.isIgnoringBatteryOptimizations() ? "on" : "off",
+      };
+    }
   }
 };
 
@@ -89,6 +106,13 @@ export const requestPermission = async (permission: Permission): Promise<void> =
     }
     case "usage": {
       openUsageAccessSettings();
+      return;
+    }
+    case "background": {
+      // Started last, the exemption's dialog is on top; the phone maker's autostart page (where
+      // there is one) waits under it, so the person meets it right after answering.
+      paceNative.openAutostartSettings();
+      paceNative.requestIgnoreBatteryOptimizations();
       return;
     }
   }

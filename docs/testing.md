@@ -29,7 +29,18 @@ revocations, amendments that would break the schema, `materializeAt`,
 `shouldRematerialize`), the settings reducer, `t`/`plural`/`formatDuration`/
 `formatRelativeDay`, catalog parity (`en` and `ru` have the same keys, placeholders and
 no empty strings), palette contrast ratios, time-zone helpers, deterministic ids.
-Order-insensitivity and similar invariants use **fast-check** properties.
+Order-insensitivity and similar invariants use **fast-check** properties. Among them:
+every deterministic id builder at its longest fits the sync's `EVENT_ID_MAX` (`ids.test.ts`);
+the automatic sleep rules (`tracking/sleep-auto.test.ts`) reach the same answer whether a night is
+decided once or pass by pass under late and shrinking uploads, never walk an end the person set
+and never undo on less knowledge; a series made at any minute starts its next instance at 00:00
+of a later day, or at the start's own time of day when the person chose one
+(`recurrence/series-instances.test.ts`, Europe/Moscow).
+
+The client's sync tests (`sync-client.test.ts`) run one code path over both transports: HTTP
+through the fake `fetch`, the live socket's `pace.v2` through `fake-socket.fake.ts`; they pin the
+store id resets, a page the socket sends unasked, a lost `pushed` answer, and the one-time re-pull
+from 0 after an update that reads more of the log (outbox kept, no second re-pull).
 
 ## API tests (workerd)
 
@@ -58,6 +69,18 @@ bind); sessions (token never stored, revoke, hourly touch); dev login 404 in pro
 webhook secret check, login deep link, "Not allowed", expired link; sync push/pull
 ordering, idempotent re-push, paging, `recordedAt` clamping, partial rejection, user
 isolation; the store id (stable, new after a wipe, an old epoch emptied on start).
+Phase C added: `instance.int.test.ts` (`GET /api/instance` without a token, the protocol header
+and `426 client/outdated`); `sessions.int.test.ts` (the one sessions list with agents and MCP
+grants, revoke by id, an agent's token may not list); `login-notice.int.test.ts` (the sign-in
+notice's text from what Cloudflare reported, the deep link's one edited message, Not me from
+Telegram, the phone and the feed, double presses and polls at once, groups refused);
+`live.int.test.ts` (v1 `changed` and `pace.v2` push, pull, unasked events, `more` for a big
+batch, bad requests; every revoke path closing the session's sockets, late upgrades refused);
+`sleep.int.test.ts` and `user-store/sleep-pass.test.ts` (automatic sleep opened, stopped,
+reopened and discarded from the system path, idempotent across uploads and alarms, each decision
+logged); `cloud.int.test.ts` (use intervals and how far each phone read); `alarm.test.ts` (one
+shared alarm only moved earlier); `migrations.int.test.ts` (no migration drops what the previous
+release still reads).
 
 ## App tests (jest-expo)
 

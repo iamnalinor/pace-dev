@@ -99,7 +99,7 @@ const activities = (runtime: Awaited<ReturnType<typeof createTestRuntime>>) =>
   Object.values(runtime.state.store.getState().time.activities);
 
 describe("Day with the phone's data", () => {
-  it("offers last night's sleep, shows phone time in a block and the calendar's events", async () => {
+  it("shows phone time in a block and the calendar's events, and asks nothing about sleep", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({
       category: "study",
@@ -109,25 +109,17 @@ describe("Day with the phone's data", () => {
     });
     await renderScreen(<DayScreen />, runtime);
 
-    expect(await screen.findByText("Slept 23:50–07:40 · 7h 46m · woke up 1×")).toBeOnTheScreen();
     // Where the time went on the phone, with no penalty for it.
     expect(await screen.findByText("Phone 20m: Telegram 20m")).toBeOnTheScreen();
     const seminar = await screen.findByText("Seminar");
     expect(seminar).toBeOnTheScreen();
     // A declined invitation is not the person's to attend.
     expect(screen.queryByText("Faculty meeting")).toBeNull();
-
-    await fireEvent.press(screen.getByRole("button", { name: "Log sleep" }));
-    await waitFor(() => {
-      expect(activities(runtime).find((activity) => activity.category === "sleep")).toMatchObject({
-        endAt: "2026-10-06T04:40:00.000Z",
-        label: "Sleep",
-        startAt: "2026-10-05T20:50:00.000Z",
-      });
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/^Slept /u)).toBeNull();
-    });
+    // Sleep is recorded on the server from the uses it is sent: Day asks nothing about the night.
+    expect(screen.queryByText("Last night")).toBeNull();
+    expect(screen.queryByText(/^Slept /u)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Log sleep" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Not sleep" })).toBeNull();
 
     const calendarList = screen.getByLabelText("From your calendar");
     await fireEvent.press(within(calendarList).getByRole("button", { name: "Attended" }));
@@ -137,6 +129,7 @@ describe("Day with the phone's data", () => {
     expect(
       await within(screen.getByLabelText("From your calendar")).findByText("logged"),
     ).toBeOnTheScreen();
+    expect(activities(runtime).some((activity) => activity.category === "sleep")).toBe(false);
   });
 
   // The activity begins at the event's start once that has passed, else now (12:00 UTC).
@@ -176,7 +169,7 @@ describe("Day with the phone's data", () => {
   );
 
   it("keeps the day's blocks in a box of their own, so the cards above cannot move them", async () => {
-    // The sleep card and the calendar arrive after the blocks: on Android a flattened box would
+    // The calendar arrives after the blocks: on Android a flattened box would
     // hand their arrival to every block's own layout transition (see RowList).
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({
@@ -226,17 +219,15 @@ describe("Day with the phone's data", () => {
     expect(within(list).getByRole("button", { name: "Skip" })).toBeOnTheScreen();
   });
 
-  it("waves a wrong sleep guess and a calendar event away for good", async () => {
+  it("waves a calendar event away for good", async () => {
     const runtime = await createTestRuntime({
       routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
     });
     await renderScreen(<DayScreen />, runtime);
-    await fireEvent.press(await screen.findByRole("button", { name: "Not sleep" }));
-    await waitFor(() => {
-      expect(screen.queryByText(/^Slept /u)).toBeNull();
-    });
     await fireEvent.press(
-      within(screen.getByLabelText("From your calendar")).getByRole("button", { name: "Skip" }),
+      within(await screen.findByLabelText("From your calendar")).getByRole("button", {
+        name: "Skip",
+      }),
     );
     await waitFor(() => {
       expect(screen.queryByText("Seminar")).toBeNull();

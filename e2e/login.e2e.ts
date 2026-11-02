@@ -51,11 +51,28 @@ test("the theme choice is kept per device and paints the page", async ({ page })
   await page.getByRole("radio", { name: "Light" }).click();
   await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   const light = await background();
+  // The page behind the app and the browser's colour follow the app's Light on a dark system,
+  // from before the app has loaded (QA 17 L9).
+  const pageColors = async () => ({
+    body: await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundColor),
+    themeColors: await page
+      .locator('meta[name="theme-color"]')
+      .evaluateAll((metas) => metas.map((meta) => meta.getAttribute("content"))),
+  });
+  await expect.poll(pageColors).toMatchObject({ body: "rgb(244, 245, 247)" });
+  // Both theme colours (the system's dark and light) now say the app's light, none the dark one.
+  expect((await pageColors()).themeColors).not.toContain("#0b0b0c");
   await page.reload();
   await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   expect(await background()).toBe(light);
+  expect((await pageColors()).body).toBe("rgb(244, 245, 247)");
   await page.getByRole("radio", { name: "System" }).click();
   await expect.poll(background).not.toBe(light);
+  // System, reloaded on a dark system: the page follows the system again, from the first paint on.
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "System" })).toBeChecked();
+  expect(await background()).not.toBe(light);
+  expect((await pageColors()).body).toBe("rgb(11, 11, 12)");
 });
 
 test("the App Link landing offers to open the app", async ({ page }) => {
@@ -152,7 +169,10 @@ test("a server older than the app holds a signed-in person at the versions scree
   await expect(
     page.getByRole("heading", { name: "Server and app versions don't match" }),
   ).toBeVisible();
-  await expect(page.getByText(/Update the server/u)).toBeVisible();
+  // The web has no other server to sign in on: its owner updates it (QA 17 L1).
+  await expect(page.getByText("Ask whoever runs it to update it.", { exact: false })).toBeVisible();
+  await expect(page.getByText(/sign in on another/u)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh" })).toHaveCount(0);
   // Nothing of the app around it: no navigation, no Change server, one way out.
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await expect(page.getByText(/Change/u)).toHaveCount(0);
@@ -160,4 +180,25 @@ test("a server older than the app holds a signed-in person at the versions scree
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/u);
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
+});
+
+test("a page older than its server offers Refresh, and a refresh with a fitting server goes on (QA 17 L1)", async ({
+  page,
+}) => {
+  const instance = { isTooNew: true };
+  await page.route("**/api/instance", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({
+      json: instance.isTooNew ? { ...body, minClientProtocol: 99, protocol: 99 } : body,
+      response,
+    });
+  });
+  await loginViaApi(page);
+  await page.goto("/");
+  await expect(page.getByText("Refresh it to load the new one.", { exact: false })).toBeVisible();
+  await expectNoA11yViolations(page);
+  instance.isTooNew = false;
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
 });

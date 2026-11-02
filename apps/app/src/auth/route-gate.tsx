@@ -1,6 +1,5 @@
-import type { ReactNode } from "react";
-
 import { Redirect } from "expo-router";
+import { createContext, type ReactNode, use, useState } from "react";
 import { View } from "react-native";
 
 import { useAuth } from "#app/app-state.tsx";
@@ -12,6 +11,44 @@ export const BARE_PATHS = ["/login", "/auth", "/app/auth", "/app/login", "/onboa
 /** Whether a path is one of the screens that need no session (a whole segment: not "/authors"). */
 export const isBarePath = (path: string): boolean =>
   BARE_PATHS.some((bare) => path === bare || path.startsWith(`${bare}/`));
+
+/** Whether this phone went through the walk-through, read once for the whole app (`null` while read). */
+const OnboardedContext = createContext<boolean | null>(null);
+
+/** Reads the walk-through mark once, above the navigator, for `NavigatorHold` and `RouteGate`. */
+export const GateProvider = ({ children }: { readonly children: ReactNode }) => (
+  <OnboardedContext value={useOnboarded()}>{children}</OnboardedContext>
+);
+
+/** What the gate decides on: the session and, signed in, the walk-through mark; `null` while read. */
+const useGate = (): {
+  readonly isOnboarded: boolean | null;
+  readonly isRead: boolean;
+  readonly status: ReturnType<typeof useAuth>["status"];
+} => {
+  const { status } = useAuth();
+  const isOnboarded = use(OnboardedContext);
+  const isRead = status !== "loading" && (status !== "signed-in" || isOnboarded !== null);
+  return { isOnboarded, isRead, status };
+};
+
+/** A blank page of the app's own background, so nothing flashes while the gate is read. */
+const Blank = () => <View className="flex-1 bg-bg" />;
+
+/**
+Holds the navigator back until the gate knows where to go, then never again. Mounted any later
+(behind a blank gate), a nested navigator such as the tabs would take the route from the address
+too late: in between, the address bar was rewritten to `/` and a reload of Day or Inbox landed
+on Now (QA round 17 M2). Mounted only now, every navigator down to the screen mounts at once.
+*/
+export const NavigatorHold = ({ children }: { readonly children: ReactNode }) => {
+  const { isRead } = useGate();
+  const [hasBeenRead, setHasBeenRead] = useState(isRead);
+  if (isRead && !hasBeenRead) {
+    setHasBeenRead(true);
+  }
+  return hasBeenRead || isRead ? <>{children}</> : <Blank />;
+};
 
 /**
 The one guard of every signed-in screen, whichever navigator it sits in (the tabs or a stack
@@ -25,14 +62,12 @@ export const RouteGate = ({
   readonly children: ReactNode;
   readonly path: string;
 }) => {
-  const { status } = useAuth();
-  const isOnboarded = useOnboarded();
+  const { isOnboarded, isRead, status } = useGate();
   if (isBarePath(path)) {
     return <>{children}</>;
   }
-  if (status === "loading" || (status === "signed-in" && isOnboarded === null)) {
-    // A blank page of the app's own background, so nothing flashes while the session is read.
-    return <View className="flex-1 bg-bg" />;
+  if (!isRead) {
+    return <Blank />;
   }
   if (status === "signed-out") {
     return <Redirect href="/login" />;

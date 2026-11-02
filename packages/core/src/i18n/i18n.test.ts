@@ -5,6 +5,7 @@ import { en } from "./en.ts";
 import { EVENT_LABEL_KEYS } from "./event-labels.ts";
 import {
   countryName,
+  formatDaySpan,
   formatDuration,
   formatEyebrow,
   formatLate,
@@ -151,6 +152,12 @@ describe("countryName", () => {
     expect(countryName("T1", "en")).toBe("T1");
     expect(countryName("Germany", "en")).toBe("Germany");
   });
+
+  it("writes ё where Russian names need it, whatever the platform's data leaves out", () => {
+    // QA round 15 L10: the browser's data reads «Соединенные Штаты».
+    expect(countryName("US", "ru")).toBe("Соединённые Штаты");
+    expect(countryName("US", "en")).toBe("United States");
+  });
 });
 
 describe("plural", () => {
@@ -293,6 +300,18 @@ describe("formatRelativeDay", () => {
   });
 });
 
+describe("a notification switch's name (QA round 17 review m10)", () => {
+  it("names the kind and the channel the same way in both languages, never «in Phone»", () => {
+    const named = (language: "en" | "ru") =>
+      t(language, "notify.switch", {
+        channel: t(language, "notify.channel.app"),
+        kind: t(language, "notify.kind.event_start"),
+      });
+    expect(named("en")).toBe(`${t("en", "notify.kind.event_start")}: Phone`);
+    expect(named("ru")).toBe(`${t("ru", "notify.kind.event_start")}: Телефон`);
+  });
+});
+
 describe("page header dates", () => {
   it("spells the weekday out in the eyebrow, on the zone's calendar", () => {
     expect(formatEyebrow("2026-10-08T12:00:00.000Z", "Europe/Moscow", "en")).toBe(
@@ -303,6 +322,54 @@ describe("page header dates", () => {
     );
     expect(formatEyebrow("2026-10-08T12:00:00.000Z", "Europe/Moscow", "ru")).toBe(
       "четверг · 8 окт.",
+    );
+  });
+
+  it("names the days a block spans, the end's own day when it is another", () => {
+    const zone = "Europe/Moscow";
+    // Saturday 23:25 → Sunday 07:40 in Moscow.
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-04T04:40:00.000Z", startAt: "2026-10-03T20:25:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe("Sat · Oct 3 – Sun · Oct 4");
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-04T04:40:00.000Z", startAt: "2026-10-03T20:25:00.000Z" },
+        zone,
+        "ru",
+      ),
+    ).toBe("сб · 3 окт. – вс · 4 окт.");
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-02T04:00:00.000Z", startAt: "2026-09-30T17:00:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe("Wed · Sep 30 – Fri · Oct 2");
+  });
+
+  it("names one day for a block within it, ending at its midnight, or still running", () => {
+    const zone = "Europe/Moscow";
+    const saturday = "Saturday · Oct 3";
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-03T07:00:00.000Z", startAt: "2026-10-03T06:00:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe(saturday);
+    expect(
+      formatDaySpan(
+        { endAt: "2026-10-03T21:00:00.000Z", startAt: "2026-10-03T19:00:00.000Z" },
+        zone,
+        "en",
+      ),
+    ).toBe(saturday);
+    expect(formatDaySpan({ endAt: null, startAt: "2026-10-03T06:00:00.000Z" }, zone, "en")).toBe(
+      saturday,
     );
   });
 

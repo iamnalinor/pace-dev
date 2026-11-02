@@ -1,5 +1,6 @@
 import {
   accountTz,
+  type Activity,
   type ActivityCategory,
   activityLabel,
   addDaysIn,
@@ -11,6 +12,7 @@ import {
   LANGUAGES,
   type ProjectColorName,
   type QueryContext,
+  shownLabel,
   startOfDayIn,
   t,
   taskById,
@@ -88,6 +90,10 @@ export const trackedDates = (state: CoreState, ctx: QueryContext): ReadonlySet<s
   );
 };
 
+/**
+What a block's sheet edits: the activity as it is, not the part the day shows. A night from 23:25
+shows from 00:00 on the next day, and its sheet still says From 23:25 (QA round 17 L14).
+*/
 const editTargetOf = (
   row: Pick<
     DayRow,
@@ -100,14 +106,15 @@ const editTargetOf = (
     | "startAt"
     | "taskId"
   >,
+  activity: Activity | undefined,
 ): ActivityTarget => ({
   activityId: row.activityId,
   category: row.category,
-  endAt: row.isRunning ? null : row.endAt,
+  endAt: row.isRunning ? null : (activity?.endAt ?? row.endAt),
   expectMinutes: row.expectMinutes,
   kind: "edit",
   label: row.label,
-  startAt: row.startAt,
+  startAt: activity?.startAt ?? row.startAt,
   taskId: row.taskId,
 });
 
@@ -142,17 +149,24 @@ export const dayModel = (state: CoreState, date: null | string, ctx: QueryContex
   const from = date === null ? today : startOfDayIn(date, zone);
   const to = addDaysIn(from, 1, zone);
   const day = timeline(state.time, { from, now: ctx.now, to });
-  const rows: readonly DayEntry[] = [...day.segments, ...day.alongside].map((segment) => ({
-    key: `${segment.activityId}-${segment.startAt}`,
-    kind: "activity",
-    target: editTargetOf(segment),
-    row: {
-      ...segment,
-      color: CATEGORY_COLORS[segment.category],
-      showsLabel: !isCategoryName(segment.label, segment.category),
-      taskLink: taskLinkOf(state, segment),
-    },
-  }));
+  const rows: readonly DayEntry[] = [...day.segments, ...day.alongside].map((segment) => {
+    const label = shownLabel(
+      { id: segment.activityId, label: segment.label },
+      state.settings.language,
+    );
+    return {
+      key: `${segment.activityId}-${segment.startAt}`,
+      kind: "activity",
+      target: editTargetOf({ ...segment, label }, state.time.activities[segment.activityId]),
+      row: {
+        ...segment,
+        color: CATEGORY_COLORS[segment.category],
+        label,
+        showsLabel: !isCategoryName(label, segment.category),
+        taskLink: taskLinkOf(state, segment),
+      },
+    };
+  });
   // A day with nothing on it is empty, not one gap from midnight to now.
   const gaps: readonly DayEntry[] =
     rows.length === 0

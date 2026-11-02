@@ -27,4 +27,8 @@ export const ruServer: { readonly [K in keyof typeof enServer]: string } = {
   "server.mismatchApp": "Обновите приложение, чтобы пользоваться этим сервером.",
   "server.mismatchServer":
     "На этом сервере старая версия Pace. Обновите сервер или выйдите и войдите на другом.",
+  "server.mismatchAppWeb":
+    "На этой странице Pace старее, чем на сервере. Обновите страницу, чтобы загрузить новую версию.",
+  "server.mismatchServerWeb":
+    "На этом сервере старая версия Pace. Попросите владельца сервера обновить его.",
 };

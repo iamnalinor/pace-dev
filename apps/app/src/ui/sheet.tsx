@@ -1,6 +1,5 @@
-import type { ReactNode } from "react";
-
 import { X } from "lucide-react-native";
+import { type ReactNode, useId } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -64,16 +63,23 @@ const SheetTitle = ({
   onClose,
   subtitle,
   title,
+  titleId,
 }: {
   readonly closeLabel: string;
   readonly isWide: boolean;
   readonly onClose: () => void;
   readonly subtitle: string | undefined;
   readonly title: string;
+  /** The title's id: the dialog is named by it. */
+  readonly titleId: string;
 }) => (
   <View className="flex-row items-start gap-2">
     <View className="flex-1">
-      <Text accessibilityRole="header" className="font-sans text-[20px] font-semibold text-fg">
+      <Text
+        accessibilityRole="header"
+        className="font-sans text-[20px] font-semibold text-fg"
+        nativeID={titleId}
+      >
         {title}
       </Text>
       {subtitle === undefined ? null : (
@@ -81,11 +87,39 @@ const SheetTitle = ({
       )}
     </View>
     {isWide ? (
-      <View className="-mr-2 -mt-1.5">
+      // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low).
+      <View className="-mr-2 -mt-2.5">
         <IconButton icon={X} label={closeLabel} onPress={onClose} variant="plain" />
       </View>
     ) : null}
   </View>
+);
+
+/**
+Under the title: the fixed header, the scrolling body and the fixed footer. The body shrinks and
+clips inside the frame, under a hairline: scrolled content meets an edge instead of seeming to run
+into the title; its scroll stays in it, the page behind never scrolls on (QA round 15 L8).
+*/
+const SheetBody = ({
+  children,
+  footer,
+  header,
+}: {
+  readonly children: ReactNode;
+  readonly footer: ReactNode;
+  readonly header: ReactNode;
+}) => (
+  <>
+    {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
+    <ScrollView
+      className="mt-3 min-h-0 shrink overscroll-contain border-t border-line"
+      contentContainerClassName="gap-[18px] pt-[15px]"
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+    {footer === undefined ? null : <View className="border-t border-line pt-3">{footer}</View>}
+  </>
 );
 
 /** The sheet's own hotkeys; its buttons are its actions, taking its width also on a computer. */
@@ -130,8 +164,16 @@ export const Sheet = ({
   const { scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
+  const titleId = useId();
   return (
-    <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
+    // The dialog (react-native-web gives the modal the role) is named by its title (QA round 15 L8).
+    <Modal
+      animationType="none"
+      aria-labelledby={titleId}
+      onRequestClose={onClose}
+      transparent
+      visible={visible}
+    >
       <SheetLayer>
         {/* A modal renders outside the app's root (a portal on the web): the theme's variables
       are declared again here, or the sheet would lose its surface and ink. */}
@@ -166,20 +208,11 @@ export const Sheet = ({
                 onClose={onClose}
                 subtitle={subtitle}
                 title={title}
+                titleId={titleId}
               />
-              {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
-              {/* The body shrinks and clips inside the frame, under a hairline: scrolled content
-            meets an edge instead of seeming to run into the title. */}
-              <ScrollView
-                className="mt-3 min-h-0 shrink border-t border-line"
-                contentContainerClassName="gap-[18px] pt-[15px]"
-                keyboardShouldPersistTaps="handled"
-              >
+              <SheetBody footer={footer} header={header}>
                 {children}
-              </ScrollView>
-              {footer === undefined ? null : (
-                <View className="border-t border-line pt-3">{footer}</View>
-              )}
+              </SheetBody>
             </View>
           </Animated.View>
         </View>

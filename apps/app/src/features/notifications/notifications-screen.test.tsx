@@ -1,5 +1,6 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
+import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -9,11 +10,11 @@ import { MOSCOW, NOW } from "@pace/core/testing";
 import { NotificationsScreen } from "./notifications-screen.tsx";
 
 /** Where focus went, as the feed asked the platform (bug class 5). */
-const mockMoveFocus = jest.fn<undefined, [unknown]>();
+const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
 jest.mock("#app/platform/move-focus.ts", (): unknown => ({
   isFocusLost: () => true,
-  moveFocus: (target: unknown) => {
-    mockMoveFocus(target);
+  moveFocus: (target: unknown, say?: string) => {
+    mockMoveFocus(target, say);
   },
 }));
 
@@ -115,6 +116,28 @@ const feedRuntime = async (
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+/** Not me, then its confirm's End session: it ends a session for good, so it asks first. */
+const endFromFeed = async (): Promise<void> => {
+  await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+  await fireEvent.press(screen.getByRole("button", { name: en("notifications.notMeEnd") }));
+};
+
+/** The account's sessions as `GET /api/sessions` lists them: this browser and maybe others. */
+const sessionsList = (ids: readonly string[]) => () => ({
+  sessions: ids.map((id) => ({
+    city: null,
+    country: "DE",
+    createdAt: 1,
+    current: id === "me",
+    id,
+    ip: SIGN_IN_IP,
+    kind: "browser",
+    lastDataAt: null,
+    lastSeenAt: 1,
+    name: "Chrome on macOS",
+  })),
 });
 
 describe("NotificationsScreen", () => {
@@ -261,7 +284,7 @@ describe("NotificationsScreen", () => {
       "POST /api/notifications/n-login/resolve": resolve,
     });
     await renderScreen(<NotificationsScreen />, runtime);
-    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    await endFromFeed();
     expect(await screen.findByText(en("notify.resolved.revoked"))).toBeOnTheScreen();
     expect(resolve).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -282,10 +305,9 @@ describe("NotificationsScreen", () => {
       }),
     });
     await renderScreen(<NotificationsScreen />, runtime);
-    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    await endFromFeed();
     await screen.findByText(en("notify.resolved.revoked"));
-    expect(mockMoveFocus).toHaveBeenCalledTimes(1);
-    expect(textOf(mockMoveFocus.mock.calls[0]?.[0])).toBe(en("notify.resolved.revoked"));
+    expect(textOf(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(en("notify.resolved.revoked"));
   });
 
   it("does not move focus when the answer is refused: the button keeps it", async () => {
@@ -295,9 +317,10 @@ describe("NotificationsScreen", () => {
       },
     });
     await renderScreen(<NotificationsScreen />, runtime);
-    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    await endFromFeed();
+    const moves = mockMoveFocus.mock.calls.length;
     expect(await screen.findByText(en("notifications.failedAction"))).toBeOnTheScreen();
-    expect(mockMoveFocus).not.toHaveBeenCalled();
+    expect(mockMoveFocus).toHaveBeenCalledTimes(moves);
   });
 
   it("offers no Not me on this session's own sign-in, which only the person's other devices answer", async () => {
@@ -321,6 +344,94 @@ describe("NotificationsScreen", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: en("notify.action.revoked") })).toBeNull();
     });
+  });
+
+  it("asks before Not me ends a session; Cancel keeps the notice as it was (QA round 15 L11)", async () => {
+    const resolve = jest.fn(() => ({ notification: { ...login, resolution: "revoked" } }));
+    const { runtime } = await feedRuntime([login], {
+      "POST /api/notifications/n-login/resolve": resolve,
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    // The question is said, and focus lands on Cancel, the safe choice.
+    expect(screen.getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    const [target, said] = mockMoveFocus.mock.calls.at(-1) ?? [];
+    expect(said).toBe(en("notifications.notMeConfirm"));
+    const cancel = screen.getByRole("button", { name: en("common.cancel") });
+    expect(isControl(target, cancel)).toBe(true);
+    await fireEvent.press(cancel);
+    expect(screen.queryByText(en("notifications.notMeConfirm"))).toBeNull();
+    expect(resolve).not.toHaveBeenCalled();
+    // Focus goes back to Not me.
+    const [back] = mockMoveFocus.mock.calls.at(-1) ?? [];
+    const notMe = screen.getByRole("button", { name: en("notify.action.revoked") });
+    expect(isControl(back, notMe)).toBe(true);
+  });
+
+  it("keeps one Not me confirm open at a time (fix round 1)", async () => {
+    const other = {
+      ...login,
+      createdAt: "2026-10-06T08:30:00.000Z",
+      id: "n-login-2",
+      payload: { ...login.payload, name: "Edge on Windows", sessionId: "s2" },
+    };
+    const { runtime } = await feedRuntime([login, other]);
+    await renderScreen(<NotificationsScreen />, runtime);
+    const first = await screen.findByTestId("notification-n-login");
+    const second = screen.getByTestId("notification-n-login-2");
+    await fireEvent.press(within(first).getByRole("button", { name: en("notify.action.revoked") }));
+    expect(within(first).getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    await fireEvent.press(
+      within(second).getByRole("button", { name: en("notify.action.revoked") }),
+    );
+    expect(within(second).getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    expect(within(first).queryByText(en("notifications.notMeConfirm"))).toBeNull();
+    expect(
+      within(first).getByRole("button", { name: en("notify.action.revoked") }),
+    ).toBeOnTheScreen();
+  });
+
+  it("hands focus to the status when a reload ends the session under an open confirm (fix round 1)", async () => {
+    const listed = { ids: ["me", "s"] };
+    const { runtime } = await feedRuntime([login], {
+      "GET /api/sessions": () => sessionsList(listed.ids)(),
+    });
+    await renderScreen(<NotificationsScreen />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: en("notify.action.revoked") }));
+    expect(screen.getByText(en("notifications.notMeConfirm"))).toBeOnTheScreen();
+    // Ended from another device meanwhile; a new sign-in notice makes the feed's list reload.
+    listed.ids = ["me"];
+    await act(async () => {
+      runtime.notifications.store.setState((state) => ({
+        ...state,
+        items: [
+          { ...login, id: "n-new", payload: { ...login.payload, sessionId: "me" } },
+          ...state.items,
+        ],
+      }));
+      await Promise.resolve();
+    });
+    const row = screen.getByTestId("notification-n-login");
+    expect(await within(row).findByText(en("notify.resolved.revoked"))).toBeOnTheScreen();
+    expect(textOf(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(en("notify.resolved.revoked"));
+  });
+
+  it("marks this device's own sign-in as this device (QA round 15 L11)", async () => {
+    const own = { ...login, payload: { ...login.payload, sessionId: "me" } };
+    const { runtime } = await feedRuntime([own], { "GET /api/sessions": sessionsList(["me"]) });
+    await renderScreen(<NotificationsScreen />, runtime);
+    const row = await screen.findByTestId("notification-n-login");
+    expect(await within(row).findByText(/^This device/u)).toBeOnTheScreen();
+    expect(within(row).queryByRole("button")).toBeNull();
+  });
+
+  it("offers no Not me on a sign-in whose session already ended elsewhere: it says so (QA round 15 L11)", async () => {
+    // The notice came on Oct 6; the list, fetched now, no longer holds its session "s".
+    const { runtime } = await feedRuntime([login], { "GET /api/sessions": sessionsList(["me"]) });
+    await renderScreen(<NotificationsScreen />, runtime);
+    const row = await screen.findByTestId("notification-n-login");
+    expect(await within(row).findByText(en("notify.resolved.revoked"))).toBeOnTheScreen();
+    expect(within(row).queryByRole("button", { name: en("notify.action.revoked") })).toBeNull();
   });
 
   it("says a refused answer did not go through and keeps the buttons", async () => {

@@ -8,6 +8,7 @@ import {
   formatInZone,
   type ProjectColorName,
   type QueryContext,
+  shownLabel,
   startOfWeekIn,
   timeline,
 } from "@pace/core";
@@ -81,6 +82,8 @@ type Run = {
 
 type Placed = readonly (readonly [number, Lane])[];
 
+const MS_PER_MINUTE = 60_000;
+
 const EMPTY_RUN: Run = { end: -Infinity, laneEnds: [], members: [] };
 
 /** A finished run: each member shares the column in as many lanes as the run needed. */
@@ -113,12 +116,16 @@ const placeNext = (
 /**
 Lanes for stretches that may overlap (calendar events, tracked blocks): each takes the first
 lane free at its start, and a run of overlapping stretches shares the column in as many lanes
-as it needed. Returned in the input order.
+as it needed. A stretch counts as at least `minMinutes` long: the height the grid draws it at,
+so a short block never sits under the next one (QA round 17 L8). Returned in the input order.
 */
-export const lanesOf = (stretches: readonly Stretch[]): readonly Lane[] => {
+export const lanesOf = (stretches: readonly Stretch[], minMinutes = 0): readonly Lane[] => {
   const order = stretches
     .map((stretch, index) => ({
-      end: Date.parse(stretch.endAt),
+      end: Math.max(
+        Date.parse(stretch.endAt),
+        Date.parse(stretch.startAt) + minMinutes * MS_PER_MINUTE,
+      ),
       index,
       start: Date.parse(stretch.startAt),
     }))
@@ -175,7 +182,10 @@ export const weekModel = (
           endAt: segment.endAt,
           id: `${segment.activityId}-${segment.startAt}`,
           isAlongside: segment.isAlongside,
-          label: segment.label,
+          label: shownLabel(
+            { id: segment.activityId, label: segment.label },
+            state.settings.language,
+          ),
           minutes: segment.minutes,
           startAt: segment.startAt,
           taskId: segment.taskId,

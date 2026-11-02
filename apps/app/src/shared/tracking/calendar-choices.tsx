@@ -29,7 +29,13 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
   const { actions } = usePace();
   return (
     <View className="gap-2">
-      <Nothing>{t(noEventsKey(calendar))}</Nothing>
+      {/* The sections by their own titles, so a renamed one is renamed here too (QA 17 L3). */}
+      <Nothing>
+        {t(noEventsKey(calendar), {
+          section: t("sessions.title"),
+          settings: t("settings.title"),
+        })}
+      </Nothing>
       <ChoiceRow
         aside={null}
         label={t("time.calendarStartUntitled")}

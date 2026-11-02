@@ -32,10 +32,38 @@ for (const size of SIZES) {
       const section = page.getByRole("group", { name: "Devices and sessions" });
       await expect(section.getByText("This device")).toBeVisible();
       await expectNoA11yViolations(page);
-
+      // The bottom of Settings (QA round 15 L6): the danger zone's openers match the account's
+      // actions, full width (one above the other) on a phone, side by side on a computer.
+      const isPhone = size.name === "phone";
+      const logout = await boxOf(page.getByRole("button", { name: "Log out" }));
+      const wipe = await boxOf(page.getByRole("button", { name: "Wipe data" }));
+      const remove = await boxOf(page.getByRole("button", { name: "Delete account" }));
+      expect(Math.abs(remove.width - logout.width) < 2).toBe(isPhone);
+      expect(Math.abs(wipe.y - remove.y) < 2).toBe(!isPhone);
+      // The tab names the screen; the page's scheme follows the app's theme (QA round 15 L8, L14).
+      await expect(page).toHaveTitle("Settings · Pace");
+      await expect
+        .poll(
+          async () =>
+            await page.evaluate(
+              () => globalThis.getComputedStyle(globalThis.document.documentElement).colorScheme,
+            ),
+        )
+        .toBe("light");
       // By keyboard (QA round 15 M2): the name is focused with its suggestion selected, the button
       // shows Enter, and Enter in the field creates the token.
       await section.getByRole("button", { name: "Add a computer" }).click();
+      // The dialog is named by its title, and its scroll stays in it (QA round 15 L8).
+      const dialog = page.getByRole("dialog", { name: "Add a computer" });
+      await expect(dialog).toBeVisible();
+      expect(
+        await dialog.evaluate(
+          (node) =>
+            [...node.querySelectorAll("div")].filter(
+              (div) => globalThis.getComputedStyle(div).overscrollBehaviorY === "contain",
+            ).length,
+        ),
+      ).toBeGreaterThan(0);
       const name = page.getByRole("textbox", { name: "Name" });
       await expect(name).toBeFocused();
       await expect(page.getByRole("button", { name: "Create the token" })).toHaveAttribute(
@@ -46,6 +74,10 @@ for (const size of SIZES) {
       await expect(name).toHaveValue("Linux Mint");
       await page.keyboard.press("Enter");
       await expect(page.getByTestId("device-setup-token")).not.toBeEmpty();
+      // The name step went: focus moves to the next step's chosen system (QA round 16 L2).
+      await expect(dialog.getByRole("radio", { checked: true })).toBeFocused();
+      // Done stays in sight under the scrolling steps (QA round 15 L7).
+      await expect(page.getByRole("button", { name: "Done" })).toBeInViewport();
       // The commands name the local API, the server this build talks to.
       await page.getByRole("radio", { name: "Linux" }).click();
       await expect(page.getByText(/^curl .*pace_agent\.py install /u)).toContainText(
@@ -74,6 +106,12 @@ for (const size of SIZES) {
       await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(computer.getByRole("button", { name: "Disconnect" })).toBeFocused();
+      // Escape cancels it too, as it closes a sheet (QA round 15 L1), and gives focus back.
+      await page.keyboard.press("Enter");
+      await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(confirm).toHaveCount(0);
+      await expect(computer.getByRole("button", { name: "Disconnect" })).toBeFocused();
 
       await computer.getByRole("button", { name: "Disconnect" }).click();
       await expect(confirm.getByRole("status")).toHaveText(
@@ -95,6 +133,61 @@ for (const size of SIZES) {
       await page.reload();
       await expect(section.getByText("This device")).toBeVisible();
       await expect(section.getByRole("group", { name: "Linux Mint" })).toHaveCount(0);
+    });
+
+    test('ending this device signs out as the person\'s own act: no 401, no "ended elsewhere" (QA round 15 L2)', async ({
+      page,
+    }) => {
+      await loginViaApi(page);
+      const refused: string[] = [];
+      const pending = new Set<unknown>();
+      page.on("request", (request) => {
+        pending.add(request);
+      });
+      page.on("requestfinished", (request) => {
+        pending.delete(request);
+      });
+      page.on("requestfailed", (request) => {
+        pending.delete(request);
+      });
+      // A 401 this end sets off: the session check (`me`) or a logout at any time, or anything
+      // asked once the DELETE was answered. A request of the start still on its way when the
+      // session ends is another race than the one this pins.
+      const asked = { afterEnd: new Set<unknown>(), isEnded: false };
+      page.on("request", (request) => {
+        if (asked.isEnded) {
+          asked.afterEnd.add(request);
+        }
+      });
+      page.on("response", (response) => {
+        const { pathname } = new URL(response.url());
+        if (response.request().method() === "DELETE" && pathname.startsWith("/api/sessions/")) {
+          asked.isEnded = true;
+        }
+        const isOfTheEnd =
+          pathname === "/api/me" ||
+          pathname === "/api/auth/logout" ||
+          asked.afterEnd.has(response.request());
+        if (isOfTheEnd && response.status() === 401) {
+          refused.push(response.url());
+        }
+      });
+      await page.goto("/settings");
+      const section = page.getByRole("group", { name: "Devices and sessions" });
+      const current = section.getByRole("group").filter({ hasText: "This device" }).first();
+      await expect(current).toBeVisible();
+      await current.getByRole("button", { name: "Revoke" }).click();
+      await current
+        .getByRole("group", { name: "End this session? This device signs out." })
+        .getByRole("button", { name: "Revoke" })
+        .click();
+      await expect(page).toHaveURL(/\/login$/u);
+      // The server closes this browser's socket as it ends the session: a late check of it must
+      // not answer 401, nor tell the person someone else signed them out.
+      // Everything sent by then (a check the socket's close set off included) has its answer.
+      await expect.poll(() => pending.size).toBe(0);
+      await expect(page.getByText(/You were signed out/u)).toHaveCount(0);
+      expect(refused).toEqual([]);
     });
 
     test("shows the local server's MCP URL under Connect an AI app", async ({ page }) => {

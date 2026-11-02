@@ -1,6 +1,6 @@
 import type { Language } from "./language.ts";
 
-import { addDaysIn, minutesBetween, startOfDayIn } from "../time.ts";
+import { addDaysIn, formatInZone, minutesBetween, startOfDayIn } from "../time.ts";
 import { en } from "./en.ts";
 import { pluralCategory } from "./plural-rules.ts";
 import { ru } from "./ru.ts";
@@ -20,6 +20,12 @@ const interpolate = (text: string, params: MessageParams | undefined): string =>
   });
 
 /**
+The platform's Russian region names spell «Соединенные Штаты» with е where the language writes ё
+(QA round 15 L10); the one such name a sign-in is likely to come from.
+*/
+const withYo = (name: string): string => name.replaceAll("Соединенн", "Соединённ");
+
+/**
 A country's name in the reader's language, from the code Cloudflare reports (`DE`); the value as
 it came when it names no region (Tor's "T1") or the platform cannot name regions (Hermes has no
 `Intl.DisplayNames`). Settings' session list and the sign-in notice both name places this way.
@@ -29,7 +35,8 @@ export const countryName = (code: string, language: Language): string => {
     return code;
   }
   try {
-    return new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
+    const name = new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
+    return language === "ru" ? withYo(name) : name;
   } catch {
     return code;
   }
@@ -242,6 +249,35 @@ export const formatEyebrow = (atIso: string, zone: string, language: Language): 
   });
   const day = language === "ru" ? `${parts.day} ${parts.month}` : `${parts.month} ${parts.day}`;
   return `${parts.weekday} · ${day}`;
+};
+
+/** `Sat · Oct 3` / `сб · 3 окт.`: one end of a span of days. */
+const shortDay = (atIso: string, zone: string, language: Language): string => {
+  const parts = dateParts(atIso, language, {
+    day: "numeric",
+    month: "short",
+    timeZone: zone,
+    weekday: "short",
+  });
+  const day = language === "ru" ? `${parts.day} ${parts.month}` : `${parts.month} ${parts.day}`;
+  return `${parts.weekday} · ${day}`;
+};
+
+/**
+The day a block runs on (`formatEyebrow`), or both days when it ends on another one:
+`Sat · Oct 3 – Sun · Oct 4` / `сб · 3 окт. – вс · 4 окт.`. An end at midnight still belongs to
+the day before it; a running block (`null`) names its start's day.
+*/
+export const formatDaySpan = (
+  { endAt, startAt }: { readonly startAt: string; readonly endAt: null | string },
+  zone: string,
+  language: Language,
+): string => {
+  const lastMoment = endAt === null ? startAt : new Date(Date.parse(endAt) - 1).toISOString();
+  const dayOf = (atIso: string): string => formatInZone(atIso, zone, "yyyy-MM-dd");
+  return dayOf(lastMoment) === dayOf(startAt)
+    ? formatEyebrow(startAt, zone, language)
+    : `${shortDay(startAt, zone, language)} – ${shortDay(lastMoment, zone, language)}`;
 };
 
 /** `Oct 5 – 11`, `Sep 28 – Oct 4` / `5 – 11 окт.`: the seven days from `weekStartIso`. */

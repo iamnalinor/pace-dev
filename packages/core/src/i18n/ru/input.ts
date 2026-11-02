@@ -137,6 +137,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "composer.placeholder": "Добавьте задачу или текст",
   "composer.addTo": "Добавить в {title}",
   "composer.toInbox": "Во входящие",
+  "composer.toInboxDone": "Добавлено во входящие",
   "composer.category": "Категория",
   "composer.project": "Проект",
   "composer.noProject": "Без проекта",

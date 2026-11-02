@@ -5,6 +5,8 @@ import { Text, View } from "react-native";
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { moveFocus } from "#app/platform/move-focus.ts";
+import { useOnReturn } from "#app/platform/on-return.ts";
+import { useSignInsChanged } from "#app/shared/notifications/use-sign-ins-changed.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -21,11 +23,28 @@ import { SessionRow } from "./session-row.tsx";
 /** The sheet open over the section, if any. */
 type Opened = "addComputer" | "connectAi" | null;
 
+/** The list could not load: a quiet line and Try again under it. */
+const ListFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
+  const t = useT();
+  return (
+    // The ghost button sits under the line, its label flush with it: wrapped beside the line it
+    // came out indented by its own padding (QA round 15 L10).
+    <View className="items-start">
+      <Text className="font-sans text-[14px] text-muted">{t("sessions.failed")}</Text>
+      <View className="-ml-4">
+        <Button onPress={onRetry} variant="ghost">
+          {t("sessions.retry")}
+        </Button>
+      </View>
+    </View>
+  );
+};
+
 /**
-The list itself: skeleton rows while it loads, a quiet retry line when it cannot, then the rows.
-Ending this device's own session is logging out: it signs out and goes to the login card.
+The rows of a loaded list. Ending this device's own session is logging out: it signs out and goes
+to the login card.
 */
-const SessionList = ({
+const ReadyList = ({
   afterLast,
   sessions,
 }: {
@@ -36,24 +55,14 @@ const SessionList = ({
   const t = useT();
   const router = useRouter();
   const { auth } = useAuth();
+  const { live } = usePace();
   const { timezone } = useSettings();
   const { deviceTz, language, now } = useViewer();
   const [hasEndFailed, setHasEndFailed] = useState(false);
+  // The one row whose confirm is open: opening another closes it (QA round 15 L1).
+  const [confirming, setConfirming] = useState<null | string>(null);
   // Each row's Revoke or Disconnect, by id: an ended row's focus goes to the next one's.
   const openersRef = useRef(new Map<string, View>());
-  if (sessions.status === "loading") {
-    return <Skeleton label={t("sessions.loading")} />;
-  }
-  if (sessions.status === "error") {
-    return (
-      <View className="flex-row flex-wrap items-center gap-x-2">
-        <Text className="font-sans text-[14px] text-muted">{t("sessions.failed")}</Text>
-        <Button onPress={sessions.reload} variant="ghost">
-          {t("sessions.retry")}
-        </Button>
-      </View>
-    );
-  }
   const rows = sessionRows(sessions.sessions, { language, now, zone: timezone ?? deviceTz });
   /** The row's going takes its controls with it: focus moves on, never to the page (class 5). */
   const focusAfter = (row: Row): void => {
@@ -66,9 +75,17 @@ const SessionList = ({
     moveFocus(next ?? afterLast.current);
   };
   const didEnd = async (row: Row): Promise<boolean> => {
+    // Ending this device: the socket rests first. The server closes it as the session ends, and
+    // the channel would read that as "ended elsewhere" and check `me` (a 401; fix round 1).
+    if (row.isCurrent) {
+      live.stop();
+    }
     try {
       await sessions.revoke(row.id);
     } catch {
+      if (row.isCurrent) {
+        live.start();
+      }
       // The row stays, its confirm open for another try; the line under the list says why.
       setHasEndFailed(true);
       return false;
@@ -78,7 +95,8 @@ const SessionList = ({
       focusAfter(row);
       return true;
     }
-    await auth.logout();
+    // The server ended it already: forgotten here, no logout to answer 401 (QA round 15 L2).
+    await auth.forget();
     router.replace("/login");
     return true;
   };
@@ -86,7 +104,12 @@ const SessionList = ({
     <View>
       {rows.map((row) => (
         <SessionRow
+          isConfirming={confirming === row.id}
           key={row.id}
+          onConfirming={(isOpen) => {
+            setConfirming(isOpen ? row.id : null);
+            setHasEndFailed(false);
+          }}
           onEnd={async () => await didEnd(row)}
           openerRef={(node) => {
             if (node === null) {
@@ -107,6 +130,33 @@ const SessionList = ({
   );
 };
 
+/** The list itself: skeleton rows while it loads, a quiet retry line when it cannot, then the rows. */
+const SessionList = ({
+  afterLast,
+  sessions,
+}: {
+  readonly sessions: Sessions;
+  readonly afterLast: RefObject<null | View>;
+}) => {
+  const t = useT();
+  if (sessions.status === "loading") {
+    return <Skeleton label={t("sessions.loading")} />;
+  }
+  return sessions.status === "error" ? (
+    <ListFailed onRetry={sessions.reload} />
+  ) : (
+    <ReadyList afterLast={afterLast} sessions={sessions} />
+  );
+};
+
+/**
+Keeps the list current (QA round 15 M1): it reloads when the person comes back to the app or the
+tab, and when a sign-in notice arrives or is answered (one request for both).
+*/
+const useLiveSessions = (sessions: Sessions): void => {
+  useOnReturn(useSignInsChanged(sessions.reload));
+};
+
 /**
 Settings → Devices and sessions, inline: every way into the account (browsers, this app,
 computers' agents, MCP apps) from one `useSessions`, so a revoke or a new computer shows in the
@@ -117,6 +167,7 @@ export const SessionsSection = () => {
   const { api } = usePace();
   const isWide = useIsWide();
   const sessions = useSessions(api);
+  useLiveSessions(sessions);
   const [opened, setOpened] = useState<Opened>(null);
   const computerButtonRef = useRef<View>(null);
   const close = () => {

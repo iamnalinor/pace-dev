@@ -66,14 +66,20 @@ server at the latest release.
      ```
      and for the web app, `EXPO_PUBLIC_API_URL=https://<your api> EXPO_PUBLIC_TELEGRAM_BOT=<bot>
      bun run --cwd apps/app build:web && bun run --cwd apps/app deploy:web`. `PACE_VERSION` is
-     what `GET /api/instance` reports (`dev` when unset).
+     what `GET /api/instance` reports (`dev` when unset). Set it on every deploy, and make it
+     change with the code: the release tag or the commit, as the workflow and the command above
+     do. The server keeps its SQL projection rows while the version stays the same, so a fixed
+     value (`PACE_VERSION=mine`) would keep rows that older code wrote after an upgrade. A
+     server without it rewrites its SQL projections on every cold start (as often as every
+     alarm).
 6. **Telegram**: in BotFather, `/setdomain` → your web origin's host, so the Login Widget may run
    there (a bot has one widget domain). The deploy workflow sets the webhook; by hand, call
    `https://api.telegram.org/bot<token>/setWebhook` with
    `url=https://<your api>/telegram/webhook`, `secret_token=<TELEGRAM_WEBHOOK_SECRET>` and
    `allowed_updates=["message","callback_query"]`, then store `getMe`'s `result` with
    `bunx wrangler secret put BOT_INFO`.
-7. **Check it**: `https://<your api>/api/instance` answers your bot, version and protocol.
+7. **Check it**: `https://<your api>/api/instance` answers your server's name, version, protocol,
+   bot, origins and features.
 8. **In the app**: on the login screen press **Change** next to "Server: …", type your API's
    address (`pace-api.example.dev`; https only, plain http only for `localhost`, `10.0.2.2` and
    private networks during development), press **Check**, then **Use this server**, and sign in.
@@ -90,7 +96,9 @@ the project that sends it. So a self-hosted server gets **no Google push** with 
 even with a Firebase project of its own (Settings says why). Everything else works:
 
 - while the app is open, notifications arrive instantly over the live connection;
-- in the background, the phone checks your server about every 15 minutes;
+- in the background, the phone checks your server about every 15 minutes (the permissions
+  walk-through then asks to leave Pace out of battery optimization, or Android defers the check
+  for hours; on phones that have one it also opens the maker's autostart page);
 - reminders and alerts also come from your bot in Telegram.
 
 Instant push needs your own build of the app with your Firebase project

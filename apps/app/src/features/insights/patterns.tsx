@@ -80,11 +80,13 @@ const FragmentationCard = ({
   const tiles = fragmentationTiles(fragmentation, useViewer().language);
   return tiles === null ? null : (
     <Card title={t("insights.fragmentation")}>
-      <View className="flex-row gap-2">
+      {/* A tile keeps room for its longest word ("Переключений"), so a phone wraps the row, not
+          the word (QA round 17 L12). */}
+      <View className="flex-row flex-wrap gap-2">
         {tiles.map((tile) => (
           <View
             accessibilityLabel={`${t(tile.key)}: ${tile.value}`}
-            className="flex-1 gap-1 rounded-lg bg-raised p-3"
+            className="min-w-[112px] flex-1 gap-1 rounded-lg bg-raised p-3"
             key={tile.key}
             role="group"
           >

@@ -424,6 +424,17 @@ export default defineConfig([
     },
   },
   {
+    // Plain scripts the web page loads before the app (no bundler, no types): checked as browser JS.
+    files: ["apps/app/public/*.js"],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      globals: { document: "readonly", globalThis: "readonly" },
+      parserOptions: { project: false, projectService: false },
+      sourceType: "script",
+    },
+    rules: { ...tseslint.configs.disableTypeChecked.rules },
+  },
+  {
     files: APP_JS_CONFIGS,
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {

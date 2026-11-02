@@ -73,6 +73,7 @@ export {
   type NotificationFeed,
   parseLiveNotice,
 } from "./notifications.ts";
+export { type PeerTabs, type StoreChange } from "./peer-tabs.ts";
 export { createMemorySessionStore, type SessionStore } from "./session.ts";
 export {
   type AppState,
@@ -112,7 +113,7 @@ export {
   type DayTotal,
   trackedDates,
 } from "./view-models/day.ts";
-export { type DecisionView, decisionViews } from "./view-models/decisions.ts";
+export { type DecisionView, decisionViews, doneLines } from "./view-models/decisions.ts";
 export {
   agentCommand,
   agentLogsCommand,
@@ -223,6 +224,7 @@ export {
   sessionRows,
   type SessionRowsContext,
 } from "./view-models/sessions.ts";
+export { type ListedSessions, signInState } from "./view-models/sign-in-notice.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,

@@ -28,6 +28,21 @@ const Board = () => (
 
 const calendar = Calendar as unknown as FakeCalendar;
 
+/** Where focus went, as Now asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  isFocusLost: () => true,
+  moveFocus: (target: unknown) => {
+    mockMoveFocus(target);
+  },
+}));
+
+/** What a focus target says: its accessible name. */
+const saidBy = (target: unknown): unknown =>
+  (target as null | { readonly props?: Readonly<Record<string, unknown>> })?.props?.[
+    "accessibilityLabel"
+  ];
+
 beforeEach(() => {
   jest.clearAllMocks();
   (SecureStore as unknown as FakeSecureStore).values.clear();
@@ -291,6 +306,17 @@ describe("NowBoard", () => {
     expect(screen.queryByRole("button", { name: "Use UTC" })).toBeNull();
   });
 
+  it("keeps the account's zone on Keep, and the card stays away on this device (QA 17 L10)", async () => {
+    const runtime = await createTestRuntime({ deviceTz: "UTC" });
+    await renderScreen(<Board />, runtime);
+    await fireEvent.press(await screen.findByRole("button", { name: "Keep Europe/Moscow" }));
+    expect(screen.queryByRole("button", { name: "Use UTC" })).toBeNull();
+    expect(runtime.state.store.getState().settings.timezone).toBe("Europe/Moscow");
+    // Kept on this device for the next visit, until either zone changes.
+    await expect(SecureStore.getItemAsync("pace.zoneKept")).resolves.toBe("UTC|Europe/Moscow");
+    await SecureStore.deleteItemAsync("pace.zoneKept");
+  });
+
   it("offers a calendar event about to start: Attend tracks it under its title", async () => {
     seminarSoon();
     const runtime = await createTestRuntime();
@@ -307,6 +333,72 @@ describe("NowBoard", () => {
       expect(screen.queryByLabelText("From your calendar")).toBeNull();
     });
   });
+
+  it.each([
+    ["Attend", "✓ Attending"],
+    ["Skip", "Skipped"],
+  ])(
+    "hands focus to the outcome once %s takes the calendar card away (bug class 5)",
+    async (button, outcome) => {
+      seminarSoon();
+      const runtime = await createTestRuntime({
+        routes: {
+          "POST /api/calendar/skip": () => ({ ok: true }),
+        },
+      });
+      await renderScreen(<Board />, runtime);
+      const card = await screen.findByLabelText("From your calendar");
+      await fireEvent.press(within(card).getByRole("button", { name: button }));
+      await waitFor(() => {
+        expect(screen.queryByLabelText("From your calendar")).toBeNull();
+      });
+      // The card's buttons went with it: its outcome takes focus, never the page or another action.
+      const status = await screen.findByText(`${outcome} · Seminar`);
+      expect(status).toBeOnTheScreen();
+      expect(saidBy(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(`${outcome} · Seminar`);
+    },
+  );
+
+  it.each([
+    ["Attend", "✓ Attending"],
+    ["Skip", "Skipped"],
+  ])(
+    "with a second event right behind, %s hands focus to the outcome, never to the next card's buttons (fix round 1)",
+    async (button, outcome) => {
+      calendar.state.status = "granted";
+      calendar.state.events = [
+        {
+          allDay: false,
+          endDate: addMinutesIso(NOW, 95),
+          id: "ev-1",
+          startDate: addMinutesIso(NOW, 5),
+          title: "Seminar",
+        },
+        {
+          allDay: false,
+          endDate: addMinutesIso(NOW, 60),
+          id: "ev-2",
+          startDate: addMinutesIso(NOW, 10),
+          title: "Lab",
+        },
+      ];
+      const runtime = await createTestRuntime({
+        routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
+      });
+      await renderScreen(<Board />, runtime);
+      const card = await screen.findByLabelText("From your calendar");
+      expect(within(card).getByText("Seminar")).toBeOnTheScreen();
+      const pressed = within(card).getByRole("button", { name: button });
+      await fireEvent.press(pressed);
+      // The next event's card comes at once; the answered one's outcome takes the focus.
+      expect(await screen.findByText(`${outcome} · Seminar`)).toBeOnTheScreen();
+      const next = screen.getByLabelText("From your calendar");
+      expect(within(next).getByText("Lab")).toBeOnTheScreen();
+      expect(saidBy(mockMoveFocus.mock.calls.at(-1)?.[0])).toBe(`${outcome} · Seminar`);
+      // A new card, not the old one refilled: the button that held focus is gone with its event.
+      expect(within(next).getByRole("button", { name: button })).not.toBe(pressed);
+    },
+  );
 
   describe("Attend on an Android phone in Moscow (the owner's 13:47, a 12:15–15:20 colloquium)", () => {
     /** 13:47 in Moscow (UTC+3): what the phone's clock read in the owner's screenshot. */

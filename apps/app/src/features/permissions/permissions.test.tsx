@@ -7,6 +7,7 @@ import { AppState, type AppStateStatus, Linking } from "react-native";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
+import { type PushMethod, pushStore } from "#app/platform/notifications.ts";
 import { removeSeriesRule, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
@@ -15,15 +16,28 @@ import { createTestRuntime } from "#app/test/runtime.ts";
 import { OnboardingScreen } from "./onboarding-screen.tsx";
 import { PermissionsScreen } from "./permissions-screen.tsx";
 
-const mockPhone = { restricted: false, usage: false };
+const mockPhone = { ignoresBattery: false, restricted: false, usage: false };
+/** The order the Android screens were opened in: the last one is the one on top. */
+const mockOpened: string[] = [];
 
 jest.mock("../../../modules/pace-native/index.ts", () => ({
   paceNative: {
     hasUsageAccess: () => mockPhone.usage,
+    isIgnoringBatteryOptimizations: () => mockPhone.ignoresBattery,
+    openAutostartSettings: () => {
+      mockOpened.push("autostart");
+      return true;
+    },
+    requestIgnoreBatteryOptimizations: () => {
+      mockOpened.push("exemption");
+    },
     restrictsSettings: () => mockPhone.restricted,
     openUsageAccessSettings: jest.fn(),
   },
 }));
+
+const BACKGROUND = "Let Pace check in the background";
+const BACKGROUND_WHY = "Notifications arrive within ~15 minutes instead of hours.";
 
 type FakeNotifications = { state: { granted: boolean; canAskAgain: boolean } };
 
@@ -45,8 +59,11 @@ const comeBack = async (): Promise<void> => {
 beforeEach(() => {
   (SecureStore as unknown as FakeSecureStore).values.clear();
   (SecureStore as unknown as FakeSecureStore).values.set("pace.session", "session-test");
+  mockPhone.ignoresBattery = false;
   mockPhone.restricted = false;
   mockPhone.usage = false;
+  mockOpened.length = 0;
+  pushStore.setState({ method: null });
   notifications.state.granted = false;
   notifications.state.canAskAgain = true;
   calendar.state.status = "undetermined";
@@ -192,5 +209,78 @@ describe("the first-run onboarding", () => {
     expect((SecureStore as unknown as FakeSecureStore).values.get("pace.onboarding.v1")).toBe(
       "done",
     );
+  });
+});
+
+/** Everything else already on, so the battery step is the walk-through's only one. */
+const grantTheRest = (): void => {
+  mockPhone.usage = true;
+  notifications.state.granted = true;
+  calendar.state.status = "granted";
+};
+
+describe("the battery step, only while the phone checks in the background (8c)", () => {
+  it("asks for the exemption with its reason, then the vendor's page, and shows it done once back", async () => {
+    grantTheRest();
+    pushStore.setState({ method: "poll" });
+    await renderScreen(<OnboardingScreen />, await createTestRuntime());
+    expect(await screen.findByText(BACKGROUND)).toBeOnTheScreen();
+    expect(screen.getByText(BACKGROUND_WHY)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText("1 of 1")).toBeOnTheScreen();
+    expect(screen.getByText(BACKGROUND_WHY)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Allow" }));
+    // The exemption's dialog on top; the vendor's autostart page waits under it.
+    expect(mockOpened).toEqual(["autostart", "exemption"]);
+
+    const summary = await screen.findByLabelText(BACKGROUND);
+    expect(within(summary).getByText("Off")).toBeOnTheScreen();
+    mockPhone.ignoresBattery = true;
+    await comeBack();
+    expect(await within(summary).findByText("On")).toBeOnTheScreen();
+  });
+
+  it.each<null | PushMethod>(["fcm", "none", null])(
+    "is not part of the walk-through or the permissions with the method %s",
+    async (method) => {
+      pushStore.setState({ method });
+      await renderScreen(<OnboardingScreen />, await createTestRuntime());
+      expect(await screen.findByText("A few permissions")).toBeOnTheScreen();
+      expect(screen.getByText("Usage access")).toBeOnTheScreen();
+      expect(screen.queryByText(BACKGROUND)).toBeNull();
+      await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
+      expect(await screen.findByText("1 of 3")).toBeOnTheScreen();
+      await screen.unmount();
+
+      await renderScreen(<PermissionsScreen />, await createTestRuntime());
+      await screen.findByLabelText("Usage access");
+      expect(screen.queryByLabelText(BACKGROUND)).toBeNull();
+    },
+  );
+
+  it("appears once the phone registers for the background check while the walk-through is open", async () => {
+    await renderScreen(<OnboardingScreen />, await createTestRuntime());
+    expect(await screen.findByText("A few permissions")).toBeOnTheScreen();
+    expect(screen.queryByText(BACKGROUND)).toBeNull();
+    await act(async () => {
+      pushStore.setState({ method: "poll" });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(BACKGROUND)).toBeOnTheScreen();
+  });
+
+  it("has a card in Settings → Permissions whose Allow asks for the exemption", async () => {
+    pushStore.setState({ method: "poll" });
+    await renderScreen(<PermissionsScreen />, await createTestRuntime());
+    const card = await screen.findByLabelText(BACKGROUND);
+    expect(within(card).getByText(BACKGROUND_WHY)).toBeOnTheScreen();
+    expect(within(card).getByText("Off")).toBeOnTheScreen();
+    await fireEvent.press(within(card).getByRole("button", { name: "Allow" }));
+    expect(mockOpened.at(-1)).toBe("exemption");
+    mockPhone.ignoresBattery = true;
+    await comeBack();
+    expect(await within(card).findByText("On")).toBeOnTheScreen();
+    expect(within(card).queryByRole("button")).toBeNull();
   });
 });

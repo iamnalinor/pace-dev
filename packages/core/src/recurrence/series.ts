@@ -6,7 +6,7 @@ import {
   differenceInCalendarMonths,
 } from "date-fns";
 
-import { addDaysIn, formatInZone, wallClockInstant } from "../time.ts";
+import { addDaysIn, formatInZone, startOfDayIn, wallClockInstant } from "../time.ts";
 
 /** A task series has its own schedule, independent of any preset. */
 export type SeriesSchedule =
@@ -50,6 +50,17 @@ export const seriesStartProblem = (
     ? "repeat/due-before-start"
     : null;
 };
+
+/**
+What a new series counts its instances from (`template.startAt`): the start the person chose,
+with its time of day; without one, the start of the day the series is made on. Every later
+instance then starts at the start of its day, never at the minute the series happened to be made
+(QA round 11 M3, round 14 L10e). The first instance keeps its own start; only the count moves.
+*/
+export const seriesAnchor = (
+  start: null | string | undefined,
+  made: { readonly at: string; readonly tz: string },
+): string => start ?? startOfDayIn(made.at, made.tz);
 
 const toIso = (date: Date): string => new Date(date).toISOString();
 

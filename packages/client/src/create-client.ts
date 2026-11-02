@@ -15,6 +15,7 @@ import {
   type SocketLike,
 } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
+import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
 import {
@@ -39,6 +40,12 @@ export type PaceClient = {
   readonly notifications: NotificationFeed;
   /** Other live messages about the pool (a new notification to show, one to take back). */
   readonly onNotice: (listener: (notice: LiveNotice) => void) => () => void;
+  /**
+  Lets go of what would outlive a client nobody uses any more (a runtime replaced for another
+  server, React's second effect run in development): the line to the other tabs. The sync loop
+  and the socket are stopped by whoever started them.
+  */
+  readonly close: () => void;
 };
 
 export type PaceClientOptions = {
@@ -50,6 +57,8 @@ export type PaceClientOptions = {
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
   /** Defaults to the clock's `now`. */
   readonly now?: () => string;
+  /** The other tabs sharing this store (a browser profile's), told of every change to it. */
+  readonly peers?: PeerTabs | undefined;
   readonly session: SessionStore;
   readonly source: "app" | "web";
   readonly store: EventStore;
@@ -65,7 +74,11 @@ const stateAndSync = (
   options: PaceClientOptions,
   transport: SyncTransport,
   now: () => string,
-): { readonly state: AppStateHandle; readonly sync: SyncClient } => {
+): {
+  readonly state: AppStateHandle;
+  readonly sync: SyncClient;
+  readonly closePeers: () => void;
+} => {
   // The sync is wired after the state it reads, so the state reaches it through this.
   const wiring = { sendSoon: (): void => undefined };
   const state = createAppState({
@@ -74,8 +87,15 @@ const stateAndSync = (
     onLocal: () => {
       wiring.sendSoon();
     },
+    ...(options.peers !== undefined && { onStored: options.peers.post }),
     source: options.source,
     store: options.store,
+  });
+  const stopListening = options.peers?.listen((message) => {
+    const change = parseStoreChange(message);
+    if (change !== null) {
+      void state.adoptPeerChange(change);
+    }
   });
   const sync = createSyncClient({
     now,
@@ -84,7 +104,11 @@ const stateAndSync = (
     transport,
   });
   wiring.sendSoon = sync.soon;
-  return { state, sync };
+  const closePeers = (): void => {
+    stopListening?.();
+    options.peers?.close();
+  };
+  return { closePeers, state, sync };
 };
 
 /**
@@ -154,7 +178,12 @@ const liveAndSync = (
     readonly now: () => string;
     readonly onMessage: (message: unknown) => void;
   },
-): { readonly live: LiveChannel; readonly state: AppStateHandle; readonly sync: SyncClient } => {
+): {
+  readonly closePeers: () => void;
+  readonly live: LiveChannel;
+  readonly state: AppStateHandle;
+  readonly sync: SyncClient;
+} => {
   const { api, auth } = deps;
   const wired: { sync?: SyncClient } = {};
   const live: LiveChannel = liveChannelOf(options, {
@@ -168,6 +197,10 @@ const liveAndSync = (
     // The server ended the socket's session: `me` signs out on its 401, so the app goes to
     // sign-in; a session still good (an expiry the server misjudged) gets its socket back.
     onSessionEnded: () => {
+      // Forgotten here already (this device ended itself): nothing to check, no 401 to provoke.
+      if (auth.token() === undefined) {
+        return;
+      }
       void (async (): Promise<void> => {
         const checked = await auth.me();
         if (checked.ok) {
@@ -178,9 +211,9 @@ const liveAndSync = (
     token: auth.token,
   });
   const transport = preferSocket(socketTransport(live), httpTransport(api));
-  const { state, sync } = stateAndSync(options, transport, deps.now);
+  const { closePeers, state, sync } = stateAndSync(options, transport, deps.now);
   wired.sync = sync;
-  return { live, state, sync };
+  return { closePeers, live, state, sync };
 };
 
 /**
@@ -203,7 +236,7 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   const auth = createAuth({ api, session: options.session });
   token = auth.token;
   const notices = noticeRouter(createNotificationFeed({ api, source: options.source }));
-  const { live, state, sync } = liveAndSync(options, {
+  const { closePeers, live, state, sync } = liveAndSync(options, {
     api,
     auth,
     now,
@@ -220,5 +253,17 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
 
   const assistant = createAssistant({ api, clock, state });
   const { feed: notifications, onNotice } = notices;
-  return { actions, api, assistant, auth, clock, live, notifications, onNotice, state, sync };
+  return {
+    actions,
+    api,
+    assistant,
+    auth,
+    clock,
+    close: closePeers,
+    live,
+    notifications,
+    onNotice,
+    state,
+    sync,
+  };
 };

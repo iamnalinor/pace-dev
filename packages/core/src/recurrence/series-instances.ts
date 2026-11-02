@@ -18,8 +18,18 @@ the series' `revisionKey`: an edit undone and made again starts fresh ids, not t
 export const seriesInstanceId = (seriesId: string, revisionKey: string, index: number): string =>
   `rep:${seriesId}:${revisionKey}:${String(index)}`;
 
+/** The revocation of a future instance when its series is archived. */
+export const seriesArchiveId = (seriesId: string): string => `rep:${seriesId}:archive`;
+
+/** A future instance revoked or amended for a series revision (`:<n>` on a retry, see `unusedId`). */
+export const seriesRevisionId = (
+  seriesId: string,
+  kind: "amend" | "revoke",
+  revisionKey: string,
+): string => `rep:${seriesId}:${kind}:${revisionKey}`;
+
 /** More corrections of one instance for one schedule than History undo can make. */
-const MAX_ATTEMPTS = 16;
+export const MAX_ATTEMPTS = 16;
 
 /**
 The first of `base`, `base:1`, `base:2`… not in the log: the same log gives every device the
@@ -126,7 +136,7 @@ const archivedEvents = (
   future: Task | undefined,
   input: MissingSeriesInput,
 ): readonly EventInput[] => {
-  const id = `rep:${series.id}:archive`;
+  const id = seriesArchiveId(series.id);
   return future === undefined ||
     future.userModified ||
     future.id === series.keepTaskId ||
@@ -157,7 +167,7 @@ const revisedEvents = (
     zone: series.template.startTz,
   });
   const id = unusedId(
-    `rep:${series.id}:${slot === null ? "revoke" : "amend"}:${series.revisionKey}`,
+    seriesRevisionId(series.id, slot === null ? "revoke" : "amend", series.revisionKey),
     input.existingEventIds,
   );
   return id === null ? [] : [updated(series, future, { id, slot, now: input.now })];

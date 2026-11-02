@@ -3,7 +3,7 @@ import {
   type ActionKind,
   addMinutesIso,
   type CoreState,
-  type DecisionStep,
+  deferredReadId,
   type EventBody,
   type EventInput,
   newId,
@@ -22,7 +22,9 @@ import { parseProviders } from "../shared/llm/providers.ts";
 import { readMessage } from "../shared/llm/read.ts";
 import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
 import { taskUrl } from "../shared/web-links.ts";
+import { armEarliest } from "./alarm.ts";
 import { telegramOf, webOriginOf } from "./notifier.ts";
+import { decisionOf } from "./parse-queue-decision.ts";
 
 /** A text to read once the assistant is back: kept in the store until then. */
 export type QueuedParse = {
@@ -95,11 +97,7 @@ export const armForQueue = async (storage: DurableObjectStorage, now: string): P
   if (due === null) {
     return;
   }
-  const at = Math.max(Date.parse(due), Date.parse(now) + 1000);
-  const existing = await storage.getAlarm();
-  if (existing === null || at < existing) {
-    await storage.setAlarm(at);
-  }
+  await armEarliest(storage, Math.max(Date.parse(due), Date.parse(now) + 1000));
 };
 
 /** What a queued text became: written as read, put in the Inbox, or still waiting. */
@@ -128,10 +126,17 @@ const stampSystem = (bodies: readonly EventBody[], now: string): readonly EventI
   bodies.map((body) => ({ ...body, occurredAt: now, precision: "exact", source: "system" }));
 
 const toInbox = (item: QueuedParse, now: string): Exclude<Drained, { kind: "wait" }> => ({
-  inputs: stampSystem([inboxBody(item.text)], now),
+  inputs: stampSystem([inboxBody(item.text)], now).map((input) => ({
+    ...input,
+    id: deferredReadId(item.id, "inbox"),
+  })),
   item,
   kind: "inbox",
 });
+
+/** The reading's events, each named after the text's place in the queue (`deferredReadId`). */
+const namedAfter = (item: QueuedParse, inputs: readonly EventInput[]): readonly EventInput[] =>
+  inputs.map((input, index) => ({ ...input, id: deferredReadId(item.id, index) }));
 
 /**
 Every action planned in order, the text kept as the source of a task it adds to; `null`
@@ -192,7 +197,10 @@ export const drainOne = async (
   }
   const inputs = planAll(answer.value.actions, { now, state, text: item.text });
   return {
-    drained: inputs === null ? toInbox(item, now) : { inputs, item, kind: "done" },
+    drained:
+      inputs === null
+        ? toInbox(item, now)
+        : { inputs: namedAfter(item, inputs), item, kind: "done" },
     limited,
   };
 };
@@ -206,6 +214,8 @@ type DrainStore = {
     meta: { readonly deviceId: string; readonly now: string; readonly source: "system" },
   ) => Promise<Result<unknown, unknown>>;
   readonly logDecisions: (entries: readonly DecisionEntry[], now: string) => Promise<void>;
+  /** One event of the log by id; `undefined` when there is none. */
+  readonly find: (id: string) => Promise<unknown>;
   /** The user's Telegram chat (see `chatFor`); none means nothing is told. */
   readonly chatId: () => Promise<string | undefined>;
 };
@@ -257,42 +267,6 @@ const tell = async (
   });
 };
 
-/** The tasks a text read later wrote, as the decision log keeps its steps. */
-const createdSteps = (written: readonly EventInput[]): readonly DecisionStep[] =>
-  written
-    .filter(
-      (input): input is Extract<EventInput, { readonly type: "task.created" }> =>
-        input.type === "task.created",
-    )
-    .map((input) => ({
-      activityId: null,
-      closeOutcome: null,
-      fields: [],
-      kind: "task.create",
-      renamedTo: null,
-      startAt: null,
-      subject: input.payload.title,
-      taskId: input.payload.taskId,
-    }));
-
-/** What became of a text read later: what it created (a row that opens the task), or the Inbox. */
-const decisionOf = (
-  item: QueuedParse,
-  { isDone, written }: { readonly isDone: boolean; readonly written: readonly EventInput[] },
-): DecisionEntry => {
-  const steps = isDone ? createdSteps(written) : [];
-  return {
-    explanation: isDone
-      ? "Read later, as asked when the assistant was out of requests."
-      : "Could not be read later; kept in the Inbox.",
-    inputs: { channel: item.channel, enqueuedAt: item.enqueuedAt, steps, text: item.text },
-    kind: "parse",
-    outcome: isDone ? "applied" : "inbox",
-    rule: "parse.deferred",
-    taskId: steps[0]?.taskId ?? null,
-  };
-};
-
 /** Writes what a drained text became; a reading that cannot be written falls back to the Inbox. */
 const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" }>) => {
   const written = await write(deps, drained.inputs);
@@ -307,6 +281,15 @@ const settle = async (deps: DrainDeps, drained: Exclude<Drained, { kind: "wait" 
   await tell(deps, isDone, drained);
 };
 
+/**
+Whether a drain before this one wrote the text already (its reading or its Inbox entry), and was
+cut short before the queue was saved: the log, written with the events themselves, says so. What
+it would have told and logged after the write is not told again.
+*/
+const wasWritten = async ({ store }: DrainDeps, item: QueuedParse): Promise<boolean> =>
+  (await store.find(deferredReadId(item.id, 0))) !== undefined ||
+  (await store.find(deferredReadId(item.id, "inbox"))) !== undefined;
+
 /** One queued text at the alarm: `null` once settled, else the item to keep for later. */
 const drainItem = async (
   deps: DrainDeps,
@@ -316,6 +299,9 @@ const drainItem = async (
   const { now, storage } = deps;
   if (item.retryAt !== null && item.retryAt > now) {
     return item;
+  }
+  if (await wasWritten(deps, item)) {
+    return null;
   }
   const world = {
     cooldowns: await cooldownsOf(storage, now),
@@ -332,11 +318,23 @@ const drainItem = async (
   return null;
 };
 
-/** Reads every due text of the queue once; what is still out of reach stays for the next alarm. */
+/** Whether a text is due now; before the first is, the queue's time is armed again. */
+const hasDue = async (deps: DrainDeps, queue: readonly QueuedParse[]): Promise<boolean> => {
+  const due = queueDueAt(queue, deps.now);
+  if (due !== null && due > deps.now) {
+    await armForQueue(deps.storage, deps.now);
+  }
+  return due !== null && due <= deps.now;
+};
+
+/**
+Reads every due text of the queue once; what is still out of reach stays for the next alarm. An
+alarm before the first text is due (another wait's) arms the queue's time again and loads nothing.
+*/
 export const drainQueue = async (deps: DrainDeps): Promise<void> => {
   const queue = await queueOf(deps.storage);
   const config = loadConfig(deps.env);
-  if (queue.length === 0 || !config.ok) {
+  if (!config.ok || !(await hasDue(deps, queue))) {
     return;
   }
   await deps.store.derive(deps.now);

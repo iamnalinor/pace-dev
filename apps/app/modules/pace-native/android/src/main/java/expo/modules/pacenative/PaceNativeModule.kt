@@ -16,7 +16,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * Android capabilities Pace needs beyond Expo's packages: usage access (screen on/off, app
- * foreground events, aggregated stats) and Do Not Disturb.
+ * foreground events, aggregated stats), Do Not Disturb and the battery-optimization exemption.
  * Every `open*Settings` function opens the matching system screen; none of them block.
  */
 class PaceNativeModule : Module() {
@@ -84,6 +84,17 @@ class PaceNativeModule : Module() {
       )
       true
     }
+
+    // Only asked while the phone checks for notifications itself (no Google push): an optimized
+    // app's background work is deferred for hours.
+    Function("isIgnoringBatteryOptimizations") { ignoresBatteryOptimizations(context) }
+
+    // Android's own Allow/Deny dialog for Pace; a phone whose settings lack it opens the list
+    // of optimized apps instead, and one without either opens nothing (Battery.kt).
+    Function("requestIgnoreBatteryOptimizations") { requestBatteryExemption(context) }
+
+    // The phone maker's autostart page (Battery.kt), false when this phone has no known one.
+    Function("openAutostartSettings") { openAutostartPage(context) }
 
     // Raw usage events in [beginMs, endMs); the JS side filters screen/keyguard/activity types.
     AsyncFunction("queryUsageEvents") { beginMs: Double, endMs: Double ->

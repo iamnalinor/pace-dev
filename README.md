@@ -16,7 +16,8 @@ phone, in the browser and on the server.
 | 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
 | 3 — Time | the time ledger: a time bar under Now (one tap switches), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers, alerts through the bot, MCP time tools | **done** — `v0.3.0` |
 | 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
-| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | PR 1 preparing for `v0.10.0`; later work remains in PR 2 and PR 3 |
+| 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | **done** — PR 1 `v0.10.0`, PR 2 `v0.11.0`; PR 3 below |
+| PR 3 (phase C) | your own server (Change server, `GET /api/instance`, protocol checks), one list of devices and sessions with sign-in notices and "Not me", sync over the live socket with HTTP as fallback, a background check for phones without Google push and its battery step, sleep recorded on the server by itself | part 1 merged (#47); part 2 in review |
 
 Still `v0.x`: the product is in daily use but not final.
 
@@ -30,10 +31,10 @@ The screenshots are taken by `README_SHOTS=docs/screenshots bun test:e2e e2e/rea
 with a seeded week.
 
 Phone data (`v0.3.1`, Android only): the Day screen reads the phone's own screen and app
-events and its calendar, on the device. It proposes last night's sleep from the longest
-screen-off stretch, shows phone time and top apps inside each block, and lists the day's
-calendar events with Attended / Skip. Confirming a suggestion writes an event; cloud calendar
-and app-usage copies are described under [Devices](#devices-calendar-and-app-usage-in-the-cloud).
+events and its calendar, on the device. It shows phone time and top apps inside each block and
+lists the day's calendar events with Attended / Skip; sleep is recorded by the server from when
+the phone was in use (see **Sleep** below). Cloud calendar and app-usage copies are described
+under [Devices](#devices-calendar-and-app-usage-in-the-cloud).
 A first-run walk-through explains and asks for each permission (Settings →
 Permissions later). See [Phone data on the device](#phone-data-on-the-device) for what to check.
 
@@ -161,7 +162,9 @@ account may sign in.
   once `{ status: "ready", token, user }` (the nonce is consumed in that call). Nonces live
   five minutes.
 - **Sessions** are bearer tokens: 32 random bytes, only the SHA-256 is stored in D1, valid
-  for 90 days, revoked by `POST /api/auth/logout`. `GET /api/me` returns the current user;
+  for 90 days, ended by `POST /api/auth/logout`, by *Settings → Devices and sessions*
+  (`DELETE /api/sessions/:id`) or by "Not me" on the sign-in notice that every new browser or
+  phone session sends to Telegram (where it signed in from, and the client's name). `GET /api/me` returns the current user;
   `DELETE /api/me` (Settings → Delete account) deletes the account for good: its event log,
   every session and the MCP clients' grants. A later login of the same Telegram id starts a
   new, empty account.
@@ -292,8 +295,8 @@ next release installs over it, and main after a squash merge installs over the b
 
 ## Devices: calendar and app usage in the cloud
 
-The phone can send its calendar (own and accepted events) when *Settings → Devices → Send this
-phone's calendar* is enabled for the current login. A new login starts with this switch off;
+The phone can send its calendar (own and accepted events) when *Settings → Devices and
+sessions → Send this phone's calendar* is enabled for the current login. A new login starts with this switch off;
 turning it off deletes that login's cloud copy. The phone also sends the apps it had in front,
 names and times only. A computer
 runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
@@ -314,10 +317,13 @@ the native code and runs the JS logic against mocks).
 - **Settings → Permissions**: the same four, each with its state (on / off / turned off in
   Android settings) and one button. Calendar series you answered "every time" are listed
   there too, each with Forget.
-- **Sleep**: after a night with the phone idle for at least 3 h touching 21:00–12:00,
-  the Day screen shows a "Last night" card with the times and how often you woke up
-  (screen-on glances up to 5 min are merged into the night). *Log sleep* writes a `sleep`
-  block; *Not sleep* hides that guess on this phone.
+- **Sleep**: the phone sends when it was in use (unlocked, an app in front) about every
+  15 minutes, and the server records the night by itself, without asking: a sleep opens
+  after 45 minutes with no use on any device from 21:00 on, ends when a device is used
+  again, and continues as if never stopped after a short wake in the small hours. A rest
+  shorter than 3 hours is not kept as sleep. The assistant log says each step ("Sleep
+  started at 23:40 (no phone or computer used since)"). History lists every step; deleting
+  the sleep, or undoing a stop there, is respected and never written again.
 - **Phone time per block**: under each block on Day, "Phone 25m: YouTube, Telegram…"
   sums foreground app time inside it. It only shows where the time went: nothing is taken
   off the block.
@@ -372,7 +378,10 @@ falls back to the other, and is tried again later.
 `GOOGLE_SERVICES_JSON`, a server without `FIREBASE_SERVICE_ACCOUNT`, or one with another
 Firebase project) notifications still reach the phone while Pace is closed: a periodic
 background check (Android's WorkManager, about every 15 minutes, later under Doze or a vendor
-battery saver) fetches what waits for it and shows it. There is no foreground service and no
+battery saver) fetches what waits for it and shows it. While the phone uses it, the
+permissions walk-through and *Settings → Notifications* ask to leave Pace out of battery
+optimization (and open the phone maker's autostart page where there is a known one), so the
+check keeps its rhythm; with Google's push that step is not shown. There is no foreground service and no
 ongoing notification. The open app fetches at once on each live update, and Telegram gets
 everything as before. `GET /api/push/methods` says what the server
 accepts. If Google refuses the server's Firebase credentials, the server stops offering FCM and

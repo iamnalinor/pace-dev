@@ -188,6 +188,9 @@ export const TaskFields = ({
   const titleRef = useRef<TextInput>(null);
   const [panel, setPanel] = useState<Panel>(null);
   const [isFinalOpen, setIsFinalOpen] = useState(false);
+  // A fresh form does not open blaming the title the person has not typed yet (QA round 14 L6);
+  // once typed and cleared it asks for one.
+  const [isTitleTouched, setIsTitleTouched] = useState(false);
   // Not `autoFocus`: on the web that scrolls the box the composer's form is still growing in.
   useEffect(() => {
     if (isTitleFocused) {
@@ -203,9 +206,10 @@ export const TaskFields = ({
       }}
     >
       <TextField
-        error={values.title.trim() === "" ? t("edit.titleRequired") : null}
+        error={isTitleTouched && values.title.trim() === "" ? t("edit.titleRequired") : null}
         label={t("edit.taskTitle")}
         onChangeText={(title) => {
+          setIsTitleTouched(true);
           onChange({ title });
         }}
         onSubmitEditing={onSubmit}

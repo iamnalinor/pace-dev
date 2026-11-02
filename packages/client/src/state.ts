@@ -35,6 +35,7 @@ import {
 } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
+import type { StoreChange } from "./peer-tabs.ts";
 
 /**
 The whole client state: the materialized slices (the same four as the core's `CoreState`,
@@ -81,6 +82,11 @@ export type AppStateHandle = {
   readonly undoLast: () => Promise<Result<Event, string>>;
   /** Full rebuild from the event store (after another writer touched it). */
   readonly rematerialize: () => Promise<void>;
+  /**
+  What another tab of this profile put into the store both share: its events are taken in
+  without writing them again, a dropped copy is read again. Nothing is told on (no echo).
+  */
+  readonly adoptPeerChange: (change: StoreChange) => Promise<void>;
 };
 
 const slice =
@@ -190,7 +196,10 @@ const createLog = (
 ): {
   readonly has: (id: string) => boolean;
   readonly persistLocal: (event: Event) => Promise<void>;
-  readonly persistRemote: (events: readonly Event[]) => Promise<void>;
+  /** Answers the events that were new to the log (written and applied). */
+  readonly persistRemote: (events: readonly Event[]) => Promise<readonly Event[]>;
+  /** Takes in events another tab already wrote to the shared store. */
+  readonly adopt: (events: readonly Event[]) => void;
   readonly reload: () => Promise<void>;
 } => {
   const known = new Map<string, Event>();
@@ -208,20 +217,30 @@ const createLog = (
     );
   };
 
+  const unknownOf = (events: readonly Event[]): readonly Event[] =>
+    uniqueById(events).filter((event) => !known.has(event.id));
+
   return {
+    adopt: (events) => {
+      const fresh = unknownOf(events);
+      if (fresh.length > 0) {
+        integrate(fresh);
+      }
+    },
     has: (id) => known.has(id),
     persistLocal: async (event) => {
       await eventStore.append([event]);
       integrate([event]);
     },
     persistRemote: async (events) => {
-      const fresh = uniqueById(events).filter((event) => !known.has(event.id));
+      const fresh = unknownOf(events);
       if (fresh.length === 0) {
-        return;
+        return [];
       }
       await eventStore.append(fresh);
       await eventStore.markSynced(fresh.map((event) => event.id));
       integrate(fresh);
+      return fresh;
     },
     reload: async () => {
       const all = await eventStore.listAll();
@@ -247,6 +266,38 @@ const envelope = (
   recordedAt: input.recordedAt ?? defaults.now(),
 });
 
+/**
+Changes from outside this tab's own writes (the server, another tab, another writer); the other
+tabs hear only what this state itself put into the store.
+*/
+const externalChanges = (
+  log: ReturnType<typeof createLog>,
+  enqueue: ReturnType<typeof createQueue>,
+  onStored: ((change: StoreChange) => void) | undefined,
+): Pick<AppStateHandle, "adoptPeerChange" | "ingest" | "rematerialize"> => ({
+  adoptPeerChange: async (change) => {
+    await enqueue(async () => {
+      if (change.kind === "reload") {
+        await log.reload();
+      } else {
+        log.adopt(change.events);
+      }
+    });
+  },
+  ingest: async (events) => {
+    await enqueue(async () => {
+      const fresh = await log.persistRemote(events);
+      if (fresh.length > 0) {
+        onStored?.({ events: fresh, kind: "events" });
+      }
+    });
+  },
+  rematerialize: async () => {
+    await enqueue(log.reload);
+    onStored?.({ kind: "reload" });
+  },
+});
+
 export const createAppState = (options: {
   readonly deviceId: string;
   readonly now: () => string;
@@ -254,6 +305,8 @@ export const createAppState = (options: {
   readonly store: EventStore;
   /** Told after each event written here (the sync sends it within a second). */
   readonly onLocal?: () => void;
+  /** Told of every change this state made to the store (for the other tabs that share it). */
+  readonly onStored?: (change: StoreChange) => void;
 }): AppStateHandle => {
   const { deviceId, now } = options;
   const store = createStore<AppState>(() => initialState(deviceId));
@@ -271,6 +324,7 @@ export const createAppState = (options: {
         return err("event/duplicate");
       }
       await log.persistLocal(parsed.value);
+      options.onStored?.({ events: [parsed.value], kind: "events" });
       options.onLocal?.();
       return ok(parsed.value);
     });
@@ -288,16 +342,9 @@ export const createAppState = (options: {
   };
 
   return {
+    ...externalChanges(log, enqueue, options.onStored),
     dispatch,
-    ingest: async (events) => {
-      await enqueue(async () => {
-        await log.persistRemote(events);
-      });
-    },
     ready,
-    rematerialize: async () => {
-      await enqueue(log.reload);
-    },
     revoke,
     store,
     undoLast: async () => {

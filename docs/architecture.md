@@ -95,10 +95,22 @@ clock is frozen within a request). System-generated events use deterministic ids
 every device and the server produce the same event once:
 
 - `instanceId(presetId, isoWeek)` → `hw:<presetId>:<isoWeek>` (recurring homework)
+- `seriesInstanceId(seriesId, revisionKey, n)` → `rep:<series>:<revision>:<n>` (a task series's
+  n-th instance; `n` counts from the series' `template.startAt`, which `seriesAnchor` sets to the
+  start the person chose or else to 00:00 of the day the series was made, so later instances start
+  at the person's time of day or at the start of their day, never at the minute of creation)
 - `autoOutcomeId(taskId, kind)` → `auto:<taskId>:missed|skipped` (automatic outcomes)
+- automatic sleep: `auto:sleep-<night>:start-<yyyyMMddTHHmm>` (the start and its activity),
+  `auto:sleep-stop-<digest of the activity id>-<yyyyMMddTHHmm>`, and `auto:<stop id>:reopen` /
+  `auto:<start id>:discard` for the revocations; a `-2`, `-3`… suffix where the first is used
 
-`EventIdSchema` accepts a ULID or `^(?:hw|auto):[^\s:]+:[^\s:]+$`; the log stores an id
-once (`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op.
+`EventIdSchema` accepts a ULID or `^(?:hw|auto|rep):\S+$`; the log stores an id once
+(`INSERT … ON CONFLICT DO NOTHING`), so a second copy is a no-op. The sync carries ids of at
+most `EVENT_ID_MAX` (128) characters: one built longer stays on the server and a client's pull
+leaves it out. Follow-ups nest the id they follow (`auto:<instance>:missed` of an edited series's
+`rep:<series>:<revision>:<n>` is over 70, a sleep's reopen and discard nest its stop and start),
+so `ids.test.ts` checks every builder at its longest against the limit; the sleep stop names its
+activity by a digest instead, since an activity id may be as long as any id.
 
 ### Materialization rules
 
@@ -120,8 +132,15 @@ the `notificationChannels` switches on top
 of `DEFAULT_SETTINGS`); the task, project and preset reducers come in stage 1.
 
 High-volume phone facts (the calendar copy, app usage) are **not** events. They have
-their own tables in the Durable Object (`calendar_events`, `usage_sessions`), replaced or
-added per device through the cloud routes; only derived decisions become events.
+their own tables in the Durable Object (`calendar_events`, `usage_sessions`, and `phone_uses`:
+when a phone was really in use, which automatic sleep reads instead of its app sessions),
+replaced or added per device through the cloud routes; only derived decisions become events.
+A phone sends its calendar copy with every background run, mostly unchanged, so the store writes
+only the rows that differ and the pool looks again only when a row or the ruled series changed.
+A change is marked (`calendar:unplanned`) before its rows go in and unmarked once the pool has
+looked at it, so a copy cut short in between is looked at with the next upload.
+Each usage upload also records how far that device's usage is known (storage key
+`usage:known:<deviceId>`: the phone's `until`, or the arrival of a computer's upload).
 
 ## API contract
 
@@ -269,6 +288,18 @@ change in the same run stops it and the next run retries. What was written on th
 while a reset was under way goes with it. Signing out (a 401 on `/api/me` included) drops
 the local log, outbox, cursor and id as well.
 
+**A one-time re-pull after an update.** A client update that accepts events older clients left
+out (their pull skipped what they could not read and moved the cursor past it) raises
+`SYNC_SCHEMA_VERSION` in `sync-version.ts`; the store keeps the version its log was pulled under
+(`getSyncVersion`, 0 for logs from before versions). A run that finds a lower one sets the cursor
+to 0 and the version to the current one, in that order, before its pull: the log and the outbox
+stay, events the log already holds are skipped on the way in, the outbox is pushed as usual, and
+the next start pulls from its cursor again. A reset stores the current version with the fresh copy,
+and a log without a store id is dropped by its pull anyway. Version 1 is the id limit raised from
+64 to 128. On the server the re-pull is the ordinary paged pull (`listPage`: the next `limit`
+events after `since` by the `seq` primary key), so it costs one request per 200 events, once per
+device.
+
 A reset also forgets the store's Telegram chat; the store then sends to the user's private
 chat, whose id is their Telegram id (looked up in D1 by the store's name, the user id).
 
@@ -304,18 +335,27 @@ emptied: `deleteAll` (SQL tables and keys) and its alarm. Raising the epoch drop
 user's data at once, so a breaking change never needs a data migration (and the DO
 migrations could be squashed into one `0000`). Tables (`user-store/schema.ts`): `events`
 (`seq` primary key, `id` unique, indexed by `occurredAt`), `calendar_events`,
-`usage_sessions`, `decisions` (every automatic decision with its inputs, for "why?"), the
+`usage_sessions`, `phone_uses`, `decisions` (every automatic decision with its inputs, for "why?"), the
 notification pool (`notifications`, its delivery log `notification_deliveries`, and
 `poll_outbox` for phones that poll),
 `meta` (cursors, budgets) and the projections `tasks`, `subtasks`, `projects`, `presets`
 (the materialized state as SQL rows for SQL readers; never the source of truth).
 
-The object keeps core's `CoreState` materialized in memory (`user-store/state.ts`), tagged
+The object keeps core's `CoreState` materialized in memory (`user-store/state-cache.ts`), tagged
 with the log `seq` it was built at; a cache behind the log is rebuilt. A batch that is in
 order (nothing before the last applied `occurredAt`, no correction: core's
 `shouldRematerialize`) is folded incrementally and only the rows it touched are rewritten
 (a preset change rewrites every task row, since it moves their derived columns); anything
-else rebuilds the state and every projection row (`user-store/projections.ts`). After every
+else rebuilds the state and rewrites the projection rows that differ from the state before
+(`user-store/projections.ts`). Production evicts an instance idle for a minute or two, so most
+alarms and uploads at night start with nothing in memory. The projection rows therefore carry a
+mark (key `projections:mark`: the log `seq`, the build that wrote them, as `PACE_VERSION` plus
+the newest DO migration, and the state's zone), written after them: a cold rebuild at the marked
+`seq` and build loads the log but writes no row, and a deploy or a write cut short rewrites every
+row once. A build without `PACE_VERSION` (`dev`) may be newer code under the same name, so its
+every cold start rewrites every row (`docs/self-hosting.md` says to set it). Automatic sleep reads the zone from the mark while it is current, without loading the
+log. The log as last loaded is kept in step with what goes in, so a pass that reads it and then
+writes, or a write out of order, does not load it again. After every
 append (a client's sync push, an `apply`) and before every read and every `apply`,
 `derive(now)` appends the system events the state calls for: this week's homework instances, the automatic
 `cancelled_missed` / `skipped` outcomes, then the next instance of a course left with none open
@@ -328,6 +368,86 @@ delivery per channel and device, and arms the Durable Object alarm for the next 
 The feed and open app update through the live socket. Telegram and a configured FCM project
 can deliver outside the app; a phone with a different Firebase project uses polling.
 
+**Automatic sleep** (`user-store/sleep-pass.ts`) runs after every phone's usage upload and at
+its own alarm time (a computer's uploads and other waits' alarms run no pass).
+A pass reads use on every device from 36 hours back and how far the phones have told
+(`usageForSleep`), builds the rules' input from the log with core's `sleepInputOf` (the same
+builder the rules' own tests use: every effective activity, plus each instant the person recorded
+for a non-Rest activity, which counts as a use of no length, and where their live starts close a
+sleep), decides with `decideSleep` and appends `sleepEvents` through
+the system path (device `server`, deterministic `auto:sleep-…` ids, so passes are idempotent).
+Each decision that wrote an event goes to `decisions` (kind `sleep`, rule `sleep.open` /
+`sleep.stop` / `sleep.reopen` / `sleep.discard`, inputs: the instant, the zone, `knownUntil` and
+the spells awake around it); the assistant log words them through `decision-system.ts`. The
+highest `knownUntil` a pass decided with is kept (key `sleep:decided-until`) and passed back, so
+less known later undoes nothing. The stored label `"Sleep"` is the server's; every screen shows
+an automatic sleep through `shownLabel` in the reader's language, and the Day sheet sends back
+only what the person changed (times at the minute it shows them, the label against the shown
+one), so a save never makes the worded label or an unchanged time the person's. A pass loads the
+log only when what it decides on can have changed since the last pass that read it (key
+`sleep:held`: digests of the log's `seq` and the zone, of the uses, and of the uses before what it
+decided on, with core's `sleepHorizon` of its input; `user-store/sleep-hold.ts`). The uses digested are those of the window
+that pass decided on, from its front (the hold's `anchor`): while the hold lasts, later passes read
+from the anchor rather than from their own front, so the front moving on with `now` changes no
+digest, and use that arrives late anywhere in the window still does. A use leaving the window is
+no change (core's property 13 moves the front: a night whose evening use left the window stands as
+decided), and a day past the front the hold is let go and made again, so no read grows without
+bound. It skips when the log, zone and uses are the
+same and `knownUntil` is still short of the horizon (the next instant a decision compares with:
+a use or a recorded instant becoming known, a rest's bound, the open rest's candidate and its 45
+minutes, a possible wake-up's 90), or, by day (noon to 21:00), when everything it followed is
+decided for good and only new use came after what it knew. A quiet night with an upload every 15 minutes
+and sleep's hourly alarm therefore reads the log when the night opens and when the morning's first
+use ends it, and otherwise only when the person records something or a late upload lands in the
+window (`sleep-pass.test.ts` counts the reads over such a night). That holds on a cold instance
+too, the normal case at night: the zone comes from the projection mark, and the alarm's other
+waits pass only at their own time (below). `night-cost.int.test.ts` runs a night of uploads and
+alarms on a new instance each time and counts the log loads (the pool's two digest passes and
+sleep's passes that can decide something, one load each) and the projection rows written (none). The usage reads go through end indexes
+(`phone_uses_end_idx`, `usage_sessions_end_idx`, `calendar_events_end_idx`), so a pass, the pool's
+calendar read and the usage list read the rows of their window, never all history (nothing is
+pruned: the owner keeps the data). Without a phone upload within a day nothing new is decided
+and nothing armed, but an automatic sleep still running ends where knowledge ended (the highest
+`knownUntil` decided with), and goes when that leaves it short: a dead or signed-out phone never
+leaves a sleep open for days. A phone that tells again later walks it as usual. A failed pass is logged and never fails what ran it: after an
+upload the upload is answered, at the alarm sleep looks again in an hour, doubling while
+passes keep failing up to four hours (key `sleep:failures`; a pass that completes starts it again).
+
+**The alarm** is one per store and shared: the pool's next pass and delivery retries, the
+assistant's queue and automatic sleep each arm it through `armEarliest` (`user-store/alarm.ts`),
+which only ever moves it earlier, so none postpones another's earlier time. `alarm()` runs the
+pool, the queue and sleep (a failure in one does not hold the others back; the pool's or the
+queue's fails the alarm afterwards, so the runtime retries it, while the pool itself passes again
+only once its backoff has come, from a minute up to four hours, and sleep's is logged and looked
+at again later, from an hour up to four hours), and each arms its next time again; the runtime takes the alarm off as it fires.
+Each wait keeps its own time and reads nothing before it has come: the pool's (`pool:next-at`,
+the earliest pass any write, retry or pass asked for), the queue's (its earliest text) and
+sleep's (`sleep:next-at`); before that each arms its time again. A pool pass loads the log on a
+cold instance, so it runs only at its own times, never at sleep's looks: its digest slots, the
+starts of calendar events and the ends of those announced, the overrun wait, the end of the quiet
+hours, delivery retries, and never later than a day after the pass before (`scheduleNextPass`):
+a pass that finds nothing coming still looks again within a day, within the three days of
+calendar it reads, so an event that comes into that window with no write and an unchanged
+calendar copy is still announced, and a time left by older rules heals (bug-lessons class 57). A
+pass first counts itself (`pool:failures`, the passes in a row that have not completed), writes a
+lease (`pool:lease`, five minutes on for the first pass in a row, doubling for each one after up to
+four hours), arms the alarm at the lease's end and takes the pool's time (`null`); whatever asks for a pass while it runs arms the time again, its
+own next decision included, and at the end it gives the lease back if it is still its own. A
+pass cut short (an isolate reset mid-delivery: a deploy, the CPU limit) leaves its lease, and the
+lease's wake runs it again, whether or not the runtime retries the alarm (class 58), and one that
+keeps being cut short (the CPU limit, where no `catch` runs) waits 5, 10, 20 minutes and so on up
+to four hours; after a pass that completed, that wake reads the gate and loads nothing. A failed
+pass runs again a minute on, doubling while passes keep failing or being cut short, up to four
+hours (a pass that completes clears `pool:failures`), or sooner when a write asks for it (a pass
+asks for its own delivery retries only at its end, so one that breaks after a failed delivery
+still backs off); a store from before the key passes
+at its next alarm, and one with no alarm at all (main deleted it when nothing was coming; a store
+just made or wiped has none) gets one at once from its next write or calendar copy, changed or
+not (`armIfPoolUnplanned`), so its pool starts its own times. Sleep looks every hour from 21:00 to noon in the person's zone (owner, 2026-11-01: not every 15
+minutes; a night's start is its last use and its end the morning's first, whenever a pass sees
+them, and each phone upload runs a pass, so the hour only delays a night while no phone uploads) and at the
+next 21:00 by day (`nextSleepCheckAt`).
+
 **The background check** (`apps/app/src/platform/background-check.ts`): every signed-in phone
 registers `pace.background-check` with `expo-background-task` (WorkManager,
 `minimumInterval: 15`) on sign-in and unregisters it on logout. A run builds its client with
@@ -338,15 +458,26 @@ signed out and nothing is sent. It polls `GET /api/push/poll` only when the phon
 usage on every phone, whatever the method, since the server's rules need them at night too.
 Each step is caught on its own (a failed poll never stops the upload); a logout during a run
 makes its client stop sending the ended session's token.
+
+**The battery step**: Android defers an optimized app's background work for hours, so a phone
+whose push method is `poll` is asked to leave Pace out of battery optimization. One predicate,
+`isBackgroundStepNeeded` (`platform/notifications.ts`: method `poll`), decides whether the
+permission walk-through lists the `background` step, Settings → Permissions shows it and the hint
+under the push picker appears (bug class 1); with Google push, or no method, nothing is asked.
+Allow opens the phone maker's autostart page where there is one (`Battery.kt`, the packages
+listed under `<queries>` in the module's manifest) and Android's own exemption dialog on top of
+it; a phone without the dialog gets the list of optimized apps, and one without either opens
+nothing instead of crashing.
 Answering or settling a notification resolves it in the pool and takes back its copies.
 
 Methods: `append` and `list` (sync; `list` answers the store id too), `storeId`, `wipe`, `find(id)`, `read(now)`,
 `apply(inputs, { source, deviceId, now })` (derives, then validates the batch in order with
 core's `validateEventInput`, the first refusal stops it and none of it is written; stamps
 ids, `recordedAt` and the device; returns the stored events and the new state), `dryRun`
-(the same without any write, derivation included), `derive(now)`, `countEvents`. The MCP tools (and the bot from stage
-2) reach it through `UserStoreApi` in `shared/contract.ts`; alarms (digests) join in stage
-2, so heavy recomputes never cross a network boundary.
+(the same without any write, derivation included), `derive(now)`, `countEvents`, `addUsage`
+(stores an upload, then runs a sleep pass), `usageForSleep`. The MCP tools and the bot reach it
+through `UserStoreApi` in `shared/contract.ts`, so heavy recomputes never cross a network
+boundary.
 
 ## How to add an endpoint
 

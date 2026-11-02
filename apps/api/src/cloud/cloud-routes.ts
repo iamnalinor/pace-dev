@@ -27,10 +27,15 @@ const mountCalendar = (app: Hono<AppEnv>): void => {
 const mountUsage = (app: Hono<AppEnv>): void => {
   mount(app, endpoints.usage.upload, async ({ body, c }) => {
     // A computer's token files its sessions under that computer, never under another device.
+    // A phone is what the server recorded at sign-in (an `app` session), never what a request
+    // claims: only its uses and `until` bound what automatic sleep may decide.
     const device = c.get("device");
+    const isPhone = c.get("sessionKind") === "app" && device === undefined;
     const upload =
-      device === undefined ? body : { ...body, deviceId: device.id, deviceName: device.name };
-    return ok({ stored: await userStoreOf(c).addUsage(upload) });
+      device === undefined
+        ? { ...body, isPhone }
+        : { ...body, deviceId: device.id, deviceName: device.name, isPhone };
+    return ok({ stored: await userStoreOf(c).addUsage(upload, new Date().toISOString()) });
   });
   mount(app, endpoints.usage.list, async ({ c, query }) =>
     ok({ sessions: [...(await userStoreOf(c).usage(query))] }),

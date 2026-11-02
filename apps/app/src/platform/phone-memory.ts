@@ -2,8 +2,6 @@ import * as SecureStore from "expo-secure-store";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 
-import type { SleepCandidate } from "@pace/core";
-
 import type { PhoneCalendarEvent } from "./phone-calendar.ts";
 
 import { createSecureSessionStore } from "./secure-session.ts";
@@ -82,15 +80,11 @@ const keyList = (storeKey: string) => {
   };
 };
 
-/** The key a sleep guess is remembered by (dismissed, asked about). */
-export const sleepKey = (sleep: Pick<SleepCandidate, "startAt">): string =>
-  `sleep@${sleep.startAt}`;
-
 /** The key one occurrence of a calendar event is remembered by. */
 export const calendarKey = (event: Pick<PhoneCalendarEvent, "id" | "startAt">): string =>
   `calendar@${event.id}@${event.startAt}`;
 
-/** What the person waved away on this phone: a sleep stretch, a calendar event. */
+/** What the person waved away on this phone: a calendar event. */
 const dismissed = keyList("pace.phone.dismissed");
 
 export const dismissedKeys = dismissed.all;
@@ -167,16 +161,33 @@ export const setCalendarSync = async (
 
 const USAGE_CURSOR_KEY = "pace.phone.usageCursor";
 
-/** Where the next usage upload starts: the start of the last session sent (it may have grown). */
-export const usageCursor = async (session: string): Promise<null | string> => {
+/**
+Where the next usage upload starts (the start of the last session or use sent: it may have
+grown), and whether the lock screen showed there: the read that starts there cannot see the lock
+that came before it.
+*/
+export type UsageCursor = { readonly at: string; readonly locked: boolean };
+
+export const usageCursor = async (session: string): Promise<null | UsageCursor> => {
   const value = await readSessionValue(USAGE_CURSOR_KEY, session);
-  return typeof value === "string" ? value : null;
+  // A cursor written before the lock state was kept: the state is unknown, read as unlocked.
+  if (typeof value === "string") {
+    return { at: value, locked: false };
+  }
+  return typeof value === "object" &&
+    value !== null &&
+    "at" in value &&
+    typeof value.at === "string" &&
+    "locked" in value &&
+    typeof value.locked === "boolean"
+    ? { at: value.at, locked: value.locked }
+    : null;
 };
 
 export const setUsageCursor = async (
   session: string,
-  at: string,
+  cursor: UsageCursor,
   isCurrentSession: () => boolean,
 ): Promise<void> => {
-  await writeSessionValue({ key: USAGE_CURSOR_KEY, session, value: at, isCurrentSession });
+  await writeSessionValue({ key: USAGE_CURSOR_KEY, session, value: cursor, isCurrentSession });
 };

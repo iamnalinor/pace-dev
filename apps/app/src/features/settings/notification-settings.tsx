@@ -119,7 +119,7 @@ const pushLine = (
 };
 
 /**
-On a phone: how system notifications reach it, picked from what the server takes now (Google's
+In a browser: one line on how the web gets notifications (the bell). On a phone: how system notifications reach it, picked from what the server takes now (Google's
 push, Pace's own check) or Off, or left automatic (the default, and a way back after a pick). It
 follows every change (`pushStore`): a pick, a start that registered again, the server's methods
 changing (the live notice registers again).
@@ -130,7 +130,8 @@ export const PushStatus = () => {
   useLoadPushState();
   const state = useStore(pushStore);
   if (!IS_PHONE) {
-    return null;
+    // A browser has no method to pick: say what its Web column means (QA round 15 L12).
+    return <Text className="font-sans text-[13px] text-muted">{t("settings.push.web")}</Text>;
   }
   const values: readonly PushOption[] = ["auto", ...offeredMethods(state), "none"];
   const options = values.map((value) => ({ label: t(`settings.push.option.${value}`), value }));

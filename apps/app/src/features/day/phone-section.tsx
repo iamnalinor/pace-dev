@@ -6,86 +6,19 @@ import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
 import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { openUsageAccessSettings } from "#app/platform/phone-data.ts";
-import { calendarKey, sleepKey } from "#app/platform/phone-memory.ts";
+import { calendarKey } from "#app/platform/phone-memory.ts";
 import { isAttendableNow } from "#app/shared/tracking/calendar-today.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
-import { inkClass, washClass } from "#app/ui/color.tsx";
-import { cx } from "#app/ui/cx.ts";
 import { useToast } from "#app/ui/toast.tsx";
 import { type DayEntry, type DayRow, isCalendarRun } from "@pace/client";
-import { CATEGORY_COLORS, formatDuration } from "@pace/core";
+import { formatDuration } from "@pace/core";
 
 import { type DayPhone, isCalendarLogged, type NamedApp } from "./use-day-phone.ts";
 
-/** Sleep is drawn in the sleep category's color, like its blocks on the day. */
-const SLEEP_COLOR = CATEGORY_COLORS.sleep;
-
 /** How many apps a block's phone line names. */
 const TOP_APPS = 3;
-
-/** "Last night": the screen's guess at the sleep, to log in one tap or wave away. */
-export const SleepCard = ({ phone, zone }: { readonly phone: DayPhone; readonly zone: string }) => {
-  const t = useT();
-  const { language } = useViewer();
-  const { actions } = usePace();
-  const run = useRunAction();
-  const { sleep } = phone;
-  if (sleep === null) {
-    return null;
-  }
-  const summary = [
-    t("phone.sleep", {
-      duration: formatDuration(sleep.minutes, language),
-      from: clockTime(sleep.startAt, zone),
-      to: clockTime(sleep.endAt, zone),
-    }),
-    ...(sleep.wakeUps > 0 ? [t("phone.wakeUps", { count: sleep.wakeUps })] : []),
-  ].join(" · ");
-  return (
-    <View
-      accessibilityLabel={t("phone.sleepTitle")}
-      className={cx("mx-5 mb-3 gap-2 rounded-xl border p-3.5", washClass(SLEEP_COLOR))}
-      role="group"
-    >
-      <Text className={cx("font-sans text-[12px] font-medium", inkClass(SLEEP_COLOR))}>
-        {t("phone.sleepTitle")}
-      </Text>
-      <Text className="font-sans text-[15px] text-fg">{summary}</Text>
-      <View className="flex-row gap-2">
-        <View className="flex-1">
-          <Button
-            onPress={() => {
-              void run(
-                actions.logPast({
-                  category: "sleep",
-                  endAt: sleep.endAt,
-                  label: t("phone.sleepLabel"),
-                  startAt: sleep.startAt,
-                }),
-              );
-            }}
-            width="fill"
-          >
-            {t("phone.logSleep")}
-          </Button>
-        </View>
-        <View className="flex-1">
-          <Button
-            onPress={() => {
-              phone.dismiss(sleepKey(sleep));
-            }}
-            variant="secondary"
-            width="fill"
-          >
-            {t("phone.notSleep")}
-          </Button>
-        </View>
-      </View>
-    </View>
-  );
-};
 
 /** "Phone 23m: Telegram 15m, YouTube 8m" under a block, when the phone was used in it. */
 export const UsageLine = ({ apps }: { readonly apps: readonly NamedApp[] }) => {

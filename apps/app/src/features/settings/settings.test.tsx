@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
 
 import * as firebaseProject from "#app/platform/firebase-project.ts";
@@ -9,6 +9,8 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { problem } from "@pace/client/testing";
+
+import { paceNative } from "../../../modules/pace-native/index.ts";
 
 /** Where focus went and what was said, as a confirm asked the platform (bug class 5). */
 const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
@@ -133,7 +135,7 @@ describe("SettingsScreen", () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     // A table's rows hold cells: each switch sits in one (axe aria-required-children on the web).
-    const switches = screen.getAllByRole("switch", { name: /^Sign-ins in |^Deadline digest in / });
+    const switches = screen.getAllByRole("switch", { name: /^Sign-ins: |^Deadline digest: / });
     expect(switches).toHaveLength(6);
     expect(new Set(switches.map((item) => roleAbove(item)))).toEqual(new Set(["cell"]));
     const digestOnWeb = screen.getByLabelText(
@@ -288,6 +290,48 @@ describe("SettingsScreen", () => {
       expect(screen.getByRole("radio", { name: en("settings.push.option.fcm") })).toBeChecked();
     });
     expect(screen.getByText(en("settings.push.fcm"))).toBeOnTheScreen();
+  });
+
+  it("asks for the battery exemption under the picker only while the background check is in use", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const exemption = { granted: false };
+    jest
+      .spyOn(paceNative, "isIgnoringBatteryOptimizations")
+      .mockImplementation(() => exemption.granted);
+    const request = jest
+      .spyOn(paceNative, "requestIgnoreBatteryOptimizations")
+      .mockImplementation(() => {
+        exemption.granted = true;
+      });
+    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    await setPushChoice(null);
+    await renderScreen(<SettingsScreen />, runtime);
+    const option = (method: "fcm" | "poll") =>
+      screen.getByRole("radio", { name: en(`settings.push.option.${method}`) });
+    const hint = () => screen.queryByLabelText(en("permissions.background"));
+    await waitFor(() => {
+      expect(option("poll")).toBeOnTheScreen();
+    });
+    expect(hint()).toBeNull();
+
+    await fireEvent.press(option("poll"));
+    const shown = await screen.findByLabelText(en("permissions.background"));
+    expect(within(shown).getByText(en("permissions.background.why"))).toBeOnTheScreen();
+    // Google's push wakes the phone itself: no exemption to ask for.
+    await fireEvent.press(option("fcm"));
+    await waitFor(() => {
+      expect(hint()).toBeNull();
+    });
+
+    await fireEvent.press(option("poll"));
+    const again = await screen.findByLabelText(en("permissions.background"));
+    await fireEvent.press(within(again).getByRole("button", { name: en("permissions.allow") }));
+    expect(request).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(hint()).toBeNull();
+    });
+    jest.restoreAllMocks();
   });
 
   it("logs out and goes to the login card", async () => {

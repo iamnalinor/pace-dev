@@ -7,6 +7,8 @@ import type { AccountAction, AccountConfirmation, AccountConfirmationStatus } fr
 import { useAuth, useSync, useT } from "#app/app-state.tsx";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
+import { cx } from "#app/ui/cx.ts";
+import { useIsWide } from "#app/ui/layout.ts";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { useToast } from "#app/ui/toast.tsx";
 
@@ -150,34 +152,33 @@ const DangerOpeners = ({
   readonly focus: ReturnType<typeof useConfirmFocus>;
 }) => {
   const t = useT();
+  const isWide = useIsWide();
+  // Both outlined, side by side on a computer and full width on a phone, like Export data and
+  // Log out above them (QA round 15 L6: Delete was a bare link beside a bordered Wipe).
   return (
-    <View className="flex-row flex-wrap gap-2">
-      <View className="self-start">
-        <Button
-          onPress={() => {
-            focus.toCancel();
-            flow.setAction("wipe");
-            flow.setNotice(null);
-          }}
-          ref={focus.openerRef("wipe")}
-          variant="secondary"
-        >
-          {t("settings.wipe")}
-        </Button>
-      </View>
-      <View className="self-start">
-        <Button
-          onPress={() => {
-            focus.toCancel();
-            flow.setAction("delete");
-            flow.setNotice(null);
-          }}
-          ref={focus.openerRef("delete")}
-          variant="ghost"
-        >
-          {t("settings.deleteAccount")}
-        </Button>
-      </View>
+    <View className={cx("gap-2", isWide && "flex-row flex-wrap")}>
+      <Button
+        onPress={() => {
+          focus.toCancel();
+          flow.setAction("wipe");
+          flow.setNotice(null);
+        }}
+        ref={focus.openerRef("wipe")}
+        variant="secondary"
+      >
+        {t("settings.wipe")}
+      </Button>
+      <Button
+        onPress={() => {
+          focus.toCancel();
+          flow.setAction("delete");
+          flow.setNotice(null);
+        }}
+        ref={focus.openerRef("delete")}
+        variant="secondary"
+      >
+        {t("settings.deleteAccount")}
+      </Button>
     </View>
   );
 };
@@ -247,7 +248,8 @@ export const DangerZone = () => {
   const t = useT();
   const flow = useDangerFlow();
   return (
-    <View className="gap-3">
+    // Set apart from the account's actions: a rule and room above it (QA round 15 L6).
+    <View className="mt-3 gap-3 border-t border-line pt-5">
       <Text accessibilityRole="header" className="font-sans text-[14px] font-semibold text-warn">
         {t("settings.danger")}
       </Text>

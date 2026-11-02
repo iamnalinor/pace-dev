@@ -1,7 +1,6 @@
 import { drizzle, type DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
 import {
-  type CalendarEvent,
   err,
   type Event,
   type EventInput,
@@ -9,7 +8,6 @@ import {
   parseEvent,
   type Result,
   STORE_CHANGED,
-  type UsageRow,
 } from "@pace/core";
 
 import type {
@@ -32,30 +30,24 @@ import type {
 } from "../shared/contract.ts";
 import type { Cooldowns } from "../shared/llm/llm.ts";
 
+import { UNNAMED_VERSION, versionOf } from "../shared/config.ts";
+import { runEach } from "./alarm.ts";
 import { describeTables, runReadOnly, simulate } from "./analytics.ts";
-import * as cloud from "./cloud-data.ts";
+import { CloudStore } from "./cloud-store.ts";
 import { insertDecisions, listDecisions, resolveDecisions } from "./decision-log.ts";
 import { DERIVE_STEPS } from "./derive-steps.ts";
 import * as eventLog from "./event-log.ts";
 import { announceChange } from "./live-sockets.ts";
 import * as log from "./log-queries.ts";
-import { saveRuledSeries } from "./notification-pool.ts";
 import * as notifier from "./notifier.ts";
 import * as parseQueue from "./parse-queue.ts";
+import { poolAtAlarm } from "./pool-retry-alarm.ts";
 import { NotificationPool } from "./pool-service.ts";
-import { PoolStore } from "./pool-store.ts";
-import { rewriteProjections, updateProjections } from "./projections.ts";
 import * as schema from "./schema.ts";
-import {
-  applyInOrder,
-  canApplyInOrder,
-  type Materialized,
-  prepareBatch,
-  rebuild,
-  toRpcState,
-  touchedBy,
-} from "./state.ts";
-import { openStore, resetStore, storeIdOf } from "./store-identity.ts";
+import { runSleepPass, sleepAtAlarm } from "./sleep-pass.ts";
+import { StateCache } from "./state-cache.ts";
+import { prepareBatch, toRpcState } from "./state.ts";
+import { openStore, resetStore, SCHEMA_TAG, storeIdOf } from "./store-identity.ts";
 
 type Db = DrizzleSqliteDODatabase<typeof schema>;
 
@@ -70,10 +62,10 @@ One instance per user (id = user id): the event log, the materialized state, the
 projections, decisions and alarms. Before the first request touches storage, a store from
 another epoch is emptied (see `STORE_EPOCH`) and migrations run. The state is cached in
 memory with the log sequence it was built at and rebuilt when the cache is stale or a batch
-cannot be applied in order.
+cannot be applied in order (`StateCache`).
 */
-export class UserStore extends PoolStore {
-  #cache: Materialized | undefined;
+export class UserStore extends CloudStore {
+  readonly #state: StateCache;
 
   readonly #pool: NotificationPool;
 
@@ -82,10 +74,17 @@ export class UserStore extends PoolStore {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { casing: "snake_case", schema });
+    const version = versionOf(env.PACE_VERSION);
+    this.#state = new StateCache({
+      build: `${version}+${SCHEMA_TAG}`,
+      isNamed: version !== UNNAMED_VERSION,
+      db: this.db,
+      storage: ctx.storage,
+    });
     this.#pool = new NotificationPool({
       chatId: async () => await this.chatId(),
       ctx,
-      current: async () => await this.#current(),
+      current: async () => await this.#state.current(),
       db: this.db,
       derive: async (now) => await this.derive(now),
       deviceId: SERVER_DEVICE_ID,
@@ -98,38 +97,21 @@ export class UserStore extends PoolStore {
     });
   }
 
-  /** The cached state, rebuilt from the log when the cache is missing or behind it. */
-  async #current(): Promise<Materialized> {
-    const seq = await log.latestSeq(this.db);
-    if (this.#cache?.seq === seq) {
-      return this.#cache;
-    }
-    const rebuilt = rebuild({ events: await log.loadLog(this.db), seq });
-    await rewriteProjections(this.db, rebuilt.state);
-    this.#cache = rebuilt;
-    return rebuilt;
-  }
-
   /**
   The one write path: inserts what is new (known ids are skipped), then folds the new
   events into the cache and the projections, incrementally when the batch is in order
   and from scratch otherwise.
   */
   async #insert(events: readonly Event[]): Promise<readonly Event[]> {
-    const before = await this.#current();
-    const inserted = await log.insertNew(this.db, events, before.ids);
-    if (inserted.length === 0) {
-      return inserted;
+    if (events.length === 0) {
+      return events;
     }
-    const seq = await log.latestSeq(this.db);
-    await announceChange(this.ctx, { inserted, seq, since: before.seq });
-    if (canApplyInOrder(before, inserted)) {
-      const next = applyInOrder(before, inserted, seq);
-      await updateProjections(this.db, next.state, touchedBy(inserted));
-      this.#cache = next;
-    } else {
-      this.#cache = undefined;
-      await this.#current();
+    const before = await this.#state.current();
+    const inserted = await log.insertNew(this.db, events, before.ids);
+    if (inserted.length > 0) {
+      const seq = await log.latestSeq(this.db);
+      await announceChange(this.ctx, { inserted, seq, since: before.seq });
+      await this.#state.fold(before, inserted, seq);
     }
     return inserted;
   }
@@ -151,7 +133,7 @@ export class UserStore extends PoolStore {
   same person from scratch and a device still holding the old copy drops it.
   */
   async wipe(): Promise<void> {
-    this.#cache = undefined;
+    this.#state.forget();
     await resetStore(this.db, this.ctx.storage);
   }
 
@@ -219,7 +201,7 @@ export class UserStore extends PoolStore {
   /** The materialized state as of `now`, with the system events due by then derived first. */
   async read(now: string): Promise<ReadResult> {
     await this.derive(now);
-    const current = await this.#current();
+    const current = await this.#state.current();
     return { state: toRpcState(current.state), seq: current.seq };
   }
 
@@ -234,14 +216,14 @@ export class UserStore extends PoolStore {
     meta: ApplyMeta,
   ): Promise<Result<ApplyResult, ApplyError>> {
     await this.derive(meta.now);
-    const prepared = prepareBatch(await this.#current(), inputs, meta);
+    const prepared = prepareBatch(await this.#state.current(), inputs, meta);
     if (!prepared.ok) {
       return prepared;
     }
     const inserted = await this.#insert(prepared.value.events);
     await this.derive(meta.now);
     await this.#pool.afterWrite(meta.now);
-    const current = await this.#current();
+    const current = await this.#state.current();
     return ok({
       events: inserted.map((event) => toStored(event)),
       state: toRpcState(current.state),
@@ -257,7 +239,7 @@ export class UserStore extends PoolStore {
     inputs: readonly EventInput[],
     meta: ApplyMeta,
   ): Promise<Result<DryRunResult, ApplyError>> {
-    const prepared = prepareBatch(await this.#current(), inputs, meta);
+    const prepared = prepareBatch(await this.#state.current(), inputs, meta);
     return prepared.ok
       ? ok({
           events: prepared.value.events.map((event) => toStored(event)),
@@ -281,49 +263,29 @@ export class UserStore extends PoolStore {
     return await this.ctx.storage.get<JsonValue>(`memo:${key}`);
   }
 
-  /**
-  A phone's calendar over a range, replacing what that phone sent for it before, with the series
-  it answers "every time" for (never announced as they start).
-  */
-  async syncCalendar(
-    upload: cloud.Range & {
-      readonly deviceId: string;
-      readonly events: readonly CalendarEvent[];
-      readonly ruledSeries?: readonly string[] | undefined;
-    },
-    now: string,
-  ): Promise<number> {
-    const stored = await cloud.replaceCalendar(this.db, upload);
-    if (upload.ruledSeries !== undefined) {
-      await saveRuledSeries(this.ctx.storage, upload.ruledSeries);
-    }
-    await this.#pool.afterWrite(now);
-    return stored;
-  }
-
-  /** The calendar's events overlapping a range. */
-  async calendar(range: cloud.Range): Promise<readonly CalendarEvent[]> {
-    return await cloud.listCalendar(this.db, range);
-  }
-
-  /** Forgets one phone's calendar copy (it stopped sending it). */
-  async clearCalendar(deviceId: string): Promise<void> {
-    await cloud.clearCalendar(this.db, deviceId);
-  }
-
-  /** A device's app sessions (names and times only). */
-  async addUsage(upload: Parameters<typeof cloud.addUsage>[1]): Promise<number> {
-    return await cloud.addUsage(this.db, upload);
-  }
-
-  /** Each device that sent usage, with the end of its newest session. */
-  async usageDevices(): Promise<ReturnType<typeof cloud.usageDevices>> {
-    return await cloud.usageDevices(this.db);
-  }
-
-  /** App sessions on every device overlapping a range. */
-  async usage(range: cloud.Range): Promise<readonly UsageRow[]> {
-    return await cloud.listUsage(this.db, range);
+  /** One pass of automatic sleep (see `runSleepPass`); its events go through the system path. */
+  protected override async sleepPass(now: string): Promise<readonly string[]> {
+    return await runSleepPass(
+      {
+        insert: async (inputs, at) => {
+          const made = await this.#system(inputs, at);
+          if (made.length > 0) {
+            await this.derive(at);
+            await this.#pool.afterWrite(at);
+          }
+          return made;
+        },
+        log: async () => await this.#state.log(),
+        seq: async () => await log.latestSeq(this.db),
+        logDecisions: async (entries, at) => {
+          await this.logDecisions(entries, at);
+        },
+        storage: this.ctx.storage,
+        usageForSleep: async (from, at) => await this.usageForSleep(from, at),
+        zone: async () => await this.#state.zone(),
+      },
+      now,
+    );
   }
 
   /** Appends to the decision log (notifications here, parses from the routes and the bot). */
@@ -345,13 +307,13 @@ export class UserStore extends PoolStore {
   run in a transaction that always rolls back.
   */
   async querySql(sql: string): Promise<Result<SqlRows, SqlError>> {
-    await this.#current();
+    await this.#state.current();
     return runReadOnly(this.ctx.storage, sql);
   }
 
   /** The tables `querySql` can read and their CREATE statements. */
   async describeSchema(): Promise<readonly TableSchema[]> {
-    await this.#current();
+    await this.#state.current();
     return describeTables(this.ctx.storage);
   }
 
@@ -371,20 +333,28 @@ export class UserStore extends PoolStore {
     return await notifier.chatFor(this.ctx.storage, this.env.DB, this.ctx.id.name);
   }
 
+  /**
+  Everything the store waits on, each arming its own next time again through `armEarliest`: the
+  notification pool, the assistant's queue, automatic sleep. Each reads only once its own time has
+  come (`poolAtAlarm`, the queue's due texts, `sleepAtAlarm`): an alarm for one loads no log for the
+  others.
+  */
   override async alarm(): Promise<void> {
     const now = new Date().toISOString();
-    // A failed pass of the pool does not hold the assistant's queue back; it fails the alarm
-    // afterwards, so the runtime tries it again.
-    let failure: Error | null = null;
-    try {
-      await this.runNotifications(now);
-    } catch (error) {
-      failure = error instanceof Error ? error : new Error(String(error));
-    }
-    await this.drainParses(now);
-    if (failure !== null) {
-      throw failure;
-    }
+    await runEach([
+      async () => {
+        await poolAtAlarm(this.ctx.storage, {
+          now,
+          pass: async () => await this.runNotifications(now),
+        });
+      },
+      async () => {
+        await this.drainParses(now);
+      },
+      async () => {
+        await sleepAtAlarm(this.ctx.storage, { now, pass: async () => await this.sleepPass(now) });
+      },
+    ]);
   }
 
   /** The providers known to be rate limited at `now`, to skip until their time. */
@@ -421,7 +391,7 @@ export class UserStore extends PoolStore {
   async derive(now: string): Promise<readonly string[]> {
     const made: string[] = [];
     for (const step of DERIVE_STEPS) {
-      const current = await this.#current();
+      const current = await this.#state.current();
       const events = step({ ...current.state, existingEventIds: current.ids, now });
       const appended = await this.#system(events, now);
       made.push(...appended.map((event) => event.id));

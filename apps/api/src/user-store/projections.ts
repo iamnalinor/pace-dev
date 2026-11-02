@@ -155,6 +155,55 @@ export const rewriteProjections = async (db: Db, state: CoreState): Promise<void
   });
 };
 
+/** Each entity's rows as text, by id: what the projections hold for it in `state`. */
+const rowsOf = (state: CoreState) => ({
+  presets: new Map(
+    Object.values(state.presets.byId).map((preset) => [
+      preset.id,
+      JSON.stringify(presetRow(preset)),
+    ]),
+  ),
+  projects: new Map(
+    Object.values(state.projects.byId).map((project) => [
+      project.id,
+      JSON.stringify(projectRow(project)),
+    ]),
+  ),
+  tasks: new Map(
+    Object.values(state.tasks.byId).map((task) => [
+      task.id,
+      JSON.stringify([taskRow(state, task), subtaskRows(task)]),
+    ]),
+  ),
+});
+
+/** The ids whose rows differ between two states: changed, added or gone. */
+const changedIds = (
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+): ReadonlySet<string> =>
+  new Set([...before.keys(), ...after.keys()].filter((id) => before.get(id) !== after.get(id)));
+
+/**
+After a rebuild from a state the rows mirrored: rewrites only the rows that differ. The rows are a
+function of the state, so an out-of-order write (an automatic sleep decided after the fact, a
+correction) rewrites what it changed, not every row.
+*/
+export const rewriteChanged = async (
+  db: Db,
+  { after, before }: { after: CoreState; before: CoreState },
+): Promise<void> => {
+  const was = rowsOf(before);
+  const is = rowsOf(after);
+  const touched: Touched = {
+    presetIds: changedIds(was.presets, is.presets),
+    projectIds: changedIds(was.projects, is.projects),
+    taskIds: changedIds(was.tasks, is.tasks),
+  };
+  await deleteTouched(db, touched);
+  await insertTouched(db, after, touched);
+};
+
 /**
 A preset change moves the derived columns (default importance, progress, outcome) of every
 task down its chain, children included; presets change rarely, so all task rows are rewritten.
@@ -173,4 +222,38 @@ export const updateProjections = async (
   const affected = withAffectedTasks(state, touched);
   await deleteTouched(db, affected);
   await insertTouched(db, state, affected);
+};
+
+/** Storage key of what the projection rows mirror (`ProjectionMark`). */
+const MARK_KEY = "projections:mark";
+
+/**
+What the projection rows mirror: the state at the log's `seq`, as the build named `build` writes
+them (its version and the tables' newest migration), with that state's zone, the one setting a
+pass reads without materializing the log. Written after the rows, so a write cut short leaves a
+mark behind the log, and the next start rewrites them.
+*/
+export type ProjectionMark = {
+  readonly build: string;
+  readonly seq: number;
+  readonly timezone: null | string;
+};
+
+/** The mark the last projection write left, if any. */
+export const markOf = async (storage: DurableObjectStorage): Promise<ProjectionMark | undefined> =>
+  await storage.get<ProjectionMark>(MARK_KEY);
+
+/** Whether the rows mirror the log at `seq` as this build writes them. */
+export const isMarkedAt = (
+  mark: ProjectionMark | undefined,
+  at: Pick<ProjectionMark, "build" | "seq">,
+): mark is ProjectionMark => mark?.build === at.build && mark.seq === at.seq;
+
+/** Records that the rows now mirror `state` at `seq`. */
+export const saveMark = async (
+  storage: DurableObjectStorage,
+  { build, seq, state }: { build: string; seq: number; state: CoreState },
+): Promise<void> => {
+  const mark: ProjectionMark = { build, seq, timezone: state.settings.timezone };
+  await storage.put(MARK_KEY, mark);
 };

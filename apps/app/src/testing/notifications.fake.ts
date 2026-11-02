@@ -1,3 +1,5 @@
+import { useLayoutEffect, useState } from "react";
+
 type Scheduled = {
   readonly identifier: string;
   readonly content: {
@@ -14,10 +16,17 @@ type Category = {
   readonly options?: object;
 };
 
-type ResponseListener = (response: {
+type Response = {
   readonly actionIdentifier: string;
-  readonly notification: { readonly request: { readonly content: { readonly data?: unknown } } };
-}) => void;
+  readonly notification: {
+    readonly request: {
+      readonly content: { readonly data?: unknown };
+      readonly identifier: string;
+    };
+  };
+};
+
+type ResponseListener = (response: Response) => void;
 
 /** expo-notifications without the native module: a test sets what the phone answers. */
 export const createFakeNotifications = () => {
@@ -35,6 +44,10 @@ export const createFakeNotifications = () => {
     /** The FCM token the phone has; `null`: no Google services (the call fails). */
     pushToken: null as null | string,
     responseListeners: [] as ResponseListener[],
+    /** The tap the app was opened with (a cold start from a notification); `null`: none. */
+    lastResponse: null as null | Response,
+    /** Hooks told when the last tap is cleared, as the module's own emitter tells them. */
+    clearListeners: [] as (() => void)[],
   };
   const permission = () => ({ canAskAgain: state.canAskAgain, granted: state.granted });
   return {
@@ -54,6 +67,13 @@ export const createFakeNotifications = () => {
       await Promise.resolve();
       state.scheduled = state.scheduled.filter((item) => item.identifier !== id);
     },
+    /** As the module's: the phone forgets the last tap, and every hook reading it turns `null`. */
+    clearLastNotificationResponse: (): void => {
+      state.lastResponse = null;
+      for (const listener of state.clearListeners) {
+        listener();
+      }
+    },
     dismissNotificationAsync: async (id: string): Promise<void> => {
       await Promise.resolve();
       state.dismissed = [...state.dismissed, id];
@@ -72,7 +92,7 @@ export const createFakeNotifications = () => {
       }
       return { data: state.pushToken, type: "android" };
     },
-    getLastNotificationResponse: () => null,
+    getLastNotificationResponse: (): null | Response => state.lastResponse,
     getPermissionsAsync: async () => permission(),
     registerTaskAsync: async (): Promise<null> => null,
     requestPermissionsAsync: async () => {
@@ -94,5 +114,24 @@ export const createFakeNotifications = () => {
     setNotificationChannelAsync: async (): Promise<null> => null,
     setNotificationHandler: (): void => undefined,
     state,
+    /**
+    As the module's own: `undefined` on the first render, the phone's last tap read on every mount
+    in a layout effect, and `null` once it is cleared.
+    */
+    useLastNotificationResponse: (): null | Response | undefined => {
+      const [response, setResponse] = useState<null | Response | undefined>(undefined);
+      useLayoutEffect(() => {
+        // eslint-disable-next-line @eslint-react/set-state-in-effect -- mirrors expo-notifications' own hook, which sets the launch tap in a layout effect
+        setResponse(state.lastResponse);
+        const cleared = () => {
+          setResponse(null);
+        };
+        state.clearListeners.push(cleared);
+        return () => {
+          state.clearListeners = state.clearListeners.filter((item) => item !== cleared);
+        };
+      }, []);
+      return response;
+    },
   };
 };

@@ -34,3 +34,10 @@ export const deadlineChoiceProblem = (
 
 export const isDeadlineChoiceValid = (policy: DeadlinePolicy, due: Zoned): boolean =>
   deadlineChoiceProblem(policy, due) === null;
+
+/**
+Whether the form offers the deadline type: only once there is a deadline to give a type to (QA
+round 17 L7), or while a two-stage one is chosen, so what it lacks is said under it.
+*/
+export const isDeadlineTypeShown = (policy: DeadlinePolicy, due: Zoned): boolean =>
+  due !== null || policy.kind !== "hard";

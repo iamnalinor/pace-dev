@@ -64,6 +64,13 @@ export type LiveChannelOptions = {
 
 /** Often enough that no proxy closes an idle socket; the server answers without waking. */
 const PING_MS = 45_000;
+
+/**
+A ping whose "pong" has not come by then means the socket went quiet (a network switch leaves it
+half-open, reading as connected): it is dropped and reconnected, instead of waiting for the safety
+poll minutes later (QA round 16 L1). The server's auto-response answers without waking it.
+*/
+export const PONG_WAIT_MS = 10_000;
 const RETRY_MIN_MS = 1000;
 const RETRY_MAX_MS = 60_000;
 
@@ -99,21 +106,40 @@ const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
 const retryDelay = (failures: number): number =>
   Math.min(RETRY_MIN_MS * 2 ** (failures - 1), RETRY_MAX_MS);
 
-/** The keep-alive and the pending reconnect of one channel. */
+/**
+The keep-alive (a ping, then its pong in time or `onQuiet`) and the pending reconnect. `onQuiet`
+hears how many sockets in a row went quiet without a pong, so a slow link or a proxy that drops
+text frames backs off instead of reconnecting every minute (fix round 1); a pong resets it.
+*/
 const createTimers = () => {
   let ping: ReturnType<typeof setInterval> | undefined;
+  let pong: ReturnType<typeof setTimeout> | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
+  let quietStreak = 0;
   return {
     clear: (): void => {
       clearInterval(ping);
+      clearTimeout(pong);
       clearTimeout(retry);
       ping = undefined;
+      pong = undefined;
       retry = undefined;
     },
-    keepAlive: (socket: SocketLike): void => {
+    keepAlive: (socket: SocketLike, onQuiet: (streak: number) => void): void => {
       ping = setInterval(() => {
+        clearTimeout(pong);
+        pong = setTimeout(() => {
+          quietStreak += 1;
+          onQuiet(quietStreak);
+        }, PONG_WAIT_MS);
         socket.send("ping");
       }, PING_MS);
+    },
+    /** The pong came: the line is alive. */
+    ponged: (): void => {
+      clearTimeout(pong);
+      pong = undefined;
+      quietStreak = 0;
     },
     retryIn: (delayMs: number, connect: () => void): void => {
       retry = setTimeout(connect, delayMs);
@@ -129,6 +155,7 @@ type Handlers = {
   readonly events?: ((page: LiveEventsPage) => void) | undefined;
   readonly message?: ((message: unknown) => void) | undefined;
   readonly close: (code: unknown) => void;
+  readonly pong: () => void;
 };
 
 const SYNC_TYPES = new Set(["changed", "error", "events", "hello", "pushed"] as const);
@@ -181,10 +208,14 @@ const onMessage = (raw: { readonly type?: unknown }, on: Handlers): void => {
   }
 };
 
-/** Wires one socket: open, its messages, close. */
+/** Wires one socket: open, its messages (a keep-alive's pong among them), close. */
 const follow = (socket: SocketLike, on: Handlers): void => {
   socket.addEventListener("open", on.open);
   socket.addEventListener("message", ({ data }) => {
+    if (data === "pong") {
+      on.pong();
+      return;
+    }
     const message = parseMessage(data);
     if (message !== null) {
       onMessage(message, on);
@@ -204,14 +235,21 @@ send for minutes; meanwhile the channel would read as connected and poll rarely.
 const createLine = (onQuiet: () => void) => {
   let socket: SocketLike | undefined;
   let isV2 = false;
-  const requests = createRequests(() => {
-    const quiet = socket;
+  const quiet = (): void => {
+    const gone = socket;
     // Dropped first, so its close event (if it ever comes) is one of a socket no longer current.
     onQuiet();
-    quiet?.close();
-  });
+    gone?.close();
+  };
+  const requests = createRequests(quiet);
   return {
     current: (): SocketLike | undefined => socket,
+    /** A keep-alive went unanswered on `from`: if it is still the socket in use, it is quiet. */
+    goneQuiet: (from: SocketLike): void => {
+      if (socket === from) {
+        quiet();
+      }
+    },
     /** The socket is gone (or replaced): its requests fail. */
     drop: (): void => {
       socket = undefined;
@@ -251,6 +289,7 @@ const handlersFor = (
   on: {
     readonly close: (code: unknown) => void;
     readonly open: () => void;
+    readonly pong: () => void;
     readonly options: LiveChannelOptions;
   },
 ): Handlers => ({
@@ -268,6 +307,11 @@ const handlersFor = (
   },
   message: on.options.onMessage,
   open: on.open,
+  pong: () => {
+    if (line.current() === socket) {
+      on.pong();
+    }
+  },
 });
 
 /**
@@ -309,11 +353,16 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     line.use(socket);
     const opened = (): void => {
       failures = 0;
-      timers.keepAlive(socket);
+      timers.keepAlive(socket, (streak) => {
+        // Each fresh socket that goes quiet again waits longer (`createTimers`).
+        failures = line.current() === socket ? streak - 1 : failures;
+        line.goneQuiet(socket);
+      });
       status.setState({ isConnected: true });
       options.onChange();
     };
-    follow(socket, handlersFor(socket, line, { close: closed, open: opened, options }));
+    const on = { close: closed, open: opened, options, pong: timers.ponged };
+    follow(socket, handlersFor(socket, line, on));
   }
   return {
     isV2: line.isV2,

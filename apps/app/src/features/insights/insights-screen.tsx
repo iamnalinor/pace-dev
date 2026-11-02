@@ -96,6 +96,7 @@ export const InsightsScreen = () => {
     <DestinationScreen
       eyebrow={formatWeekRange(week.weekStart, week.zone, language)}
       right={<WeekNav onWeek={setWeekOf} week={week} />}
+      scrollLabel={t("insights.body", { title: t("insights.title") })}
       title={t("insights.title")}
     >
       <View className="gap-3 px-5">
