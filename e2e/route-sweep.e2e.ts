@@ -179,6 +179,13 @@ for (const size of SIZES) {
               message: `${url} renders something`,
             })
             .toBeGreaterThan(10);
+          // A reload covers the app while the device's copy is read and its first sync runs (no
+          // sidebar under the cover): judged once the cover has given the app back.
+          await expect(
+            page.getByRole("progressbar", {
+              name: /^(?:Syncing your data|Синхронизируем данные)$/u,
+            }),
+          ).toHaveCount(0, { timeout: 15_000 });
           // The sync pull lands and the screen re-renders with the seeded data: wait until the
           // text stops changing.
           const settled = { previous: "" };
