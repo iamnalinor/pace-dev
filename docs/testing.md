@@ -108,6 +108,17 @@ Every test starts on an account of its own: `loginViaApi` (`e2e/support/login.ts
 next id of the worker's whitelisted block and deletes that account first (`DELETE /api/test/account`),
 so parallel tests, `--repeat-each` and reruns against a reused server never share state.
 
+### The worst-case gallery and the overflow sweep
+
+`/dev/gallery?set=demo|worst|empty|one&lang=ru|en&theme=light|dark` shows the kit's components
+from fixtures (`packages/core/src/testing/worst-case.ts`): 300-character titles, 37 subtasks, a
+23 h 59 m block. The route exists only in a build made with `EXPO_PUBLIC_DEV_LOGIN=1`, a
+build-time constant: also under `expo start`, where the variable must be set in the shell
+(otherwise the route is the not-found screen). `e2e/worst-case.e2e.ts` opens every set at 390,
+320 and 1440 px in both languages and fails on any text wider than its box that is not in the
+set's `KNOWN` list (with its finding id), and on a `KNOWN` entry that no longer matches. A new
+component or screen gets a gallery section in the same change.
+
 ### Every screen, on real-looking data
 
 Feature tests start from an empty account, so they never see what months of use put in the
