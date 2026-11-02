@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { refuseFocus } from "../platform/refuse-focus.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { ButtonWidthContext } from "./button.tsx";
 import { cx } from "./cx.ts";
@@ -29,8 +30,9 @@ const DIALOG_FRAME = {
 } as const;
 
 /**
-The dim behind: it fades in where it is, and a tap on it closes the sheet. It is never a Tab stop
-(QA round 18 M1: it took the first focus and a second "Close" stop); where the cross is shown it
+The dim behind: it fades in where it is, and a tap on it closes the sheet. It never holds keyboard
+focus (QA round 18 M1: it took the first focus and a second "Close" stop; QA round 19 L1: the
+modal's trap wrapped Shift+Tab onto it); where the cross is shown it
 is hidden from assistive tech too, and on a phone's sheet (no cross) it stays the reader's way out.
 */
 const Backdrop = ({
@@ -48,6 +50,8 @@ const Backdrop = ({
       accessibilityRole="button"
       aria-hidden={hasCross}
       className="flex-1 bg-black/55"
+      // A focus trap that focuses it anyway (react-native-web's walks every descendant) is refused.
+      {...(refuseFocus !== undefined && { onFocus: refuseFocus })}
       onPress={onClose}
       // `focusable={false}` does not reach react-native-web's button; the tab index does.
       tabIndex={-1}

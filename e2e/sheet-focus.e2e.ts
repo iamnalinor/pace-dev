@@ -91,12 +91,16 @@ for (const size of SIZES) {
         ],
       ];
       const seen: { sheet: string; name: string; closeStops: number }[] = [];
+      const wrapped: { sheet: string; isInSheet: boolean }[] = [];
       for (const [sheet, open] of opens) {
         await open();
         await expect(page.locator(SURFACE)).toBeVisible();
         // The modal moves focus after it mounts: given a moment.
         await expect.poll(async () => (await focus(page)).isInSheet, { message: sheet }).toBe(true);
         seen.push({ closeStops: await closeTabStops(page), name: (await focus(page)).name, sheet });
+        // Shift+Tab wraps inside the sheet, never onto the full-screen dim (QA 19 L1).
+        await page.keyboard.press("Shift+Tab");
+        wrapped.push({ isInSheet: (await focus(page)).isInSheet, sheet });
         await page.keyboard.press("Escape");
         await expect(page.locator(SURFACE)).toHaveCount(0);
       }
@@ -108,6 +112,7 @@ for (const size of SIZES) {
           sheet,
         })),
       );
+      expect(wrapped).toEqual(opens.map(([sheet]) => ({ isInSheet: true, sheet })));
     });
   });
 }
