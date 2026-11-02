@@ -206,14 +206,20 @@ export const PaceProvider = ({
       return;
     }
     const lifetime = new AbortController();
+    let created: PaceRuntime | undefined;
     void (async () => {
-      const created = await createRuntime({ baseUrl: origin });
-      if (!lifetime.signal.aborted) {
-        setRuntime(created);
+      created = await createRuntime({ baseUrl: origin });
+      if (lifetime.signal.aborted) {
+        // Dropped before it was used (React's second effect run in development): let it go whole.
+        created.close();
+        return;
       }
+      setRuntime(created);
     })();
     return () => {
       lifetime.abort();
+      // Replaced for another server: it stops hearing the other tabs (review m1).
+      created?.close();
     };
   }, [provided, origin]);
 

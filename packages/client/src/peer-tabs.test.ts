@@ -19,9 +19,13 @@ other tab, a moment later (never the tab that sent it), as a structured clone.
 const fakePeers = () => {
   const tabs = new Set<(message: unknown) => void>();
   const sent: unknown[] = [];
+  const closed: PeerTabs[] = [];
   const tab = (): PeerTabs => {
     let own: ((message: unknown) => void) | undefined;
-    return {
+    const peer: PeerTabs = {
+      close: () => {
+        closed.push(peer);
+      },
       listen: (onMessage) => {
         own = onMessage;
         tabs.add(onMessage);
@@ -41,8 +45,9 @@ const fakePeers = () => {
         }
       },
     };
+    return peer;
   };
-  return { sent, tab };
+  return { closed, listening: () => tabs.size, sent, tab };
 };
 
 /**
@@ -167,5 +172,24 @@ describe("parseStoreChange", () => {
     for (const message of [null, "reload", { kind: "other" }, { events: "x", kind: "events" }]) {
       expect(parseStoreChange(message)).toBeNull();
     }
+  });
+});
+
+describe("a dropped client (QA round 17 review m1)", () => {
+  it("stops hearing the other tabs and lets go of its line to them when closed", async () => {
+    const { first, peers, second } = await twoTabs();
+    expect(peers.listening()).toBe(2);
+    second.close();
+    expect(peers.listening()).toBe(1);
+    expect(peers.closed).toHaveLength(1);
+    await first.state.dispatch({
+      occurredAt: at(10),
+      payload: { language: "ru" },
+      type: "settings.updated",
+    });
+    await settle();
+    expect(languageOf(second)).toBe("en");
+    first.live.stop();
+    second.live.stop();
   });
 });

@@ -12,7 +12,7 @@ import { CLIENT_OUTDATED, type Instance, type Result } from "@pace/core";
 
 import { loadDeviceId } from "./platform/device-id.ts";
 import { IS_PHONE } from "./platform/device.ts";
-import { createEventStore } from "./platform/event-store.ts";
+import { createEventStore, type LocalEventStore } from "./platform/event-store.ts";
 import { createPeerTabs } from "./platform/peer-tabs.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
 import { markClientOutdated } from "./platform/server-store.ts";
@@ -71,7 +71,12 @@ const watchingProtocol =
 
 /** Builds the client stack on the platform adapters; options override them (tests). */
 export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceRuntime> => {
-  const eventStore = options.eventStore ?? createEventStore();
+  // A store a test hands in is nobody else's.
+  const local: LocalEventStore =
+    options.eventStore === undefined
+      ? createEventStore()
+      : { isShared: () => Promise.resolve(false), store: options.eventStore };
+  const eventStore = local.store;
   const deviceId = await (options.deviceId ?? loadDeviceId)();
   const baseUrl = options.baseUrl ?? (await readServer());
   const fetchOf: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
@@ -82,7 +87,7 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     deviceId,
     fetch: watched,
     ...(options.now !== undefined && { now: options.now }),
-    peers: createPeerTabs(),
+    peers: createPeerTabs(local.isShared),
     session: options.session ?? createSecureSessionStore(baseUrl),
     // The event log tells which shell a change came from.
     source: IS_PHONE ? "app" : "web",

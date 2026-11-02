@@ -18,6 +18,8 @@ the first one's writes (QA round 17 M1).
 export type PeerTabs = {
   readonly post: (change: StoreChange) => void;
   readonly listen: (onMessage: (message: unknown) => void) => () => void;
+  /** Leaves the line for good: a dropped client must not keep adopting the live one's writes. */
+  readonly close: () => void;
 };
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
