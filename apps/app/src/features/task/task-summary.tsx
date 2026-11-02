@@ -103,8 +103,10 @@ const TaskTags = ({
           >
             <Text
               className={cx(
-                "font-sans text-caption2 font-normal",
-                color === null ? "text-label-secondary" : cx("font-medium", inkClass(color)),
+                "font-sans text-caption2",
+                color === null
+                  ? "font-normal text-label-secondary"
+                  : cx("font-medium", inkClass(color)),
               )}
             >
               {t(tagKey(tag))}

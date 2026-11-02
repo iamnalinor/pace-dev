@@ -124,8 +124,8 @@ const SidebarLink = ({
       />
       <Text
         className={cx(
-          "flex-1 font-sans text-subhead font-normal",
-          isCurrent ? "font-medium text-label-primary" : "text-label-secondary",
+          "flex-1 font-sans text-subhead",
+          isCurrent ? "text-label-primary" : "font-normal text-label-secondary",
         )}
       >
         {t(destination.label)}

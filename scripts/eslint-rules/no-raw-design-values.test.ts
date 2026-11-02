@@ -38,7 +38,7 @@ const tester = new RuleTester({
 });
 
 const APP_FILE = "apps/app/src/ui/example.tsx";
-const ALLOWED = { allowedClasses: ["p-5", "text-body", "rounded-md", "bg-bg-cell"] };
+const ALLOWED = { allowedClasses: ["p-5", "text-body", "rounded-md", "bg-bg-cell", "flex-row"] };
 
 tester.run("no-raw-design-values", noRawDesignValues, {
   invalid: [
@@ -150,6 +150,33 @@ tester.run("no-raw-design-values", noRawDesignValues, {
       errors: [{ messageId: "arbitraryClass" }],
       options: [ALLOWED],
     },
+    // Class strings outside a className: constants, maps, class-helper arguments.
+    {
+      code: 'const ROW = "flex-row p-5 active:opacity-70";',
+      errors: [{ data: { name: "active:opacity-70" }, messageId: "offScaleClass" }],
+      options: [ALLOWED],
+    },
+    {
+      code: 'const LOOK = { danger: "text-body bg-warn", plain: "p-5" };',
+      errors: [{ data: { name: "bg-warn" }, messageId: "offScaleClass" }],
+      options: [ALLOWED],
+    },
+    {
+      code: 'const a = cx("p-5", flag && "gap-7");',
+      errors: [{ data: { name: "gap-7" }, messageId: "offScaleClass" }],
+      options: [ALLOWED],
+    },
+    {
+      code: "const a = `rounded-md ${x} m-[3px]`;",
+      errors: [{ messageId: "arbitraryClass" }],
+      options: [ALLOWED],
+    },
+    {
+      // Checked once, inside the className, not again as a loose string.
+      code: 'const a = <View className={cx("p-7")} />;',
+      errors: [{ data: { name: "p-7" }, messageId: "offScaleClass" }],
+      options: [ALLOWED],
+    },
   ].map((c) => ({ ...c, filename: APP_FILE })),
   valid: [
     'const a = <View className="p-5 text-body rounded-md" />;',
@@ -196,6 +223,16 @@ tester.run("no-raw-design-values", noRawDesignValues, {
       options: [ALLOWED],
     },
     { code: 'const a = <View className="web-only-class" />;' },
+    {
+      // Strings that are not class lists: ids, keys, style values, words.
+      code: [
+        'const a = <View testID="day-entry" accessibilityRole="text" />;',
+        'const b = { position: "absolute", overflow: "hidden", side: "top", key: "nav.inbox" };',
+        'const c = { id: `inbox-${n}`, lang: "en-US", label: "Stop now", file: "pace-export.xlsx" };',
+        'import { x } from "react-native-reanimated";',
+      ].join("\n"),
+      options: [ALLOWED],
+    },
     {
       // Words cut by a `${...}` are fragments, not classes.
       code: "const a = <View className={`p-5 ${x} text-body gap-${n} m${y}`} />;",

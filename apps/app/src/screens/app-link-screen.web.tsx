@@ -24,7 +24,7 @@ export const AppLinkScreen = () => {
   const token = readToken();
   return (
     <View className="flex-1 items-center justify-center bg-app px-4">
-      <View className="w-full max-w-inspector items-center gap-5 rounded-lg border border-separator bg-cell px-6 py-8">
+      <View className="w-full max-w-auth-card items-center gap-5 rounded-lg border border-separator bg-cell px-6 py-8">
         <PaceLogo heading={t("appLink.title")} wordmark={t("appLink.title")} />
         {token === null ? (
           <Text

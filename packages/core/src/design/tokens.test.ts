@@ -253,6 +253,9 @@ describe("scales", () => {
       knob: { off: 16, on: 24 },
     });
     expect([size.chip.max, size.tooltip.max]).toEqual([180, 280]);
+    expect([size.authCard, size.message, size.narrowColumn, size.toast.max]).toEqual([
+      400, 480, 560, 480,
+    ]);
   });
 
   it("has the motion tokens: nothing above 300 ms, exits at 0.7 of the enter", () => {

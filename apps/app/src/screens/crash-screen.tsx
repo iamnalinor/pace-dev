@@ -28,18 +28,18 @@ export const CrashScreen = ({ error }: { readonly error: Error }) => {
       <Text accessibilityRole="header" className="font-sans text-title2 text-label-primary">
         {t(language, "crash.title")}
       </Text>
-      <Text className="max-w-inspector-max text-center font-sans text-subhead font-normal text-label-secondary">
+      <Text className="max-w-message text-center font-sans text-subhead font-normal text-label-secondary">
         {t(language, "crash.body")}
       </Text>
       <Text
-        className="max-w-inspector-max text-center font-sans text-caption font-normal text-label-tertiary"
+        className="max-w-message text-center font-sans text-caption font-normal text-label-tertiary"
         selectable
       >
         {error.message}
       </Text>
       {savedAt === null ? null : (
         <Text
-          className="max-w-inspector-max text-center font-sans text-caption font-normal text-label-tertiary"
+          className="max-w-message text-center font-sans text-caption font-normal text-label-tertiary"
           selectable
         >
           {t(language, "crash.savedAt", { path: savedAt })}

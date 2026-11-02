@@ -113,12 +113,12 @@ of the screen's footer, as the toast does, so it covers no header control (round
 export const useFloatBottom = (): number => use(FloatBottomContext);
 
 /**
-Where a toast docked in the sidebar sits: inside its column (`w-sidebar-inner`), at its foot, its action under
-the text so the text has the column's whole width (QA round 17 L5: beside the action it had a
+Where a toast docked in the sidebar sits: inside its column (`w-sidebar-inner`), at its foot, its
+action under the text so the text has the column's whole width (QA round 17 L5: beside the action it had a
 hundred pixels and lost its third line).
 */
 const DOCKED = "bottom-4 left-3 w-sidebar-inner flex-col items-stretch gap-0 pr-2";
-const FLOATING = "inset-x-4 mx-auto w-auto max-w-inspector-max flex-row items-center gap-3 pr-1";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-toast-max flex-row items-center gap-3 pr-1";
 
 const ToastBar = ({
   bottom,

@@ -2,7 +2,7 @@ import type { Rule } from "eslint";
 import type { Expression, Literal, Property } from "estree";
 
 import { type Context, isNonZero, keyName, numericValue } from "./ast.ts";
-import { checkClasses } from "./class-checks.ts";
+import { checkClasses, checkLooseClasses, type ClassScope } from "./class-checks.ts";
 import { isColorString, isNamedColorValue } from "./colors.ts";
 import { checkDurationProperty, createMotionCallChecks } from "./motion-checks.ts";
 
@@ -49,17 +49,13 @@ const rawValueId = (
   return FONT_KEYS.has(name) && numericValue(value) !== undefined ? "rawFontMetric" : undefined;
 };
 
-const checkProperty = (
-  context: Context,
-  allowed: ReadonlySet<string> | undefined,
-  node: Property,
-): void => {
+const checkProperty = (context: Context, scope: ClassScope, node: Property): void => {
   const name = keyName(node);
   if (name === undefined) {
     return;
   }
   if (CLASS_PROP.test(name)) {
-    checkClasses(context, allowed, node.value);
+    checkClasses(context, scope, node.value);
     return;
   }
   if (node.value.type === "Literal" && typeof node.value.value === "string") {
@@ -77,7 +73,7 @@ const checkProperty = (
 
 const checkJsxAttribute = (
   context: Context,
-  allowed: ReadonlySet<string> | undefined,
+  scope: ClassScope,
   { name, value }: JsxAttribute,
 ): void => {
   if (value === null || name.type !== "JSXIdentifier") {
@@ -86,7 +82,7 @@ const checkJsxAttribute = (
   if (CLASS_PROP.test(name.name)) {
     checkClasses(
       context,
-      allowed,
+      scope,
       value.type === "JSXExpressionContainer" ? value.expression : value,
     );
   } else if (
@@ -109,20 +105,34 @@ export const noRawDesignValues: Rule.RuleModule = {
     const allowed = classes.length > 0 ? new Set(classes) : undefined;
 
     const motion = createMotionCallChecks(context);
+    // Parents are visited before their strings: a className's pieces are marked before the
+    // loose-string check reaches them.
+    const scope: ClassScope = { allowed, seen: new WeakSet() };
 
     return {
       CallExpression: motion.call,
       ImportDeclaration: motion.importDeclaration,
       JSXAttribute(node: Rule.Node) {
-        checkJsxAttribute(context, allowed, node as unknown as JsxAttribute);
+        checkJsxAttribute(context, scope, node as unknown as JsxAttribute);
       },
       Literal(node) {
-        if (typeof node.value === "string" && isColorString(node.value)) {
+        if (typeof node.value !== "string") {
+          return;
+        }
+        if (isColorString(node.value)) {
           context.report({ data: { value: node.value }, messageId: "rawColor", node });
+        } else if (
+          node.parent.type !== "ImportDeclaration" &&
+          (node.parent as { type: string }).type !== "JSXAttribute"
+        ) {
+          checkLooseClasses(context, scope, node);
         }
       },
       Property: (node) => {
-        checkProperty(context, allowed, node);
+        checkProperty(context, scope, node);
+      },
+      TemplateLiteral(node) {
+        checkLooseClasses(context, scope, node);
       },
       VariableDeclarator: motion.declarator,
     };

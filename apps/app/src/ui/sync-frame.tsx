@@ -42,7 +42,7 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
     >
       <View
         accessibilityLiveRegion="polite"
-        className="min-h-hit-web max-w-inspector-max flex-row items-center gap-2 rounded-pill border border-separator bg-elevated pl-3 pr-1 shadow-lg"
+        className="min-h-hit-web max-w-toast-max flex-row items-center gap-2 rounded-pill border border-separator bg-elevated pl-3 pr-1 shadow-lg"
         role="status"
         testID="sync-strip"
       >
