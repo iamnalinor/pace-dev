@@ -301,6 +301,47 @@ describe("createLiveChannel", () => {
     live.stop();
   });
 
+  it("says a socket closed before it ever opened once per streak of such failures (round 7 CI)", () => {
+    // Refused at the door (its session ended while it was connecting, or no server): a browser
+    // gives a refused upgrade no close code, so the app must look for itself.
+    const sockets = fakeSockets();
+    const onFailedToOpen = vi.fn();
+    const onDropped = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      onDropped,
+      onFailedToOpen,
+      token: () => "tok",
+    });
+    live.start();
+    sockets.made[0]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(1);
+    // Its reconnects are refused too: still once.
+    vi.advanceTimersByTime(1000);
+    sockets.made[1]?.drop();
+    vi.advanceTimersByTime(2000);
+    sockets.made[2]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(1);
+    // One that opens ends the streak; a socket cut after it opened is no refusal.
+    vi.advanceTimersByTime(4000);
+    sockets.made[3]?.open();
+    vi.advanceTimersByTime(STABLE_MS);
+    sockets.made[3]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(1);
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // The next refusal starts a new streak; a stop says nothing.
+    vi.advanceTimersByTime(1000);
+    sockets.made[4]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(2);
+    live.stop();
+    live.start();
+    live.stop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(2);
+  });
+
   it("waits for a token instead of opening without one", () => {
     const sockets = fakeSockets();
     const live = createLiveChannel({

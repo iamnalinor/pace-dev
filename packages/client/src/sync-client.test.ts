@@ -21,7 +21,13 @@ import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.
 import { STABLE_MS } from "./live-timers.ts";
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
-import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
+import {
+  createSyncClient,
+  HOLD_MAX_MS,
+  HOLD_WAIT_MS,
+  SOON_MS,
+  type SyncClient,
+} from "./sync-client.ts";
 import { HTTP_SYNC_TIMEOUT_MS, httpTransport } from "./sync-transport.ts";
 import { SYNC_SCHEMA_VERSION } from "./sync-version.ts";
 
@@ -523,6 +529,19 @@ describe("createSyncClient scheduling", () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(pulls()).toBe(before);
     await vi.advanceTimersByTimeAsync(30_000);
+    expect(pulls()).toBe(before + 1);
+    sync.stop();
+  });
+
+  it("keeps a soon() asked right after start, before the first tick was placed (round 7 review 6)", async () => {
+    vi.useFakeTimers();
+    const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+    await sync.syncNow();
+    const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+    const before = pulls();
+    sync.start({ intervalMs: 30_000 });
+    sync.soon();
+    await vi.advanceTimersByTimeAsync(1500);
     expect(pulls()).toBe(before + 1);
     sync.stop();
   });
@@ -1269,5 +1288,71 @@ describe("createSyncClient hold (round 6: ending this device's own session)", ()
     sync.stop();
     release();
     await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+  });
+  it("keeps its loop waiting while held, without ticking, and runs it at once on release (round 7 review 8)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+      const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+      sync.start({ intervalMs: 30_000 });
+      await vi.advanceTimersByTimeAsync(100);
+      const release = await sync.hold();
+      const before = pulls();
+      const timeouts = vi.spyOn(globalThis, "setTimeout");
+      // Held past the loop's tick: it waits, no timer re-armed every half second, nothing sent.
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(pulls()).toBe(before);
+      expect(timeouts).not.toHaveBeenCalled();
+      timeouts.mockRestore();
+      release();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(pulls()).toBe(before + 1);
+      sync.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("lets go of a hold nobody released after a while: sync cannot stay held for good (round 7 review 2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+      const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+      sync.start({ intervalMs: 30_000 });
+      await vi.advanceTimersByTimeAsync(100);
+      await sync.hold();
+      const before = pulls();
+      await vi.advanceTimersByTimeAsync(HOLD_MAX_MS + 100);
+      expect(pulls()).toBe(before + 1);
+      await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+      sync.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not wait for good for a run in flight that never ends", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = {
+        pull: async () => await new Promise<never>(() => undefined),
+        push: async () => await new Promise<never>(() => undefined),
+      };
+      const store = createMemoryEventStore();
+      const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+      await state.ready;
+      const sync = createSyncClient({ now: () => NOW, state, store, transport });
+      void sync.syncNow();
+      const holding = sync.hold();
+      const hold = { isInPlace: false };
+      void (async () => {
+        await holding;
+        hold.isInPlace = true;
+      })();
+      await vi.advanceTimersByTimeAsync(HOLD_WAIT_MS);
+      expect(hold.isInPlace).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

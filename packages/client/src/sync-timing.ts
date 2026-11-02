@@ -75,3 +75,30 @@ export const createHolds = (): {
     isHeld: () => count > 0,
   };
 };
+
+/** Settles once `work` has, or after `ms` at the latest. */
+export const settledWithin = async (work: Promise<unknown>, ms: number): Promise<void> => {
+  const timer: { id?: ReturnType<typeof setTimeout> } = {};
+  try {
+    await Promise.race([
+      work,
+      new Promise((resolve) => {
+        timer.id = setTimeout(resolve, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer.id);
+  }
+};
+
+/** `letGo` then `after`, once: called by its holder, or on its own after `ms`. */
+export const expiringRelease = (letGo: () => void, ms: number, after: () => void): (() => void) => {
+  const expiry: { id?: ReturnType<typeof setTimeout> } = {};
+  const release = (): void => {
+    clearTimeout(expiry.id);
+    letGo();
+    after();
+  };
+  expiry.id = setTimeout(release, ms);
+  return release;
+};

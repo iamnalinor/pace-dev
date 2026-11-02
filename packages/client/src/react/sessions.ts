@@ -17,8 +17,9 @@ export type Sessions = {
   readonly reload: () => void;
   /**
   Ends a session or revokes an MCP app's grant; the row goes once the server agrees, or says it
-  is gone already (ended elsewhere: the list reloads). Rejects when it did not go through. Ending
-  the current session is logging out: the caller signs out.
+  is gone already (ended elsewhere: the list reloads). Rejects when it did not go through, or got
+  no answer within `REQUEST_DEADLINE_MS`. Ending the current session is logging out: the caller
+  signs out.
   */
   readonly revoke: (id: string) => Promise<void>;
   /** Connects a computer; rejects when the server could not be reached. */
@@ -30,6 +31,25 @@ type Loaded = Pick<Sessions, "loadedAt" | "sessions" | "status">;
 /** The server has no such session (any more): a revoke of it has nothing left to do. */
 const isAlreadyEnded = (error: unknown): boolean =>
   error instanceof ApiError && error.code === "session/not-found";
+
+/**
+Ends a session on the server; true when it was gone already (ended elsewhere). A DELETE that
+never comes back fails like any other (round 7 review 2): ending this device holds its sync
+meanwhile, which must not wait for good.
+*/
+const wasGoneOnRevoke = async (api: ApiClient, id: string): Promise<boolean> => {
+  try {
+    await withinDeadline(
+      async (signal) => await api.call(endpoints.sessions.revoke, { params: { id } }, { signal }),
+    );
+    return false;
+  } catch (error) {
+    if (!isAlreadyEnded(error)) {
+      throw error;
+    }
+    return true;
+  }
+};
 
 export const useSessions = (api: ApiClient): Sessions => {
   const [loaded, setLoaded] = useState<Loaded>({
@@ -76,13 +96,8 @@ export const useSessions = (api: ApiClient): Sessions => {
     },
     reload,
     revoke: async (id) => {
-      try {
-        await api.call(endpoints.sessions.revoke, { params: { id } });
-      } catch (error) {
+      if (await wasGoneOnRevoke(api, id)) {
         // Ended elsewhere meanwhile: what the person asked for is done, and the list is stale.
-        if (!isAlreadyEnded(error)) {
-          throw error;
-        }
         reload();
       }
       setLoaded((current) => ({

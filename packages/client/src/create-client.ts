@@ -122,6 +122,7 @@ const liveChannelOf = (
   wiring: {
     readonly onChange: () => void;
     readonly onDropped: () => void;
+    readonly onFailedToOpen: () => void;
     readonly onEvents: (page: LiveEventsPage) => void;
     readonly onMessage: (message: unknown) => void;
     readonly onSessionEnded: () => void;
@@ -135,6 +136,7 @@ const liveChannelOf = (
     onChange: wiring.onChange,
     onDropped: wiring.onDropped,
     onEvents: wiring.onEvents,
+    onFailedToOpen: wiring.onFailedToOpen,
     onMessage: wiring.onMessage,
     onSessionEnded: wiring.onSessionEnded,
     token: wiring.token,
@@ -201,6 +203,12 @@ const liveAndSync = (
     },
     onEvents: (page) => {
       void wired.sync?.ingestLive(page);
+    },
+    // Refused at the door (or no server): a run's 401 checks the session (`sessionCheck`), its
+    // network failure shows the offline line; else a session ended while this socket was still
+    // connecting would sign out only at the next poll, 30 s on (round 7 CI).
+    onFailedToOpen: () => {
+      wired.sync?.soon();
     },
     onMessage: deps.onMessage,
     // The server ended the socket's session: `me` signs out on its 401, so the app goes to

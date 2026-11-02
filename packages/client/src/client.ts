@@ -62,7 +62,7 @@ export {
   systemClock,
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
-export { REQUEST_DEADLINE_MS } from "./deadline.ts";
+export { REQUEST_DEADLINE_MS, withinDeadline } from "./deadline.ts";
 export type { EventStore } from "./event-store.ts";
 export { checkInstance, type InstanceError } from "./instance.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";

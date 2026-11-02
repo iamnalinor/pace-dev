@@ -11,7 +11,14 @@ import {
   type SyncStatus,
   type SyncSummary,
 } from "./sync-run.ts";
-import { createHolds, createSerial, createTimer } from "./sync-timing.ts";
+import {
+  createHolds,
+  createSerial,
+  createTimer,
+  expiringRelease,
+  type RunTimer,
+  settledWithin,
+} from "./sync-timing.ts";
 
 export type { SyncStatus, SyncSummary } from "./sync-run.ts";
 
@@ -38,9 +45,10 @@ export type SyncClient = {
   */
   readonly ingestLive: (page: PullPage) => Promise<void>;
   /**
-  Lets the run in flight finish, then starts none (every call gets `stopped`, the loop's ticks
-  send nothing) until the returned `release`: nothing goes out while this device ends its own
-  session (a request sent once the server ended it would answer 401; round 6).
+  Lets the run in flight finish (waited for at most `HOLD_WAIT_MS`), then starts none (every call
+  gets `stopped`, the loop waits without ticking) until the returned `release`, or `HOLD_MAX_MS`
+  at the latest: nothing goes out while this device ends its own session (a request sent once
+  the server ended it would answer 401; round 6). The loop runs at once on release.
   */
   readonly hold: () => Promise<() => void>;
 };
@@ -50,6 +58,18 @@ export const SYNC_STOPPED = "stopped";
 
 /** How long a burst of changes may gather before it is sent. */
 export const SOON_MS = 800;
+
+/**
+How long a hold waits for the run in flight: a run whose request hangs (each has its own timeout,
+but a transport may not keep it) does not keep the device's own sign-out waiting for good.
+*/
+export const HOLD_WAIT_MS = 5000;
+
+/**
+How long a hold lasts at most: one its holder never releases (a request that hung past every
+deadline, a screen gone) lets go on its own, so sync cannot stay held for good (round 7 review 2).
+*/
+export const HOLD_MAX_MS = 60_000;
 
 const BACKOFF_MIN_MS = 1000;
 const BACKOFF_MAX_MS = 60_000;
@@ -88,6 +108,18 @@ const firstTickIn = async (
   }
   const pending = await deps.store.listPending();
   return pending.length === 0 ? intervalMs : 0;
+};
+
+/**
+Settles once no run is in flight (`current` reads the one under way, if any: wrapped, since a
+getter of a promise or nothing must not become one that always answers a promise).
+*/
+const drain = async (
+  current: () => { readonly run: Promise<unknown> | undefined },
+): Promise<void> => {
+  for (let { run } = current(); run !== undefined; { run } = current()) {
+    await run;
+  }
 };
 
 /**
@@ -142,15 +174,15 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
     /** Whether the last run succeeded within `withinMs` of `at` and none is under way. */
     isFresh: (at: string, withinMs: number): boolean =>
       inFlight === undefined && record.isOkWithin(at, withinMs),
-    /** A hold in place: the runs waiting are dropped and the one in flight finishes. */
+    /** Holds: runs waiting drop, the one in flight is waited for, `HOLD_WAIT_MS` at most. */
     hold: async (): Promise<() => void> => {
       const release = holds.add();
       dropWaiting();
-      while (inFlight !== undefined) {
-        await inFlight;
-      }
+      const drained = drain(() => ({ run: inFlight }));
+      await settledWithin(drained, HOLD_WAIT_MS);
       return release;
     },
+    isHeld: holds.isHeld,
     /** Applies a live page that fits; true when a pull is needed instead. */
     ingestLive: async (page: PullPage): Promise<boolean> =>
       await serial(async () => await shouldPullFor(deps, page)),
@@ -176,36 +208,62 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
 /** Before any run: never synced, nothing wrong, taken to be online. */
 const NOT_SYNCED: SyncStatus = { lastError: null, lastSyncAt: null, online: true, syncing: false };
 
-export const createSyncClient = (deps: SyncDeps): SyncClient => {
-  const status = createStore<SyncStatus>(() => NOT_SYNCED);
-  const runner = createRunner(deps, status);
-  let intervalMs: number | undefined;
-  const timer = createTimer(() => {
+type Runner = ReturnType<typeof createRunner>;
+
+/**
+The loop's next tick, after a run: its interval, or the backoff after a failure. A tick that comes
+while a hold is in place parks the loop instead (`park`), which waits for the release rather
+than ticking every half second (round 7 review 8).
+*/
+const tickOf =
+  (
+    runner: Runner,
+    loop: {
+      readonly interval: () => number | undefined;
+      readonly park: () => void;
+      readonly timer: () => RunTimer;
+    },
+  ) =>
+  (): void => {
+    if (runner.isHeld()) {
+      loop.park();
+      return;
+    }
     void (async () => {
       const result = await runner.syncNow();
-      if (intervalMs !== undefined) {
-        timer.in(result.ok ? intervalMs : backoffMs(runner.failures()));
+      const intervalMs = loop.interval();
+      if (intervalMs === undefined) {
+        return;
       }
+      if (!result.ok && runner.isHeld()) {
+        loop.park();
+        return;
+      }
+      loop.timer().in(result.ok ? intervalMs : backoffMs(runner.failures()));
     })();
-  });
-  // A run already due sooner stays: a burst of changes goes at most this long after the first.
-  const soon = (): void => {
-    if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
-      timer.in(SOON_MS);
-    }
   };
+
+/** The loop: its interval while started, its one pending tick, and whether a hold parked it. */
+const createLoop = (deps: SyncDeps, runner: Runner) => {
+  let intervalMs: number | undefined;
+  let isParked = false;
+  const timer: RunTimer = createTimer(
+    tickOf(runner, {
+      interval: () => intervalMs,
+      park: () => {
+        isParked = true;
+      },
+      timer: () => timer,
+    }),
+  );
   return {
-    ingestLive: async (page) => {
-      try {
-        if (await runner.ingestLive(page)) {
-          soon();
-        }
-      } catch {
-        // The local store failed to take it: a run pulls it and reports what goes wrong.
-        soon();
+    /** A run already due sooner stays: a burst of changes goes at most this long after the first. */
+    soon: (): void => {
+      if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
+        timer.in(SOON_MS);
       }
     },
-    setInterval: (next) => {
+    setInterval: (next: number): void => {
       if (intervalMs === undefined || next === intervalMs) {
         return;
       }
@@ -213,27 +271,64 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
       intervalMs = next;
       timer.in(next);
     },
-    soon,
-    start: (options) => {
+    start: (interval: number): void => {
       if (intervalMs !== undefined) {
         return;
       }
 
-      intervalMs = options.intervalMs;
-      const interval = options.intervalMs;
+      intervalMs = interval;
       void (async () => {
         const ms = await firstTickIn(deps, runner.isFresh, interval);
-        // Stopped (or started anew) meanwhile: that start schedules its own.
-        if (intervalMs === interval) {
+        // Stopped (or started anew) meanwhile: that start schedules its own. A run asked for
+        // meanwhile (`soon`) and due sooner stays (round 7 review 6).
+        if (intervalMs === interval && !timer.isDueWithin(ms)) {
           timer.in(ms);
         }
       })();
     },
-    hold: runner.hold,
+    stop: (): void => {
+      intervalMs = undefined;
+      isParked = false;
+      timer.cancel();
+    },
+    /** Released: a loop a hold parked runs at once. */
+    unpark: (): void => {
+      if (!isParked || runner.isHeld()) {
+        return;
+      }
+      isParked = false;
+      if (intervalMs !== undefined) {
+        timer.in(0);
+      }
+    },
+  };
+};
+
+export const createSyncClient = (deps: SyncDeps): SyncClient => {
+  const status = createStore<SyncStatus>(() => NOT_SYNCED);
+  const runner = createRunner(deps, status);
+  const loop = createLoop(deps, runner);
+  return {
+    ingestLive: async (page) => {
+      try {
+        if (await runner.ingestLive(page)) {
+          loop.soon();
+        }
+      } catch {
+        // The local store failed to take it: a run pulls it and reports what goes wrong.
+        loop.soon();
+      }
+    },
+    setInterval: loop.setInterval,
+    soon: loop.soon,
+    start: (options) => {
+      loop.start(options.intervalMs);
+    },
+    // Released by its holder or, at the latest, `HOLD_MAX_MS` on; a loop that waited runs then.
+    hold: async () => expiringRelease(await runner.hold(), HOLD_MAX_MS, loop.unpark),
     status,
     stop: () => {
-      intervalMs = undefined;
-      timer.cancel();
+      loop.stop();
       runner.dropWaiting();
     },
     syncNow: runner.syncNow,

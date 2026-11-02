@@ -130,6 +130,36 @@ describe("createPaceClient", () => {
     expect(api.pathsCalled("/api/me")).toHaveLength(2);
   });
 
+  it("signs out within seconds when its socket is refused at the door, not at the next poll (round 7 CI)", async () => {
+    // The session ended while this visible tab's socket was still connecting: the refused upgrade
+    // closes with no code (1006), every reconnect is refused too, and the poll is 30 s away.
+    const socket = oneSocket();
+    const server = { isRevoked: false };
+    const { client } = await setup(
+      {
+        "GET /api/me": () => (server.isRevoked ? problem(401, "auth/unauthorized") : fakeMe),
+        "GET /api/sync/pull": () =>
+          server.isRevoked
+            ? problem(401, "auth/unauthorized")
+            : { events: [], more: false, seq: 0, storeId: "store-test" },
+      },
+      "tok",
+      socket.create,
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    await client.sync.syncNow();
+    client.sync.start({ intervalMs: 30_000 });
+    client.live.start();
+    server.isRevoked = true;
+    socket.emit("close", { code: 1006 });
+    await expect
+      .poll(() => client.auth.store.getState().status, { timeout: 3000 })
+      .toBe("signed-out");
+    expect(client.auth.store.getState().endedElsewhere).toBe(true);
+    client.sync.stop();
+    client.live.stop();
+  });
+
   it("wires the state and the sync client on one store", async () => {
     const { api, client } = await setup({
       "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
