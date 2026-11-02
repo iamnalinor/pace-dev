@@ -734,6 +734,63 @@ The same rule applies when a previously successful channel is no longer configur
   a failure, and when it fails ours too it is an answer out of shape, never a provider down. What we
   send is pinned against the strictest mode we may meet (every object's properties all `required`,
   `additionalProperties: false`). Test doubles copy the real endpoint's refusal, body and chunk.
+### 80. A field that reads half of a value and guesses the rest, with no way to say it
+- **Bug.** Round 6 (the owner, after QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00
+  could not be cut back to Friday from the Day sheet. Its To field reads a clock time only; the day
+  was guessed near the old end (rules (a)–(c), at most 12 hours either way), so Friday 23:00 was
+  refused ("The end must be after the start.") and every other time landed on Saturday or Sunday.
+- **Missed because.** Every test typed a clock and asked which day the rules chose; the tests were
+  about guessing well, and none asked whether a person could say the day when the guess is wrong.
+- **Rule.** A value typed in parts (a day and a clock, an amount and a unit) has a control for
+  every part the person may need to change; a guess fills a part only while the person has not
+  said it, and once said it is read as said, refused in the usual words if it cannot be. Test the
+  answer the guess never gives (Friday for a weekend block), not only the guesses.
+
+### 81. A key the system needs asked of the person
+- **Bug.** QA round 18 L4: New preset showed a bare "Id" field next to Name (filled from the name
+  in Latin letters only, so a Russian name left it empty and Save failed with "bad id"), and the
+  form opened with nothing focused.
+- **Missed because.** The form test typed an English name and read the id back; it asserted the
+  field existed. Nobody typed a Russian name, and nobody asked why a person should see it.
+- **Rule.** Ids, slugs and keys are made by the system (`freePresetId`: from the name, Russian
+  spelt in Latin letters, numbered past a taken or reserved one) and never shown as a field; a form
+  for a new thing puts the cursor in its first field where there is a keyboard (class 71). Test
+  with a name in the owner's language and a second thing of the same name.
+
+### 82. A name taken from the kind of screen where the thing it shows is known
+- **Bug.** QA round 18 L8: every `/task/<id>` tab was "Task · Pace", every project "Projects ·
+  Pace", the new preset form "Presets · Pace": a browser history and the PWA switcher listed eight
+  identical rows.
+- **Missed because.** The title was a pure function of the route's first segment, and its test
+  checked one title per route kind.
+- **Rule.** A label for one thing (a tab title, a notification, a share sheet, a back button's
+  name) says that thing in the person's own words, never translated (`subjectName`), and falls
+  back to the kind only while it cannot be found. Test it with a thing whose name is a word of the
+  catalog ("Settings") and one in another script.
+
+### 83. An address a server says it has handed out over the one the app has reached it at
+- **Bug.** QA round 18 L10: "Connect an AI app" printed `http://localhost:8787/mcp` and "Add a
+  computer" put `--api http://localhost:8787` in its command, while the app talked to the Worker
+  on :8818; the Worker's `API_ORIGIN` named a port it was not running on, so both were dead.
+- **Missed because.** The tests served `/api/instance` with the same origin the fake runtime used,
+  so the two never differed.
+- **Rule.** An address the app gives a person to use elsewhere is one the app has proven (the
+  origin it talks to), not one a server reports about itself; a reported one is only a fallback
+  for what the app cannot know (its web app). Test it with the two different.
+
+### 84. A cost of using the screen that no test counts: tab stops, target size, a jump
+- **Bug.** QA round 19 L5: the date picker had a tab stop per day (30+ before "Next month") and
+  opened on "Previous month". QA round 18 L6: the composer's icons were 36×36, the task's link row
+  15 px high, narrow Week blocks 31 px wide and switches 24 px high at 390. QA round 18 L11: the
+  offline line pushed the page down 37 px mid-typing.
+- **Missed because.** The tests ask whether a control exists, has a name and works; none counts
+  what it costs to reach it (Tab presses, the size of the thing a thumb aims at) or whether the
+  page moves under the person when a status comes and goes.
+- **Rule.** A grid of like choices is one tab stop with arrow keys (roving tab index) and opens on
+  the chosen one; anything tapped is at least 44×44 at phone width (`hitSlop` where the drawing
+  stays small); a status that comes and goes takes no room from the page (an overlay or a row kept
+  for it). Guards: the e2e measures every visible control's hit box at 390, counts the date
+  picker's tab stops, and measures the main heading's position across going offline.
 
 ## Log
 
@@ -1002,3 +1059,12 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 20 L9: the first load sent the log's first pull, the notification pool and today's calendar twice each | 79 (new) | yes: the start's other reads (`me` once, instances local, the phone's data only on a phone); the pool's other refresh callers (a live notice must always refresh, so the rule is only on the "back on the line" path) | the loop's first tick waits its interval right after a run that synced everything with nothing written since; the pool is not fetched again on the socket's connection within 5 s of a fetch; today's calendar shares one request in flight; unit, app and web tests; e2e counts a first load (no URL twice, one pull since 0) |
 | 2026-11-02 | e2e flakes of the composer journey ("composer adds lines and fills the form (desktop, dark)" timed out at 30 s with nothing failing, 4/8 under four workers per 6-B; a typed line once came out with characters moved, "dashboardsис", and `addTask` once in `time.e2e.ts`) | 20 (a test acts before the screen has settled) | yes: every caller of `addTask` and the journey's first line now type into a settled line; the typing race did not show in 72 runs (a probe typing right after load, 24 under four workers; the composer and time files, 3 × under four workers), so no app change: nothing in the composer resets its value while typing | `settledLine` (no first-sync cover or grey rows, the line editable) before typing, the typed value asserted before Enter (a race now fails at the step that has it), no reload after each task on a computer (the line stays and empties); the journey's limit is 60 s (about 20 s of real work under load); 16/16 and 87/87 green under four workers |
 | 2026-11-02 | LLM regression run 41423290212: slot 3's endpoint refused its own model's answer on its schema check (the model left out a task action's activity keys), and the read counted it as the provider failing; the diagnosis to check was "our schema keeps those keys optional", but the schema sent already requires every key (nullable) | 85 (new) | yes: only one schema goes to models (`ModelOutputSchema` through `runStructured`); every way an answer arrives now goes through `answerCheck` (the stream's output, the refusal's `failed_generation`, the text streamed before a refusal); the prompt says every action keeps every key; the rate-limit and refused-key reading moved with the rest of the failure sorting into `failure.ts`, where a schema refusal is told apart from an outage | `llm.test.ts`: an answer with those five keys left out is kept with them null; a refusal carrying the answer in its body and one after streaming it are both read; a refused answer that fails our check too is `llm/invalid-output`, not `llm/unavailable` (all RED); a guard over the schema actually sent: every object's properties all required, no others (green: the schema was already strict-mode valid); the fake model plays the endpoint's refusal as copied from the run |
+| 2026-11-02 | Round 6 (owner, QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00 could not be cut back to Friday from the Day sheet; the end field read a clock only and the day was guessed near the old end | 80 (new) | yes: the other typed times carry their day (the close sheet's and the date field's typed date and time) or are a time of day by nature (presets' deadline and recurrence, quiet hours); the Day sheet was the only clock read on a guessed day | `fromDay`/`toDay` in `ActivityForm` and a day row for each time in the sheet (`day-choices.tsx`: shown for a block across days, behind "Other days" otherwise); `readDraft` tests (Friday 23:00 saved, red before; Friday 19:00 and a day before the start refused as `day.badRange`; a start on its chosen day; a new block's chosen end never read past midnight) and sheet tests (cut back to Friday, start moved to Saturday, a one-day block's next day) |
+| 2026-11-02 | QA round 18 L4: New preset asked for a bare "Id" (empty for a Russian name, so Save failed) and opened with nothing focused | 81 (new) | yes: the other forms that create things (task, project, activity) make their ids with `newId()` and show none; the preset form was the only one with a typed key | `freePresetId` (the name's slug, Russian spelt in Latin letters, accents dropped, numbered past a taken, archived, default or reserved `new` id; client tests); the Id field and its catalog key gone; Name focused on a new preset where there is a keyboard; app tests: no Id field, Name focused, a Russian name saved as `algebra`, a second one as `algebra-2` (both red before) |
+| 2026-11-02 | QA round 18 L8: every task, project and the new preset form had the kind's name as the tab title ("Task · Pace" eight times in the history) | 82 (new) | yes: the pushed screens' own headers already name the thing (task title, project name, preset label); the document title was the only label taken from the route's kind | `routeSubject` + `subjectName` (task title and project name verbatim, a default preset in the reader's language), `documentTitle` names the thing and says "New preset" for `/presets/new`, the kind only while the thing cannot be found; route-title tests including a task called "Settings" and a Russian preset name (red before) |
+| 2026-11-02 | QA round 18 L10: "Connect an AI app" and "Add a computer" handed out the server's reported `apiOrigin` (a port the dev Worker was not on) instead of the origin the app talks to | 83 (new) | yes: the two screens are the only ones that hand out the API's address (both read `useServerInfo().apiOrigin`); the login's web origin stays the server's own on purpose (the token goes to that server) | `serverInfoOf` gives the origin in use; `server-store.test.ts` (a reported 8787 with the app on 8818, red before) and the sessions tests now serve an `/api/instance` whose origin differs from the app's |
+| 2026-11-02 | QA round 19 L5: the date picker had a tab stop per day and opened on "Previous month" | 84 (new) | yes: the one shared month view (`ui/calendar.tsx`) serves Day's "Pick a day", the task's dates and the repeat's end; the other grids of like choices (chips, swatches) are short rows Tab walks in a few stops | the month view is one tab stop (roving tab index; arrows, Home/End, Page Up/Down via `calendarKeyMove`, never past `max`), the picked day (else today) takes focus on opening where there is a keyboard (`claimFocus`, which outlasts the sheet's own first focus); client tests of the moves, app tests of the one stop and the focus (red before); the days other than the stop refuse the sheet trap's focus walk, so Shift+Tab lands on the stop; e2e: the Day picker opens on the picked day, Left moves it, one Tab leaves the grid and Shift+Tab comes back to the moved day |
+| 2026-11-02 | QA round 18 L7: Week's narrow side-by-side blocks showed one letter with no other way to read them but a tap, and a 0-minute block was not drawn at all (the timeline gives it no time, and `placeIn` placed only stretches with length) | 82 (a label cut to a letter where the whole name is known) and 2 (the week's ways in were tested with blocks that have length) | yes: calendar events in narrow lanes take the same tooltip; the usage strip already drew a 1 px line for a short session; Day lists only blocks with time (a 0-minute one is reached from Week and History) | every Week block and event says its whole name and times in a tooltip (hover, keyboard focus); `placeIn` places a 0-minute stretch inside the column and the week model adds activities that ended as they began, drawn at the 24 px floor; client test of the point (red before), app test that a 0-minute block opens (red before), e2e of the tooltip and the 0-minute block at 1440 |
+| 2026-11-02 | QA round 18 L6: at 390 the composer's icons were 36×36, the task's link row 15 px high, two side-by-side Week blocks 31 px wide and the switches 48×24 | 84 | partly: the four named kinds are fixed; the sweep's guard also showed rows of chips (the project filter, the preset form's choices) and the task row's check reach about 40 px where their 44 px boxes overlap a neighbour's in the next row, left as they are and named in the round's report | the composer's icons sit in 44 px boxes that touch, the link in a 44 px box reaching into the gaps around it, a phone's day column widens until each lane is 44 px (`phoneColumnPx`, the sideways scroll counts each day's width), a web switch has a 44 px reach drawn over it (`SWITCH_REACH_PX`); e2e `targets.e2e.ts` presses 21 px either side of each such control at 390 and fails on a neighbour or nothing, and flips a switch from just above and below it |
+| 2026-11-02 | QA round 18 L11: the offline line sat in the layout and pushed the page down 37 px mid-typing, in grey with no icon | 84 | yes: the other status that comes and goes at the top (still syncing) is the same strip; the update banner is a bar that stays once shown and the toasts already float | the strip is a pill floating over the top of the page (role status, an icon in the warning colour, the toast's surface and shadow), out of the layout; e2e: the main heading's box is the same before, during and after going offline at 390 and 1440, with no axe finding |
+| 2026-11-02 | Found by this round's full e2e run: the web switch's 44 px reach (QA round 18 L6) was drawn over the switch, so it took every press meant for the switch; Playwright could not click "Alongside what is running" (`time.e2e.ts:42`, phone and desktop) | 6 (an overlay placed over the control it serves: it covered an enabled control) | yes: the composer's icons, the task's link and the Week blocks grew their own boxes instead of drawing anything over them; the switch's reach was the only overlay of round 6 | the reach is drawn behind the switch (before it), so a press on the switch reaches the switch and one just above or below it the reach; `targets.e2e.ts` still finds the 44 px area by pressing around it, and `time.e2e.ts` clicks the switch itself (both pass at 390 and 1440) |

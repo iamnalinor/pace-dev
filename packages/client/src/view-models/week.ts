@@ -65,7 +65,11 @@ export const placeIn = (
   const dayEnd = Date.parse(addDaysIn(day, 1, zone));
   const start = Math.max(Date.parse(stretch.startAt), dayStart);
   const end = Math.min(Date.parse(stretch.endAt), dayEnd);
-  return end > start ? { height: (end - start) / 60_000, top: (start - dayStart) / 60_000 } : null;
+  // A 0-minute stretch inside the column is a point the screen still draws (QA round 18 L7).
+  const isPoint = start === end && start < dayEnd && stretch.startAt === stretch.endAt;
+  return isPoint || end > start
+    ? { height: (end - start) / 60_000, top: (start - dayStart) / 60_000 }
+    : null;
 };
 
 /** A column within a day: which one, out of how many side by side. */
@@ -142,6 +146,33 @@ export const lanesOf = (stretches: readonly Stretch[], minMinutes = 0): readonly
 const hourOf = (at: string, zone: string): number => Number(formatInZone(at, zone, "H"));
 
 /**
+Activities that ended the instant they began, inside `[from, to)` and not after `now`: the
+timeline has no time to give them, but the week draws them as a point to open (QA round 18 L7).
+*/
+const pointsIn = (
+  time: CoreState["time"],
+  { from, now, to }: { readonly from: string; readonly now: string; readonly to: string },
+) =>
+  Object.values(time.activities)
+    .filter(
+      (activity) =>
+        activity.endAt === activity.startAt &&
+        Date.parse(activity.startAt) >= Date.parse(from) &&
+        Date.parse(activity.startAt) < Date.parse(to) &&
+        Date.parse(activity.startAt) <= Date.parse(now),
+    )
+    .map((activity) => ({
+      activityId: activity.id,
+      category: activity.category,
+      endAt: activity.startAt,
+      isAlongside: activity.isAlongside,
+      label: activity.label,
+      minutes: 0,
+      startAt: activity.startAt,
+      taskId: activity.taskId,
+    }));
+
+/**
 A week as lived: Monday to Sunday in the account zone, each day's tracked blocks (and what ran
 alongside) placed on an hour grid. The calendar and the devices' usage are laid over it by the
 screen, with `placeIn`.
@@ -156,8 +187,9 @@ export const weekModel = (
   const weekStart = weekOf === null ? thisWeek : startOfWeekIn(weekOf, zone);
   const dates = Array.from({ length: 7 }, (_, index) => addDaysIn(weekStart, index, zone));
   const lived = dates.map((date) => {
-    const day = timeline(state.time, { from: date, now: ctx.now, to: addDaysIn(date, 1, zone) });
-    return { date, segments: [...day.segments, ...day.alongside] };
+    const range = { from: date, now: ctx.now, to: addDaysIn(date, 1, zone) };
+    const day = timeline(state.time, range);
+    return { date, segments: [...day.segments, ...day.alongside, ...pointsIn(state.time, range)] };
   });
   const earliest = Math.min(
     state.settings.nightHours ? 0 : DEFAULT_FROM_HOUR,

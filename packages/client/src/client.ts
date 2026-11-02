@@ -96,7 +96,14 @@ export {
 } from "./sync-client.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { type EventDetails, eventDetails } from "./view-models/calendar-event.ts";
-export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
+export {
+  type CalendarDay,
+  calendarKeyMove,
+  monthGrid,
+  monthOf,
+  rovingDay,
+  shiftMonth,
+} from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
   canAiRead,
@@ -179,6 +186,7 @@ export { SCOPE_KEYS } from "./view-models/oauth-scopes.ts";
 export {
   definitionIssues,
   editorDraft,
+  freePresetId,
   inheritedOf,
   isOverridden,
   isSubOverridden,
@@ -186,7 +194,6 @@ export {
   type PresetDraft,
   setSub,
   setValue,
-  slugify,
   type SubKey,
   toggleOverride,
   toggleSubOverride,

@@ -1,5 +1,6 @@
 import {
   BASE_PRESETS,
+  foldToLatin,
   isBuiltInPreset,
   type Preset,
   type PresetDefinition,
@@ -122,10 +123,38 @@ export const definitionIssues = (definition: PresetDefinition): ReadonlySet<stri
   );
 };
 
-/** A preset id from its name: lowercase ASCII words joined by `-` (other scripts are dropped). */
+/**
+A preset id from its name: lowercase ASCII words joined by `-`. Russian is spelt in Latin letters
+and accents are dropped (`Алгебра` → `algebra`, `Café` → `cafe`); other scripts are dropped.
+*/
 export const slugify = (name: string): string =>
-  name
-    .toLowerCase()
+  foldToLatin(name)
+    .normalize("NFKD")
+    .replaceAll(/\p{M}/gu, "")
     .split(/[^a-z0-9]+/u)
     .filter((word) => word !== "")
     .join("-");
+
+/** The longest slug kept from a name: room for a `-NNN` after it within the id's 64. */
+const SLUG_MAX = 56;
+
+/** Ids a preset may not take: the address of the new preset form. */
+const RESERVED_IDS: ReadonlySet<string> = new Set(["new"]);
+
+/**
+The id a new preset gets from its name (QA round 18 L4: nobody types an id): the name's slug, or
+`preset` for a name with no letters it can spell, numbered `-2`, `-3`… past an id already taken
+by a preset (an archived one too), a default or the new form's own address.
+*/
+export const freePresetId = (state: PresetsState, name: string): string => {
+  // A slug has single hyphens between words, so a cut leaves at most one at its end.
+  const cut = slugify(name).slice(0, SLUG_MAX);
+  const slug = cut.endsWith("-") ? cut.slice(0, -1) : cut;
+  const base = slug === "" ? "preset" : slug;
+  const isFree = (id: string): boolean =>
+    !RESERVED_IDS.has(id) && !isBuiltInPreset(id) && !Object.hasOwn(state.byId, id);
+  const free = Array.from({ length: Object.keys(state.byId).length + 2 }, (_, step) =>
+    step === 0 ? base : `${base}-${String(step + 1)}`,
+  ).find((id) => isFree(id));
+  return free ?? `${base}-${String(Object.keys(state.byId).length + 3)}`;
+};

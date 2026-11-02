@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { BASE_PRESETS, INITIAL_PRESETS_STATE } from "@pace/core";
+import { BASE_PRESETS, INITIAL_PRESETS_STATE, PresetIdSchema } from "@pace/core";
 
 import {
   definitionIssues,
   editorDraft,
+  freePresetId,
   inheritedOf,
   isOverridden,
   newDraft,
@@ -65,7 +66,42 @@ describe("slugify", () => {
   it("turns a name into a preset id", () => {
     expect(slugify("Linear Algebra HW")).toBe("linear-algebra-hw");
     expect(slugify("  C++ / Rust!! ")).toBe("c-rust");
-    expect(slugify("Алгебра")).toBe("");
+    expect(slugify("Алгебра")).toBe("algebra");
+    expect(slugify("Щи и Чай, ёж")).toBe("schi-i-chay-ezh");
+    expect(slugify("Café déjà vu")).toBe("cafe-deja-vu");
+    expect(slugify("数学")).toBe("");
+  });
+});
+
+/** The default presets and one more under `id`. */
+const withPreset = (id: string) => ({
+  byId: { ...INITIAL_PRESETS_STATE.byId, [id]: { ...BASE_PRESETS.hw, id, name: id } },
+});
+
+describe("freePresetId (QA round 18 L4: nobody types an id)", () => {
+  it("takes the name's slug while it is free", () => {
+    expect(freePresetId(INITIAL_PRESETS_STATE, "Linear Algebra")).toBe("linear-algebra");
+    expect(freePresetId(INITIAL_PRESETS_STATE, "Линейная алгебра")).toBe("lineynaya-algebra");
+  });
+
+  it("numbers it past a preset already there, an archived one or a default", () => {
+    expect(freePresetId(withPreset("algebra"), "Algebra")).toBe("algebra-2");
+    expect(freePresetId(withPreset("algebra-2"), "Algebra")).toBe("algebra");
+    expect(freePresetId(INITIAL_PRESETS_STATE, "Work")).toBe("work-2");
+  });
+
+  it("never takes the new preset form's own address", () => {
+    expect(freePresetId(INITIAL_PRESETS_STATE, "New")).toBe("new-2");
+  });
+
+  it("names a preset whose name has no letters it can spell, and keeps long ones a valid slug", () => {
+    expect(freePresetId(INITIAL_PRESETS_STATE, "数学")).toBe("preset");
+    // Cut at 56 right after a word: the hyphen there goes too.
+    const name = `${"a".repeat(55)} bcd efg`;
+    expect(freePresetId(INITIAL_PRESETS_STATE, name)).toBe("a".repeat(55));
+    const numbered = freePresetId(withPreset("a".repeat(55)), name);
+    expect(numbered).toBe(`${"a".repeat(55)}-2`);
+    expect(PresetIdSchema.safeParse(numbered).success).toBe(true);
   });
 });
 

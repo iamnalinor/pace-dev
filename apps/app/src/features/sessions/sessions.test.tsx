@@ -567,9 +567,12 @@ describe("Settings → Devices and sessions", () => {
   });
 
   it("adds a computer: install commands omit the separately displayed token", async () => {
-    // The commands name the current server's API and web app, as it reports them.
+    // The commands name the API the app reaches the server at (the server reports another one,
+    // QA round 18 L10), and the web app the server reports.
     const serverApi = "https://pace-api.example.dev";
     const serverWeb = "https://pace.example.dev";
+    const usedApi = serverStore.getState().origin;
+    expect(usedApi).not.toBe(serverApi);
     const listed: Session[] = [];
     await renderSettings({
       "GET /api/instance": () => ({ ...fakeInstance, apiOrigin: serverApi, webOrigin: serverWeb }),
@@ -596,7 +599,7 @@ describe("Settings → Devices and sessions", () => {
       `Invoke-WebRequest -UseBasicParsing ${serverWeb}/pace_agent.py`,
       { exact: false },
     );
-    expect(windowsLine).toHaveTextContent(`install --api ${serverApi} --name 'Work laptop'`, {
+    expect(windowsLine).toHaveTextContent(`install --api ${usedApi} --name 'Work laptop'`, {
       exact: false,
     });
     expect(windowsLine).not.toHaveTextContent("tok_secret");
@@ -615,7 +618,7 @@ describe("Settings → Devices and sessions", () => {
     expect(screen.getByText(/GNOME on Wayland/u)).toBeOnTheScreen();
     expect(
       screen.getByText(
-        `curl -fsSL ${serverWeb}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${serverApi} --name 'Work laptop'`,
+        `curl -fsSL ${serverWeb}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${usedApi} --name 'Work laptop'`,
       ),
     ).toBeOnTheScreen();
     expect(screen.queryByText(/winget/u)).toBeNull();
@@ -688,7 +691,11 @@ describe("Settings → Devices and sessions", () => {
   });
 
   it("shows how to connect an AI app: the server's MCP URL and the steps per client", async () => {
+    // The server reports an API origin the app does not talk to (a Worker started on another
+    // port than its `API_ORIGIN`, QA round 18 L10): the URL is the one the app reaches.
     const serverApi = "https://pace-api.example.dev";
+    const usedApi = serverStore.getState().origin;
+    expect(usedApi).not.toBe(serverApi);
     await renderSettings({
       "GET /api/instance": () => ({ ...fakeInstance, apiOrigin: serverApi }),
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
@@ -697,7 +704,8 @@ describe("Settings → Devices and sessions", () => {
       expect(serverStore.getState().instance?.apiOrigin).toBe(serverApi);
     });
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
-    expect(await screen.findByText(`${serverApi}/mcp`)).toBeOnTheScreen();
+    expect(await screen.findByText(`${usedApi}/mcp`)).toBeOnTheScreen();
+    expect(screen.queryByText(`${serverApi}/mcp`)).toBeNull();
     // A phone has no clipboard module: the URL goes on through the share sheet.
     expect(screen.getByRole("button", { name: "Send the URL" })).toBeOnTheScreen();
     expect(screen.getByText("Claude")).toBeOnTheScreen();
@@ -710,7 +718,7 @@ describe("Settings → Devices and sessions", () => {
     // Leaving is the dim (or the cross, or Escape), as for every sheet.
     await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => {
-      expect(screen.queryByText(`${serverApi}/mcp`)).toBeNull();
+      expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
     });
   });
 });

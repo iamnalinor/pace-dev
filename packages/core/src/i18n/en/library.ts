@@ -89,7 +89,6 @@ export const enLibrary = {
   "presets.archivedBadge": "Deleted",
   "presets.notFound": "This preset does not exist.",
   "presets.name": "Name",
-  "presets.id": "Id",
   "presets.extends": "Extends",
   "presets.nameRequired": "Give the preset a name.",
   "presets.archive": "Delete preset",

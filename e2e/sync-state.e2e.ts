@@ -169,6 +169,35 @@ test("offline, a line says so; a task written meanwhile goes out on reconnect an
   expect(repeated(after.calls)).toEqual([]);
 });
 
+for (const [width, height] of [
+  [390, 844],
+  [1440, 900],
+] as const) {
+  test(`going offline and back moves nothing on the page at ${String(width)} (QA 18 L11)`, async ({
+    context,
+    page,
+  }) => {
+    await page.setViewportSize({ height, width });
+    await loginViaApi(page);
+    await page.goto("/");
+    const heading = page.getByRole("heading", { name: "Now" });
+    await expect(heading).toBeVisible();
+    const before = await heading.boundingBox();
+    await context.setOffline(true);
+    const line = page.getByRole("status").filter({ hasText: "You are offline" });
+    await expect(line).toBeVisible();
+    expect(await heading.boundingBox()).toEqual(before);
+    // The pill keeps to the top of the page, under the browser's bar, and is no wider than it.
+    const pill = await line.boundingBox();
+    expect(pill?.y ?? -1).toBeGreaterThanOrEqual(0);
+    expect((pill?.x ?? 0) + (pill?.width ?? 0)).toBeLessThanOrEqual(width);
+    await expectNoA11yViolations(page);
+    await context.setOffline(false);
+    await expect(line).toHaveCount(0);
+    expect(await heading.boundingBox()).toEqual(before);
+  });
+}
+
 test("a server gone while the tab sits idle: the line says offline without a write, and clears once it is back (QA 18 M4)", async ({
   page,
 }) => {

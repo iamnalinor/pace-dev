@@ -149,6 +149,18 @@ describe("weekModel", () => {
       ),
     ).toBeNull();
   });
+
+  it("places a 0-minute stretch inside the day as a point to draw (QA round 18 L7)", () => {
+    const day = "2026-10-05T21:00:00.000Z"; // Tuesday 00:00 in Moscow
+    const zone = MOSCOW;
+    const point = (iso: string) =>
+      placeIn(day, { endAt: iso, startAt: iso }, { fromHour: 7, zone });
+    // 16:00 Moscow.
+    expect(point("2026-10-06T13:00:00.000Z")).toEqual({ height: 0, top: 540 });
+    // Before the grid's first hour, and at the next day's midnight: not on this column.
+    expect(point("2026-10-06T03:00:00.000Z")).toBeNull();
+    expect(point("2026-10-06T21:00:00.000Z")).toBeNull();
+  });
 });
 
 const at = (hhmm: string): string => `2026-10-06T${hhmm}:00.000Z`;

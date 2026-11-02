@@ -468,6 +468,61 @@ describe("an end typed before the start's clock (QA round 18 M3)", () => {
   });
 });
 
+describe("a time put on another day (round 6: a runaway block cut back)", () => {
+  // Fri 20:00 → Sun 07:00 in Moscow: a timer left running all weekend.
+  const runaway = { endAt: "2026-10-04T04:00:00.000Z", startAt: "2026-10-02T17:00:00.000Z" };
+
+  it("cuts a weekend-long block back to Friday evening", async () => {
+    const { activityId, saved } = await editSheet(runaway);
+    expect(screen.getByText("End day")).toBeOnTheScreen();
+    expect(screen.getByRole("radio", { name: "Ends Sun · Oct 4" })).toBeChecked();
+    await fireEvent.press(screen.getByRole("radio", { name: "Ends Fri · Oct 2" }));
+    await fireEvent.changeText(screen.getByLabelText("To"), "2300");
+    expect(screen.getByRole("radio", { name: "Ends Fri · Oct 2" })).toBeChecked();
+    expect(screen.getByText("Friday · Oct 2")).toBeOnTheScreen();
+    expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
+      ["activity.adjusted", { activityId, endAt: "2026-10-02T20:00:00.000Z" }],
+    ]);
+  });
+
+  it("refuses an end on the chosen day before the start in the usual words", async () => {
+    await editSheet(runaway);
+    await fireEvent.press(screen.getByRole("radio", { name: "Ends Fri · Oct 2" }));
+    await fireEvent.changeText(screen.getByLabelText("To"), "1900");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("The end must be after the start.")).toBeOnTheScreen();
+  });
+
+  it("moves a start to a later day of the block", async () => {
+    const { activityId, saved } = await editSheet(runaway);
+    await fireEvent.press(screen.getByRole("radio", { name: "Starts Sat · Oct 3" }));
+    await fireEvent.changeText(screen.getByLabelText("From"), "2200");
+    expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
+      ["activity.adjusted", { activityId, startAt: "2026-10-03T19:00:00.000Z" }],
+    ]);
+  });
+
+  it("keeps a one-day block's days behind a button, then offers the next day for its end", async () => {
+    const { activityId, saved } = await editSheet();
+    expect(screen.queryByText("End day")).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Other days" }));
+    expect(screen.getByText("End day")).toBeOnTheScreen();
+    expect(screen.queryByText("Start day")).toBeNull();
+    await fireEvent.press(screen.getByRole("radio", { name: "Ends Wed · Oct 7" }));
+    await fireEvent.changeText(screen.getByLabelText("To"), "0100");
+    await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+    // The next day's 01:00 is still ahead of the test world's clock (6 Oct, 15:00).
+    expect(
+      await screen.findByText("That is still ahead: log what already happened."),
+    ).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("radio", { name: "Ends Tue · Oct 6" }));
+    await fireEvent.changeText(screen.getByLabelText("To"), "1400");
+    expect((await saved()).map((event) => [event.type, event.payload])).toEqual([
+      ["activity.adjusted", { activityId, endAt: "2026-10-06T11:00:00.000Z" }],
+    ]);
+  });
+});
+
 describe("deleting a block", () => {
   it("asks for a second tap, then takes it off the day", async () => {
     const runtime = await createTestRuntime();

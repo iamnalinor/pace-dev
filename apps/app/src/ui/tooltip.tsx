@@ -10,6 +10,8 @@ import {
 } from "react";
 import { Text, View } from "react-native";
 
+import type { TooltipProps } from "./tooltip-props.ts";
+
 import { type Box, placeTooltip, type Size, TAP_TOOLTIP_MS } from "./tooltip-place.ts";
 
 type Shown = {
@@ -146,14 +148,10 @@ label there is nothing to explain and the trigger is left as it is.
 */
 export const Tooltip = ({
   children,
+  isFilling = false,
   label,
   showsOnTap = true,
-}: {
-  readonly children: ReactNode;
-  readonly label: string | undefined;
-  /** False for a control whose tap changes the screen anyway (a bubble would be left behind). */
-  readonly showsOnTap?: boolean;
-}) => {
+}: TooltipProps) => {
   const host = use(HostContext);
   const triggerRef = useRef<View>(null);
   const shownIdRef = useRef<null | number>(null);
@@ -166,6 +164,7 @@ export const Tooltip = ({
   }, [host, label]);
   return (
     <View
+      {...(isFilling && { className: "flex-1" })}
       collapsable={false}
       onTouchEnd={() => {
         if (showsOnTap && label !== undefined && host !== null) {

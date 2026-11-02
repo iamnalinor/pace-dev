@@ -50,8 +50,9 @@ export const Chip = ({
   readonly label?: string;
   readonly leading?: ReactNode;
   readonly onPress: () => void;
-  /** The pressable itself, for a group that moves focus between its chips. */
-  readonly ref?: Ref<View>;
+  /** The pressable itself: for a group that moves focus between its chips, or for focus to be
+  moved onto it when the control that held it goes away. */
+  readonly ref?: Ref<View> | undefined;
   readonly selected?: boolean;
   /** In a group with one tab stop (`RadioChips`): 0 for the chosen chip, -1 for the others. */
   readonly tabIndex?: -1 | 0;

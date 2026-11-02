@@ -1,7 +1,7 @@
 import { clockTime, fromWallClock, wallClock } from "#app/format/time.ts";
 import { activityFormOf, type ActivityTarget } from "@pace/client";
 
-import { readDraft } from "./activity-draft.ts";
+import { dayChoicesOf, readDraft } from "./activity-draft.ts";
 
 const MOSCOW = "Europe/Moscow";
 const BERLIN = "Europe/Berlin";
@@ -315,5 +315,86 @@ describe("readDraft's round trip", () => {
         ({ range, target }) => range?.startAt !== target.startAt || range.endAt !== target.endAt,
       );
     expect(moved).toEqual([]);
+  });
+});
+
+describe("readDraft with a day chosen for a time (round 6: a runaway block cut back)", () => {
+  // Fri 20:00 → Sun 07:00 in Moscow: a timer left running all weekend.
+  const runaway = block("2026-10-02T17:00:00.000Z", "2026-10-04T04:00:00.000Z");
+
+  it("reads the end on the chosen day, however far from the old end", () => {
+    const draft = { ...opened(runaway, MOSCOW, { to: "23:00" }), toDay: "2026-10-02" };
+    expect(readDraft(draft, runaway, MOSCOW)).toEqual({
+      faults: NO_FAULTS,
+      range: { endAt: "2026-10-02T20:00:00.000Z", startAt: "2026-10-02T17:00:00.000Z" },
+    });
+  });
+
+  it("moves an untouched end's clock to the chosen day", () => {
+    const draft = { ...opened(runaway, MOSCOW), toDay: "2026-10-03" };
+    expect(readDraft(draft, runaway, MOSCOW).range?.endAt).toBe("2026-10-03T04:00:00.000Z");
+  });
+
+  it("keeps the very instant when the chosen day is the one the end was on", () => {
+    const target = block("2026-10-02T17:00:00.000Z", "2026-10-04T04:00:08.004Z");
+    const draft = { ...opened(target, MOSCOW), toDay: "2026-10-04" };
+    expect(readDraft(draft, target, MOSCOW).range?.endAt).toBe("2026-10-04T04:00:08.004Z");
+  });
+
+  it.each([
+    ["on the start's day, before its clock", "2026-10-02", "19:00"],
+    ["on a day before the start", "2026-10-01", "23:00"],
+  ])("refuses an end %s in the usual words", (_name, toDay, to) => {
+    const draft = { ...opened(runaway, MOSCOW, { to }), toDay };
+    expect(readDraft(draft, runaway, MOSCOW)).toEqual({
+      faults: { ...NO_FAULTS, to: "day.badRange" },
+      range: null,
+    });
+  });
+
+  it("reads the start on its chosen day", () => {
+    const draft = { ...opened(runaway, MOSCOW, { from: "22:00" }), fromDay: "2026-10-03" };
+    expect(readDraft(draft, runaway, MOSCOW).range).toEqual({
+      endAt: "2026-10-04T04:00:00.000Z",
+      startAt: "2026-10-03T19:00:00.000Z",
+    });
+  });
+
+  it("never reads a chosen end as past midnight on a new block", () => {
+    const target: ActivityTarget = {
+      endAt: "2026-10-05T20:00:00.000Z",
+      kind: "log",
+      startAt: "2026-10-05T19:00:00.000Z",
+    };
+    const draft = {
+      ...opened(target, MOSCOW, { to: "01:00" }),
+      toDay: "2026-10-05",
+    };
+    expect(readDraft(draft, target, MOSCOW).faults.to).toBe("day.badRange");
+  });
+});
+
+describe("the days a time may be put on", () => {
+  it("offers the end every day from the start's to the day after the old end", () => {
+    const target = block("2026-10-02T17:00:00.000Z", "2026-10-04T04:00:00.000Z");
+    expect(dayChoicesOf(target, MOSCOW)).toEqual({
+      from: ["2026-10-02", "2026-10-03", "2026-10-04"],
+      to: ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"],
+    });
+  });
+
+  it("offers a one-day block's end its day and the next, its start no other", () => {
+    const target = block("2026-10-06T06:00:00.000Z", "2026-10-06T07:00:00.000Z");
+    expect(dayChoicesOf(target, MOSCOW)).toEqual({
+      from: ["2026-10-06"],
+      to: ["2026-10-06", "2026-10-07"],
+    });
+  });
+
+  it("offers no end day for a block still running", () => {
+    expect(dayChoicesOf(block("2026-10-06T06:00:00.000Z", null), MOSCOW)).toEqual({
+      from: ["2026-10-06"],
+      to: [],
+    });
   });
 });

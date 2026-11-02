@@ -35,6 +35,14 @@ const newEndOf = (sameDay: string, startAt: string, zone: string): null | string
 const keptAt = (typed: string, atIso: null | string, zone: string): null | string =>
   atIso !== null && typed === clockTime(atIso, zone) ? atIso : null;
 
+/** `keptAt` while the day chosen for the field is the one it opened on. */
+const keptOn = (
+  { atIso, day }: { readonly atIso: null | string; readonly day: string },
+  typed: string,
+  zone: string,
+): null | string =>
+  atIso !== null && wallClock(atIso, zone).date === day ? keptAt(typed, atIso, zone) : null;
+
 /**
 A retyped end of a block that has one: among the instants with that wall clock on the day before,
 of or after where the block ended, the nearest to that end that is after the (typed) start and
@@ -89,15 +97,27 @@ const movedEndOf = (
 };
 
 /**
-The typed end as an instant before it meets the start: the one the sheet opened on when
-untouched, near the old end (and after the typed start) when retyped on a block that has one,
-else on the block's day. `undefined` when the text is not a time.
+The typed end as an instant before it meets the start: on the day the person chose, when they
+chose one (the clock rules below are only for a time typed without a day); else the one the sheet
+opened on when untouched, near the old end (and after the typed start) when retyped on a block
+that has one, else on the block's day. `undefined` when the text is not a time.
 */
 const endFrom = (
   typed: string,
-  { startAt, target }: { readonly startAt: null | string; readonly target: SheetTarget },
+  {
+    day,
+    startAt,
+    target,
+  }: { readonly day: null | string; readonly startAt: null | string; readonly target: SheetTarget },
   zone: string,
 ): string | undefined => {
+  if (day !== null) {
+    return (
+      keptOn({ atIso: target.endAt, day }, typed, zone) ??
+      fromWallClock({ date: day, time: typed, tz: zone }) ??
+      undefined
+    );
+  }
   const kept = keptAt(typed, target.endAt, zone);
   if (kept !== null) {
     return kept;
@@ -152,19 +172,60 @@ type Times = {
 /**
 The sheet's typed times as instants. A field left as it opened gives back the very instant it
 showed (its seconds, a repeated summer-time hour, a day or more of length); a retyped start is
-read on the block's own day, a retyped end as `endFrom` says.
+read on the day chosen for it, else the block's own day, a retyped end as `endFrom` says.
 */
 const typedTimes = (draft: Draft, target: SheetTarget, zone: string): Times => {
-  const { date } = wallClock(target.startAt, zone);
+  const date = draft.fromDay ?? wallClock(target.startAt, zone).date;
   const startAt =
-    keptAt(draft.from, target.startAt, zone) ?? fromWallClock({ date, time: draft.from, tz: zone });
-  const endAt = draft.to === "" ? null : endFrom(draft.to, { startAt, target }, zone);
+    keptOn({ atIso: target.startAt, day: date }, draft.from, zone) ??
+    fromWallClock({ date, time: draft.from, tz: zone });
+  const endAt =
+    draft.to === "" ? null : endFrom(draft.to, { day: draft.toDay, startAt, target }, zone);
   if (endAt === null || endAt === undefined || startAt === null) {
     return { endAt, startAt };
   }
-  const isNewEnd = target.kind === "log" && keptAt(draft.to, target.endAt, zone) === null;
+  const isNewEnd =
+    target.kind === "log" && draft.toDay === null && keptAt(draft.to, target.endAt, zone) === null;
   return { endAt: endAfter(endAt, startAt, { isNewEnd, zone }), startAt };
 };
+
+const DAY_MS = 86_400_000;
+
+/** Every calendar date from `first` to `last`, both `yyyy-MM-dd` and both included. */
+const datesThrough = (first: string, last: string): readonly string[] => {
+  const firstMs = Date.parse(`${first}T00:00:00.000Z`);
+  const count = Math.round((Date.parse(`${last}T00:00:00.000Z`) - firstMs) / DAY_MS) + 1;
+  return Array.from({ length: Math.max(count, 0) }, (_, step) =>
+    new Date(firstMs + step * DAY_MS).toISOString().slice(0, 10),
+  );
+};
+
+/**
+The days the sheet offers each time to be put on: the start any day the block touched, the end
+any day from the start's to the day after it ended (a running block's end has none). A Fri 20:00 –
+Sun 07:00 block left running is cut back to Friday by choosing Friday, which the clock rules alone
+never reach (round 6).
+*/
+export const dayChoicesOf = (
+  target: SheetTarget,
+  zone: string,
+): { readonly from: readonly string[]; readonly to: readonly string[] } => {
+  const startDate = wallClock(target.startAt, zone).date;
+  if (target.endAt === null) {
+    return { from: [startDate], to: [] };
+  }
+  const endDate = wallClock(target.endAt, zone).date;
+  const dayAfter = new Date(Date.parse(`${endDate}T00:00:00.000Z`) + DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+  return { from: datesThrough(startDate, endDate), to: datesThrough(startDate, dayAfter) };
+};
+
+/** A block whose start and end fall on different days (an end at midnight is still the day before). */
+export const isAcrossDays = (target: SheetTarget, zone: string): boolean =>
+  target.endAt !== null &&
+  wallClock(new Date(Date.parse(target.endAt) - 1).toISOString(), zone).date !==
+    wallClock(target.startAt, zone).date;
 
 export const readDraft = (
   draft: Draft,

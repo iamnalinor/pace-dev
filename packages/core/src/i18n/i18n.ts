@@ -252,7 +252,7 @@ export const formatEyebrow = (atIso: string, zone: string, language: Language): 
 };
 
 /** `Sat · Oct 3` / `сб · 3 окт.`: one end of a span of days. */
-const shortDay = (atIso: string, zone: string, language: Language): string => {
+export const formatShortDay = (atIso: string, zone: string, language: Language): string => {
   const parts = dateParts(atIso, language, {
     day: "numeric",
     month: "short",
@@ -277,7 +277,7 @@ export const formatDaySpan = (
   const dayOf = (atIso: string): string => formatInZone(atIso, zone, "yyyy-MM-dd");
   return dayOf(lastMoment) === dayOf(startAt)
     ? formatEyebrow(startAt, zone, language)
-    : `${shortDay(startAt, zone, language)} – ${shortDay(lastMoment, zone, language)}`;
+    : `${formatShortDay(startAt, zone, language)} – ${formatShortDay(lastMoment, zone, language)}`;
 };
 
 /** `Oct 5 – 11`, `Sep 28 – Oct 4` / `5 – 11 окт.`: the seven days from `weekStartIso`. */
