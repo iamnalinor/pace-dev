@@ -92,6 +92,12 @@ e2e sweep above stands in for the scripted matrix here too.
    never does (races, one-shots, cut connections), and the other way round.
 3. Fix the findings with TDD (a failing unit/app/e2e test first where the bug is testable),
    commit in batches, then launch the next round.
+4. Before a batch PR (and before any QA round of a design batch), run the **full** `bun test:e2e`
+   on a fresh build: every file and every project, latency included (a failure in `chromium`
+   leaves `latency` unrun, which is not a pass). A task may run only the files it touched, but a
+   change to shared classes, tokens or a kit component reaches screens no subset visits
+   (bug-lessons class 11, mirrors, and 61: after Task 2.2 only subsets ran, and three failures
+   waited for the batch's end).
 
 ## The prompt (fill in the round number, its kind, what changed, the fixes and the open lows)
 

@@ -109,6 +109,11 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
 
 - [ ] `bun lint` clean; `bun test:unit`, `bun test:app`, `bun test:api` green; `bun test:e2e` green
       for the touched areas (full run before the PR).
+- [ ] Run the full `bun test:e2e` before a batch PR: a fresh build, every file, every project
+      (`latency` runs only once `chromium` is green: "did not run" is a failure). Tasks that touch
+      tokens, generated classes or the kit run it too, not a subset (since Task 2.2 tasks ran only
+      e2e subsets, and Week's grid and the selected task row's contrast waited for the
+      batch close-out; docs/qa.md step 4, bug-lessons 11 and 61).
 - [ ] Re-shoot the matrix for touched screens:
       `DESIGN_SHOTS=.cache/shots/batch-<n> DESIGN_SHOTS_ONLY=routes,states,scroll bun test:e2e e2e/design-shots.e2e.ts`;
       put before/after pairs (baseline from `context/design/baseline/`) in the PR description.
