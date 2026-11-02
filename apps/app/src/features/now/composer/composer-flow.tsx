@@ -107,7 +107,8 @@ const useToInbox = (
   const toast = useToast();
   const t = useT();
   return async (): Promise<void> => {
-    if (!(await run(actions.captureInbox(text)))) {
+    const capture = await run(actions.captureInbox(text));
+    if (!capture.ok) {
       return;
     }
     // Where the line went, in words: only the Inbox badge moved before (QA round 14 L10).
@@ -178,7 +179,10 @@ const useAddTask = (model: ComposerModel, isReadByAssistant: boolean, done: () =
     }
     isAddingRef.current = true;
     try {
-      if (await run(actions.createFromComposer(model, { readByAssistant: isReadByAssistant }))) {
+      const creation = await run(
+        actions.createFromComposer(model, { readByAssistant: isReadByAssistant }),
+      );
+      if (creation.ok) {
         done();
       }
     } finally {

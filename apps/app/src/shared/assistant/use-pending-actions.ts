@@ -193,11 +193,11 @@ const useApprove = ({
       const result = await actions.applyActions(pending.actions);
       const written = result.ok ? [...result.value] : [];
       const done = doneLines(pending.actions, { language, now, state: state.store.getState() });
-      const isSuccess = await run(
+      const applied = await run(
         Promise.resolve(result),
         approvalFeedback({ actions, done, run, t, written }),
       );
-      if (!isSuccess) {
+      if (!applied.ok) {
         return;
       }
       setPending(null);

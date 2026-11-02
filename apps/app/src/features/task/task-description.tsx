@@ -82,7 +82,8 @@ export const TaskDescription = ({ view }: { readonly view: TaskViewModel }) => {
     }
     setIsSaving(true);
     try {
-      if (await run(actions.updateTask(view.id, { description }))) {
+      const saving = await run(actions.updateTask(view.id, { description }));
+      if (saving.ok) {
         close();
       }
     } finally {

@@ -75,7 +75,8 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const undo = async () => {
     setIsBusy(true);
     try {
-      if (await run(actions.revoke(entry.id))) {
+      const revocation = await run(actions.revoke(entry.id));
+      if (revocation.ok) {
         setIsConfirming(false);
       }
     } finally {

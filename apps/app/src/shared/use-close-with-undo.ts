@@ -1,11 +1,16 @@
 import { useCallback } from "react";
 
+import type { ActionResult } from "@pace/client";
+
 import { usePace, useT } from "#app/app-state.tsx";
 
 import { useRunAction } from "./use-run-action.ts";
 
-/** A one-tap Done action offers an immediate way back wherever it appears. */
-export const useCloseWithUndo = (): ((taskId: string, title: string) => Promise<boolean>) => {
+/**
+A one-tap Done action offers an immediate way back wherever it appears. Resolves to the close's
+own result (`ok` once it went through).
+*/
+export const useCloseWithUndo = (): ((taskId: string, title: string) => ActionResult) => {
   const { actions } = usePace();
   const t = useT();
   const run = useRunAction();

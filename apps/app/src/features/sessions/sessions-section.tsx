@@ -21,9 +21,6 @@ import { CalendarSyncRow } from "./calendar-sync-row.tsx";
 import { ConnectAiSheet } from "./connect-ai-sheet.tsx";
 import { SessionRow } from "./session-row.tsx";
 
-/** The sheet open over the section, if any. */
-type Opened = "addComputer" | "connectAi" | null;
-
 /** The list could not load: a quiet line and Try again under it. */
 const ListFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
   const t = useT();
@@ -46,9 +43,11 @@ Ending this device: the socket rests and the sync holds (its run in flight finis
 server closes the socket as the session ends, and the channel would read that as "ended elsewhere"
 and check `me`; a sync run sent once the session is gone answers 401 (fix round 1, round 6). The
 other tabs' note goes before the request and the token is forgotten as it is answered, with no
-logout to answer 401 (QA round 15 L2, round 6 M1). True once it ended and the login card is next.
+logout to answer 401 (QA round 15 L2, round 6 M1). `ok` once it ended and the login card is next.
 */
-const useEndThisDevice = (sessions: Sessions): ((id: string) => Promise<boolean>) => {
+const useEndThisDevice = (
+  sessions: Sessions,
+): ((id: string) => Promise<{ readonly ok: boolean }>) => {
   const router = useRouter();
   const { auth } = useAuth();
   const runtime = usePace();
@@ -66,11 +65,11 @@ const useEndThisDevice = (sessions: Sessions): ((id: string) => Promise<boolean>
       release();
       // Kept: the sync loop runs again (released) and the socket with it, as a start leaves them.
       startSenders(runtime);
-      return false;
+      return { ok: false };
     }
     release();
     router.replace("/login");
-    return true;
+    return { ok: true };
   };
 };
 
@@ -106,20 +105,20 @@ const ReadyList = ({
       .find((node) => node !== undefined);
     moveFocus(next ?? afterLast.current);
   };
-  const didEndOther = async (row: Row): Promise<boolean> => {
+  const endOther = async (row: Row): Promise<{ readonly ok: boolean }> => {
     try {
       await sessions.revoke(row.id);
     } catch {
-      return false;
+      return { ok: false };
     }
     focusAfter(row);
-    return true;
+    return { ok: true };
   };
   const didEnd = async (row: Row): Promise<boolean> => {
-    const hasEnded = row.isCurrent ? await endThisDevice(row.id) : await didEndOther(row);
+    const ending = row.isCurrent ? await endThisDevice(row.id) : await endOther(row);
     // A failed end keeps the row, its confirm open for another try; the line under the list says why.
-    setHasEndFailed(!hasEnded);
-    return hasEnded;
+    setHasEndFailed(!ending.ok);
+    return ending.ok;
   };
   return (
     <View>
@@ -184,6 +183,8 @@ computers' agents, MCP apps) from one `useSessions`, so a revoke or a new comput
 same list; under it, adding a computer and connecting an AI app.
 */
 export const SessionsSection = () => {
+  /** The sheet open over the section, if any. */
+  type Opened = "addComputer" | "connectAi" | null;
   const t = useT();
   const { api } = usePace();
   const isWide = useIsWide();
