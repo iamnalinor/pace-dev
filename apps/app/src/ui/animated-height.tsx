@@ -15,7 +15,8 @@ const CLIP = { overflow: "hidden" } as const;
 /**
 A box whose height follows its content smoothly: when what is inside changes (a line becomes a
 form, a form folds back to a line), the box grows or shrinks to the new height instead of
-jumping. The first height is taken as it is. Reduced motion makes it instant.
+jumping. The first height is taken as it is (not a 0 measured while hidden). Reduced motion makes
+it instant.
 */
 export const AnimatedHeight = ({ children }: { readonly children: ReactNode }) => {
   const [isMeasured, setIsMeasured] = useState(false);
@@ -30,7 +31,10 @@ export const AnimatedHeight = ({ children }: { readonly children: ReactNode }) =
             height.set(
               withTiming(next, { duration: DURATION_MS, reduceMotion: ReduceMotion.System }),
             );
-          } else {
+          } else if (next > 0) {
+            // A height of 0 is a box laid out hidden (the first-sync cover draws the app with
+            // `display: none`): taken as the first, the box would grow from nothing once shown,
+            // its content clipped while it grows.
             height.set(next);
             setIsMeasured(true);
           }
