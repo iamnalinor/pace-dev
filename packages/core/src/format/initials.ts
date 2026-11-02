@@ -55,7 +55,12 @@ data quoted in a sentence (a task title in a toast) without the sentence ever be
 */
 export const clipText = (text: string, max: number): string => {
   const graphemes = splitGraphemes(text);
-  return graphemes.length <= max ? text : `${graphemes.slice(0, max - 1).join("")}…`;
+  if (graphemes.length <= Math.max(1, max)) {
+    return text;
+  }
+  // A limit below one still says that something was cut; no space is left before the ellipsis.
+  const kept = graphemes.slice(0, Math.max(0, max - 1)).join("");
+  return `${kept.trimEnd()}…`;
 };
 
 /** From U+1F000 on lie the emoji planes (the fallback's idea of a pictograph). */

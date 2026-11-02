@@ -91,7 +91,12 @@ const seed = async (token: string): Promise<void> => {
   expect(response.ok).toBe(true);
 };
 
-type Timing = { readonly interactionId: number; readonly duration: number };
+type Timing = {
+  readonly interactionId: number;
+  readonly duration: number;
+  /** When the input happened, on the page's clock. */
+  readonly startTime: number;
+};
 
 /** Every Event Timing entry of an interaction (a tap), buffered ones included, kept in the page. */
 const observeEvents = async (page: Page): Promise<JSHandle<Timing[]>> =>
@@ -102,7 +107,7 @@ const observeEvents = async (page: Page): Promise<JSHandle<Timing[]>> =>
         // `interactionId` (0 for an event that is no interaction) is not in TypeScript's DOM yet.
         const { interactionId = 0 } = entry as PerformanceEntry & { interactionId?: number };
         if (interactionId > 0) {
-          entries.push({ duration: entry.duration, interactionId });
+          entries.push({ duration: entry.duration, interactionId, startTime: entry.startTime });
         }
       }
     });
@@ -175,12 +180,15 @@ const tapTimer = (page: Page, timings: JSHandle<Timing[]>): TimeTap => {
   const seen = new Set<number>();
   return async (target) => {
     await target.waitFor();
+    // Only this tap's input counts: an untimed step before it (closing a sheet with Escape, a
+    // tap on its Close) is an interaction of its own and must not be folded into this one.
+    const tappedAt = await page.evaluate(() => performance.now());
     await target.tap();
     await rest(page);
     const fresh = await timings.evaluate((entries) => [...entries]);
     const byInteraction = new Map<number, number>();
-    for (const { duration, interactionId } of fresh) {
-      if (!seen.has(interactionId)) {
+    for (const { duration, interactionId, startTime } of fresh) {
+      if (!seen.has(interactionId) && startTime >= tappedAt) {
         byInteraction.set(interactionId, Math.max(byInteraction.get(interactionId) ?? 0, duration));
       }
     }

@@ -757,7 +757,9 @@ non-urgent subtrees), list rendering, the tab scenes kept mounted.
 - [ ] Every case in `e2e/latency.e2e.ts` passes the 100 ms budget; the over-budget markers are
       removed. Report before/after per case. Commit.
 - [ ] The cases QA round 18 found over the budget (R18-09), each with a regression ceiling in
-      `CEILINGS` owned by this task (largest p75 of five isolated runs × 1.25, rounded up to 10 ms):
+      `CEILINGS` owned by this task (largest p75 of six isolated runs on one build — the project
+      alone five times plus these six cases alone once, which set `weekStep` and `newTask` —
+      × 1.25, rounded up to 10 ms):
       Day previous / next day (`dayStep`, 160 ms), Week previous / next week (`weekStep`, 260),
       opening Log past activity on Day (`logPast`, 210), the Settings theme chip (`themeChip`,
       370), opening the New task form on Now (`newTask`, 270), opening a time-bar picker
@@ -947,6 +949,7 @@ ceilings in `e2e/latency.e2e.ts` owned by Task 5.6.
 | R18-23 blank page until the bundle; manifest dark only | Task 6.3 (light and dark splash in the manifest) + Task 6.4 (a boot mark, skeleton heights) | |
 | R18-24 bell reachable from Now only on a phone | Task 4.12 (Notifications in More) | |
 | R18-25 cosmetics: selected row 8 px wider than the composer; Progress card wider than Start/Due; card in a card around the assistant preview; sidebar avatar repeats the initial; Inbox explanation 11 px with mixed quotes | Task 4.1 + 4.3 (row, composer card), Task 4.5 (cards), Task 3.10 (no avatar in the header, spec 5.0.1), Task 4.7 + 4.13 (Inbox copy) | |
+| R18-02 follow-up (fix review): a Log out that cannot reach the server leaves its session alive on the server (up to its 90-day expiry) and says nothing | Task 4.11 | keep the ended token aside and send the logout once the network is back (then forget it); until it went, Settings' sign-out line says the server has not confirmed it, with Devices and sessions as the remedy from another device |
 | R17 L7 "Deadline type" shown with "No deadline" | Task 4.3 | still open in round 18 |
 | R17 L1 versions screen "Reload", R17 L10 time-zone card cannot be dismissed | Task 4.12 (versions screen), Task 4.3 (Now's cards) | not re-run in round 18 |
 

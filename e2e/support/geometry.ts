@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect } from "./fixtures.ts";
 
@@ -147,4 +147,30 @@ export const controlsUnder = async (
     },
     { controls: CONTROLS, exceptNames: [...except], selector: overlay },
   );
+};
+
+/** How long a control's box must hold still before it is clicked. */
+const SETTLED_MS = 120;
+
+/**
+Clicks a control once its box has held still: the assistant's preview unfolds and its card
+scrolls into place after it shows, and under load Playwright's two-frame "stable" check can pass
+mid-move, so the press lands on the old spot and the release on another (no click). Seen in the
+full run as an Approve that did nothing (fix round 1 of QA 18, bug-lessons class 5).
+*/
+export const clickWhenSettled = async (control: Locator): Promise<void> => {
+  const boxOf = async (): Promise<string> => JSON.stringify(await control.boundingBox());
+  let last = await boxOf();
+  await expect
+    .poll(
+      async () => {
+        const now = await boxOf();
+        const isStill = now === last && now !== "null";
+        last = now;
+        return isStill;
+      },
+      { intervals: [SETTLED_MS] },
+    )
+    .toBe(true);
+  await control.click();
 };

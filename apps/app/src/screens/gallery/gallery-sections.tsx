@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 
 import type { GalleryData } from "@pace/core/testing";
 
-import { useT } from "#app/app-state.tsx";
+import { usePace, useT } from "#app/app-state.tsx";
 import { ActivityRow } from "#app/features/day/day-screen.tsx";
 import { Item as NotificationItem } from "#app/features/notifications/notifications-screen.tsx";
 import { ProjectChips } from "#app/features/now/project-chips.tsx";
@@ -21,8 +21,8 @@ import { CountBadge } from "#app/ui/count-badge.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
 import { ToastCard, toastQuote } from "#app/ui/toast.tsx";
-import { openTasksLabel } from "@pace/client";
-import { formatCount, formatDuration, type MessageKey } from "@pace/core";
+import { approvalText, openTasksLabel } from "@pace/client";
+import { type Action, formatCount, formatDuration, type MessageKey } from "@pace/core";
 
 import {
   dayRows,
@@ -43,6 +43,9 @@ const HOUR_PX = 24;
 const PHONE_COLUMN_PX = 72;
 
 const NOTHING = (): void => undefined;
+
+/** The most actions one assistant answer proposes: the approval toast's worst case. */
+const APPROVED_ACTIONS = 10;
 
 /** One section of the gallery: a heading and the components it shows. */
 const Section = ({
@@ -170,21 +173,30 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
 
 /**
 The toast at its narrowest (docked in the sidebar's column) and at a phone's width: the refusal
-sentence of a rolled-back tap whole (QA round 18 R18-01), and a done task quoted short with Undo.
+sentence of a rolled-back tap whole (QA round 18 R18-01), a done task quoted short with Undo, and
+an approval of ten actions (two named, the rest counted).
 The overflow sweep reads every line of it.
 */
 const Toasts = ({ data }: { readonly data: GalleryData }) => {
   const t = useT();
+  const { state } = usePace();
   const [task] = data.tasks;
+  // An approval of up to ten actions, each starting one of the set's tasks by its title.
+  const approved: readonly Action[] = data.tasks.slice(0, APPROVED_ACTIONS).map((each) => ({
+    category: "study",
+    kind: "activity.start",
+    label: each.title,
+    summary: each.title,
+  }));
+  const world = { language: data.language, now: GALLERY_NOW, state: state.store.getState() };
+  const undo = { label: t("common.undo"), onPress: NOTHING };
   const toasts = [
     { message: t("actionError.persist_failed") },
     ...(task === undefined
       ? []
       : [
-          {
-            action: { label: t("common.undo"), onPress: NOTHING },
-            message: t("now.doneToast", { title: toastQuote(task.title) }),
-          },
+          { action: undo, message: t("now.doneToast", { title: toastQuote(task.title) }) },
+          { action: undo, message: approvalText(approved, world, toastQuote) },
         ]),
   ];
   return (

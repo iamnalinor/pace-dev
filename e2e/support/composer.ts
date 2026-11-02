@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect } from "./fixtures.ts";
+import { clickWhenSettled } from "./geometry.ts";
 
 /** The task form, wherever it shows (the line's card on a phone, Now's right pane on a computer). */
 export const taskForm = (page: Page) => page.getByRole("form", { name: "New task" });
@@ -45,7 +46,8 @@ export const approve = async (scope: Locator | Page): Promise<void> => {
   const button = scope.getByRole("button", { name: "Approve" });
   await expect(button).toBeVisible();
   await expect.poll(async () => await isUnclipped(button)).toBe(true);
-  await button.click();
+  // Unfolded, it may still be scrolling into place: the press waits for its box to hold still.
+  await clickWhenSettled(button);
 };
 
 /**

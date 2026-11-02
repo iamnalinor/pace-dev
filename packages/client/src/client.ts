@@ -95,6 +95,7 @@ export {
   type SyncSummary,
 } from "./sync-client.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
+export { approvalText } from "./view-models/approval.ts";
 export { type EventDetails, eventDetails } from "./view-models/calendar-event.ts";
 export {
   type CalendarDay,
@@ -126,7 +127,7 @@ export {
   type DayTotal,
   trackedDates,
 } from "./view-models/day.ts";
-export { type DecisionView, decisionViews, doneLines } from "./view-models/decisions.ts";
+export { type DecisionView, decisionViews } from "./view-models/decisions.ts";
 export {
   agentCommand,
   agentLogsCommand,

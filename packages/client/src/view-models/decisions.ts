@@ -1,5 +1,4 @@
 import {
-  type Action,
   ACTION_KINDS,
   type ActionKind,
   type Decision,
@@ -7,18 +6,15 @@ import {
   type DecisionInputs,
   type DecisionResolution,
   type DecisionStep,
-  decisionStepOf,
   type Language,
   type MessageKey,
-  type ParseField,
   readDecisionInputs,
-  shownLabel,
   t,
-  taskById,
 } from "@pace/core";
 
 import { existing, type Lookup, lookupOf, seenAfter, type World } from "./decision-lookup.ts";
 import { providerLabel } from "./decision-provider.ts";
+import { fieldList, stepText, type Tense } from "./decision-step-text.ts";
 import { systemRow } from "./decision-system.ts";
 import { conversationOf, quoted } from "./decision-text.ts";
 import { isFolded } from "./decision-threads.ts";
@@ -78,90 +74,6 @@ const stepsOf = (decision: Decision, inputs: DecisionInputs): Steps => {
 
 const known = (steps: Steps): readonly DecisionStep[] =>
   steps.filter((step): step is DecisionStep => step !== null);
-
-/** An activity's name as the reader sees it (automatic sleep's stored label worded, class 42). */
-const activityName = (
-  activityId: null | string,
-  { language, state }: Pick<Lookup, "language" | "state">,
-): string | undefined => {
-  const activity = activityId === null ? undefined : state.time.activities[activityId];
-  return activity === undefined ? undefined : shownLabel(activity, language);
-};
-
-/** What a step is about as it was named when read (its summary quotes it), else as it is now. */
-const subjectOf = (step: DecisionStep, lookup: Lookup, summary = ""): string =>
-  step.subject ??
-  quoted(summary) ??
-  (step.taskId === null ? undefined : taskById(lookup.state.tasks, step.taskId)?.title) ??
-  activityName(step.activityId, lookup) ??
-  "…";
-
-const fieldList = (fields: readonly ParseField[], language: Language): string =>
-  [...new Set(fields)].map((field) => t(language, `parseField.${field}`)).join(", ");
-
-const isOnly = (step: DecisionStep, field: ParseField): boolean =>
-  step.fields.length > 0 && step.fields.every((changed) => changed === field);
-
-/** Which sentence says a step: a rename and a moved deadline have their own. */
-const sentenceOf = (step: DecisionStep) => {
-  if (step.renamedTo !== null && step.kind === "task.update" && isOnly(step, "title")) {
-    return "task.rename";
-  }
-  if (step.renamedTo !== null && step.kind === "activity.update" && isOnly(step, "label")) {
-    return "activity.rename";
-  }
-  return step.kind === "task.update" && isOnly(step, "dueDate") ? "task.due" : step.kind;
-};
-
-/**
-A step in words; `null` when the step lacks what its sentence names (an older row's edit
-without its fields, a close without its outcome), so the stored summary is shown instead.
-*/
-/** Done (applied), offered (answered or expired), pending (a card still open: QA round 17 L16). */
-type Tense = "done" | "offered" | "pending";
-
-const stepText = (
-  step: DecisionStep,
-  {
-    lookup,
-    summary,
-    tense,
-  }: {
-    readonly lookup: Lookup;
-    readonly summary: string | undefined;
-    readonly tense: Tense;
-  },
-): null | string => {
-  const { language } = lookup;
-  const isEdit = step.kind === "task.update" || step.kind === "activity.update";
-  if (
-    (isEdit && step.fields.length === 0) ||
-    (step.kind === "task.close" && step.closeOutcome === null)
-  ) {
-    return null;
-  }
-  const key: MessageKey = `decisions.${tense}.${sentenceOf(step)}`;
-  return t(language, key, {
-    fields: fieldList(step.fields, language),
-    outcome: step.closeOutcome === null ? "" : t(language, `outcome.${step.closeOutcome}`),
-    subject: subjectOf(step, lookup, summary),
-    to: step.renamedTo ?? "",
-  });
-};
-
-/**
-What an approval did, one line per action in the log's past tense ("Created task “X”"), for the
-toast after Approve that said only "Done" (QA round 11 L3); a step this client cannot word keeps
-its summary.
-*/
-export const doneLines = (actions: readonly Action[], world: World): readonly string[] => {
-  const lookup = lookupOf(world);
-  return actions.map(
-    (action) =>
-      stepText(decisionStepOf(action), { lookup, summary: action.summary, tense: "done" }) ??
-      action.summary,
-  );
-};
 
 /** Each step in words beside its own summary; a step this client cannot word keeps the summary. */
 const linesOf = (

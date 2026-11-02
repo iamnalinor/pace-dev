@@ -207,13 +207,22 @@ describe("clipText", () => {
     expect(splitGraphemes(clipText("Домашка по алгебре номер шесть", 10))).toHaveLength(10);
   });
 
+  it("drops the space before the ellipsis, and keeps at least the ellipsis for a limit below one", () => {
+    expect(clipText("Buy milk tomorrow", 5)).toBe("Buy…");
+    expect(clipText("Buy milk", 1)).toBe("…");
+    expect(clipText("Buy milk", 0)).toBe("…");
+    expect(clipText("", 0)).toBe("");
+  });
+
   it("never cuts an emoji or a letter from its marks", () => {
     const family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
     expect(clipText(`${FOX}${family}${FOX}`, 2)).toBe(`${FOX}…`);
     fc.assert(
       fc.property(fc.string({ unit: "grapheme" }), fc.integer({ max: 40, min: 1 }), (text, max) => {
         const clipped = clipText(text, max);
-        return isWellFormed(clipped) && splitGraphemes(clipped).length <= max;
+        return (
+          isWellFormed(clipped) && splitGraphemes(clipped).length <= max && !/\s…$/u.test(clipped)
+        );
       }),
     );
   });
