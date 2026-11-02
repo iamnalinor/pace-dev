@@ -15,12 +15,12 @@ export const ReviewCard = ({ row }: { readonly row: ReviewRow }) => {
   const { actions } = usePace();
   const run = useRunAction();
   return (
-    <View className="gap-2 rounded-xl border border-line bg-surface p-3.5">
-      <Text className="font-sans text-[14px] font-medium text-fg">
+    <View className="gap-2 rounded-xl border border-separator bg-cell p-4">
+      <Text className="font-sans text-subhead text-label-primary">
         {t(`review.kind.${row.kind}`)}
       </Text>
-      <Text className="font-sans text-[14px] text-fg2">{row.title}</Text>
-      <Text className="font-sans text-[12px] text-muted">
+      <Text className="font-sans text-subhead font-normal text-label-secondary">{row.title}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
         {t("review.since", {
           when: zonedText({ at: row.since, mode: "datetime", tz: viewer.deviceTz }, viewer),
         })}

@@ -16,8 +16,8 @@ import { agentCommand, agentLogsCommand, type ComputerOs, LINUX_PACKAGES } from 
 import { CodeText } from "./code-text.tsx";
 import { OsPicker } from "./os-picker.tsx";
 
-const STEP = "font-sans text-[14px] leading-[20px] text-fg";
-const NOTE = "font-sans text-[12px] leading-[17px] text-muted";
+const STEP = "font-sans text-subhead font-normal text-label-primary";
+const NOTE = "font-sans text-caption font-normal text-label-tertiary";
 
 const tokenShareLabel = (isShared: boolean) => {
   if (SHARE_LABEL_KEY !== "devices.copy") {
@@ -36,9 +36,9 @@ const TokenOnce = () => {
   return (
     <View className="flex-row gap-2">
       <View className="pt-0.5">
-        <TriangleAlert aria-hidden color={palette.warn} size={16} strokeWidth={2} />
+        <TriangleAlert aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
       </View>
-      <Text className="min-w-0 flex-1 font-sans text-[13px] leading-[18px] text-fg2">
+      <Text className="min-w-0 flex-1 font-sans text-footnote text-label-secondary">
         {t("devices.tokenOnce")}
       </Text>
     </View>

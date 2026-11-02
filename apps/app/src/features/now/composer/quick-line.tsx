@@ -85,7 +85,7 @@ const LineButton = ({
   hotkey,
   icon: Icon,
   isBusy = false,
-  isLime = false,
+  isAccent = false,
   label,
   onPress,
 }: {
@@ -93,13 +93,13 @@ const LineButton = ({
   readonly hotkey: Hotkey;
   readonly icon: LucideIcon;
   readonly isBusy?: boolean;
-  /** The important action, ready: in the lime accent. */
-  readonly isLime?: boolean;
+  /** The important action, ready: on the accent. */
+  readonly isAccent?: boolean;
   readonly label: string;
   readonly onPress: () => void;
 }) => {
   const { palette } = useTheme();
-  const iconColor = isLime ? palette.accentFg : palette.fg2;
+  const iconColor = isAccent ? palette["accent.on"] : palette["label.secondary"];
   return (
     <Tooltip label={labelWithHotkey(label, hotkey, KEYBOARD)} showsOnTap={false}>
       <Pressable
@@ -107,22 +107,22 @@ const LineButton = ({
         accessibilityRole="button"
         aria-busy={isBusy}
         aria-disabled={disabled}
-        // A 44px target around the 36px circle (hitSlop does nothing on the web, QA round 18 L6);
+        // A 44px target around the 40px circle (hitSlop does nothing on the web, QA round 18 L6);
         // side by side they touch, and above and below they reach into the card's padding.
-        className="-my-1 h-11 w-11 items-center justify-center active:opacity-70"
+        className="-my-0.5 h-hit-web w-hit-web items-center justify-center active:opacity-70"
         disabled={disabled || isBusy}
         onPress={onPress}
       >
         <View
-          className={cx("h-9 w-9 items-center justify-center rounded-full", isLime && "bg-accent")}
+          className={cx("h-10 w-10 items-center justify-center rounded-pill", isAccent && "bg-accent")}
         >
           {isBusy ? (
             <ActivityIndicator color={iconColor} size="small" />
           ) : (
             <Icon
-              color={disabled ? palette.faint : iconColor}
+              color={disabled ? palette["label.quaternary"] : iconColor}
               size={18}
-              strokeWidth={isLime ? 2.25 : 1.75}
+              strokeWidth={isAccent ? 2.25 : 1.75}
             />
           )}
         </View>
@@ -184,8 +184,8 @@ const LineInput = ({
       accessibilityLabel={t("composer.label")}
       autoFocus={isFocused}
       className={cx(
-        "flex-1 px-1.5 py-2.5 font-sans text-[15px] leading-6",
-        isLocked ? "text-muted" : "text-fg",
+        "flex-1 px-1 py-3 font-sans text-callout",
+        isLocked ? "text-label-secondary" : "text-label-primary",
       )}
       editable={!isLocked}
       multiline
@@ -214,7 +214,7 @@ const LineInput = ({
           }),
         }))}
       placeholder={t("composer.placeholder")}
-      placeholderTextColor={palette.muted}
+      placeholderTextColor={palette["label.tertiary"]}
       ref={inputRef}
       // An empty line is one line high whatever it measured before (a wrapped placeholder, a
       // long message just added): a textarea's measured height never shrinks by itself.
@@ -227,7 +227,7 @@ const LineInput = ({
 
 /**
 The line: + (the empty form, New task), what to add, then To Inbox and Send at its right edge.
-Send is lime once there is something to send.
+Send is on the accent once there is something to send.
 */
 export const QuickLine = ({
   flow,
@@ -280,8 +280,8 @@ export const QuickLine = ({
           disabled={isIdle}
           hotkey={HOTKEYS.enter}
           icon={ArrowUp}
+          isAccent={!isIdle}
           isBusy={isReading}
-          isLime={!isIdle}
           label={t("composer.send")}
           onPress={flow.enter}
         />

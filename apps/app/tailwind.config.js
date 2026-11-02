@@ -1,33 +1,52 @@
-// The v1 block: the app is switched to the v2 tokens in Task 2.2.
-const tokens = require("@pace/core/design/tokens.json").v1;
+const plugin = require("tailwindcss/plugin");
 
-// Semantic colors come from CSS variables so the same class names work in both themes;
-// the variables are defined per theme in app/_layout.tsx via NativeWind's `vars()`.
-const semantic = Object.fromEntries(
-  Object.keys(tokens.dark).map((name) => [name, `var(--pace-${name})`]),
-);
-const project = Object.fromEntries(
-  Object.entries(tokens.project).map(([name, value]) => [`project-${name}`, value]),
-);
-const radius = Object.fromEntries(
-  Object.entries(tokens.radius).map(([name, value]) => [name, `${value}px`]),
-);
+// Generated from the design tokens by scripts/design/generate-design.ts (`bun design:generate`).
+const generated = require("./src/ui/generated/tailwind-theme.json");
 
+// Each type role switches to its desktop column at `lg` (≥ 1024): one class, both sizes.
+const desktopType = plugin(({ addUtilities }) => {
+  addUtilities({
+    [`@media (min-width: ${generated.screens.lg})`]: Object.fromEntries(
+      Object.entries(generated.typeDesktop).map(([name, style]) => [`.text-${name}`, style]),
+    ),
+  });
+});
+
+const size = generated.size;
+
+/**
+The theme is replaced, not extended, by the token scales (spec §3): a class off the scale does not
+exist. Colours are CSS variables, so the same class works in both themes; the variables are set per
+theme on the root view by NativeWind's `vars()` (src/platform/theme.ts).
+*/
 /** @type {import("tailwindcss").Config} */
 module.exports = {
   content: ["./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   presets: [require("nativewind/preset")],
   darkMode: "class",
   theme: {
+    screens: generated.screens,
+    colors: generated.colors,
+    spacing: generated.spacing,
+    height: size,
+    width: size,
+    minHeight: size,
+    minWidth: size,
+    maxHeight: size,
+    maxWidth: size,
+    size,
+    fontSize: generated.fontSize,
+    fontWeight: generated.fontWeight,
+    lineHeight: {},
+    letterSpacing: {},
+    borderRadius: generated.borderRadius,
     extend: {
-      colors: { ...semantic, ...project },
-      borderRadius: radius,
-      // Tailwind only generates the opacity modifiers on its scale; 22 is TAG_TINT, the wash
-      // behind a colored tag (without it `bg-project-*/22` compiled to nothing).
-      opacity: { 22: "0.22" },
-      // The phone uses the first family (embedded by expo-font); the web falls back glyph by glyph.
-      fontFamily: { sans: [tokens.fonts.sans, "system-ui", "sans-serif"] },
+      borderWidth: generated.borderWidth,
+      flex: generated.flex,
+      // In `extend`, after NativeWind's preset (which sets a platform font): the phone uses the
+      // first family (embedded by expo-font); the web falls back glyph by glyph.
+      fontFamily: generated.fontFamily,
     },
   },
-  plugins: [],
+  plugins: [desktopType],
 };

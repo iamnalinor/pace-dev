@@ -48,7 +48,10 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     : resolved;
 };
 
+// rem compiles to 16 px on Android as on the web (NativeWind's default is 14; F-AND-01). The theme
+// is in px from the tokens, so this only covers a rem value that slips past it.
 module.exports = withNativeWind(config, {
   configPath: path.join(__dirname, "tailwind.config.js"),
+  inlineRem: 16,
   input: path.join(__dirname, "global.css"),
 });

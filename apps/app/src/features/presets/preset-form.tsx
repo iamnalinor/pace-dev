@@ -44,7 +44,7 @@ const Identity = ({
     .toSorted(byPresetOrder);
   const { extends: parent } = draft;
   return (
-    <View className="mx-4 gap-3 rounded-xl border border-line bg-surface p-3.5">
+    <View className="mx-4 gap-3 rounded-xl border border-separator bg-cell p-4">
       <TextField
         autoFocus={isNew && !IS_TOUCH_BROWSER}
         label={t("presets.name")}
@@ -54,8 +54,10 @@ const Identity = ({
         value={draft.name}
       />
       {parent === null ? null : (
-        <View className="gap-1.5">
-          <Text className="font-sans text-[12px] text-muted">{t("presets.extends")}</Text>
+        <View className="gap-2">
+          <Text className="font-sans text-caption font-normal text-label-tertiary">
+            {t("presets.extends")}
+          </Text>
           <ChoiceChips
             colorOf={(id) => {
               const resolved = resolvePreset(presets, id);
@@ -110,12 +112,12 @@ const DeleteButton = ({
   return (
     <View
       aria-label={question}
-      className="mx-4 mt-4 gap-2 rounded-xl border border-line bg-surface p-3.5"
+      className="mx-4 mt-4 gap-2 rounded-xl border border-separator bg-cell p-4"
       role="group"
     >
       <Text
         accessibilityLiveRegion="polite"
-        className="font-sans text-[14px] text-fg"
+        className="font-sans text-subhead font-normal text-label-primary"
         role="status"
       >
         {question}
@@ -202,7 +204,10 @@ export const PresetForm = ({
         }}
       />
       {problem === null ? null : (
-        <Text accessibilityRole="alert" className="mx-5 mt-3 font-sans text-[14px] text-warn">
+        <Text
+          accessibilityRole="alert"
+          className="mx-5 mt-3 font-sans text-subhead font-normal text-danger"
+        >
           {problem}
         </Text>
       )}

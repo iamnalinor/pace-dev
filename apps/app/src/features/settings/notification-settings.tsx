@@ -31,12 +31,14 @@ export const NotificationChannels = () => {
   const settings = useSettings();
   return (
     <View className="gap-1" role="table">
-      <Text className="font-sans text-[13px] text-muted">{t("settings.notifications.hint")}</Text>
+      <Text className="font-sans text-footnote text-label-secondary">
+        {t("settings.notifications.hint")}
+      </Text>
       <View className="flex-row items-center gap-2 pt-1" role="row">
         <View className="flex-1" />
         {NOTIFICATION_CHANNELS.map((channel) => (
           <Text
-            className="w-14 text-center font-sans text-[11px] text-muted"
+            className="w-row text-center font-sans text-caption2 font-normal text-label-tertiary"
             key={channel}
             role="columnheader"
           >
@@ -45,12 +47,15 @@ export const NotificationChannels = () => {
         ))}
       </View>
       {NOTIFICATION_KINDS.map((kind) => (
-        <View className="min-h-11 flex-row items-center gap-2" key={kind} role="row">
-          <Text className="min-w-0 flex-1 font-sans text-[14px] text-fg" role="rowheader">
+        <View className="min-h-hit-web flex-row items-center gap-2" key={kind} role="row">
+          <Text
+            className="min-w-0 flex-1 font-sans text-subhead font-normal text-label-primary"
+            role="rowheader"
+          >
             {t(`notify.kind.${kind}`)}
           </Text>
           {NOTIFICATION_CHANNELS.map((channel) => (
-            <View className="w-14 items-center" key={channel} role="cell">
+            <View className="w-row items-center" key={channel} role="cell">
               <PaceSwitch
                 isOn={isChannelOn(settings, kind, channel)}
                 label={t("notify.switch", {
@@ -131,7 +136,9 @@ export const PushStatus = () => {
   const state = useStore(pushStore);
   if (!IS_PHONE) {
     // A browser has no method to pick: say what its Web column means (QA round 15 L12).
-    return <Text className="font-sans text-[13px] text-muted">{t("settings.push.web")}</Text>;
+    return (
+      <Text className="font-sans text-footnote text-label-secondary">{t("settings.push.web")}</Text>
+    );
   }
   const values: readonly PushOption[] = ["auto", ...offeredMethods(state), "none"];
   const options = values.map((value) => ({ label: t(`settings.push.option.${value}`), value }));
@@ -147,15 +154,19 @@ export const PushStatus = () => {
   };
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[13px] text-muted">{t("settings.push.hint")}</Text>
+      <Text className="font-sans text-footnote text-label-secondary">
+        {t("settings.push.hint")}
+      </Text>
       <Segmented onChange={pick} options={options} value={state.choice ?? "auto"} />
       {state.isFcmOtherProject ? (
-        <Text className="font-sans text-[13px] text-muted">{t("settings.push.otherProject")}</Text>
+        <Text className="font-sans text-footnote text-label-secondary">
+          {t("settings.push.otherProject")}
+        </Text>
       ) : null}
       {state.method === null
         ? null
         : pushLine({ ...state, method: state.method }, t).map((line) => (
-            <Text className="font-sans text-[13px] text-muted" key={line}>
+            <Text className="font-sans text-footnote text-label-secondary" key={line}>
               {line}
             </Text>
           ))}
@@ -173,7 +184,9 @@ export const DigestWindows = () => {
   };
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[13px] text-muted">{t("settings.digestWindows.hint")}</Text>
+      <Text className="font-sans text-footnote text-label-secondary">
+        {t("settings.digestWindows.hint")}
+      </Text>
       {digestWindows.map((time, index) => (
         // The row is its position: keyed by value, editing a time would remount the input.
         // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
@@ -214,8 +227,10 @@ export const QuietHours = () => {
   const { actions } = usePace();
   const { quietHours } = useSettings();
   const edge = (side: "from" | "to") => (
-    <View className="flex-1 gap-1.5">
-      <Text className="font-sans text-[12px] text-muted">{t(`settings.quietHours.${side}`)}</Text>
+    <View className="flex-1 gap-2">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t(`settings.quietHours.${side}`)}
+      </Text>
       <TimeInput
         label={t(`settings.quietHours.${side}`)}
         onTime={(time) => {
@@ -227,7 +242,9 @@ export const QuietHours = () => {
   );
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[13px] text-muted">{t("settings.quietHours.hint")}</Text>
+      <Text className="font-sans text-footnote text-label-secondary">
+        {t("settings.quietHours.hint")}
+      </Text>
       <View className="flex-row gap-3">
         {edge("from")}
         {edge("to")}

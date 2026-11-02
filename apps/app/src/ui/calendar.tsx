@@ -41,9 +41,9 @@ const dayLabel = (date: string, language: Language): string =>
 /** The picked day on the quiet accent, the month's days in ink, the neighbours' faint. */
 const ink = (cell: CalendarDay, isSelected: boolean): string => {
   if (isSelected) {
-    return "font-semibold text-accentQuietFg";
+    return "font-semibold text-accent-text";
   }
-  return cell.isInMonth ? "text-fg" : "text-faint";
+  return cell.isInMonth ? "text-label-primary" : "text-label-tertiary";
 };
 
 const NONE: ReadonlySet<string> = new Set();
@@ -82,8 +82,8 @@ const DayCell = ({
     aria-selected={isSelected}
     className={cx(
       "h-10 flex-1 items-center justify-center rounded-lg active:opacity-70",
-      isSelected && "bg-accentQuiet",
-      !isSelected && isToday && "border-2 border-fg",
+      isSelected && "bg-accent-quiet",
+      !isSelected && isToday && "border-2 border-label-primary",
       isDisabled && "opacity-30",
     )}
     disabled={isDisabled}
@@ -97,14 +97,14 @@ const DayCell = ({
     ref={ref}
     tabIndex={isStop ? 0 : -1}
   >
-    <Text className={cx("font-sans text-[13px] tabular-nums", ink(cell, isSelected))}>
+    <Text className={cx("font-sans text-footnote tabular-nums", ink(cell, isSelected))}>
       {String(cell.day)}
     </Text>
     {isMarked ? (
       <View
         className={cx(
-          "absolute bottom-1 h-1 w-1 rounded-full",
-          isSelected ? "bg-accentQuietFg" : "bg-accentQuietText",
+          "absolute bottom-1 h-1 w-1 rounded-pill",
+          isSelected ? "bg-accent-text" : "bg-accent",
         )}
       />
     ) : null}
@@ -136,7 +136,7 @@ const MonthHeader = ({
     />
     <Text
       accessibilityLiveRegion="polite"
-      className="flex-1 text-center font-sans text-[15px] font-medium text-fg"
+      className="flex-1 text-center font-sans text-callout font-medium text-label-primary"
     >
       {monthTitle(month, language)}
     </Text>
@@ -159,7 +159,7 @@ const WeekdayRow = ({ language }: { readonly language: Language }) => (
       new Intl.DateTimeFormat(language, { timeZone: "UTC", weekday: "narrow" }).format(date),
     ).map((weekday, index) => (
       <Text
-        className="flex-1 text-center font-sans text-[11px] tabular-nums text-muted"
+        className="flex-1 text-center font-sans text-caption2 font-normal tabular-nums text-label-tertiary"
         // Narrow names repeat (T, S): the column is the key.
         // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
         key={index}

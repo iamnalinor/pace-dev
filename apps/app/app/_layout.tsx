@@ -54,7 +54,7 @@ const Navigator = () => {
   return (
     <UpdateBanner>
       <SyncFrame isBare={isBarePath(path)}>
-        <View className="flex-1 flex-row bg-bg">
+        <View className="flex-1 flex-row bg-app">
           <CrashContext />
           <DocumentLanguage />
           <DocumentHead />
@@ -75,7 +75,7 @@ const Navigator = () => {
                 )}
                 screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
                 screenOptions={{
-                  contentStyle: { backgroundColor: palette.bg },
+                  contentStyle: { backgroundColor: palette["bg.app"] },
                   headerShown: false,
                 }}
               >

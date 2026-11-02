@@ -1,9 +1,8 @@
 import { type ReactNode, useRef } from "react";
 import { Text, View } from "react-native";
 
-import type { ProjectColorName } from "@pace/core";
-
 import { Chip } from "./chip.tsx";
+import type { TagColor } from "./color.tsx";
 
 export type RadioChoice<T extends string> = {
   readonly value: T;
@@ -13,7 +12,7 @@ export type RadioChoice<T extends string> = {
   readonly label?: string;
   readonly leading?: ReactNode;
   /** The chip's colour mark (a preset's, a project's, an importance's). */
-  readonly color?: null | ProjectColorName;
+  readonly color?: null | TagColor;
 };
 
 /** The keys that move the choice inside the group, and which way. */
@@ -74,11 +73,11 @@ export const RadioChips = <T extends string>({
   // react-native-web passes the key events to the DOM; React Native's types do not list them.
   const keys = { onKeyDown };
   return (
-    <View className="gap-1.5">
-      <Text className="font-sans text-[12px] text-muted">{label}</Text>
+    <View className="gap-2">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{label}</Text>
       <View
         accessibilityLabel={label}
-        className="flex-row flex-wrap gap-1.5"
+        className="flex-row flex-wrap gap-2"
         role="radiogroup"
         {...(keys as object)}
       >

@@ -52,13 +52,13 @@ const Identity = ({ row }: { readonly row: Row }) => {
     <>
       <View
         aria-hidden
-        className="h-8 w-8 items-center justify-center rounded-full bg-raised"
+        className="h-8 w-8 items-center justify-center rounded-pill bg-fill-3"
         importantForAccessibility="no-hide-descendants"
       >
-        <Icon color={palette.fg2} size={18} strokeWidth={1.75} />
+        <Icon color={palette["label.secondary"]} size={18} strokeWidth={1.75} />
       </View>
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-[15px] font-medium text-fg">{row.name}</Text>
+        <Text className="font-sans text-callout font-medium text-label-primary">{row.name}</Text>
         <View
           accessibilityLabel={row.meta.join(", ")}
           accessible
@@ -68,7 +68,7 @@ const Identity = ({ row }: { readonly row: Row }) => {
           {/* Parts apart by a gap, not a dot: a wrapped line never ends or starts on a dangling
               separator (QA round 17 L2); each part keeps together where it can. */}
           {row.meta.map((part) => (
-            <Text className="max-w-full font-sans text-[13px] text-muted" key={part}>
+            <Text className="max-w-full font-sans text-footnote text-label-secondary" key={part}>
               {part}
             </Text>
           ))}
@@ -105,31 +105,35 @@ const Confirm = ({
   const width = isWide ? "auto" : "fill";
   return (
     // Named by its question, so landing on Cancel inside it reads the question too.
-    <View aria-label={question} className="gap-2 pl-11" role="group">
-      <Text
-        accessibilityLiveRegion="polite"
-        className="font-sans text-[14px] text-fg"
-        role="status"
-      >
-        {question}
-      </Text>
-      <View className={cx("flex-row gap-2", isWide && "justify-end")}>
-        <View className={cx(!isWide && "flex-1")}>
-          {/* Escape cancels, as it closes the sheets (QA round 15 L1); one confirm is open at a time. */}
-          <Button
-            hotkey={HOTKEYS.escape}
-            onPress={onCancel}
-            ref={cancelRef}
-            variant="secondary"
-            width={width}
-          >
-            {t("common.cancel")}
-          </Button>
-        </View>
-        <View className={cx(!isWide && "flex-[2]")}>
-          <Button busy={isEnding} onPress={onEnd} ref={actionRef} variant="danger" width={width}>
-            {actionLabel}
-          </Button>
+    // It starts under the name: a spacer as wide as the icon, and the row's gap.
+    <View aria-label={question} className="flex-row gap-3" role="group">
+      <View className="w-8" />
+      <View className="min-w-0 flex-1 gap-2">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="font-sans text-subhead font-normal text-label-primary"
+          role="status"
+        >
+          {question}
+        </Text>
+        <View className={cx("flex-row gap-2", isWide && "justify-end")}>
+          <View className={cx(!isWide && "flex-1")}>
+            {/* Escape cancels, as it closes the sheets (QA round 15 L1); one confirm is open at a time. */}
+            <Button
+              hotkey={HOTKEYS.escape}
+              onPress={onCancel}
+              ref={cancelRef}
+              variant="secondary"
+              width={width}
+            >
+              {t("common.cancel")}
+            </Button>
+          </View>
+          <View className={cx(!isWide && "flex-2")}>
+            <Button busy={isEnding} onPress={onEnd} ref={actionRef} variant="danger" width={width}>
+              {actionLabel}
+            </Button>
+          </View>
         </View>
       </View>
     </View>

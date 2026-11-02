@@ -12,8 +12,8 @@ export const Totals = ({ day }: { readonly day: DayModel }) => {
   const t = useT();
   const { language } = useViewer();
   return (
-    <View className="flex-row flex-wrap items-center gap-1.5 px-5 pb-3">
-      <Text className="mr-1 font-sans text-[14px] text-fg">
+    <View className="flex-row flex-wrap items-center gap-2 px-5 pb-3">
+      <Text className="mr-1 font-sans text-subhead font-normal text-label-primary">
         {t("day.tracked", { duration: formatDuration(day.trackedMinutes, language) })}
       </Text>
       {day.totals.map((total) => (

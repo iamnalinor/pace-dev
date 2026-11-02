@@ -27,7 +27,7 @@ export const BackHeader = ({
   return (
     <View
       className={cx(
-        "flex-row items-center gap-1 pb-2.5 pr-4 pt-3.5",
+        "flex-row items-center gap-1 pb-3 pr-4 pt-4",
         onBack === undefined ? "pl-5" : "pl-2",
       )}
     >
@@ -36,14 +36,14 @@ export const BackHeader = ({
           <Pressable
             accessibilityLabel={backLabel}
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center active:opacity-70"
+            className="h-hit-web w-hit-web items-center justify-center active:opacity-70"
             onPress={onBack}
           >
-            <BackIcon color={palette.fg2} size={20} strokeWidth={1.75} />
+            <BackIcon color={palette["label.secondary"]} size={20} strokeWidth={1.75} />
           </Pressable>
         </Tooltip>
       )}
-      <View className="flex-1 flex-row items-center gap-1.5">{children}</View>
+      <View className="flex-1 flex-row items-center gap-2">{children}</View>
       {right}
     </View>
   );
@@ -51,7 +51,7 @@ export const BackHeader = ({
 
 /** The 22px title of a pushed screen. */
 export const HeaderTitle = ({ children }: { readonly children: string }) => (
-  <Text accessibilityRole="header" className="font-sans text-[22px] font-semibold text-fg">
+  <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
     {children}
   </Text>
 );

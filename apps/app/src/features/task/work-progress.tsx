@@ -58,10 +58,12 @@ export const WorkProgress = ({
     return null;
   }
   return (
-    <View className="mx-4 gap-1 rounded-xl border border-line bg-surface px-3.5 pb-1.5 pt-3.5">
+    <View className="mx-4 gap-1 rounded-xl border border-separator bg-cell px-4 pb-2 pt-4">
       <View className="flex-row justify-between">
-        <Text className="font-sans text-[14px] text-fg">{t("task.progress")}</Text>
-        <Text className="font-sans text-[13px] tabular-nums text-fg">
+        <Text className="font-sans text-subhead font-normal text-label-primary">
+          {t("task.progress")}
+        </Text>
+        <Text className="font-sans text-footnote tabular-nums text-label-primary">
           {t("task.progressOf", { value: (live.step * 100) / MAX })}
         </Text>
       </View>

@@ -38,9 +38,9 @@ export const CardView = ({ card }: { readonly card: InboxCard }) => {
   const run = useRunAction();
   const guess = useGuess(card);
   return (
-    <View className="gap-2.5 rounded-xl border border-line bg-surface p-3.5" role="listitem">
-      <Text className="font-sans text-[15px] text-fg">{card.text}</Text>
-      <Text className="font-sans text-[12px] text-muted">{guess}</Text>
+    <View className="gap-3 rounded-xl border border-separator bg-cell p-4" role="listitem">
+      <Text className="font-sans text-callout text-label-primary">{card.text}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{guess}</Text>
       <View className="flex-row gap-2">
         <View className="flex-1">
           <Button

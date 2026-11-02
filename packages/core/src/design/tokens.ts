@@ -19,6 +19,12 @@ import tokensJson from "./tokens.json";
 
 export const THEMES: readonly ThemeName[] = ["dark", "light"];
 
+/**
+How far a loading placeholder's rows fade as they breathe (their opacity's low point): their
+`label.quaternary` bars still stand out from the page there (QA round 19 L2: dark rows at 1.1:1).
+*/
+export const PLACEHOLDER_DIM = 0.7;
+
 export const HUE_NAMES: readonly HueName[] = [
   "red",
   "orange",

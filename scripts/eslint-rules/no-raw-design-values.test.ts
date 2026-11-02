@@ -153,6 +153,11 @@ tester.run("no-raw-design-values", noRawDesignValues, {
   ].map((c) => ({ ...c, filename: APP_FILE })),
   valid: [
     'const a = <View className="p-5 text-body rounded-md" />;',
+    // A compared value is not a class: only the branches and concatenations are.
+    {
+      code: 'const a = <View className={cn(variant === "raised" && "p-5", x !== "surface" ? "text-body" : "")} />;',
+      options: [ALLOWED],
+    },
     "const a = <View style={{ borderRadius: radius.md }} />;",
     "const a = withTiming(1, motion.enter.md);",
     "const a = withTiming(1, { duration: motion.duration.fast });",

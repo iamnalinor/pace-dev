@@ -10,11 +10,11 @@ export const NotFoundScreen = () => {
   const router = useRouter();
   const path = usePathname();
   return (
-    <View className="flex-1 items-center justify-center gap-3 bg-bg px-6">
-      <Text accessibilityRole="header" className="font-sans text-[24px] font-semibold text-fg">
+    <View className="flex-1 items-center justify-center gap-3 bg-app px-6">
+      <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
         {t("errors.pageNotFound")}
       </Text>
-      <Text className="text-center font-sans text-[14px] text-muted">
+      <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
         {t("errors.pageNotFoundBody", { path })}
       </Text>
       <Button

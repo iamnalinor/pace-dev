@@ -40,10 +40,10 @@ const Choice = <T extends string>({
   return (
     <View
       accessibilityLabel={t(label)}
-      className="flex-row flex-wrap items-center gap-1.5"
+      className="flex-row flex-wrap items-center gap-2"
       role="radiogroup"
     >
-      <Text className="font-sans text-sm text-muted">{t(label)}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-secondary">{t(label)}</Text>
       {choices.map((choice) => (
         <Chip
           key={choice}
@@ -81,7 +81,7 @@ const GalleryBody = ({
       {/* `dataSet` is react-native-web's way to a `data-*` attribute (the e2e reads `data-set`); React Native's types do not know it. */}
       <View testID="worst-case-gallery" {...({ dataSet: { set } } as object)}>
         <View className="gap-2 px-5 pt-6">
-          <Text accessibilityRole="header" className="font-sans text-xl font-semibold text-fg">
+          <Text accessibilityRole="header" className="font-sans text-title2 text-label-primary">
             {t("dev.gallery.title")}
           </Text>
           <Choice

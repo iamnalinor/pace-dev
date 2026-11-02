@@ -27,7 +27,7 @@ const Frame = ({
   const insets = useSafeAreaInsets();
   return (
     <View
-      className="flex-1 justify-between bg-bg px-6"
+      className="flex-1 justify-between bg-app px-6"
       style={{ paddingBottom: insets.bottom + 24, paddingTop: insets.top + 32 }}
     >
       <View className="gap-5">{children}</View>
@@ -60,10 +60,10 @@ const Intro = ({
         </>
       }
     >
-      <Text accessibilityRole="header" className="font-sans text-[26px] font-semibold text-fg">
+      <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
         {t("onboarding.title")}
       </Text>
-      <Text className="font-sans text-[15px] text-fg2">{t("onboarding.intro")}</Text>
+      <Text className="font-sans text-callout text-label-secondary">{t("onboarding.intro")}</Text>
       {ids.map((id) => (
         <PermissionText id={id} key={id} />
       ))}
@@ -119,12 +119,14 @@ const Step = ({
         </>
       }
     >
-      <Text className="font-sans text-[12px] tabular-nums text-muted">
+      <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
         {t("onboarding.step", { index: index + 1, total })}
       </Text>
       <PermissionText id={permission.id} />
       {isOpensSettings && action.guide === null ? (
-        <Text className="font-sans text-[13px] text-muted">{t("permissions.settingsHint")}</Text>
+        <Text className="font-sans text-footnote text-label-secondary">
+          {t("permissions.settingsHint")}
+        </Text>
       ) : null}
       {action.guide === null ? null : <UsageSteps step={action.guide} />}
     </Frame>
@@ -132,9 +134,9 @@ const Step = ({
 };
 
 const STATE_INK: Readonly<Record<Permission["state"], string>> = {
-  blocked: "text-muted",
-  off: "text-muted",
-  on: "text-fg",
+  blocked: "text-label-secondary",
+  off: "text-label-secondary",
+  on: "text-label-primary",
 };
 
 /** The walk-through's end: what is on now, and where the rest is turned on later. */
@@ -154,10 +156,12 @@ const Summary = ({
         </Button>
       }
     >
-      <Text accessibilityRole="header" className="font-sans text-[26px] font-semibold text-fg">
+      <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
         {t("onboarding.done.title")}
       </Text>
-      <Text className="font-sans text-[15px] text-fg2">{t("onboarding.done.body")}</Text>
+      <Text className="font-sans text-callout text-label-secondary">
+        {t("onboarding.done.body")}
+      </Text>
       {list.map((permission) => (
         <View
           accessibilityLabel={t(`permissions.${permission.id}`)}
@@ -165,8 +169,10 @@ const Summary = ({
           key={permission.id}
           role="group"
         >
-          <Text className="font-sans text-[15px] text-fg">{t(`permissions.${permission.id}`)}</Text>
-          <Text className={`font-sans text-[13px] ${STATE_INK[permission.state]}`}>
+          <Text className="font-sans text-callout text-label-primary">
+            {t(`permissions.${permission.id}`)}
+          </Text>
+          <Text className={`font-sans text-footnote ${STATE_INK[permission.state]}`}>
             {t(`permissions.${permission.state}`)}
           </Text>
         </View>
@@ -256,7 +262,7 @@ export const OnboardingScreen = () => {
     );
   }
   if (isDone) {
-    return <View className="flex-1 bg-bg" />;
+    return <View className="flex-1 bg-app" />;
   }
   return (
     <Intro

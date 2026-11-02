@@ -29,7 +29,8 @@
   "scripts": {
     "dev": "bun run --cwd apps/api dev",
     "build": "bun run --cwd apps/app build:web",
-    "lint": "bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run lint:workflows && bun run db:check",
+    "lint": "bun run lint:design && bun run lint:format && bun run lint:eslint && bun run typecheck && bun run lint:knip && bun run lint:dup && bun run lint:arch && bun run lint:workflows && bun run db:check",
+    "lint:design": "bun scripts/design/generate-design.ts --check",
     "lint:format": "biome format --write .",
     "lint:eslint": "bun scripts/eslint-all.ts --fix",
     "lint:knip": "knip --no-progress",
@@ -44,6 +45,7 @@
     "test:e2e": "playwright test",
     "test:llm": "bun run --cwd apps/api llm:smoke",
     "test:mutation": "bun run --cwd packages/core test:mutation",
+    "design:generate": "bun scripts/design/generate-design.ts",
     "db:generate": "bun run --cwd apps/api db:generate",
     "db:check": "bun run --cwd apps/api db:check",
     "prepare": "lefthook install",

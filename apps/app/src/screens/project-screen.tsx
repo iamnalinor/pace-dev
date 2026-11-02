@@ -23,8 +23,10 @@ const Figure = ({ label, value }: { readonly label: string; readonly value: stri
     className="flex-1 gap-0.5"
     role="group"
   >
-    <Text className="font-sans text-[11px] text-fg2">{label}</Text>
-    <Text className="font-sans text-[18px] tabular-nums text-fg">{value}</Text>
+    <Text className="font-sans text-caption2 font-normal text-label-secondary">{label}</Text>
+    <Text className="font-sans text-headline font-normal tabular-nums text-label-primary">
+      {value}
+    </Text>
   </View>
 );
 
@@ -81,8 +83,8 @@ const Stats = ({ project }: { readonly project: ProjectViewModel }) => {
   return (
     <View
       className={cx(
-        "mx-4 mb-4 flex-row gap-2 rounded-xl border p-3.5",
-        project.color === null ? "border-line bg-surface" : washClass(project.color),
+        "mx-4 mb-4 flex-row gap-2 rounded-xl border p-4",
+        project.color === null ? "border-separator bg-cell" : washClass(project.color),
       )}
     >
       <Figure label={t("project.stat.open")} value={String(stats.open)} />
@@ -131,7 +133,9 @@ export const ProjectScreen = ({ id }: { readonly id: string }) => {
         />
       ) : null}
       {project.description === null ? null : (
-        <Text className="mx-5 mb-3 font-sans text-[14px] text-fg2">{project.description}</Text>
+        <Text className="mx-5 mb-3 font-sans text-subhead font-normal text-label-secondary">
+          {project.description}
+        </Text>
       )}
       <Stats project={project} />
       {project.open.length + project.future.length + project.done.length === 0 ? (

@@ -47,8 +47,10 @@ export const GiveUpFields = ({
       />
       {reasons.length === 0 ? null : (
         <View className="gap-2">
-          <Text className="font-sans text-[12px] text-muted">{t("close.recentReasons")}</Text>
-          <View className="flex-row flex-wrap gap-1.5">
+          <Text className="font-sans text-caption font-normal text-label-tertiary">
+            {t("close.recentReasons")}
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
             {reasons.map((reason) => (
               <Chip
                 key={reason}

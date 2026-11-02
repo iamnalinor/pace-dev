@@ -247,7 +247,7 @@ export const PaceProvider = ({
   );
 
   return runtime === null ? (
-    <View className="flex-1 bg-bg" />
+    <View className="flex-1 bg-app" />
   ) : (
     <RuntimeContext value={runtime}>
       <SyncedContext value={synced}>{children}</SyncedContext>

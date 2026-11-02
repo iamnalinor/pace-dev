@@ -90,7 +90,9 @@ const ResubmissionFields = ({
   const zone = policy.finalTz ?? timezone ?? deviceTz;
   return (
     <View className="gap-2 pl-3 pt-2">
-      <Text className="font-sans text-[12px] text-muted">{t("presets.softDays")}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">
+        {t("presets.softDays")}
+      </Text>
       <NumberInput
         label={t("presets.softDays")}
         onChange={(softDays) => {
@@ -100,7 +102,7 @@ const ResubmissionFields = ({
         value={policy.softDays}
       />
       <FinalAt onPolicy={onPolicy} policy={policy} zone={zone} />
-      <Text className="font-sans text-[12px] tabular-nums text-muted">
+      <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
         {t("add.dueZone", { tz: zone })}
       </Text>
     </View>

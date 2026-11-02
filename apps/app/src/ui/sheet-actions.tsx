@@ -49,7 +49,7 @@ export const SheetActions = ({
           </Button>
         </View>
       ) : null}
-      <View className="flex-[2]">
+      <View className="flex-2">
         <Button
           busy={isBusy}
           disabled={isDisabled}

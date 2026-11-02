@@ -15,7 +15,11 @@ const childNodes = (node: Node): readonly (Node | null)[] => {
   if (node.type === "ConditionalExpression") {
     return [node.consequent, node.alternate];
   }
-  if (node.type === "LogicalExpression" || node.type === "BinaryExpression") {
+  // A comparison (`variant === "raised"`) holds a value, not a class: only `+` joins class text.
+  if (
+    node.type === "LogicalExpression" ||
+    (node.type === "BinaryExpression" && node.operator === "+")
+  ) {
     return [node.left, node.right];
   }
   if (node.type === "CallExpression") {

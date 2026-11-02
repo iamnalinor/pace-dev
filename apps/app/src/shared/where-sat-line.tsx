@@ -9,29 +9,22 @@ import { formatDuration, type SatRow } from "@pace/core";
 const TOP_APPS = 3;
 
 /**
-"Laptop: code 45m, Firefox 15m" under a block, one line per device that was used in it. On Day
-it lines up with the block's words, past the time column; elsewhere (`isIndented` off) it starts
-at the edge.
+"Laptop: code 45m, Firefox 15m" under a block, one line per device that was used in it. It starts
+at its parent's edge (on Day the parent lines it up with the block's words).
 */
 export const WhereSatLine = ({
   compact = false,
-  isIndented = true,
   rows,
 }: {
   readonly rows: readonly SatRow[];
   readonly compact?: boolean;
-  readonly isIndented?: boolean;
 }) => {
   const t = useT();
   const { language } = useViewer();
   const devices = Object.entries(Object.groupBy(rows, (row) => row.deviceName));
   return devices.map(([device, apps = []]) => (
     <Text
-      className={cx(
-        "font-sans text-[12px] text-muted",
-        !compact && "pb-2",
-        isIndented && "pl-[116px]",
-      )}
+      className={cx("font-sans text-caption font-normal text-label-tertiary", !compact && "pb-2")}
       key={device}
       numberOfLines={compact ? 1 : 2}
     >

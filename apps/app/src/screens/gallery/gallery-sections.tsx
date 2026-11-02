@@ -16,12 +16,12 @@ import { WeekGrid } from "#app/features/week/week-grid.tsx";
 import { CardView } from "#app/screens/inbox-card.tsx";
 import { TaskRows } from "#app/shared/task-list.tsx";
 import { RunningRow } from "#app/shared/tracking/running-row.tsx";
-import { ColorTag } from "#app/ui/color.tsx";
+import { ColorTag, IMPORTANCE_HUES } from "#app/ui/color.tsx";
 import { CountBadge } from "#app/ui/count-badge.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { SidebarHeader } from "#app/ui/sidebar.tsx";
 import { openTasksLabel } from "@pace/client";
-import { formatDuration, IMPORTANCE_COLORS, type MessageKey } from "@pace/core";
+import { formatDuration, type MessageKey } from "@pace/core";
 
 import {
   dayRows,
@@ -54,7 +54,7 @@ const Section = ({
   const t = useT();
   return (
     <View className="gap-2 px-5 pt-6">
-      <Text accessibilityRole="header" className="font-sans text-lg font-semibold text-fg">
+      <Text accessibilityRole="header" className="font-sans text-headline text-label-primary">
         {t(title)}
       </Text>
       {children}
@@ -71,20 +71,22 @@ export const TextSections = ({ data }: { readonly data: GalleryData }) => {
     <>
       <Section title="dev.gallery.section.tasks">
         {rows.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           <TaskRows label={t("dev.gallery.section.tasks")} rows={rows} />
         )}
       </Section>
       <Section title="dev.gallery.section.tags">
-        <View className="flex-row flex-wrap gap-1.5">
+        <View className="flex-row flex-wrap gap-2">
           {data.projects.map((project) => (
             <ColorTag color={project.color} key={project.id}>
               {project.name}
             </ColorTag>
           ))}
           {(["asap", "prioritized", "normal", "nice_to_have"] as const).map((importance) => (
-            <ColorTag color={IMPORTANCE_COLORS[importance]} key={importance}>
+            <ColorTag color={IMPORTANCE_HUES[importance]} key={importance}>
               {t(`importance.${importance}`)}
             </ColorTag>
           ))}
@@ -92,7 +94,9 @@ export const TextSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.chips">
         {chips.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           <ProjectChips chips={chips} onSelect={NOTHING} selected={null} />
         )}
@@ -112,9 +116,11 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
     <>
       <Section title="dev.gallery.section.running">
         {running.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
-          <View className="gap-3 rounded-xl border border-line bg-surface p-3.5">
+          <View className="gap-3 rounded-xl border border-separator bg-cell p-4">
             {running.map((view) => (
               <RunningRow key={view.activityId} running={view} />
             ))}
@@ -123,7 +129,9 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.day">
         {rows.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           rows.map((row) => (
             <ActivityRow
@@ -138,7 +146,9 @@ export const TimeSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.week">
         {data.blocks.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           <WeekGrid
             calendar={[]}
@@ -166,7 +176,7 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
   return (
     <>
       <Section title="dev.gallery.section.sidebar">
-        <View className="w-56 border border-line bg-bg px-3 pt-5">
+        <View className="w-sidebar border border-separator bg-app px-3 pt-5">
           <SidebarHeader owner={data.ownerName} />
         </View>
       </Section>
@@ -175,17 +185,19 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.counts">
         {data.pluralCounts.map((count) => (
-          <Text className="font-sans text-sm text-fg" key={count}>
+          <Text className="font-sans text-subhead font-normal text-label-primary" key={count}>
             {`${String(count)}: ${openTasksLabel(data.language, count)}`}
           </Text>
         ))}
-        <Text className="font-sans text-sm text-fg">
+        <Text className="font-sans text-subhead font-normal text-label-primary">
           {data.durations.map((minutes) => formatDuration(minutes, data.language)).join(" · ")}
         </Text>
       </Section>
       <Section title="dev.gallery.section.sessions">
         {sessions.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           sessions.map((row) => (
             <SessionRow
@@ -200,18 +212,24 @@ export const ChromeSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.inbox">
         <View className="flex-row items-center gap-2">
-          <Text className="font-sans text-sm text-fg">{t("nav.inbox")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-primary">
+            {t("nav.inbox")}
+          </Text>
           <CountBadge count={data.inboxCount} />
         </View>
         {cards.length === 0 ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           cards.map((card) => <CardView card={card} key={card.id} />)
         )}
       </Section>
       <Section title="dev.gallery.section.notification">
         {notification === null ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           <NotificationItem
             asking={{ id: null, set: NOTHING }}
@@ -234,7 +252,9 @@ export const TaskSections = ({ data }: { readonly data: GalleryData }) => {
     <>
       <Section title="dev.gallery.section.taskHeader">
         {view === null ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           <TaskHeader
             actions={{ onEdit: NOTHING, onGiveUp: NOTHING, view }}
@@ -245,7 +265,9 @@ export const TaskSections = ({ data }: { readonly data: GalleryData }) => {
       </Section>
       <Section title="dev.gallery.section.taskFooter">
         {view === null ? (
-          <Text className="font-sans text-sm text-muted">{t("dev.gallery.nothing")}</Text>
+          <Text className="font-sans text-subhead font-normal text-label-secondary">
+            {t("dev.gallery.nothing")}
+          </Text>
         ) : (
           <TaskFooter onClose={NOTHING} view={view} />
         )}

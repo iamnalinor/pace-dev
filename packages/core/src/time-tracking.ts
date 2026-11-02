@@ -26,7 +26,6 @@ export {
 } from "./tracking/calendar-run.ts";
 export {
   ACTIVITY_CATEGORIES,
-  CATEGORY_COLORS,
   CATEGORY_EXPECT,
   CATEGORY_HUES,
   FOCUS_CATEGORIES,

@@ -3,7 +3,9 @@ import { vars } from "nativewind";
 import { useCallback, useEffect, useState } from "react";
 import { type ColorSchemeName, useColorScheme } from "react-native";
 
-import { type PaletteName, type ThemeName, tokens } from "@pace/core";
+import { color, COLOR_ROLES, type ColorRole, type ThemeName } from "@pace/core";
+
+import { THEME_VARS } from "../ui/generated/tokens.ts";
 
 /** Per-device theme preference; `system` follows the OS appearance. */
 export type ThemePreference = "dark" | "light" | "system";
@@ -40,11 +42,19 @@ export const resolveScheme = (
   return systemScheme === "light" ? "light" : "dark";
 };
 
-/** `--pace-<token>` CSS variables for one palette, as `tailwind.config.js` expects them. */
+/** Every colour role's value in one theme, for props that take a colour (icons, native controls). */
+export type Palette = Readonly<Record<ColorRole, string>>;
+
+const PALETTES: Readonly<Record<ThemeName, Palette>> = {
+  dark: Object.fromEntries(COLOR_ROLES.map((role) => [role, color("dark", role)])) as Palette,
+  light: Object.fromEntries(COLOR_ROLES.map((role) => [role, color("light", role)])) as Palette,
+};
+
+export const paletteOf = (scheme: ThemeName): Palette => PALETTES[scheme];
+
+/** `--pace-<colour>` CSS variables for one theme (generated), as `tailwind.config.js` expects them. */
 export const paletteVariables = (scheme: ThemeName): Readonly<Record<string, string>> =>
-  Object.fromEntries(
-    Object.entries(tokens[scheme]).map(([name, value]) => [`--pace-${name as PaletteName}`, value]),
-  );
+  THEME_VARS[scheme];
 
 /** The NativeWind `vars()` style for the root view; every `bg-*`/`text-*` class resolves through it. */
 export const paletteVars = (scheme: ThemeName): ReturnType<typeof vars> =>

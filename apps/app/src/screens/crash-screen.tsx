@@ -24,18 +24,24 @@ export const CrashScreen = ({ error }: { readonly error: Error }) => {
   // Saved once, when the screen first shows: the boundary renders a new one for a new error.
   const [savedAt] = useState(() => paceNative.saveCrashTrace(traceOf(error)));
   return (
-    <View className="flex-1 items-center justify-center gap-4 bg-bg px-6">
-      <Text accessibilityRole="header" className="font-sans text-[20px] font-semibold text-fg">
+    <View className="flex-1 items-center justify-center gap-4 bg-app px-6">
+      <Text accessibilityRole="header" className="font-sans text-title2 text-label-primary">
         {t(language, "crash.title")}
       </Text>
-      <Text className="max-w-[480px] text-center font-sans text-[14px] text-fg2">
+      <Text className="max-w-inspector-max text-center font-sans text-subhead font-normal text-label-secondary">
         {t(language, "crash.body")}
       </Text>
-      <Text className="max-w-[480px] text-center font-sans text-[12px] text-muted" selectable>
+      <Text
+        className="max-w-inspector-max text-center font-sans text-caption font-normal text-label-tertiary"
+        selectable
+      >
         {error.message}
       </Text>
       {savedAt === null ? null : (
-        <Text className="max-w-[480px] text-center font-sans text-[12px] text-muted" selectable>
+        <Text
+          className="max-w-inspector-max text-center font-sans text-caption font-normal text-label-tertiary"
+          selectable
+        >
           {t(language, "crash.savedAt", { path: savedAt })}
         </Text>
       )}

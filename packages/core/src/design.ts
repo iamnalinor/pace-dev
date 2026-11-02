@@ -23,16 +23,6 @@ export type {
   TypeStyle,
 } from "./design/token-types.ts";
 export {
-  IMPORTANCE_COLORS,
-  type Palette,
-  type PaletteName,
-  PLACEHOLDER_DIM,
-  type RadiusName,
-  STATUS_COLORS,
-  type Tokens,
-  tokens,
-} from "./design/tokens-v1.ts";
-export {
   color,
   COLOR_ROLES,
   font,
@@ -41,6 +31,7 @@ export {
   isTabular,
   layout,
   motion,
+  PLACEHOLDER_DIM,
   projectHue,
   radius,
   shadow,

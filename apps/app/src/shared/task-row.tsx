@@ -23,8 +23,8 @@ const RowTitle = ({
 }) => (
   <Text
     className={cx(
-      "font-sans text-[15px]",
-      isChecked || isDimmed ? "text-fg2" : "font-medium text-fg",
+      "font-sans text-callout",
+      isChecked || isDimmed ? "text-label-secondary" : "font-medium text-label-primary",
       isChecked && "line-through",
     )}
     numberOfLines={2}
@@ -67,8 +67,12 @@ export const TaskRow = ({
   const { palette } = useTheme();
   const isSelected = useSelectedTask() === row.id;
   return (
-    <Dissolve color={palette.fg2} isActive={isDissolving} onDone={onDissolved ?? NOTHING}>
-      <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-raised")}>
+    <Dissolve
+      color={palette["label.secondary"]}
+      isActive={isDissolving}
+      onDone={onDissolved ?? NOTHING}
+    >
+      <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-fill-3")}>
         <CheckCircle
           checked={checked || isDissolving}
           label={t("now.markDone", { title: row.title })}
@@ -77,7 +81,7 @@ export const TaskRow = ({
         <Pressable
           accessibilityRole="link"
           aria-current={isSelected ? "page" : undefined}
-          className="flex-1 gap-[5px] active:opacity-70"
+          className="flex-1 gap-1 active:opacity-70"
           onPress={onOpen}
         >
           <RowTitle isChecked={checked} isDimmed={row.dimmed} title={row.title} />

@@ -12,15 +12,19 @@ export const PermissionText = ({ id }: { readonly id: Permission["id"] }) => {
   const t = useT();
   return (
     <View className="gap-0.5">
-      <Text className="font-sans text-[15px] font-medium text-fg">{t(`permissions.${id}`)}</Text>
-      <Text className="font-sans text-[13px] text-fg2">{t(`permissions.${id}.why`)}</Text>
+      <Text className="font-sans text-callout font-medium text-label-primary">
+        {t(`permissions.${id}`)}
+      </Text>
+      <Text className="font-sans text-footnote text-label-secondary">
+        {t(`permissions.${id}.why`)}
+      </Text>
     </View>
   );
 };
 
 const STATE_CLASS: Readonly<Record<Permission["state"], string>> = {
-  blocked: inkClass("coral"),
-  off: "text-muted",
+  blocked: inkClass("red"),
+  off: "text-label-secondary",
   on: inkClass("green"),
 };
 
@@ -66,10 +70,13 @@ export const useUsageGuide = (
 export const UsageSteps = ({ step }: { readonly step: UsageStep }) => {
   const t = useT();
   return (
-    <View className="gap-1.5">
+    <View className="gap-2">
       {USAGE_STEPS.map((key, index) => (
         <Text
-          className={cx("font-sans text-[13px]", index === step ? "text-fg" : "text-muted")}
+          className={cx(
+            "font-sans text-footnote",
+            index === step ? "text-label-primary" : "text-label-secondary",
+          )}
           key={key}
         >
           {t(key)}
@@ -127,12 +134,12 @@ export const PermissionCard = ({
   return (
     <View
       accessibilityLabel={t(`permissions.${permission.id}`)}
-      className="gap-2 border-t border-line px-5 py-4"
+      className="gap-2 border-t border-separator px-5 py-4"
       role="group"
     >
       <PermissionText id={permission.id} />
       <View className="flex-row items-center justify-between gap-3">
-        <Text className={cx("font-sans text-[13px]", STATE_CLASS[permission.state])}>
+        <Text className={cx("font-sans text-footnote", STATE_CLASS[permission.state])}>
           {t(`permissions.${permission.state}`)}
         </Text>
         {isGuided || permission.state === "on" ? null : (

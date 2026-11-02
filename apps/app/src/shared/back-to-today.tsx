@@ -21,10 +21,10 @@ export const BackToToday = ({
   return (
     <Pressable
       accessibilityRole="button"
-      className="h-11 justify-center rounded-md px-2 active:opacity-70"
+      className="h-hit-web justify-center rounded-md px-2 active:opacity-70"
       onPress={onPress}
     >
-      <Text className="font-sans text-[13px] font-medium text-accentQuietText">
+      <Text className="font-sans text-footnote font-medium text-accent-text">
         {t("common.backToToday")}
       </Text>
     </Pressable>

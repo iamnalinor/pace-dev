@@ -10,8 +10,9 @@ import type {
   WeekBlock,
   WeekModel,
 } from "@pace/client";
-import type { PoolNotification, ProjectColorName } from "@pace/core";
 import type { GalleryBlock, GalleryData, GalleryRunning, GalleryTask } from "@pace/core/testing";
+
+import { type PoolNotification, type ProjectColorName, projectHue } from "@pace/core";
 
 /*
 The dev gallery's view-models: the shapes the components take, built from plain worst-case data
@@ -73,7 +74,7 @@ export const projectChips = (data: GalleryData): readonly ProjectChip[] =>
 const runningView = (running: GalleryRunning, isAlongside: boolean): RunningView => ({
   activityId: isAlongside ? "alongside" : "main",
   category: running.category,
-  color: running.color,
+  color: projectHue(running.color),
   expectMinutes: running.expectMinutes,
   isAlongside,
   label: running.label,
@@ -96,7 +97,7 @@ export const runningViews = (data: GalleryData): readonly RunningView[] => [
 
 const weekBlock = (block: GalleryBlock): WeekBlock => ({
   category: block.category,
-  color: block.color,
+  color: projectHue(block.color),
   endAt: instant(block.day, block.startMinute + block.minutes),
   height: block.minutes,
   id: block.id,
@@ -134,7 +135,7 @@ export const dayRows = (data: GalleryData): readonly DayRow[] =>
     .map((block) => ({
       activityId: block.id,
       category: block.category,
-      color: block.color,
+      color: projectHue(block.color),
       endAt: instant(block.day, block.startMinute + block.minutes),
       expectMinutes: block.minutes > 1 ? block.minutes : null,
       isAlongside: block.isAlongside,

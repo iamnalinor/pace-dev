@@ -1,19 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProjectColorName } from "./token-types.ts";
-
 import { apcaLc, composite, contrastRatio, parseHex, relativeLuminance } from "./contrast.ts";
 import { type ContrastTarget, USED_PAIRS } from "./pairs.ts";
-import {
-  IMPORTANCE_COLORS,
-  inkOf,
-  type PaletteName,
-  PLACEHOLDER_DIM,
-  STATUS_COLORS,
-  TAG_TINT,
-  tokens,
-} from "./tokens-v1.ts";
-import { color, THEMES } from "./tokens.ts";
+import { color, PLACEHOLDER_DIM, THEMES } from "./tokens.ts";
 
 describe("parseHex", () => {
   it("parses 6-digit and 3-digit hex", () => {
@@ -44,163 +33,6 @@ describe("contrastRatio", () => {
 
   it("is null for a colour it cannot parse", () => {
     expect(contrastRatio("rgba(0,0,0,0.5)", "#ffffff")).toBeNull();
-  });
-});
-
-const COLORS = Object.keys(tokens.project) as ProjectColorName[];
-
-/** `color` laid over `background` at `alpha`, as the browser composites a tinted tag. */
-const wash = (color: string, background: string, alpha: number): string => {
-  const top = parseHex(color);
-  const bottom = parseHex(background);
-  if (top === null || bottom === null) {
-    return "";
-  }
-  const mix = (a: number, b: number): string =>
-    Math.round(a * alpha + b * (1 - alpha))
-      .toString(16)
-      .padStart(2, "0");
-  return `#${mix(top.r, bottom.r)}${mix(top.g, bottom.g)}${mix(top.b, bottom.b)}`;
-};
-
-describe("tokens", () => {
-  const TEXT: readonly PaletteName[] = [
-    "fg",
-    "fg2",
-    "muted",
-    "accentText",
-    "accentQuietText",
-    "warn",
-    "question",
-  ];
-  const BACKGROUNDS: readonly PaletteName[] = ["bg", "surface"];
-
-  it.each(THEMES)("%s text colours reach 4.5:1 on bg and surface", (theme) => {
-    const palette = tokens[theme];
-    const failures = TEXT.flatMap((text) =>
-      BACKGROUNDS.map((background) => ({
-        background,
-        ratio: contrastRatio(palette[text], palette[background]),
-        text,
-      })),
-    ).filter(({ ratio }) => ratio === null || ratio < 4.5);
-    expect(failures).toEqual([]);
-  });
-
-  it.each(THEMES)(
-    "%s outlines and the mark (ink-*, accentText, accentQuietText) reach 3:1 on bg, surface and raised",
-    (theme) => {
-      const palette = tokens[theme];
-      const marks: readonly PaletteName[] = [
-        "accentText",
-        "accentQuietText",
-        "faint",
-        ...COLORS.map((color) => inkOf(color)),
-      ];
-      const failures = marks.flatMap((mark) =>
-        (["bg", "surface", "raised"] as const)
-          .map((background) => ({
-            background,
-            mark,
-            ratio: contrastRatio(palette[mark], palette[background]) ?? 0,
-          }))
-          .filter(({ ratio }) => ratio < 3),
-      );
-      expect(failures).toEqual([]);
-    },
-  );
-
-  it.each(THEMES)(
-    "%s placeholder rows stand out from bg and surface at 1.5:1, even at the dim of their breath (QA 19 L2)",
-    (theme) => {
-      const palette = tokens[theme];
-      const failures = (["bg", "surface"] as const)
-        .map((background) => ({
-          background,
-          ratio:
-            contrastRatio(
-              wash(palette.placeholder, palette[background], PLACEHOLDER_DIM),
-              palette[background],
-            ) ?? 0,
-        }))
-        .filter(({ ratio }) => ratio < 1.5);
-      expect(failures).toEqual([]);
-    },
-  );
-
-  it.each(THEMES)("%s accentFg reaches 4.5:1 on accent", (theme) => {
-    expect(contrastRatio(tokens[theme].accentFg, tokens[theme].accent)).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it.each(THEMES)("%s accentQuietFg reaches 4.5:1 on accentQuiet", (theme) => {
-    expect(
-      contrastRatio(tokens[theme].accentQuietFg, tokens[theme].accentQuiet),
-    ).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it.each(THEMES)(
-    "%s keeps two accents: a lime for important actions, an indigo for quiet states",
-    (theme) => {
-      const palette = tokens[theme];
-      const lime = parseHex(palette.accent);
-      const indigo = parseHex(palette.accentQuiet);
-      // Lime: green and red lead, blue trails. Indigo: blue leads.
-      expect(lime !== null && lime.g > lime.b && lime.r > lime.b).toBe(true);
-      expect(indigo !== null && indigo.b > indigo.g && indigo.b > indigo.r).toBe(true);
-    },
-  );
-
-  it("fills the dark theme's actions with the brand lime", () => {
-    expect(tokens.dark.accent).toBe("#d4ff3a");
-    expect(tokens.dark.accentText).toBe("#d4ff3a");
-  });
-
-  it.each(THEMES)(
-    "%s colored tags reach 4.5:1: ink on its wash, dark text on the solid color",
-    (theme) => {
-      const palette = tokens[theme];
-      const failures = COLORS.flatMap((color) =>
-        (["surface", "raised"] as const).map((background) => {
-          const tinted = wash(tokens.project[color], palette[background], TAG_TINT);
-          const ink = contrastRatio(palette[inkOf(color)], tinted) ?? 0;
-          const solid = contrastRatio(palette.onColor, tokens.project[color]) ?? 0;
-          return { background, color, ink, solid };
-        }),
-      ).filter(({ ink, solid }) => ink < 4.5 || solid < 4.5);
-      expect(failures).toEqual([]);
-    },
-  );
-
-  it("exposes fonts, radii and the project palette", () => {
-    expect(tokens.fonts).toEqual({ sans: "Inter" });
-    expect(tokens.radius.pill).toBe(999);
-    expect(Object.keys(tokens.project)).toHaveLength(10);
-  });
-});
-
-describe("IMPORTANCE_COLORS", () => {
-  it("marks every importance with a color of its own, Normal green", () => {
-    expect(IMPORTANCE_COLORS).toEqual({
-      asap: "coral",
-      prioritized: "amber",
-      normal: "green",
-      nice_to_have: "slate",
-    });
-  });
-});
-
-describe("STATUS_COLORS", () => {
-  it("draws In progress in blue, never in the gray of the other tags", () => {
-    expect(STATUS_COLORS.in_progress).toBe("blue");
-    expect(STATUS_COLORS.not_started).toBeNull();
-  });
-});
-
-describe("project colors", () => {
-  it("keeps ASAP's red and Personal's tangerine apart: red leans further from orange", () => {
-    const red = parseHex(tokens.project.coral);
-    const tangerine = parseHex(tokens.project.orange);
-    expect(red !== null && tangerine !== null && tangerine.g - red.g >= 10).toBe(true);
   });
 });
 
@@ -245,6 +77,31 @@ const TARGETS: Readonly<Record<ContrastTarget, { lc: number; ratio: number }>> =
   large: { ratio: 3, lc: 45 },
   ui: { ratio: 3, lc: 0 },
 };
+
+/** `role` laid at `alpha` over `ground`, as an element faded by its opacity is drawn. */
+const faded = (theme: (typeof THEMES)[number], role: "label.quaternary", ground: string, alpha: number) => {
+  const solid = composite(color(theme, role), ground).slice(1);
+  const [r, g, b] = [0, 2, 4].map((at) => Number.parseInt(solid.slice(at, at + 2), 16));
+  return composite(`rgba(${r}, ${g}, ${b}, ${alpha})`, ground);
+};
+
+describe("placeholder rows", () => {
+  it.each(THEMES)(
+    "%s placeholder rows stand out from bg.app and bg.cell at 1.5:1, even at the dim of their breath (QA 19 L2)",
+    (theme) => {
+      const failures = (["bg.app", "bg.cell"] as const)
+        .map((background) => {
+          const ground = composite(color(theme, background), "#ffffff");
+          return {
+            background,
+            ratio: contrastRatio(faded(theme, "label.quaternary", ground, PLACEHOLDER_DIM), ground) ?? 0,
+          };
+        })
+        .filter(({ ratio }) => ratio < 1.5);
+      expect(failures).toEqual([]);
+    },
+  );
+});
 
 describe("USED_PAIRS (tokens v2)", () => {
   it.each(THEMES)("%s: every pair reaches its target on its real ground", (theme) => {

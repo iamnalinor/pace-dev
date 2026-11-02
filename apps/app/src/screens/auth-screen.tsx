@@ -40,8 +40,10 @@ export const AuthScreen = () => {
 
   if (isFailed) {
     return (
-      <View className="flex-1 items-center justify-center gap-4 bg-bg px-8">
-        <Text className="text-center font-sans text-[15px] text-fg">{t("auth.invalidLink")}</Text>
+      <View className="flex-1 items-center justify-center gap-4 bg-app px-8">
+        <Text className="text-center font-sans text-callout text-label-primary">
+          {t("auth.invalidLink")}
+        </Text>
         <Button
           onPress={() => {
             router.replace("/login");
@@ -58,9 +60,11 @@ export const AuthScreen = () => {
     return <Redirect href="/login" />;
   }
   return (
-    <View className="flex-1 items-center justify-center gap-3 bg-bg">
+    <View className="flex-1 items-center justify-center gap-3 bg-app">
       <ActivityIndicator accessibilityLabel={t("auth.signingIn")} />
-      <Text className="font-sans text-[14px] text-muted">{t("auth.signingIn")}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-secondary">
+        {t("auth.signingIn")}
+      </Text>
     </View>
   );
 };

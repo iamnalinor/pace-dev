@@ -42,10 +42,10 @@ const Mismatch = () => {
   const reason = useStore(serverStore, (state) => state.reason);
   return (
     <View accessibilityRole="alert" className="gap-1">
-      <Text className="text-center font-sans text-[15px] font-medium text-fg">
+      <Text className="text-center font-sans text-callout font-medium text-label-primary">
         {t("server.mismatch")}
       </Text>
-      <Text className="text-center font-sans text-[13px] text-warn">
+      <Text className="text-center font-sans text-footnote text-danger">
         {t(reason === "client-outdated" ? "server.clientOutdated" : "server.serverOutdated")}
       </Text>
     </View>
@@ -111,10 +111,12 @@ export const LoginScreen = () => {
   const isWaiting = bot.phase.kind === "waiting";
 
   return (
-    <View className="flex-1 justify-center gap-8 bg-bg px-6">
+    <View className="flex-1 justify-center gap-8 bg-app px-6">
       <View className="items-center gap-2">
         <PaceLogo heading={t("login.title")} wordmark={t("app.name")} />
-        <Text className="text-center font-sans text-[14px] text-muted">{t("login.subtitle")}</Text>
+        <Text className="text-center font-sans text-subhead font-normal text-label-secondary">
+          {t("login.subtitle")}
+        </Text>
         <SignedOutLine />
       </View>
       {isWaiting ? (
@@ -124,7 +126,7 @@ export const LoginScreen = () => {
       )}
       {isRefused ? <Mismatch /> : null}
       {error === undefined ? null : (
-        <Text className="text-center font-sans text-[13px] text-warn">{t(error)}</Text>
+        <Text className="text-center font-sans text-footnote text-danger">{t(error)}</Text>
       )}
       {__DEV__ && !isWaiting ? (
         <DevLoginForm

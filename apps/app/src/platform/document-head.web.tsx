@@ -29,6 +29,7 @@ export const DocumentHead = () => {
   useEffect(() => {
     document.title = title;
   }, [title]);
+  const background = palette["bg.app"];
   useEffect(() => {
     document.documentElement.style.colorScheme = scheme;
     // The page behind the app and the browser's own bar follow the app's theme, not only the
@@ -36,8 +37,8 @@ export const DocumentHead = () => {
     document.documentElement.dataset["theme"] = scheme;
     for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
       meta.removeAttribute("media");
-      meta.setAttribute("content", palette.bg);
+      meta.setAttribute("content", background);
     }
-  }, [palette.bg, scheme]);
+  }, [background, scheme]);
   return null;
 };

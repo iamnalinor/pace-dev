@@ -52,12 +52,15 @@ const UndoConfirmation = ({
       title={t("history.undoConfirm")}
       visible
     >
-      <Text className="pb-4 font-sans text-[14px] leading-5 text-fg">
+      <Text className="pb-4 font-sans text-subhead font-normal text-label-primary">
         {t("history.undoConfirmQuestion")}
       </Text>
     </Sheet>
   );
 };
+
+const LINE = "font-sans text-subhead font-normal text-label-primary";
+const META = "font-sans text-caption font-normal text-label-tertiary";
 
 const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const t = useT();
@@ -83,23 +86,21 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
     }
   };
   return (
-    <View className="gap-2 border-t border-line py-2.5">
+    <View className="gap-2 border-t border-separator py-3">
       <View className="flex-row items-center gap-3">
         <View className="flex-1 gap-0.5">
-          <Text className="font-sans text-[14px] text-fg">
+          <Text className={LINE}>
             {eventLabel}
             {entry.taskTitle === null ? "" : ` · ${entry.taskTitle}`}
           </Text>
-          <Text className="font-sans text-[12px] text-muted">
+          <Text className={META}>
             {[
               zonedText({ at: entry.occurredAt, mode: "datetime", tz: viewer.deviceTz }, viewer),
               t(`source.${entry.source}`),
             ].join(" · ")}
           </Text>
         </View>
-        {entry.revokedBy === null ? null : (
-          <Text className="font-sans text-[12px] text-muted">{t("history.revoked")}</Text>
-        )}
+        {entry.revokedBy === null ? null : <Text className={META}>{t("history.revoked")}</Text>}
         {/* Undo stays while the dialog asks, so the dialog gives focus back to it (bug class 5). */}
         {entry.revocable ? (
           <Button
@@ -193,7 +194,7 @@ export const HistoryScreen = () => {
   return (
     <PushedScreen title={t("history.title")}>
       <DayNav at={at} now={now} onAt={setAt} />
-      <Text className="px-5 pb-1 font-sans text-[12px] font-medium text-muted">
+      <Text className="px-5 pb-1 font-sans text-caption text-label-tertiary">
         {`${t("history.boardAt")} ${when}`}
       </Text>
       <View className="px-2">
@@ -209,11 +210,11 @@ export const HistoryScreen = () => {
         ))}
       </View>
       <View className="px-5 pt-4">
-        <Text className="pb-1 font-sans text-[12px] font-medium text-muted">
+        <Text className="pb-1 font-sans text-caption text-label-tertiary">
           {at === null ? t("history.events") : t("history.eventsUntil", { when })}
         </Text>
         {history.board.rows.length === 0 && events.length === 0 ? (
-          <EmptyText className="py-2 font-sans text-[14px] text-muted">
+          <EmptyText className="py-2 font-sans text-subhead font-normal text-label-secondary">
             {t("history.emptyAt")}
           </EmptyText>
         ) : null}

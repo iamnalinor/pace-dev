@@ -29,14 +29,16 @@ const IdentityStep = ({
   const t = useT();
   if (consent.identity !== null) {
     return (
-      <Text className="font-sans text-[14px] text-fg2">
+      <Text className="font-sans text-subhead font-normal text-label-secondary">
         {t("oauth.signedInAs", { name: identityLabel(consent.identity) })}
       </Text>
     );
   }
   return (
     <View className="gap-3">
-      <Text className="font-sans text-[14px] text-muted">{t("oauth.identify")}</Text>
+      <Text className="font-sans text-subhead font-normal text-label-secondary">
+        {t("oauth.identify")}
+      </Text>
       {renderWidget((payload) => {
         const name = [payload.first_name, payload.last_name].filter(Boolean).join(" ");
         consent.identify({ kind: "telegram", name, payload });
@@ -75,7 +77,7 @@ const ReadyStep = ({
       />
       <IdentityStep consent={consent} renderWidget={renderWidget} />
       {consent.error === null ? null : (
-        <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-subhead font-normal text-danger">
           {t(consent.error)}
         </Text>
       )}
@@ -123,26 +125,29 @@ export const ConsentFlow = ({
   const consent = useConsent(api, authQuery, redirect);
   const { phase } = consent;
   return (
-    <View className="gap-5 rounded-xl border border-line bg-surface px-6 py-8">
+    <View className="gap-5 rounded-xl border border-separator bg-cell px-6 py-8">
       <View className="flex-row items-center gap-3">
         <PaceMark size={40} />
-        <Text className="font-sans text-[24px] font-semibold tracking-[-0.04em] text-fg">
-          {t("app.name")}
-        </Text>
+        <Text className="font-sans text-title1 text-label-primary">{t("app.name")}</Text>
       </View>
       <View className="gap-1">
-        <Text accessibilityRole="header" className="font-sans text-[24px] font-semibold text-fg">
+        <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
           {t("oauth.title")}
         </Text>
-        <Text className="font-sans text-[14px] text-muted">{t("oauth.body")}</Text>
+        <Text className="font-sans text-subhead font-normal text-label-secondary">
+          {t("oauth.body")}
+        </Text>
       </View>
       {phase.kind === "invalid" ? (
-        <Text accessibilityRole="alert" className="font-sans text-[14px] text-warn">
+        <Text accessibilityRole="alert" className="font-sans text-subhead font-normal text-danger">
           {t(phase.key)}
         </Text>
       ) : null}
       {phase.kind === "redirecting" ? (
-        <Text accessibilityLiveRegion="polite" className="font-sans text-[14px] text-fg2">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="font-sans text-subhead font-normal text-label-secondary"
+        >
           {t("oauth.redirecting", { name: phase.name })}
         </Text>
       ) : null}

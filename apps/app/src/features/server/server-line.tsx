@@ -20,15 +20,15 @@ export const ServerLine = () => {
       <Pressable
         accessibilityLabel={t("server.changeLabel", { host })}
         accessibilityRole="button"
-        className="min-h-11 items-center justify-center self-center px-3 active:opacity-70"
+        className="min-h-hit-web items-center justify-center self-center px-3 active:opacity-70"
         onPress={() => {
           setIsOpen(true);
         }}
       >
-        <Text className="text-center font-sans text-[13px] text-muted">
+        <Text className="text-center font-sans text-footnote text-label-secondary">
           {t("server.line", { host })}
           {" · "}
-          <Text className="font-medium text-accentQuietText">{t("server.change")}</Text>
+          <Text className="font-medium text-accent-text">{t("server.change")}</Text>
         </Text>
       </Pressable>
       {isOpen ? (

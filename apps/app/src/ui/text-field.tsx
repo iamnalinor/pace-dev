@@ -21,27 +21,32 @@ export const TextField = ({
 }) => {
   const { palette } = useTheme();
   return (
-    <View className="gap-1.5">
-      <Text className="font-sans text-[12px] text-muted">{label}</Text>
+    <View className="gap-2">
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{label}</Text>
       <TextInput
         accessibilityLabel={label}
         className={cx(
-          "rounded-lg border bg-bg px-3 font-sans text-[15px] text-fg",
-          multiline ? "min-h-24 py-2.5" : "h-11",
-          error === null || error === undefined ? "border-line" : "border-warn",
+          "rounded-lg border bg-app px-3 font-sans text-callout text-label-primary",
+          multiline ? "min-h-24 py-3" : "h-hit-web",
+          error === null || error === undefined ? "border-outline" : "border-danger",
         )}
         multiline={multiline}
-        placeholderTextColor={palette.faint}
+        placeholderTextColor={palette["label.tertiary"]}
         ref={ref}
         textAlignVertical={multiline ? "top" : "center"}
         {...input}
       />
       {error === null || error === undefined ? null : (
-        <Text accessibilityLiveRegion="polite" className="font-sans text-[12px] text-warn">
+        <Text
+          accessibilityLiveRegion="polite"
+          className="font-sans text-caption font-normal text-danger"
+        >
           {error}
         </Text>
       )}
-      {hint === undefined ? null : <Text className="font-sans text-[12px] text-muted">{hint}</Text>}
+      {hint === undefined ? null : (
+        <Text className="font-sans text-caption font-normal text-label-tertiary">{hint}</Text>
+      )}
     </View>
   );
 };

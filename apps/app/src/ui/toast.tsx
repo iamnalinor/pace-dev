@@ -113,12 +113,12 @@ of the screen's footer, as the toast does, so it covers no header control (round
 export const useFloatBottom = (): number => use(FloatBottomContext);
 
 /**
-Where a toast docked in the sidebar sits: inside its 224 px column, at its foot, its action under
+Where a toast docked in the sidebar sits: inside its column (`w-sidebar-inner`), at its foot, its action under
 the text so the text has the column's whole width (QA round 17 L5: beside the action it had a
 hundred pixels and lost its third line).
 */
-const DOCKED = "bottom-4 left-3 w-[200px] flex-col items-stretch gap-0 pr-2";
-const FLOATING = "inset-x-4 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 pr-1";
+const DOCKED = "bottom-4 left-3 w-sidebar-inner flex-col items-stretch gap-0 pr-2";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-inspector-max flex-row items-center gap-3 pr-1";
 
 const ToastBar = ({
   bottom,
@@ -135,7 +135,7 @@ const ToastBar = ({
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
     className={cx(
-      "absolute rounded-xl border border-line bg-surface py-1 pl-4 shadow-lg",
+      "absolute rounded-xl border border-separator bg-elevated py-1 pl-4 shadow-lg",
       isDocked ? DOCKED : FLOATING,
     )}
     style={isDocked ? undefined : { bottom }}
@@ -143,7 +143,7 @@ const ToastBar = ({
   >
     {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
     <Pressable className={isDocked ? "self-stretch" : "flex-1"} onPress={onDone}>
-      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={isDocked ? 5 : 3}>
+      <Text className="py-3 font-sans text-subhead font-normal text-label-primary" numberOfLines={isDocked ? 5 : 3}>
         {toast.message}
       </Text>
     </Pressable>
@@ -151,7 +151,7 @@ const ToastBar = ({
       <Pressable
         accessibilityRole="button"
         className={cx(
-          "h-11 justify-center rounded-md px-3 active:opacity-70",
+          "h-hit-web justify-center rounded-md px-3 active:opacity-70",
           isDocked && "self-end",
         )}
         onPress={() => {
@@ -160,7 +160,7 @@ const ToastBar = ({
           toast.action?.onPress();
         }}
       >
-        <Text className="font-sans text-[14px] font-semibold text-accentText">
+        <Text className="font-sans text-subhead font-semibold text-accent-text">
           {toast.action.label}
         </Text>
       </Pressable>

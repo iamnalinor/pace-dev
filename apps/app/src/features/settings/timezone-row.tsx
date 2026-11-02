@@ -21,16 +21,16 @@ export const TimezoneRow = () => {
   const isOffsetDifferent = zonesDiffer({ at: now, tz: account }, { at: now, tz: device });
   return (
     <View className="gap-2">
-      <Text className="font-sans text-[14px] tabular-nums text-fg">
+      <Text className="font-sans text-subhead font-normal tabular-nums text-label-primary">
         {t("settings.timezone.account", { tz: account })}
       </Text>
       {account === device ? null : (
-        <Text className="font-sans text-[13px] text-muted">
+        <Text className="font-sans text-footnote text-label-secondary">
           {t("settings.timezone.device", { tz: device })}
         </Text>
       )}
       {isOffsetDifferent ? (
-        <Text className="font-sans text-[13px] text-warn">{t("settings.timezone.differs")}</Text>
+        <Text className="font-sans text-footnote text-warn">{t("settings.timezone.differs")}</Text>
       ) : null}
       {account === device ? null : (
         <Button

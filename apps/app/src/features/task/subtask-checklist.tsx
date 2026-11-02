@@ -17,12 +17,12 @@ const Mark = ({ state }: { readonly state: SubtaskRow["state"] }) => {
   return (
     <View
       className={cx(
-        "h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px]",
-        state === "pending" ? "border-muted" : "border-fg bg-fg",
+        "h-6 w-6 items-center justify-center rounded-pill border-stroke",
+        state === "pending" ? "border-outline" : "border-label-primary bg-label-primary",
         state === "submitted" && "opacity-50",
       )}
     >
-      {state === "pending" ? null : <Check color={palette.bg} size={14} strokeWidth={2.5} />}
+      {state === "pending" ? null : <Check color={palette["bg.app"]} size={14} strokeWidth={2.5} />}
     </View>
   );
 };
@@ -51,7 +51,7 @@ const SubtaskItem = ({
       accessibilityRole="checkbox"
       aria-checked={subtask.state !== "pending"}
       aria-disabled={isSent}
-      className="min-h-[52px] flex-row items-center gap-3 border-b border-line px-1 active:opacity-70"
+      className="min-h-row flex-row items-center gap-3 border-b border-separator px-1 active:opacity-70"
       disabled={isSent}
       onPress={() => {
         void run(
@@ -64,14 +64,19 @@ const SubtaskItem = ({
       <Mark state={subtask.state} />
       {/* A bare number label ("290") is the number itself: shown once, in the label. */}
       {subtask.number === null || String(subtask.number) === subtask.label ? null : (
-        <Text className="min-w-8 font-sans text-[13px] tabular-nums text-muted">
+        <Text className="min-w-8 font-sans text-footnote tabular-nums text-label-secondary">
           {`№${String(subtask.number)}`}
         </Text>
       )}
-      <Text className={cx("flex-1 font-sans text-[15px]", isSent ? "text-muted" : "text-fg")}>
+      <Text
+        className={cx(
+          "flex-1 font-sans text-callout",
+          isSent ? "text-label-secondary" : "text-label-primary",
+        )}
+      >
         {subtask.label}
       </Text>
-      <Text className="font-sans text-[12px] text-muted">{note()}</Text>
+      <Text className="font-sans text-caption font-normal text-label-tertiary">{note()}</Text>
     </Pressable>
   );
 };
@@ -87,10 +92,10 @@ export const SubtaskChecklist = ({ view }: { readonly view: TaskViewModel }) => 
   return (
     <View className="px-4">
       <View className="flex-row items-baseline justify-between px-1 pb-1">
-        <Text accessibilityRole="header" className="font-sans text-[12px] font-medium text-muted">
+        <Text accessibilityRole="header" className="font-sans text-caption text-label-tertiary">
           {t("task.subtasks")}
         </Text>
-        <Text className="font-sans text-[12px] text-muted">
+        <Text className="font-sans text-caption font-normal text-label-tertiary">
           {t("task.subtasksSummary", { sent, solved })}
         </Text>
       </View>

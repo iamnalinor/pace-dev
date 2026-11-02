@@ -1,9 +1,11 @@
 import { createContext, type ReactNode, use, useMemo } from "react";
 import { View } from "react-native";
 
-import { type Palette, type ThemeName, tokens } from "@pace/core";
+import type { ThemeName } from "@pace/core";
 
 import {
+  type Palette,
+  paletteOf,
   paletteVars,
   type ThemePreference,
   type ThemePreferenceHandle,
@@ -34,12 +36,12 @@ export const ThemeProvider = ({
   const { preference, scheme: preferred, setPreference } = useThemePreference();
   const scheme = forced ?? preferred;
   const theme = useMemo<Theme>(
-    () => ({ palette: tokens[scheme], preference, scheme, setPreference }),
+    () => ({ palette: paletteOf(scheme), preference, scheme, setPreference }),
     [preference, scheme, setPreference],
   );
   return (
     <ThemeContext value={theme}>
-      <View className="flex-1 bg-bg" style={paletteVars(scheme)}>
+      <View className="flex-1 bg-app" style={paletteVars(scheme)}>
         {children}
       </View>
     </ThemeContext>

@@ -4,7 +4,7 @@ import type { CalendarEvent, Language, UsageRow } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
-import { PROJECT_FILL } from "#app/ui/color.tsx";
+import { inkClass, tintClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import {
@@ -64,10 +64,10 @@ const HourGutter = ({
   readonly fromHour: number;
   readonly hourPx: number;
 }) => (
-  <View className="w-8 pt-7">
+  <View className="w-8 pt-8">
     {Array.from({ length: 24 - fromHour }, (_, index) => (
       <Text
-        className="font-sans text-[10px] tabular-nums text-muted"
+        className="font-sans text-caption2 font-normal tabular-nums text-label-tertiary"
         key={index}
         style={{ height: hourPx }}
       >
@@ -92,14 +92,14 @@ const UsageStrip = ({ hourPx, place, usage }: Grid & Pick<GridProps, "usage">) =
     const at = place(session);
     return at === null ? null : (
       <View
-        className="absolute left-0 w-[3px] bg-fg2 opacity-40"
+        className="absolute left-0 w-1 bg-label-secondary opacity-40"
         key={`${session.deviceId}-${session.app}-${session.startAt}`}
         style={{ height: Math.max(1, px(at.height, hourPx)), top: px(at.top, hourPx) }}
       />
     );
   });
 
-/** One thing on a day's column: a calendar event (outlined) or tracked time (filled). */
+/** One thing on a day's column: a calendar event (outlined) or tracked time (washed in its hue). */
 type Item =
   | { readonly kind: "block"; readonly at: Placement; readonly block: WeekBlock }
   | { readonly kind: "event"; readonly at: Placement; readonly event: CalendarEvent };
@@ -113,23 +113,20 @@ const pickOf = (item: Item): Picked =>
     ? { event: item.event, kind: "event" }
     : { block: item.block, kind: "block" };
 
-/** How an item looks: events outlined, blocks filled; the picked one ringed in the quiet accent. */
+/** How an item looks: events outlined, blocks ink on their hue's tint; the picked one ringed. */
 const itemLook = (
   item: Item,
   isSelected: boolean,
 ): { readonly box: string; readonly text: string } => {
   if (item.kind === "block") {
     return {
-      box: cx(
-        PROJECT_FILL[item.block.color],
-        isSelected ? "border-2 border-accentQuietText" : "opacity-90",
-      ),
-      text: "font-medium text-onColor",
+      box: cx(tintClass(item.block.color), isSelected ? "border-2 border-accent" : "opacity-90"),
+      text: cx("font-medium", inkClass(item.block.color)),
     };
   }
   return isSelected
-    ? { box: "border-2 border-accentQuietText bg-accentQuiet", text: "text-accentQuietFg" }
-    : { box: "border border-dashed border-ink-slate", text: "text-fg2" };
+    ? { box: "border-2 border-accent bg-accent-quiet", text: "text-accent-text" }
+    : { box: "border border-dashed border-hue-slate-ink", text: "text-label-secondary" };
 };
 
 /** One block or event on its column, in its lane; a tap picks it. */
@@ -178,7 +175,7 @@ const ItemBox = ({
             onPick(picked);
           }}
         >
-          <Text className={cx("font-sans text-[10px]", look.text)} numberOfLines={1}>
+          <Text className={cx("font-sans text-caption2 font-normal", look.text)} numberOfLines={1}>
             {label}
           </Text>
         </Pressable>
@@ -259,19 +256,19 @@ const DayColumn = ({
     <View className="min-w-0 flex-1" style={{ minWidth: columnPx }}>
       <Text
         className={cx(
-          "h-7 text-center font-sans text-[11px] tabular-nums",
-          day.isToday ? "font-semibold text-fg" : "text-muted",
+          "h-8 text-center font-sans text-caption2 font-normal tabular-nums",
+          day.isToday ? "font-semibold text-label-primary" : "text-label-secondary",
         )}
       >
         {dayLabel(day.date, week.zone, language)}
       </Text>
       <View
-        className="relative border-l border-line"
+        className="relative border-l border-separator"
         style={{ height: (24 - week.fromHour) * hourPx }}
       >
         {Array.from({ length: 24 - week.fromHour }, (_, index) => (
           <View
-            className="absolute left-0 right-0 border-t border-line"
+            className="absolute left-0 right-0 border-t border-separator"
             key={index}
             style={{ top: index * hourPx }}
           />
@@ -280,11 +277,11 @@ const DayColumn = ({
         {nowMinutes >= 0 && day.isToday ? (
           // The line only shows where now is; the blocks and events carry the words.
           <View
-            className="absolute left-0 right-0 h-0.5 bg-warn"
+            className="absolute left-0 right-0 h-0.5 bg-danger"
             style={{ top: px(nowMinutes, hourPx) }}
           />
         ) : null}
-        <View className="absolute bottom-0 left-1.5 right-0.5 top-0">
+        <View className="absolute bottom-0 left-2 right-0.5 top-0">
           <DayItems
             grid={grid}
             laidOut={laidOut}

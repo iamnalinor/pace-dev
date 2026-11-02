@@ -17,9 +17,9 @@ export const SplitPane = ({
   /** What the side pane holds, for screen readers ("Details"). */
   readonly sideLabel: string;
 }) => (
-  <View className="flex-1 flex-row bg-bg">
-    <View className="min-w-0 flex-1 border-r border-line">{main}</View>
-    <View accessibilityLabel={sideLabel} className="w-[400px] max-w-[40%]" role="region">
+  <View className="flex-1 flex-row bg-app">
+    <View className="min-w-0 flex-1 border-r border-separator">{main}</View>
+    <View accessibilityLabel={sideLabel} className="w-inspector max-w-2/5" role="region">
       {side}
     </View>
   </View>

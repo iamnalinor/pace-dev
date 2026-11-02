@@ -42,12 +42,12 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
     >
       <View
         accessibilityLiveRegion="polite"
-        className="min-h-11 max-w-xl flex-row items-center gap-2 rounded-full border border-line bg-surface pl-3 pr-1 shadow-lg"
+        className="min-h-hit-web max-w-inspector-max flex-row items-center gap-2 rounded-pill border border-separator bg-elevated pl-3 pr-1 shadow-lg"
         role="status"
         testID="sync-strip"
       >
-        <Icon aria-hidden color={palette.warn} size={16} strokeWidth={2} />
-        <Text className="shrink py-1.5 font-sans text-[13px] text-fg">{t(message)}</Text>
+        <Icon aria-hidden color={palette["status.warn"]} size={16} strokeWidth={2} />
+        <Text className="shrink py-2 font-sans text-footnote text-label-primary">{t(message)}</Text>
         {message === "errors.offline" ? <RetryNow /> : null}
       </View>
     </View>
@@ -65,12 +65,12 @@ const RetryNow = () => {
   return (
     <Pressable
       accessibilityRole="button"
-      className="min-h-11 min-w-11 items-center justify-center rounded-full px-3 active:opacity-70"
+      className="min-h-hit-web min-w-hit-web items-center justify-center rounded-pill px-3 active:opacity-70"
       onPress={() => {
         backOnline(runtime);
       }}
     >
-      <Text className="font-sans text-[13px] font-medium text-fg underline">{t("sync.retry")}</Text>
+      <Text className="font-sans text-footnote font-medium text-label-primary underline">{t("sync.retry")}</Text>
     </Pressable>
   );
 };
@@ -147,9 +147,9 @@ const FirstSyncPlaceholder = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1 items-center bg-bg px-4" style={{ paddingTop: insets.top + 32 }}>
-      <View className="w-full max-w-xl gap-4">
-        <Text className="font-sans text-[15px] text-muted">{t("sync.firstSyncLine")}</Text>
+    <View className="flex-1 items-center bg-app px-4" style={{ paddingTop: insets.top + 32 }}>
+      <View className="w-full max-w-content gap-4">
+        <Text className="font-sans text-callout text-label-secondary">{t("sync.firstSyncLine")}</Text>
         <Skeleton label={t("sync.firstSync")} rows={6} />
       </View>
     </View>
@@ -184,7 +184,7 @@ export const SyncFrame = ({
   const isCovered = isFirstSync && !isOverdue;
   const message = stripMessage({ isOffline, isOverdue });
   return (
-    <View className="flex-1 bg-bg">
+    <View className="flex-1 bg-app">
       {/* Out of the page while covered (not drawn, not read), yet mounted. */}
       <View className="flex-1" style={isCovered ? HIDDEN : undefined}>
         {children}

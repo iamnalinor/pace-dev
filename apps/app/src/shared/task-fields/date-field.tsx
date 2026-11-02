@@ -63,7 +63,7 @@ export const DateChip = ({
   return (
     <Chip
       label={`${t(dateLabel(kind))}: ${text}`}
-      leading={<Icon color={palette.fg2} size={14} strokeWidth={1.75} />}
+      leading={<Icon color={palette["label.secondary"]} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >
@@ -101,7 +101,7 @@ export const DatePanel = ({
     }
   };
   return (
-    <View className="gap-3 rounded-xl border border-line bg-bg p-3">
+    <View className="gap-3 rounded-xl border border-separator bg-app p-3">
       <Calendar
         labels={{ next: t("calendar.nextMonth"), previous: t("calendar.previousMonth") }}
         language={viewer.language}
@@ -113,7 +113,7 @@ export const DatePanel = ({
         today={today}
       />
       <View className="flex-row items-center gap-2">
-        <Text className="font-sans text-[13px] text-muted">
+        <Text className="font-sans text-footnote text-label-secondary">
           {t(kind === "final" ? "form.finalTime" : "composer.dueTime")}
         </Text>
         <TimeInput
@@ -126,7 +126,7 @@ export const DatePanel = ({
           value={time}
         />
         {tz === viewer.deviceTz ? null : (
-          <Text className="font-sans text-[12px] tabular-nums text-muted">
+          <Text className="font-sans text-caption font-normal tabular-nums text-label-tertiary">
             {t("add.dueZone", { tz })}
           </Text>
         )}

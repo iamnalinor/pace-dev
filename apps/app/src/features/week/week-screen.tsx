@@ -47,7 +47,7 @@ const NightHoursToggle = () => {
   // Until a sync of this session succeeded, a failed first pull included (round 7 review 12).
   const isUnknown = useIsAccountUnknown();
   if (isUnknown) {
-    return <View className="h-11 w-11" />;
+    return <View className="h-hit-web w-hit-web" />;
   }
   const label = t("week.nightHours");
   return (
@@ -57,15 +57,15 @@ const NightHoursToggle = () => {
         accessibilityRole="switch"
         aria-checked={nightHours}
         className={cx(
-          "h-11 w-11 items-center justify-center rounded-md active:opacity-80",
-          nightHours && "bg-accentQuiet",
+          "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
+          nightHours && "bg-accent-quiet",
         )}
         onPress={() => {
           void actions.setNightHours(!nightHours);
         }}
       >
         <Moon
-          color={nightHours ? palette.accentQuietFg : palette.fg2}
+          color={nightHours ? palette["accent.text"] : palette["label.secondary"]}
           size={18}
           strokeWidth={1.75}
         />
@@ -123,7 +123,9 @@ const FittedGrid = (props: GridArgs) => {
       </ScrollView>
       {isWide ? null : (
         <View className="h-6 items-end justify-center pr-3">
-          <Text className="font-sans text-[11px] text-muted">{t("week.scrollHint")}</Text>
+          <Text className="font-sans text-caption2 font-normal text-label-tertiary">
+            {t("week.scrollHint")}
+          </Text>
         </View>
       )}
     </View>
