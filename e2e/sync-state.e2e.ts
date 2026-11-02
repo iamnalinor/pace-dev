@@ -7,7 +7,7 @@ import { API_URL, loginViaApi } from "./support/login.ts";
 import { isBare, screenUrls, STAND_IN_IDS } from "./support/routes.ts";
 import { settle } from "./support/screen-checks.ts";
 import { type LivedIn, seedLivedIn } from "./support/seed.ts";
-import { recordSyncTraffic, repeated } from "./support/sync-traffic.ts";
+import { hasPulledAfterPush, recordSyncTraffic, repeated } from "./support/sync-traffic.ts";
 
 /** The titles of the tasks created in the server's log of the account behind `token`. */
 const serverTitles = async (token: string): Promise<readonly string[]> => {
@@ -288,6 +288,10 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   await expect
     .poll(() => traffic.calls.filter((call) => call.startsWith("GET /api/sync/pull")))
     .not.toEqual([]);
+  // The signed-in start ends with its loop's first tick pushing what the start wrote (a new
+  // account's time zone) and pulling after it: over the socket once it is open, else over HTTP
+  // (a socket slow to open under load sent them inside the idle window, round 7 merge, class 107).
+  await expect.poll(() => hasPulledAfterPush(traffic.steps)).toBe(true);
   // An idle tab: its socket has been up a while (one cut at once is a flapping link, which backs
   // off without a check, fix round 5 V2), and it sends nothing meanwhile.
   const idle = await traffic.over(6000);
