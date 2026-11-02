@@ -4,6 +4,8 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { SheetName } from "./sheet-names.ts";
+
 import { refuseFocus } from "../platform/refuse-focus.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { ButtonWidthContext } from "./button.tsx";
@@ -144,6 +146,23 @@ const SheetLayer = ({ children }: { readonly children: ReactNode }) => (
   </HotkeyLayer>
 );
 
+type SheetProps = {
+  readonly children: ReactNode;
+  readonly closeLabel: string;
+  /** Stays under the scrolling body (a long form keeps its buttons in sight). */
+  readonly footer?: ReactNode;
+  /** The sheet is a form (its fields and the footer's buttons), named this. */
+  readonly formLabel?: string;
+  /** Stays under the title, above the scrolling body: a picker's Stop, its switch, its search. */
+  readonly header?: ReactNode;
+  /** Which sheet this is: its name in the registry the e2e sweep opens every sheet from. */
+  readonly name: SheetName;
+  readonly onClose: () => void;
+  readonly subtitle?: string;
+  readonly title: string;
+  readonly visible: boolean;
+};
+
 /**
 A form or a choice over the screen, the way each platform expects one. On a phone it is the
 bottom sheet from the Close artboard: a grab handle, dismissed by a tap on the dim or the
@@ -158,24 +177,12 @@ export const Sheet = ({
   footer,
   formLabel,
   header,
+  name,
   onClose,
   subtitle,
   title,
   visible,
-}: {
-  readonly children: ReactNode;
-  readonly closeLabel: string;
-  /** Stays under the scrolling body (a long form keeps its buttons in sight). */
-  readonly footer?: ReactNode;
-  /** The sheet is a form (its fields and the footer's buttons), named this. */
-  readonly formLabel?: string;
-  /** Stays under the title, above the scrolling body: a picker's Stop, its switch, its search. */
-  readonly header?: ReactNode;
-  readonly onClose: () => void;
-  readonly subtitle?: string;
-  readonly title: string;
-  readonly visible: boolean;
-}) => {
+}: SheetProps) => {
   const { scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
@@ -208,7 +215,7 @@ export const Sheet = ({
               ref={surfaceRef}
               {...(formLabel !== undefined && { accessibilityLabel: formLabel, role: "form" })}
               // The modal is the dialog already (react-native-web gives it the role); this is its surface.
-              {...({ dataSet: { paceSurface: "sheet" } } as object)}
+              {...({ dataSet: { paceSheet: name, paceSurface: "sheet" } } as object)}
               className={cx(
                 "shrink overflow-hidden bg-surface px-5",
                 isWide

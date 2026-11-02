@@ -265,6 +265,7 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
   return (
     <Sheet
       closeLabel={t("common.close")}
+      name="activity"
       onClose={onClose}
       // Only the times are typed, so the days they fall on are named here: both for a night, and
       // as typed once the times read right (a retyped end moves near where it was).

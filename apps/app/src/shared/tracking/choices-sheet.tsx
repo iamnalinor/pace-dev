@@ -219,6 +219,7 @@ export const ChoicesSheet = ({
   return (
     <Sheet
       closeLabel={t("common.close")}
+      name="time-choices"
       {...(hasHeader && { header })}
       onClose={onClose}
       title={t(button.labelKey)}

@@ -12,8 +12,9 @@ const STOPS = '[tabindex="0"], button:not([disabled]), a[href]';
 /**
 Where an open sheet may start, in order: its fields (only where there is a keyboard to type with:
 on a touch screen a focused field brings up the on-screen keyboard over the sheet, fix round 5
-V4), then its other controls but the close cross. None when focus is already in the sheet on
-something other than the cross (a field that focused itself).
+V4), then its other controls but the close cross; and the sheet itself when it holds nothing
+else to focus (a block's details on a phone: focus stayed on the page behind it). None when focus
+is already in the sheet on something other than the cross (a field that focused itself).
 */
 export const sheetStartStops = (
   surface: HTMLElement,
@@ -35,7 +36,8 @@ export const sheetStartStops = (
   const others = [...surface.querySelectorAll<HTMLElement>(STOPS)].filter(
     (element) => !isClose(element) && !element.matches(FIELDS),
   );
-  return [...fields, ...others];
+  const stops = [...fields, ...others];
+  return stops.length > 0 ? stops : [surface];
 };
 
 /**
@@ -72,6 +74,8 @@ export const useSheetFocusRef = ({
       if (element === null) {
         return;
       }
+      // Focusable by the script alone (never a Tab stop): where a sheet with nothing else starts.
+      element.tabIndex = -1;
       let frame = 0;
       let left = FOCUS_FRAMES;
       const attempt = (): void => {

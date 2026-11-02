@@ -285,6 +285,7 @@ export const EditTaskSheet = ({
           primaryLabel={t("common.save")}
         />
       }
+      name="task-edit"
       onClose={onClose}
       title={t("edit.title")}
       visible

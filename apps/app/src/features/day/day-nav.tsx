@@ -67,6 +67,7 @@ export const DayNav = ({
       />
       <Sheet
         closeLabel={t("common.close")}
+        name="day-picker"
         onClose={() => {
           setIsPicking(false);
         }}

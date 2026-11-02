@@ -78,7 +78,13 @@ export const ProjectSheet = ({
     }
   };
   return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} title={t("task.moveTitle")} visible>
+    <Sheet
+      closeLabel={t("common.close")}
+      name="move-to-project"
+      onClose={onClose}
+      title={t("task.moveTitle")}
+      visible
+    >
       <View accessibilityRole="radiogroup" className="gap-2">
         {choices.map((choice) => (
           <ChoiceRow

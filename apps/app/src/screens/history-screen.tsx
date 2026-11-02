@@ -21,6 +21,44 @@ import { PushedScreen } from "./pushed-screen.tsx";
 
 const MINUTES_PER_DAY = 1440;
 
+/** Asks before an event is undone; it names the event and its task under the question. */
+const UndoConfirmation = ({
+  isBusy,
+  onClose,
+  onUndo,
+  subtitle,
+}: {
+  readonly isBusy: boolean;
+  readonly onClose: () => void;
+  readonly onUndo: () => void;
+  readonly subtitle: string;
+}) => {
+  const t = useT();
+  return (
+    <Sheet
+      closeLabel={t("common.close")}
+      footer={
+        <SheetActions
+          cancelLabel={t("common.cancel")}
+          isBusy={isBusy}
+          onCancel={onClose}
+          onPrimary={onUndo}
+          primaryLabel={t("history.undoConfirm")}
+        />
+      }
+      name="history-undo"
+      onClose={onClose}
+      subtitle={subtitle}
+      title={t("history.undoConfirm")}
+      visible
+    >
+      <Text className="pb-4 font-sans text-[14px] leading-5 text-fg">
+        {t("history.undoConfirmQuestion")}
+      </Text>
+    </Sheet>
+  );
+};
+
 const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const t = useT();
   const viewer = useViewer();
@@ -75,28 +113,14 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
         ) : null}
       </View>
       {isConfirming && entry.revocable ? (
-        <Sheet
-          closeLabel={t("common.close")}
-          footer={
-            <SheetActions
-              cancelLabel={t("common.cancel")}
-              isBusy={isBusy}
-              onCancel={closeConfirmation}
-              onPrimary={() => {
-                void undo();
-              }}
-              primaryLabel={t("history.undoConfirm")}
-            />
-          }
+        <UndoConfirmation
+          isBusy={isBusy}
           onClose={closeConfirmation}
+          onUndo={() => {
+            void undo();
+          }}
           subtitle={entry.taskTitle === null ? eventLabel : `${eventLabel} · ${entry.taskTitle}`}
-          title={t("history.undoConfirm")}
-          visible
-        >
-          <Text className="pb-4 font-sans text-[14px] leading-5 text-fg">
-            {t("history.undoConfirmQuestion")}
-          </Text>
-        </Sheet>
+        />
       ) : null}
     </View>
   );

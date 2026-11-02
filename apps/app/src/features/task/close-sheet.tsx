@@ -106,6 +106,7 @@ export const CloseSheet = ({
           primaryLabel={primary}
         />
       }
+      name="close"
       onClose={onClose}
       subtitle={isSubmit ? t("close.subtitleSolved", { title: view.title }) : view.title}
       title={isSubmit ? submitTitle : t("close.closeTitle")}
