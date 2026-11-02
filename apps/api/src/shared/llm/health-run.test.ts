@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { HealthEntry } from "./health.ts";
+
 import { echoParse, fakeParseModel, type FakeReply } from "./fake-model.ts";
 import { memoryHealth } from "./health-store.ts";
 import { type ParseProvider, runParse } from "./llm.ts";
@@ -23,6 +25,13 @@ const noting = (
 });
 
 const down = (): FakeReply => ({ unavailableWith: 503 });
+
+/** A record whose penalty just ran out: the provider is probed in its place. */
+const probation = (strikes: number): HealthEntry => ({
+  reason: "server-error",
+  strikes,
+  until: new Date(NOW - 1000).toISOString(),
+});
 
 describe("runParse with the health memory", () => {
   it("asks a provider that just failed last, for the next person too", async () => {
@@ -52,6 +61,75 @@ describe("runParse with the health memory", () => {
     const read = await runParse(pool, PROMPT, { health, hedgeAfterMs: 60_000, now: () => NOW });
     expect(read).toMatchObject({ ok: true, value: { provider: "good" } });
     expect(Date.now() - started).toBeLessThan(700);
+  });
+
+  it("takes a probe's first token as its recovery, though another answered first (bug class 96)", async () => {
+    const health = memoryHealth({ back: probation(3) });
+    const pool = [
+      {
+        model: fakeParseModel(echoParse, { firstTokenAfterMs: 20, restAfterMs: 400 }),
+        name: "back",
+      },
+      { model: fakeParseModel(echoParse, { firstTokenAfterMs: 50 }), name: "quick" },
+    ];
+    const read = await runParse(pool, PROMPT, { health, now: () => NOW });
+    expect(read).toMatchObject({ ok: true, value: { provider: "quick" } });
+    expect(await health.read()).toEqual({});
+  });
+
+  it("puts a probe that could not be judged back in its place: the next read asks one provider", async () => {
+    const health = memoryHealth({ slower: probation(2) });
+    const asked: string[] = [];
+    const pool = [
+      {
+        model: fakeParseModel(
+          (text) => {
+            asked.push("slower");
+            return echoParse(text);
+          },
+          { firstTokenAfterMs: 150 },
+        ),
+        name: "slower",
+      },
+      noting(asked, "quick", echoParse),
+    ];
+    expect(await runParse(pool, PROMPT, { health, now: () => NOW })).toMatchObject({
+      ok: true,
+      value: { provider: "quick" },
+    });
+    asked.length = 0;
+    const next = await runParse(pool, PROMPT, { health, now: () => NOW });
+    expect(next).toMatchObject({ ok: true, value: { provider: "slower" } });
+    expect(asked).toEqual(["slower"]);
+    expect(await health.read()).toEqual({});
+  });
+
+  it("penalises a probe again when it stays silent past the hedge while another answers", async () => {
+    const health = memoryHealth({ hung: probation(1) });
+    const pool = [
+      { model: fakeParseModel(echoParse, { firstTokenAfterMs: 60_000 }), name: "hung" },
+      { model: fakeParseModel(echoParse, { firstTokenAfterMs: 80 }), name: "quick" },
+    ];
+    await runParse(pool, PROMPT, { health, hedgeAfterMs: 30, now: () => NOW });
+    expect(await health.read()).toEqual({
+      hung: { reason: "slow", strikes: 2, until: new Date(NOW + 60_000).toISOString() },
+    });
+  });
+
+  it("strikes nobody slow when the read lost to its deadline", async () => {
+    const health = memoryHealth();
+    const pool = [
+      { model: fakeParseModel(echoParse, { firstTokenAfterMs: 60_000 }), name: "first" },
+      { model: fakeParseModel(echoParse, { firstTokenAfterMs: 60_000 }), name: "second" },
+    ];
+    const read = await runParse(pool, PROMPT, {
+      deadlineMs: 80,
+      health,
+      hedgeAfterMs: 10,
+      now: () => NOW,
+    });
+    expect(read).toMatchObject({ error: { code: "llm/unavailable" }, ok: false });
+    expect(await health.read()).toEqual({});
   });
 
   it("clears the record on a success: back in its place, asked alone", async () => {

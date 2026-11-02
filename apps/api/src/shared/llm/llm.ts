@@ -23,7 +23,7 @@ import {
   type UnwellReason,
   unwellReasonOf,
 } from "./failure.ts";
-import { type Health, orderByHealth, type Verdict } from "./health.ts";
+import { type Health, orderByHealth, type Verdict, verdictOf } from "./health.ts";
 import { hedgedRace, type Lost, type Won } from "./race.ts";
 
 const log = createLogger("info");
@@ -253,24 +253,19 @@ class ReadOutcome {
     this.retryAt = earliest(this.retryAt, failure.retryAt);
   }
 
-  /**
-  What the race showed about each provider asked: the winner answered; a failure said it is
-  unwell; one still silent past `hedgeAfterMs` when the race ended was slow. The rest (an answer
-  out of shape, a rate limit, one asked too late to judge) say nothing.
-  */
+  /** What the race showed about each provider asked (`verdictOf`). */
   verdicts(won: Result<Won<unknown>, Lost>, hedgeAfterMs: number): readonly Verdict[] {
     const ended = Date.now();
-    return [...this.asked].flatMap(([index, attempt]): Verdict[] => {
-      const provider = this.ready[index]?.name ?? "?";
-      if (won.ok && won.value.index === index) {
-        return [{ outcome: "ok", provider }];
-      }
-      if (this.failed.has(index)) {
-        const unwell = this.failed.get(index) ?? null;
-        return unwell === null ? [] : [{ outcome: "unwell", provider, why: unwell }];
-      }
-      const isSilent = !attempt.hasSpoken && ended - attempt.at >= hedgeAfterMs;
-      return isSilent ? [{ outcome: "slow", provider, why: "slow" }] : [];
+    return [...this.asked].flatMap(([index, attempt]) => {
+      const verdict = verdictOf({
+        ...(this.failed.has(index) && { failure: this.failed.get(index) ?? null }),
+        hasSpoken: attempt.hasSpoken,
+        isOutwaited: won.ok && ended - attempt.at >= hedgeAfterMs,
+        isProbe: this.probes.has(index),
+        isWinner: won.ok && won.value.index === index,
+        provider: this.ready[index]?.name ?? "?",
+      });
+      return verdict === null ? [] : [verdict];
     });
   }
 

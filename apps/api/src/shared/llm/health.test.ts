@@ -87,6 +87,24 @@ describe("nextHealth", () => {
     expect(nextHealth({}, [{ outcome: "ok", provider: "one" }], NOW).changes).toEqual([]);
   });
 
+  it("puts an unjudged probe back in its place with its strikes, and nothing else", () => {
+    const health: Health = {
+      one: { reason: "server-error", strikes: 2, until: at(-1) },
+      two: { reason: "server-error", strikes: 1, until: at(1) },
+    };
+    const next = nextHealth(
+      health,
+      ["one", "two", "three"].map((provider) => ({ outcome: "unjudged" as const, provider })),
+      NOW,
+    );
+    expect(next.health).toEqual({
+      one: { reason: "server-error", strikes: 2, until: null },
+      two: health["two"],
+    });
+    expect(next.changes).toEqual([{ kind: "returned", provider: "one" }]);
+    expect(orderByHealth(providers, next.health, NOW).probes.size).toBe(0);
+  });
+
   it("penalizes slowness only when it repeats", () => {
     const once = nextHealth({}, [{ outcome: "slow", provider: "two", why: "slow" }], NOW);
     expect(once.health).toEqual({ two: { reason: "slow", strikes: 1, until: null } });

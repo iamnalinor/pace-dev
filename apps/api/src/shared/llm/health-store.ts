@@ -18,18 +18,37 @@ export type HealthMemory = {
 };
 
 /** The one log line per change of order: a provider moved last, or back in its place. */
-const logChanges = (changes: readonly HealthChange[]): void => {
-  for (const change of changes) {
-    if (change.kind === "moved-last") {
+const logChange = (change: HealthChange): void => {
+  switch (change.kind) {
+    case "moved-last": {
       log.warn("llm: provider asked last", {
         provider: change.provider,
         strikes: change.strikes,
         until: change.until,
         why: change.reason,
       });
-    } else if (change.kind === "recovered") {
-      log.info("llm: provider back in its place", { provider: change.provider });
+      return;
     }
+    case "recovered": {
+      log.info("llm: provider back in its place", { provider: change.provider });
+      return;
+    }
+    case "returned": {
+      log.info("llm: provider back in its place, its probe unjudged", {
+        provider: change.provider,
+      });
+      return;
+    }
+    case "noted": {
+      // A first slow answer changes no order: nothing to tell.
+      return;
+    }
+  }
+};
+
+const logChanges = (changes: readonly HealthChange[]): void => {
+  for (const change of changes) {
+    logChange(change);
   }
 };
 

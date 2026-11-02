@@ -89,12 +89,14 @@ const partsOf = (
       { error: new Error("connection reset"), type: "error" },
     ];
   }
+  // The first character goes alone, so a pause after the first token can come between.
   const body: readonly StreamPart[] =
     text === ""
       ? []
       : [
           { id: "0", type: "text-start" },
-          { delta: text, id: "0", type: "text-delta" },
+          { delta: text.slice(0, 1), id: "0", type: "text-delta" },
+          { delta: text.slice(1), id: "0", type: "text-delta" },
         ];
   const ending: readonly StreamPart[] =
     errorAfter === undefined
@@ -106,15 +108,33 @@ const partsOf = (
   return [opening, ...body, ...ending];
 };
 
-export const streamOf = (streamed: Streamed, how: { readonly breaksMidStream: boolean }): Stream =>
-  new ReadableStream({
-    start: (controller) => {
-      for (const part of partsOf(streamed, how)) {
+type StreamHow = {
+  readonly breaksMidStream: boolean;
+  /** How long it pauses after its first token before the rest of the answer, in ms. */
+  readonly restAfterMs: number;
+  readonly signal: AbortSignal | undefined;
+};
+
+/** The parts as a stream: up to the first token at once, the rest after `restAfterMs`. */
+export const streamOf = (streamed: Streamed, how: StreamHow): Stream => {
+  const parts = partsOf(streamed, how);
+  const firstToken = parts.findIndex((part) => part.type === "text-delta") + 1;
+  const pause = how.restAfterMs > 0 && firstToken > 0 ? firstToken : parts.length;
+  return new ReadableStream({
+    start: async (controller) => {
+      for (const part of parts.slice(0, pause)) {
+        controller.enqueue(part);
+      }
+      if (pause < parts.length) {
+        await sleep(how.restAfterMs, how.signal);
+      }
+      for (const part of parts.slice(pause)) {
         controller.enqueue(part);
       }
       controller.close();
     },
   });
+};
 
 /** Waits `ms`, or rejects at once when the call is cancelled (as a real request would). */
 export const sleep = async (ms: number, signal?: AbortSignal): Promise<void> => {

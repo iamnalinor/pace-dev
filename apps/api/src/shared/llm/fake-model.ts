@@ -61,6 +61,8 @@ export type FakeModelOptions = {
   readonly firstTokenAfterMs?: number;
   /** Sends the start of its answer, then the stream breaks (a provider dropping mid-answer). */
   readonly breaksMidStream?: boolean;
+  /** How long it takes from its first token to the rest of its answer, in ms. */
+  readonly restAfterMs?: number;
 };
 
 /**
@@ -70,7 +72,7 @@ the answer as one text part after `firstTokenAfterMs`, and honours an abort whil
 */
 export const fakeParseModel = (
   reply: (text: string, system: string) => FakeReply,
-  { breaksMidStream = false, firstTokenAfterMs = 0 }: FakeModelOptions = {},
+  { breaksMidStream = false, firstTokenAfterMs = 0, restAfterMs = 0 }: FakeModelOptions = {},
 ): LanguageModel => {
   /** The scripted answer as JSON text, after the wait; a scripted failure is thrown. */
   const answerTo = async ({
@@ -101,7 +103,13 @@ export const fakeParseModel = (
       };
     },
     doStream: async (call) => {
-      return { stream: streamOf(await answerTo(call), { breaksMidStream }) };
+      return {
+        stream: streamOf(await answerTo(call), {
+          breaksMidStream,
+          restAfterMs,
+          signal: call.abortSignal,
+        }),
+      };
     },
     modelId: "fake-parse",
     provider: "fake",

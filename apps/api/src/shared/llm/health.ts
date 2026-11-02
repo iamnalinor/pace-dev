@@ -31,21 +31,27 @@ export type HealthEntry = {
 export type Health = Readonly<Record<string, HealthEntry>>;
 
 /**
-What one read showed about one provider it asked: answered; could not serve (`unwell`); silent
-past the hedge while another answered (`slow`).
+What one read showed about one provider it asked: answered or started to (`ok`: a first token
+counts); could not serve (`unwell`); silent past the hedge while another answered (`slow`); a
+probe that showed none of these (`unjudged`: the read ended before it could, bug class 96).
 */
 export type Verdict =
   | { readonly provider: string; readonly outcome: "ok" }
   | { readonly provider: string; readonly outcome: "slow"; readonly why: "slow" }
+  | { readonly provider: string; readonly outcome: "unjudged" }
   | { readonly provider: string; readonly outcome: "unwell"; readonly why: UnwellReason };
 
 /** A verdict against the provider. */
-type Failed = Exclude<Verdict, { readonly outcome: "ok" }>;
+type Failed = Extract<Verdict, { readonly outcome: "slow" | "unwell" }>;
 
-/** A record that changed: the ones that move a provider are logged, every one is written. */
+/**
+A record that changed. `moved-last`, `recovered` and `returned` (a probe back in its place,
+unjudged) change who is asked first and are logged and kept for every isolate; `noted` (a
+first slow answer) changes no order.
+*/
 export type HealthChange =
   | (HealthEntry & { readonly kind: "moved-last"; readonly provider: string })
-  | { readonly kind: "noted" | "recovered"; readonly provider: string };
+  | { readonly kind: "noted" | "recovered" | "returned"; readonly provider: string };
 
 export const PENALTY_BASE_MS = 60_000;
 export const PENALTY_CAP_MS = 30 * 60_000;
@@ -86,6 +92,43 @@ export const orderByHealth = <P extends { readonly name: string }>(
   };
 };
 
+/** What a read knows of one provider it asked, for its verdict. */
+export type Asked = {
+  readonly provider: string;
+  readonly isWinner: boolean;
+  /** It failed: why it could not serve anyone, `null` for a failure about this request only. */
+  readonly failure?: null | UnwellReason;
+  /** It sent a first token. */
+  readonly hasSpoken: boolean;
+  /** Still silent past the hedge when the read ended, and another provider answered. */
+  readonly isOutwaited: boolean;
+  readonly isProbe: boolean;
+};
+
+/**
+The verdict on one provider a read asked, or `null` when it says nothing: the winner answered; a
+failure that says the provider cannot serve anyone counts against it; a first token proves it up
+(a probe that started to answer has recovered, though another answered first); silence past the
+hedge while another answered is slow (never when nobody answered: a deadline strikes nobody); a
+probe with none of these is unjudged, and goes back to its place (bug class 96).
+*/
+export const verdictOf = (asked: Asked): null | Verdict => {
+  const { provider } = asked;
+  if (asked.isWinner) {
+    return { outcome: "ok", provider };
+  }
+  if (asked.failure !== undefined && asked.failure !== null) {
+    return { outcome: "unwell", provider, why: asked.failure };
+  }
+  if (asked.hasSpoken) {
+    return { outcome: "ok", provider };
+  }
+  if (asked.isOutwaited) {
+    return { outcome: "slow", provider, why: "slow" };
+  }
+  return asked.isProbe ? { outcome: "unjudged", provider } : null;
+};
+
 /**
 A failure on top of `entry`: one strike more and the penalty it earns. Slowness earns one only
 when it repeats (the first slow answer may be a long message), so it counts a strike less.
@@ -101,9 +144,10 @@ const struck = (entry: HealthEntry | undefined, verdict: Failed, now: string): H
 };
 
 /**
-What a read's verdicts change at `now`. A success clears a provider's record; a failure while
-its penalty still runs changes nothing (it was asked last, as meant), so a provider that stays
-down is written once per penalty, not once per request.
+What a read's verdicts change at `now`. A success (or a first token) clears a provider's record;
+a probe the read could not judge goes back to its place, its strikes kept, so no read after asks
+two providers for it; a failure while its penalty still runs changes nothing (it was asked last,
+as meant), so a provider that stays down is written once per penalty, not once per request.
 */
 export const nextHealth = (
   health: Health,
@@ -132,6 +176,14 @@ const stepOf = (
 ): null | { readonly health: Health; readonly change: HealthChange } => {
   const { provider } = verdict;
   const entry = health[provider];
+  if (verdict.outcome === "unjudged") {
+    return entry === undefined || standingOf(entry, now) !== "probation"
+      ? null
+      : {
+          change: { kind: "returned", provider },
+          health: { ...health, [provider]: { ...entry, until: null } },
+        };
+  }
   if (verdict.outcome === "ok") {
     return entry === undefined
       ? null
