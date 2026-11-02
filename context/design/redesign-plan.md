@@ -382,6 +382,25 @@ is removed from `known`, the state is rebuilt without it, and the returned promi
 
 ---
 
+### Task 2.6: Rematerialization linear in history (class 55, found by Task 2.5)
+
+Task 2.5 measured a full rebuild of the client state at about 13–33 ms for 500 events, 0.5 s for
+2,000 and 4 s for 5,000: `timeReducer` in core copies the whole activities map on every activity
+event and maps over all activities on every start. A full rebuild runs at app start, on Undo,
+delete, amend, retro actions and a refused write's rollback, so a long-time user waits seconds for
+each of them.
+**Files:** `packages/core/src/**` reducers (time first; sweep every reducer for per-event whole-copy
+or whole-scan), a cost test in core.
+- [ ] Failing test: a core cost test materializes a generated log of 2,000 and 8,000 events (a year
+      of the owner's use: activities, tasks, calendar) and asserts the time per event does not grow
+      with history (8k / 2k ratio ≤ 5) and 8,000 events rebuild in ≤ 300 ms on the CI runner.
+- [ ] Implement with structural sharing or batch-local mutation inside the reducer pass (results
+      stay immutable to callers; core stays pure); property test: the fast path equals the old
+      reducer on random logs.
+- [ ] Bug-lessons: class 55 instance (client side), the cost test as the guard. Commit.
+
+---
+
 ## Batch 3 — Primitives and components (PR "Design overhaul 2/7: the kit")
 
 Every task here: jest-expo tests by role and `accessibilityState` for each state the spec names
@@ -721,6 +740,17 @@ generated constants), presets `fadeIn/Out`, `riseIn/Out`, `sheetIn/Out`, `dialog
       filter none, list mount none (F-MOT-05…15).
 - [ ] e2e `motion.e2e.ts`: sheet open/close both animate (frames in between); dialog first frame
       scale ≥ 0.95; route push on web has ≥ 3 intermediate frames. Commit.
+
+### Task 5.6: Render budget — every latency case inside 100 ms
+
+Task 2.5 found that after the store fix the tab switch (≈120 ms), filter chip (≈160 ms), check-off
+(≈185 ms) and opening a row (≈150 ms) at 4× CPU still miss the 100 ms budget, and the cost is React
+render work on the click (52–165 ms), not writes.
+**Files:** whatever the profile names (React Profiler / Chrome trace at 4× CPU on the web build):
+memoised rows and view-model selectors, deferring off-screen work (`startTransition` for
+non-urgent subtrees), list rendering, the tab scenes kept mounted.
+- [ ] Every case in `e2e/latency.e2e.ts` passes the 100 ms budget; the over-budget markers are
+      removed. Report before/after per case. Commit.
 
 ### Task 5.4: Reduced-motion and focus sweeps
 
