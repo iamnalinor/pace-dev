@@ -47,13 +47,13 @@ textarea:focus {
 }
 
 /*
-A switch is an invisible checkbox laid over its track (react-native-web): the rule above would
-hide where the keyboard is, so a switch keeps a ring of its own.
+Where the keyboard is: one ring for every control, in the `focus` role (accent ink; the browser's
+own ring is black or white and not part of the design). A control that draws its own focused
+state (a text field) sets `outline: none` above.
 */
-input[role="switch"]:focus-visible {
+:focus-visible {
   outline: 2px solid var(--pace-focus);
   outline-offset: 2px;
-  border-radius: 999px;
 }
 
 /*
@@ -118,7 +118,5 @@ thick track filled up to the thumb (`--pace-share`) and a round thumb.
 }
 
 [data-pace-slider]:focus-visible {
-  outline: 2px solid var(--pace-focus);
-  outline-offset: 2px;
   border-radius: 8px;
 }

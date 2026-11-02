@@ -65,7 +65,7 @@ const Tab = ({
           size={ICON_SIZE}
           strokeWidth={STROKE}
         />
-        <View className="absolute -right-3 -top-2">
+        <View className="absolute -top-2 left-5">
           <CountBadge count={count} />
         </View>
       </View>

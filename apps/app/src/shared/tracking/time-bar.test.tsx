@@ -273,7 +273,7 @@ describe("TimeBar", () => {
       expect(running(runtime)).toEqual(["Commute"]);
     });
     await fireEvent.press(screen.getByRole("button", { name: "Rest" }));
-    await fireEvent(await screen.findByLabelText("Alongside what is running"), "valueChange", true);
+    await fireEvent.press(await screen.findByLabelText("Alongside what is running"));
     await fireEvent.press(screen.getByRole("button", { name: "Workout" }));
     await waitFor(() => {
       expect(running(runtime).toSorted((a, b) => a.localeCompare(b))).toEqual([

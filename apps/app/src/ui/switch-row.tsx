@@ -1,9 +1,13 @@
-import { Pressable, Switch, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import { SWITCH_REACH_PX, SWITCH_STYLE } from "./switch-size.ts";
-import { useTheme } from "./theme-provider.tsx";
+import { cx } from "./cx.ts";
 
-/** The native switch in Pace's colours: off, a cell knob on the outline track; on, on the accent. */
+/**
+The switch, drawn by the kit on both platforms (spec §4.2.26). The knob sits inside the track, so it
+never meets the page behind the switch: the native one is wider than its track, and a dark knob
+vanished into the dark page. On: the accent track with the on-accent knob. Off: the `outline` ring
+on the `fill.2` track with a `label.tertiary` knob (the spec's `outline` knob measures 2.7:1 on it).
+*/
 export const PaceSwitch = ({
   isOn,
   label,
@@ -12,39 +16,36 @@ export const PaceSwitch = ({
   readonly isOn: boolean;
   readonly label: string;
   readonly onChange: (isOn: boolean) => void;
-}) => {
-  const { palette } = useTheme();
-  // react-native-web colors the knob of an "on" switch with its own teal unless told otherwise.
-  const webKnob = { activeThumbColor: palette["accent.on"] };
-  return (
-    <View>
-      {SWITCH_REACH_PX === null ? null : (
-        // Behind the switch and reaching past it: a press just above or below it flips the
-        // switch too, while a press on the switch reaches the switch itself (drawn after, so on
-        // top). The switch stays the control for the keyboard and screen readers.
-        <Pressable
-          aria-hidden
-          className="absolute left-0 right-0"
-          onPress={() => {
-            onChange(!isOn);
-          }}
-          style={{ bottom: -SWITCH_REACH_PX, top: -SWITCH_REACH_PX }}
-          tabIndex={-1}
-          testID="switch-reach"
-        />
+}) => (
+  <Pressable
+    accessibilityLabel={label}
+    accessibilityRole="switch"
+    accessibilityState={{ checked: isOn }}
+    aria-checked={isOn}
+    className="shrink-0"
+    onPress={() => {
+      onChange(!isOn);
+    }}
+  >
+    <View
+      className={cx(
+        "h-switch-h w-switch-w flex-row items-center rounded-pill border-2",
+        isOn ? "border-accent bg-accent" : "border-outline bg-fill-2",
       )}
-      <Switch
-        accessibilityLabel={label}
-        onValueChange={onChange}
-        style={SWITCH_STYLE}
-        thumbColor={isOn ? palette["accent.on"] : palette["bg.cell"]}
-        trackColor={{ false: palette.outline, true: palette.accent }}
-        value={isOn}
-        {...webKnob}
+      testID="switch-track"
+    >
+      <View
+        className={cx(
+          "rounded-pill",
+          isOn
+            ? "ml-auto mr-0.5 size-switch-knob-on bg-accent-on"
+            : "ml-2 size-switch-knob-off bg-label-tertiary",
+        )}
+        testID="switch-knob"
       />
     </View>
-  );
-};
+  </Pressable>
+);
 
 /** A setting line with a hint under the label and the switch on the right. */
 export const SwitchRow = ({

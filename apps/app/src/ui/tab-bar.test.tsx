@@ -53,6 +53,14 @@ describe("TabBar", () => {
     expect(screen.getAllByTestId("count-badge")).toHaveLength(1);
   });
 
+  it("anchors the badge at the icon's trailing top and grows it away from the icon (never back over it)", async () => {
+    await renderScreen(<TabBar {...propsAt("index", jest.fn())} />, await createTestRuntime());
+    const anchor = screen.getByTestId("count-badge").parent?.props["className"] as string;
+    const classes = anchor.split(" ");
+    expect(classes).toContain("left-5");
+    expect(classes.some((name) => /^-?right-/.test(name))).toBe(false);
+  });
+
   it("has no badge on an empty Inbox", async () => {
     await renderScreen(
       <TabBar {...propsAt("index", jest.fn())} />,

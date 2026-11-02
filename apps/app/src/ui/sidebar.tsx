@@ -188,7 +188,7 @@ export const Sidebar = () => {
   return (
     <View
       aria-label={t("nav.main")}
-      className="w-sidebar gap-1 border-r border-separator bg-app px-3 pb-4 pt-5"
+      className="w-sidebar gap-1 border-r border-separator bg-sidebar px-3 pb-4 pt-5"
       role="navigation"
     >
       <SidebarHeader owner={owner} />

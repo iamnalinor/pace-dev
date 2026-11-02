@@ -53,8 +53,9 @@ const Bars = ({
             </Text>
             <View className="h-3 flex-1 overflow-hidden rounded-r-xs bg-fill-4">
               <View
-                className={`h-full rounded-r-xs ${bar.color === null ? "bg-label-quaternary" : fillClass(bar.color)}`}
+                className={`h-full rounded-r-xs ${bar.color === null ? "bg-hue-slate-stroke" : fillClass(bar.color)}`}
                 style={{ width: barWidth(bar.share) }}
+                testID="insight-bar"
               />
             </View>
             <Text className="font-sans text-caption font-normal tabular-nums text-label-primary">

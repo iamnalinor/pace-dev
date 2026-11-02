@@ -42,7 +42,7 @@ export const NotificationBell = ({
       >
         <Bell color={palette["label.secondary"]} size={18} strokeWidth={1.75} />
         <View className="absolute right-0.5 top-0.5">
-          <CountBadge count={model.unread} />
+          <CountBadge count={model.unread} tone="neutral" />
         </View>
       </Pressable>
     </Tooltip>

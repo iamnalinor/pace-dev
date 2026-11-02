@@ -69,7 +69,7 @@ describe("PresetScreen", () => {
     const override = screen.getByRole("switch", {
       name: en("presets.override", { field: colorField }),
     });
-    await fireEvent(override, "valueChange", true);
+    await fireEvent.press(override);
     await fireEvent.press(screen.getByRole("radio", { name: en("color.coral") }));
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     await waitFor(() => {

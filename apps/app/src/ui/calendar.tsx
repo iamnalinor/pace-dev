@@ -37,10 +37,10 @@ const dayLabel = (date: string, language: Language): string =>
     weekday: "long",
   }).format(new Date(`${date}T00:00:00Z`));
 
-/** The picked day on the quiet accent, the month's days in ink, the neighbours' faint. */
+/** The picked day on the solid accent, the month's days in ink, the neighbours' faint. */
 const ink = (cell: CalendarDay, isSelected: boolean): string => {
   if (isSelected) {
-    return "font-semibold text-accent-text";
+    return "font-semibold text-accent-on";
   }
   return cell.isInMonth ? "text-label-primary" : "text-label-tertiary";
 };
@@ -81,7 +81,7 @@ const DayCell = ({
     aria-selected={isSelected}
     className={cx(
       "h-10 flex-1 items-center justify-center rounded-lg active:opacity-70",
-      isSelected && "bg-accent-quiet",
+      isSelected && "bg-accent",
       !isSelected && isToday && "border-2 border-label-primary",
       isDisabled && "opacity-30",
     )}
@@ -103,7 +103,7 @@ const DayCell = ({
       <View
         className={cx(
           "absolute bottom-1 h-1 w-1 rounded-pill",
-          isSelected ? "bg-accent-text" : "bg-accent",
+          isSelected ? "bg-accent-on" : "bg-accent",
         )}
       />
     ) : null}
@@ -221,7 +221,7 @@ const useRovingDays = ({
 
 /**
 A themed month view: the month's title with previous / next, Monday-first weeks, today
-outlined, the picked day filled in the quiet accent and days with something on them dotted.
+outlined, the picked day filled in the accent and days with something on them dotted.
 The days are one tab stop (QA round 19 L5): the arrows move a day or a week, Home and End to the
 week's ends, Page Up and Down a month, Enter or Space picks; with a keyboard the picked day (else
 today) takes focus as the view opens.

@@ -94,6 +94,11 @@ const SIZE_TOKENS: Readonly<Record<string, number>> = {
   sidebar: layout.sidebarWidth,
   // The sidebar's column inside its `px-3` (a toast docked at its foot).
   "sidebar-inner": layout.sidebarWidth - 2 * space["4"],
+  // The switch's track and its two knobs (spec §4.2.26).
+  "switch-h": size.switch.track.height,
+  "switch-knob-off": size.switch.knob.off,
+  "switch-knob-on": size.switch.knob.on,
+  "switch-w": size.switch.track.width,
   "toast-max": size.toast.max,
   "tooltip-max": size.tooltip.max,
 };

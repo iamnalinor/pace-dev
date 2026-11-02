@@ -117,3 +117,20 @@ No clipping or overlap breakage and no lost targets. The migration is clean over
 - Toast in the sidebar (desktop) no longer clips its text; it now wraps to three lines.
 - Week: calmer tint blocks and a clear now-line; the selected block gets an accent ring.
 - Light theme backgrounds are cleaner (cool paper #F4F5F9 plus white cells) than the grey v1 canvas.
+
+---
+
+## Fix round (2026-11-02)
+
+After shots: `.cache/shots/batch-2-v/` (same names as batch-2; routes, focus, and the states task-edit-sheet, toast-to-inbox, now-check-toast, task-close-as, day-pick-date, now-calendar-tooltip, time-chores-picker). Details per finding: `.superpowers/sdd/redesign-plan/visual-fix-report.md`. Bug-lessons class 61.
+
+| Finding | Status |
+|---|---|
+| V2-01 switch knob | Fixed: the kit draws the switch (knob inside the track; on `accent.on` on `accent`, off `label.tertiary` on `fill.2` inside an `outline` ring). The spec's `outline` knob measures 2.7-2.9:1 on `fill.2` in light, so `label.tertiary` replaces it. |
+| V2-02 selected chip | Fixed: selected = solid `accent` fill and edge with `accent.on` label; the calendar's picked day likewise. |
+| V2-03 inbox badge | Fixed: `CountBadge` tone `danger` (solid `status.danger`, `bg.cell` digits, spec §4.2.8) for the Inbox, `neutral` for the bell; the tab-bar badge grows away from the icon (`left-5`). Danger, not accent, as the spec says (§3.1 "badges → status.danger"). |
+| V2-04 No project bar | Fixed: `hue.slate.stroke`. |
+| V2-06 RU running card | Fixed: Yes/Stop buttons `px-2`, Stop's icon gap `gap-1` (the caption and tag type roles are wider than the old px sizes). |
+| V2-07 sidebar ground | Fixed: `bg-sidebar`. |
+| V2-08 focus ring | Fixed: one `:focus-visible` rule in `global.css` in the `focus` role. |
+| V2-05 Week, V2-09..V2-14 | Deferred to Batch 4 (Week, Insights tiles, Task row, Login) and Batch 3 (Button disabled, Toast and Tooltip borders, chip-row wrap). |

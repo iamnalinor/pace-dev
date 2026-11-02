@@ -124,12 +124,12 @@ describe("SettingsScreen", () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     expect(nightHours()).not.toBeChecked();
-    await fireEvent(nightHours(), "valueChange", true);
+    await fireEvent.press(nightHours());
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.nightHours).toBe(true);
     });
     expect(nightHours()).toBeChecked();
-    await fireEvent(nightHours(), "valueChange", false);
+    await fireEvent.press(nightHours());
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.nightHours).toBe(false);
     });
@@ -140,7 +140,7 @@ describe("SettingsScreen", () => {
     const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
     await renderScreen(<SettingsScreen />, runtime);
     disk.refuse();
-    await fireEvent(nightHours(), "valueChange", true);
+    await fireEvent.press(nightHours());
     expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
     expect(nightHours()).not.toBeChecked();
     expect(runtime.state.store.getState().settings.nightHours).toBe(false);
@@ -168,7 +168,7 @@ describe("SettingsScreen", () => {
         kind: en("notify.kind.deadline_digest"),
       }),
     );
-    await fireEvent(digestOnWeb, "valueChange", true);
+    await fireEvent.press(digestOnWeb);
     expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
     expect(digestOnWeb).not.toBeChecked();
   });
@@ -187,7 +187,7 @@ describe("SettingsScreen", () => {
       }),
     );
     expect(digestOnWeb).not.toBeChecked();
-    await fireEvent(digestOnWeb, "valueChange", true);
+    await fireEvent.press(digestOnWeb);
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.notificationChannels.deadline_digest).toEqual({
         app: false,

@@ -36,6 +36,21 @@ describe("InsightsScreen", () => {
     expect(screen.getByLabelText("Typical focus block: 1h 30m")).toBeOnTheScreen();
   });
 
+  it("draws a bar with no project in a data colour, never the disabled one (V2-04)", async () => {
+    const runtime = await createTestRuntime();
+    await runtime.actions.logPast({
+      category: "study",
+      endAt: addMinutesIso(NOW, -60),
+      label: "Lecture",
+      startAt: addMinutesIso(NOW, -150),
+    });
+    await renderScreen(<InsightsScreen />, runtime);
+    const bars = within(screen.getByLabelText("Time by project")).getAllByTestId("insight-bar");
+    const classes = bars.map((bar) => bar.props["className"] as string);
+    expect(classes.some((name) => name.includes("bg-hue-slate-stroke"))).toBe(true);
+    expect(classes.join(" ")).not.toContain("quaternary");
+  });
+
   it("puts the night before next to the day's focus", async () => {
     const runtime = await createTestRuntime();
     await runtime.actions.logPast({

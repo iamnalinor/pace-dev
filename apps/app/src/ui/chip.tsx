@@ -2,30 +2,29 @@ import type { ReactNode, Ref } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
-import { inkClass, outlineClass, type TagColor, tintClass } from "./color.tsx";
+import { inkClass, outlineClass, type TagColor } from "./color.tsx";
 import { cx } from "./cx.ts";
 
 /**
-Unselected: the cell inside a 2px outline (in the chip's hue, else the control outline). Selected:
-the hue's tint under its ink; a neutral chip gets the selected fill and a label outline instead —
-never a black pill.
+Unselected: the cell inside a 2px outline (in the chip's hue, else the control outline). Selected: the
+solid accent with its own edge, a step the unselected ring cannot be mistaken for (accent against
+the cell is ≥ 3:1 in both themes, WCAG 1.4.11): a 12 % hue tint under the same ring read as "not
+chosen" (V2-02). The chip's hue stays in the ring of the ones not chosen.
 */
 const chipFill = (color: null | TagColor, isSelected: boolean): string => {
-  if (color === null) {
-    return isSelected
-      ? "border-2 border-label-primary bg-fill-3"
-      : "border-2 border-outline bg-cell";
+  if (isSelected) {
+    return "border-2 border-accent bg-accent";
   }
-  return isSelected
-    ? `border-2 ${outlineClass(color)} ${tintClass(color)}`
+  return color === null
+    ? "border-2 border-outline bg-cell"
     : `border-2 ${outlineClass(color)} bg-cell`;
 };
 
 const chipText = (color: null | TagColor, isSelected: boolean): string => {
-  if (color === null) {
-    return isSelected ? "font-medium text-label-primary" : "text-label-secondary";
+  if (isSelected) {
+    return "font-medium text-accent-on";
   }
-  return isSelected ? cx("font-medium", inkClass(color)) : inkClass(color);
+  return color === null ? "text-label-secondary" : inkClass(color);
 };
 
 /**
@@ -45,7 +44,7 @@ export const Chip = ({
   tall = false,
 }: {
   readonly children: string;
-  /** Drawn in this colour: washed, and filled with it once chosen. */
+  /** Drawn in this colour: ringed and inked in it; the accent fill marks it once chosen. */
   readonly color?: null | TagColor;
   /** Spoken instead of the visible text when the text alone is ambiguous. */
   readonly label?: string;
@@ -75,6 +74,7 @@ export const Chip = ({
         tall ? "h-10" : "h-8",
         chipFill(color, selected),
       )}
+      testID="chip-pill"
     >
       {leading}
       <Text className={cx("font-sans text-caption font-normal", chipText(color, selected))}>
