@@ -52,3 +52,27 @@ export const EmptyText = ({
     <Text className={className}>{children}</Text>
   );
 };
+
+/**
+A screen's figures and lists (Day's totals, timeline and screen time, Week's grid, the Assistant
+log) while the first sync of an empty copy runs: grey rows stand in for all of them, so no total
+reads 0 and no list says it is empty before the account's data came (QA round 19 M1). `isWaiting`:
+the screen is still loading its own answer from the server too.
+*/
+export const FirstSyncBody = ({
+  children,
+  isWaiting = false,
+}: {
+  readonly children: ReactNode;
+  readonly isWaiting?: boolean;
+}) => {
+  const t = useT();
+  const isFirstSync = useIsFirstSync();
+  return isFirstSync || isWaiting ? (
+    <View className="w-full px-5 py-2">
+      <Skeleton label={t("sync.loadingData")} />
+    </View>
+  ) : (
+    children
+  );
+};

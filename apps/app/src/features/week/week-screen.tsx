@@ -8,6 +8,7 @@ import { useBack } from "#app/shared/use-back.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
@@ -152,15 +153,17 @@ const WeekPage = ({
         />
       }
     >
-      <FittedGrid
-        calendar={calendar}
-        language={language}
-        now={now}
-        onPick={onPick}
-        selectedKey={picked === null ? null : pickedKey(picked)}
-        usage={usage}
-        week={week}
-      />
+      <FirstSyncBody>
+        <FittedGrid
+          calendar={calendar}
+          language={language}
+          now={now}
+          onPick={onPick}
+          selectedKey={picked === null ? null : pickedKey(picked)}
+          usage={usage}
+          week={week}
+        />
+      </FirstSyncBody>
     </Screen>
   );
 };

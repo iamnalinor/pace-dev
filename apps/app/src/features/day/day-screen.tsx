@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
-import type { DayEntry, DayModel, DayRowProps } from "@pace/client";
+import type { DayEntry, DayRowProps } from "@pace/client";
 
 import { usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
@@ -15,7 +15,7 @@ import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
-import { EmptyText } from "#app/ui/empty-state.tsx";
+import { EmptyText, FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
@@ -33,6 +33,7 @@ import {
 
 import { ActivitySheet, type SheetTarget } from "./activity-sheet.tsx";
 import { DayNav } from "./day-nav.tsx";
+import { Totals } from "./day-totals.tsx";
 import { CalendarSection, EndedAtPrompt, UsageAccessHint, UsageLine } from "./phone-section.tsx";
 import { type DayPhone, useDayPhone } from "./use-day-phone.ts";
 
@@ -267,27 +268,6 @@ const Entries = ({
   </RowList>
 );
 
-/** The day's tracked time and its split by category. */
-const Totals = ({ day }: { readonly day: DayModel }) => {
-  const t = useT();
-  const { language } = useViewer();
-  return (
-    <View className="flex-row flex-wrap items-center gap-1.5 px-5 pb-3">
-      <Text className="mr-1 font-sans text-[14px] text-fg">
-        {t("day.tracked", { duration: formatDuration(day.trackedMinutes, language) })}
-      </Text>
-      {day.totals.map((total) => (
-        <ColorTag color={total.color} key={total.category}>
-          {t("day.total", {
-            category: t(`category.${total.category}`),
-            duration: formatDuration(total.minutes, language),
-          })}
-        </ColorTag>
-      ))}
-    </View>
-  );
-};
-
 /**
 One day of the time ledger: totals per category, the timeline with its gaps, edits. Today it
 has the time bar at its foot, where the thumb rests; another day is only looked back on.
@@ -311,23 +291,31 @@ export const DayScreen = () => {
   );
   return (
     <Screen header={header}>
-      <Totals day={day} />
-      {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
-      {day.entries.length === 0 ? (
-        <EmptyText className="px-5 py-6 font-sans text-[14px] text-muted">
-          {t("day.empty")}
-        </EmptyText>
-      ) : (
-        <Entries entries={day.entries} onOpen={setSheet} phone={phone} sat={sat} zone={day.zone} />
-      )}
-      <LogPastRow
-        hasDivider={day.entries.length > 0}
-        onPress={() => {
-          setSheet(day.logTarget);
-        }}
-      />
-      {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
-      <ScreenTimeSection date={day.date} key={day.date} zone={day.zone} />
+      <FirstSyncBody>
+        <Totals day={day} />
+        {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
+        {day.entries.length === 0 ? (
+          <EmptyText className="px-5 py-6 font-sans text-[14px] text-muted">
+            {t("day.empty")}
+          </EmptyText>
+        ) : (
+          <Entries
+            entries={day.entries}
+            onOpen={setSheet}
+            phone={phone}
+            sat={sat}
+            zone={day.zone}
+          />
+        )}
+        <LogPastRow
+          hasDivider={day.entries.length > 0}
+          onPress={() => {
+            setSheet(day.logTarget);
+          }}
+        />
+        {IS_PHONE ? <CalendarSection entries={day.entries} phone={phone} zone={day.zone} /> : null}
+        <ScreenTimeSection date={day.date} key={day.date} zone={day.zone} />
+      </FirstSyncBody>
       {sheet === null ? null : (
         <ActivitySheet
           onClose={() => {

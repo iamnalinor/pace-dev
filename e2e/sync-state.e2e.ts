@@ -22,8 +22,12 @@ const serverTitles = async (token: string): Promise<readonly string[]> => {
     .map((event) => event.payload.title ?? "");
 };
 
-/** Final empty states the screens show for a log that holds nothing, in either language. */
-const EMPTY_COPY = /Nothing to do right now|Сейчас дел нет/u;
+/**
+Final empty states and zero totals the screens show for a log that holds nothing, in either
+language (QA round 19 M1 added Day's and the Assistant log's).
+*/
+const EMPTY_COPY =
+  /Nothing to do right now|Сейчас дел нет|Nothing in the log yet|В журнале пока пусто|Nothing recorded|Нет данных|ничего не записано|Tracked 0m|Учтено 0/u;
 
 test("the first sync of an empty copy shows placeholders, never the empty states, then the account's language (QA 17 M4)", async ({
   page,
@@ -94,6 +98,47 @@ test("a first sync that outlasts the cover shows no final empty copy in either l
   );
   expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
 });
+
+for (const path of ["/day", "/decisions"]) {
+  test(`${path} during a first sync that outlasts the cover shows no empty copy or zero total (QA 19 M1)`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const { token } = await loginViaApi(page);
+    await seedLivedIn(token);
+    await page.route("**/api/sync/pull**", async (route) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 12_000);
+      });
+      await route.continue();
+    });
+    await page.addInitScript(() => {
+      const seen: string[] = [];
+      Object.assign(globalThis, { seenTexts: seen });
+      new MutationObserver(() => {
+        const body = document.querySelector("body");
+        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText leaves out what is not drawn (the covered app); textContent keeps it
+        seen.push(body === null ? "" : body.innerText);
+      }).observe(document, { characterData: true, childList: true, subtree: true });
+    });
+    await page.goto(path);
+    await expect(page.getByRole("status").filter({ hasText: "Still syncing" })).toBeVisible({
+      timeout: 15_000,
+    });
+    // The app is given back with grey rows standing in for the screen's figures and lists.
+    await expect(
+      page.getByRole("progressbar", { name: "Loading your data…" }).first(),
+    ).toBeVisible();
+    // Every text shown while the log was not there yet (an empty "screen time" may be true later).
+    const seen = await page.evaluate(
+      () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
+    );
+    expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
+    await expect(page.getByRole("status").filter({ hasText: "Still syncing" })).toHaveCount(0, {
+      timeout: 20_000,
+    });
+  });
+}
 
 test("offline, a line says so; a task written meanwhile goes out on reconnect and the line clears (QA 17 M5)", async ({
   context,
