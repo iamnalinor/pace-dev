@@ -6,12 +6,12 @@ import type { PhoneCalendarEvent } from "#app/platform/phone-calendar.ts";
 import { useAppState, usePace } from "#app/app-state.tsx";
 import {
   calendarKey,
-  dismiss,
   dismissedKeys,
   seriesRules,
   usePhoneMemoryVersion,
 } from "#app/platform/phone-memory.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
+import { useLatestLoad, usePhoneAnswers } from "#app/shared/tracking/use-phone-answers.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { eventAnswers } from "@pace/client";
 import { calendarEventKey } from "@pace/core";
@@ -48,17 +48,19 @@ export const useCalendarPrompt = (): {
   const [loaded, setLoaded] = useState<Loaded>(EMPTY);
   // Read again when Day (or Settings) changes what the phone remembers.
   const memory = usePhoneMemoryVersion();
+  const loadLatest = useLatestLoad(setLoaded);
   const reload = useCallback(() => {
-    void (async () => {
+    loadLatest(async () => {
       const today = await calendarToday({ api, now: clock.now(), zone: deviceTz });
       const rules = await seriesRules();
-      setLoaded({
+      return {
         dismissed: await dismissedKeys(),
         events: today.events,
         ruled: new Set(rules.map((rule) => rule.series)),
-      });
-    })();
-  }, [api, clock, deviceTz]);
+      };
+    });
+  }, [loadLatest, api, clock, deviceTz]);
+  const answeredHere = usePhoneAnswers(reload);
   useEffect(() => {
     reload();
     const timer = setInterval(reload, RELOAD_MS);
@@ -72,10 +74,16 @@ export const useCalendarPrompt = (): {
       subscription.remove();
     };
   }, [reload, memory]);
+  // What was answered here this session holds whatever the phone's storage did with it.
+  const known: Loaded = {
+    dismissed: new Set([...loaded.dismissed, ...answeredHere.dismissed]),
+    events: loaded.events,
+    ruled: new Set([...loaded.ruled, ...answeredHere.rules.map((rule) => rule.series)]),
+  };
   const offered = promptedEvent(
-    loaded.events.filter((event) => !answered.has(calendarEventKey(event))),
+    known.events.filter((event) => !answered.has(calendarEventKey(event))),
     now,
-    { ...loaded, activities: Object.values(activities) },
+    { ...known, activities: Object.values(activities) },
   );
   return {
     event: offered,
@@ -84,14 +92,8 @@ export const useCalendarPrompt = (): {
       if (!(await notifications.skipEvent(calendarEventKey(event)))) {
         return false;
       }
-      // Gone at once; the phone's storage (slow on Android) follows, then the reload reads it back.
-      const key = calendarKey(event);
-      setLoaded((current) => ({ ...current, dismissed: new Set([...current.dismissed, key]) }));
-      try {
-        await dismiss(key);
-      } finally {
-        reload();
-      }
+      // Gone at once; the phone's storage (slow on Android) follows.
+      answeredHere.dismiss(calendarKey(event));
       return true;
     },
   };

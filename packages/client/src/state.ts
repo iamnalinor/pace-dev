@@ -105,6 +105,11 @@ export type AppStateHandle = {
   without writing them again, a dropped copy is read again. Nothing is told on (no echo).
   */
   readonly adoptPeerChange: (change: StoreChange) => Promise<void>;
+  /**
+  Drops the local copy: the log, its outbox, the cursor and the store id go, through the write
+  queue (a write still waiting is never made), and the state is empty.
+  */
+  readonly clear: () => Promise<void>;
 };
 
 const slice =
@@ -322,6 +327,11 @@ export const createAppState = (options: Options): AppStateHandle => {
 
   return {
     ...externalChanges(log, enqueue, options.onStored),
+    clear: async () => {
+      await enqueue(log.clear);
+      // The other tabs share the store that was just emptied: they read it again.
+      options.onStored?.({ kind: "reload" });
+    },
     dispatch,
     ready,
     revoke,
