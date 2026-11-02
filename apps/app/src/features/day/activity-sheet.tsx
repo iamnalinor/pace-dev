@@ -222,7 +222,8 @@ const DeleteBlock = ({
           return;
         }
         void (async () => {
-          if (await run(actions.deleteActivity(activityId))) {
+          const deletion = await run(actions.deleteActivity(activityId));
+          if (deletion.ok) {
             onDeleted();
           }
         })();
@@ -250,7 +251,7 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
     if (range === null || hasFault(faults)) {
       return;
     }
-    const isSaved = await run(
+    const saved = await run(
       actions.saveActivity(target, {
         category: draft.category,
         expectMinutes: draft.expectMinutes,
@@ -259,7 +260,7 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         ...range,
       }),
     );
-    if (isSaved) {
+    if (saved.ok) {
       onClose();
     }
   };

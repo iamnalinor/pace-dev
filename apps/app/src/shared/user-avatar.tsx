@@ -14,16 +14,7 @@ export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
     .slice(0, 2)
     .map((part) => part.slice(0, 1).toUpperCase())
     .join("");
-  return photoUrl !== null && failedUrl !== photoUrl ? (
-    <Image
-      accessibilityLabel={user?.name}
-      onError={() => {
-        setFailedUrl(photoUrl);
-      }}
-      source={{ uri: photoUrl }}
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-    />
-  ) : (
+  return photoUrl === null || failedUrl === photoUrl ? (
     <View
       className="items-center justify-center rounded-full bg-accentQuiet"
       style={{ width: size, height: size }}
@@ -35,5 +26,14 @@ export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
         {initials}
       </Text>
     </View>
+  ) : (
+    <Image
+      accessibilityLabel={user?.name}
+      onError={() => {
+        setFailedUrl(photoUrl);
+      }}
+      source={{ uri: photoUrl }}
+      style={{ width: size, height: size, borderRadius: size / 2 }}
+    />
   );
 };

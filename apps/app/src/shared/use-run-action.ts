@@ -15,11 +15,14 @@ export type RunOptions = {
   readonly action: NonNullable<ToastInput["action"]>;
 };
 
-/** Awaits an action: a refusal shows its sentence, a success only its follow-up offer, if any. */
+/**
+Awaits an action: a refusal shows its sentence, a success only its follow-up offer, if any.
+Resolves to the action's own result, so a caller goes on only once it went through (`.ok`).
+*/
 export const useRunAction = (): ((
   result: ActionResult,
   options?: RunOptions,
-) => Promise<boolean>) => {
+) => Promise<Awaited<ActionResult>>) => {
   const toast = useToast();
   const t = useT();
   return useCallback(
@@ -27,12 +30,12 @@ export const useRunAction = (): ((
       const done = await result;
       if (!done.ok) {
         toast.show({ message: errorText(t, done.error) });
-        return false;
+        return done;
       }
       if (options !== undefined) {
         toast.show({ action: options.action, message: options.success });
       }
-      return true;
+      return done;
     },
     [t, toast],
   );

@@ -34,8 +34,8 @@ export const notificationEndpoints = {
     path: "/api/notifications/read",
   }),
   /**
-    Answers a notification (Attend, Skip, "Yes, still", Stop) or puts it away (`read`): what the
-    answer means is written, and the notification is taken back on every other channel.
+  Answers a notification (Attend, Skip, "Yes, still", Stop) or puts it away (`read`): what the
+  answer means is written, and the notification is taken back on every other channel.
   */
   resolve: endpoint({
     auth: true,
@@ -46,8 +46,8 @@ export const notificationEndpoints = {
     path: "/api/notifications/:id/resolve",
   }),
   /**
-    What waits for this device when its push method is `poll` (its background check, and the
-    open app on a live notice); passing the last cursor acknowledges what came before.
+  What waits for this device when its push method is `poll` (its background check, and the
+  open app on a live notice); passing the last cursor acknowledges what came before.
   */
   poll: endpoint({
     auth: true,
@@ -64,8 +64,8 @@ export const notificationEndpoints = {
     path: "/api/push/methods",
   }),
   /**
-    How this session's device gets system notifications while the app is closed; a method the
-    server does not accept is refused with 409 `push/method-unavailable`.
+  How this session's device gets system notifications while the app is closed; a method the
+  server does not accept is refused with 409 `push/method-unavailable`.
   */
   push: endpoint({
     auth: true,

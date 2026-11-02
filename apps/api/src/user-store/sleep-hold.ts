@@ -127,14 +127,13 @@ export const keptHold = (held: Held | undefined, usesFrom: string): Held | undef
     ? held
     : undefined;
 
-/** A hold as stored: one the build before the anchor saved has none. */
-type StoredHeld = Omit<Held, "anchor"> & { readonly anchor?: string };
-
 /**
 The hold the last pass that read the log left, if any. One without an anchor (saved by the build
 before it) is dropped here, explicitly: the pass then decides and holds again from its own front.
 */
 export const heldOf = async (storage: DurableObjectStorage): Promise<Held | undefined> => {
+  /** A hold as stored: one the build before the anchor saved has none. */
+  type StoredHeld = Omit<Held, "anchor"> & { readonly anchor?: string };
   const held = await storage.get<StoredHeld>(HELD_KEY);
   return held?.anchor === undefined ? undefined : { ...held, anchor: held.anchor };
 };

@@ -10,12 +10,12 @@ import { useCloseWithUndo } from "./use-close-with-undo.ts";
 
 export type CheckTask = {
   /** A task submitted subtask by subtask: the check opens its submit sheet (which, when). */
-  readonly opensSheet: (row: NowRow) => boolean;
+  readonly doesOpenSheet: (row: NowRow) => boolean;
   /**
   The sheet for such a task; anything else is closed as done (History undoes it). Resolves to
-  whether it went through: a refused close says why, and the row has to come back.
+  whether it went through (`ok`): a refused close says why, and the row has to come back.
   */
-  readonly check: (row: NowRow) => Promise<boolean>;
+  readonly check: (row: NowRow) => Promise<{ readonly ok: boolean }>;
 };
 
 /** The row's check: close as done, or the submit sheet of a task sent subtask by subtask. */
@@ -23,7 +23,7 @@ export const useCheckTask = (): CheckTask => {
   const { state } = usePace();
   const openTask = useOpenTask();
   const closeWithUndo = useCloseWithUndo();
-  const opensSheet = useCallback(
+  const doesOpenSheet = useCallback(
     (row: NowRow): boolean => {
       const current = state.store.getState();
       const task = current.tasks.byId[row.id];
@@ -37,14 +37,14 @@ export const useCheckTask = (): CheckTask => {
     [state],
   );
   const check = useCallback(
-    async (row: NowRow): Promise<boolean> => {
-      if (opensSheet(row)) {
+    async (row: NowRow): Promise<{ readonly ok: boolean }> => {
+      if (doesOpenSheet(row)) {
         openTask(row.id, { close: true });
-        return true;
+        return { ok: true };
       }
       return await closeWithUndo(row.id, row.title);
     },
-    [closeWithUndo, openTask, opensSheet],
+    [closeWithUndo, doesOpenSheet, openTask],
   );
-  return { check, opensSheet };
+  return { check, doesOpenSheet };
 };

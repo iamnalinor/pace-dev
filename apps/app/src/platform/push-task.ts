@@ -157,7 +157,6 @@ export const handlePushTask = async (payload: Payload, api?: ApiClient | null): 
 };
 
 /** A push while the app is open shows like any other; a silent one (a dismissal) shows nothing. */
-// eslint-disable-next-line unicorn/no-top-level-side-effects -- the handler must be set before the first notification arrives
 Notifications.setNotificationHandler({
   handleNotification: (notification) => {
     const isShown = (notification.request.content.title ?? "") !== "";
@@ -171,7 +170,6 @@ Notifications.setNotificationHandler({
 });
 
 // Defined when this module loads (the root layout imports it), as the task manager requires.
-// eslint-disable-next-line unicorn/no-top-level-side-effects -- expo-task-manager needs the task defined at module load, before Android runs it
 TaskManager.defineTask<Payload>(PUSH_TASK, async ({ data }) => {
   try {
     await handlePushTask(data);

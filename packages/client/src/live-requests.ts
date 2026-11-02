@@ -16,12 +16,6 @@ export class LiveUnavailable extends Error {
   }
 }
 
-type Pending = {
-  readonly resolve: (message: LiveServerMessage) => void;
-  readonly reject: (error: LiveUnavailable) => void;
-  readonly timer: ReturnType<typeof setTimeout>;
-};
-
 /**
 The open requests of one channel, by id: at most `LIVE_MAX_IN_FLIGHT`, each failed after
 `LIVE_REQUEST_TIMEOUT_MS` (then `onTimeout` drops the socket that went quiet) or when the socket
@@ -37,6 +31,11 @@ export type Requests = {
 };
 
 export const createRequests = (onTimeout: () => void): Requests => {
+  type Pending = {
+    readonly resolve: (message: LiveServerMessage) => void;
+    readonly reject: (error: LiveUnavailable) => void;
+    readonly timer: ReturnType<typeof setTimeout>;
+  };
   const pending = new Map<string, Pending>();
   return {
     failAll: (): void => {

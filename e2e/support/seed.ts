@@ -359,8 +359,7 @@ export const pushAsClient = async (
 };
 
 /** Pushes the lived-in log for the account behind `token`; every event must be accepted. */
-export const seedLivedIn = async (token: string): Promise<LivedIn> => {
-  const now = Date.now();
+export const seedLivedIn = async (token: string, now: number = Date.now()): Promise<LivedIn> => {
   const ids = {
     algebraId: ulid(now - 5 * DAY),
     doneTaskId: ulid(now - 5 * DAY + 1),

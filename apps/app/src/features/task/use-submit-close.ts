@@ -36,7 +36,8 @@ export const useSubmitClose = (
             taskId,
           });
     void (async () => {
-      if (await run(result)) {
+      const written = await run(result);
+      if (written.ok) {
         onDone();
       }
     })();

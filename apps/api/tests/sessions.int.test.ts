@@ -13,8 +13,6 @@ const CHROME_MAC =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 const OKHTTP = "okhttp/4.12.0";
 
-type Problem = { readonly code: string };
-
 /** A request as Cloudflare hands it over: its address, country and city, and the client's UA. */
 const from = (ip: string, userAgent: string, cf: { city: string; country: string }) => ({
   cf,
@@ -179,6 +177,8 @@ describe("DELETE /api/sessions/:id", () => {
     expect((await call("/api/usage/sessions", { body, token: agent.token })).status).toBe(401);
     expect((await list(token)).map((session) => session.id)).not.toContain(agent.id);
   });
+
+  type Problem = { readonly code: string };
 
   it("revokes an MCP app's grant: gone from KV, and its token is refused", async () => {
     const { tokens } = await obtainToken({ devTelegramId: "1002" });

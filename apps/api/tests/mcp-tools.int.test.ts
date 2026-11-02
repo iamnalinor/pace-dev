@@ -29,12 +29,6 @@ const WRITE_TOOLS = [
   "update_task",
 ].toSorted(byText);
 
-type Listed = {
-  name: string;
-  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
-  description?: string;
-  inputSchema: { type: string; properties?: Record<string, unknown> };
-};
 type ToolResult = {
   isError?: boolean;
   content: { type: string; text?: string }[];
@@ -100,6 +94,12 @@ const createTask = async (token: string, args: Record<string, unknown>): Promise
 
 describe("MCP tools catalogue", () => {
   it("lists every tool with annotations, a title and an LLM-facing description", async () => {
+    type Listed = {
+      name: string;
+      annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+      description?: string;
+      inputSchema: { type: string; properties?: Record<string, unknown> };
+    };
     const token = await readWriteToken();
     const { tools } = await mcpResult<{ tools: Listed[] }>(token, "tools/list");
     const names = tools.map((tool) => tool.name).toSorted(byText);

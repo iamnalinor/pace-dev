@@ -18,12 +18,6 @@ import {
 
 type Problem = InstanceError | ServerUrlError;
 
-type Phase =
-  | { readonly kind: "checking" }
-  | { readonly kind: "found"; readonly origin: string; readonly instance: Instance }
-  | { readonly kind: "idle" }
-  | { readonly kind: "refused"; readonly problem: Problem };
-
 const PROBLEM_KEY: Readonly<Record<Problem, MessageKey>> = {
   "client-outdated": "server.clientOutdated",
   insecure: "server.insecure",
@@ -61,6 +55,11 @@ const Found = ({ instance }: { readonly instance: Instance }) => {
 
 /** The typed address, checked on demand: refused with a reason, or found with what it is. */
 const useServerCheck = () => {
+  type Phase =
+    | { readonly kind: "checking" }
+    | { readonly kind: "found"; readonly origin: string; readonly instance: Instance }
+    | { readonly kind: "idle" }
+    | { readonly kind: "refused"; readonly problem: Problem };
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   // Which check may still answer: an edit (or a newer check) makes a slower answer stale.

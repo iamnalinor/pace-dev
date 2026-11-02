@@ -35,8 +35,6 @@ const PrecisionRow = ({ form }: { readonly form: CloseForm }) => {
   );
 };
 
-type Outcome = "cancelled" | "first" | "skipped";
-
 /**
 How the task ends, one choice in sight: Done (or Submit), Cancelled, Skipped. A choice made by
 mistake is undone in the same row, and the row stays where it is, so the focus on it stays in
@@ -52,6 +50,7 @@ const OutcomeRow = ({
   readonly onReasonWanted: () => void;
   readonly view: TaskViewModel;
 }) => {
+  type Outcome = "cancelled" | "first" | "skipped";
   const t = useT();
   const first = initialMode(view);
   return (
