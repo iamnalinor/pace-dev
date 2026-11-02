@@ -9,11 +9,11 @@ Not testable on the web (stated, not guessed): the server's sleep pass itself. T
 ## Summary
 
 | Severity | Count |
-| -------- | ----- |
-| blocker  | 0     |
-| high     | 0     |
-| medium   | 7     |
-| low      | 16    |
+|---|---|
+| blocker | 0 |
+| high | 0 |
+| medium | 7 |
+| low | 16 |
 
 Medium:
 - **M1** A second tab of the same browser profile never receives the first tab's changes (until reload).
@@ -28,19 +28,18 @@ Round 16 findings re-tested: L2 (remote revoke), L3 (Escape on the confirm) and 
 
 ## Round 16 findings: state
 
-| Id                                           | State                                          | Evidence                                                                                                                                                                                                                                                                                     |
-| -------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M1 "Not me" drops focus to `<body>`          | not re-run (feed re-checked for requests only) | The feed is quiet: 15 s open with 3 unread = 1 `POST /notifications/read`, 2 `GET /notifications`, 1 `GET /sessions`, then silence; the bell goes "Notifications, 3 unread" → "Notifications". A live sign-in while open adds one POST + one GET + one `GET /sessions`, the 5th row appears. |
-| L2 a remote revoke signs out without a word  | **fixed**                                      | `S/revoke1.ts`: the session ended from another one → 509 ms later `/login` with the line "You were signed out: this session was ended on another device, or it expired." The local store stays until the next sign-in (log out proper empties it: events 9 → 0, `S/logout1.ts`).             |
-| L3 Escape does not cancel the inline confirm | **fixed**                                      | `S/conf1.ts`: clicking Revoke on two rows leaves one confirm open; Escape closes it and focus returns to the row's Revoke. The confirm now prints the key ("Cancel Escape").                                                                                                                 |
-| L4 devices list is not live                  | **fixed**                                      | `S/live2.ts`: a computer created through the API appears 504 ms later with no reload (`GET /api/sessions` ×2 in total).                                                                                                                                                                      |
-| L11 versions screen with a 404 blocks        | unchanged                                      | JSON 404, a protocol below the app's and a `minClientProtocol` above it all block; see L1 below for wording on the web.                                                                                                                                                                      |
-| L1 half-open socket                          | not re-run                                     |                                                                                                                                                                                                                                                                                              |
+| Id | State | Evidence |
+|---|---|---|
+| M1 "Not me" drops focus to `<body>` | not re-run (feed re-checked for requests only) | The feed is quiet: 15 s open with 3 unread = 1 `POST /notifications/read`, 2 `GET /notifications`, 1 `GET /sessions`, then silence; the bell goes "Notifications, 3 unread" → "Notifications". A live sign-in while open adds one POST + one GET + one `GET /sessions`, the 5th row appears. |
+| L2 a remote revoke signs out without a word | **fixed** | `S/revoke1.ts`: the session ended from another one → 509 ms later `/login` with the line "You were signed out: this session was ended on another device, or it expired." The local store stays until the next sign-in (log out proper empties it: events 9 → 0, `S/logout1.ts`). |
+| L3 Escape does not cancel the inline confirm | **fixed** | `S/conf1.ts`: clicking Revoke on two rows leaves one confirm open; Escape closes it and focus returns to the row's Revoke. The confirm now prints the key ("Cancel Escape"). |
+| L4 devices list is not live | **fixed** | `S/live2.ts`: a computer created through the API appears 504 ms later with no reload (`GET /api/sessions` ×2 in total). |
+| L11 versions screen with a 404 blocks | unchanged | JSON 404, a protocol below the app's and a `minClientProtocol` above it all block; see L1 below for wording on the web. |
+| L1 half-open socket | not re-run | |
 
 ## Findings
 
 ### M1 medium — A second tab in the same browser profile stays stale, for good
-
 Now and Day, 1440 light EN. Script `S/tabs3.ts`, `S/tabs4.ts`.
 Steps: sign in, open the app in tab A and in a second tab A2 of the same browser profile (a normal window plus an installed PWA window does the same). In A change a task's title in the edit sheet (Ctrl+Enter). Wait. Also bring A2 to the front (hidden → visible).
 Happened: A shows "Third edit" at once; A2 shows "Second edit" for as long as I watched (35 s, and after a hidden→visible return that did send two `GET /api/sync/pull?since=…`); only a reload shows "Third edit". Another browser (different profile, same account) got the same edit over the socket in about 2 s. Both tabs open `…/api/sync/live?device=<one id>`: they share one device id and the server never tells a device about its own writes (`live-sockets.ts`); both share one IndexedDB, so tab A's sync already moved the shared cursor and A2's pull returns nothing; and A2's in-memory state is not rebuilt from the store it shares.
@@ -49,7 +48,6 @@ Class: bug-lessons class 1 (the other side of a contract: "do not tell the write
 Guard: a Playwright test with two pages in one context (one edit, assert on the other page) in `e2e/live.e2e.ts`.
 
 ### M2 medium — A tab screen opened by URL loses its address; a reload then lands on Now
-
 `/day`, `/inbox` (also `/more`), 1440 and 390, every theme and language. Scripts `S/url1.ts`–`S/url3.ts`.
 Steps: sign in, open `http://…/day` directly (or press F5 on Day).
 Happened: Day shows, and 80 ms after load the app calls `history.replaceState` twice (`/day`, then `/`); the address bar reads `/`. F5 now shows Now ("Now · Pace"); the same for `/inbox`. `/week`, `/projects`, `/settings`, `/task/…` keep their URL. Clicking the sidebar entries does write `/day`, `/inbox` correctly. In the sweep the cold URL of the Day and Inbox screens came back as `/` in all 16 combinations (`S/sweep.out`: `ru-1440-light /day -> /`).
@@ -57,7 +55,6 @@ Should: the URL stays `/day` and reload returns to the same screen. This is what
 Guard: `route-sweep.e2e.ts` asserts `page.url()` after load for every tab screen.
 
 ### M3 medium — The PWA share target drops the shared text
-
 `/add?title=Article&text=https://example.com/a%20look%20at%20this&url=https://example.com/a`, 1440 and 390. Script `S/add2.ts`, screenshot `S/x/share-add.png`.
 Steps: `public/manifest.webmanifest` declares `"share_target": {"action": "/add", "method": "GET", "params": {"text","title","url"}}`; open that URL signed in.
 Happened: the New task form opens (focus in Title), `location` becomes `/`, and every field is empty (Title, Description, Link, the composer line): the text and link the person shared are gone without a word. `app/(tabs)/add.tsx` reads only the native `useShareIntentContext()`, which the web build never fills.
@@ -65,7 +62,6 @@ Should: on the web read `text`, `title`, `url` from the query (or remove `share_
 Guard: a web test that opens `/add?text=…` and asserts the assistant's preview or the form's fields.
 
 ### M4 medium — The first sync shows definitive empty states, in the wrong language
-
 Cold load (empty IndexedDB: new browser, new device, after "Log out"), `/`, `/day`, `/projects`, `/inbox`, `/week`, `/insights`, `/history`, 1440 and 390, RU. Script `S/slow.ts`, flicker trace `S/flick.ts`, screenshot `S/ld/_-390-cold.png`.
 Steps: sign in on a browser with no local data; delay `GET /api/sync/pull` by 3 s (or use a long log: a pull page is 200 events).
 Happened: for the whole wait the screens say "Сейчас дел нет." / "Nothing to do right now.", "За этот день ничего не записано.", "Проектов пока нет.", "Нечего разбирать.", "На этой неделе пока ничего не учтено.", "На тот момент в Pace ещё ничего не было." — no skeleton, no "loading". With the fake 3 s delay it is 3 s; on an undelayed local pull the empty copy still shows for about 0.3–0.5 s (`flick.ts`: first paint 643 ms empty, data at 810–1007 ms) and, for an RU account in an EN browser, in English first and then RU. A warm reload does not do this (data is local). The owner asked for skeletons while loading in feedback 4; the Devices list has them, the rest of the app does not.
@@ -73,88 +69,69 @@ Should: while the store has never completed a pull (no cursor), show the skeleto
 Guard: a unit/app test: "a store with no cursor renders no empty copy"; an e2e with the pull delayed.
 
 ### M5 medium — Nothing says "offline" or "not synced yet"
-
 Now, 1440 light EN. Script `S/off1.ts`, screenshots `S/r/offline-now.png`, `S/r/offline-created.png`.
 Steps: sign in, go offline (`context.setOffline(true)`), create a task by hand (+ → Create), open Settings, go back online.
 Happened: the task appears at once (good: it is local), but there is no banner, badge, toast or dot anywhere to say the device is offline or that the change has not reached the server; the form's Create gives no toast at all. After reconnecting the task reaches the server (1 event, no duplicate). Console: ~7 `ERR_INTERNET_DISCONNECTED` errors and a refused socket while offline (browser noise). `errors.offline` ("You are offline. Changes will sync when you reconnect.") exists in `packages/core/src/i18n/en/shell.ts` and is used nowhere in `apps/app`. In Settings, "Add a computer" offline does say "Could not create the token. Check the connection."
 Should: a calm persistent status (sidebar bottom / header) when offline or when the outbox is not empty, using the existing string.
 
 ### M6 medium — The name of the signed-in person is unreadable
-
 Sidebar header, 1440 light and dark. Script `S/name1.ts`, screenshot `S/x/sidebar-name.png` and any `S/sw/*1440*_.png` (it reads "Pace [D7] D…").
 Happened: next to the logo the avatar chip and a name box 23 px wide: "Dev 7003" is cut to "D…", with no `title`, `aria-label` or tooltip, and on a phone More shows the name. The owner (feedback 4): "in the sidebar at the top Pace, to the right the name from the Telegram profile, Albert". A name like "Albert" would read "A…".
 Should: give the name room (drop the bell below, or put the name under the logo), or show it in a tooltip and the account block.
 
 ### M7 medium — Icon-only actions have no tooltip or visible name on a computer
-
 Task pane header (Edit details, Pause, Cancel or skip the task…, Delete the task, ✕ Close), project chip, Day's pencils, Week's switch, 1440 light. Script `S/tip1.ts`/`S/tip2.ts`, screenshot `S/x/tooltip-edit.png`.
 Happened: hovering for 1.5 s shows nothing for any of them (`[role=tooltip]` exists only for the composer's New task, To Inbox, Send and the Calendar button). They have `aria-label` only (no `title`), so a mouse user must guess that ⏸ is "Pause the task" (and not "Focus", which sits in the footer with a stopwatch) and that ⊘ is "Cancel or skip".
 Should: the same tooltip primitive on every icon-only button (the stage-8 plan: "icon buttons use it for their hotkey hint").
 
 ### L1 low — The versions screen on the web offers only "Log out"
-
 `/api/instance` stubbed as 404, `protocol: 0`, `minClientProtocol: 99`; 1440 EN and 390 RU. Script `S/ver1.ts`, `S/v/`.
 Happened: "Server and app versions don't match / Update the app to keep using this server. / Server: localhost:8791 / Log out" (and RU). On the web "Update the app" means "reload" (the app is the page) but there is no Reload button, and the server-outdated text says "log out and sign in on another one", which a web build cannot do (no Change server). `document.title` stays "Now · Pace" / "Сейчас · Pace" (already known). Another URL while blocked shows the same screen (good).
 Should: on the web a "Reload" button for `client-outdated`; drop "sign in on another one" where there is no server switch.
 
 ### L2 low — Devices and sessions rows (phone)
-
 390 dark EN, `S/a/sessions-en-390-dark.png`. A wrapped row ends its first line with a dangling separator ("Developer sign-in ·" / "United States · 203.0.113.7 ·"); the "this device" row has no time or place while every other row has ("Signed in Nov 1, 20:13"); the country is spelled out in Settings ("United States") and shown as a code in the feed notice ("Columbus · US").
 
 ### L3 low — The Calendar picker points to a section that no longer has that name
-
 Calendar button on Now (web), EN: "Nothing on today in the calendar your phone sends (Pace on Android, with the calendar on in Settings → Devices)". The section is "Devices and sessions" now.
 
 ### L4 low — Time bar: the Task picker lists a task that has not started and a paused one
-
 `S/t/pick-task.png` (account 7002): "Fourth edit … Paused" and "Weekly review … Starts Nov 8" (a future series instance). A task that starts in a week is not something a person is working on now.
 
 ### L5 low — Feedback of starting an activity differs by path, the toast is narrow
-
 Typed line + Approve → toast "Started “played chess” · Undo" (5.2 s); Rest → Walk (picker) → no toast at all; the form's Create → no toast, the assistant's Approve → toast. The toast sits at the bottom-left in the sidebar column (≈200 px wide): "Created task “Buy milk tomorrow 18:… 30m”" is clipped on its third line (`S/c/p1-approve-enter.png`, `S/t/toast-crop.png`).
 
 ### L6 low — New project form: no focus on open, Escape does not close it
-
 Projects, 1440 EN. `S/proj2.ts`. After "New project" the focus is on `<body>` (the name field is not focused), Enter on the empty field does nothing and says nothing, Escape leaves the form open. The colour swatches have names (Blue, Violet, …) but are 20 px dots. A duplicate name is refused with "A project with this name already exists." (good).
 
 ### L7 low — "Deadline type" is shown while there is no deadline
-
 New task form (desktop pane and phone card): with "No deadline" chosen the form still offers "Deadline type: Hard due date / Main due + final deadline" (`S/c/form-repeat.png`). A control with nothing to act on until a deadline exists.
 
 ### L8 low — Week: a 0-minute activity is a 0 px target
-
 axe `target-size` (serious) on `/week` after "played chess 20:22–20:22" in the EN/390 and EN/1440 runs, light and dark; also a partially covered block in RU 390 ("Дорога в вуз 23:04–23:44"). A zero-length block should have a minimum height (and be reachable by keyboard). Only axe finding of the whole matrix.
 
 ### L9 low — The in-app theme does not set the browser's colours
-
 `S/theme2.ts`, `S/theme1.ts`. With the OS dark and the app set to Light (or the reverse) `body` stays the OS colour (rgb(11,11,12) / rgb(244,245,247)), `meta[name=theme-color]` has two `prefers-color-scheme` entries (the tab/status-bar colour follows the OS, not the app), and the manifest's `background_color` / `theme_color` are dark only. Visible effect: a dark flash before the first paint for a light-theme person on a dark OS, and a mismatching status bar on Android Chrome.
 
 ### L10 low — The time-zone card on Now cannot be dismissed
-
 RU/EN, `S/tz1.ts`: "This device is in UTC; the account uses Europe/Moscow. [Use UTC]" is shown above the list on every visit (a card of two lines and a button; on a phone it pushes the first task below the fold) with no "Keep" / ✕. A traveller on purpose must either change the account's zone or look at it forever.
 
 ### L11 low — Unknown task and unknown route
-
 `/task/doesnotexist`: header still shows a "No project" picker above "This task does not exist." (`S/x/nf_task_doesnotexist.png`); `/no-such-page` has `document.title` "Pace" only; `/presets/zzz` and `/project/…` are fine.
 
 ### L12 low — RU Insights wraps mid-word at 390
-
 "Насколько дробилось время" card: "Переключени / й в день" (the stat box is too narrow for the word). `S/m/ru-390-light-a.jpg`.
 
 ### L13 low — The notification matrix says "App" in English and "Телефон" in Russian
-
 Settings → Notifications column header: EN "App", RU "Телефон" (`S/set1.ts` text dump); the sheet/notice copy uses "phone" elsewhere in RU and "app" in EN.
 
 ### L14 low — Overnight activities show a fake start in their sheet
-
 Day, 1440 EN, `S/sleep5.ts`, `S/sleep7.ts`, screenshot `S/d/edit-sleep.png`. The automatic sleep that began Saturday 23:25 opens with "From 00:00 To 07:40" on Sunday (clamped to the day shown), while the real start is 23:25 the day before. Saving unchanged writes nothing (good) and changing To writes only `activity.adjusted {endAt}` (good), but the sheet says the start is 00:00.
 
 ### L15 low — Dead second control for the same job
-
 The Week screen has a "Ночные часы / Night hours" switch (a real `role=switch`, `aria-checked`) and Settings → Week has "Show night hours": same setting, two entry points; the Week one has no visible label or tooltip (see M7).
 
 ### L16 low — The assistant log still says "Suggested … Shown to you for approval" for a preview that was never answered
-
 `/decisions`, 1440 EN: "Suggested a new task “call mom tomorrow 19:00” · You wrote: … · Shown to you for approval" stays as the final state of a preview that the person closed by leaving the page; the stage-8 ruling is that the UI speaks as the assistant's pending action, not "Suggested by the assistant". (The new automatic-sleep rows could not be read on the web at all: with no real phone session the log has no sleep entries, so their screen wording needs a device check.)
 
 ## Owner requests: still not met or only partly met
@@ -182,7 +159,6 @@ Breaches (each is a finding above): control with no meaning (L7), state not visi
 Passes: lime used for the one primary action per screen; tags use distinct colours (Personal orange, Normal green, Not started grey, Paused grey but never both at once); phone sheets slide from the bottom and close on the dim, desktop sheets are centred with ✕ and Escape; "Not me" is outlined in the danger colour; axe finds no contrast problem in 13 routes × 8 combinations.
 
 ## What works well
-
 - Sleep, own live starts and overnight blocks are consistent across Day, Week, Insights and the edit sheet in EN and RU, and do not flicker.
 - Sessions: kind and age per row, a live list, one confirm at a time that Escape closes, a clear signed-out line after a remote revoke, local data emptied on log out.
 - The re-pull, the cold-wake comparison and offline creation (one event after reconnect) are clean: no duplicates, no loop, no console error online on any of 128 screens.

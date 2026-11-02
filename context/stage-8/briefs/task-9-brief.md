@@ -24,7 +24,6 @@ DeviceRow, AddComputer sheet), features/oauth/connected-apps.tsx, screens/settin
 The notification pool from Task 8 (`notify(kind, payload)` on the user DO via UserStoreApi) exists.
 
 ## Sessions model (D1, then `bun db:generate`)
-
 `sessions` gains: `kind` (`browser | app | agent | dev`), `name` (display name), `userAgent`, `ip`, `country`,
 `city`, `deviceId` (nullable; links a phone or an agent to its usage data). `label` goes (breaking is fine) — derive
 `name` instead. `scope` stays (`usage:write` for agents).
@@ -42,7 +41,6 @@ The notification pool from Task 8 (`notify(kind, payload)` on the user DO via Us
 - `lastSeenAt` as today.
 
 ## Endpoints (contract first)
-
 - `GET /api/sessions` → `{ sessions: [{ id, kind: browser|app|agent|dev|mcp, name, ip, country, city, createdAt,
   lastSeenAt, lastDataAt (agents/app: the latest usage upload for its deviceId; null otherwise), current: boolean,
   scopes? (mcp) }] }` = D1 sessions of the user + MCP grants from OAUTH_KV (kind `mcp`, name = client name, createdAt
@@ -54,7 +52,6 @@ The notification pool from Task 8 (`notify(kind, payload)` on the user DO via Us
   client code. Update docs/mcp.md / docs/desktop.md mentions.
 
 ## Login notices
-
 On every new session of kind browser/app/dev (not agents — an agent token is created by the person in Settings; not
 mcp), call the DO's `notify("login", { sessionId, kind, name, ip, country, city })` (Task 8). Telegram text (EN/RU by
 language): "You signed in from Chrome on macOS · IP 1.2.3.4 · Germany, Berlin" / RU "Вход с Chrome on macOS · IP 1.2.3.4 ·
@@ -68,7 +65,6 @@ correct one and explain. Tests: api int tests for both login paths producing one
 text and buttons (stubbed fetch), and the Not-me callback revoking the session.
 
 ## Settings (apps/app/src/screens/settings-screen.tsx and features/*)
-
 - Buttons size to content on a computer (no full-width buttons ≥1024 except inside sheets); on phones full-width is fine
   where it is the main action. Check ui/button.tsx for a `fit`/`block` prop or add one.
 - Order: preferences (theme, language, zone, permissions on phone, night hours if Task 5 added it), Notifications
@@ -92,7 +88,6 @@ text and buttons (stubbed fetch), and the Not-me callback revoking the session.
 - Delete apps/app/src/features/oauth/connected-apps.tsx and the devices screen; keep shared bits that are reused.
 
 ## Tests
-
 API int: sessions list (D1 + mcp grant), revoke both kinds, current flag, cf fields stored, UA naming; login notices
 (above). Client: hooks for sessions. App: Settings renders the list with skeletons then rows, the 8 h rule, revoke flow,
 Add a computer opens on phone, Connect an AI app shows the URL. Update/replace e2e/devices.e2e.ts. `bun lint`,

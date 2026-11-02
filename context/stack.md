@@ -10,20 +10,20 @@
 
 ## Компоненты
 
-| Слой                | Выбор                                                                                                                                                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Android             | Expo (React Native); `expo-calendar` для календарей телефона; свои Kotlin-модули на Expo Modules API — `UsageStatsManager` (экранное время, разблокировки для сна) и «Не беспокоить»; share intent; `expo-notifications` поверх FCM |
-| Веб                 | Vite + React, SQLite в WASM (OPFS) для офлайна                                                                                                                                                                                      |
-| Дизайн              | Общие токены: Tailwind в вебе, NativeWind в приложении                                                                                                                                                                              |
-| Синхронизация       | LiveStore (event sourcing, локальная SQLite). План Б — своя синхронизация событий push/pull по курсору через Durable Object                                                                                                         |
-| Бэкенд              | Cloudflare Workers, бесплатный план                                                                                                                                                                                                 |
-| Данные пользователя | Durable Object на пользователя (SQLite): лог событий, проекции, журнал решений, alarms для уведомлений и дайджестов                                                                                                                 |
-| Общие данные        | D1: вайтлист, сессии, связь Telegram ID с пользователем                                                                                                                                                                             |
-| Telegram-бот        | GramIO на вебхуке, проверка `secret_token`                                                                                                                                                                                          |
-| MCP                 | Cloudflare Agents SDK, OAuth через `workers-oauth-provider`; read-only SQL с ограничителем и готовые саммари                                                                                                                        |
-| Авторизация         | Telegram: Login Widget в вебе, deep link в бота для Android; вайтлист по Telegram ID                                                                                                                                                |
-| LLM                 | Vercel AI SDK (провайдер-агностично), structured output по строгой схеме, проверка по исходному тексту; бесплатная модель, выбор — по регрессионному набору                                                                         |
-| Тесты               | Vitest, включая регрессионный набор разбора LLM                                                                                                                                                                                     |
+| Слой | Выбор |
+| --- | --- |
+| Android | Expo (React Native); `expo-calendar` для календарей телефона; свои Kotlin-модули на Expo Modules API — `UsageStatsManager` (экранное время, разблокировки для сна) и «Не беспокоить»; share intent; `expo-notifications` поверх FCM |
+| Веб | Vite + React, SQLite в WASM (OPFS) для офлайна |
+| Дизайн | Общие токены: Tailwind в вебе, NativeWind в приложении |
+| Синхронизация | LiveStore (event sourcing, локальная SQLite). План Б — своя синхронизация событий push/pull по курсору через Durable Object |
+| Бэкенд | Cloudflare Workers, бесплатный план |
+| Данные пользователя | Durable Object на пользователя (SQLite): лог событий, проекции, журнал решений, alarms для уведомлений и дайджестов |
+| Общие данные | D1: вайтлист, сессии, связь Telegram ID с пользователем |
+| Telegram-бот | GramIO на вебхуке, проверка `secret_token` |
+| MCP | Cloudflare Agents SDK, OAuth через `workers-oauth-provider`; read-only SQL с ограничителем и готовые саммари |
+| Авторизация | Telegram: Login Widget в вебе, deep link в бота для Android; вайтлист по Telegram ID |
+| LLM | Vercel AI SDK (провайдер-агностично), structured output по строгой схеме, проверка по исходному тексту; бесплатная модель, выбор — по регрессионному набору |
+| Тесты | Vitest, включая регрессионный набор разбора LLM |
 
 ## Правила под бесплатный план Cloudflare
 

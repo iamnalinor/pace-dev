@@ -14,7 +14,6 @@ Owner's words:
   можно просто про то что в календаре нет событий рядом».
 
 ## 1. Tooltip primitive (apps/app/src/ui/tooltip.tsx + tooltip.web.tsx)
-
 `<Tooltip label="…">{trigger}</Tooltip>` anchored to its trigger (above it by default, flipping below when
 there is no room, kept inside the viewport). Web with a fine pointer: shows instantly on hover and on keyboard
 focus, hides on leave/blur/Escape; uses `role="tooltip"` + `aria-describedby`. Touch (phone and touch web):
@@ -30,7 +29,6 @@ button when the reason is noAccess may still open the permissions screen — say
 the button's accessibilityHint. (b) the composer's icon buttons (below) for their names + hotkeys.
 
 ## 2. The composer, simpler (apps/app/src/features/now/composer/*)
-
 - One line: the input, with two icon buttons inside its right edge: Inbox (lucide Inbox/tray icon; ⌥↵ / Alt+Enter
   — hotkey label per OS from ui/hotkeys.ts) and Send (an arrow-up/CornerDownLeft icon; ↵). Their names and hotkeys
   show in the Tooltip on hover. The Send button is lime (accent) when there is text, faint when empty.
@@ -40,7 +38,6 @@ the button's accessibilityHint. (b) the composer's icon buttons (below) for thei
 - Remove keys that become unused (composer.quickHint, the chevron's label…), EN and RU.
 
 ## 3. The form
-
 - Header: no «Check before adding». When the form was opened by hand: title "New task". When it holds what the
   assistant read: "Suggested by the assistant" (the next task turns this into create/change/delete wording — keep
   the header text coming from one place, e.g. a `formTitle(model)` helper). Create button stays (lime, ↵ hint);
@@ -55,7 +52,6 @@ the button's accessibilityHint. (b) the composer's icon buttons (below) for thei
 - Keyboard: Enter in Title adds, ⌘↵/Ctrl+Enter adds from anywhere in the form, Esc closes — as today.
 
 ## 4. Problems → Subtasks
-
 Grep "problem" (case-insensitive) in packages/core/src/i18n, apps/app/src, packages/client/src: every
 user-facing "problem" becomes "subtask" (EN: Subtasks / Add a subtask; RU: Подзадачи / Добавить подзадачу);
 identifiers named after problems get renamed too (breaking changes are fine), but do NOT rename event types or
@@ -66,7 +62,6 @@ on touch); the last row is a "+ Add subtask" text button that turns into an inli
 keeps the input open for the next one, Escape/blur with empty text closes it). No dashed pill.
 
 ## Tests and checks
-
 TDD: app tests for the tooltip, the composer line (Inbox button sends to Inbox; Send asks the assistant; "+"
 opens an empty form titled "New task"), the pane form on a wide window (mock useIsWide), the subtask editor.
 Update existing composer tests and e2e/composer.e2e.ts for the new controls (the e2e from Task 1 — N, title,

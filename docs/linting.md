@@ -5,15 +5,15 @@ pre-commit hook (lefthook, staging its own fixes) and the first CI job; CI then 
 `bun lint` changed any file (`git status --porcelain` must be empty), so unformatted code,
 a forgotten migration cannot reach `main`.
 
-| Step          | Tool                                                                                                                                              | Catches                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `lint:format` | **Biome** (formatter only), `biome format --write .`                                                                                              | formatting of TS/TSX/JS/JSON/CSS                                              |
-| `lint:eslint` | **ESLint 10** + plugins, `--fix --max-warnings 0`, one process per workspace (`scripts/eslint-all.ts`, memory), cached in `.cache/eslint/<part>/` | bugs, unsafe types, complexity, conventions                                   |
-| `typecheck`   | **tsc** (TypeScript 6, strictest) in six projects: root configs, `packages/core`, `packages/client`, `apps/api`, `apps/app`, `e2e`                | type errors                                                                   |
-| `lint:knip`   | **knip**                                                                                                                                          | unused files, exports, types and dependencies; missing dependencies           |
-| `lint:dup`    | **jscpd** (threshold 0, 50+ tokens)                                                                                                               | copy-paste outside tests, generated code, the i18n catalogs                   |
-| `lint:arch`   | **dependency-cruiser** over `apps packages e2e`                                                                                                   | layer boundaries, cycles, orphans, dev deps in prod code, undeclared packages |
-| `db:check`    | `apps/api/scripts/check-migrations.ts` (drizzle-kit)                                                                                              | a D1 or Durable Object schema change without a committed migration            |
+| Step | Tool | Catches |
+|---|---|---|
+| `lint:format` | **Biome** (formatter only), `biome format --write .` | formatting of TS/TSX/JS/JSON/CSS |
+| `lint:eslint` | **ESLint 10** + plugins, `--fix --max-warnings 0`, one process per workspace (`scripts/eslint-all.ts`, memory), cached in `.cache/eslint/<part>/` | bugs, unsafe types, complexity, conventions |
+| `typecheck` | **tsc** (TypeScript 6, strictest) in six projects: root configs, `packages/core`, `packages/client`, `apps/api`, `apps/app`, `e2e` | type errors |
+| `lint:knip` | **knip** | unused files, exports, types and dependencies; missing dependencies |
+| `lint:dup` | **jscpd** (threshold 0, 50+ tokens) | copy-paste outside tests, generated code, the i18n catalogs |
+| `lint:arch` | **dependency-cruiser** over `apps packages e2e` | layer boundaries, cycles, orphans, dev deps in prod code, undeclared packages |
+| `db:check` | `apps/api/scripts/check-migrations.ts` (drizzle-kit) | a D1 or Durable Object schema change without a committed migration |
 
 Scoped runs while working on one package (the same tools, fewer files):
 `bunx biome format --write <paths>`, `bunx eslint --fix --max-warnings 0 <paths>`,
@@ -68,36 +68,36 @@ TS 7 yet.
 
 ### Deliberately off or relaxed (and why)
 
-| Where                                                                                         | Rule                                                                                                                               | Why                                                                                                        |
-| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| everywhere                                                                                    | `unicorn/no-null`                                                                                                                  | `null` is part of JSON, SQL and React APIs                                                                 |
-| everywhere                                                                                    | `unicorn/name-replacements`                                                                                                        | fights conventional names (`db`, `props`, `params`, `env`, `err`)                                          |
-| everywhere                                                                                    | `unicorn/filename-case`                                                                                                            | check-file owns file naming                                                                                |
-| everywhere                                                                                    | `unicorn/single-line-block-comment-style`                                                                                          | one-line JSDoc is idiomatic                                                                                |
-| everywhere                                                                                    | `unicorn/no-useless-undefined` (arrow bodies)                                                                                      | `() => undefined` is the explicit "ignore" callback                                                        |
-| everywhere                                                                                    | `sonarjs/deprecation`, `sonarjs/no-unused-vars`                                                                                    | duplicated by the type-aware typescript-eslint rules                                                       |
-| everywhere                                                                                    | `sonarjs/todo-tag`                                                                                                                 | TODOs are allowed with a tracking reference (review)                                                       |
-| everywhere                                                                                    | `security/detect-object-injection`                                                                                                 | flags every `obj[key]`; noise in type-checked code                                                         |
-| everywhere                                                                                    | `import-x/no-unresolved`                                                                                                           | resolution is tsc's job, which runs right after                                                            |
-| everywhere                                                                                    | `promise/always-return`                                                                                                            | async/await style; `.then` chains are banned anyway                                                        |
-| everywhere                                                                                    | `@typescript-eslint/no-misused-promises` for JSX attributes                                                                        | `onClick={async () => …}` is idiomatic React                                                               |
-| everywhere                                                                                    | perfectionist `sort-objects` / `sort-object-types` / `sort-interfaces` / `sort-classes` not enabled                                | they destroy meaningful order (id first, table columns, config sections)                                   |
-| React files                                                                                   | `promise-function-async`                                                                                                           | React 19's `ReactNode` includes `Promise`; the autofix would turn components into async components         |
-| React files, routes, tests, inferred contracts (`app.ts`, `worker.ts`, `*-routes.ts`, `mcp/`) | `explicit-module-boundary-types`                                                                                                   | the inferred type is the contract, or the component return type is noise                                   |
-| `apps/app/app/**`                                                                             | check-file rules, `no-default-export`                                                                                              | expo-router maps the file system to routes (`(tabs)`, `[id].tsx`, `_layout.tsx`) and needs default exports |
-| `apps/app/modules/*/index.ts`                                                                 | `check-file/no-index`                                                                                                              | Expo local modules autolink by `index.ts`                                                                  |
-| `apps/app/*.js`, `apps/app/plugins/*.js`                                                      | type-checked rules, `no-require-imports`, `prefer-module`                                                                          | Expo loads Metro/Babel configs and config plugins as CommonJS under Node                                   |
-| `apps/api/src/worker.ts`, config files, `*.d.ts`                                              | `no-default-export`                                                                                                                | the Workers runtime, every tool and module declarations require it                                         |
-| config files                                                                                  | `no-unsafe-assignment`, `no-unsafe-member-access`, `max-lines`                                                                     | declarative lists; some plugins ship without types                                                         |
-| loggers, `scripts/**`, `apps/api/scripts/**`                                                  | `no-console`, `no-process-exit`, `detect-non-literal-fs-filename`                                                                  | they own stdout and the exit code and work with paths they compute                                         |
-| tests                                                                                         | size limits, `no-duplicate-string`, `no-await-expression-member`, `require-await`, `no-nested-functions`; `max-nested-callbacks` 5 | tests are long and repetitive by design (DAMP over DRY); fakes implement async ports synchronously         |
-| `*.d.ts`                                                                                      | `consistent-type-definitions`, `consistent-type-imports`                                                                           | ambient augmentation needs `interface` and `import()` types                                                |
+| Where | Rule | Why |
+|---|---|---|
+| everywhere | `unicorn/no-null` | `null` is part of JSON, SQL and React APIs |
+| everywhere | `unicorn/name-replacements` | fights conventional names (`db`, `props`, `params`, `env`, `err`) |
+| everywhere | `unicorn/filename-case` | check-file owns file naming |
+| everywhere | `unicorn/single-line-block-comment-style` | one-line JSDoc is idiomatic |
+| everywhere | `unicorn/no-useless-undefined` (arrow bodies) | `() => undefined` is the explicit "ignore" callback |
+| everywhere | `sonarjs/deprecation`, `sonarjs/no-unused-vars` | duplicated by the type-aware typescript-eslint rules |
+| everywhere | `sonarjs/todo-tag` | TODOs are allowed with a tracking reference (review) |
+| everywhere | `security/detect-object-injection` | flags every `obj[key]`; noise in type-checked code |
+| everywhere | `import-x/no-unresolved` | resolution is tsc's job, which runs right after |
+| everywhere | `promise/always-return` | async/await style; `.then` chains are banned anyway |
+| everywhere | `@typescript-eslint/no-misused-promises` for JSX attributes | `onClick={async () => …}` is idiomatic React |
+| everywhere | perfectionist `sort-objects` / `sort-object-types` / `sort-interfaces` / `sort-classes` not enabled | they destroy meaningful order (id first, table columns, config sections) |
+| React files | `promise-function-async` | React 19's `ReactNode` includes `Promise`; the autofix would turn components into async components |
+| React files, routes, tests, inferred contracts (`app.ts`, `worker.ts`, `*-routes.ts`, `mcp/`) | `explicit-module-boundary-types` | the inferred type is the contract, or the component return type is noise |
+| `apps/app/app/**` | check-file rules, `no-default-export` | expo-router maps the file system to routes (`(tabs)`, `[id].tsx`, `_layout.tsx`) and needs default exports |
+| `apps/app/modules/*/index.ts` | `check-file/no-index` | Expo local modules autolink by `index.ts` |
+| `apps/app/*.js`, `apps/app/plugins/*.js` | type-checked rules, `no-require-imports`, `prefer-module` | Expo loads Metro/Babel configs and config plugins as CommonJS under Node |
+| `apps/api/src/worker.ts`, config files, `*.d.ts` | `no-default-export` | the Workers runtime, every tool and module declarations require it |
+| config files | `no-unsafe-assignment`, `no-unsafe-member-access`, `max-lines` | declarative lists; some plugins ship without types |
+| loggers, `scripts/**`, `apps/api/scripts/**` | `no-console`, `no-process-exit`, `detect-non-literal-fs-filename` | they own stdout and the exit code and work with paths they compute |
+| tests | size limits, `no-duplicate-string`, `no-await-expression-member`, `require-await`, `no-nested-functions`; `max-nested-callbacks` 5 | tests are long and repetitive by design (DAMP over DRY); fakes implement async ports synchronously |
+| `*.d.ts` | `consistent-type-definitions`, `consistent-type-imports` | ambient augmentation needs `interface` and `import()` types |
 
 ## Biome (formatter only)
 
 Biome's linter and assists are disabled — ESLint is the single linter. The config
 therefore uses `eslint-config-prettier`, not `eslint-config-biome` (which would turn off
-ESLint rules the Biome _linter_ covers and silently lose checks). Settings: 2 spaces,
+ESLint rules the Biome *linter* covers and silently lose checks). Settings: 2 spaces,
 100 columns, double quotes, semicolons, trailing commas. It skips `drizzle/meta`, the
 bundled DO migrations, `worker-configuration.d.ts` and the generated `android/` folder.
 Markdown and YAML are not formatted (editorconfig covers whitespace there).

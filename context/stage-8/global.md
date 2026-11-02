@@ -5,7 +5,7 @@ Repo: /home/user/pace-dev, branch claude/new-session-sy3n4a. Read /home/user/pac
 - After every change run `bun lint` (auto-fixes) and fix everything it reports. Never run biome/eslint/tsc/knip separately. Never disable a lint rule inline without `-- <reason>`; never weaken a rule.
 - TDD for behaviour changes; test levels per docs/testing.md: `bun test:unit` (core, client), `bun test:api` (Worker), `bun test:app` (jest-expo). e2e (`bun test:e2e`, Playwright, Chromium at /opt/pw-browsers/chromium, never `playwright install`) only when the brief asks.
 - Never skip or delete a failing test (deleting tests of removed behaviour is fine).
-- Architecture (dependency-cruiser): core pure/immutable, no workspace imports; client imports core + only _types_ of api; apps never import each other; API feature folders share only through apps/api/src/shared.
+- Architecture (dependency-cruiser): core pure/immutable, no workspace imports; client imports core + only *types* of api; apps never import each other; API feature folders share only through apps/api/src/shared.
 - Event sourcing: user actions are immutable events; corrections are event.amended / event.revoked. Never mutate projections directly.
 - Errors: pure code returns Result<T,E> with string-literal codes; HTTP maps them with exhaustive switch (no default).
 - API contract first: routes are zod endpoint() in packages/core/src/api/endpoints.ts, mounted with mount() from apps/api/src/shared/mount.ts. Read bindings from c.env.

@@ -6,7 +6,6 @@ Everything below is medium or lower, an owner action, or a known limit. It was f
 TDD, a bug-lessons row, trace the other side of a contract.
 
 ## QA round 21 (`context/qa-round-21.md`, read the steps there)
-
 - **M1:** Enter in a single-line field of a sheet submits nothing and drops focus to the body behind
   the dim. Affected fields: the close sheet's Reason and typed time, Day's activity sheet (What, From),
   Edit task's Title. Enter should submit the sheet; focus never leaves it.
@@ -39,7 +38,6 @@ TDD, a bug-lessons row, trace the other side of a contract.
   - "Signed in from Dev login" entries in the bell (a dev artefact).
 
 ## Review of round 7 (a217c37..a76bf6e)
-
 - **#2:** a deferred text queued with `retryAt: null` is retried every 5 min for up to a day, even
   when a provider refuses it for good (400, content filter, context length). Count tries and move it
   to the Inbox after a few races with no `retryAt`, or send our-request failures to the Inbox.
@@ -60,7 +58,6 @@ TDD, a bug-lessons row, trace the other side of a contract.
   - the drain could wait for the earliest health penalty instead of 5 min.
 
 ## From the implementers (rounds 6–7)
-
 - **Account-bound defaults during the first sync:**
   - `/add` during the first sync shows New task's built-in defaults (presets, project, importance).
     Same class as the Settings and Week fixes (class 62).
@@ -85,7 +82,6 @@ TDD, a bug-lessons row, trace the other side of a contract.
   repo runners).
 
 ## Owner actions
-
 - Replace LLM slot 3's second key (`LLM_API_KEY_3`'s second entry answers 401 Invalid API Key) in
   GitHub secrets.
 - Slot 1 (nekocode) still answers 503. The health memory now puts it last; drop or replace it if it
@@ -95,7 +91,6 @@ TDD, a bug-lessons row, trace the other side of a contract.
 - A real signing keystore (`ANDROID_KEYSTORE_BASE64`).
 
 ## Carried over from earlier rounds (owner list)
-
 - **Sleep:**
   - Pool answers (Attend/Stop, recorded as system) are not counted as awake signs.
   - A live non-Rest activity started at night, followed by a quiet phone, becomes a 0-minute
@@ -113,6 +108,5 @@ TDD, a bug-lessons row, trace the other side of a contract.
   - The QA15 L16 and QA16 L11 leftovers.
 
 ## Briefs already written for the next iterations
-
 `context/firebase-from-server-plan.md`, `ota-updates-plan.md`, `infra-portability-plan.md`,
 `cold-storage-plan.md` and `android-e2e-plan.md`. Not planned: `telegram-oidc-plan.md`.

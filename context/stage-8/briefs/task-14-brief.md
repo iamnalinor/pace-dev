@@ -10,7 +10,7 @@ Owner's words: «Еще насчет автотрекинга сна. Не ну�
   под критерий небольших перерывов в сне, то мы задним числом ту старую запись снова открываем (как будто она и не
   останавливалась).
 - активность сна заводим даже если есть другая активность, кроме класса Rest. Если есть наложения, можно потом поподвигать даты»
-  («тело» = the phone.)
+(«тело» = the phone.)
 
 Data available on the server: usage sessions per device in the user DO table `usage_sessions` (apps/api/src/user-store/
 schema.ts; written by `POST /api/usage/sessions` from the phone's background task about every 30 min and from desktop agents
@@ -21,7 +21,6 @@ apps/app/src/features/day/phone-section.tsx (the "Log sleep / Not sleep" card), 
 (the sleep notice — Task 8 may already have removed the notice).
 
 ## Rules (pure, packages/core/src/tracking/sleep-auto.ts), constants named and documented
-
 - Night window for a sleep START: 20:00–05:00 local (`SLEEP_START_WINDOW`).
 - `SLEEP_OPEN_AFTER_MINUTES = 60`: no use on any device for this long.
 - `SHORT_WAKE_MINUTES = 15`: a wake this short (use in total, from the first use after the sleep start to the last use before
@@ -46,20 +45,17 @@ apps/app/src/features/day/phone-section.tsx (the "Log sleep / Not sleep" card), 
 - Idempotent: re-running on the same inputs yields no new events (deterministic ids + existing-event checks).
 
 ## Where it runs (apps/api/src/user-store)
-
 After every usage upload (append) and on the DO alarm: during the night window + until 12:00, re-arm the alarm at most every
 15 min (merge with the existing alarm scheduling in notifier.ts `rearm` — one alarm, earliest wins). Each decision is appended
 through the same path as derived system events (`derive` in derive-steps.ts / apply with source "system") and logged in the
 `decisions` table with its inputs (why).
 
 ## Remove
-
 The phone-only sleep detector and its UI: detectSleep and constants that only it uses in core/tracking/phone.ts (keep what
 other features use — check with grep), the Day card in phone-section.tsx (keep the rest of that section if it shows other
 phone data), the background notice if still there, tests of removed code.
 
 ## Tests (TDD)
-
 Core: scenarios with fixtures — (1) last use 23:40, quiet till 07:10 → open at 23:40, stop at 07:10; (2) wake 03:00–03:06 then
 quiet → stop at 03:00 then reopen (revoke) — final effective state: one sleep 23:40→07:10; (3) wake 03:00–03:40 → stays stopped
 at 03:00, a new open? (no — "if sleep in this window already was" → no new sleep; document this) ; (4) manual sleep started

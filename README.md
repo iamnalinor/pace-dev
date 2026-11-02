@@ -9,23 +9,23 @@ phone, in the browser and on the server.
 
 ## Status
 
-| Stage                     | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | State                                                 |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| 0 — Foundation            | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets                                                                                                                                                                                                                                                                                                                 | **done**                                              |
-| 1 — Tasks                 | presets (edited in the web UI), tasks and subtasks, the Now list, projects, inbox, history, MCP minimum with OAuth                                                                                                                                                                                                                                                                                                                                                                  | **done** — deployed, `v0.1.0`                         |
-| 2 — Language              | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log                                                                                                                                                                                                                                                                                                                                                                                                | **done** — deployed                                   |
-| 3 — Time                  | the time ledger: a time bar under Now (one tap switches), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers, alerts through the bot, MCP time tools                                                                                                                                                                                                                                | **done** — `v0.3.0`                                   |
-| 4 — Phone and depth       | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all`                                                                                                                                              | **done** — `v0.4.0`, `v0.5.0`                         |
+| Stage | Scope | State |
+|---|---|---|
+| 0 — Foundation | shared core (events, materializer, settings, i18n, design tokens, API contract), Worker (Telegram auth, bot login, sync), typed client, CI/CD, deploy, brand assets | **done** |
+| 1 — Tasks | presets (edited in the web UI), tasks and subtasks, the Now list, projects, inbox, history, MCP minimum with OAuth | **done** — deployed, `v0.1.0` |
+| 2 — Language | free-text input parsed by an LLM, the full Telegram bot, notifications, decision log | **done** — deployed |
+| 3 — Time | the time ledger: a time bar under Now (one tap switches), focus on a task, the Day timeline (gaps, log past, edit), Insights (time by category and project, on-time rate, estimate vs tracked), phone timers, alerts through the bot, MCP time tools | **done** — `v0.3.0` |
+| 4 — Phone and depth | phone data on Day (sleep, phone time per block, calendar), Settings → Permissions and a first-run walk-through, background checks, "ended at …?", calendar series rules; Insights by hour, fragmentation, sleep and focus; Excel export; LLM limits remembered and "read it when it's back"; MCP `query_sql`, `simulate`, `export_all` | **done** — `v0.4.0`, `v0.5.0` |
 | 6 — Second feedback round | one sidebar on every desktop screen, Inter everywhere, Now sorted by deadline only (no ranking, no Waiting), quick input and the task form as two steps, every field of a task editable, project pages as task lists; the time bar's four fixed buttons (From calendar, Rest, Sport, Chores), activities alongside the main one, "still doing this?" at twice the Expect instead of limits, typed activities read by the assistant in the background, only accepted calendar events | **done** — PR 1 `v0.10.0`, PR 2 `v0.11.0`; PR 3 below |
-| PR 3 (phase C)            | your own server (Change server, `GET /api/instance`, protocol checks), one list of devices and sessions with sign-in notices and "Not me", sync over the live socket with HTTP as fallback, a background check for phones without Google push and its battery step, sleep recorded on the server by itself                                                                                                                                                                          | part 1 merged (#47); part 2 in review                 |
+| PR 3 (phase C) | your own server (Change server, `GET /api/instance`, protocol checks), one list of devices and sessions with sign-in notices and "Not me", sync over the live socket with HTTP as fallback, a background check for phones without Google push and its battery step, sleep recorded on the server by itself | part 1 merged (#47); part 2 in review |
 
 Still `v0.x`: the product is in daily use but not final.
 
-| Now (desktop)                                                                                          | Insights (desktop)                                                                                                  |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Now (desktop) | Insights (desktop) |
+|---|---|
 | ![Now on a desktop: the composer, what is running and the task list](docs/screenshots/now-desktop.png) | ![Insights: time by category, focus by hour, fragmentation, sleep and focus](docs/screenshots/insights-desktop.png) |
-| **Day (desktop)**                                                                                      | **Now (phone, dark)**                                                                                               |
-| ![Day: the blocks of a day and the gaps between them](docs/screenshots/day-desktop.png)                | ![Now on a phone in the dark theme](docs/screenshots/now-phone-dark.png)                                            |
+| **Day (desktop)** | **Now (phone, dark)** |
+| ![Day: the blocks of a day and the gaps between them](docs/screenshots/day-desktop.png) | ![Now on a phone in the dark theme](docs/screenshots/now-phone-dark.png) |
 
 The screenshots are taken by `README_SHOTS=docs/screenshots bun test:e2e e2e/readme-shots.e2e.ts`
 with a seeded week.
@@ -122,22 +122,22 @@ bot webhook 503, while `POST /api/auth/dev { telegramId }` signs in any id liste
 `ALLOWED_TELEGRAM_IDS` (the `dev` environment in `wrangler.jsonc` is not `production`, so
 the route exists).
 
-| Command                          | What it does                                                                                                                                                                                               |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun dev`                        | `wrangler dev` (API, port 8787)                                                                                                                                                                            |
-| `bun dev:web`                    | the app in the browser (`expo start --web`)                                                                                                                                                                |
-| `bun lint`                       | every static check with auto-fix: Biome → ESLint → tsc (6 projects) → knip → jscpd → dependency-cruiser → migration drift. See [docs/linting.md](docs/linting.md)                                          |
-| `bun test:unit`                  | Vitest in `packages/core` and `packages/client` (with coverage thresholds)                                                                                                                                 |
-| `bun test:api`                   | Vitest inside workerd with real D1 / KV / Durable Object bindings                                                                                                                                          |
-| `bun test:app`                   | jest-expo + React Native Testing Library                                                                                                                                                                   |
-| `bun test:e2e`                   | Playwright + axe against `wrangler dev` and the production web build                                                                                                                                       |
-| `bun run test`                   | the four above, in that order                                                                                                                                                                              |
-| `bun test:mutation`              | Stryker on core (slow; on demand in CI)                                                                                                                                                                    |
-| `bun test:llm`                   | one real read through every configured LLM endpoint (`apps/api/scripts/llm-smoke.ts`), run after any change to a provider, its config or the schema; the full parsing regression runner does not exist yet |
-| `bun db:generate`                | drizzle-kit migrations for both the D1 and the Durable Object schema                                                                                                                                       |
-| `bun db:check`                   | fails when a schema changed without a migration (part of `bun lint`)                                                                                                                                       |
-| `bun run build`                  | production build of the web app (`apps/app/dist`, with the service worker)                                                                                                                                 |
-| `bun run --cwd apps/app android` | `expo run:android` on a connected device or emulator                                                                                                                                                       |
+| Command | What it does |
+|---|---|
+| `bun dev` | `wrangler dev` (API, port 8787) |
+| `bun dev:web` | the app in the browser (`expo start --web`) |
+| `bun lint` | every static check with auto-fix: Biome → ESLint → tsc (6 projects) → knip → jscpd → dependency-cruiser → migration drift. See [docs/linting.md](docs/linting.md) |
+| `bun test:unit` | Vitest in `packages/core` and `packages/client` (with coverage thresholds) |
+| `bun test:api` | Vitest inside workerd with real D1 / KV / Durable Object bindings |
+| `bun test:app` | jest-expo + React Native Testing Library |
+| `bun test:e2e` | Playwright + axe against `wrangler dev` and the production web build |
+| `bun run test` | the four above, in that order |
+| `bun test:mutation` | Stryker on core (slow; on demand in CI) |
+| `bun test:llm` | one real read through every configured LLM endpoint (`apps/api/scripts/llm-smoke.ts`), run after any change to a provider, its config or the schema; the full parsing regression runner does not exist yet |
+| `bun db:generate` | drizzle-kit migrations for both the D1 and the Durable Object schema |
+| `bun db:check` | fails when a schema changed without a migration (part of `bun lint`) |
+| `bun run build` | production build of the web app (`apps/app/dist`, with the service worker) |
+| `bun run --cwd apps/app android` | `expo run:android` on a connected device or emulator |
 
 Playwright needs a browser: `bunx playwright install --with-deps chromium`, or point
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` at an installed Chromium. [docs/testing.md](docs/testing.md)
@@ -162,7 +162,7 @@ account may sign in.
   once `{ status: "ready", token, user }` (the nonce is consumed in that call). Nonces live
   five minutes.
 - **Sessions** are bearer tokens: 32 random bytes, only the SHA-256 is stored in D1, valid
-  for 90 days, ended by `POST /api/auth/logout`, by _Settings → Devices and sessions_
+  for 90 days, ended by `POST /api/auth/logout`, by *Settings → Devices and sessions*
   (`DELETE /api/sessions/:id`) or by "Not me" on the sign-in notice that every new browser or
   phone session sends to Telegram (where it signed in from, and the client's name). `GET /api/me` returns the current user;
   `DELETE /api/me` (Settings → Delete account) deletes the account for good: its event log,
@@ -187,13 +187,13 @@ Step by step, and what works without Google push: [docs/self-hosting.md](docs/se
 
 ### Cloudflare resources
 
-| Resource               | Name / binding                           | Notes                                                                                                                   |
-| ---------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Worker                 | `pace-api`                               | custom domain `pace-api.nalinor.dev`, `nodejs_compat`, observability on                                                 |
-| Worker (static assets) | `pace-web`                               | `apps/app/wrangler.web.jsonc`, serves `apps/app/dist` with SPA fallback, custom domain `pace.nalinor.dev`               |
-| D1                     | `pace` → binding `DB`                    | migrations in `apps/api/drizzle/d1`; `database_id` in `wrangler.jsonc` is a placeholder until `wrangler d1 create pace` |
-| KV                     | binding `OAUTH_KV`                       | the MCP OAuth provider's clients, grants and tokens                                                                     |
-| Durable Object         | class `UserStore` → binding `USER_STORE` | SQLite-backed, migration tag `v1`                                                                                       |
+| Resource | Name / binding | Notes |
+|---|---|---|
+| Worker | `pace-api` | custom domain `pace-api.nalinor.dev`, `nodejs_compat`, observability on |
+| Worker (static assets) | `pace-web` | `apps/app/wrangler.web.jsonc`, serves `apps/app/dist` with SPA fallback, custom domain `pace.nalinor.dev` |
+| D1 | `pace` → binding `DB` | migrations in `apps/api/drizzle/d1`; `database_id` in `wrangler.jsonc` is a placeholder until `wrangler d1 create pace` |
+| KV | binding `OAUTH_KV` | the MCP OAuth provider's clients, grants and tokens |
+| Durable Object | class `UserStore` → binding `USER_STORE` | SQLite-backed, migration tag `v1` |
 
 Create them once (`bunx wrangler d1 create pace`, `bunx wrangler kv namespace create OAUTH_KV`),
 put the ids into `apps/api/wrangler.jsonc`, change the two custom domains to yours, and
@@ -202,31 +202,31 @@ the workflow do it.
 
 ### GitHub Actions
 
-| Workflow             | Trigger                                                                | Does                                                                                                                                                                                                                                                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ci.yml`             | pull requests and pushes to `main` (not for docs-only changes), manual | one checks job (lint with a clean tree afterwards, `bun audit`, unit, app, api), then e2e once it passes; manual runs also build the arm64 **release APK** as an artifact (R8 and all, unpublished; the step summary shows its size)                                                                                                 |
-| `deploy.yml`         | after a green CI on `main`, or manual                                  | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
-| `release.yml`        | tag `v*`                                                               | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk`, sends the APK to the owner in Telegram when `TELEGRAM_RELEASE_CHAT_ID` is set                                                                                                                                        |
-| `mutation.yml`       | manual                                                                 | Stryker on core and web                                                                                                                                                                                                                                                                                                              |
-| `llm-regression.yml` | manual                                                                 | `bun test:llm` against the `LLM_*_N` endpoints set in GitHub                                                                                                                                                                                                                                                                         |
+| Workflow | Trigger | Does |
+|---|---|---|
+| `ci.yml` | pull requests and pushes to `main` (not for docs-only changes), manual | one checks job (lint with a clean tree afterwards, `bun audit`, unit, app, api), then e2e once it passes; manual runs also build the arm64 **release APK** as an artifact (R8 and all, unpublished; the step summary shows its size) |
+| `deploy.yml` | after a green CI on `main`, or manual | builds the web app (`bun run build:web` in `apps/app`, `EXPO_PUBLIC_API_URL=https://pace-api.nalinor.dev`), applies D1 migrations (`wrangler d1 migrations apply pace --remote`), deploys `pace-api` and `pace-web`, pushes the Worker secrets that are set, stores `BOT_INFO` (`getMe`), calls `setWebhook`, smoke-tests both hosts |
+| `release.yml` | tag `v*` | lint + unit + api + app, builds the release APK (arm64-v8a), publishes a GitHub Release with `pace-vX.Y.Z.apk`, sends the APK to the owner in Telegram when `TELEGRAM_RELEASE_CHAT_ID` is set |
+| `mutation.yml` | manual | Stryker on core and web |
+| `llm-regression.yml` | manual | `bun test:llm` against the `LLM_*_N` endpoints set in GitHub |
 
 Secrets and variables read by the workflows:
 
-| Name                                                                                                | Kind                            | Used by                | Purpose                                                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`                                                                              | secret                          | deploy                 | Workers Scripts, D1, KV, custom domains for the account                                                                                                                                                                                             |
-| `CLOUDFLARE_ACCOUNT_ID`                                                                             | variable (secret also accepted) | deploy                 | account the Workers live in                                                                                                                                                                                                                         |
-| `TELEGRAM_BOT_USERNAME`                                                                             | variable                        | deploy                 | baked into the web build as `EXPO_PUBLIC_TELEGRAM_BOT` (defaults to `PaceTaskTrackerBot`)                                                                                                                                                           |
-| `TELEGRAM_BOT_TOKEN`                                                                                | secret                          | deploy, Worker         | widget verification and bot replies; without it login and the webhook stay disabled                                                                                                                                                                 |
-| `TELEGRAM_WEBHOOK_SECRET`                                                                           | secret (optional)               | deploy, Worker         | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token                                                                                                                                         |
-| `TELEGRAM_WEBHOOK_ALLOWED_CIDRS`                                                                    | var in `wrangler.jsonc`         | Worker                 | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
-| `LLM_BASE_URL_N`                                                                                    | variable (secret also accepted) | deploy, llm-regression | OpenAI-compatible API prefix of LLM slot N (1–5 from GitHub, any N set on the Worker directly; 1 is asked first), including its `/v1` path; set together with `LLM_API_KEY_N` and `LLM_MODEL_N`                                                     |
-| `LLM_MODEL_N`                                                                                       | variable (secret also accepted) | deploy, llm-regression | one or more model identifiers of slot N, comma separated, each its own priority                                                                                                                                                                     |
-| `LLM_API_KEY_N`                                                                                     | secret                          | deploy, llm-regression | one or more keys of slot N, comma or newline separated; a rate-limited key rests while the next one answers                                                                                                                                         |
-| `TELEGRAM_RELEASE_CHAT_ID`                                                                          | variable (optional)             | release                | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent                                                                                                                                     |
-| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets                         | release                | optional release keystore; absent → debug keystore                                                                                                                                                                                                  |
-| `GOOGLE_SERVICES_JSON`                                                                              | secret                          | release                | the Firebase `google-services.json` (raw JSON) for push through FCM; absent → the APK has no Google push and phones poll                                                                                                                            |
-| `FIREBASE_SERVICE_ACCOUNT`                                                                          | secret                          | deploy, Worker         | the Firebase service account's JSON key the Worker sends pushes with; absent → push is off, everything else works                                                                                                                                   |
+| Name | Kind | Used by | Purpose |
+|---|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | secret | deploy | Workers Scripts, D1, KV, custom domains for the account |
+| `CLOUDFLARE_ACCOUNT_ID` | variable (secret also accepted) | deploy | account the Workers live in |
+| `TELEGRAM_BOT_USERNAME` | variable | deploy | baked into the web build as `EXPO_PUBLIC_TELEGRAM_BOT` (defaults to `PaceTaskTrackerBot`) |
+| `TELEGRAM_BOT_TOKEN` | secret | deploy, Worker | widget verification and bot replies; without it login and the webhook stay disabled |
+| `TELEGRAM_WEBHOOK_SECRET` | secret (optional) | deploy, Worker | string Telegram echoes on every webhook call; when unset, deploy derives it as the SHA-256 of the bot token |
+| `TELEGRAM_WEBHOOK_ALLOWED_CIDRS` | var in `wrangler.jsonc` | Worker | comma-separated IPv4 CIDRs the webhook accepts calls from, checked against `CF-Connecting-IP`; default `149.154.160.0/20,91.108.4.0/22` ([Telegram's subnets](https://core.telegram.org/bots/webhooks#the-short-version)); empty = the check is off |
+| `LLM_BASE_URL_N` | variable (secret also accepted) | deploy, llm-regression | OpenAI-compatible API prefix of LLM slot N (1–5 from GitHub, any N set on the Worker directly; 1 is asked first), including its `/v1` path; set together with `LLM_API_KEY_N` and `LLM_MODEL_N` |
+| `LLM_MODEL_N` | variable (secret also accepted) | deploy, llm-regression | one or more model identifiers of slot N, comma separated, each its own priority |
+| `LLM_API_KEY_N` | secret | deploy, llm-regression | one or more keys of slot N, comma or newline separated; a rate-limited key rests while the next one answers |
+| `TELEGRAM_RELEASE_CHAT_ID` | variable (optional) | release | Telegram user id that gets each release's APK from the bot (with `TELEGRAM_BOT_TOKEN`); unset = nothing is sent |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | secrets | release | optional release keystore; absent → debug keystore |
+| `GOOGLE_SERVICES_JSON` | secret | release | the Firebase `google-services.json` (raw JSON) for push through FCM; absent → the APK has no Google push and phones poll |
+| `FIREBASE_SERVICE_ACCOUNT` | secret | deploy, Worker | the Firebase service account's JSON key the Worker sends pushes with; absent → push is off, everything else works |
 
 Worker secrets are pushed with `wrangler secret put` only when the GitHub secret is set, so
 a fork deploys without a bot token. `BOT_INFO` is stored as a secret too, by the workflow.
@@ -269,8 +269,8 @@ next release installs over it, and main after a squash merge installs over the b
 - The native project (`apps/app/android`) is generated by `expo prebuild` and gitignored.
   CI uses JDK 17, NDK 27.1 and builds `arm64-v8a` only.
 - **Installing from the APK**: Pace is not in a store, so Android 13+ treats usage access as a
-  "restricted setting" and greys it out ("App was denied access"). Lift it once: _Settings →
-  Apps → Pace → ⋮ → Allow restricted settings_, then grant usage access. The ⋮ item appears only
+  "restricted setting" and greys it out ("App was denied access"). Lift it once: *Settings →
+  Apps → Pace → ⋮ → Allow restricted settings*, then grant usage access. The ⋮ item appears only
   after a first, refused try at the switch, so on Android 13+ the usage step of the permissions
   screen and the walk-through leads through the three steps, its button the step to take now. Reminders are plain notifications:
   no exact-alarm permission (the manifest blocks it), so one may come a few minutes late in Doze.
@@ -279,7 +279,7 @@ next release installs over it, and main after a squash merge installs over the b
   Without that the APK is ~50 MB: every class of every library stays, all of Jetpack Compose
   among them (expo-router links it through `@expo/ui`).
 - **Crash traces**: a crash, a JS error at start included, writes its trace to
-  _Download/Pace/crash-<date-time>.txt_ (Android 10+; on older ones
+  *Download/Pace/crash-<date-time>.txt* (Android 10+; on older ones
   `Android/data/dev.nalinor.pace/files`) before the app closes, so it can be shared without
   adb (`CrashCatcher.kt` in `modules/pace-native`); the next start says where in a toast. An
   error the crash screen shows is saved there too, and the screen gives the path.
@@ -295,12 +295,12 @@ next release installs over it, and main after a squash merge installs over the b
 
 ## Devices: calendar and app usage in the cloud
 
-The phone can send its calendar (own and accepted events) when _Settings → Devices and
-sessions → Send this phone's calendar_ is enabled for the current login. A new login starts with this switch off;
+The phone can send its calendar (own and accepted events) when *Settings → Devices and
+sessions → Send this phone's calendar* is enabled for the current login. A new login starts with this switch off;
 turning it off deletes that login's cloud copy. The phone also sends the apps it had in front,
 names and times only. A computer
 runs Pace's own agent (one Python file, standard library only, for Windows, macOS and Linux):
-_Settings → Devices and sessions → Add a computer_ gives one install line per system (see
+*Settings → Devices and sessions → Add a computer* gives one install line per system (see
 [docs/desktop.md](docs/desktop.md)). Day and Week show where the
 time of each block went; MCP has `get_calendar`, `get_usage` and `get_week`.
 
@@ -332,16 +332,16 @@ the native code and runs the JS logic against mocks).
 - **Calendar**: "From your calendar" lists the day's timed events from every visible
   calendar that are yours to attend: your own events and subscriptions, and invitations you
   accepted (declined, tentative and unanswered ones, and all-day events, are skipped). The
-  time bar sits at the foot of Day (today). Every one of its buttons (_Calendar_, _Task_,
-  _Chores_, _Rest_) opens a picker, with _Stop_ first when that button's activity runs.
-  _Calendar_'s picker lists today's events; one picked starts under its title, from its
+  time bar sits at the foot of Day (today). Every one of its buttons (*Calendar*, *Task*,
+  *Chores*, *Rest*) opens a picker, with *Stop* first when that button's activity runs.
+  *Calendar*'s picker lists today's events; one picked starts under its title, from its
   start. When nothing is near now (starting, going on or just over within 15 minutes), or
   without access, the button is greyed: its tooltip and its picker say why, and the picker
   still offers a meeting without an event. Now shows what runs in one compact row with
-  _Stop_. _Attended_ (offered from 15 minutes before the start) tracks the event from its
-  start, as Now's offer does. _Skip_ skips that occurrence on every channel (Telegram, the web
+  *Stop*. *Attended* (offered from 15 minutes before the start) tracks the event from its
+  start, as Now's offer does. *Skip* skips that occurrence on every channel (Telegram, the web
   and the feed stop asking); one that did not reach the server stays, with a note to try again.
-  For a repeating event, the toast offers _Every time_: the whole series is then logged when it
+  For a repeating event, the toast offers *Every time*: the whole series is then logged when it
   ends, or always hidden. Exchange or work accounts appear only if
   Android syncs them into its calendar provider.
 - **Notifications** come from the server only (see [Notifications](#notifications)); the
@@ -352,14 +352,14 @@ the native code and runs the JS logic against mocks).
 One pool on the server holds every notification, and each channel shows it: Telegram, the app
 and the web (a bell with an unread count in the sidebar header and on Now's phone header; the
 `/notifications` screen, grouped by day, with the assistant's log one link away). Kinds and their
-default channels (_Settings → Notifications_ switches each kind per channel):
+default channels (*Settings → Notifications* switches each kind per channel):
 
-| Kind            | What                                                                                                     | Default            |
-| --------------- | -------------------------------------------------------------------------------------------------------- | ------------------ |
-| Sign-in         | a new session (who, where from)                                                                          | Telegram, app, web |
-| Deadline digest | at each digest time: open tasks due before a day after the next digest time, each task and deadline once | Telegram           |
-| Event starting  | a calendar event (own or accepted, not all-day) as it starts: _Attend_ / _Skip_                          | Telegram           |
-| Still doing X?  | the running activity at twice its Expect: _Yes, still_ / _Stop_                                          | app                |
+| Kind | What | Default |
+|---|---|---|
+| Sign-in | a new session (who, where from) | Telegram, app, web |
+| Deadline digest | at each digest time: open tasks due before a day after the next digest time, each task and deadline once | Telegram |
+| Event starting | a calendar event (own or accepted, not all-day) as it starts: *Attend* / *Skip* | Telegram |
+| Still doing X? | the running activity at twice its Expect: *Yes, still* / *Stop* | app |
 
 An answer anywhere resolves the notification everywhere: answered in Telegram, the message is
 edited; from anywhere else (the app, the web, Now's offer, a phone notification) the Telegram
@@ -369,8 +369,8 @@ and "still doing X?"; sign-ins and digests always come.
 
 The phone gets system notifications one way, chosen at each start: Google's push (FCM) when the
 server offers it and the phone has a Google token, else polling (it fetches what waits for it;
-the open app does so at once on each live update). _Settings → Notifications_ on the phone picks
-it by hand (_Automatic_, _Google_, _Background check (every ~15 min)_ or _Only in the app_, where
+the open app does so at once on each live update). *Settings → Notifications* on the phone picks
+it by hand (*Automatic*, *Google*, *Background check (every ~15 min)* or *Only in the app*, where
 the phone shows none and the app's bell has them all) and says which one the phone uses; a pick the server or the phone cannot take right now
 falls back to the other, and is tried again later.
 
@@ -379,7 +379,7 @@ falls back to the other, and is tried again later.
 Firebase project) notifications still reach the phone while Pace is closed: a periodic
 background check (Android's WorkManager, about every 15 minutes, later under Doze or a vendor
 battery saver) fetches what waits for it and shows it. While the phone uses it, the
-permissions walk-through and _Settings → Notifications_ ask to leave Pace out of battery
+permissions walk-through and *Settings → Notifications* ask to leave Pace out of battery
 optimization (and open the phone maker's autostart page where there is a known one), so the
 check keeps its rhythm; with Google's push that step is not shown. There is no foreground service and no
 ongoing notification. The open app fetches at once on each live update, and Telegram gets
@@ -392,12 +392,12 @@ phones switch to polling on their next start or at once while open. Each item's 
 
 1. In the [Firebase console](https://console.firebase.google.com/) create a project (no
    Analytics needed).
-2. _Add app → Android_, package name `dev.nalinor.pace`. Download `google-services.json` and
+2. *Add app → Android*, package name `dev.nalinor.pace`. Download `google-services.json` and
    store its contents as the GitHub secret `GOOGLE_SERVICES_JSON`; the release workflow writes
    it next to `app.config.ts` (`GOOGLE_SERVICES_FILE`) before prebuild.
-3. _Project settings → Cloud Messaging_: make sure **Firebase Cloud Messaging API (V1)** is
+3. *Project settings → Cloud Messaging*: make sure **Firebase Cloud Messaging API (V1)** is
    enabled.
-4. _Project settings → Service accounts → Generate new private key_: store the downloaded JSON
+4. *Project settings → Service accounts → Generate new private key*: store the downloaded JSON
    as the GitHub secret `FIREBASE_SERVICE_ACCOUNT`; the deploy workflow puts it into the Worker.
 5. Release a new APK and deploy. Without either secret everything works and phones poll.
 
@@ -441,7 +441,7 @@ What the bot does, in the account language:
   assistant is back.
 - `/now` lists the top five of Now.
 - Notifications: the kinds on for Telegram (see [Notifications](#notifications)), with
-  _Attend_ / _Skip_ under an event starting and _Yes, still_ / _Stop_ under "still doing X?".
+  *Attend* / *Skip* under an event starting and *Yes, still* / *Stop* under "still doing X?".
   An answer there edits the message; an answer anywhere else deletes it. The Durable Object's
   alarm drives the pool and re-arms itself after every write.
 

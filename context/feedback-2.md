@@ -118,45 +118,45 @@ Chores. Тут открываем пикер и выбираем: Getting ready,
 
 Written while planning stage 6 (full / partial / none), see `plan.md` (Stage 6) for the fixes.
 
-| #   | Scenario                                                                                                                       | Before stage 6                                                                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| T1  | Weekly homework exists as tasks ahead of time                                                                                  | Partial: instances exist, empty ones hidden in «+ N later»                                |
-| T2  | Pasted homework maps to the nearest open instance or the explicit deadline, subtasks, description, link, hours from the preset | Partial: always the nearest instance, typed due/estimate dropped, LLM description dropped |
-| T3  | Irregular task: project and fields from context or defaults                                                                    | Partial                                                                                   |
-| T4  | Manual typing: AI on a visible button, paste detected, quick input differs from the task form                                  | None: auto-read 700 ms after a pause                                                      |
-| T5  | Start time visible and editable, future starts under «In future»                                                               | None in the UI                                                                            |
-| T6  | Edit start, due, estimate and the rest                                                                                         | None: title and description only                                                          |
-| T7  | Project page like a task list, Done reachable                                                                                  | Partial: Done is plain text                                                               |
-| T8  | Focus from a task                                                                                                              | Partial: icon without text, an extra Waiting button                                       |
-| A1  | Chores → Getting ready in three taps                                                                                           | Partial: no picker, small shifting buttons                                                |
-| A2  | New activity ends the previous one; parallel by long press / right click / ⋯                                                   | Partial: no parallel, no right click on the web                                           |
-| A3  | Rest 30m, Sport 30m–3h, «still doing it?» at 2×, no limits                                                                     | Partial: reminder at 1×, phone only, limits exist                                         |
-| A4  | Accepted calendar events: Attend / Skip before they start                                                                      | Partial: only on Day, afterwards, no status filter                                        |
-| A5  | From calendar names the activity after the current event                                                                       | None                                                                                      |
-| A6  | «Пошел в ЦСС, 20мин» starts at once, the LLM names it in the background                                                        | Partial: raw label only                                                                   |
-| W1  | Calendar synced to the cloud, week view in the browser                                                                         | None                                                                                      |
-| W2  | App time from every device in the cloud, «where I sat» per activity, in MCP                                                    | None: phone-local only, messenger penalty                                                 |
+| # | Scenario | Before stage 6 |
+|---|---|---|
+| T1 | Weekly homework exists as tasks ahead of time | Partial: instances exist, empty ones hidden in «+ N later» |
+| T2 | Pasted homework maps to the nearest open instance or the explicit deadline, subtasks, description, link, hours from the preset | Partial: always the nearest instance, typed due/estimate dropped, LLM description dropped |
+| T3 | Irregular task: project and fields from context or defaults | Partial |
+| T4 | Manual typing: AI on a visible button, paste detected, quick input differs from the task form | None: auto-read 700 ms after a pause |
+| T5 | Start time visible and editable, future starts under «In future» | None in the UI |
+| T6 | Edit start, due, estimate and the rest | None: title and description only |
+| T7 | Project page like a task list, Done reachable | Partial: Done is plain text |
+| T8 | Focus from a task | Partial: icon without text, an extra Waiting button |
+| A1 | Chores → Getting ready in three taps | Partial: no picker, small shifting buttons |
+| A2 | New activity ends the previous one; parallel by long press / right click / ⋯ | Partial: no parallel, no right click on the web |
+| A3 | Rest 30m, Sport 30m–3h, «still doing it?» at 2×, no limits | Partial: reminder at 1×, phone only, limits exist |
+| A4 | Accepted calendar events: Attend / Skip before they start | Partial: only on Day, afterwards, no status filter |
+| A5 | From calendar names the activity after the current event | None |
+| A6 | «Пошел в ЦСС, 20мин» starts at once, the LLM names it in the background | Partial: raw label only |
+| W1 | Calendar synced to the cloud, week view in the browser | None |
+| W2 | App time from every device in the cloud, «where I sat» per activity, in MCP | None: phone-local only, messenger penalty |
 
 ## Scenario coverage after stage 6 (PR #38)
 
-| #   | Now                                                                                                                                                                                                                     | Where                                                     |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| T1  | Done: empty weekly instances are ordinary rows by their due; a course with no open instance gets its next week's one ahead (under «In future»), and a week whose deadline passed before the course was added is skipped | Now list, `compareNowItems`, `recurrence/hw-instances.ts` |
-| T2  | Done: nearest open instance, or the one the due names (else a task of its own); subtasks, description, link, estimate                                                                                                   | `input/compose.ts`, task form «Add to …»                  |
-| T3  | Done: the form shows the guessed project and fields, all editable                                                                                                                                                       | composer form                                             |
-| T4  | Done: Parse button or paste only; Enter adds a short line; the form is a separate step                                                                                                                                  | `composer.tsx`, `composer-form.tsx`                       |
-| T5  | Done: start in the form and the edit sheet; later starts fold under «In future»                                                                                                                                         | Now, project page                                         |
-| T6  | Done: every field in the edit sheet, start and due can be cleared                                                                                                                                                       | `EditTaskSheet`                                           |
-| T7  | Done: Open / In future / Done rows, done tasks open                                                                                                                                                                     | project page                                              |
-| T8  | Done: `[Focus] [Done]` footer, no Waiting                                                                                                                                                                               | task footer                                               |
-| A1  | Done: four fixed buttons, Chores → picker                                                                                                                                                                               | time bar                                                  |
-| A2  | Done: switching closes the main one; long press, right click or ⋯ → «Alongside what is running»                                                                                                                         | time bar, `activity.started.alongside`                    |
-| A3  | Done: Rest 30m, Sport 30m–3h; «Still doing this?» at 2× in the bar, a phone timer and the bot; limits removed                                                                                                           | `paceStatus`, `long-run.ts`                               |
-| A4  | Done: own and accepted events only; Attend / Skip on Now from ten minutes before; a phone reminder at the start                                                                                                         | `calendar-filter.ts`, `CalendarPrompt`                    |
-| A5  | Done: From calendar starts the event going on now under its title, from its start                                                                                                                                       | `startCalendar`                                           |
-| A6  | Done: starts at once with the length as Expect; `POST /api/parse/activity` relabels it in the background                                                                                                                | `startTyped`, `refineActivity`                            |
-| W1  | Done: the phone sends its calendar (toggle in Settings → Devices); `/week` in the browser                                                                                                                               | `calendar_events`, Week                                   |
-| W2  | Done: phone and computers (ActivityWatch bridge) send app sessions; «where I sat» on Day and Week; MCP `get_usage`, `get_week`; no penalties                                                                            | `usage_sessions`, Devices                                 |
+| # | Now | Where |
+|---|---|---|
+| T1 | Done: empty weekly instances are ordinary rows by their due; a course with no open instance gets its next week's one ahead (under «In future»), and a week whose deadline passed before the course was added is skipped | Now list, `compareNowItems`, `recurrence/hw-instances.ts` |
+| T2 | Done: nearest open instance, or the one the due names (else a task of its own); subtasks, description, link, estimate | `input/compose.ts`, task form «Add to …» |
+| T3 | Done: the form shows the guessed project and fields, all editable | composer form |
+| T4 | Done: Parse button or paste only; Enter adds a short line; the form is a separate step | `composer.tsx`, `composer-form.tsx` |
+| T5 | Done: start in the form and the edit sheet; later starts fold under «In future» | Now, project page |
+| T6 | Done: every field in the edit sheet, start and due can be cleared | `EditTaskSheet` |
+| T7 | Done: Open / In future / Done rows, done tasks open | project page |
+| T8 | Done: `[Focus] [Done]` footer, no Waiting | task footer |
+| A1 | Done: four fixed buttons, Chores → picker | time bar |
+| A2 | Done: switching closes the main one; long press, right click or ⋯ → «Alongside what is running» | time bar, `activity.started.alongside` |
+| A3 | Done: Rest 30m, Sport 30m–3h; «Still doing this?» at 2× in the bar, a phone timer and the bot; limits removed | `paceStatus`, `long-run.ts` |
+| A4 | Done: own and accepted events only; Attend / Skip on Now from ten minutes before; a phone reminder at the start | `calendar-filter.ts`, `CalendarPrompt` |
+| A5 | Done: From calendar starts the event going on now under its title, from its start | `startCalendar` |
+| A6 | Done: starts at once with the length as Expect; `POST /api/parse/activity` relabels it in the background | `startTyped`, `refineActivity` |
+| W1 | Done: the phone sends its calendar (toggle in Settings → Devices); `/week` in the browser | `calendar_events`, Week |
+| W2 | Done: phone and computers (ActivityWatch bridge) send app sessions; «where I sat» on Day and Week; MCP `get_usage`, `get_week`; no penalties | `usage_sessions`, Devices |
 
 ## Product references found while planning
 

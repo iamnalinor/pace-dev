@@ -28,4 +28,4 @@ at min(event start, now)) could not produce retro/future — the owner's screens
    has end == now) — hide Attended/Skip once answered; a second tap must not restart it. Test.
 4. Record both bugs in context/bug-lessons.md (why the previous fix and the tests missed them — note that the Task 3c sweep checked
    only offsets in UTC and never the real Android event shape — the class, the sweep, the guard).
-   `bun lint`, `bun test:unit`, `bun test:app` green; run the e2e you add/touch.
+`bun lint`, `bun test:unit`, `bun test:app` green; run the e2e you add/touch.

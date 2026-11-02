@@ -4,14 +4,12 @@ Owner's words: «Напомню что совершенно ок дропать 
 мигрировать и какие-то корнер кейсы учитывать». «Делать ломающие изменения можно, мы не хотим обрастать костылями.»
 
 ## 1. D1 (apps/api/src/shared/db/d1-schema.ts, apps/api/drizzle/d1)
-
 Add a custom migration (`bunx drizzle-kit generate --custom` with the D1 config — check apps/api/package.json's
 db:generate script for the exact config path/flags) named like `reset_all_data` that empties every D1 table:
 `DELETE FROM login_nonces; DELETE FROM sessions; DELETE FROM users;` (children first). Never edit applied
 migrations. `bun run db:check` (part of `bun lint`) must pass.
 
 ## 2. Durable Object store (apps/api/src/user-store/*, apps/api/drizzle/do)
-
 - Squash the DO migrations into one fresh `0000` from the current schema: delete apps/api/drizzle/do/*.sql and
   meta, regenerate with `bun db:generate` (DO config), rebuild migrations.js the way the repo does (check how
   migrations.js is produced — drizzle-kit generates it for durable-sqlite). This is allowed only because of the
@@ -25,7 +23,6 @@ migrations. `bun run db:check` (part of `bun lint`) must pass.
   kept in DO storage. `UserStore.wipe()` (used by account deletion) regenerates it.
 
 ## 3. storeId to clients; clients reset on mismatch
-
 - Return `storeId` from `GET /api/sync/pull` (add to its output schema in packages/core/src/api/schemas) and from
   `GET /api/me`.
 - packages/client sync loop (createSyncClient / createPaceClient): remember the storeId the local log belongs to
@@ -38,14 +35,13 @@ migrations. `bun run db:check` (part of `bun lint`) must pass.
   outbox can never land in a fresh store) — check the order in the sync loop and make it so.
 - Also make sure signing out (and a 401 that signs out) clears the local log, outbox and cursor — check; if it
   does not, make it.
-  Tests (TDD): client unit tests with the fake fetch (packages/client testing helpers): mismatch wipes the local log
-  and outbox and refetches; first id is stored; outbox is not pushed before the id is confirmed. API int tests:
-  pull returns a stable storeId; after wipe it changes; a store with a different stored epoch is wiped on startup
-  (simulate by writing an old epoch then re-instantiating — look at how tests reach the DO, e.g. runInDurableObject
-  from cloudflare:test).
+Tests (TDD): client unit tests with the fake fetch (packages/client testing helpers): mismatch wipes the local log
+and outbox and refetches; first id is stored; outbox is not pushed before the id is confirmed. API int tests:
+pull returns a stable storeId; after wipe it changes; a store with a different stored epoch is wiped on startup
+(simulate by writing an old epoch then re-instantiating — look at how tests reach the DO, e.g. runInDurableObject
+from cloudflare:test).
 
 ## 4. Dead pieces out
-
 - The `observations` DO table, `POST /api/sync/observations` endpoint + schema + handler + client code (nothing
   in the app sends to it — verify with grep first; if something does, report instead of deleting).
 - Retired event types `activity.button.set` / `activity.button.removed` (packages/core/src/events/event-schema.ts,

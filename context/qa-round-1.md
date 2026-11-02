@@ -21,11 +21,11 @@ Left for later: a course preset linked to a project (QA-9, needs a preset field)
 ## 1. Summary
 
 | Severity | Count |
-| -------- | ----- |
-| blocker  | 0     |
-| high     | 3     |
-| medium   | 17    |
-| low      | 14    |
+|---|---|
+| blocker | 0 |
+| high | 3 |
+| medium | 17 |
+| low | 14 |
 
 Nothing crashes. The weak spots are (a) the paste -> form -> weekly-homework mapping, which in this build does not do what the owner described, (b) leftovers of the removed "smart logic" in the UI and texts, (c) states that contradict each other on the task page (closed/paused/estimate), (d) bottom sheets and chip rows that clip or hide things, (e) the web PWA icons, which still have the "too big, off-centre" problem the owner reported.
 
@@ -35,7 +35,7 @@ Nothing crashes. The weak spots are (a) the paste -> form -> weekly-homework map
 
 **QA-1 (high) A pasted multi-line message becomes the whole task title, newlines included.**
 Now, 1440, light, RU. Click the quick-input field and paste (`page.keyboard.insertText`) a 5-line message:
-`Домашнее задание №2 по «Безопасность жизнедеятельности»` / `Дедлайн: вторник 13 октября 23:59` / `Нужно ответить на вопросы 1-5 …, решить задачи 12, 14, 17.` / `Методичка: https://example.com/bzd/method.pdf` / `Время на выполнение около 2 часов`. The form opens at once (paste detection works). Title field contains the _entire_ text, with the line breaks removed and no spaces (`…жизнедеятельности»Дедлайн: вторник…`). Press "Создать": the task is stored with the line breaks, and the Now row shows a 5-line title (no line clamp).
+`Домашнее задание №2 по «Безопасность жизнедеятельности»` / `Дедлайн: вторник 13 октября 23:59` / `Нужно ответить на вопросы 1-5 …, решить задачи 12, 14, 17.` / `Методичка: https://example.com/bzd/method.pdf` / `Время на выполнение около 2 часов`. The form opens at once (paste detection works). Title field contains the *entire* text, with the line breaks removed and no spaces (`…жизнедеятельности»Дедлайн: вторник…`). Press "Создать": the task is stored with the line breaks, and the Now row shows a 5-line title (no line clamp).
 Should: the owner explicitly asked that quick-input text must not turn into a long title. Cap the title (first line / first sentence, about 80-120 chars), put the rest into the description, show a hint when the title is longer than that, never glue lines without a space, and clamp titles in lists to 2 lines.
 Shots: `shots/f3-01-form-tall.png`, `shots/f3-02-created.png`. (The fake LLM returns the text as-is; the missing guard is the bug.)
 
@@ -72,7 +72,7 @@ Shots: `shots/f1-06-long-enter.png`, `shots/f2-02-form-scrolled.png`, `shots/f21
 - /permissions and /onboarding: "Напоминания, таймеры **Expect и Limit** и утренний вопрос про сон" - the owner asked to drop limits (and "Expect"/"Limit" are English in a Russian sentence).
 - Settings -> "Журнал решений": "Почему напоминание отправлено или придержано и что прочитал ассистент" - an internal debug log shown as a feature.
 - Submit sheet: "Точное время. Выкл. = «примерно тогда», **не учитывается в калибровке**" - there is no calibration the user knows of.
-  Shots: `shots/f4-01-preset.png`, `shots/ru-d-light-permissions.png`, `shots/ru-d-light-onboarding.png`, `shots/f4-02-settings-tall.png`, `shots/f20-04-submit-sheet.png`.
+Shots: `shots/f4-01-preset.png`, `shots/ru-d-light-permissions.png`, `shots/ru-d-light-onboarding.png`, `shots/f4-02-settings-tall.png`, `shots/f20-04-submit-sheet.png`.
 
 **QA-9 (medium) Weekly-homework plan has holes and the example presets are in English.**
 After "Добавить примеры пресетов курсов" on a Russian account: preset names are "Algebra HW", "Calculus HW", "History HW" (English content on a Russian screen), instance titles "Calculus HW 1"; "Algebra HW 1" is auto-closed on creation (its Thursday deadline had passed more than 24 h ago) and immediately produces "Разобрать 1" in the Now header, so there is **no open Algebra instance** this week - the "I see my plan even without a new assignment" scenario (T1) is only partly met. Instances also get no project (the Алгебра project exists).

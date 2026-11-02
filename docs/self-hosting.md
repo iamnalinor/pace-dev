@@ -26,13 +26,11 @@ server at the latest release.
 
 1. **Fork or clone** the repository and run `bun install`.
 2. **Create the Cloudflare resources** (once), in `apps/api`:
-
    ```sh
    bunx wrangler login
    bunx wrangler d1 create pace
    bunx wrangler kv namespace create OAUTH_KV
    ```
-
    The assistant's memory of which LLM provider is down is a small Durable Object (`LlmHealth`)
    declared in `wrangler.jsonc`; the first deploy creates it, nothing to create by hand.
 3. **Edit `apps/api/wrangler.jsonc`**: the D1 `database_id` and the KV `id` from step 2, the
@@ -64,12 +62,10 @@ server at the latest release.
      `PACE_VERSION` set to the release tag or commit, pushes the secrets, stores `BOT_INFO` and
      sets the webhook.
    - **By hand**, in `apps/api`:
-
      ```sh
      bunx wrangler d1 migrations apply pace --remote
      bunx wrangler deploy --var PACE_VERSION:"$(git describe --tags --always)"
      ```
-
      and for the web app, `EXPO_PUBLIC_API_URL=https://<your api> EXPO_PUBLIC_TELEGRAM_BOT=<bot>
      bun run --cwd apps/app build:web && bun run --cwd apps/app deploy:web`. `PACE_VERSION` is
      what `GET /api/instance` reports (`dev` when unset). Set it on every deploy, and make it

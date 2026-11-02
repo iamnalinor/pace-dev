@@ -20,7 +20,6 @@ behaviour compiling: adapt their call sites minimally (e.g. map the new answer i
 code (no TODO comments; Task 12/13 will rework them).
 
 ## Core: packages/core/src/proposals/
-
 A proposal is a discriminated union (zod), each with a short human summary field produced by code (not the LLM) for display:
 - `task.create { task: TaskDraft }` (TaskDraft = today's create form fields: title, category/preset, project, importance,
   due date/time, estimate, subtasks, description, link)
@@ -35,12 +34,11 @@ A proposal is a discriminated union (zod), each with a short human summary field
 - `activity.log { start, end, category, label }` (a past span; `activity.logged`)
 - `activity.update { activityId, patch: { start?, end?, category?, label? } }`
 - `activity.delete { activityId }` (revoke)
-  `planProposal(state, proposal, ctx)` → `Result<EventInput[], ProposalError>` using the existing validators (core's
-  validateEventInput / retro rules); unknown ids → `proposal/unknown-task` / `proposal/unknown-activity`.
-  Replace PARSE_INTENTS + planParse with this (delete the old intent code once callers move; breaking is fine).
+`planProposal(state, proposal, ctx)` → `Result<EventInput[], ProposalError>` using the existing validators (core's
+validateEventInput / retro rules); unknown ids → `proposal/unknown-task` / `proposal/unknown-activity`.
+Replace PARSE_INTENTS + planParse with this (delete the old intent code once callers move; breaking is fine).
 
 ## API
-
 - `POST /api/parse { text, domain: "task" | "activity" | "auto", defer?, draft? }` → `{ status: parsed|unavailable|queued,
   domain: "task"|"activity", confidence: number 0..1, proposals: Proposal[], questions?: string[] }`. Remove
   `/api/parse/activity` (merged).
@@ -62,7 +60,6 @@ A proposal is a discriminated union (zod), each with a short human summary field
   update, delete, close, activity.log with a past span, and auto classification; make sure the fixture files typecheck.
 
 ## Tests (TDD)
-
 Core: planProposal for every kind (happy + unknown id + invalid patch), the typed.ts span reader (RU/EN formats), model-output
 → proposals conversion with aliases, verify rules. API int: /api/parse with the fake LLM returns each kind; auto
 classification; unavailable fallback for both domains; queued/defer still works. `bun lint`, `bun test:unit`,

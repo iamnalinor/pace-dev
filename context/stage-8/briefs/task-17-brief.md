@@ -13,6 +13,6 @@ Read the commits of this branch (`git log --oneline origin/main..HEAD`, and the 
    - Every toast, tooltip and popup: where it lands and what it covers (never over controls, never far from its cause), and
      how soon it appears.
    - Every changed screen in both themes and at phone width (390 px) and desktop (1280 px), with Russian text.
-     And note in the QA prompt section that the round must open every form both ways.
+   And note in the QA prompt section that the round must open every form both ways.
 3. docs/testing.md: one line that the composer's canAdd is a single predicate and must be tested at the action level.
-   `bun lint` green. Commit "docs: stage 8 — sessions, notifications, proposals, the agent; QA checks every way into a form".
+`bun lint` green. Commit "docs: stage 8 — sessions, notifications, proposals, the agent; QA checks every way into a form".

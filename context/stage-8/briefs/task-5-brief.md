@@ -15,7 +15,6 @@ Owner's words:
   из календаря подсосать».
 
 ## 1. Day list (apps/app/src/features/day/day-screen.tsx, day-nav.tsx; model packages/client/src/view-models/day.ts)
-
 One consistent timeline list: every entry (activity or gap) is a row of the same height rhythm and the same
 left time column; a hairline divider between EVERY pair of rows (or none at all — pick one and apply it
 everywhere, including around gaps and the "Log past activity" action). Gaps are not dashed boxes: a muted row
@@ -24,13 +23,11 @@ their duration/pencil). "Log past activity" becomes a quiet text/ghost row at th
 Keep row animations. Look at the result in screenshots and iterate until it is calm and consistent.
 
 ## 2. "Back to today" (Day and Calendar)
-
 Remove the 48 px "Today" / "This week" buttons. Show a small text/ghost button "Back to today" (EN) / "К сегодня"
 (RU) next to the ‹ › arrows only when the shown day/week is not today / the current week. Arrows stay. On Day keep
 the date picker. Tests: app tests that the button is absent on today/this week and present (and works) otherwise.
 
 ## 3. Calendar fits the screen; night hours option
-
 apps/app/src/features/calendar (ex-week) week-screen/week-grid + packages/client/src/view-models/week.ts.
 The grid must not scroll vertically: compute the hour height from the available height (onLayout of the grid's
 container: (height − header − day labels) / number of hours), with a floor (e.g. 18 px per hour on phones,
@@ -45,7 +42,6 @@ Tests: view-model test for the hour range with and without night hours; app test
 measured height (mock onLayout).
 
 ## 4. Details beside the calendar / sheet on phones
-
 Like Now: on a wide window the Calendar screen is a split — the grid on the left, a details pane on the right
 that shows the clicked event or tracked block (empty state: "Pick an event or a block to see its details");
 on a phone a bottom sheet (ui/sheet.tsx) as today. Reuse the split layout approach of
@@ -65,7 +61,6 @@ Tests: api int test that the new fields round-trip through sync → the calendar
 details pane content; client view-model test if the view-model maps them.
 
 ## Checks
-
 Screenshots desktop 1280 (light + dark) and phone 390 of Day (a day with gaps), Calendar (this week and another
 week, with night hours on and off, a selected event with details), saved under
 /tmp/claude-0/-home-user-pace-dev/cb223545-7465-5720-b7e6-b3fd375d3413/scratchpad/task5/; look at them and fix what
