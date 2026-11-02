@@ -14,6 +14,7 @@ import { IconButton } from "./icon-button.tsx";
 import { useIsWide } from "./layout.ts";
 import { BACKDROP_ENTER, DIALOG_ENTER, SHEET_ENTER } from "./motion.ts";
 import { useSheetFocusRef } from "./sheet-focus.ts";
+import { useScrim } from "./scrim.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
 
@@ -189,6 +190,8 @@ export const Sheet = ({
   const isWide = useIsWide();
   const titleId = useId();
   const surfaceRef = useSheetFocusRef({ closeLabel });
+  // The web page dims its status bar (`theme-color`) with the backdrop.
+  useScrim(visible);
   return (
     // The dialog (react-native-web gives the modal the role) is named by its title (QA round 15 L8).
     <Modal

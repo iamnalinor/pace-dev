@@ -1,5 +1,6 @@
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { DEV_TELEGRAM_ID, loginViaApi, resetAccount } from "./support/login.ts";
+import { documentGround, rgb } from "./support/theme-colors.ts";
 
 test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await resetAccount(DEV_TELEGRAM_ID);
@@ -59,20 +60,20 @@ test("the theme choice is kept per device and paints the page", async ({ page })
       .locator('meta[name="theme-color"]')
       .evaluateAll((metas) => metas.map((meta) => meta.getAttribute("content"))),
   });
-  await expect.poll(pageColors).toMatchObject({ body: "rgb(244, 245, 247)" });
+  await expect.poll(pageColors).toMatchObject({ body: rgb(documentGround("light", false)) });
   // Both theme colours (the system's dark and light) now say the app's light, none the dark one.
-  expect((await pageColors()).themeColors).not.toContain("#0b0b0c");
+  expect((await pageColors()).themeColors).not.toContain(documentGround("dark", false));
   await page.reload();
   await expect(page.getByRole("radio", { name: "Light" })).toBeChecked();
   expect(await background()).toBe(light);
-  expect((await pageColors()).body).toBe("rgb(244, 245, 247)");
+  expect((await pageColors()).body).toBe(rgb(documentGround("light", false)));
   await page.getByRole("radio", { name: "System" }).click();
   await expect.poll(background).not.toBe(light);
   // System, reloaded on a dark system: the page follows the system again, from the first paint on.
   await page.reload();
   await expect(page.getByRole("radio", { name: "System" })).toBeChecked();
   expect(await background()).not.toBe(light);
-  expect((await pageColors()).body).toBe("rgb(11, 11, 12)");
+  expect((await pageColors()).body).toBe(rgb(documentGround("dark", false)));
 });
 
 test("the App Link landing offers to open the app", async ({ page }) => {
