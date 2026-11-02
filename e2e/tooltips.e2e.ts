@@ -88,3 +88,33 @@ test("every icon-only button on a computer shows its name on hover", async ({ pa
     expect.arrayContaining([expect.stringContaining("Изменить детали")]),
   );
 });
+
+/**
+Done at another time, or the task cancelled or skipped, is reachable without a gesture nobody is
+told about (QA round 19 M2): Done says what its long press does on hover, and a button beside it
+opens the same sheet, whose other outcomes are buttons.
+*/
+test("Done tells of its other times on hover, and a button beside it opens them", async ({
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  const seeded = await seedLivedIn(token);
+  await page.goto(`/task/${seeded.openTaskId}`);
+  const done = page.getByRole("button", { exact: true, name: /^Готово/u });
+  await expect(done).toBeVisible();
+  await done.hover();
+  await expect(page.getByRole("tooltip").filter({ hasText: "Долгое нажатие" })).toBeVisible();
+  await page.mouse.move(0, 0);
+  const other = page.getByRole("button", { name: "Другое время или итог…" });
+  // An icon button: it names itself on hover too.
+  expect(await hasTooltipOnHover(page, other)).toBe(true);
+  await other.click();
+  await expect(page.getByText("Когда это было сделано?")).toBeVisible();
+  for (const outcome of ["Отменена", "Пропущена"]) {
+    await expect(
+      page
+        .locator('[data-pace-surface="sheet"]')
+        .getByRole("button", { exact: true, name: outcome }),
+    ).toBeVisible();
+  }
+});

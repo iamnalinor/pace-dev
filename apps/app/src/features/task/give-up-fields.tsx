@@ -8,7 +8,7 @@ import { recentReasons } from "@pace/client";
 
 import type { CloseForm, GiveUp } from "./use-close-form.ts";
 
-const OUTCOMES: readonly GiveUp[] = ["cancelled", "skipped"];
+export const OUTCOMES: readonly GiveUp[] = ["cancelled", "skipped"];
 
 /** Cancelled or Skipped, an optional reason, and the reasons used before (one tap fills them). */
 export const GiveUpFields = ({ form }: { readonly form: CloseForm }) => {

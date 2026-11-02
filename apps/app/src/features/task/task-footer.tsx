@@ -1,4 +1,4 @@
-import { Square, Timer } from "lucide-react-native";
+import { ChevronUp, Square, Timer } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,6 +8,8 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { IconButton } from "#app/ui/icon-button.tsx";
+import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import { useFinishTask } from "./use-finish-task.ts";
 import { useSubmitTitle } from "./use-submit-title.ts";
@@ -36,7 +38,9 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
 
 /**
 Focus and the primary Done or "Submit 3 and 4", side by side and the same width. Done finishes
-in one tap; a long press opens the sheet for another time or outcome (`onClose`).
+in one tap; the button beside it (and a long press on Done) opens the sheet for another time or
+outcome (`onClose`), and Done's tooltip says so: a gesture nobody is told about is no way in (QA
+round 19 M2).
 */
 export const TaskFooter = ({
   onClose,
@@ -71,17 +75,22 @@ export const TaskFooter = ({
         <FocusButton view={view} />
       </View>
       {view.primaryAction.kind === "none" ? null : (
-        <View className="flex-1">
-          <Button
-            hint={t("task.doneHint")}
-            hotkey={HOTKEYS.primary}
-            onLongPress={onClose}
-            onPress={finish}
-            width="fill"
-          >
-            {primary}
-          </Button>
-        </View>
+        <>
+          <View className="flex-1">
+            <Tooltip label={t("task.doneHint")} showsOnTap={false}>
+              <Button
+                hint={t("task.doneHint")}
+                hotkey={HOTKEYS.primary}
+                onLongPress={onClose}
+                onPress={finish}
+                width="fill"
+              >
+                {primary}
+              </Button>
+            </Tooltip>
+          </View>
+          <IconButton icon={ChevronUp} label={t("task.doneOther")} onPress={onClose} />
+        </>
       )}
     </View>
   );

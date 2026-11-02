@@ -111,8 +111,10 @@ describe("CloseSheet — submitting subtasks", () => {
 
   it("closes the task as skipped with a reason instead", async () => {
     const runtime = await openSubmit();
-    await fireEvent.press(screen.getByRole("button", { name: en("close.other") }));
-    await fireEvent.press(screen.getByRole("radio", { name: en("close.skipped") }));
+    // "Close task as…" offers each outcome as a button of its own (QA 19 M2).
+    expect(screen.getByText(en("close.otherLabel"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("close.skipped") }));
+    expect(screen.getByRole("radio", { name: en("close.skipped") })).toBeChecked();
     await fireEvent.changeText(screen.getByLabelText(en("close.reason")), "course dropped");
     const confirm = en("close.confirm", { outcome: en("close.skipped") });
     await fireEvent.press(screen.getByRole("button", { name: confirm }));

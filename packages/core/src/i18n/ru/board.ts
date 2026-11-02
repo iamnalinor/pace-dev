@@ -103,6 +103,7 @@ export const ruBoard: { readonly [K in keyof typeof enBoard]: string } = {
   "task.done": "Готово",
   "task.doneHint":
     "Закрывает задачу сейчас. Долгое нажатие: другое время или закрыть как отменённую или пропущенную.",
+  "task.doneOther": "Другое время или итог…",
   "task.submitSubtasks": "Сдать {subtasks}",
   "task.estimate": "Оценка {duration}",
   "task.trackedLine": "Затрачено {duration}",

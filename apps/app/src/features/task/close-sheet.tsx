@@ -1,10 +1,9 @@
-import { Pressable, Text } from "react-native";
-
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
 import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
+import { Button } from "#app/ui/button.tsx";
 import { Chip } from "#app/ui/chip.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
@@ -12,7 +11,7 @@ import { Sheet } from "#app/ui/sheet.tsx";
 import type { CloseMode } from "./close-model.ts";
 
 import { ClosePreview } from "./close-preview.tsx";
-import { GiveUpFields } from "./give-up-fields.tsx";
+import { GiveUpFields, OUTCOMES } from "./give-up-fields.tsx";
 import { type CloseForm, useCloseForm } from "./use-close-form.ts";
 import { useSubmitClose } from "./use-submit-close.ts";
 import { useSubmitTitle } from "./use-submit-title.ts";
@@ -40,9 +39,33 @@ const PrecisionRow = ({ form }: { readonly form: CloseForm }) => {
 };
 
 /**
+The way out of Done: "Close task as…" and each outcome as a button of its own, which turns the
+sheet to that outcome (QA round 19 M2: one grey caption read as a label, not a control).
+*/
+const OtherOutcomes = ({ form }: { readonly form: CloseForm }) => {
+  const t = useT();
+  return (
+    <OptionRow label={t("close.otherLabel")}>
+      {OUTCOMES.map((outcome) => (
+        <Button
+          key={outcome}
+          onPress={() => {
+            form.setOutcome(outcome);
+            form.setMode("other");
+          }}
+          variant="secondary"
+        >
+          {t(`close.${outcome}`)}
+        </Button>
+      ))}
+    </OptionRow>
+  );
+};
+
+/**
 The Close artboard: when it happened (pills or an exact time), exactly or about then (two
 chips, so both choices are in sight),
-a preview of what gets recorded, and the way out ("Close task as… Cancelled · Skipped").
+a preview of what gets recorded, and the way out ("Close task as…" Cancelled, Skipped).
 */
 export const CloseSheet = ({
   onClose,
@@ -90,17 +113,7 @@ export const CloseSheet = ({
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
       <PrecisionRow form={form} />
       <ClosePreview form={form} view={view} />
-      {form.mode === "other" ? null : (
-        <Pressable
-          accessibilityRole="button"
-          className="h-11 items-center justify-center"
-          onPress={() => {
-            form.setMode("other");
-          }}
-        >
-          <Text className="font-sans text-[13px] text-muted">{t("close.other")}</Text>
-        </Pressable>
-      )}
+      {form.mode === "other" ? null : <OtherOutcomes form={form} />}
     </Sheet>
   );
 };

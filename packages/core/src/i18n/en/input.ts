@@ -82,7 +82,7 @@ export const enInput = {
   "close.beforeDeadline": "Done · before deadline",
   "close.late": "Done · late",
   "close.submit": "Submit",
-  "close.other": "Close task as… Cancelled · Skipped",
+  "close.otherLabel": "Close task as…",
   "close.cancelled": "Cancelled",
   "close.skipped": "Skipped",
   "close.reason": "Reason",

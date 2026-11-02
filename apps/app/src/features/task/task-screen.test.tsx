@@ -501,6 +501,16 @@ describe("TaskScreen — work", () => {
     });
   });
 
+  it("opens the sheet for another time without a long press, from the button beside Done (QA 19 M2)", async () => {
+    await trkScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("task.doneOther") }));
+    expect(screen.getByText(en("close.whenDone"))).toBeOnTheScreen();
+    // In its Done mode, with Cancelled and Skipped as buttons of their own.
+    expect(screen.getByRole("button", { name: en("common.done") })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("close.cancelled") })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("close.skipped") })).toBeOnTheScreen();
+  });
+
   it("says so when the task does not exist", async () => {
     await renderScreen(<TaskScreen id="t-nope" />, await createTestRuntime());
     expect(screen.getByText(en("task.notFound"))).toBeOnTheScreen();

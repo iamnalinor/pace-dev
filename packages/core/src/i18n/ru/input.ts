@@ -84,7 +84,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.beforeDeadline": "Сделано · до срока",
   "close.late": "Сделано · с опозданием",
   "close.submit": "Сдать",
-  "close.other": "Закрыть как… Отменена · Пропущена",
+  "close.otherLabel": "Закрыть как…",
   "close.cancelled": "Отменена",
   "close.skipped": "Пропущена",
   "close.reason": "Причина",
