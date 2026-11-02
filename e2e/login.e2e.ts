@@ -68,6 +68,11 @@ test("the theme choice is kept per device and paints the page", async ({ page })
   expect((await pageColors()).body).toBe("rgb(244, 245, 247)");
   await page.getByRole("radio", { name: "System" }).click();
   await expect.poll(background).not.toBe(light);
+  // System, reloaded on a dark system: the page follows the system again, from the first paint on.
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "System" })).toBeChecked();
+  expect(await background()).not.toBe(light);
+  expect((await pageColors()).body).toBe("rgb(11, 11, 12)");
 });
 
 test("the App Link landing offers to open the app", async ({ page }) => {

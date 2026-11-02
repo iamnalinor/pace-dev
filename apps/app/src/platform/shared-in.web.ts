@@ -13,7 +13,8 @@ What the system's share sheet sent to the installed web app: the manifest's `sha
 
 The share is taken once: the line keeps it while the address drops the query, so a reload or a
 return to the app's window does not fill the line again and a second Enter cannot add the same
-task twice (review m11). A new share replaces it.
+task twice (review m11). `setParams` would clear the params but keep the route's `path`, which
+the address is written from, so the route is navigated to again without them.
 */
 export const useSharedIn = (): string => {
   const router = useRouter();
@@ -29,7 +30,7 @@ export const useSharedIn = (): string => {
   }
   useEffect(() => {
     if (shared !== "") {
-      router.setParams({ text: undefined, title: undefined, url: undefined });
+      router.navigate("/add");
     }
   }, [router, shared]);
   return taken;

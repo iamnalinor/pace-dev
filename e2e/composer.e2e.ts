@@ -93,14 +93,20 @@ for (const [width, height, size] of [
     const line = page.getByRole("textbox", { name: "New task" });
     await expect(line).toHaveValue("Article https://example.com/a a look at this");
     // Taken once: the address drops the share, so a reload (or a return to the window) does not
-    // fill the line again and a second Enter cannot add it twice (review m11).
+    // fill the line from it again and a second Enter cannot add it twice (review m11).
     await expect.poll(() => new URL(page.url()).search).toBe("");
     expect(new URL(page.url()).pathname).toBe("/add");
     await expect(line).toHaveValue("Article https://example.com/a a look at this");
     await line.press("Enter");
     await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
+    // A reload finds no share left to fill in: /add opens as New task, nothing holds the text.
     await page.reload();
-    await expect(page.getByRole("textbox", { name: "New task" })).not.toHaveValue(/Article/u);
+    await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+    expect(new URL(page.url()).search).toBe("");
+    const values = await page
+      .locator("input, textarea")
+      .evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value));
+    expect(values.filter((value) => value.includes("look at this"))).toEqual([]);
   });
 }
 

@@ -254,9 +254,15 @@ test("a block of a few seconds sits beside the next one, never under it (QA 17 L
 }) => {
   await page.setViewportSize({ height: 900, width: 1440 });
   const { token } = await loginViaApi(page);
-  // Started and stopped within half a minute, then another activity five minutes later: both
-  // earlier today (at least an hour ago, so the grid shows them).
-  const start = Date.now() - 2 * 60 * 60_000;
+  // The page's clock stands on the last Wednesday at 15:00 UTC (not the real time of day: two hours
+  // before a Monday 00:30 is last week, class 9). Started and stopped within half a minute, then
+  // another activity five minutes later: both that day, two hours before.
+  const day = 24 * 60 * 60_000;
+  const lastWednesday = new Date(Date.now() - day);
+  lastWednesday.setUTCDate(lastWednesday.getUTCDate() - ((lastWednesday.getUTCDay() + 4) % 7));
+  lastWednesday.setUTCHours(15, 0, 0, 0);
+  await page.clock.setFixedTime(lastWednesday);
+  const start = lastWednesday.getTime() - 2 * 60 * 60_000;
   const at = (offsetMs: number): string => new Date(start + offsetMs).toISOString();
   const event = (offsetMs: number, type: string, payload: object) => ({
     deviceId: "e2e-seed",
