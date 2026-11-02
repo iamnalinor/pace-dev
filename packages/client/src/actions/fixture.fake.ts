@@ -3,6 +3,7 @@ import type { Event } from "@pace/core";
 import { artboardEvents, MOSCOW, NOW } from "@pace/core/testing";
 
 import type { Clock } from "../clock.ts";
+import type { EventStore } from "../event-store.ts";
 
 import { createMemoryEventStore } from "../adapters/memory-event-store.ts";
 import { type AppStateHandle, createAppState } from "../state.ts";
@@ -19,8 +20,8 @@ export type ActionsWorld = {
 /** The artboard world in a memory store, driven by the web client with a frozen clock. */
 export const setupActions = async (
   seed: readonly Event[] = artboardEvents(),
+  store: EventStore = createMemoryEventStore(),
 ): Promise<ActionsWorld> => {
-  const store = createMemoryEventStore();
   await store.append(seed);
   await store.markSynced(seed.map((event) => event.id));
   let now = NOW;

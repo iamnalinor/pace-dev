@@ -1,4 +1,9 @@
-import { type Clock, createMemoryEventStore, createMemorySessionStore } from "@pace/client";
+import {
+  type Clock,
+  createMemoryEventStore,
+  createMemorySessionStore,
+  type EventStore,
+} from "@pace/client";
 import {
   createFakeFetch,
   emptySyncRoutes,
@@ -18,6 +23,8 @@ export type TestWorld = {
   readonly world?: "artboard" | "empty";
   /** Extra fake API routes (for example the assistant's parse). */
   readonly routes?: Readonly<Record<string, FakeRoute>>;
+  /** The local log (a memory store by default); a test may make its writes fail. */
+  readonly eventStore?: EventStore;
 };
 
 /** A clock that never moves, so every relative figure matches the artboards. */
@@ -39,7 +46,7 @@ export const createTestRuntime = async (options: TestWorld = {}): Promise<PaceRu
   const runtime = await createRuntime({
     clock: frozenClock(options),
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    eventStore: createMemoryEventStore(),
+    eventStore: options.eventStore ?? createMemoryEventStore(),
     fetch: api.fetch,
     session: createMemorySessionStore(),
   });

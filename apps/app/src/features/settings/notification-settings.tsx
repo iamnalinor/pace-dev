@@ -144,7 +144,12 @@ export const PushStatus = () => {
   const options = values.map((value) => ({ label: t(`settings.push.option.${value}`), value }));
   const pick = (option: PushOption): void => {
     void (async () => {
-      await setPushChoice(option === "auto" ? null : option);
+      try {
+        await setPushChoice(option === "auto" ? null : option);
+      } catch {
+        // The phone did not keep it: the radio is back on the previous pick, nothing to register.
+        return;
+      }
       try {
         await registerPush(api);
       } catch {

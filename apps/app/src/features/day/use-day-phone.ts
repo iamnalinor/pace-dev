@@ -130,6 +130,42 @@ const named = (
 ): readonly NamedApp[] => rows.map((row) => ({ ...row, name: labels[row.app] ?? row.app }));
 
 /**
+Answers kept on the phone (a series rule, a dismissed event): shown at once, then written to the
+phone's storage (slow on Android, bug-lessons 57); the reload after it reads back what was kept.
+*/
+const phoneAnswers = (
+  setLoaded: (change: (current: Loaded) => Loaded) => void,
+  reload: () => void,
+): { readonly remember: (rule: SeriesRule) => void; readonly dismiss: (key: string) => void } => {
+  const keep = (write: () => Promise<void>): void => {
+    void (async () => {
+      try {
+        await write();
+      } finally {
+        reload();
+      }
+    })();
+  };
+  return {
+    dismiss: (key) => {
+      setLoaded((current) => ({ ...current, dismissed: new Set([...current.dismissed, key]) }));
+      keep(async () => {
+        await rememberDismissed(key);
+      });
+    },
+    remember: (rule) => {
+      setLoaded((current) => ({
+        ...current,
+        rules: [...current.rules.filter((each) => each.series !== rule.series), rule],
+      }));
+      keep(async () => {
+        await setSeriesRule(rule);
+      });
+    },
+  };
+};
+
+/**
 The phone's side of a day, read on the device: time in apps during each block and the calendar's
 events (the night's sleep is recorded on the server from the uses the phone sends). Reloads when the app comes back (after granting access).
 */
@@ -157,24 +193,13 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       subscription.remove();
     };
   }, [reload, memory]);
-  const remember = (rule: SeriesRule): void => {
-    void (async () => {
-      await setSeriesRule(rule);
-      reload();
-    })();
-  };
   const shown = loaded.calendar.filter(
     (event) =>
       !loaded.dismissed.has(calendarKey(event)) &&
       ruleOf(loaded, event) !== "skip" &&
       answers.get(calendarEventKey(event)) !== "skipped",
   );
-  const dismiss = (key: string): void => {
-    void (async () => {
-      await rememberDismissed(key);
-      reload();
-    })();
-  };
+  const { dismiss, remember } = phoneAnswers(setLoaded, reload);
   return {
     askCalendar: () => {
       void (async () => {

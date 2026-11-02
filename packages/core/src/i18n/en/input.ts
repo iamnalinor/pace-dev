@@ -27,6 +27,8 @@ export const enInput = {
   "actionError.event/duplicate": "This was already recorded.",
   "actionError.event/not-found": "That record does not exist anymore.",
   "actionError.undo/nothing": "Nothing to undo.",
+  "actionError.persist_failed":
+    "Could not save this on the device, so it was not changed. Try again.",
   "actionError.task/unknown": "That task does not exist anymore.",
   "actionError.subtask/unknown": "That subtask does not exist anymore.",
   "actionError.subtask/submitted": "A sent subtask stays on the task.",

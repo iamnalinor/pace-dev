@@ -26,7 +26,6 @@ import {
   type SeriesState,
   type Settings,
   settingsReducer,
-  shouldRematerialize,
   sortEvents,
   taskReducer,
   type TasksState,
@@ -36,6 +35,15 @@ import {
 
 import type { EventStore } from "./event-store.ts";
 import type { StoreChange } from "./peer-tabs.ts";
+
+import {
+  createLocalLog,
+  createQueue,
+  type Fold,
+  type LocalLog,
+  type Persisted,
+  type Staged,
+} from "./local-log.ts";
 
 /**
 The whole client state: the materialized slices (the same four as the core's `CoreState`,
@@ -74,8 +82,18 @@ export type AppStateHandle = {
   readonly store: StoreApi<AppState>;
   /** Resolves once the persisted log is loaded and materialized. */
   readonly ready: Promise<void>;
+  /**
+  Validates every input, then shows them all in the state at once and writes them to the local
+  store in one go, answering as soon as the state shows them (or with the first refusal, before
+  anything is shown). `persisted` settles with the write: refused, the events leave the state.
+  */
+  readonly stage: (inputs: readonly DispatchInput[]) => Promise<Result<Staged, string>>;
+  /** One event, staged; answers once its local write landed (`persist_failed` when refused). */
   readonly dispatch: (input: DispatchInput) => Promise<Result<Event, string>>;
-  /** Remote events: known ids are skipped, the rest persisted as synced and applied. */
+  /**
+  Remote events: known ids are skipped, the rest applied at once and written as synced; rejects
+  (and takes them back) when the local store refuses them.
+  */
   readonly ingest: (events: readonly Event[]) => Promise<void>;
   readonly revoke: (eventId: string) => Promise<Result<Event, string>>;
   /** Revokes the latest effective event recorded by this device. */
@@ -168,91 +186,6 @@ const latestOwn = (events: readonly Event[], deviceId: string): Event | undefine
     .toSorted((a, b) => `${b.recordedAt}${b.id}`.localeCompare(`${a.recordedAt}${a.id}`))
     .at(0);
 
-const uniqueById = (events: readonly Event[]): readonly Event[] =>
-  new Map(events.map((event) => [event.id, event])).values().toArray();
-
-/** Serializes mutations so persist-then-apply never interleaves. */
-const createQueue = (first: Promise<void>): (<T>(job: () => Promise<T>) => Promise<T>) => {
-  let tail: Promise<unknown> = first;
-  return async (job) => {
-    const previous = tail;
-    const next = (async () => {
-      try {
-        await previous;
-      } catch {
-        // A failed job must not block the ones after it; its caller saw the error.
-      }
-      return await job();
-    })();
-    tail = next;
-    return await next;
-  };
-};
-
-/** The raw log in memory (corrections included) plus the persist-then-apply steps. */
-const createLog = (
-  eventStore: EventStore,
-  store: StoreApi<AppState>,
-): {
-  readonly has: (id: string) => boolean;
-  readonly persistLocal: (event: Event) => Promise<void>;
-  /** Answers the events that were new to the log (written and applied). */
-  readonly persistRemote: (events: readonly Event[]) => Promise<readonly Event[]>;
-  /** Takes in events another tab already wrote to the shared store. */
-  readonly adopt: (events: readonly Event[]) => void;
-  readonly reload: () => Promise<void>;
-} => {
-  const known = new Map<string, Event>();
-
-  const integrate = (fresh: readonly Event[]): void => {
-    for (const event of fresh) {
-      known.set(event.id, event);
-    }
-    const state = store.getState();
-    const isNeedsRebuild = fresh.some((event) =>
-      shouldRematerialize(state.lastAppliedOccurredAt, event),
-    );
-    store.setState(
-      isNeedsRebuild ? rebuild(state, known.values().toArray()) : applyInOrder(state, fresh),
-    );
-  };
-
-  const unknownOf = (events: readonly Event[]): readonly Event[] =>
-    uniqueById(events).filter((event) => !known.has(event.id));
-
-  return {
-    adopt: (events) => {
-      const fresh = unknownOf(events);
-      if (fresh.length > 0) {
-        integrate(fresh);
-      }
-    },
-    has: (id) => known.has(id),
-    persistLocal: async (event) => {
-      await eventStore.append([event]);
-      integrate([event]);
-    },
-    persistRemote: async (events) => {
-      const fresh = unknownOf(events);
-      if (fresh.length === 0) {
-        return [];
-      }
-      await eventStore.append(fresh);
-      await eventStore.markSynced(fresh.map((event) => event.id));
-      integrate(fresh);
-      return fresh;
-    },
-    reload: async () => {
-      const all = await eventStore.listAll();
-      known.clear();
-      for (const event of all) {
-        known.set(event.id, event);
-      }
-      store.setState(rebuild(store.getState(), all));
-    },
-  };
-};
-
 /** Fills what the caller left out: the store owns the envelope. */
 const envelope = (
   input: DispatchInput,
@@ -271,7 +204,7 @@ Changes from outside this tab's own writes (the server, another tab, another wri
 tabs hear only what this state itself put into the store.
 */
 const externalChanges = (
-  log: ReturnType<typeof createLog>,
+  log: LocalLog,
   enqueue: ReturnType<typeof createQueue>,
   onStored: ((change: StoreChange) => void) | undefined,
 ): Pick<AppStateHandle, "adoptPeerChange" | "ingest" | "rematerialize"> => ({
@@ -285,12 +218,14 @@ const externalChanges = (
     });
   },
   ingest: async (events) => {
-    await enqueue(async () => {
-      const fresh = await log.persistRemote(events);
-      if (fresh.length > 0) {
-        onStored?.({ events: fresh, kind: "events" });
-      }
-    });
+    const { persisted } = await enqueue(() => ({ persisted: log.persistRemote(events) }));
+    const written = await persisted;
+    if (!written.ok) {
+      throw new Error(written.error);
+    }
+    if (written.value.length > 0) {
+      onStored?.({ events: written.value, kind: "events" });
+    }
   },
   rematerialize: async () => {
     await enqueue(log.reload);
@@ -298,7 +233,7 @@ const externalChanges = (
   },
 });
 
-export const createAppState = (options: {
+type Options = {
   readonly deviceId: string;
   readonly now: () => string;
   readonly source: "app" | "web";
@@ -307,27 +242,71 @@ export const createAppState = (options: {
   readonly onLocal?: () => void;
   /** Told of every change this state made to the store (for the other tabs that share it). */
   readonly onStored?: (change: StoreChange) => void;
-}): AppStateHandle => {
+};
+
+const FOLD: Fold<AppState> = {
+  applyInOrder,
+  lastAppliedOccurredAt: (state) => state.lastAppliedOccurredAt,
+  rebuild,
+};
+
+/**
+Tells the other tabs and the sync once the write landed: only what is on the disk can be adopted
+by a tab sharing the store, or sent.
+*/
+const announced = async (persisted: Persisted, options: Options): Persisted => {
+  const written = await persisted;
+  if (written.ok) {
+    options.onStored?.({ events: written.value, kind: "events" });
+    options.onLocal?.();
+  }
+  return written;
+};
+
+/** Validates every input (a refusal shows nothing), then shows them all and starts their write. */
+const createStage =
+  (
+    log: LocalLog,
+    enqueue: ReturnType<typeof createQueue>,
+    options: Options,
+  ): AppStateHandle["stage"] =>
+  async (inputs) =>
+    await enqueue(() => {
+      const events: Event[] = [];
+      const ids = new Set<string>();
+      for (const input of inputs) {
+        const parsed = parseEvent(envelope(input, options));
+        if (!parsed.ok) {
+          return parsed;
+        }
+        const { id } = parsed.value;
+        if (ids.has(id) || log.has(id)) {
+          return err("event/duplicate");
+        }
+        ids.add(id);
+        events.push(parsed.value);
+      }
+      // Not awaited here: the next action integrates while this write is on its way.
+      return ok({ events, persisted: announced(log.persistLocal(events), options) });
+    });
+
+export const createAppState = (options: Options): AppStateHandle => {
   const { deviceId, now } = options;
   const store = createStore<AppState>(() => initialState(deviceId));
-  const log = createLog(options.store, store);
+  const log = createLocalLog(options.store, store, FOLD);
   const ready = log.reload();
   const enqueue = createQueue(ready);
+  const stage = createStage(log, enqueue, options);
 
-  const dispatch: AppStateHandle["dispatch"] = async (input) =>
-    await enqueue(async () => {
-      const parsed = parseEvent(envelope(input, options));
-      if (!parsed.ok) {
-        return parsed;
-      }
-      if (log.has(parsed.value.id)) {
-        return err("event/duplicate");
-      }
-      await log.persistLocal(parsed.value);
-      options.onStored?.({ events: [parsed.value], kind: "events" });
-      options.onLocal?.();
-      return ok(parsed.value);
-    });
+  const dispatch: AppStateHandle["dispatch"] = async (input) => {
+    const staged = await stage([input]);
+    if (!staged.ok) {
+      return staged;
+    }
+    const written = await staged.value.persisted;
+    const [event] = staged.value.events;
+    return event !== undefined && written.ok ? ok(event) : err("persist_failed");
+  };
 
   const revoke: AppStateHandle["revoke"] = async (eventId) => {
     await ready;
@@ -346,6 +325,7 @@ export const createAppState = (options: {
     dispatch,
     ready,
     revoke,
+    stage,
     store,
     undoLast: async () => {
       await ready;

@@ -84,8 +84,14 @@ export const useCalendarPrompt = (): {
       if (!(await notifications.skipEvent(calendarEventKey(event)))) {
         return false;
       }
-      await dismiss(calendarKey(event));
-      reload();
+      // Gone at once; the phone's storage (slow on Android) follows, then the reload reads it back.
+      const key = calendarKey(event);
+      setLoaded((current) => ({ ...current, dismissed: new Set([...current.dismissed, key]) }));
+      try {
+        await dismiss(key);
+      } finally {
+        reload();
+      }
       return true;
     },
   };
