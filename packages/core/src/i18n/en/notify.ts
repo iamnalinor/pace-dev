@@ -71,6 +71,7 @@ export const enNotify = {
     "This phone shows none: notifications are not allowed (Settings → Permissions).",
   "settings.push.otherProject":
     "Google: not available, this server uses a different Firebase project.",
+  "settings.push.notSaved": "The phone could not save this choice. Try again.",
   "settings.push.unavailable": "{method} is not available right now.",
   "settings.notifications.hint": "Where each kind of notification goes.",
   "settings.push.web":

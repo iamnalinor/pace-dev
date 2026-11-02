@@ -93,8 +93,8 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     deviceId,
     hooks: createAppHooks(client.state, client.clock),
     resetLocalData: async () => {
-      await eventStore.clear();
-      await client.state.rematerialize();
+      // Through the log's write queue: a write still waiting must not land in the wiped store.
+      await client.state.clear();
     },
   };
 };

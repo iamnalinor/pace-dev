@@ -18,6 +18,7 @@ import {
 } from "./fake-fetch.fake.ts";
 import { say } from "./fake-socket.fake.ts";
 import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.ts";
+import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
@@ -317,6 +318,54 @@ describe("createSyncClient store id", () => {
     await expect(store.listPending()).resolves.toEqual([]);
     expect(state.store.getState().events).toEqual([remote]);
     expect(state.store.getState().settings.language).toBe("ru");
+  });
+});
+
+describe("createSyncClient reset with local writes in flight", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+
+  it("drops a write queued behind one in flight: nothing of the old copy is pushed afterwards", async () => {
+    const held = createHeldEventStore();
+    await held.store.setStoreId(STORE_ID);
+    await held.store.setCursor(9);
+    await held.store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    const { calls, state, sync } = await started(held.store, {
+      "GET /api/sync/pull": ({ url }) =>
+        url.searchParams.get("since") === "0"
+          ? { events: [remote], more: false, seq: 1, storeId: "store-b" }
+          : { ...EMPTY_PAGE, seq: 9, storeId: "store-b" },
+      "POST /api/sync/push": acceptAll,
+    });
+    held.hold();
+    const first = state.dispatch({
+      occurredAt: at(11),
+      payload: { language: "en" },
+      type: "settings.updated",
+    });
+    const second = state.dispatch({
+      occurredAt: at(12),
+      payload: { timezone: "UTC" },
+      type: "settings.updated",
+    });
+    const run = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(1);
+    });
+    await held.writes[0]?.resolve();
+    // The reset's own pull (the remote event) is written once the old copy is gone.
+    await vi.waitFor(() => {
+      expect(held.writes).toHaveLength(2);
+    });
+    expect(held.writes[1]?.events).toEqual([remote]);
+    await held.writes[1]?.resolve();
+    await expect(run).resolves.toMatchObject({ ok: true });
+    await expect(second).resolves.toEqual({ error: "persist_failed", ok: false });
+    await first;
+    held.release();
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 0 } });
+    expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
+    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
   });
 });
 

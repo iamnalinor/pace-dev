@@ -541,6 +541,7 @@ describe("NowBoard", () => {
     const card = await screen.findByLabelText("From your calendar");
     const saving = Promise.withResolvers<undefined>();
     mockDismissHold.current = saving.promise;
+    mockDismissHold.waiting = 0;
     try {
       await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
       await waitFor(() => {
@@ -557,6 +558,39 @@ describe("NowBoard", () => {
     } finally {
       mockDismissHold.current = null;
       saving.resolve(undefined);
+    }
+  });
+
+  it("keeps the calendar card hidden when the phone refuses to save its skip (no unhandled rejection)", async () => {
+    seminarSoon();
+    const skip = heldRoute();
+    const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } });
+    await renderScreen(<Board />, runtime);
+    const card = await screen.findByLabelText("From your calendar");
+    const saving = Promise.withResolvers<undefined>();
+    mockDismissHold.current = saving.promise;
+    mockDismissHold.waiting = 0;
+    try {
+      await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
+      await waitFor(() => {
+        expect(skip.waiting()).toBe(1);
+      });
+      await act(async () => {
+        skip.answer({ ok: true });
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockDismissHold.waiting).toBe(1);
+      });
+      await act(async () => {
+        saving.reject(new Error("keystore refused the write"));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
+      });
+      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    } finally {
+      mockDismissHold.current = null;
     }
   });
 

@@ -19,6 +19,7 @@ import { IconButton } from "#app/ui/icon-button.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
 import { PaceSwitch } from "#app/ui/switch-row.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
+import { useToast } from "#app/ui/toast.tsx";
 import { isChannelOn, NOTIFICATION_CHANNELS, NOTIFICATION_KINDS } from "@pace/core";
 
 /**
@@ -132,6 +133,7 @@ changing (the live notice registers again).
 export const PushStatus = () => {
   const t = useT();
   const { api } = usePace();
+  const toast = useToast();
   useLoadPushState();
   const state = useStore(pushStore);
   if (!IS_PHONE) {
@@ -147,7 +149,8 @@ export const PushStatus = () => {
       try {
         await setPushChoice(option === "auto" ? null : option);
       } catch {
-        // The phone did not keep it: the radio is back on the previous pick, nothing to register.
+        // The phone did not keep it: the radio is back on the previous pick, and it says so.
+        toast.show({ message: t("settings.push.notSaved") });
         return;
       }
       try {

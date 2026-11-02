@@ -385,6 +385,40 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     await expect(held.store.listPending()).resolves.toEqual([]);
   });
 
+  it("keeps an adopted id on screen when the server's write is refused but its own local write landed", async () => {
+    const { held, state } = await heldSetup();
+    const id = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
+    const local = track(state.dispatch({ ...RU_AT_10, id }));
+    await flush();
+    const ingested = state.ingest([settingsEvent(id, at(10), { language: "ru" })]);
+    await flush();
+    await held.writes[0]?.resolve();
+    await flush();
+    held.writes[1]?.reject();
+    await expect(ingested).rejects.toThrow("persist_failed");
+    expect(local.value()).toMatchObject({ ok: true });
+    // On the disk through its own write: it stays, on screen and in the log.
+    expect(state.store.getState().events.map((event) => event.id)).toEqual([id]);
+    expect(state.store.getState().settings.language).toBe("ru");
+  });
+
+  it("shows the server's copy of an id whose local write is still in flight", async () => {
+    const { held, state } = await heldSetup();
+    const id = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
+    void state.dispatch({ ...RU_AT_10, id });
+    await flush();
+    const copy = settingsEvent(id, at(10), { language: "en" });
+    void state.ingest([copy]);
+    await flush();
+    expect(state.store.getState().settings.language).toBe("en");
+    expect(state.store.getState().log).toEqual([copy]);
+    await held.writes[0]?.resolve();
+    await flush();
+    await held.writes[1]?.resolve();
+    await flush();
+    expect(state.store.getState().log).toEqual([copy]);
+  });
+
   it("takes remote events back and rejects the ingest when the local store refuses them", async () => {
     const { held, state } = await heldSetup();
     const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { timezone: "UTC" });
@@ -423,6 +457,32 @@ describe("createAppState local writes (the screen first, the disk after)", () =>
     expect(staged.ok).toBe(false);
     expect(held.writes).toEqual([]);
     expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("clears through the write queue: a write queued behind one in flight never lands in the wiped store", async () => {
+    const { held, locals, state } = await heldSetup();
+    const first = track(state.dispatch(RU_AT_10));
+    const second = track(state.dispatch(UTC_AT_11));
+    await flush();
+    expect(held.writes).toHaveLength(1);
+    const cleared = track(state.clear());
+    await flush();
+    // Gone from the screen at once (signing out), whatever the disk still does.
+    expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
+    await held.writes[0]?.resolve();
+    await flush();
+    expect(cleared.isSettled()).toBe(true);
+    expect(held.writes).toHaveLength(1);
+    expect(second.value()).toEqual({ error: "persist_failed", ok: false });
+    expect(first.value()).toMatchObject({ ok: true });
+    await expect(held.store.listAll()).resolves.toEqual([]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+    expect(state.store.getState().events).toEqual([]);
+    expect(locals()).toBe(1);
+    // A fresh write after the clear lands as usual.
+    held.release();
+    await expect(state.dispatch(RU_AT_10)).resolves.toMatchObject({ ok: true });
+    await expect(held.store.listPending()).resolves.toHaveLength(1);
   });
 
   it("a reload waits for writes in flight, so it never drops an event the state shows", async () => {

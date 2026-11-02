@@ -405,6 +405,7 @@ describe("Day and the notification pool", () => {
     // The phone's own storage is slow to write (Android's keystore): the card must not wait.
     const saving = Promise.withResolvers<undefined>();
     mockDismissHold.current = saving.promise;
+    mockDismissHold.waiting = 0;
     try {
       await fireEvent.press(await seminarSkip());
       await waitFor(() => {
@@ -421,6 +422,36 @@ describe("Day and the notification pool", () => {
     } finally {
       mockDismissHold.current = null;
       saving.resolve(undefined);
+    }
+  });
+
+  it("keeps a skipped event hidden when the phone refuses to save it (no unhandled rejection)", async () => {
+    const { skip } = await withPool([]);
+    const saving = Promise.withResolvers<undefined>();
+    mockDismissHold.current = saving.promise;
+    mockDismissHold.waiting = 0;
+    try {
+      await fireEvent.press(await seminarSkip());
+      await waitFor(() => {
+        expect(skip.waiting()).toBe(1);
+      });
+      await act(async () => {
+        skip.answer({ ok: true });
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockDismissHold.waiting).toBe(1);
+      });
+      await act(async () => {
+        saving.reject(new Error("keystore refused the write"));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
+      });
+      // The server took the skip; the phone not keeping it does not bring the card back.
+      expect(screen.queryByText("Seminar")).toBeNull();
+    } finally {
+      mockDismissHold.current = null;
     }
   });
 

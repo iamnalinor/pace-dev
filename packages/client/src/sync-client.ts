@@ -72,13 +72,13 @@ const createReset = (store: EventStore, state: AppStateHandle): Reset => {
       throw new ApiError(409, STORE_CHANGED, STORE_CHANGED);
     }
     isUsed = true;
-    await store.clear();
+    // Through the log's write queue: a local write still waiting must not land in the fresh copy.
+    await state.clear();
     // The fresh copy is pulled from 0 by this client, so it needs no re-pull of its own.
     await store.setSyncVersion(SYNC_SCHEMA_VERSION);
     if (storeId !== null) {
       await store.setStoreId(storeId);
     }
-    await state.rematerialize();
   };
 };
 

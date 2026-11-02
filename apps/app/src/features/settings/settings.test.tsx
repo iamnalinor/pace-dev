@@ -1,5 +1,8 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
+
+import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import * as firebaseProject from "#app/platform/firebase-project.ts";
 import { pushStore, registerPush, setPushChoice } from "#app/platform/notifications.ts";
@@ -274,6 +277,23 @@ describe("SettingsScreen", () => {
     expect(screen.queryByRole("radio", { name: en("settings.push.option.fcm") })).toBeNull();
     expect(screen.getByRole("radio", { name: en("settings.push.option.poll") })).toBeOnTheScreen();
     jest.restoreAllMocks();
+  });
+
+  it("says so and keeps the previous pick when the phone refuses to save a method", async () => {
+    fakeNotifications.state.granted = true;
+    fakeNotifications.state.pushToken = "fcm-token";
+    const runtime = await createTestRuntime({ routes: pushRoutes().routes, world: "empty" });
+    await setPushChoice(null);
+    await renderScreen(<SettingsScreen />, runtime);
+    const poll = await screen.findByRole("radio", { name: en("settings.push.option.poll") });
+    (SecureStore as unknown as FakeSecureStore).writes.isRefused = true;
+    try {
+      await fireEvent.press(poll);
+      expect(await screen.findByText(en("settings.push.notSaved"))).toBeOnTheScreen();
+      expect(screen.getByRole("radio", { name: en("settings.push.option.auto") })).toBeChecked();
+    } finally {
+      (SecureStore as unknown as FakeSecureStore).writes.isRefused = false;
+    }
   });
 
   it("keeps the picked method shown and selected while offline", async () => {

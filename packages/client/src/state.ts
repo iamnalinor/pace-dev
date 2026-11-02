@@ -99,6 +99,11 @@ export type AppStateHandle = {
   readonly undoLast: () => Promise<Result<Event, string>>;
   /** Full rebuild from the event store (after another writer touched it). */
   readonly rematerialize: () => Promise<void>;
+  /**
+  Drops the local copy: the log, its outbox, the cursor and the store id go, through the write
+  queue (a write still waiting is never made), and the state is empty.
+  */
+  readonly clear: () => Promise<void>;
 };
 
 const slice =
@@ -275,6 +280,9 @@ export const createAppState = (options: Options): AppStateHandle => {
   };
 
   return {
+    clear: async () => {
+      await enqueue(log.clear);
+    },
     dispatch,
     ingest: async (events) => {
       const { persisted } = await enqueue(() => ({ persisted: log.persistRemote(events) }));

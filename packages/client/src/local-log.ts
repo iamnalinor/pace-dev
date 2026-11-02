@@ -34,6 +34,12 @@ export type LocalLog = {
   readonly persistRemote: (events: readonly Event[]) => Persisted;
   /** Reads the whole log from the store again, once the writes in flight have settled. */
   readonly reload: () => Promise<void>;
+  /**
+  Drops the local copy (sign-out, another server, a reset store): the state is empty at once, and
+  the store is cleared in the write queue, after the write in flight; a write still waiting
+  behind it is never made.
+  */
+  readonly clear: () => Promise<void>;
 };
 
 const settled = async (promise: Promise<unknown>): Promise<void> => {
@@ -73,12 +79,27 @@ type Memory = {
   readonly rollback: (ids: readonly string[]) => void;
   /** Replaces the whole log (a reload). */
   readonly replace: (all: readonly Event[]) => void;
+  /** Takes the server's copy of ids the log holds already, and derives the state again. */
+  readonly adopt: (copies: readonly Event[]) => void;
 };
 
 const createMemory = <S>(store: StoreApi<S>, fold: Fold<S>): Memory => {
   const known = new Map<string, Event>();
   const unsaved = new Set<string>();
+  const rebuildAll = (): void => {
+    store.setState(fold.rebuild(store.getState(), known.values().toArray()));
+  };
   return {
+    adopt: (copies) => {
+      if (copies.length === 0) {
+        return;
+      }
+      for (const copy of copies) {
+        known.set(copy.id, copy);
+        unsaved.delete(copy.id);
+      }
+      rebuildAll();
+    },
     integrate: (fresh) => {
       if (fresh.length === 0) {
         return;
@@ -109,7 +130,7 @@ const createMemory = <S>(store: StoreApi<S>, fold: Fold<S>): Memory => {
         known.delete(id);
         unsaved.delete(id);
       }
-      store.setState(fold.rebuild(store.getState(), known.values().toArray()));
+      rebuildAll();
     },
     unsaved,
   };
@@ -117,7 +138,7 @@ const createMemory = <S>(store: StoreApi<S>, fold: Fold<S>): Memory => {
 
 /** Writes in the order integrated, and a way to wait for every one handed over so far. */
 const createWrites = (): {
-  readonly write: (job: () => Persisted) => Persisted;
+  readonly write: <T>(job: () => Promise<T>) => Promise<T>;
   readonly settledAll: () => Promise<void>;
 } => {
   const enqueue = createQueue(Promise.resolve());
@@ -134,6 +155,90 @@ const createWrites = (): {
   };
 };
 
+/** What the two write paths share. */
+type Context = {
+  readonly eventStore: EventStore;
+  readonly memory: Memory;
+  readonly write: <T>(job: () => Promise<T>) => Promise<T>;
+  /** Which local copy is current: `clear` starts a new one. */
+  readonly copy: () => number;
+  /** Ids the server's copy took over whose own local write was refused: not on the disk. */
+  readonly notOnDisk: Set<string>;
+};
+
+const persistLocalWith =
+  ({ copy, eventStore, memory, notOnDisk, write }: Context): LocalLog["persistLocal"] =>
+  async (events) => {
+    const ofCopy = copy();
+    memory.integrate(events);
+    for (const event of events) {
+      memory.unsaved.add(event.id);
+    }
+    return await write(async () => {
+      if (ofCopy !== copy()) {
+        // Written on a copy that was dropped meanwhile: it goes with it.
+        return err("persist_failed");
+      }
+      try {
+        await eventStore.append(events);
+      } catch {
+        // A copy the server sent meanwhile (a deterministic id) stays: it is not this write's,
+        // but it is not on the disk either.
+        const ids = events.map((event) => event.id);
+        const mine = ids.filter((id) => memory.unsaved.has(id));
+        const adopted = ids.filter((id) => !memory.unsaved.has(id) && memory.known.has(id));
+        for (const id of adopted) {
+          notOnDisk.add(id);
+        }
+        memory.rollback(mine);
+        return err("persist_failed");
+      }
+      for (const event of events) {
+        memory.unsaved.delete(event.id);
+      }
+      return ok(events);
+    });
+  };
+
+const persistRemoteWith =
+  ({ copy, eventStore, memory, notOnDisk, write }: Context): LocalLog["persistRemote"] =>
+  async (events) => {
+    const ofCopy = copy();
+    const unique = uniqueById(events);
+    const fresh = unique.filter((event) => !memory.known.has(event.id));
+    // An id whose local write is still in flight is the server's now: its copy is kept,
+    // written and marked synced.
+    const adopted = unique.filter((event) => memory.unsaved.has(event.id));
+    const batch = [...fresh, ...adopted];
+    if (batch.length === 0) {
+      return ok([]);
+    }
+    memory.integrate(fresh);
+    memory.adopt(adopted);
+    return await write(async () => {
+      if (ofCopy !== copy()) {
+        return err("persist_failed");
+      }
+      const ids = batch.map((event) => event.id);
+      try {
+        await eventStore.append(batch);
+        await eventStore.markSynced(ids);
+      } catch {
+        // Not stored, so not kept (the cursor did not move, the next pull brings them again);
+        // an adopted id whose own local write landed is on the disk and stays.
+        memory.rollback([
+          ...fresh.map((event) => event.id),
+          ...adopted.map((event) => event.id).filter((id) => notOnDisk.has(id)),
+        ]);
+        return err("persist_failed");
+      }
+      for (const id of ids) {
+        notOnDisk.delete(id);
+      }
+      return ok(batch);
+    });
+  };
+
 /**
 The raw log in memory (corrections included) and its two steps: integrate (the state shows the
 events at once, before any disk) and write (the local store, one write after another, in the
@@ -145,58 +250,28 @@ export const createLocalLog = <S>(
   store: StoreApi<S>,
   fold: Fold<S>,
 ): LocalLog => {
-  const { integrate, known, replace, rollback, unsaved } = createMemory(store, fold);
+  const memory = createMemory(store, fold);
   const { settledAll, write } = createWrites();
+  /** Bumped by `clear`: a write handed over before it is not made any more. */
+  let copy = 0;
+  const notOnDisk = new Set<string>();
+  const context: Context = { copy: () => copy, eventStore, memory, notOnDisk, write };
   return {
-    has: (id) => known.has(id),
-    persistLocal: async (events) => {
-      integrate(events);
-      for (const event of events) {
-        unsaved.add(event.id);
-      }
-      return await write(async () => {
-        try {
-          await eventStore.append(events);
-        } catch {
-          // A copy the server sent meanwhile (a deterministic id) stays: it is not this write's.
-          rollback(events.map((event) => event.id).filter((id) => unsaved.has(id)));
-          return err("persist_failed");
-        }
-        for (const event of events) {
-          unsaved.delete(event.id);
-        }
-        return ok(events);
+    clear: async () => {
+      copy += 1;
+      notOnDisk.clear();
+      memory.replace([]);
+      await write(async () => {
+        await eventStore.clear();
       });
     },
-    persistRemote: async (events) => {
-      // An id whose local write is still in flight is the server's now: written and marked synced.
-      const batch = uniqueById(events).filter(
-        (event) => unsaved.has(event.id) || !known.has(event.id),
-      );
-      if (batch.length === 0) {
-        return ok([]);
-      }
-      const ids = batch.map((event) => event.id);
-      integrate(batch.filter((event) => !known.has(event.id)));
-      for (const id of ids) {
-        unsaved.delete(id);
-      }
-      return await write(async () => {
-        try {
-          await eventStore.append(batch);
-          await eventStore.markSynced(ids);
-        } catch {
-          // Not stored, so not kept: the cursor did not move, the next pull brings them again.
-          rollback(ids);
-          return err("persist_failed");
-        }
-        return ok(batch);
-      });
-    },
+    has: (id) => memory.known.has(id),
+    persistLocal: persistLocalWith(context),
+    persistRemote: persistRemoteWith(context),
     reload: async () => {
       // A write in flight lands (or is taken back) first, or the reload would drop what it shows.
       await settledAll();
-      replace(await eventStore.listAll());
+      memory.replace(await eventStore.listAll());
     },
   };
 };

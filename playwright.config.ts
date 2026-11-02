@@ -28,6 +28,9 @@ const E2E_TELEGRAM_IDS = [
   ),
 ].join(",");
 
+/** The tap-latency suite, run as a project of its own after the rest (see `projects`). */
+const LATENCY = "**/latency.e2e.ts";
+
 // Optional: a pre-installed Chromium instead of `playwright install` (e.g. sandboxes).
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
 
@@ -42,6 +45,19 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: LATENCY,
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(executablePath !== undefined && { launchOptions: { executablePath } }),
+      },
+    },
+    {
+      // The tap-latency budget (e2e/latency.e2e.ts) measures the CPU: it runs alone, after
+      // every other test, one test at a time, so no parallel worker slows its frames.
+      dependencies: ["chromium"],
+      fullyParallel: false,
+      name: "latency",
+      testMatch: LATENCY,
       use: {
         ...devices["Desktop Chrome"],
         ...(executablePath !== undefined && { launchOptions: { executablePath } }),
