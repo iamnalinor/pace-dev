@@ -10,6 +10,7 @@ import { useIsWide } from "#app/ui/layout.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
+import { IS_TOUCH_BROWSER } from "#app/ui/use-hotkey.tsx";
 import { type ActionResult, taskChoices, type TimeButtonView } from "@pace/client";
 import { formatDuration } from "@pace/core";
 
@@ -101,14 +102,15 @@ const TaskSearch = ({
 }) => {
   const t = useT();
   const { palette } = useTheme();
-  // On a phone the keyboard would cover the list it narrows: it opens on a tap in the field.
-  const isWide = useIsWide();
+  // On a phone, or any touch screen in a browser, the keyboard would cover the list it narrows:
+  // it opens on a tap in the field (fix round 5 V4: a wide touch browser is no computer).
+  const isTypedInAtOnce = useIsWide() && !IS_TOUCH_BROWSER;
   return (
     <View className="h-11 flex-row items-center gap-2 rounded-lg border border-line bg-bg px-3">
       <Search color={palette.muted} size={16} />
       <TextInput
         accessibilityLabel={t("time.taskSearch")}
-        autoFocus={isWide}
+        autoFocus={isTypedInAtOnce}
         className="h-11 flex-1 font-sans text-[15px] text-fg"
         onChangeText={onChange}
         placeholder={t("time.taskSearch")}

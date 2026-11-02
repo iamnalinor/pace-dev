@@ -25,6 +25,12 @@ export const KEYBOARD: KeyboardOs | null = hasKeyboard()
     )
   : null;
 
+/**
+A browser on a touch screen (no fine pointer): a field focused for the person brings up the
+on-screen keyboard over what they were about to read (fix round 5 V4).
+*/
+export const IS_TOUCH_BROWSER = KEYBOARD === null;
+
 type Entry = {
   readonly hotkey: Hotkey;
   readonly layer: number;

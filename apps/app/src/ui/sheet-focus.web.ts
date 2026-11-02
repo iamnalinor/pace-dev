@@ -2,25 +2,54 @@ import type { View } from "react-native";
 
 import { type RefCallback, useCallback } from "react";
 
+import { IS_TOUCH_BROWSER } from "./use-hotkey.tsx";
+
 /** A field to type into, in the order the sheet shows them. */
 const FIELDS = "input:not([disabled]):not([type=hidden]), textarea:not([disabled])";
 /** Anything else Tab stops at. */
 const STOPS = '[tabindex="0"], button:not([disabled]), a[href]';
 
 /**
-The element an open sheet starts on: its first field (a form's title, a picker's search), else
-its first control that is not the close cross; `null` when focus is already in the sheet on
+Where an open sheet may start, in order: its fields (only where there is a keyboard to type with:
+on a touch screen a focused field brings up the on-screen keyboard over the sheet, fix round 5
+V4), then its other controls but the close cross. None when focus is already in the sheet on
 something other than the cross (a field that focused itself).
 */
-const firstStop = (surface: HTMLElement, closeLabel: string): HTMLElement | null => {
-  const active = document.activeElement;
+export const sheetStartStops = (
+  surface: HTMLElement,
+  {
+    active,
+    closeLabel,
+    hasKeyboard,
+  }: {
+    readonly active: Element | null;
+    readonly closeLabel: string;
+    readonly hasKeyboard: boolean;
+  },
+): readonly HTMLElement[] => {
   const isClose = (element: Element): boolean => element.getAttribute("aria-label") === closeLabel;
-  return active !== null && surface.contains(active) && !isClose(active)
-    ? null
-    : (surface.querySelector<HTMLElement>(FIELDS) ??
-        [...surface.querySelectorAll<HTMLElement>(STOPS)].find((element) => !isClose(element)) ??
-        null);
+  if (active !== null && surface.contains(active) && !isClose(active)) {
+    return [];
+  }
+  const fields = hasKeyboard ? [...surface.querySelectorAll<HTMLElement>(FIELDS)] : [];
+  const others = [...surface.querySelectorAll<HTMLElement>(STOPS)].filter(
+    (element) => !isClose(element) && !element.matches(FIELDS),
+  );
+  return [...fields, ...others];
 };
+
+/**
+Focuses the first of `stops` that takes focus (a hidden one takes none: the next is tried); false
+when none did, as while the modal has not shown its content yet.
+*/
+export const didFocusFirstOf = (
+  stops: readonly HTMLElement[],
+  active: () => Element | null,
+): boolean =>
+  stops.some((stop) => {
+    stop.focus();
+    return active() === stop;
+  });
 
 /** How many frames the sheet tries to take focus while the modal is still showing its content. */
 const FOCUS_FRAMES = 30;
@@ -46,10 +75,13 @@ export const useSheetFocusRef = ({
       let frame = 0;
       let left = FOCUS_FRAMES;
       const attempt = (): void => {
-        const stop = firstStop(element, closeLabel);
-        stop?.focus();
+        const stops = sheetStartStops(element, {
+          active: document.activeElement,
+          closeLabel,
+          hasKeyboard: !IS_TOUCH_BROWSER,
+        });
         left -= 1;
-        if (stop !== null && document.activeElement !== stop && left > 0) {
+        if (stops.length > 0 && !didFocusFirstOf(stops, () => document.activeElement) && left > 0) {
           frame = requestAnimationFrame(attempt);
         }
       };

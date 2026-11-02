@@ -5,6 +5,12 @@ import type { Hotkey, KeyboardOs } from "./hotkeys.ts";
 /** A phone has no keyboard shortcuts to show (the web build swaps in `use-hotkey.web.tsx`). */
 export const KEYBOARD: KeyboardOs | null = null;
 
+/**
+A browser on a touch screen, where a focused field brings up the on-screen keyboard: never the
+app, whose fields decide for themselves (fix round 5 V4).
+*/
+export const IS_TOUCH_BROWSER = false;
+
 /** On a phone a shortcut does nothing. */
 // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- the same hook as the web build's, which does call hooks
 export const useHotkey = (_hotkey: Hotkey | undefined, _onPress: () => void): void => undefined;
