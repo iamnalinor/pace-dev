@@ -53,6 +53,37 @@ export const didFocusFirstOf = (
     return active() === stop;
   });
 
+/**
+One try at the sheet's start: focuses the first stop that takes focus; true when that worked or
+focus is already where it belongs, false to try again next frame. The surface is focusable (by the
+script alone, never a Tab stop) only while it is the start itself: react-native-web's modal trap,
+when Tab leaves the sheet, tries each element before its descendants, so a focusable surface would
+take every such walk and Shift+Tab could never come back to a control (the date picker's day,
+round 7, class 106).
+*/
+export const didFocusSheetStart = (
+  surface: HTMLElement,
+  {
+    active,
+    closeLabel,
+    hasKeyboard,
+  }: {
+    readonly active: () => Element | null;
+    readonly closeLabel: string;
+    readonly hasKeyboard: boolean;
+  },
+): boolean => {
+  const stops = sheetStartStops(surface, { active: active(), closeLabel, hasKeyboard });
+  if (stops.length === 0) {
+    return true;
+  }
+  surface.removeAttribute("tabindex");
+  if (stops[0] === surface) {
+    surface.setAttribute("tabindex", "-1");
+  }
+  return didFocusFirstOf(stops, active);
+};
+
 /** How many frames the sheet tries to take focus while the modal is still showing its content. */
 const FOCUS_FRAMES = 30;
 
@@ -74,18 +105,16 @@ export const useSheetFocusRef = ({
       if (element === null) {
         return;
       }
-      // Focusable by the script alone (never a Tab stop): where a sheet with nothing else starts.
-      element.tabIndex = -1;
       let frame = 0;
       let left = FOCUS_FRAMES;
       const attempt = (): void => {
-        const stops = sheetStartStops(element, {
-          active: document.activeElement,
+        const isDone = didFocusSheetStart(element, {
+          active: () => document.activeElement,
           closeLabel,
           hasKeyboard: !IS_TOUCH_BROWSER,
         });
         left -= 1;
-        if (stops.length > 0 && !didFocusFirstOf(stops, () => document.activeElement) && left > 0) {
+        if (!isDone && left > 0) {
           frame = requestAnimationFrame(attempt);
         }
       };
