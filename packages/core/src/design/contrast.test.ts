@@ -105,14 +105,17 @@ describe("placeholder rows", () => {
 
 describe("USED_PAIRS (tokens v2)", () => {
   it.each(THEMES)("%s: every pair reaches its target on its real ground", (theme) => {
-    const measured = USED_PAIRS.map(({ bg, fg, over, target }) => {
-      const below = composite(color(theme, over ?? "bg.cell"), "#ffffff");
+    const measured = USED_PAIRS.map(({ between, bg, fg, over, target }) => {
+      const page = composite(color(theme, over ?? "bg.cell"), "#ffffff");
+      const below = between === undefined ? page : composite(color(theme, between), page);
       const ground = composite(color(theme, bg), below);
       const text = composite(color(theme, fg), ground);
       const ratio = contrastRatio(text, ground) ?? 0;
       const lc = Math.abs(apcaLc(text, ground));
       const need = TARGETS[target];
-      const where = over === undefined ? bg : `${bg} over ${over}`;
+      const where = [bg, between, over ?? (between === undefined ? undefined : "bg.cell")]
+        .filter((role) => role !== undefined)
+        .join(" over ");
       return {
         label: `${fg} on ${where} (${target}): ${ratio.toFixed(2)}:1, Lc ${lc.toFixed(1)}`,
         met: ratio >= need.ratio && lc >= need.lc,

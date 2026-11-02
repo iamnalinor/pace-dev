@@ -53,6 +53,14 @@ describe("ConsentFlow", () => {
     });
   });
 
+  it("draws the client card as a cell on the page, where its tertiary and warning lines were measured (bug-lessons 61)", async () => {
+    await setupConsent();
+    const warning = await screen.findByText(en("oauth.loopbackWarning"));
+    const card = String(warning.parent?.props["className"] ?? "").split(" ");
+    expect(card).toContain("bg-cell");
+    expect(card.filter((name) => name.startsWith("bg-fill"))).toEqual([]);
+  });
+
   it("allows with the ticked scopes only, as the dev identity", async () => {
     const { complete, redirect } = await setupConsent();
     await fireEvent.press(

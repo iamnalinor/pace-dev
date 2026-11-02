@@ -12,10 +12,12 @@ export type ContrastTarget = "large" | "meta" | "text" | "textSmall" | "ui";
 
 /**
 A foreground on a background as the system draws them. A translucent `bg` (a tint, a quiet fill)
-is composited over `over` (default `bg.cell`) before measuring.
+is composited over `over` (default `bg.cell`) before measuring; `between` is a translucent layer
+in between (a tag on a selected row: the tag's tint over the row's selection over the page).
 */
 export type ContrastPair = {
   readonly bg: ColorRole;
+  readonly between?: ColorRole;
   readonly fg: ColorRole;
   readonly over?: ColorRole;
   readonly target: ContrastTarget;
@@ -35,6 +37,37 @@ const onGrounds = (
   target: ContrastTarget,
   grounds: readonly ColorRole[] = GROUNDS,
 ): readonly ContrastPair[] => grounds.map((bg) => ({ bg, fg, target }));
+
+/**
+The ground of a selected row that carries a meta line (`TaskRow`: Now, a project, History). The
+whole meta line sits on it (tertiary times, danger words, every tag), so it is the lightest neutral
+fill: on `fill.3` the tertiary meta and the green tag fall to 4.0-4.3:1 in light (bug-lessons 61).
+`apps/app/src/shared/task-row.test.tsx` pins the row's class to it.
+*/
+export const SELECTED_ROW_FILL = "fill.1" satisfies ColorRole;
+
+/**
+Everything a selected row's meta line draws (its tags always have a hue: the project's, else the
+category's, and the importance's), on the selection over the grounds a task list sits on: a cell
+group, or the page (a list beside the inspector). No sheet or popover carries task rows.
+*/
+const SELECTED_ROW_PAIRS: readonly ContrastPair[] = (["bg.app", "bg.cell"] as const).flatMap(
+  (over): readonly ContrastPair[] => [
+    { bg: SELECTED_ROW_FILL, fg: "label.primary", over, target: "text" },
+    { bg: SELECTED_ROW_FILL, fg: "label.secondary", over, target: "meta" },
+    { bg: SELECTED_ROW_FILL, fg: "label.tertiary", over, target: "textSmall" },
+    { bg: SELECTED_ROW_FILL, fg: "status.danger", over, target: "textSmall" },
+    ...HUE_NAMES.map(
+      (name): ContrastPair => ({
+        bg: `hue.${name}.tint`,
+        between: SELECTED_ROW_FILL,
+        fg: `hue.${name}.ink`,
+        over,
+        target: "meta",
+      }),
+    ),
+  ],
+);
 
 /**
 Every foreground/background pair the design uses (spec §3.1 and §3.9). The unit test measures each
@@ -63,6 +96,11 @@ export const USED_PAIRS: readonly ContrastPair[] = [
   { fg: "status.warn", bg: "warnQuiet", over: "bg.cell", target: "meta" },
   // A count badge: cell-coloured digits on the danger fill.
   { fg: "bg.cell", bg: "status.danger", target: "textSmall" },
+  // A tag without a colour (`ColorTag` with no project colour): secondary on `fill.4`.
+  ...GROUNDS.map(
+    (over): ContrastPair => ({ bg: "fill.4", fg: "label.secondary", over, target: "meta" }),
+  ),
+  ...SELECTED_ROW_PAIRS,
   // A neutral count badge (unread notifications): secondary digits on `fill.3`.
   ...GROUNDS.map(
     (over): ContrastPair => ({ bg: "fill.3", fg: "label.secondary", over, target: "meta" }),

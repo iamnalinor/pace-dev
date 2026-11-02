@@ -11,7 +11,8 @@ registration or metadata document); it is rendered as text, never as markup.
 export const ClientCard = ({ info }: { readonly info: OAuthClientInfo }) => {
   const t = useT();
   return (
-    <View className="gap-3 rounded-lg border border-separator bg-fill-3 p-4">
+    // A cell on the page: its tertiary and warning lines are measured on `bg.cell` (bug-lessons 61).
+    <View className="gap-3 rounded-lg border border-separator bg-cell p-4">
       <View className="flex-row items-center gap-3">
         {info.logoUri === null ? null : (
           <Image
