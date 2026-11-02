@@ -41,9 +41,16 @@ block ended, on the day before, of or after it, among those after the start (QA 
 I1; round-3 review I-a: taking the nearest before checking the start sent 08:00–09:00 retyped to
 21:30 to the evening before). The sheet types clock times only, and a block's end may be a day or
 two after its start: a night, a timer left running. Reading it on the start's day cut a 30-hour
-block by a day without a word. A later day is taken only within `MAX_OVERNIGHT_MS` of the old end,
-so a time typed before the start of a short block stays a reversed pair, not a day-long block.
-With none after the start (or no start to meet), the nearest: the range check says what is wrong.
+block by a day without a word.
+
+On the typed start's own day an end moves later without limit. On any day after it, a reading
+later than the old end counts only within `MAX_OVERNIGHT_MS` of that end (round-4 review R1: the
+day the old end sits on was exempt, so 22:00–02:00 retyped to 21:00 became a 23-hour block). A
+time typed before the start's clock thus stays a reversed pair unless it lands at most 12 hours
+past the old end (22:00–07:00 → 19:00). Unlike `newEndOf`, which caps a new block's length from
+its start, this caps how far a retyped end moves from where the block ended. Moving an end
+earlier is never capped. With none fitting, the nearest reading not after the start, so the range
+check refuses it as reversed (with no start to meet, the nearest).
 */
 const movedEndOf = (
   typed: string,
@@ -51,7 +58,7 @@ const movedEndOf = (
   zone: string,
 ): null | string => {
   const was = Date.parse(endAt);
-  const { date: endDate } = wallClock(endAt, zone);
+  const startDate = startAt === null ? null : wallClock(startAt, zone).date;
   const nearest = [-1, 0, 1]
     .map((days) => wallClock(addDaysIn(endAt, days, zone), zone).date)
     .map((date) => ({ atIso: fromWallClock({ date, time: typed, tz: zone }), date }))
@@ -59,10 +66,15 @@ const movedEndOf = (
     .toSorted((a, b) => Math.abs(Date.parse(a.atIso) - was) - Math.abs(Date.parse(b.atIso) - was));
   const fits = nearest.find(
     ({ atIso, date }) =>
-      (startAt === null || Date.parse(atIso) > Date.parse(startAt)) &&
-      (date <= endDate || Date.parse(atIso) - was <= MAX_OVERNIGHT_MS),
+      startAt !== null &&
+      startDate !== null &&
+      Date.parse(atIso) > Date.parse(startAt) &&
+      (date <= startDate || Date.parse(atIso) - was <= MAX_OVERNIGHT_MS),
   );
-  return (fits ?? nearest[0])?.atIso ?? null;
+  const reversed = nearest.find(
+    ({ atIso }) => startAt !== null && Date.parse(atIso) <= Date.parse(startAt),
+  );
+  return (fits ?? reversed ?? nearest[0])?.atIso ?? null;
 };
 
 /**

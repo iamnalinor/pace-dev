@@ -113,6 +113,40 @@ describe("readDraft on a block's real boundaries", () => {
     expect(read).toEqual({ faults: { ...NO_FAULTS, to: "day.badRange" }, range: null });
   });
 
+  it.each([
+    // 22:00 Mon – 02:00 Tue in Moscow, To retyped 21:00: not Mon 22:00 – Tue 21:00 (23 h).
+    {
+      endAt: "2026-10-05T23:00:00.000Z",
+      name: "22:00–02:00 retyped to 21:00",
+      startAt: "2026-10-05T19:00:00.000Z",
+      to: "21:00",
+    },
+    // 23:30–00:30, To retyped 23:00: not a 23.5-hour block.
+    {
+      endAt: "2026-10-05T21:30:00.000Z",
+      name: "23:30–00:30 retyped to 23:00",
+      startAt: "2026-10-05T20:30:00.000Z",
+      to: "23:00",
+    },
+  ])(
+    "refuses an end typed before the start of a block crossing midnight: $name",
+    ({ endAt, startAt, to }) => {
+      const target = block(startAt, endAt);
+      expect(readDraft(opened(target, MOSCOW, { to }), target, MOSCOW)).toEqual({
+        faults: { ...NO_FAULTS, to: "day.badRange" },
+        range: null,
+      });
+    },
+  );
+
+  it("moves a night's end to the evening after, 12 hours on", () => {
+    // 22:00–07:00 in Moscow, To retyped 19:00: the evening of the day it ended.
+    const target = block("2026-10-05T19:00:00.000Z", "2026-10-06T04:00:00.000Z");
+    expect(readDraft(opened(target, MOSCOW, { to: "19:00" }), target, MOSCOW).range?.endAt).toBe(
+      "2026-10-06T16:00:00.000Z",
+    );
+  });
+
   it("gives back a running block's start unchanged", () => {
     const target = block("2026-10-06T06:00:42.000Z", null);
     expect(readDraft(opened(target, MOSCOW), target, MOSCOW)).toEqual({
@@ -169,6 +203,49 @@ describe("readDraft on an end moved later the same day", () => {
   it("comes back on the block's own day for every later time typed", () => {
     expect(blocks.length).toBeGreaterThan(150);
     expect(blocks.flatMap((item) => misread(item))).toEqual([]);
+  });
+});
+
+describe("readDraft on an end typed before the start of a block crossing midnight", () => {
+  // The guard for round-4 review R1's class: the end of a block that crosses midnight, retyped to a
+  // time earlier than the start's clock, is a reversed pair or lands at most 12 hours past the old
+  // end, never a day-long block. Nights of summer-time changes included.
+  const zones = [MOSCOW, BERLIN, "America/New_York", "Asia/Kolkata", "Australia/Lord_Howe"];
+  const days = ["2026-03-28", "2026-04-04", "2026-07-15", "2026-10-24", "2026-10-31"];
+  const lengths = [60, 240, 540, 700].map((minutes) => minutes * 60_000);
+  const startTimes = ["15:00", "20:30", "22:00", "23:30"];
+  const MAX_PAST_OLD_END_MS = 12 * 3_600_000;
+
+  const blocks = zones.flatMap((zone) =>
+    days.flatMap((date) =>
+      startTimes.flatMap((time) => {
+        const startAt = fromWallClock({ date, time, tz: zone }) ?? "";
+        return lengths
+          .map((length) => new Date(Date.parse(startAt) + length).toISOString())
+          .filter((endAt) => wallClock(endAt, zone).date > date)
+          .map((endAt) => ({ target: block(startAt, endAt), zone }));
+      }),
+    ),
+  );
+
+  it("reads every such time as a reversed pair or within 12 hours of the old end", () => {
+    expect(blocks.length).toBeGreaterThan(100);
+    const wrong = blocks.flatMap(({ target, zone }) =>
+      TYPED.filter((to) => to < clockTime(target.startAt, zone))
+        .map((to) => ({
+          read: readDraft(opened(target, zone, { to }), target, zone),
+          target,
+          to,
+          zone,
+        }))
+        .filter(({ read }) => {
+          const endAt = read.range?.endAt;
+          return endAt === undefined || endAt === null
+            ? read.faults.to !== "day.badRange"
+            : Date.parse(endAt) - Date.parse(target.endAt ?? "") > MAX_PAST_OLD_END_MS;
+        }),
+    );
+    expect(wrong).toEqual([]);
   });
 });
 
