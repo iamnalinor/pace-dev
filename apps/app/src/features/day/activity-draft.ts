@@ -37,33 +37,51 @@ const keptAt = (typed: string, atIso: null | string, zone: string): null | strin
 
 /**
 A retyped end of a block that has one: the instant with that wall clock nearest to where the
-block ended, on the day before, of or after it (QA round 17 review I1). The sheet types clock
-times only, and a block's end may be a day or two after its start: a night, a timer left running.
-Reading it on the start's day cut a 30-hour block by a day without a word.
+block ended, on the day before, of or after it, among those after the start (QA round 17 review
+I1; round-3 review I-a: taking the nearest before checking the start sent 08:00–09:00 retyped to
+21:30 to the evening before). The sheet types clock times only, and a block's end may be a day or
+two after its start: a night, a timer left running. Reading it on the start's day cut a 30-hour
+block by a day without a word. A later day is taken only within `MAX_OVERNIGHT_MS` of the old end,
+so a time typed before the start of a short block stays a reversed pair, not a day-long block.
+With none after the start (or no start to meet), the nearest: the range check says what is wrong.
 */
-const movedEndOf = (typed: string, endAt: string, zone: string): null | string => {
+const movedEndOf = (
+  typed: string,
+  { endAt, startAt }: { readonly endAt: string; readonly startAt: null | string },
+  zone: string,
+): null | string => {
   const was = Date.parse(endAt);
+  const { date: endDate } = wallClock(endAt, zone);
   const nearest = [-1, 0, 1]
     .map((days) => wallClock(addDaysIn(endAt, days, zone), zone).date)
-    .map((date) => fromWallClock({ date, time: typed, tz: zone }))
-    .filter((atIso) => atIso !== null)
-    .toSorted((a, b) => Math.abs(Date.parse(a) - was) - Math.abs(Date.parse(b) - was));
-  return nearest[0] ?? null;
+    .map((date) => ({ atIso: fromWallClock({ date, time: typed, tz: zone }), date }))
+    .filter((read): read is { atIso: string; date: string } => read.atIso !== null)
+    .toSorted((a, b) => Math.abs(Date.parse(a.atIso) - was) - Math.abs(Date.parse(b.atIso) - was));
+  const fits = nearest.find(
+    ({ atIso, date }) =>
+      (startAt === null || Date.parse(atIso) > Date.parse(startAt)) &&
+      (date <= endDate || Date.parse(atIso) - was <= MAX_OVERNIGHT_MS),
+  );
+  return (fits ?? nearest[0])?.atIso ?? null;
 };
 
 /**
 The typed end as an instant before it meets the start: the one the sheet opened on when
-untouched, near the old end when retyped on a block that has one, else on the block's day.
-`undefined` when the text is not a time.
+untouched, near the old end (and after the typed start) when retyped on a block that has one,
+else on the block's day. `undefined` when the text is not a time.
 */
-const endFrom = (typed: string, target: SheetTarget, zone: string): string | undefined => {
+const endFrom = (
+  typed: string,
+  { startAt, target }: { readonly startAt: null | string; readonly target: SheetTarget },
+  zone: string,
+): string | undefined => {
   const kept = keptAt(typed, target.endAt, zone);
   if (kept !== null) {
     return kept;
   }
   const read =
     target.kind === "edit" && target.endAt !== null
-      ? movedEndOf(typed, target.endAt, zone)
+      ? movedEndOf(typed, { endAt: target.endAt, startAt }, zone)
       : fromWallClock({ date: wallClock(target.startAt, zone).date, time: typed, tz: zone });
   return read ?? undefined;
 };
@@ -117,7 +135,7 @@ const typedTimes = (draft: Draft, target: SheetTarget, zone: string): Times => {
   const { date } = wallClock(target.startAt, zone);
   const startAt =
     keptAt(draft.from, target.startAt, zone) ?? fromWallClock({ date, time: draft.from, tz: zone });
-  const endAt = draft.to === "" ? null : endFrom(draft.to, target, zone);
+  const endAt = draft.to === "" ? null : endFrom(draft.to, { startAt, target }, zone);
   if (endAt === null || endAt === undefined || startAt === null) {
     return { endAt, startAt };
   }
