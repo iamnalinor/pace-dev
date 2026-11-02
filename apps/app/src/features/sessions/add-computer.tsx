@@ -9,6 +9,7 @@ import { Button } from "#app/ui/button.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
+import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 
 import { ComputerSteps, ComputerStepsDone } from "./computer-steps.tsx";
 
@@ -18,10 +19,15 @@ const FOCUS_TRIES = 10;
 
 /**
 Not `autoFocus`: on the web the sheet gives focus to its dialog as it opens, after the field took
-it, and the dialog may still be hidden a moment. Asked again until it takes, briefly.
+it, and the dialog may still be hidden a moment. Asked again until it takes, briefly. Only with a
+keyboard: on a touch screen the on-screen keyboard would cover the sheet (bug class 71, QA round
+20 L1).
 */
 const useFocusAsSheetOpens = (fieldRef: RefObject<null | TextInput>): void => {
   useEffect(() => {
+    if (KEYBOARD === null) {
+      return;
+    }
     const tries = { left: FOCUS_TRIES };
     const timer = setInterval(() => {
       tries.left -= 1;

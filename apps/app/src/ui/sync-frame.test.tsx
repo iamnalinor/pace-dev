@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { AppState, Text } from "react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -207,6 +207,31 @@ describe("the offline line (QA round 17 M5)", () => {
     await act(async () => {
       await runtime.sync.syncNow();
     });
+    await waitFor(() => {
+      expect(screen.queryByText(en("errors.offline"))).toBeNull();
+    });
+  });
+});
+
+describe("the offline line's Retry (QA round 20 L2)", () => {
+  it("tries the server again at once instead of waiting out the backoff, and clears", async () => {
+    const network = { isDown: true };
+    const runtime = await createTestRuntime({
+      routes: {
+        ...DEV_LOGIN,
+        "GET /api/sync/pull": () => {
+          if (network.isDown) {
+            throw new TypeError("Failed to fetch");
+          }
+          return EMPTY_PAGE;
+        },
+      },
+    });
+    await runtime.auth.loginWithDev("1");
+    await renderScreen(<App />, runtime);
+    expect(await screen.findByText(en("errors.offline"))).toBeOnTheScreen();
+    network.isDown = false;
+    await fireEvent.press(screen.getByRole("button", { name: en("sync.retry") }));
     await waitFor(() => {
       expect(screen.queryByText(en("errors.offline"))).toBeNull();
     });

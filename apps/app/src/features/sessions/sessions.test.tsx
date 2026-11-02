@@ -40,6 +40,13 @@ jest.mock("#app/platform/focus-field.ts", (): unknown => ({
   },
 }));
 
+/** No keyboard (a phone) by default; a test may give the window one (a computer). */
+const mockKeyboard: { os: "mac" | "other" | null } = { os: null };
+jest.mock("#app/ui/use-hotkey.tsx", (): unknown => {
+  const actual: object = jest.requireActual("#app/ui/use-hotkey.tsx");
+  return Object.defineProperty({ ...actual }, "KEYBOARD", { get: () => mockKeyboard.os });
+});
+
 /** The Android app by default; a test may render the web build's Settings instead. */
 const mockDevice = { isPhone: true };
 jest.mock("#app/platform/device.ts", (): unknown => ({
@@ -157,6 +164,7 @@ const appStateIs = async (next: "active" | "background"): Promise<void> => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockKeyboard.os = null;
   mockLayout.isWide = false;
   mockDevice.isPhone = true;
 });
@@ -626,7 +634,22 @@ describe("Settings → Devices and sessions", () => {
     expect(await screen.findByLabelText("Work laptop")).toBeOnTheScreen();
   });
 
+  it("leaves the name unfocused on a touch screen: no on-screen keyboard over the sheet (QA round 20 L1)", async () => {
+    await renderSettings({
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [THIS_BROWSER] }),
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Add a computer" }));
+    expect(screen.getByLabelText("Name")).toBeOnTheScreen();
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    });
+    expect(mockFocusField).not.toHaveBeenCalled();
+  });
+
   it("adds a computer from the keyboard: the name is focused and selected, Enter creates the token once (QA round 15 M2)", async () => {
+    mockKeyboard.os = "other";
     const created: string[] = [];
     await renderSettings({
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [THIS_BROWSER] }),

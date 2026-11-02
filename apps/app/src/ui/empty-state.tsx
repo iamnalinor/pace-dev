@@ -76,3 +76,14 @@ export const FirstSyncBody = ({
     children
   );
 };
+
+/**
+A control showing one of the account's values (its language, a switch, digest times): until the
+first sync of an empty copy ends the value is not known, so a grey row stands in, never a default
+drawn as the account's own and never a control that would write over it (QA round 20 M1).
+*/
+export const KnownAfterSync = ({ children }: { readonly children: ReactNode }) => {
+  const t = useT();
+  const isFirstSync = useIsFirstSync();
+  return isFirstSync ? <Skeleton label={t("sync.loadingData")} rows={1} /> : children;
+};

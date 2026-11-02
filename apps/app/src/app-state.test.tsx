@@ -64,6 +64,17 @@ const setup = async (
   return { api, eventStore, runtime };
 };
 
+/** The browser window's focus coming back, as the web stand-in hears it. */
+const mockWindowFocus = { listeners: new Set<() => void>() };
+jest.mock("./platform/window-focus.ts", (): unknown => ({
+  onWindowFocus: (listener: () => void) => {
+    mockWindowFocus.listeners.add(listener);
+    return () => {
+      mockWindowFocus.listeners.delete(listener);
+    };
+  },
+}));
+
 // eslint-disable-next-line @typescript-eslint/unbound-method -- inspecting the jest mock, never calling it
 const addEventListener = jest.mocked(AppState.addEventListener);
 
@@ -446,8 +457,10 @@ describe("PaceProvider", () => {
         <Probe />
       </PaceProvider>,
     );
+    // Synced, and the signed-in start's own write (the time zone) sent: then the loop rests.
     await waitFor(async () => {
       await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
     });
     await act(async () => {
       runtime.sync.stop();
@@ -471,6 +484,86 @@ describe("PaceProvider", () => {
   });
 });
 
+describe("the notification pool on the first load (QA round 20 L9)", () => {
+  it("is fetched once by the signed-in start, not again by the socket's first connection", async () => {
+    const { api, runtime } = await setup({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+    });
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(api.pathsCalled("/api/notifications")).toHaveLength(1);
+    });
+    await act(async () => {
+      runtime.live.status.setState({ isConnected: true });
+      await Promise.resolve();
+    });
+    expect(api.pathsCalled("/api/notifications")).toHaveLength(1);
+    // A reconnect later (the line dropped a while): what the pool got meanwhile is fetched.
+    const later = Date.now() + 60_000;
+    jest.spyOn(Date, "now").mockReturnValue(later);
+    await act(async () => {
+      runtime.live.status.setState({ isConnected: false });
+      runtime.live.status.setState({ isConnected: true });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(api.pathsCalled("/api/notifications")).toHaveLength(2);
+    });
+    jest.restoreAllMocks();
+  });
+});
+
+describe("the window's focus coming back while offline (QA round 20 L2)", () => {
+  it("tries the server again at once, and only while the last run could not reach it", async () => {
+    const network = { isDown: true };
+    const { api, runtime } = await setup({
+      "GET /api/sync/pull": () => {
+        if (network.isDown) {
+          throw new TypeError("Failed to fetch");
+        }
+        return { events: [], more: false, seq: 0, storeId: "store-test" };
+      },
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().online).toBe(false);
+    });
+    network.isDown = false;
+    const before = api.pathsCalled("/api/sync/pull").length;
+    await act(async () => {
+      for (const listener of mockWindowFocus.listeners) {
+        listener();
+      }
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().online).toBe(true);
+    });
+    expect(api.pathsCalled("/api/sync/pull").length).toBeGreaterThan(before);
+    // Online: a focus asks for nothing.
+    const after = api.pathsCalled("/api/sync/pull").length;
+    await act(async () => {
+      for (const listener of mockWindowFocus.listeners) {
+        listener();
+      }
+      await Promise.resolve();
+    });
+    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(after);
+  });
+});
+
 describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () => {
   it("keeps the shared local copy when its late 401 finds another tab's session in the store", async () => {
     // The browser profile's session store, shared with a tab that logged out and in again.
@@ -486,8 +579,10 @@ describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () =
         <Probe />
       </PaceProvider>,
     );
+    // Synced, and the signed-in start's own write (the time zone) sent: then the loop rests.
     await waitFor(async () => {
       await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
     });
     await act(async () => {
       runtime.sync.stop();

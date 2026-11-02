@@ -189,6 +189,7 @@ export const enShell = {
   "common.retry": "Retry",
   "common.home": "Go home",
   "errors.offline": "You are offline. Changes will sync when you reconnect.",
+  "sync.retry": "Retry",
   "sync.firstSync": "Syncing your data",
   "sync.stillSyncing": "Still syncing your data…",
   "sync.firstSyncLine": "Syncing your data…",

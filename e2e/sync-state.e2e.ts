@@ -215,3 +215,118 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   expect(back.calls.length).toBeLessThanOrEqual(1);
   expect(repeated(back.calls)).toEqual([]);
 });
+
+test("Settings and Presets show no account value and write nothing during a first sync that outlasts the cover (QA 20 M1)", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  // A Russian account in an English browser: a default drawn as the account's would read English.
+  const { token } = await loginViaApi(page);
+  await seedLivedIn(token);
+  const pushed: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/sync/push")) {
+      pushed.push(request.postData() ?? "");
+    }
+  });
+  await page.route("**/api/sync/pull**", async (route) => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 12_000);
+    });
+    await route.continue();
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("status").filter({ hasText: "Still syncing" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("progressbar", { name: "Loading your data…" }).first()).toBeVisible();
+  await expect(page.getByRole("radio", { name: "English" })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "Show night hours" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  await page
+    .getByRole("link", { name: "Presets" })
+    .or(page.getByRole("button", { name: "Presets" }))
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "Add example course presets" })).toHaveCount(0);
+  // Once the account's data is in, its own values show, and nothing was written meanwhile.
+  await expect(page.getByRole("status").filter({ hasText: /Still syncing/u })).toHaveCount(0, {
+    timeout: 20_000,
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("radio", { name: "Русский" })).toBeChecked();
+  expect(pushed.filter((body) => body.includes("settings.updated"))).toEqual([]);
+});
+
+test("a server back after a long outage: Retry and a return to the window clear the line at once (QA 20 L2)", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await loginViaApi(page);
+  const server = { isDown: false };
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
+    if (server.isDown) {
+      await socket.close();
+      return;
+    }
+    socket.connectToServer();
+    sockets.push(socket);
+  });
+  await page.route(/\/api\//u, async (route) => {
+    await (server.isDown ? route.abort("connectionrefused") : route.fallback());
+  });
+  const traffic = recordSyncTraffic(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+  await expect.poll(() => sockets.length).toBeGreaterThan(0);
+  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  const waysBack = [
+    async () => {
+      await line.getByRole("button", { name: "Retry" }).click();
+    },
+    async () => {
+      await page.evaluate(() => {
+        globalThis.dispatchEvent(new Event("focus"));
+      });
+    },
+  ];
+  for (const comeBack of waysBack) {
+    // Its socket up a while first: one cut at once is a flapping link, which backs off without a
+    // check (fix round 5 V2).
+    await traffic.over(6000);
+    server.isDown = true;
+    for (const socket of sockets.splice(0)) {
+      await socket.close();
+    }
+    await expect(line).toBeVisible({ timeout: 5000 });
+    // An outage long enough for the backoff to reach well past ten seconds, and no storm in it.
+    const down = await traffic.over(20_000);
+    expect(down.calls.length).toBeLessThanOrEqual(6);
+    server.isDown = false;
+    await comeBack();
+    await expect(line).toHaveCount(0, { timeout: 3000 });
+  }
+});
+
+test("the first load asks for each thing once: one pull of the log, one of the pool, one of today's calendar (QA 20 L9)", async ({
+  page,
+}) => {
+  // An account that has its time zone already: the start writes nothing of its own.
+  const { token } = await loginViaApi(page);
+  await seedLivedIn(token);
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (/^\/api\/(?:sync\/pull|notifications|calendar)$/u.test(url.pathname)) {
+      asked.push(`${url.pathname}${url.pathname === "/api/sync/pull" ? url.search : ""}`);
+    }
+  });
+  const traffic = recordSyncTraffic(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Сейчас" })).toBeVisible({ timeout: 15_000 });
+  // The socket's first connection and the loop's first tick come within this window.
+  await traffic.over(3000);
+  expect(repeated(asked)).toEqual([]);
+  expect(asked.filter((call) => call.includes("since=0"))).toHaveLength(1);
+});

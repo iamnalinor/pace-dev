@@ -14,7 +14,9 @@ import { DecisionsScreen } from "./decisions-screen.tsx";
 import { HistoryScreen } from "./history-screen.tsx";
 import { InboxScreen } from "./inbox-screen.tsx";
 import { NowScreen } from "./now-screen.tsx";
+import { PresetsScreen } from "./presets-screen.tsx";
 import { ProjectsScreen } from "./projects-screen.tsx";
+import { SettingsScreen } from "./settings-screen.tsx";
 
 /*
 QA round 19 M1 (class 62): while the first sync of an empty copy runs, no screen says anything is
@@ -73,6 +75,62 @@ const SCREENS: readonly (readonly [string, () => ReactElement])[] = [
   ["Assistant log", () => <DecisionsScreen />],
   ["Notifications", () => <NotificationsScreen />],
 ];
+
+/** An empty copy, signed in, its first pull held: the first sync is running. */
+const duringFirstSync = async (ui: ReactElement) => {
+  const held = Promise.withResolvers<unknown>();
+  const runtime = await createTestRuntime({
+    routes: {
+      // The server's own answers come at once; only the log waits.
+      "GET /api/decisions": () => ({ decisions: [] }),
+      "GET /api/sessions": () => ({ sessions: [] }),
+      "GET /api/sync/pull": async () => await held.promise,
+      "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
+    },
+    world: "empty",
+  });
+  await runtime.auth.loginWithDev("1");
+  await renderScreen(ui, runtime);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return runtime;
+};
+
+describe("Settings and Presets during the first sync (QA round 20 M1)", () => {
+  it("Settings shows no account value nor a control that writes one, Log out stays", async () => {
+    await duringFirstSync(<SettingsScreen />);
+    // The account's language, night hours, notifications, digest times: not known yet.
+    for (const text of [
+      en("settings.language.en"),
+      en("settings.language.ru"),
+      en("settings.nightHours"),
+    ]) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    // Only the phone's own switch (whether it sends its calendar) is there.
+    expect(
+      screen
+        .queryAllByRole("switch")
+        .map((control) => control.props["accessibilityLabel"] as string),
+    ).toEqual([en("devices.calendar")]);
+    expect(
+      screen.getAllByRole("progressbar", { name: en("sync.loadingData") }).length,
+    ).toBeGreaterThan(0);
+    // The device's own choices and the way out are there.
+    expect(screen.getByText(en("settings.theme.dark"))).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: en("settings.logout") })).toBeOnTheScreen();
+  });
+
+  it("Presets shows grey rows instead of the built-in list and its actions", async () => {
+    await duringFirstSync(<PresetsScreen />);
+    expect(screen.queryByText(en("presets.seedExamples"))).toBeNull();
+    expect(screen.queryAllByRole("switch")).toEqual([]);
+    expect(
+      screen.getAllByRole("progressbar", { name: en("sync.loadingData") }).length,
+    ).toBeGreaterThan(0);
+  });
+});
 
 describe("a screen during the first sync (QA round 19 M1)", () => {
   it.each(SCREENS)("%s prints no empty sentence and no zero total", async (_name, ui) => {

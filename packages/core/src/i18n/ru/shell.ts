@@ -190,6 +190,7 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "common.retry": "Повторить",
   "common.home": "На главную",
   "errors.offline": "Нет сети. Изменения синхронизируются при подключении.",
+  "sync.retry": "Повторить",
   "sync.firstSync": "Синхронизируем данные",
   "sync.stillSyncing": "Синхронизация ещё идёт…",
   "sync.firstSyncLine": "Синхронизируем данные…",

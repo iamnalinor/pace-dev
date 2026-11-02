@@ -19,6 +19,7 @@ import { deviceLanguage } from "./platform/device-language.ts";
 import { IS_PHONE } from "./platform/device.ts";
 import { clearPresentedPoolNotifications } from "./platform/notification-cleanup.ts";
 import { useServerOrigin, watchServer } from "./platform/server-origin.ts";
+import { type Pool, poolOf, retryOnWindowFocus } from "./runtime-pool.ts";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
 
 /**
@@ -57,7 +58,7 @@ const SyncedContext = createContext<SyncedSessions>(NO_SYNCED_SESSION);
 A signed-in start: this week's homework instances, a first sync, then the account's time
 zone from the device when it has none yet (never "not set").
 */
-const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
+const bootstrap = async (runtime: PaceRuntime, pool: Pool): Promise<void> => {
   const { actions, auth, sync } = runtime;
   if (IS_PHONE) {
     // Every signed-in phone, before any network step (one failing must not skip it): it polls
@@ -67,7 +68,7 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   await actions.ensureInstances();
   await sync.syncNow();
   await actions.ensureTimezone();
-  await runtime.notifications.refresh();
+  await pool.refresh();
   await sendPhoneData(runtime);
   await startPhonePush(runtime);
   // Signed out meanwhile, or ending this device's session: no loop, no socket. Otherwise its
@@ -104,17 +105,30 @@ const followSyncedLanguage = (runtime: PaceRuntime, onSynced: OnSynced): (() => 
   });
 };
 
+/**
+The local copy (IndexedDB, shared by a browser's tabs) goes on sign-out only when no session is
+left in the shared store: a stale tab's late 401 never wipes the copy of the tab that signed in
+since (round 6 I1). A different account there gets a new store id, and its first pull drops the
+old copy on its own.
+*/
+const dropLocalCopyIfOwned = async (runtime: PaceRuntime): Promise<void> => {
+  if (!(await runtime.auth.isSessionStored())) {
+    await runtime.resetLocalData();
+  }
+};
+
 /** Starts/stops the sync loop with the auth status; a foreground return syncs at once. */
 const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => {
   const { actions, auth, sync } = runtime;
   let activeSession = runtime.api.currentSessionToken();
+  const pool = poolOf(runtime);
   const stopLanguageSync = followSyncedLanguage(runtime, onSynced);
   const follow = (status: AuthState["status"]): void => {
     if (status === "signed-in") {
       activeSession = runtime.api.currentSessionToken();
       void (async () => {
         try {
-          await bootstrap(runtime);
+          await bootstrap(runtime, pool);
         } catch {
           // Offline mid-start: a return to the app syncs and registers again (no unhandled rejection).
         }
@@ -142,22 +156,14 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
       void clearPresentedPoolNotifications(activeSession);
     }
     activeSession = undefined;
-    void (async () => {
-      // The local copy (IndexedDB, shared by a browser's tabs) goes only when no session is left
-      // in the shared store: a stale tab's late 401 never wipes the copy of the tab that signed
-      // in since (round 6 I1). A different account there gets a new store id, and its first
-      // pull drops the old copy on its own.
-      if (!(await auth.isSessionStored())) {
-        await runtime.resetLocalData();
-      }
-    })();
+    void dropLocalCopyIfOwned(runtime);
   });
   // The poll is a safety net while the server can say "changed" itself.
   const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {
     sync.setInterval(isConnected ? POLL_LIVE_MS : POLL_OFFLINE_MS);
-    // Back on the line: what the pool got meanwhile.
-    if (isConnected && !previous.isConnected) {
-      void runtime.notifications.refresh();
+    // Back on the line: what the pool got meanwhile, unless it was just fetched.
+    if (isConnected && !previous.isConnected && !pool.isFresh()) {
+      void pool.refresh();
     }
   });
   const subscription = AppState.addEventListener("change", (next) => {
@@ -176,14 +182,16 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
     void actions.ensureInstances();
     void (async () => {
       await sync.syncNow();
-      await runtime.notifications.refresh();
+      await pool.refresh();
       await sendPhoneData(runtime);
       await startPhonePush(runtime);
     })();
   });
   const stopNotices = followPhoneNotices(runtime);
   const stopServerChecks = watchServer(runtime);
+  const stopFocus = retryOnWindowFocus(runtime);
   return () => {
+    stopFocus();
     stopServerChecks();
     unsubscribe();
     subscription.remove();

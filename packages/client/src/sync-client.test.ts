@@ -513,6 +513,52 @@ describe("createSyncClient scheduling", () => {
     vi.useRealTimers();
   });
 
+  it("starts its loop without a second run right after one that just synced everything (QA 20 L9)", async () => {
+    vi.useFakeTimers();
+    const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+    await sync.syncNow();
+    const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+    const before = pulls();
+    sync.start({ intervalMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(pulls()).toBe(before);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(pulls()).toBe(before + 1);
+    sync.stop();
+  });
+
+  it("starts at once when something was written since that run, or when it failed", async () => {
+    vi.useFakeTimers();
+    const network = { isDown: true };
+    const { calls, state, sync } = await setup({
+      "GET /api/sync/pull": () => {
+        if (network.isDown) {
+          throw new TypeError("Failed to fetch");
+        }
+        return EMPTY_PAGE;
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+    await sync.syncNow();
+    network.isDown = false;
+    sync.start({ intervalMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(pulls()).toBe(2);
+    sync.stop();
+    await sync.syncNow();
+    // A write after the last run (the bootstrap's time zone): the loop's first tick sends it.
+    await state.dispatch({
+      occurredAt: NOW,
+      payload: { language: "ru" },
+      type: "settings.updated",
+    });
+    sync.start({ intervalMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(1);
+    sync.stop();
+  });
+
   it("does not overlap runs; calls made during one share the run after it (E1)", async () => {
     const gate = Promise.withResolvers<boolean>();
     let open = 0;

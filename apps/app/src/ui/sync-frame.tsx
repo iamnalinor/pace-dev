@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { AppState, Text, View } from "react-native";
+import { AppState, Pressable, Text, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { PaceRuntime } from "#app/runtime.ts";
@@ -33,7 +33,29 @@ const SyncStrip = ({ message }: { readonly message: MessageKey }) => {
       style={{ paddingTop: insets.top + 8 }}
     >
       <Text className="text-center font-sans text-sm text-muted">{t(message)}</Text>
+      {message === "errors.offline" ? <RetryNow /> : null}
     </View>
+  );
+};
+
+/**
+Tries the server again now, rather than at the end of the backoff (up to a minute after the
+server is back, QA round 20 L2): the socket and a sync run, as on the way back online.
+*/
+const RetryNow = () => {
+  const t = useT();
+  const runtime = usePace();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      className="mt-1 self-center active:opacity-70"
+      hitSlop={12}
+      onPress={() => {
+        backOnline(runtime);
+      }}
+    >
+      <Text className="font-sans text-sm font-medium text-fg underline">{t("sync.retry")}</Text>
+    </Pressable>
   );
 };
 
