@@ -1,7 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 import {
-  LIVE_SESSION_ENDED,
   LIVE_V1,
   LIVE_V2,
   type LiveClientMessage,
@@ -11,6 +10,8 @@ import {
 } from "@pace/core";
 
 import { createRequests, LiveUnavailable } from "./live-requests.ts";
+import { createRun, type Run } from "./live-run.ts";
+import { createTimers, type LiveTimers, retryDelay } from "./live-timers.ts";
 
 type SocketEvent = "close" | "message" | "open";
 
@@ -58,14 +59,24 @@ export type LiveChannelOptions = {
   the app checks its session.
   */
   readonly onSessionEnded?: () => void;
+  /**
+  A socket that had lived (up `STABLE_MS`) went (closed by the network or the server, or gone
+  quiet), not stopped: the app checks whether the server can still be reached, so a stale screen
+  is told it is stale (QA round 18 M4). Once per connection: the failed reconnects after it do
+  not repeat it, nor do sockets cut soon after they open (a flapping link, fix round 5 V2).
+  */
+  readonly onDropped?: () => void;
+  /**
+  A socket closed before it ever opened: refused at the door (its session ended while it was
+  connecting) or no server to reach. A browser gives a refused upgrade no close code, so the app
+  looks for itself (a run whose 401 checks the session); else a device signed out elsewhere would
+  wait for its next poll (round 7 CI). Once per streak: its refused reconnects do not repeat it,
+  a socket that opens ends the streak.
+  */
+  readonly onFailedToOpen?: () => void;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
   readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
-
-/** Often enough that no proxy closes an idle socket; the server answers without waking. */
-const PING_MS = 45_000;
-const RETRY_MIN_MS = 1000;
-const RETRY_MAX_MS = 60_000;
 
 /**
 The socket's address next to the API's: `https` becomes `wss`; the device and this build's
@@ -95,32 +106,6 @@ const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
   }
 };
 
-/** A dropped socket comes back after 1 s, 2 s, 4 s, … at most a minute. */
-const retryDelay = (failures: number): number =>
-  Math.min(RETRY_MIN_MS * 2 ** (failures - 1), RETRY_MAX_MS);
-
-/** The keep-alive and the pending reconnect of one channel. */
-const createTimers = () => {
-  let ping: ReturnType<typeof setInterval> | undefined;
-  let retry: ReturnType<typeof setTimeout> | undefined;
-  return {
-    clear: (): void => {
-      clearInterval(ping);
-      clearTimeout(retry);
-      ping = undefined;
-      retry = undefined;
-    },
-    keepAlive: (socket: SocketLike): void => {
-      ping = setInterval(() => {
-        socket.send("ping");
-      }, PING_MS);
-    },
-    retryIn: (delayMs: number, connect: () => void): void => {
-      retry = setTimeout(connect, delayMs);
-    },
-  };
-};
-
 type Handlers = {
   readonly open: () => void;
   readonly hello: () => void;
@@ -129,6 +114,7 @@ type Handlers = {
   readonly events?: ((page: LiveEventsPage) => void) | undefined;
   readonly message?: ((message: unknown) => void) | undefined;
   readonly close: (code: unknown) => void;
+  readonly pong: () => void;
 };
 
 const SYNC_TYPES = new Set(["changed", "error", "events", "hello", "pushed"] as const);
@@ -181,10 +167,14 @@ const onMessage = (raw: { readonly type?: unknown }, on: Handlers): void => {
   }
 };
 
-/** Wires one socket: open, its messages, close. */
+/** Wires one socket: open, its messages (a keep-alive's pong among them), close. */
 const follow = (socket: SocketLike, on: Handlers): void => {
   socket.addEventListener("open", on.open);
   socket.addEventListener("message", ({ data }) => {
+    if (data === "pong") {
+      on.pong();
+      return;
+    }
     const message = parseMessage(data);
     if (message !== null) {
       onMessage(message, on);
@@ -204,14 +194,21 @@ send for minutes; meanwhile the channel would read as connected and poll rarely.
 const createLine = (onQuiet: () => void) => {
   let socket: SocketLike | undefined;
   let isV2 = false;
-  const requests = createRequests(() => {
-    const quiet = socket;
+  const quiet = (): void => {
+    const gone = socket;
     // Dropped first, so its close event (if it ever comes) is one of a socket no longer current.
     onQuiet();
-    quiet?.close();
-  });
+    gone?.close();
+  };
+  const requests = createRequests(quiet);
   return {
     current: (): SocketLike | undefined => socket,
+    /** A keep-alive went unanswered on `from`: if it is still the socket in use, it is quiet. */
+    goneQuiet: (from: SocketLike): void => {
+      if (socket === from) {
+        quiet();
+      }
+    },
     /** The socket is gone (or replaced): its requests fail. */
     drop: (): void => {
       socket = undefined;
@@ -251,6 +248,7 @@ const handlersFor = (
   on: {
     readonly close: (code: unknown) => void;
     readonly open: () => void;
+    readonly pong: () => void;
     readonly options: LiveChannelOptions;
   },
 ): Handlers => ({
@@ -268,6 +266,11 @@ const handlersFor = (
   },
   message: on.options.onMessage,
   open: on.open,
+  pong: () => {
+    if (line.current() === socket) {
+      on.pong();
+    }
+  },
 });
 
 /**
@@ -276,6 +279,26 @@ second. Every reconnect (to catch up on what was missed) and every v1 `changed` 
 on v2 the socket also carries requests (`request`: push and pull, answered by id) and brings new
 events as they land (`onEvents`). Polling and HTTP stay as the fallback while it is down.
 */
+/** The socket is gone: its requests fail, and it comes back unless its session ended. */
+const whenClosed = (
+  code: unknown,
+  channel: {
+    readonly connect: () => void;
+    readonly line: Line;
+    readonly run: Run;
+    readonly status: StoreApi<LiveStatus>;
+    readonly timers: LiveTimers;
+  },
+): void => {
+  const { connect, line, run, status, timers } = channel;
+  line.drop();
+  timers.clear();
+  status.setState({ isConnected: false });
+  if (run.shouldReconnectAfter(code)) {
+    timers.retryIn(retryDelay(run.failures()), connect);
+  }
+};
+
 export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const createSocket = options.createSocket ?? globalSocket;
   const status = createStore<LiveStatus>(() => ({ isConnected: false }));
@@ -284,50 +307,54 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const line = createLine(() => {
     closed(undefined);
   });
-  let failures = 0;
-  let isRunning = false;
-  /** The socket is gone: its requests fail, and it comes back unless its session ended. */
+  const run: Run = createRun(options);
   const closed = (code: unknown): void => {
-    line.drop();
-    timers.clear();
-    status.setState({ isConnected: false });
-    if (isRunning && code === LIVE_SESSION_ENDED) {
-      isRunning = false;
-      options.onSessionEnded?.();
-    } else if (isRunning) {
-      failures += 1;
-      timers.retryIn(retryDelay(failures), connect);
-    }
+    whenClosed(code, { connect, line, run, status, timers });
   };
   function connect(): void {
     const token = options.token();
-    if (createSocket === undefined || token === undefined || !isRunning) {
+    if (createSocket === undefined || token === undefined || !run.isRunning()) {
       return;
     }
     const url = liveUrl(options.baseUrl, options.deviceId);
     const socket = createSocket(url, [LIVE_V2, LIVE_V1, `pace.auth.${token}`]);
     line.use(socket);
     const opened = (): void => {
-      failures = 0;
-      timers.keepAlive(socket);
+      if (line.current() === socket) {
+        run.opened();
+      }
+      // The backoff is reset only once the socket has lived: a link that cuts it at once backs off.
+      timers.stableIn(() => {
+        if (line.current() !== socket) {
+          return;
+        }
+
+        run.lived();
+      });
+      timers.keepAlive(socket, (streak) => {
+        // Each fresh socket that goes quiet again waits longer (`createTimers`).
+        if (line.current() === socket) {
+          run.wentQuiet(streak);
+        }
+        line.goneQuiet(socket);
+      });
       status.setState({ isConnected: true });
       options.onChange();
     };
-    follow(socket, handlersFor(socket, line, { close: closed, open: opened, options }));
+    const on = { close: closed, open: opened, options, pong: timers.ponged };
+    follow(socket, handlersFor(socket, line, on));
   }
   return {
     isV2: line.isV2,
     request: line.request,
     start: () => {
-      if (isRunning) {
-        return;
+      if (run.start()) {
+        connect();
       }
-      isRunning = true;
-      connect();
     },
     status,
     stop: () => {
-      isRunning = false;
+      run.stop();
       const socket = line.current();
       // Its requests fail and v2 ends with it, before it closes.
       closed(undefined);

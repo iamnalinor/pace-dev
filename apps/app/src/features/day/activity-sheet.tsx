@@ -26,7 +26,7 @@ import {
   ACTIVITY_CATEGORIES,
   type ActivityCategory,
   CATEGORY_COLORS,
-  formatEyebrow,
+  formatDaySpan,
   type MessageKey,
 } from "@pace/core";
 
@@ -39,6 +39,7 @@ import {
   readDraft,
 } from "./activity-draft.ts";
 import { ActivityTaskField } from "./activity-task-field.tsx";
+import { DayChoices } from "./day-choices.tsx";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
 export type SheetTarget = ActivityTarget;
@@ -265,9 +266,11 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
   return (
     <Sheet
       closeLabel={t("common.close")}
+      name="activity"
       onClose={onClose}
-      // The block's day, taken from the day on screen: only the times are typed.
-      subtitle={formatEyebrow(target.startAt, zone, language)}
+      // Only the times are typed, so the days they fall on are named here: both for a night, and
+      // as typed once the times read right (a retyped end moves near where it was).
+      subtitle={formatDaySpan(range ?? target, zone, language)}
       title={t(target.kind === "edit" ? "day.editTitle" : "day.logPast")}
       visible
     >
@@ -278,6 +281,7 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         isEndEditable={hasEnd(target)}
         patch={patch}
       />
+      <DayChoices draft={draft} patch={patch} range={range} target={target} zone={zone} />
       {target.kind === "edit" ? (
         <ActivityApps endAt={target.endAt} startAt={target.startAt} zone={zone} />
       ) : null}

@@ -17,7 +17,6 @@ import {
   type SeriesRule,
   seriesRules,
   setSeriesRule,
-  sleepKey,
   usePhoneMemoryVersion,
 } from "#app/platform/phone-memory.ts";
 import { useFeed } from "#app/shared/notifications/use-feed.ts";
@@ -28,10 +27,8 @@ import {
   type AppMinutes,
   appUsage,
   calendarEventKey,
-  detectSleep,
   type PhoneEvent,
   phonePickupAt,
-  type SleepCandidate,
 } from "@pace/core";
 
 /** The night before the day belongs to it: phone events are read from noon the day before. */
@@ -42,8 +39,6 @@ export type NamedApp = AppMinutes & { readonly name: string };
 
 export type DayPhone = {
   readonly hasUsageAccess: boolean;
-  /** Last night's sleep as the screen tells it, unless logged or waved away. */
-  readonly sleep: null | SleepCandidate;
   readonly calendar: {
     readonly access: CalendarAccess;
     /**
@@ -61,7 +56,6 @@ export type DayPhone = {
   /** When the phone was picked up for the session going on now (`null` on another day). */
   readonly pickupAt: null | string;
   readonly askCalendar: () => void;
-  readonly dismiss: (key: string) => void;
   /**
   Skips one occurrence on every channel, then here, as Now's Skip does; `false` (and still shown)
   when the server did not take it.
@@ -130,31 +124,14 @@ const ruleOf = (loaded: Loaded, event: PhoneCalendarEvent): null | SeriesRule["r
     ? null
     : (loaded.rules.find((rule) => rule.series === event.series)?.rule ?? null);
 
-/** The sleep candidate this day shows: it ends inside the day, nobody logged or dismissed it. */
-const sleepOf = (day: DayModel, loaded: Loaded, now: string): null | SleepCandidate => {
-  const dayEnd = addDaysIn(day.date, 1, day.zone);
-  const sleep = detectSleep(loaded.events, { now: dayEnd > now ? now : dayEnd, zone: day.zone });
-  if (sleep === null || sleep.endAt < day.date || loaded.dismissed.has(sleepKey(sleep))) {
-    return null;
-  }
-  const isLogged = day.entries.some(
-    (entry) =>
-      entry.kind === "activity" &&
-      entry.row.category === "sleep" &&
-      entry.row.startAt < sleep.endAt &&
-      entry.row.endAt > sleep.startAt,
-  );
-  return isLogged ? null : sleep;
-};
-
 const named = (
   rows: readonly AppMinutes[],
   labels: Readonly<Record<string, string>>,
 ): readonly NamedApp[] => rows.map((row) => ({ ...row, name: labels[row.app] ?? row.app }));
 
 /**
-The phone's side of a day, read on the device: last night's sleep, time in apps during each
-block, and the calendar's events. Reloads when the app comes back (after granting access).
+The phone's side of a day, read on the device: time in apps during each block and the calendar's
+events (the night's sleep is recorded on the server from the uses the phone sends). Reloads when the app comes back (after granting access).
 */
 export const useDayPhone = (day: DayModel, now: string): DayPhone => {
   const [loaded, setLoaded] = useState<Loaded>(EMPTY);
@@ -216,7 +193,6 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       events: shown,
       isAttendedElsewhere: (event) => answers.get(calendarEventKey(event)) === "attended",
     },
-    dismiss,
     hasUsageAccess: loaded.hasUsageAccess,
     pickupAt: day.isToday ? phonePickupAt(loaded.events, now) : null,
     remember,
@@ -228,7 +204,6 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
       }
       return isSkipped;
     },
-    sleep: sleepOf(day, loaded, now),
     usageIn: (startAt, endAt) =>
       named(appUsage(loaded.events, { from: startAt, now, to: endAt }), loaded.labels),
   };

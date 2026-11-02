@@ -37,6 +37,7 @@ export const addNotificationResponseReceivedListener = (): { readonly remove: ()
 export const BackgroundNotificationTaskResult = { Failed: 2, NewData: 0, NoData: 1 } as const;
 // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- the name expo-notifications exports
 export const useLastNotificationResponse = (): null => null;
+export const clearLastNotificationResponse = (): void => undefined;
 
 // expo-calendar
 export const EntityTypes = { EVENT: "event", REMINDER: "reminder" } as const;

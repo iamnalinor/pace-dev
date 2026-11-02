@@ -99,8 +99,9 @@ export const enBoard = {
   "task.pause": "Pause",
   "task.resume": "Resume",
   "task.done": "Done",
-  "task.doneHint":
-    "Finishes the task now. Long press: another time, or close it as cancelled or skipped.",
+  "task.doneHint": "Finishes the task now.",
+  "task.doneOther": "Other time or outcome…",
+  "task.doneOtherShort": "Other time…",
   "task.submitSubtasks": "Submit {subtasks}",
   "task.estimate": "Est. {duration}",
   "task.trackedLine": "Tracked {duration}",

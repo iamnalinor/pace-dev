@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { OAUTH_SCOPES } from "@pace/core";
 
-import { call, json, readJson } from "./helpers.ts";
+import { api, call, json, readJson } from "./helpers.ts";
 import {
   API_ORIGIN,
   authorizeQuery,
@@ -48,6 +48,24 @@ describe("discovery", () => {
       bearer_methods_supported: ["header"],
       resource: `${API_ORIGIN}/mcp`,
     });
+  });
+
+  it("names the resource the app hands out as its MCP URL, at whatever address it is reached (round 7 review 1)", async () => {
+    // A device reaching the Worker at another address than its `API_ORIGIN` (a LAN IP, a proxy):
+    // the app builds the MCP URL from `/api/instance`'s `apiOrigin` (server-store's `mcpUrl`),
+    // which must be the protected resource, or an MCP client refuses the tokens.
+    const reached = "https://pace.lan:8443";
+    const read = async (url: string): Promise<Metadata> => {
+      const response = await api.fetch(new Request(url));
+      expect({ status: response.status, url }).toEqual({ status: 200, url });
+      return await readJson<Metadata>(response);
+    };
+    const instance = await read(`${reached}/api/instance`);
+    expect(instance["apiOrigin"]).not.toBe(reached);
+    const mcpUrl = `${String(instance["apiOrigin"])}/mcp`;
+    // What an MCP client given that URL discovers: the resource it is about to get tokens for.
+    const metadata = await read(new URL("/.well-known/oauth-protected-resource/mcp", mcpUrl).href);
+    expect(metadata["resource"]).toBe(mcpUrl);
   });
 
   it("challenges an unauthenticated MCP call with the resource metadata URL", async () => {

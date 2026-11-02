@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 import type { ThemePreference } from "#app/platform/theme.ts";
 
 import { useAuth, usePace, useSettings, useT } from "#app/app-state.tsx";
+import { BackgroundHint } from "#app/features/permissions/background-hint.tsx";
 import { usePermissions } from "#app/features/permissions/use-permissions.ts";
 import { SessionsSection } from "#app/features/sessions/sessions-section.tsx";
 import { CategoryEstimates } from "#app/features/settings/category-estimates.tsx";
@@ -20,6 +21,9 @@ import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { Button } from "#app/ui/button.tsx";
+import { cx } from "#app/ui/cx.ts";
+import { KnownAfterSync } from "#app/ui/empty-state.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
 import { Segmented } from "#app/ui/segmented.tsx";
 import { SwitchRow } from "#app/ui/switch-row.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
@@ -86,23 +90,27 @@ const LookRows = () => {
         />
       </Row>
       <Row label={t("settings.language")}>
-        <Segmented
-          onChange={(language) => {
-            void actions.setLanguage(language);
-          }}
-          options={LANGUAGES.map((value) => ({ label: t(`settings.language.${value}`), value }))}
-          value={settings.language}
-        />
+        <KnownAfterSync>
+          <Segmented
+            onChange={(language) => {
+              void actions.setLanguage(language);
+            }}
+            options={LANGUAGES.map((value) => ({ label: t(`settings.language.${value}`), value }))}
+            value={settings.language}
+          />
+        </KnownAfterSync>
       </Row>
       <Row label={t("nav.week")}>
-        <SwitchRow
-          hint={t("settings.nightHours.hint")}
-          isOn={settings.nightHours}
-          label={t("settings.nightHours")}
-          onChange={(isOn) => {
-            void actions.setNightHours(isOn);
-          }}
-        />
+        <KnownAfterSync>
+          <SwitchRow
+            hint={t("settings.nightHours.hint")}
+            isOn={settings.nightHours}
+            label={t("settings.nightHours")}
+            onChange={(isOn) => {
+              void actions.setNightHours(isOn);
+            }}
+          />
+        </KnownAfterSync>
       </Row>
     </>
   );
@@ -110,6 +118,7 @@ const LookRows = () => {
 
 export const SettingsScreen = () => {
   const t = useT();
+  const isWide = useIsWide();
   const router = useRouter();
   const { auth } = useAuth();
   const logout = async (): Promise<void> => {
@@ -119,22 +128,35 @@ export const SettingsScreen = () => {
   return (
     <DestinationScreen title={t("settings.title")}>
       <LookRows />
+      {/* The account's values wait for its first sync; the device's own (theme, push) do not. */}
       <Row label={t("settings.timezone")}>
-        <TimezoneRow />
+        <KnownAfterSync>
+          <TimezoneRow />
+        </KnownAfterSync>
       </Row>
       {IS_PHONE ? <PermissionsRow /> : null}
       <Row label={t("settings.notifications")}>
-        <NotificationChannels />
+        <KnownAfterSync>
+          <NotificationChannels />
+        </KnownAfterSync>
         <PushStatus />
+        {/* Composed here: features do not import each other (dependency-cruiser). */}
+        {IS_PHONE ? <BackgroundHint /> : null}
       </Row>
       <Row label={t("settings.digestWindows")}>
-        <DigestWindows />
+        <KnownAfterSync>
+          <DigestWindows />
+        </KnownAfterSync>
       </Row>
       <Row label={t("settings.quietHours")}>
-        <QuietHours />
+        <KnownAfterSync>
+          <QuietHours />
+        </KnownAfterSync>
       </Row>
       <Row label={t("settings.categoryEstimates")}>
-        <CategoryEstimates />
+        <KnownAfterSync>
+          <CategoryEstimates />
+        </KnownAfterSync>
       </Row>
       <Row label={t("settings.more")}>
         <SettingsLinks />
@@ -144,10 +166,13 @@ export const SettingsScreen = () => {
       </Row>
       {/* The account's own actions last: export (the web's download), log out, the danger zone. */}
       <View className="gap-3 px-5 py-6">
-        {IS_PHONE ? null : <ExportRow />}
-        <Button onPress={() => void logout()} variant="secondary">
-          {t("settings.logout")}
-        </Button>
+        {/* Export data and Log out side by side on a computer, full width on a phone. */}
+        <View className={cx("gap-3", isWide && "flex-row flex-wrap")}>
+          {IS_PHONE ? null : <ExportRow />}
+          <Button onPress={() => void logout()} variant="secondary">
+            {t("settings.logout")}
+          </Button>
+        </View>
         <DangerZone />
       </View>
     </DestinationScreen>

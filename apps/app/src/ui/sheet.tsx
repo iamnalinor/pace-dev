@@ -1,16 +1,19 @@
-import type { ReactNode } from "react";
-
 import { X } from "lucide-react-native";
+import { type ReactNode, useId } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { SheetName } from "./sheet-names.ts";
+
+import { refuseFocus } from "../platform/refuse-focus.ts";
 import { paletteVars } from "../platform/theme.ts";
 import { ButtonWidthContext } from "./button.tsx";
 import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { useIsWide } from "./layout.ts";
 import { BACKDROP_ENTER, DIALOG_ENTER, SHEET_ENTER } from "./motion.ts";
+import { useSheetFocusRef } from "./sheet-focus.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
 
@@ -28,20 +31,33 @@ const DIALOG_FRAME = {
   width: "92%",
 } as const;
 
-/** The dim behind: it fades in where it is, and a tap on it closes the sheet. */
+/**
+The dim behind: it fades in where it is, and a tap on it closes the sheet. It never holds keyboard
+focus (QA round 18 M1: it took the first focus and a second "Close" stop; QA round 19 L1: the
+modal's trap wrapped Shift+Tab onto it), while a screen reader may still move onto it (round 6
+M4); where the cross is shown it
+is hidden from assistive tech too, and on a phone's sheet (no cross) it stays the reader's way out.
+*/
 const Backdrop = ({
   closeLabel,
+  hasCross,
   onClose,
 }: {
   readonly closeLabel: string;
+  readonly hasCross: boolean;
   readonly onClose: () => void;
 }) => (
   <Animated.View entering={BACKDROP_ENTER} style={FILL}>
     <Pressable
       accessibilityLabel={closeLabel}
       accessibilityRole="button"
+      aria-hidden={hasCross}
       className="flex-1 bg-black/55"
+      // A focus trap that focuses it anyway (react-native-web's walks every descendant) is refused.
+      {...(refuseFocus !== undefined && { onFocus: refuseFocus })}
       onPress={onClose}
+      // `focusable={false}` does not reach react-native-web's button; the tab index does.
+      tabIndex={-1}
     />
   </Animated.View>
 );
@@ -64,16 +80,23 @@ const SheetTitle = ({
   onClose,
   subtitle,
   title,
+  titleId,
 }: {
   readonly closeLabel: string;
   readonly isWide: boolean;
   readonly onClose: () => void;
   readonly subtitle: string | undefined;
   readonly title: string;
+  /** The title's id: the dialog is named by it. */
+  readonly titleId: string;
 }) => (
   <View className="flex-row items-start gap-2">
     <View className="flex-1">
-      <Text accessibilityRole="header" className="font-sans text-[20px] font-semibold text-fg">
+      <Text
+        accessibilityRole="header"
+        className="font-sans text-[20px] font-semibold text-fg"
+        nativeID={titleId}
+      >
         {title}
       </Text>
       {subtitle === undefined ? null : (
@@ -81,11 +104,39 @@ const SheetTitle = ({
       )}
     </View>
     {isWide ? (
-      <View className="-mr-2 -mt-1.5">
+      // The cross's middle on the title's first line (QA round 16 L10: it sat about 4 px low).
+      <View className="-mr-2 -mt-2.5">
         <IconButton icon={X} label={closeLabel} onPress={onClose} variant="plain" />
       </View>
     ) : null}
   </View>
+);
+
+/**
+Under the title: the fixed header, the scrolling body and the fixed footer. The body shrinks and
+clips inside the frame, under a hairline: scrolled content meets an edge instead of seeming to run
+into the title; its scroll stays in it, the page behind never scrolls on (QA round 15 L8).
+*/
+const SheetBody = ({
+  children,
+  footer,
+  header,
+}: {
+  readonly children: ReactNode;
+  readonly footer: ReactNode;
+  readonly header: ReactNode;
+}) => (
+  <>
+    {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
+    <ScrollView
+      className="mt-3 min-h-0 shrink overscroll-contain border-t border-line"
+      contentContainerClassName="gap-[18px] pt-[15px]"
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+    {footer === undefined ? null : <View className="border-t border-line pt-3">{footer}</View>}
+  </>
 );
 
 /** The sheet's own hotkeys; its buttons are its actions, taking its width also on a computer. */
@@ -94,6 +145,23 @@ const SheetLayer = ({ children }: { readonly children: ReactNode }) => (
     <ButtonWidthContext value="fill">{children}</ButtonWidthContext>
   </HotkeyLayer>
 );
+
+type SheetProps = {
+  readonly children: ReactNode;
+  readonly closeLabel: string;
+  /** Stays under the scrolling body (a long form keeps its buttons in sight). */
+  readonly footer?: ReactNode;
+  /** The sheet is a form (its fields and the footer's buttons), named this. */
+  readonly formLabel?: string;
+  /** Stays under the title, above the scrolling body: a picker's Stop, its switch, its search. */
+  readonly header?: ReactNode;
+  /** Which sheet this is: its name in the registry the e2e sweep opens every sheet from. */
+  readonly name: SheetName;
+  readonly onClose: () => void;
+  readonly subtitle?: string;
+  readonly title: string;
+  readonly visible: boolean;
+};
 
 /**
 A form or a choice over the screen, the way each platform expects one. On a phone it is the
@@ -109,48 +177,45 @@ export const Sheet = ({
   footer,
   formLabel,
   header,
+  name,
   onClose,
   subtitle,
   title,
   visible,
-}: {
-  readonly children: ReactNode;
-  readonly closeLabel: string;
-  /** Stays under the scrolling body (a long form keeps its buttons in sight). */
-  readonly footer?: ReactNode;
-  /** The sheet is a form (its fields and the footer's buttons), named this. */
-  readonly formLabel?: string;
-  /** Stays under the title, above the scrolling body: a picker's Stop, its switch, its search. */
-  readonly header?: ReactNode;
-  readonly onClose: () => void;
-  readonly subtitle?: string;
-  readonly title: string;
-  readonly visible: boolean;
-}) => {
+}: SheetProps) => {
   const { scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
+  const titleId = useId();
+  const surfaceRef = useSheetFocusRef({ closeLabel });
   return (
-    <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
+    // The dialog (react-native-web gives the modal the role) is named by its title (QA round 15 L8).
+    <Modal
+      animationType="none"
+      aria-labelledby={titleId}
+      onRequestClose={onClose}
+      transparent
+      visible={visible}
+    >
       <SheetLayer>
-        {/* A modal renders outside the app's root (a portal on the web): the theme's variables
-      are declared again here, or the sheet would lose its surface and ink. */}
+        {/* Outside the app's root (a portal on the web): the theme's variables again, or no ink. */}
         <View
           className={cx("flex-1", isWide ? "justify-center" : "justify-end")}
           style={paletteVars(scheme)}
         >
           {/* The animated wrappers only move; the look is on plain views inside (class names
         on reanimated views are dropped on the web, which left the sheet see-through). */}
-          <Backdrop closeLabel={closeLabel} onClose={onClose} />
+          <Backdrop closeLabel={closeLabel} hasCross={isWide} onClose={onClose} />
           <Animated.View
             entering={isWide ? DIALOG_ENTER : SHEET_ENTER}
             style={isWide ? DIALOG_FRAME : FRAME}
           >
             <View
               accessibilityViewIsModal
+              ref={surfaceRef}
               {...(formLabel !== undefined && { accessibilityLabel: formLabel, role: "form" })}
               // The modal is the dialog already (react-native-web gives it the role); this is its surface.
-              {...({ dataSet: { paceSurface: "sheet" } } as object)}
+              {...({ dataSet: { paceSheet: name, paceSurface: "sheet" } } as object)}
               className={cx(
                 "shrink overflow-hidden bg-surface px-5",
                 isWide
@@ -166,20 +231,11 @@ export const Sheet = ({
                 onClose={onClose}
                 subtitle={subtitle}
                 title={title}
+                titleId={titleId}
               />
-              {header === undefined ? null : <View className="mt-3 gap-3">{header}</View>}
-              {/* The body shrinks and clips inside the frame, under a hairline: scrolled content
-            meets an edge instead of seeming to run into the title. */}
-              <ScrollView
-                className="mt-3 min-h-0 shrink border-t border-line"
-                contentContainerClassName="gap-[18px] pt-[15px]"
-                keyboardShouldPersistTaps="handled"
-              >
+              <SheetBody footer={footer} header={header}>
                 {children}
-              </ScrollView>
-              {footer === undefined ? null : (
-                <View className="border-t border-line pt-3">{footer}</View>
-              )}
+              </SheetBody>
             </View>
           </Animated.View>
         </View>

@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { cx } from "./cx.ts";
 import { useTheme } from "./theme-provider.tsx";
+import { Tooltip } from "./tooltip.tsx";
 
 /** The pushed-screen header (Inbox, Project, Task): a 44px back chevron, a title, actions. */
 export const BackHeader = ({
@@ -31,14 +32,16 @@ export const BackHeader = ({
       )}
     >
       {onBack === undefined ? null : (
-        <Pressable
-          accessibilityLabel={backLabel}
-          accessibilityRole="button"
-          className="h-11 w-11 items-center justify-center active:opacity-70"
-          onPress={onBack}
-        >
-          <BackIcon color={palette.fg2} size={20} strokeWidth={1.75} />
-        </Pressable>
+        <Tooltip label={backLabel} showsOnTap={false}>
+          <Pressable
+            accessibilityLabel={backLabel}
+            accessibilityRole="button"
+            className="h-11 w-11 items-center justify-center active:opacity-70"
+            onPress={onBack}
+          >
+            <BackIcon color={palette.fg2} size={20} strokeWidth={1.75} />
+          </Pressable>
+        </Tooltip>
       )}
       <View className="flex-1 flex-row items-center gap-1.5">{children}</View>
       {right}

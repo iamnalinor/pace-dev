@@ -19,6 +19,7 @@ import type { AppState, AppStateHandle } from "./state.ts";
 import type { AiReading } from "./view-models/ai-reading.ts";
 
 import { type Clock, queryContext, systemClock } from "./clock.ts";
+import { withinDeadline } from "./deadline.ts";
 import { type ComposerDraft, composerModel, type ComposerModel } from "./view-models/composer.ts";
 import { type DayModel, dayModel } from "./view-models/day.ts";
 import { type HistoryViewModel, historyViewModel } from "./view-models/history.ts";
@@ -196,17 +197,35 @@ export type DecisionsState =
   | { readonly status: "loaded"; readonly decisions: readonly Decision[] }
   | { readonly status: "loading" };
 
-/** The decision log from the server, newest first, filtered by `search` (refetched when it changes). */
-export const useDecisions = (api: ApiClient, search: string): DecisionsState => {
+/** The log's request, given up on (and aborted) after `REQUEST_DEADLINE_MS` (round 6 M7). */
+const listDecisions = async (api: ApiClient, search: string): Promise<readonly Decision[]> => {
+  const q = search.trim();
+  const { decisions } = await withinDeadline(
+    async (signal) =>
+      await api.call(
+        endpoints.decisions.list,
+        { query: { limit: DECISIONS_LIMIT, ...(q !== "" && { q }) } },
+        { signal },
+      ),
+  );
+  return decisions;
+};
+
+/**
+The decision log from the server, newest first, filtered by `search` (refetched when it changes);
+`reload` asks again after a failure.
+*/
+export const useDecisions = (
+  api: ApiClient,
+  search: string,
+): DecisionsState & { readonly reload: () => void } => {
   const [loaded, setLoaded] = useState<DecisionsState>({ status: "loading" });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const status = { isCurrent: true };
     void (async () => {
       try {
-        const q = search.trim();
-        const { decisions } = await api.call(endpoints.decisions.list, {
-          query: { limit: DECISIONS_LIMIT, ...(q !== "" && { q }) },
-        });
+        const decisions = await listDecisions(api, search);
         if (status.isCurrent) {
           setLoaded({ decisions, status: "loaded" });
         }
@@ -219,8 +238,15 @@ export const useDecisions = (api: ApiClient, search: string): DecisionsState => 
     return () => {
       status.isCurrent = false;
     };
-  }, [api, search]);
-  return loaded;
+  }, [api, search, attempt]);
+  return {
+    ...loaded,
+    // Grey rows again while it asks (a new search keeps the rows shown until its answer).
+    reload: () => {
+      setLoaded({ status: "loading" });
+      setAttempt((count) => count + 1);
+    },
+  };
 };
 
 /** A form's fields as state, and a setter that merges the changed ones in. */

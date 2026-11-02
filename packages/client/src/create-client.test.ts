@@ -105,6 +105,61 @@ describe("createPaceClient", () => {
     client.live.stop();
   });
 
+  it("signs out on any call's 401 for the session in use, when no socket heard the end (fix round 5 V1)", async () => {
+    // A tab whose socket was not open when the session was revoked (hidden, still starting): its
+    // reconnects are refused at the door, and only its HTTP calls hear the 401.
+    const server = { isRevoked: false };
+    const { api, client } = await setup(
+      {
+        "GET /api/me": () => (server.isRevoked ? problem(401, "auth/unauthorized") : fakeMe),
+        "GET /api/sync/pull": () =>
+          server.isRevoked
+            ? problem(401, "auth/unauthorized")
+            : { events: [], more: false, seq: 0, storeId: "store-test" },
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    server.isRevoked = true;
+    await client.sync.syncNow();
+    await expect.poll(() => client.auth.store.getState().status).toBe("signed-out");
+    expect(client.auth.store.getState().endedElsewhere).toBe(true);
+    // One check of the session for that 401, not one per call or a loop on `me`'s own 401.
+    expect(api.pathsCalled("/api/me")).toHaveLength(2);
+    await client.sync.syncNow();
+    expect(api.pathsCalled("/api/me")).toHaveLength(2);
+  });
+
+  it("signs out within seconds when its socket is refused at the door, not at the next poll (round 7 CI)", async () => {
+    // The session ended while this visible tab's socket was still connecting: the refused upgrade
+    // closes with no code (1006), every reconnect is refused too, and the poll is 30 s away.
+    const socket = oneSocket();
+    const server = { isRevoked: false };
+    const { client } = await setup(
+      {
+        "GET /api/me": () => (server.isRevoked ? problem(401, "auth/unauthorized") : fakeMe),
+        "GET /api/sync/pull": () =>
+          server.isRevoked
+            ? problem(401, "auth/unauthorized")
+            : { events: [], more: false, seq: 0, storeId: "store-test" },
+      },
+      "tok",
+      socket.create,
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    await client.sync.syncNow();
+    client.sync.start({ intervalMs: 30_000 });
+    client.live.start();
+    server.isRevoked = true;
+    socket.emit("close", { code: 1006 });
+    await expect
+      .poll(() => client.auth.store.getState().status, { timeout: 3000 })
+      .toBe("signed-out");
+    expect(client.auth.store.getState().endedElsewhere).toBe(true);
+    client.sync.stop();
+    client.live.stop();
+  });
+
   it("wires the state and the sync client on one store", async () => {
     const { api, client } = await setup({
       "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }),
@@ -231,9 +286,39 @@ describe("client.assistant", () => {
         status: "unavailable",
       }),
     });
-    expect(await client.assistant.read("что-то")).toEqual({ retryAt, status: "unavailable" });
+    // A server older than `reason`: it kept a text for later only with a time to wait for.
+    expect(await client.assistant.read("что-то")).toEqual({
+      canReadLater: true,
+      reason: "limited",
+      retryAt,
+      status: "unavailable",
+    });
     const broken = await setup({ "POST /api/parse": () => problem(500, "internal") });
     expect(await broken.client.assistant.read("что-то")).toEqual({ status: "failed" });
+  });
+
+  it("passes on why no model read it, and whether the server can keep it for later (bug class 99)", async () => {
+    const answerFor = (reason: string | undefined) => (): object => ({
+      confidence: 1,
+      domain: "task",
+      actions: [],
+      ...(reason !== undefined && { reason }),
+      retryAt: null,
+      status: "unavailable",
+    });
+    const outcomes = await Promise.all(
+      [undefined, "unreachable", "unreadable", "off", "tired"].map(async (reason) => {
+        const { client } = await setup({ "POST /api/parse": answerFor(reason) });
+        return await client.assistant.read("что-то");
+      }),
+    );
+    expect(outcomes).toEqual([
+      { canReadLater: false, reason: "unreachable", retryAt: null, status: "unavailable" },
+      { canReadLater: true, reason: "unreachable", retryAt: null, status: "unavailable" },
+      { canReadLater: false, reason: "unreadable", retryAt: null, status: "unavailable" },
+      { canReadLater: false, reason: "off", retryAt: null, status: "unavailable" },
+      { canReadLater: false, reason: "unreachable", retryAt: null, status: "unavailable" },
+    ]);
   });
 
   it("offers a labelled rule action when the parse request itself fails", async () => {

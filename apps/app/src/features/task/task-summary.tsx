@@ -1,4 +1,4 @@
-import { Linking, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 
 import type { TaskTag, TaskViewModel } from "@pace/client";
 
@@ -175,15 +175,18 @@ export const TaskSummary = ({
           {view.title}
         </Text>
         {view.link === null ? null : (
-          <Text
+          // A 44px-tall target around the 12px line (QA round 18 L6); the negative margin reaches
+          // into the gaps around it, never over the title or the tags.
+          <Pressable
+            accessibilityLabel={`${view.link.url} ↗`}
             accessibilityRole="link"
-            className="font-sans text-[12px] text-fg2"
+            className="-my-1.5 min-h-11 justify-center self-start active:opacity-70"
             onPress={() => {
               void Linking.openURL(view.link?.url ?? "");
             }}
           >
-            {view.link.url} ↗
-          </Text>
+            <Text className="font-sans text-[12px] text-fg2">{view.link.url} ↗</Text>
+          </Pressable>
         )}
         <TaskTags category={view.category} tags={view.tags} />
       </View>

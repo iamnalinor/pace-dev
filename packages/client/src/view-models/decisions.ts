@@ -1,4 +1,5 @@
 import {
+  type Action,
   ACTION_KINDS,
   type ActionKind,
   type Decision,
@@ -6,16 +7,19 @@ import {
   type DecisionInputs,
   type DecisionResolution,
   type DecisionStep,
+  decisionStepOf,
   type Language,
   type MessageKey,
   type ParseField,
   readDecisionInputs,
+  shownLabel,
   t,
   taskById,
 } from "@pace/core";
 
 import { existing, type Lookup, lookupOf, seenAfter, type World } from "./decision-lookup.ts";
 import { providerLabel } from "./decision-provider.ts";
+import { systemRow } from "./decision-system.ts";
 import { conversationOf, quoted } from "./decision-text.ts";
 import { isFolded } from "./decision-threads.ts";
 
@@ -75,12 +79,21 @@ const stepsOf = (decision: Decision, inputs: DecisionInputs): Steps => {
 const known = (steps: Steps): readonly DecisionStep[] =>
   steps.filter((step): step is DecisionStep => step !== null);
 
+/** An activity's name as the reader sees it (automatic sleep's stored label worded, class 42). */
+const activityName = (
+  activityId: null | string,
+  { language, state }: Pick<Lookup, "language" | "state">,
+): string | undefined => {
+  const activity = activityId === null ? undefined : state.time.activities[activityId];
+  return activity === undefined ? undefined : shownLabel(activity, language);
+};
+
 /** What a step is about as it was named when read (its summary quotes it), else as it is now. */
-const subjectOf = (step: DecisionStep, { state }: Lookup, summary = ""): string =>
+const subjectOf = (step: DecisionStep, lookup: Lookup, summary = ""): string =>
   step.subject ??
   quoted(summary) ??
-  (step.taskId === null ? undefined : taskById(state.tasks, step.taskId)?.title) ??
-  (step.activityId === null ? undefined : state.time.activities[step.activityId]?.label) ??
+  (step.taskId === null ? undefined : taskById(lookup.state.tasks, step.taskId)?.title) ??
+  activityName(step.activityId, lookup) ??
   "…";
 
 const fieldList = (fields: readonly ParseField[], language: Language): string =>
@@ -104,6 +117,9 @@ const sentenceOf = (step: DecisionStep) => {
 A step in words; `null` when the step lacks what its sentence names (an older row's edit
 without its fields, a close without its outcome), so the stored summary is shown instead.
 */
+/** Done (applied), offered (answered or expired), pending (a card still open: QA round 17 L16). */
+type Tense = "done" | "offered" | "pending";
+
 const stepText = (
   step: DecisionStep,
   {
@@ -113,7 +129,7 @@ const stepText = (
   }: {
     readonly lookup: Lookup;
     readonly summary: string | undefined;
-    readonly tense: "done" | "offered";
+    readonly tense: Tense;
   },
 ): null | string => {
   const { language } = lookup;
@@ -133,10 +149,24 @@ const stepText = (
   });
 };
 
+/**
+What an approval did, one line per action in the log's past tense ("Created task “X”"), for the
+toast after Approve that said only "Done" (QA round 11 L3); a step this client cannot word keeps
+its summary.
+*/
+export const doneLines = (actions: readonly Action[], world: World): readonly string[] => {
+  const lookup = lookupOf(world);
+  return actions.map(
+    (action) =>
+      stepText(decisionStepOf(action), { lookup, summary: action.summary, tense: "done" }) ??
+      action.summary,
+  );
+};
+
 /** Each step in words beside its own summary; a step this client cannot word keeps the summary. */
 const linesOf = (
   { inputs, steps }: { readonly steps: Steps; readonly inputs: DecisionInputs },
-  tense: "done" | "offered",
+  tense: Tense,
   lookup: Lookup,
 ): readonly string[] => {
   const count = Math.max(steps.length, inputs.summaries.length);
@@ -194,11 +224,7 @@ type Row = {
   readonly claimed: ReadonlySet<string>;
 };
 
-const wordsOf = (
-  { inputs, lookup, steps }: Row,
-  tense: "done" | "offered",
-  fallback: MessageKey,
-) => {
+const wordsOf = ({ inputs, lookup, steps }: Row, tense: Tense, fallback: MessageKey) => {
   const lines = linesOf({ inputs, steps }, tense, lookup);
   return lines.length > 0 ? lines : [t(lookup.language, fallback)];
 };
@@ -216,6 +242,13 @@ const answeredParts = (row: Row, resolution: DecisionResolution): Parts => {
   };
 };
 
+/** What became of a reading nobody answered: what the data shows, else waiting or no answer. */
+const WAITING = { false: "decisions.outcome.unanswered", true: "decisions.outcome.shown" } as const;
+const outcomeOf = (seen: ReturnType<typeof seenAfter>, isWaiting: boolean, lookup: Lookup) =>
+  seen === null
+    ? t(lookup.language, WAITING[`${isWaiting}`])
+    : t(lookup.language, seen.key, { subject: seen.subject });
+
 /** A reading shown for approval: what the person did, as recorded, or else what the data shows. */
 const readingParts = (row: Row): Parts => {
   const { decision, inputs, lookup, steps } = row;
@@ -227,17 +260,11 @@ const readingParts = (row: Row): Parts => {
   const reading = { at: decision.at, text: inputs.request ?? inputs.text };
   const seen = seenAfter(known(steps), reading, { claimed: row.claimed, lookup });
   const isEmpty = steps.length === 0 && inputs.summaries.length === 0;
-  const unanswered = isStillOpen(decision.at, lookup.now)
-    ? "decisions.outcome.shown"
-    : "decisions.outcome.unanswered";
-  const outcome =
-    seen === null
-      ? t(lookup.language, unanswered)
-      : t(lookup.language, seen.key, { subject: seen.subject });
+  const isWaiting = seen === null && isStillOpen(decision.at, lookup.now);
   return {
-    lines: wordsOf(row, "offered", "decisions.nothing"),
+    lines: wordsOf(row, isWaiting ? "pending" : "offered", "decisions.nothing"),
     note: null,
-    outcome: isEmpty ? null : outcome,
+    outcome: isEmpty ? null : outcomeOf(seen, isWaiting, lookup),
     taskId: existing([seen?.taskId ?? null, ...stepTasks], lookup),
   };
 };
@@ -288,11 +315,6 @@ const parseParts = (row: Row): Parts => {
   }
 };
 
-const NOTIFICATIONS: Readonly<Record<string, MessageKey>> = {
-  sent: "decisions.notificationSent",
-  suppressed: "decisions.notificationHeld",
-};
-
 const viewOf = (
   decision: Decision,
   { claimed, lookup }: { readonly lookup: Lookup; readonly claimed: ReadonlySet<string> },
@@ -314,20 +336,7 @@ const viewOf = (
     };
   }
   const none = { followups: [], notFound: null, request: null, via: null };
-  const notification =
-    decision.kind === "notification" && Object.hasOwn(NOTIFICATIONS, decision.outcome)
-      ? NOTIFICATIONS[decision.outcome]
-      : undefined;
-  return notification === undefined
-    ? { ...base, ...none, lines: [decision.explanation], note: null, outcome: null, taskId: null }
-    : {
-        ...base,
-        ...none,
-        lines: [t(language, notification)],
-        note: decision.explanation,
-        outcome: null,
-        taskId: null,
-      };
+  return { ...base, ...none, ...systemRow(decision, language), outcome: null, taskId: null };
 };
 
 /**

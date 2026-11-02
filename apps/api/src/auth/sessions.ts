@@ -3,6 +3,7 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { ulid } from "ulidx";
 
+import type { SessionKind } from "../shared/app-env.ts";
 import type { Db } from "../shared/db/d1.ts";
 import type { User } from "./users.ts";
 
@@ -14,8 +15,7 @@ const SESSION_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 60 * 1000;
 
-/** What opened a session: a browser, the phone app, a computer's agent, or a dev login. */
-export type SessionKind = "agent" | "app" | "browser" | "dev";
+export type { SessionKind } from "../shared/app-env.ts";
 
 export type NewSession = {
   readonly userId: string;
@@ -49,6 +49,8 @@ device it belongs to (whatever it sends is filed under that device).
 export type SessionAccess = {
   /** The session the bearer opened (its row in D1). */
   readonly sessionId: string;
+  /** What opened it, as recorded at sign-in. */
+  readonly kind: SessionKind;
   /** When the session stops working (epoch ms); a live socket it opens ends then too. */
   readonly expiresAt: number;
   readonly user: User;
@@ -133,6 +135,13 @@ export const createSession = async (
   return { expiresAt, id, token };
 };
 
+const SESSION_KINDS: ReadonlySet<string> = new Set<SessionKind>(["agent", "app", "browser", "dev"]);
+
+const isSessionKind = (value: string): value is SessionKind => SESSION_KINDS.has(value);
+
+/** A stored kind; a row from before kinds were stored (or a newer one) reads as a browser. */
+const kindOf = (value: string): SessionKind => (isSessionKind(value) ? value : "browser");
+
 /**
 Resolves a bearer token to its user and scope (null when unknown or expired); records activity
 hourly. An unknown scope reads as no access at all.
@@ -150,6 +159,7 @@ export const findSession = async (
       expiresAt: sessions.expiresAt,
       lastSeenAt: sessions.lastSeenAt,
       scope: sessions.scope,
+      kind: sessions.kind,
       name: sessions.name,
       deviceId: sessions.deviceId,
       user: {
@@ -178,6 +188,7 @@ export const findSession = async (
   return {
     device: scope === null ? null : { id: usageDeviceOf(row) ?? row.sessionId, name: row.name },
     expiresAt: row.expiresAt.getTime(),
+    kind: kindOf(row.kind),
     scope,
     sessionId: row.sessionId,
     user: row.user,
@@ -197,13 +208,6 @@ export type ListedSession = {
   /** The device its usage is filed under; null when it sends none. */
   readonly usageDevice: null | string;
 };
-
-const SESSION_KINDS: ReadonlySet<string> = new Set<SessionKind>(["agent", "app", "browser", "dev"]);
-
-const isSessionKind = (value: string): value is SessionKind => SESSION_KINDS.has(value);
-
-/** A stored kind; a row from before kinds were stored (or a newer one) reads as a browser. */
-const kindOf = (value: string): SessionKind => (isSessionKind(value) ? value : "browser");
 
 /** The person's live sessions, the most recently seen first. */
 export const listSessions = async (

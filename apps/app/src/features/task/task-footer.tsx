@@ -1,4 +1,4 @@
-import { Square, Timer } from "lucide-react-native";
+import { CalendarClock, Square, Timer } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,6 +8,9 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { HOTKEYS } from "#app/ui/hotkeys.ts";
+import { IconButton } from "#app/ui/icon-button.tsx";
+import { useIsWide } from "#app/ui/layout.ts";
+import { Tooltip } from "#app/ui/tooltip.tsx";
 
 import { useFinishTask } from "./use-finish-task.ts";
 import { useSubmitTitle } from "./use-submit-title.ts";
@@ -36,7 +39,9 @@ const FocusButton = ({ view }: { readonly view: TaskViewModel }) => {
 
 /**
 Focus and the primary Done or "Submit 3 and 4", side by side and the same width. Done finishes
-in one tap; a long press opens the sheet for another time or outcome (`onClose`).
+in one tap; the button beside it (and a long press on Done) opens the sheet for another time or
+outcome (`onClose`), and Done's tooltip says so: a gesture nobody is told about is no way in (QA
+round 19 M2).
 */
 export const TaskFooter = ({
   onClose,
@@ -49,6 +54,7 @@ export const TaskFooter = ({
   const { actions } = usePace();
   const run = useRunAction();
   const insets = useSafeAreaInsets();
+  const isWide = useIsWide();
   const submitTitle = useSubmitTitle(view);
   const finish = useFinishTask(view);
   const padding = { paddingBottom: Math.max(insets.bottom, 12) + 8 };
@@ -71,17 +77,38 @@ export const TaskFooter = ({
         <FocusButton view={view} />
       </View>
       {view.primaryAction.kind === "none" ? null : (
-        <View className="flex-1">
-          <Button
-            hint={t("task.doneHint")}
-            hotkey={HOTKEYS.primary}
-            onLongPress={onClose}
-            onPress={finish}
-            width="fill"
-          >
-            {primary}
-          </Button>
-        </View>
+        <>
+          <View className="flex-1">
+            {/* One explanation per reader, never two: a computer shows the tooltip on hover and
+            focus and describes Done by it (react-native-web drops `hint`); the phone's tooltip
+            does not show on a tap here, so its screen reader gets the hint. It says what Done
+            does; the long press is a shortcut to the button beside it, never taught (QA 20 L3). */}
+            <Tooltip label={t("task.doneHint")} showsOnTap={false}>
+              <Button
+                hint={t("task.doneHint")}
+                hotkey={HOTKEYS.primary}
+                onLongPress={onClose}
+                onPress={finish}
+                width="fill"
+              >
+                {primary}
+              </Button>
+            </Tooltip>
+          </View>
+          {/* Said in words where there is room (a bare glyph read as "more", QA round 20 L3). */}
+          {isWide ? (
+            <Button
+              icon={CalendarClock}
+              label={t("task.doneOther")}
+              onPress={onClose}
+              variant="secondary"
+            >
+              {t("task.doneOtherShort")}
+            </Button>
+          ) : (
+            <IconButton icon={CalendarClock} label={t("task.doneOther")} onPress={onClose} />
+          )}
+        </>
       )}
     </View>
   );

@@ -10,6 +10,7 @@ import {
 
 import { fakeSockets, say } from "./fake-socket.fake.ts";
 import { LiveUnavailable } from "./live-requests.ts";
+import { PONG_WAIT_MS, STABLE_MS } from "./live-timers.ts";
 import { createLiveChannel, liveUrl } from "./live.ts";
 
 describe("liveUrl", () => {
@@ -110,6 +111,104 @@ describe("createLiveChannel", () => {
     expect(sockets.made).toHaveLength(3);
   });
 
+  it("takes a ping left without its pong as a quiet socket: reconnects within seconds (QA round 16 L1)", () => {
+    const sockets = fakeSockets();
+    const onChange = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange,
+      token: () => "tok",
+    });
+    live.start();
+    const [socket] = sockets.made;
+    socket?.open();
+    // A healthy line: the pong comes and the socket stays.
+    vi.advanceTimersByTime(45_000 + 30_000);
+    expect(live.status.getState().isConnected).toBe(true);
+    // The network switched: the socket reads as open, but nothing comes back, not even its close.
+    if (socket !== undefined) {
+      socket.answersPing = false;
+      socket.isHalfOpen = true;
+    }
+    // The next ping goes at 90 s; its pong never comes.
+    vi.advanceTimersByTime(15_000 + PONG_WAIT_MS - 1);
+    expect(live.status.getState().isConnected).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(live.status.getState().isConnected).toBe(false);
+    expect(socket?.closed).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(sockets.made).toHaveLength(2);
+    sockets.made[1]?.open();
+    // Back on the line: it catches up on what it missed.
+    expect(onChange).toHaveBeenCalledTimes(2);
+    live.stop();
+  });
+
+  it("keeps a socket whose pong comes late but in time (fix round 1)", () => {
+    const sockets = fakeSockets();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: () => undefined,
+      token: () => "tok",
+    });
+    live.start();
+    const [socket] = sockets.made;
+    socket?.open();
+    if (socket !== undefined) {
+      socket.answersPing = false;
+    }
+    vi.advanceTimersByTime(45_000 + PONG_WAIT_MS - 1);
+    socket?.receive("pong");
+    vi.advanceTimersByTime(30_000);
+    expect(live.status.getState().isConnected).toBe(true);
+    expect(sockets.made).toHaveLength(1);
+    live.stop();
+  });
+
+  it("waits longer each time a fresh socket goes quiet again, until a pong comes (fix round 1)", () => {
+    const sockets = fakeSockets();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: () => undefined,
+      token: () => "tok",
+    });
+    live.start();
+    /** The newest socket opens and never answers a ping: dropped one ping and 10 s later. */
+    const quietOnce = (): void => {
+      const socket = sockets.made.at(-1);
+      if (socket !== undefined) {
+        socket.answersPing = false;
+        socket.isHalfOpen = true;
+        socket.open();
+      }
+      vi.advanceTimersByTime(45_000 + PONG_WAIT_MS);
+    };
+    quietOnce();
+    vi.advanceTimersByTime(999);
+    expect(sockets.made).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sockets.made).toHaveLength(2);
+    // Quiet again right after it opened: the pause doubles instead of starting over.
+    quietOnce();
+    vi.advanceTimersByTime(1999);
+    expect(sockets.made).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(sockets.made).toHaveLength(3);
+    // A healthy socket (its pong comes) starts the count over.
+    sockets.made[2]?.open();
+    vi.advanceTimersByTime(45_000);
+    sockets.made[2]?.drop();
+    vi.advanceTimersByTime(1000);
+    expect(sockets.made).toHaveLength(4);
+    live.stop();
+  });
+
   it("stops reconnecting when the server ends the socket's session, and says so", () => {
     const sockets = fakeSockets();
     const onSessionEnded = vi.fn();
@@ -133,6 +232,114 @@ describe("createLiveChannel", () => {
     live.start();
     expect(sockets.made).toHaveLength(2);
     live.stop();
+  });
+
+  it("says a connected socket dropped once, not for its failed reconnects, a stop or a session end (QA 18 M4)", () => {
+    const sockets = fakeSockets();
+    const onDropped = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      onDropped,
+      token: () => "tok",
+    });
+    live.start();
+    sockets.made[0]?.open();
+    vi.advanceTimersByTime(STABLE_MS);
+    sockets.made[0]?.drop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // The reconnects fail without ever opening: nothing more.
+    vi.advanceTimersByTime(1000);
+    sockets.made[1]?.drop();
+    vi.advanceTimersByTime(2000);
+    sockets.made[2]?.drop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // A stop of a connected socket (a hidden tab, a log-out) is no drop.
+    vi.advanceTimersByTime(4000);
+    sockets.made[3]?.open();
+    live.stop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // Nor is the server ending the session.
+    live.start();
+    sockets.made[4]?.open();
+    sockets.made[4]?.drop(LIVE_SESSION_ENDED);
+    expect(onDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("backs off a socket cut soon after it opens, and says no drop for it (fix round 5 V2)", () => {
+    const sockets = fakeSockets();
+    const onDropped = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      onDropped,
+      token: () => "tok",
+    });
+    live.start();
+    // Let in and cut 100 ms on, again and again: 1 s, 2 s, 4 s between tries, as for a refusal.
+    for (const [index, wait] of [1000, 2000, 4000].entries()) {
+      sockets.made[index]?.open();
+      vi.advanceTimersByTime(100);
+      sockets.made[index]?.drop();
+      vi.advanceTimersByTime(wait - 1);
+      expect(sockets.made).toHaveLength(index + 1);
+      vi.advanceTimersByTime(1);
+      expect(sockets.made).toHaveLength(index + 2);
+    }
+    expect(onDropped).not.toHaveBeenCalled();
+    // One that stays up resets the backoff: its drop is said, and the next try comes after 1 s.
+    sockets.made[3]?.open();
+    vi.advanceTimersByTime(STABLE_MS);
+    sockets.made[3]?.drop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1000);
+    expect(sockets.made).toHaveLength(5);
+    live.stop();
+  });
+
+  it("says a socket closed before it ever opened once per streak of such failures (round 7 CI)", () => {
+    // Refused at the door (its session ended while it was connecting, or no server): a browser
+    // gives a refused upgrade no close code, so the app must look for itself.
+    const sockets = fakeSockets();
+    const onFailedToOpen = vi.fn();
+    const onDropped = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      onDropped,
+      onFailedToOpen,
+      token: () => "tok",
+    });
+    live.start();
+    sockets.made[0]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(1);
+    // Its reconnects are refused too: still once.
+    vi.advanceTimersByTime(1000);
+    sockets.made[1]?.drop();
+    vi.advanceTimersByTime(2000);
+    sockets.made[2]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(1);
+    // One that opens ends the streak; a socket cut after it opened is no refusal.
+    vi.advanceTimersByTime(4000);
+    sockets.made[3]?.open();
+    vi.advanceTimersByTime(STABLE_MS);
+    sockets.made[3]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(1);
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // The next refusal starts a new streak; a stop says nothing.
+    vi.advanceTimersByTime(1000);
+    sockets.made[4]?.drop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(2);
+    live.stop();
+    live.start();
+    live.stop();
+    expect(onFailedToOpen).toHaveBeenCalledTimes(2);
   });
 
   it("waits for a token instead of opening without one", () => {

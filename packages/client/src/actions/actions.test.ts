@@ -197,6 +197,55 @@ describe("createTask", () => {
     );
     expect(generated).toHaveLength(1);
   });
+
+  it("starts the next instance of a series without a chosen start at the start of its day (QA 14 L10e)", async () => {
+    const world = await setupActions();
+    // NOW is 15:00 in Moscow; the person chose no start, so 15:00 is nobody's time of day.
+    const events = unwrap(
+      await world.actions.createTask({
+        presetId: "personal",
+        recurrence: { kind: "daily" },
+        title: "Stretch",
+      }),
+    );
+    const series = events.find((event) => event.type === "series.created");
+    const first = events.find((event) => event.type === "task.created");
+    if (series?.type !== "series.created" || first?.type !== "task.created") {
+      throw new Error("Expected the series and its first instance");
+    }
+    // The first instance starts when it was made; the series counts from 00:00 that day.
+    expect(first.payload.startAt).toBe(NOW);
+    expect(series.payload.template.startAt).toBe("2026-10-05T21:00:00.000Z");
+    world.setNow("2026-10-06T12:01:00.000Z");
+    await world.actions.ensureInstances();
+    const starts = Object.values(world.state.store.getState().tasks.byId)
+      .filter((task) => task.seriesId === series.payload.seriesId)
+      .map((task) => task.startAt ?? "")
+      .toSorted((a, b) => a.localeCompare(b));
+    // Oct 7 00:00 Moscow, not Oct 7 15:00.
+    expect(starts).toEqual([NOW, "2026-10-06T21:00:00.000Z"]);
+  });
+
+  it("counts a repeat added to a task without its own start from the start of today", async () => {
+    const world = await setupActions();
+    const [created] = unwrap(
+      await world.actions.createTask({ presetId: "personal", title: "Walk" }),
+    );
+    if (created?.type !== "task.created") {
+      throw new Error("Expected task.created");
+    }
+    const events = unwrap(
+      await world.actions.startSeriesForTask(created.payload.taskId, { kind: "monthly" }),
+    );
+    const series = events.find((event) => event.type === "series.created");
+    if (series?.type !== "series.created") {
+      throw new Error("Expected series.created");
+    }
+    expect(series.payload.template.startAt).toBe("2026-10-05T21:00:00.000Z");
+    // The task itself still starts when the repeat was added.
+    expect(taskOf(world, created.payload.taskId)?.startAt).toBe(NOW);
+  });
+
   it("emits task.created with the client's envelope and fresh ids", async () => {
     const world = await setupActions();
     const events = unwrap(

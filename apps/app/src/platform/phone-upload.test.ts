@@ -5,6 +5,7 @@ import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_OWNER, type FakeCalendar } from "#app/testing/calendar.fake.ts";
+import { endpoints } from "@pace/core";
 
 import type { loadDeviceId as actualLoadDeviceId } from "./device-id.ts";
 import type { calendarEvents as actualCalendarEvents } from "./phone-calendar.ts";
@@ -14,13 +15,55 @@ import { clearPhoneCalendar, uploadPhoneData } from "./phone-upload.ts";
 
 const at = (hhmm: string): number => Date.parse(`2026-10-06T${hhmm}:00.000Z`);
 
+type UsageEvent = {
+  readonly className: null;
+  readonly eventType: number;
+  readonly packageName: string;
+  readonly timestamp: number;
+};
+
 /** Telegram in front 09:00–09:20 and Chrome from 09:40 on (still open). */
-const mockEvents = [
+const MORNING: readonly UsageEvent[] = [
   { className: null, eventType: 15, packageName: "android", timestamp: at("09:00") },
   { className: null, eventType: 1, packageName: "org.telegram.messenger", timestamp: at("09:00") },
   { className: null, eventType: 2, packageName: "org.telegram.messenger", timestamp: at("09:20") },
   { className: null, eventType: 1, packageName: "com.android.chrome", timestamp: at("09:40") },
 ];
+
+const TELEGRAM = "org.telegram.messenger";
+const CLOCK = "com.google.android.deskclock";
+
+const happened = (hhmm: string, eventType: number, packageName = "android"): UsageEvent => ({
+  className: null,
+  eventType,
+  packageName,
+  timestamp: at(hhmm),
+});
+
+/**
+A night: Telegram in bed until the phone is locked at 01:21, the alarm rings over the lock screen
+at 06:30 (shown, never unlocked), then the phone is unlocked at 07:10 for Telegram.
+*/
+const NIGHT: readonly UsageEvent[] = [
+  happened("01:00", 15),
+  happened("01:00", 18),
+  happened("01:01", 1, TELEGRAM),
+  happened("01:20", 2, TELEGRAM),
+  happened("01:21", 17),
+  happened("01:21", 16),
+  happened("06:30", 15),
+  happened("06:30", 1, CLOCK),
+  happened("06:35", 2, CLOCK),
+  happened("06:35", 16),
+  happened("07:10", 15),
+  happened("07:10", 18),
+  happened("07:11", 1, TELEGRAM),
+  happened("07:20", 2, TELEGRAM),
+  happened("07:21", 16),
+];
+
+/** What the phone recorded; the read returns what falls in the range it asks for. */
+const mockPhone = { events: MORNING };
 const mockUsageRead = {
   gate: null as null | Promise<boolean>,
   started: null as (() => void) | null,
@@ -68,14 +111,18 @@ jest.mock("../../modules/pace-native/index.ts", () => ({
   paceNative: {
     appLabels: async (packages: readonly string[]) =>
       Object.fromEntries(
-        packages.map((name) => [name, name === "org.telegram.messenger" ? "Telegram" : "Chrome"]),
+        packages.map((name) => [
+          name,
+          { "com.google.android.deskclock": "Clock", "org.telegram.messenger": "Telegram" }[name] ??
+            "Chrome",
+        ]),
       ),
     hasUsageAccess: () => true,
     openUsageAccessSettings: jest.fn(),
-    queryUsageEvents: async () => {
+    queryUsageEvents: async (from: number, to: number) => {
       mockUsageRead.started?.();
       await mockUsageRead.gate;
-      return mockEvents;
+      return mockPhone.events.filter((event) => event.timestamp >= from && event.timestamp <= to);
     },
   },
 }));
@@ -101,7 +148,9 @@ const world = async (
         return { ok: true };
       },
       "POST /api/usage/sessions": ({ body }) => {
-        sent.push({ body: body as Record<string, unknown>, url: "usage" });
+        // What the Worker accepts: the endpoint's own strict input.
+        const valid = endpoints.usage.upload.body.parse(body);
+        sent.push({ body: valid, url: "usage" });
         return { stored: 2 };
       },
     },
@@ -111,6 +160,7 @@ const world = async (
 };
 
 beforeEach(async () => {
+  mockPhone.events = MORNING;
   (SecureStore as unknown as FakeSecureStore).values.clear();
   mockUsageRead.gate = null;
   mockUsageRead.started = null;
@@ -328,5 +378,143 @@ describe("what the phone sends to Pace", () => {
     } finally {
       gate.resolve(true);
     }
+  });
+});
+
+const usageSent = (sent: readonly Sent[]): readonly Record<string, unknown>[] =>
+  sent.filter((item) => item.url === "usage").map((item) => item.body);
+
+const use = (from: string, to: string) => ({
+  endAt: `2026-10-06T${to}:00.000Z`,
+  startAt: `2026-10-06T${from}:00.000Z`,
+});
+
+describe("what the phone tells about its use, for sleep on the server", () => {
+  it("sends when the phone was really in use and how far it read", async () => {
+    mockPhone.events = NIGHT;
+    const sent: Sent[] = [];
+    await uploadPhoneData((await world(sent)).api, "2026-10-06T10:00:00.000Z");
+    const [body] = usageSent(sent);
+    expect(body?.["uses"]).toEqual([
+      use("01:00", "01:21"),
+      use("01:01", "01:20"),
+      use("07:10", "07:21"),
+      use("07:11", "07:20"),
+    ]);
+    expect(body?.["until"]).toBe("2026-10-06T10:00:00.000Z");
+    // The apps in front are still sent as they were, the alarm among them.
+    expect(body?.["sessions"]).toEqual([
+      { app: "Telegram", ...use("01:01", "01:20") },
+      { app: "Clock", ...use("06:30", "06:35") },
+      { app: "Telegram", ...use("07:11", "07:20") },
+    ]);
+  });
+
+  it("never counts the alarm over the lock screen as use, also in a later upload", async () => {
+    mockPhone.events = NIGHT;
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    await uploadPhoneData(runtime.api, "2026-10-06T01:30:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T06:40:00.000Z");
+    const [, later] = usageSent(sent);
+    // The next read starts at the last use, so the lock that followed it is read again.
+    expect(later?.["uses"]).toEqual([use("01:00", "01:21"), use("01:01", "01:20")]);
+    expect(later?.["until"]).toBe("2026-10-06T06:40:00.000Z");
+    expect(later?.["sessions"]).toEqual([
+      { app: "Telegram", ...use("01:01", "01:20") },
+      { app: "Clock", ...use("06:30", "06:35") },
+    ]);
+  });
+
+  it("reads next from the earliest start of the last app session and the last use", async () => {
+    mockPhone.events = NIGHT;
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    await uploadPhoneData(runtime.api, "2026-10-06T10:00:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T10:30:00.000Z");
+    const [, next] = usageSent(sent);
+    // The unlocked spell from 07:10 ends last: it starts before Telegram's 07:11.
+    expect(next?.["uses"]).toEqual([use("07:10", "07:21"), use("07:11", "07:20")]);
+    expect(next?.["sessions"]).toEqual([{ app: "Telegram", ...use("07:11", "07:20") }]);
+    expect(next?.["until"]).toBe("2026-10-06T10:30:00.000Z");
+  });
+
+  it("still knows the phone is locked after reads with no use, when the alarm rings", async () => {
+    // Locked at 01:21; nothing then until the alarm rings over the lock screen at 06:30.
+    mockPhone.events = [
+      happened("01:21", 17),
+      happened("01:21", 16),
+      happened("06:30", 15),
+      happened("06:30", 1, CLOCK),
+      happened("06:35", 2, CLOCK),
+      happened("06:35", 16),
+    ];
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    // A read with the lock and no use, then one with nothing at all: each starts 10 min back.
+    await uploadPhoneData(runtime.api, "2026-10-06T03:00:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T04:00:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T06:40:00.000Z");
+    const alarm = usageSent(sent).at(-1);
+    expect(alarm?.["sessions"]).toEqual([{ app: "Clock", ...use("06:30", "06:35") }]);
+    expect(alarm?.["uses"]).toEqual([]);
+  });
+
+  it("never reads an app started over the lock screen as use when the next read starts on it", async () => {
+    // The alarm rings at 06:30 over the lock screen; the phone is unlocked at 06:33 to stop it.
+    mockPhone.events = [
+      ...NIGHT.slice(0, 6),
+      happened("06:30", 15),
+      happened("06:30", 1, CLOCK),
+      happened("06:33", 18),
+      happened("06:40", 2, CLOCK),
+      happened("06:41", 16),
+    ];
+    const sent: Sent[] = [];
+    const runtime = await world(sent);
+    await uploadPhoneData(runtime.api, "2026-10-06T06:45:00.000Z");
+    await uploadPhoneData(runtime.api, "2026-10-06T07:00:00.000Z");
+    const [first, next] = usageSent(sent);
+    expect(first?.["uses"]).toEqual([
+      use("01:00", "01:21"),
+      use("01:01", "01:20"),
+      use("06:33", "06:41"),
+    ]);
+    // The Clock's session starts the next read (06:30), before the lock state is read again.
+    expect(next?.["sessions"]).toEqual([{ app: "Clock", ...use("06:30", "06:40") }]);
+    expect(next?.["uses"]).toEqual([use("06:33", "06:41")]);
+  });
+
+  it("tells how far it read when the phone was not used at all", async () => {
+    mockPhone.events = [];
+    const sent: Sent[] = [];
+    await uploadPhoneData((await world(sent)).api, "2026-10-06T10:00:00.000Z");
+    const [body, ...more] = usageSent(sent);
+    expect(more).toEqual([]);
+    expect(body).toMatchObject({ sessions: [], until: "2026-10-06T10:00:00.000Z", uses: [] });
+  });
+
+  it("says how far it read only with the last batch", async () => {
+    // 1001 Telegram minutes back to back from 15:00 the day before.
+    const start = Date.parse("2026-10-05T15:00:00.000Z");
+    mockPhone.events = Array.from({ length: 1001 }, (_, index) => [
+      { className: null, eventType: 1, packageName: TELEGRAM, timestamp: start + index * 60_000 },
+      {
+        className: null,
+        eventType: 2,
+        packageName: TELEGRAM,
+        timestamp: start + (index + 1) * 60_000,
+      },
+    ]).flat();
+    const sent: Sent[] = [];
+    await uploadPhoneData((await world(sent)).api, "2026-10-06T10:00:00.000Z");
+    const [first, last] = usageSent(sent);
+    expect(usageSent(sent)).toHaveLength(2);
+    expect(first?.["sessions"]).toHaveLength(1000);
+    expect(first?.["uses"]).toHaveLength(1000);
+    expect(first).not.toHaveProperty("until");
+    expect(last?.["sessions"]).toHaveLength(1);
+    expect(last?.["uses"]).toHaveLength(1);
+    expect(last?.["until"]).toBe("2026-10-06T10:00:00.000Z");
   });
 });

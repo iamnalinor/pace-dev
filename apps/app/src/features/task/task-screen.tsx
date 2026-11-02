@@ -83,7 +83,7 @@ export const TaskScreen = ({
   const [open, setOpen] = useState<Open>(openClose ? "close" : null);
   if (!view.ok) {
     return (
-      <Screen header={<TaskHeader project={null} />}>
+      <Screen header={<TaskHeader />}>
         <EmptyState>{t("task.notFound")}</EmptyState>
       </Screen>
     );

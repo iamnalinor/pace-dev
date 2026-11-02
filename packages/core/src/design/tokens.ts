@@ -26,6 +26,7 @@ export type PaletteName =
   | "line"
   | "muted"
   | "onColor"
+  | "placeholder"
   | "question"
   | "raised"
   | "surface"
@@ -47,6 +48,12 @@ export type ProjectColorName =
 export type RadiusName = "lg" | "md" | "pill" | "sm" | "xl";
 
 export type ThemeName = "dark" | "light";
+
+/**
+How far a loading placeholder's rows fade as they breathe (their opacity's low point): their
+`placeholder` color still stands out from the page there (QA round 19 L2: dark rows at 1.1:1).
+*/
+export const PLACEHOLDER_DIM = 0.7;
 
 export const THEMES: readonly ThemeName[] = ["dark", "light"];
 

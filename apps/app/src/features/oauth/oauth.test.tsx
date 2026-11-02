@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { REQUEST_DEADLINE_MS } from "@pace/client";
 import { problem } from "@pace/client/testing";
 
 import { ConsentFlow } from "./consent-flow.tsx";
@@ -67,6 +68,27 @@ describe("ConsentFlow", () => {
       devTelegramId: "1919230638",
       scopes: ["tasks:read"],
     });
+  });
+
+  it("says it failed when the request's details never come, instead of loading for good (round 6, class 62)", async () => {
+    const runtime = await createTestRuntime({
+      routes: {
+        "GET /api/oauth/client-info": async () => await new Promise<never>(() => undefined),
+      },
+    });
+    jest.useFakeTimers();
+    try {
+      await renderScreen(
+        <ConsentFlow authQuery={AUTH_QUERY} redirect={jest.fn()} renderWidget={() => null} />,
+        runtime,
+      );
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(en("oauth.failed"));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("explains a request the API refuses", async () => {

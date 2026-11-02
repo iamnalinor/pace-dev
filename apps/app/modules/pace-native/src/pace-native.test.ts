@@ -17,6 +17,15 @@ describe("PaceNative", () => {
     }).not.toThrow();
   });
 
+  it("treats the battery as no obstacle and has no vendor page without the native side", () => {
+    // Nothing to ask on the web or in Jest: the step and the Settings hint stay hidden.
+    expect(PaceNative.isIgnoringBatteryOptimizations()).toBe(true);
+    expect(() => {
+      PaceNative.requestIgnoreBatteryOptimizations();
+    }).not.toThrow();
+    expect(PaceNative.openAutostartSettings()).toBe(false);
+  });
+
   it("uses the linked module when there is one", () => {
     const linked = { ...fallbackPaceNative, hasUsageAccess: () => true };
     expect(resolvePaceNative(linked)).toBe(linked);

@@ -31,6 +31,12 @@ export type PaceNative = {
   readonly queryUsageStats: (beginMs: number, endMs: number) => Promise<readonly UsageStats[]>;
   /** Package id → the app's name as the launcher shows it (unknown ids map to themselves). */
   readonly appLabels: (packages: readonly string[]) => Promise<Readonly<Record<string, string>>>;
+  /** Whether Android leaves Pace out of battery optimization (the background check runs on time). */
+  readonly isIgnoringBatteryOptimizations: () => boolean;
+  /** Android's own dialog that exempts Pace from battery optimization (or its list, when absent). */
+  readonly requestIgnoreBatteryOptimizations: () => void;
+  /** The phone maker's autostart page, when this phone has a known one; false when none. */
+  readonly openAutostartSettings: () => boolean;
   /** Where the last crash's trace was saved (`Download/Pace/crash-….txt`), once; else null. */
   readonly takeLastCrash: () => null | string;
   /** Saves a trace the app caught itself (the crash screen) as a crash's; where it went, or null. */
@@ -41,15 +47,21 @@ export type PaceNative = {
 
 const noop = (): void => undefined;
 
-/** What the app sees without the native module (Jest, Expo Go): nothing granted, nothing to do. */
+/**
+What the app sees without the native module (Jest, Expo Go, the web): nothing granted, nothing to
+do. The battery is no obstacle there, so the battery step is never asked for.
+*/
 export const fallbackPaceNative: PaceNative = {
   appLabels: async (packages) => Object.fromEntries(packages.map((name) => [name, name])),
   hasUsageAccess: () => false,
   isDndAccessGranted: () => false,
+  isIgnoringBatteryOptimizations: () => true,
+  openAutostartSettings: () => false,
   openDndAccessSettings: noop,
   openUsageAccessSettings: noop,
   queryUsageEvents: async () => [],
   queryUsageStats: async () => [],
+  requestIgnoreBatteryOptimizations: noop,
   restrictsSettings: () => false,
   setDnd: () => false,
   saveCrashTrace: () => null,

@@ -24,4 +24,7 @@ export const enServer = {
   "server.mismatchApp": "Update the app to keep using this server.",
   "server.mismatchServer":
     "This server runs an older Pace. Update the server, or log out and sign in on another one.",
+  "server.mismatchAppWeb":
+    "This page has an older Pace than the server. Refresh it to load the new one.",
+  "server.mismatchServerWeb": "This server runs an older Pace. Ask whoever runs it to update it.",
 } as const;

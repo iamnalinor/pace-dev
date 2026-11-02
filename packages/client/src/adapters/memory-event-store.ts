@@ -9,6 +9,7 @@ export const createMemoryEventStore = (): EventStore => {
   const pending = new Set<string>();
   let cursor = 0;
   let storeId: null | string = null;
+  let syncVersion = 0;
   return {
     append: async (incoming) => {
       for (const event of incoming) {
@@ -25,9 +26,11 @@ export const createMemoryEventStore = (): EventStore => {
       pending.clear();
       cursor = 0;
       storeId = null;
+      syncVersion = 0;
     },
     getCursor: async () => cursor,
     getStoreId: async () => storeId,
+    getSyncVersion: async () => syncVersion,
     listAll: async () => events.values().toArray(),
     listPending: async () =>
       events
@@ -44,6 +47,9 @@ export const createMemoryEventStore = (): EventStore => {
     },
     setStoreId: async (id) => {
       storeId = id;
+    },
+    setSyncVersion: async (version) => {
+      syncVersion = version;
     },
   };
 };

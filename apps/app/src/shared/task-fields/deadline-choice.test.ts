@@ -1,4 +1,8 @@
-import { deadlineChoiceProblem, isDeadlineChoiceValid } from "./deadline-choice.ts";
+import {
+  deadlineChoiceProblem,
+  isDeadlineChoiceValid,
+  isDeadlineTypeShown,
+} from "./deadline-choice.ts";
 
 describe("task deadline choice", () => {
   const due = { at: "2026-10-16T12:00:00.000Z", tz: "Europe/Moscow" };
@@ -75,5 +79,16 @@ describe("deadlineChoiceProblem", () => {
         due,
       ),
     ).toBe("deadline/days");
+  });
+
+  it("offers the deadline type only once there is a deadline, or a two-stage one to finish", () => {
+    expect(isDeadlineTypeShown({ kind: "hard" }, null)).toBe(false);
+    expect(isDeadlineTypeShown({ kind: "hard" }, due)).toBe(true);
+    expect(
+      isDeadlineTypeShown(
+        { kind: "resubmission", finalAt: null, finalTz: null, finalMode: "offset", softDays: 3 },
+        null,
+      ),
+    ).toBe(true);
   });
 });

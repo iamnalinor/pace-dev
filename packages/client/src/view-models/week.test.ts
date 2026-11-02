@@ -149,6 +149,18 @@ describe("weekModel", () => {
       ),
     ).toBeNull();
   });
+
+  it("places a 0-minute stretch inside the day as a point to draw (QA round 18 L7)", () => {
+    const day = "2026-10-05T21:00:00.000Z"; // Tuesday 00:00 in Moscow
+    const zone = MOSCOW;
+    const point = (iso: string) =>
+      placeIn(day, { endAt: iso, startAt: iso }, { fromHour: 7, zone });
+    // 16:00 Moscow.
+    expect(point("2026-10-06T13:00:00.000Z")).toEqual({ height: 0, top: 540 });
+    // Before the grid's first hour, and at the next day's midnight: not on this column.
+    expect(point("2026-10-06T03:00:00.000Z")).toBeNull();
+    expect(point("2026-10-06T21:00:00.000Z")).toBeNull();
+  });
 });
 
 const at = (hhmm: string): string => `2026-10-06T${hhmm}:00.000Z`;
@@ -176,6 +188,21 @@ describe("lanesOf", () => {
       lanesOf([stretch("10:00", "12:00"), stretch("09:00", "10:00"), stretch("09:30", "11:00")]),
     ).toEqual([
       { lane: 0, lanes: 2 },
+      { lane: 0, lanes: 2 },
+      { lane: 1, lanes: 2 },
+    ]);
+  });
+
+  // QA round 17 L8: a block of a few seconds is drawn as tall as a finger; laid out by its real
+  // length, it sat under its neighbour, half covered (axe target-size).
+  it("lays a short stretch out by the height it is drawn at, beside what that height reaches", () => {
+    const short = stretch("10:00", "10:01");
+    const next = stretch("10:10", "11:00");
+    expect(lanesOf([short, next])).toEqual([
+      { lane: 0, lanes: 1 },
+      { lane: 0, lanes: 1 },
+    ]);
+    expect(lanesOf([short, next], 30)).toEqual([
       { lane: 0, lanes: 2 },
       { lane: 1, lanes: 2 },
     ]);

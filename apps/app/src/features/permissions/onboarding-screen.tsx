@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { Permission, PermissionId } from "#app/platform/permissions.ts";
+
 import { useT } from "#app/app-state.tsx";
 import { markOnboarded } from "#app/platform/onboarding.ts";
-import { type Permission, PERMISSION_IDS, type PermissionId } from "#app/platform/permissions.ts";
 import { Button } from "#app/ui/button.tsx";
 
 import { PermissionText, type UsageStep, UsageSteps, useUsageGuide } from "./permission-card.tsx";
@@ -37,9 +38,11 @@ const Frame = ({
 
 /** Step one: every permission Pace will ask for and what it is for, before any dialog. */
 const Intro = ({
+  ids,
   onContinue,
   onLater,
 }: {
+  readonly ids: readonly PermissionId[];
   readonly onContinue: () => void;
   readonly onLater: () => void;
 }) => {
@@ -61,7 +64,7 @@ const Intro = ({
         {t("onboarding.title")}
       </Text>
       <Text className="font-sans text-[15px] text-fg2">{t("onboarding.intro")}</Text>
-      {PERMISSION_IDS.map((id) => (
+      {ids.map((id) => (
         <PermissionText id={id} key={id} />
       ))}
     </Frame>
@@ -215,7 +218,7 @@ turn. A dialog's answer moves on by itself; a settings screen moves on once it i
 (or skipped). Seen once per phone; Settings → Permissions has the same buttons later.
 */
 export const OnboardingScreen = () => {
-  const { byId, list, request } = usePermissions();
+  const { byId, ids, list, request } = usePermissions();
   const [phase, setPhase] = useState<Phase>({ kind: "intro" });
   const [asked, setAsked] = useState<ReadonlySet<PermissionId>>(() => new Set());
   const { current, shown } = shownStepOf(phase, byId, asked);
@@ -257,6 +260,7 @@ export const OnboardingScreen = () => {
   }
   return (
     <Intro
+      ids={ids}
       onContinue={() => {
         const queue = (list ?? [])
           .filter((permission) => permission.state !== "on")

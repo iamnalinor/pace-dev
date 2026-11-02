@@ -1,10 +1,21 @@
-import { CLASSIFY_CONFIDENT, type Language, newId, type ParseRequestBody, t } from "@pace/core";
-
-import type { ParseProvider } from "../shared/llm/llm.ts";
+import {
+  CLASSIFY_CONFIDENT,
+  type Language,
+  newId,
+  type ParseRequestBody,
+  type ParseUnavailableReason,
+  t,
+} from "@pace/core";
 
 import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
-import { type ModelRead, readByRules, type Reading, readMessage } from "../shared/llm/read.ts";
+import {
+  type ModelRead,
+  type Models,
+  readByRules,
+  type Reading,
+  readMessage,
+} from "../shared/llm/read.ts";
 import { describeActions } from "./describe.ts";
 import {
   answerIndexes,
@@ -25,17 +36,22 @@ late answer makes Telegram send the update again (a second preview or revision).
 */
 const BOT_READ_DEADLINE_MS = 7000;
 
-/** No model answers: the bot still lets the person inspect and approve a rule-based action. */
+/**
+No model answers: the bot still lets the person inspect and approve a rule-based action, and says
+why: unavailable, or (every model answered out of shape) that it could not read this one.
+*/
 const unavailable = async (
   turn: Turn,
   {
     text,
     retryAt,
+    reason,
     domain,
     decisionIds = [],
   }: {
     readonly text: string;
     readonly retryAt: null | string;
+    readonly reason: ParseUnavailableReason;
     readonly domain: "activity" | "auto" | "task";
     readonly decisionIds?: readonly string[] | undefined;
   },
@@ -45,12 +61,18 @@ const unavailable = async (
     decisionIds: [...decisionIds, id],
     text,
     read: readByRules(text, domain, { now: turn.now, state: turn.state }),
-    isRuleBased: true,
+    unread: reason,
   });
 };
 
-const rulesPrefix = (language: Language, isRuleBased: boolean): string =>
-  isRuleBased ? `${t(language, "bot.rulesPreview")}\n\n` : "";
+/** The line over a rule-based preview: why no model read it (bug class 99). */
+const rulesPrefix = (language: Language, unread: null | ParseUnavailableReason): string => {
+  if (unread === null) {
+    return "";
+  }
+  const key = unread === "unreadable" ? "bot.rulesPreviewUnreadable" : "bot.rulesPreview";
+  return `${t(language, key)}\n\n`;
+};
 
 const actionText = (
   turn: Turn,
@@ -70,7 +92,7 @@ const previewOf = async (
     text,
     request = text,
     read,
-    isRuleBased = false,
+    unread = null,
     thread = [],
     decisionIds,
   }: {
@@ -78,13 +100,14 @@ const previewOf = async (
     readonly text: string;
     readonly request?: string;
     readonly read: Reading & { readonly questions?: ModelRead["questions"] };
-    readonly isRuleBased?: boolean;
+    /** Why no model read it, for a rule-based preview; `null` for the model's own. */
+    readonly unread?: null | ParseUnavailableReason;
     readonly thread?: NonNullable<ParseRequestBody["thread"]>;
   },
 ): Promise<BotReply> => {
   const { state, store } = turn;
   const { language } = state.settings;
-  const prefix = rulesPrefix(language, isRuleBased);
+  const prefix = rulesPrefix(language, unread);
   const canAccept =
     read.actions.length > 0 && planAll(turn, { actions: read.actions, text: request }).ok;
   const id = newId();
@@ -126,13 +149,9 @@ const previewOf = async (
 };
 
 /** Free text → the assistant's actions, checked against the text, shown with Accept / To Inbox / Cancel. */
-export const preview = async (
-  turn: Turn,
-  providers: readonly ParseProvider[],
-  text: string,
-): Promise<BotReply> => {
+export const preview = async (turn: Turn, models: Models, text: string): Promise<BotReply> => {
   const { now, state } = turn;
-  const read = await readMessage(providers, text, {
+  const read = await readMessage(models, text, {
     cooldowns: await turn.store.llmCooldowns(now),
     deadlineMs: BOT_READ_DEADLINE_MS,
     domain: "auto",
@@ -141,7 +160,8 @@ export const preview = async (
   });
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, now);
   if (!read.ok) {
-    return await unavailable(turn, { domain: "auto", retryAt: read.error.retryAt, text });
+    const { reason, retryAt } = read.error;
+    return await unavailable(turn, { domain: "auto", reason, retryAt, text });
   }
   const { output, actions, provider, rejected } = read.value;
   const id = await logReading(
@@ -191,7 +211,7 @@ const showRevision = async (
 /** A new chat message revises a still pending answer, with its entire earlier thread. */
 export const followupPreview = async (
   turn: Turn,
-  providers: readonly ParseProvider[],
+  models: Models,
   { id, text }: { readonly id: string; readonly text: string },
 ): Promise<BotReply | null> => {
   const pending = (await turn.store.peek(id)) as Partial<Pending> | undefined;
@@ -202,7 +222,7 @@ export const followupPreview = async (
   if (thread.length > 5) {
     return plain(t(turn.state.settings.language, "bot.tooManyCorrections"));
   }
-  const read = await readMessage(providers, text, {
+  const read = await readMessage(models, text, {
     cooldowns: await turn.store.llmCooldowns(turn.now),
     deadlineMs: BOT_READ_DEADLINE_MS,
     domain: pending.domain,
@@ -212,7 +232,9 @@ export const followupPreview = async (
   });
   await turn.store.noteLlmLimits(read.ok ? read.value.limited : read.error.limited, turn.now);
   if (!read.ok) {
-    return plain(t(turn.state.settings.language, "bot.correctionUnavailable"));
+    const isUnreadable = read.error.reason === "unreadable";
+    const key = isUnreadable ? "bot.correctionUnreadable" : "bot.correctionUnavailable";
+    return plain(t(turn.state.settings.language, key));
   }
   // Taken now, after the read: an Approve or another answer pressed meanwhile already took it.
   return (await turn.store.recall(id)) === undefined
@@ -228,10 +250,10 @@ export const followupPreview = async (
 /** A preview button: write what was understood, keep the text in the Inbox, or drop it. */
 const chooseDomain = async (
   turn: Turn,
-  providers: readonly ParseProvider[],
+  models: Models,
   { pending, domain }: { readonly pending: Pending; readonly domain: "activity" | "task" },
 ): Promise<BotReply> => {
-  const read = await readMessage(providers, pending.text, {
+  const read = await readMessage(models, pending.text, {
     cooldowns: await turn.store.llmCooldowns(turn.now),
     deadlineMs: BOT_READ_DEADLINE_MS,
     domain,
@@ -250,6 +272,7 @@ const chooseDomain = async (
     : await unavailable(turn, {
         decisionIds: pending.decisionIds,
         domain,
+        reason: read.error.reason,
         retryAt: read.error.retryAt,
         text: pending.text,
       });
@@ -280,13 +303,13 @@ const finishPreview = async (turn: Turn, pending: Pending, action: string): Prom
 /** A preview button: write what was understood, keep the text in the Inbox, or drop it. */
 export const choosePreview = async (
   turn: Turn,
-  providers: readonly ParseProvider[],
+  models: Models,
   { action, id }: { readonly action: string; readonly id: string },
 ): Promise<BotReply> => {
   const { language } = turn.state.settings;
   const at = answerIndexes(action);
   if (at !== undefined) {
-    const revise = async (text: string) => await followupPreview(turn, providers, { id, text });
+    const revise = async (text: string) => await followupPreview(turn, models, { id, text });
     return await answerPreview(turn, { at, id }, revise);
   }
   const pending = (await turn.store.recall(id)) as Partial<Pending> | undefined;
@@ -300,7 +323,7 @@ export const choosePreview = async (
   }
   if (action === PREVIEW_ACTIONS.task || action === PREVIEW_ACTIONS.activity) {
     const domain = action === PREVIEW_ACTIONS.task ? "task" : "activity";
-    return await chooseDomain(turn, providers, { pending: pending as Pending, domain });
+    return await chooseDomain(turn, models, { pending: pending as Pending, domain });
   }
   return await finishPreview(turn, pending as Pending, action);
 };

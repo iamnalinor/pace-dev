@@ -103,9 +103,22 @@ const bottomAbove = (footerHeight: number, isWide: boolean): number => {
   return (isWide ? 0 : TAB_BAR_HEIGHT) + footerHeight + FOOTER_GAP;
 };
 
-/** Where a toast docked in the sidebar sits: inside its 224 px column, at its foot. */
-const DOCKED = "bottom-4 left-3 w-[200px]";
-const FLOATING = "inset-x-4 mx-auto w-auto max-w-[480px]";
+/** How far above the bottom edge a floating line sits: clear of the tab bar and any footer. */
+const FloatBottomContext = createContext(BASE_BOTTOM);
+
+/**
+Where a status that floats over the page sits (the offline pill): low, clear of the tab bar and
+of the screen's footer, as the toast does, so it covers no header control (round 7 review 3).
+*/
+export const useFloatBottom = (): number => use(FloatBottomContext);
+
+/**
+Where a toast docked in the sidebar sits: inside its 224 px column, at its foot, its action under
+the text so the text has the column's whole width (QA round 17 L5: beside the action it had a
+hundred pixels and lost its third line).
+*/
+const DOCKED = "bottom-4 left-3 w-[200px] flex-col items-stretch gap-0 pr-2";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-[480px] flex-row items-center gap-3 pr-1";
 
 const ToastBar = ({
   bottom,
@@ -122,22 +135,25 @@ const ToastBar = ({
     accessibilityLiveRegion="polite"
     accessibilityRole="alert"
     className={cx(
-      "absolute flex-row items-center gap-3 rounded-xl border border-line bg-surface py-1 pl-4 pr-1 shadow-lg",
+      "absolute rounded-xl border border-line bg-surface py-1 pl-4 shadow-lg",
       isDocked ? DOCKED : FLOATING,
     )}
     style={isDocked ? undefined : { bottom }}
     testID="toast"
   >
     {/* Three lines at most, and a tap on the text dismisses it: a long title never sticks around. */}
-    <Pressable className="flex-1" onPress={onDone}>
-      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={3}>
+    <Pressable className={isDocked ? "self-stretch" : "flex-1"} onPress={onDone}>
+      <Text className="py-2.5 font-sans text-[14px] text-fg" numberOfLines={isDocked ? 5 : 3}>
         {toast.message}
       </Text>
     </Pressable>
     {toast.action === undefined ? null : (
       <Pressable
         accessibilityRole="button"
-        className="h-11 justify-center rounded-md px-3 active:opacity-70"
+        className={cx(
+          "h-11 justify-center rounded-md px-3 active:opacity-70",
+          isDocked && "self-end",
+        )}
         onPress={() => {
           // Closed first, so the action may show a toast of its own.
           onDone();
@@ -158,6 +174,7 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   const { footerHeight, setFooter } = useFooters();
   const isWide = useIsWide();
   const [isDocked, setIsDocked] = useState(false);
+  const floatBottom = useMemo(() => bottomAbove(footerHeight, isWide), [footerHeight, isWide]);
   const hide = useCallback(() => {
     setToast(null);
   }, []);
@@ -181,20 +198,22 @@ export const ToastProvider = ({ children }: { readonly children: ReactNode }) =>
   return (
     <ToastContext value={handle}>
       <FooterHeightContext value={setFooter}>
-        <SidebarDockContext value={setIsDocked}>
-          <View className="flex-1">
-            {children}
-            {toast === null ? null : (
-              <ToastBar
-                bottom={bottomAbove(footerHeight, isWide)}
-                isDocked={isWide && isDocked}
-                key={toast.id}
-                onDone={hide}
-                toast={toast}
-              />
-            )}
-          </View>
-        </SidebarDockContext>
+        <FloatBottomContext value={floatBottom}>
+          <SidebarDockContext value={setIsDocked}>
+            <View className="flex-1">
+              {children}
+              {toast === null ? null : (
+                <ToastBar
+                  bottom={bottomAbove(footerHeight, isWide)}
+                  isDocked={isWide && isDocked}
+                  key={toast.id}
+                  onDone={hide}
+                  toast={toast}
+                />
+              )}
+            </View>
+          </SidebarDockContext>
+        </FloatBottomContext>
       </FooterHeightContext>
     </ToastContext>
   );

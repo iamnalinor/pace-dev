@@ -31,6 +31,23 @@ export type CloseForm = {
   readonly setReason: (reason: string) => void;
 };
 
+const MINUTE_MS = 60_000;
+
+/**
+A typed minute read as an instant: the minute the task was created in means its creation, not the
+minute's first second, which comes before it (QA round 20 L4: the sheet's own default, this minute,
+was refused as "before the task was created" during the task's first minute).
+*/
+const typedAt = (at: null | string, task: Pick<TaskViewModel, "createdAt">): null | string => {
+  if (at === null) {
+    return null;
+  }
+  const typed = Date.parse(at);
+  const created = Date.parse(task.createdAt);
+  const isCreationMinute = Math.floor(typed / MINUTE_MS) === Math.floor(created / MINUTE_MS);
+  return isCreationMinute && typed < created ? task.createdAt : at;
+};
+
 /** The close sheet's state: which time, how precise, and how the task ends. */
 export const useCloseForm = (
   view: TaskViewModel,
@@ -45,7 +62,8 @@ export const useCloseForm = (
   const [reason, setReason] = useState("");
   const pillAt = (key: TimeChoice): null | string =>
     view.quickTimes.find((quick) => quick.key === key)?.at ?? null;
-  const at = choice === "custom" ? fromWallClock({ ...typed, tz: deviceTz }) : pillAt(choice);
+  const at =
+    choice === "custom" ? typedAt(fromWallClock({ ...typed, tz: deviceTz }), view) : pillAt(choice);
   const problem = at === null ? null : taskInstantProblem(view, at, now);
   const choose = (next: TimeChoice): void => {
     if (next === "custom" && choice !== "custom") {

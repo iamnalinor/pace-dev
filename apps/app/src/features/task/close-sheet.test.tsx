@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -55,9 +55,11 @@ describe("CloseSheet — submitting subtasks", () => {
     expect(preview("recorded")).toHaveTextContent("12:50", { exact: false });
     expect(screen.queryByText("12:50 · happened 12:50")).toBeNull();
 
-    // The same clock reading on an earlier day is still a different instant.
+    // The same clock reading on an earlier day is still a different instant, and says its day.
     await fireEvent.changeText(screen.getByLabelText(en("close.date")), "2026-10-06");
-    expect(preview("recorded")).toHaveTextContent("12:50 · happened 12:50", { exact: false });
+    expect(preview("recorded")).toHaveTextContent("12:50 · happened yesterday 12:50", {
+      exact: false,
+    });
   });
 
   it("submits an hour ago as an approximate time", async () => {
@@ -111,8 +113,11 @@ describe("CloseSheet — submitting subtasks", () => {
 
   it("closes the task as skipped with a reason instead", async () => {
     const runtime = await openSubmit();
-    await fireEvent.press(screen.getByRole("button", { name: en("close.other") }));
-    await fireEvent.press(screen.getByRole("radio", { name: en("close.skipped") }));
+    // The outcome is one choice in sight: Submit, Cancelled, Skipped (QA 19 M2, QA 20 L6).
+    const outcome = screen.getByLabelText(en("close.outcome"));
+    expect(within(outcome).getByRole("radio", { name: en("close.submit") })).toBeChecked();
+    await fireEvent.press(within(outcome).getByRole("radio", { name: en("close.skipped") }));
+    expect(within(outcome).getByRole("radio", { name: en("close.skipped") })).toBeChecked();
     await fireEvent.changeText(screen.getByLabelText(en("close.reason")), "course dropped");
     const confirm = en("close.confirm", { outcome: en("close.skipped") });
     await fireEvent.press(screen.getByRole("button", { name: confirm }));
@@ -137,5 +142,71 @@ describe("CloseSheet — closing a whole task", () => {
     await waitFor(() => {
       expect(runtime.state.store.getState().tasks.byId[TRK_ID]?.closed?.outcome).toBe("done");
     });
+  });
+});
+
+/** The tracker's close sheet, the day after its deadline. */
+const openTrk = async () => {
+  const runtime = await createTestRuntime({ deviceTz: "UTC", now: "2026-10-10T10:00:00.000Z" });
+  await renderScreen(<TaskScreen id={TRK_ID} openClose />, runtime);
+  return runtime;
+};
+
+const outcomeGroup = () => screen.getByLabelText(en("close.outcome"));
+
+describe("CloseSheet — the outcome and the time, one choice each (QA round 20)", () => {
+  it("switches between Done, Cancelled and Skipped, and back to Done (L6)", async () => {
+    await openTrk();
+    await fireEvent.press(
+      within(outcomeGroup()).getByRole("radio", { name: en("close.cancelled") }),
+    );
+    expect(screen.getByLabelText(en("close.reason"))).toBeOnTheScreen();
+    await fireEvent.press(within(outcomeGroup()).getByRole("radio", { name: en("outcome.done") }));
+    expect(screen.queryByLabelText(en("close.reason"))).toBeNull();
+    expect(screen.getByRole("button", { name: en("common.done") })).toBeOnTheScreen();
+  });
+
+  it("is one tab stop per choice; the arrows move inside it (L7)", async () => {
+    await openTrk();
+    const tabStops = () =>
+      within(outcomeGroup())
+        .getAllByRole("radio")
+        .map((radio) => radio.props["tabIndex"] as number);
+    expect(tabStops()).toEqual([0, -1, -1]);
+    await fireEvent(outcomeGroup(), "keyDown", { key: "ArrowRight" });
+    expect(
+      within(outcomeGroup()).getByRole("radio", { name: en("close.cancelled") }),
+    ).toBeChecked();
+    expect(tabStops()).toEqual([-1, 0, -1]);
+    await fireEvent(outcomeGroup(), "keyDown", { key: "ArrowLeft" });
+    await fireEvent(outcomeGroup(), "keyDown", { key: "ArrowLeft" });
+    expect(within(outcomeGroup()).getByRole("radio", { name: en("close.skipped") })).toBeChecked();
+    const when = screen.getByLabelText(en("close.whenClosed"));
+    expect(
+      within(when)
+        .getAllByRole("radio")
+        .filter((radio) => radio.props["tabIndex"] === 0),
+    ).toHaveLength(1);
+  });
+
+  it("offers a typed time the write takes, even in the task's first minute (L4)", async () => {
+    const now = "2026-10-10T10:00:37.000Z";
+    const runtime = await createTestRuntime({ deviceTz: "UTC", now });
+    const result = await runtime.actions.createTask({ presetId: "personal", title: "Call mom" });
+    const [created] = result.ok ? result.value : [];
+    const taskId = created?.type === "task.created" ? created.payload.taskId : "";
+    await renderScreen(<TaskScreen id={taskId} openClose />, runtime);
+    await fireEvent.press(screen.getByRole("radio", { name: en("close.pickExact") }));
+    expect(screen.queryByText(en("actionError.retro/before-created"))).toBeNull();
+    expect(screen.getByRole("button", { name: en("common.done") })).toBeEnabled();
+  });
+
+  it("names the day of a time that is not today, and calls its chip Pick a time (L5)", async () => {
+    await openTrk();
+    expect(screen.getByRole("radio", { name: en("close.pickExact") })).toHaveTextContent(
+      en("close.pickExact"),
+    );
+    await fireEvent.press(screen.getByRole("radio", { name: en("quickTime.yesterday-evening") }));
+    expect(preview("recorded")).toHaveTextContent("happened yesterday", { exact: false });
   });
 });

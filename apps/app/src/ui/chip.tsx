@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
@@ -38,7 +38,9 @@ export const Chip = ({
   label,
   leading,
   onPress,
+  ref,
   selected = false,
+  tabIndex,
   tall = false,
 }: {
   readonly children: string;
@@ -48,7 +50,12 @@ export const Chip = ({
   readonly label?: string;
   readonly leading?: ReactNode;
   readonly onPress: () => void;
+  /** The pressable itself: for a group that moves focus between its chips, or for focus to be
+  moved onto it when the control that held it goes away. */
+  readonly ref?: Ref<View> | undefined;
   readonly selected?: boolean;
+  /** In a group with one tab stop (`RadioChips`): 0 for the chosen chip, -1 for the others. */
+  readonly tabIndex?: -1 | 0;
   /** 36px with 13px text: the time pills of the close sheet. */
   readonly tall?: boolean;
 }) => (
@@ -58,6 +65,8 @@ export const Chip = ({
     aria-checked={selected}
     className={cx("justify-center active:opacity-80", tall ? "-my-1 h-11" : "-my-1.5 h-11")}
     onPress={onPress}
+    ref={ref}
+    {...(tabIndex !== undefined && { tabIndex })}
   >
     <View
       className={cx(
@@ -68,6 +77,29 @@ export const Chip = ({
     >
       {leading}
       <Text className={cx("font-sans text-[12px]", chipText(color, selected))}>{children}</Text>
+    </View>
+  </Pressable>
+);
+
+/**
+A chip that does something rather than being picked ("Start from: Homework" opens a new preset):
+a button in the unselected look, every one alike, so none reads as already chosen (QA round 19
+L7).
+*/
+export const ActionChip = ({
+  children,
+  onPress,
+}: {
+  readonly children: string;
+  readonly onPress: () => void;
+}) => (
+  <Pressable
+    accessibilityRole="button"
+    className="-my-1.5 h-11 justify-center active:opacity-80"
+    onPress={onPress}
+  >
+    <View className={cx("h-8 flex-row items-center rounded-pill px-3", chipFill(null, false))}>
+      <Text className={cx("font-sans text-[12px]", chipText(null, false))}>{children}</Text>
     </View>
   </Pressable>
 );

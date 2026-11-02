@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Event, LIVE_REQUEST_TIMEOUT_MS, newId } from "@pace/core";
 
+import type { EventStore } from "./event-store.ts";
+
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createApiClient } from "./api-client.ts";
 import { createPaceClient } from "./create-client.ts";
@@ -16,10 +18,18 @@ import {
 } from "./fake-fetch.fake.ts";
 import { say } from "./fake-socket.fake.ts";
 import { createFakeSyncServer, type FakeRequest } from "./fake-sync-server.fake.ts";
+import { STABLE_MS } from "./live-timers.ts";
 import { createMemorySessionStore } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
-import { createSyncClient, SOON_MS, type SyncClient } from "./sync-client.ts";
-import { httpTransport } from "./sync-transport.ts";
+import {
+  createSyncClient,
+  HOLD_MAX_MS,
+  HOLD_WAIT_MS,
+  SOON_MS,
+  type SyncClient,
+} from "./sync-client.ts";
+import { HTTP_SYNC_TIMEOUT_MS, httpTransport } from "./sync-transport.ts";
+import { SYNC_SCHEMA_VERSION } from "./sync-version.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
 const STORE_ID = "store-a";
@@ -28,6 +38,20 @@ const noPull: FakeRoute = () => EMPTY_PAGE;
 const acceptAll: FakeRoute = ({ body }) => {
   const { events } = body as { events: readonly Event[] };
   return { accepted: events.map((event) => event.id), rejected: [], seq: events.length };
+};
+
+/** A sync over `store` as the app starts it: a fresh state read from the store. */
+const started = async (store: EventStore, routes: Readonly<Record<string, FakeRoute>>) => {
+  const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+  await state.ready;
+  const fake = createFakeFetch(routes);
+  const api = createApiClient({
+    baseUrl: "https://api.test",
+    fetch: fake.fetch,
+    token: () => "t",
+  });
+  const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+  return { calls: fake.calls, state, sync };
 };
 
 const setup = async (
@@ -41,12 +65,7 @@ const setup = async (
 }> => {
   const store = createMemoryEventStore();
   await store.append(pending);
-  const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
-  await state.ready;
-  const fake = createFakeFetch(routes);
-  const api = createApiClient({ baseUrl: "https://api.test", fetch: fake.fetch, token: () => "t" });
-  const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
-  return { calls: fake.calls, state, store, sync };
+  return { ...(await started(store, routes)), store };
 };
 
 const localEvents = (count: number): readonly Event[] =>
@@ -54,6 +73,13 @@ const localEvents = (count: number): readonly Event[] =>
     ...settingsEvent(newId(), at(9, index % 60), { language: "ru" }),
     deviceId: "dev-1",
   }));
+
+/** The ids and store of every push the server got. */
+const pushesOf = (calls: ReturnType<typeof createFakeFetch>["calls"]) =>
+  calls
+    .filter((call) => call.path === "/api/sync/push")
+    .map((call) => call.body as { events: readonly Event[]; storeId: string })
+    .map(({ events, storeId }) => ({ ids: events.map((event) => event.id), storeId }));
 
 describe("createSyncClient push", () => {
   it("pushes pending events in batches of 200, marks accepted and keeps rejected", async () => {
@@ -133,6 +159,22 @@ describe("createSyncClient pull", () => {
     await expect(store.listPending()).resolves.toEqual([]);
   });
 
+  it("keeps a pulled event whose server-made id is longer than 64 characters", async () => {
+    // An edited series's instance is `rep:<series>:<revision>:<n>`; its missed outcome nests it.
+    const id = `auto:rep:01ARZ3NDEKTSV4RRFFQ69G5FAA:01ARZ3NDEKTSV4RRFFQ69G5FAB:12:missed`;
+    expect(id.length).toBeGreaterThan(64);
+    const { state, sync } = await setup({
+      "GET /api/sync/pull": () => ({
+        events: [{ ...settingsEvent(id, at(9), { language: "ru" }), source: "system" }],
+        more: false,
+        seq: 1,
+        storeId: STORE_ID,
+      }),
+    });
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
+    expect(state.store.getState().settings.language).toBe("ru");
+  });
+
   it("skips pulled events that fail validation and still advances", async () => {
     const { state, store, sync } = await setup({
       "GET /api/sync/pull": () => ({
@@ -199,6 +241,7 @@ describe("createSyncClient store id", () => {
     );
     await store.setStoreId(STORE_ID);
     await store.setCursor(9);
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
     await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 0 } });
     // The old outbox never reaches the fresh store.
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(0);
@@ -273,6 +316,7 @@ describe("createSyncClient store id", () => {
     });
     await store.setStoreId(STORE_ID);
     await store.setCursor(9);
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
     const run = sync.syncNow();
     // Written on the old copy while the server's answer (a new store) is on its way.
     await state.dispatch({
@@ -290,18 +334,262 @@ describe("createSyncClient store id", () => {
   });
 });
 
+describe("createSyncClient: a write while the first pull is under way (QA round 17 decision 3)", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+  const later = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAB", at(9, 1), { language: "ru" });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** The app's change written while a pull is held: a time-zone pick, on the empty copy. */
+  const writeDuring = async (state: AppStateHandle): Promise<string> => {
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: { timezone: "Europe/Berlin" },
+      type: "settings.updated",
+    });
+    return state.store.getState().events.at(-1)?.id ?? "";
+  };
+
+  it("keeps a write made while the first pull is held and pushes it after, naming the confirmed store", async () => {
+    const held = Promise.withResolvers<null>();
+    const { calls, state, store, sync } = await setup({
+      "GET /api/sync/pull": async ({ url }) => {
+        if (url.searchParams.get("since") === "0") {
+          await held.promise;
+          return { events: [remote], more: false, seq: 1, storeId: STORE_ID };
+        }
+        return { ...EMPTY_PAGE, seq: 2 };
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    await expect(store.getStoreId()).resolves.toBeNull();
+    const run = sync.syncNow();
+    const written = await writeDuring(state);
+    held.resolve(null);
+
+    await expect(run).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 1 } });
+    expect(pushesOf(calls)).toEqual([{ ids: [written], storeId: STORE_ID }]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(state.store.getState().events.map((event) => event.id)).toEqual(
+      expect.arrayContaining([remote.id, written]),
+    );
+  });
+
+  it("keeps it too when the sync timeout cuts the first pull midway, and the next run carries on", async () => {
+    vi.useFakeTimers();
+    let isCut = true;
+    const sinces: (null | string)[] = [];
+    const fake = createFakeFetch({
+      "GET /api/sync/pull": async ({ url }) => {
+        const since = url.searchParams.get("since");
+        sinces.push(since);
+        if (since === "0") {
+          return { events: [remote], more: true, seq: 1, storeId: STORE_ID };
+        }
+        if (since === "1" && isCut) {
+          // The second page never comes: the connection stalls until the run gives up.
+          await new Promise(() => undefined);
+        }
+        return since === "1"
+          ? { events: [later], more: false, seq: 2, storeId: STORE_ID }
+          : { ...EMPTY_PAGE, seq: 3 };
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // As a platform fetch does, an abort rejects the request however far it got.
+      fetch: async (input, init) =>
+        await Promise.race([
+          fake.fetch(input, init),
+          new Promise<never>((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }),
+        ]),
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+
+    const first = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(0);
+    const written = await writeDuring(state);
+    await vi.advanceTimersByTimeAsync(HTTP_SYNC_TIMEOUT_MS);
+    await expect(first).resolves.toEqual({ error: "sync request timed out", ok: false });
+    expect(pushesOf(fake.calls)).toEqual([]);
+    // The first page was kept: its store is confirmed and the cursor stands after it.
+    await expect(store.getStoreId()).resolves.toBe(STORE_ID);
+    await expect(store.getCursor()).resolves.toBe(1);
+    await expect(store.listPending()).resolves.toHaveLength(1);
+
+    isCut = false;
+    await expect(sync.syncNow()).resolves.toEqual({ ok: true, value: { pulled: 1, pushed: 1 } });
+    // Carried on from the first page's cursor: nothing pulled twice, nothing dropped.
+    expect(sinces).toEqual(["0", "1", "1", "2"]);
+    expect(pushesOf(fake.calls)).toEqual([{ ids: [written], storeId: STORE_ID }]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(state.store.getState().events.map((event) => event.id)).toEqual(
+      expect.arrayContaining([remote.id, later.id, written]),
+    );
+  });
+});
+
+describe("createSyncClient after an update that reads more of the log", () => {
+  const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { language: "ru" });
+  // Older clients refused ids past 64 characters and moved their cursor past such events.
+  const longId = `auto:rep:01ARZ3NDEKTSV4RRFFQ69G5FAA:01ARZ3NDEKTSV4RRFFQ69G5FAB:12:missed`;
+  const skipped = { ...settingsEvent(longId, at(10), { timezone: "UTC" }), source: "system" };
+
+  /** A store as an installed client left it: pulled up to 500, one change not yet sent. */
+  const upgradedStore = async () => {
+    const store = createMemoryEventStore();
+    await store.append([remote]);
+    await store.markSynced([remote.id]);
+    const [outbox] = localEvents(1);
+    await store.append(outbox === undefined ? [] : [outbox]);
+    await store.setStoreId(STORE_ID);
+    await store.setCursor(500);
+    return { outbox, store };
+  };
+
+  it("re-pulls from 0 once, keeps and sends its outbox, and pulls from its cursor after that", async () => {
+    const { outbox, store } = await upgradedStore();
+    const sinces: (null | string)[] = [];
+    const pushed: string[] = [];
+    const routes: Readonly<Record<string, FakeRoute>> = {
+      "GET /api/sync/pull": ({ url }) => {
+        const since = url.searchParams.get("since");
+        sinces.push(since);
+        return since === "0"
+          ? { events: [remote, skipped], more: false, seq: 501, storeId: STORE_ID }
+          : { ...EMPTY_PAGE, seq: Number(since) };
+      },
+      "POST /api/sync/push": (request) => {
+        const { events } = request.body as { events: readonly Event[] };
+        pushed.push(...events.map((event) => event.id));
+        return acceptAll(request);
+      },
+    };
+    const first = await started(store, routes);
+    await expect(first.sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
+    expect(sinces).toEqual(["0", "501"]);
+    expect(pushed).toEqual([outbox?.id]);
+    await expect(store.listPending()).resolves.toEqual([]);
+    expect(first.state.store.getState().settings).toMatchObject({
+      language: "ru",
+      timezone: "UTC",
+    });
+    await expect(store.getCursor()).resolves.toBe(501);
+    // The next start pulls from where it stopped.
+    const next = await started(store, routes);
+    await next.sync.syncNow();
+    expect(sinces).toEqual(["0", "501", "501"]);
+    expect(next.state.store.getState().settings.timezone).toBe("UTC");
+  });
+
+  it("does not re-pull again after its store was reset and pulled from 0", async () => {
+    const { store } = await upgradedStore();
+    await store.setSyncVersion(SYNC_SCHEMA_VERSION);
+    const sinces: (null | string)[] = [];
+    const routes: Readonly<Record<string, FakeRoute>> = {
+      "GET /api/sync/pull": ({ url }) => {
+        const since = url.searchParams.get("since");
+        sinces.push(since);
+        return since === "0"
+          ? { events: [remote], more: false, seq: 3, storeId: "store-b" }
+          : { ...EMPTY_PAGE, seq: Number(since), storeId: "store-b" };
+      },
+      "POST /api/sync/push": acceptAll,
+    };
+    await (await started(store, routes)).sync.syncNow();
+    expect(sinces).toEqual(["500", "0"]);
+    await (await started(store, routes)).sync.syncNow();
+    expect(sinces).toEqual(["500", "0", "3"]);
+  });
+});
+
 describe("createSyncClient scheduling", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("does not overlap runs", async () => {
+  it("starts its loop without a second run right after one that just synced everything (QA 20 L9)", async () => {
+    vi.useFakeTimers();
+    const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+    await sync.syncNow();
+    const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+    const before = pulls();
+    sync.start({ intervalMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(pulls()).toBe(before);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(pulls()).toBe(before + 1);
+    sync.stop();
+  });
+
+  it("keeps a soon() asked right after start, before the first tick was placed (round 7 review 6)", async () => {
+    vi.useFakeTimers();
+    const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+    await sync.syncNow();
+    const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+    const before = pulls();
+    sync.start({ intervalMs: 30_000 });
+    sync.soon();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(pulls()).toBe(before + 1);
+    sync.stop();
+  });
+
+  it("starts at once when something was written since that run, or when it failed", async () => {
+    vi.useFakeTimers();
+    const network = { isDown: true };
+    const { calls, state, sync } = await setup({
+      "GET /api/sync/pull": () => {
+        if (network.isDown) {
+          throw new TypeError("Failed to fetch");
+        }
+        return EMPTY_PAGE;
+      },
+      "POST /api/sync/push": acceptAll,
+    });
+    const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+    await sync.syncNow();
+    network.isDown = false;
+    sync.start({ intervalMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(pulls()).toBe(2);
+    sync.stop();
+    await sync.syncNow();
+    // A write after the last run (the bootstrap's time zone): the loop's first tick sends it.
+    await state.dispatch({
+      occurredAt: NOW,
+      payload: { language: "ru" },
+      type: "settings.updated",
+    });
+    sync.start({ intervalMs: 30_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(1);
+    sync.stop();
+  });
+
+  it("does not overlap runs; calls made during one share the run after it (E1)", async () => {
     const gate = Promise.withResolvers<boolean>();
+    let open = 0;
+    let most = 0;
     const { calls, sync } = await setup(
       {
         "GET /api/sync/pull": noPull,
         "POST /api/sync/push": async ({ body }) => {
+          open += 1;
+          most = Math.max(most, open);
           await gate.promise;
+          open -= 1;
           return acceptAll({ body, url: new URL("https://api.test") });
         },
       },
@@ -309,13 +597,78 @@ describe("createSyncClient scheduling", () => {
     );
     const first = sync.syncNow();
     const second = sync.syncNow();
+    const third = sync.syncNow();
     expect(sync.status.getState().syncing).toBe(true);
     gate.resolve(true);
-    await expect(Promise.all([first, second])).resolves.toEqual([
+    await expect(Promise.all([first, second, third])).resolves.toEqual([
       { ok: true, value: { pulled: 0, pushed: 1 } },
-      { ok: true, value: { pulled: 0, pushed: 1 } },
+      // The run after it, shared: the outbox read afresh holds nothing more.
+      { ok: true, value: { pulled: 0, pushed: 0 } },
+      { ok: true, value: { pulled: 0, pushed: 0 } },
     ]);
     expect(calls.filter((call) => call.path === "/api/sync/push")).toHaveLength(1);
+    // The first run's pull, its pull after the push, and the shared run's one pull.
+    expect(calls.filter((call) => call.path === "/api/sync/pull")).toHaveLength(3);
+    expect(most).toBe(1);
+  });
+
+  it("drops the run a call made during a run was waiting for, once the sync is stopped (fix round 5 V3)", async () => {
+    // Signed out while a run was under way: the run after it would go out with no token (a 401).
+    const gate = Promise.withResolvers<null>();
+    const { calls, sync } = await setup(
+      {
+        "GET /api/sync/pull": async () => {
+          await gate.promise;
+          return { events: [], more: false, seq: 0, storeId: FAKE_STORE_ID };
+        },
+      },
+      [],
+    );
+    sync.start({ intervalMs: 30_000 });
+    await vi.waitFor(() => {
+      expect(calls).toHaveLength(1);
+    });
+    const waiting = sync.syncNow();
+    sync.stop();
+    gate.resolve(null);
+    await expect(waiting).resolves.toEqual({ error: "stopped", ok: false });
+    expect(calls).toHaveLength(1);
+    // A call made after the stop runs as ever (a sign-in's first sync comes before the loop).
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+  });
+
+  it("sends a write made while a run pushes when a call made after it settles (E1)", async () => {
+    const gate = Promise.withResolvers<null>();
+    let isFirst = true;
+    const { calls, state, sync } = await setup(
+      {
+        "GET /api/sync/pull": noPull,
+        "POST /api/sync/push": async ({ body, url }) => {
+          if (isFirst) {
+            isFirst = false;
+            await gate.promise;
+          }
+          return acceptAll({ body, url });
+        },
+      },
+      localEvents(1),
+    );
+    const first = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(pushesOf(calls)).toHaveLength(1);
+    });
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: { timezone: "Europe/Berlin" },
+      type: "settings.updated",
+    });
+    const written = state.store.getState().events.at(-1)?.id ?? "";
+    // The app leaving (a hidden tab): what is unsent goes now.
+    const leaving = sync.syncNow();
+    gate.resolve(null);
+    await first;
+    await expect(leaving).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
+    expect(pushesOf(calls).at(-1)?.ids).toEqual([written]);
   });
 
   it("backs off exponentially on failure and returns to the interval on success", async () => {
@@ -400,6 +753,45 @@ describe("createSyncClient soon", () => {
     sync.stop();
   });
 
+  it("sends a change made while a run is pushing right after that run, not at the next interval (E1)", async () => {
+    // CI run 41380865441: a task written while a push hung on a socket gone quiet joined that
+    // run, whose outbox was already listed, and waited for the next interval.
+    vi.useFakeTimers();
+    const gate = Promise.withResolvers<null>();
+    let isFirst = true;
+    const { calls, state, sync } = await setup(
+      {
+        "GET /api/sync/pull": noPull,
+        "POST /api/sync/push": async ({ body, url }) => {
+          if (isFirst) {
+            isFirst = false;
+            await gate.promise;
+          }
+          return acceptAll({ body, url });
+        },
+      },
+      localEvents(1),
+    );
+    sync.start({ intervalMs: 300_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pushesOf(calls)).toHaveLength(1);
+    await state.dispatch({
+      occurredAt: at(10),
+      payload: { timezone: "Europe/Berlin" },
+      type: "settings.updated",
+    });
+    const written = state.store.getState().events.at(-1)?.id ?? "";
+    sync.soon();
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    gate.resolve(null);
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    expect(pushesOf(calls).map((push) => push.ids)).toEqual([
+      [expect.any(String) as string],
+      [written],
+    ]);
+    sync.stop();
+  });
+
   it("takes a new interval at once (live channel up: rarely; down: often)", async () => {
     vi.useFakeTimers();
     const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
@@ -428,6 +820,8 @@ const setupLive = async (
   server.options.speaksV2 = options.speaksV2 ?? true;
   server.append(options.seed ?? []);
   const fake = createFakeFetch({ ...server.routes, "GET /api/me": () => fakeMe });
+  /** `isDown`: the server is gone (stopped, or the network to it): every HTTP call fails to connect. */
+  const network = { isDown: false };
   const session = createMemorySessionStore();
   await session.set("tok");
   const store = createMemoryEventStore();
@@ -435,7 +829,12 @@ const setupLive = async (
     baseUrl: "https://api.test",
     createSocket: server.createSocket,
     deviceId: "dev-1",
-    fetch: fake.fetch,
+    fetch: async (input, init) => {
+      if (network.isDown) {
+        throw new TypeError("Failed to fetch");
+      }
+      return await fake.fetch(input, init);
+    },
     now: () => NOW,
     session,
     source: "web",
@@ -455,7 +854,7 @@ const setupLive = async (
     }
     return await store.listPending();
   };
-  return { client, fake, server, socket, store, write };
+  return { client, fake, network, server, socket, store, write };
 };
 
 const via = (transport: FakeRequest["transport"], ...types: FakeRequest["type"][]): FakeRequest[] =>
@@ -527,6 +926,69 @@ describe("createSyncClient over the live socket", () => {
       client.live.stop();
     },
   );
+
+  it("says offline soon after the socket drops while the server is gone, without a storm (QA 18 M4)", async () => {
+    vi.useFakeTimers();
+    const { client, fake, network, server, socket } = await setupLive();
+    // The safety poll while the socket is down; an idle tab writes nothing to send.
+    client.sync.start({ intervalMs: 30_000 });
+    // A tab left open: its socket has been up a while (a socket cut at once is a flapping link).
+    await vi.advanceTimersByTimeAsync(STABLE_MS);
+    expect(client.sync.status.getState().online).toBe(true);
+
+    network.isDown = true;
+    socket.drop();
+    await vi.advanceTimersByTimeAsync(2 * SOON_MS);
+    expect(client.sync.status.getState().online).toBe(false);
+
+    // The retries keep their backoff (1 s doubling): no run for every failed reconnect.
+    const before = fake.pathsCalled("/api/sync").length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fake.pathsCalled("/api/sync").length - before).toBeLessThanOrEqual(6);
+
+    // Back: the socket opens again, its catch-up run succeeds and the line can clear.
+    network.isDown = false;
+    server.connect();
+    await vi.advanceTimersByTimeAsync(2 * SOON_MS);
+    expect(client.sync.status.getState().online).toBe(true);
+    client.sync.stop();
+    client.live.stop();
+  });
+
+  it("backs off a socket that opens and is cut at once, without a pull for every cut (fix round 5 V2)", async () => {
+    vi.useFakeTimers();
+    const { client, fake, server } = await setupLive();
+    // Wired as the app wires it: the safety poll follows the socket (rare while up, 30 s while down).
+    client.sync.start({ intervalMs: 30_000 });
+    const stopFollowing = client.live.status.subscribe(({ isConnected }) => {
+      client.sync.setInterval(isConnected ? 300_000 : 30_000);
+    });
+    await vi.advanceTimersByTimeAsync(SOON_MS);
+    const pullsBefore = fake.pathsCalled("/api/sync").length;
+    const opensBefore = server.sockets.length;
+    // A flapping link for a minute: every socket the client opens gets in, and is cut 100 ms on.
+    let seen = server.sockets.at(-1);
+    for (let step = 0; step < 600; step += 1) {
+      const latest = server.sockets.at(-1);
+      if (latest !== seen) {
+        seen = latest;
+        server.connect();
+        await vi.advanceTimersByTimeAsync(100);
+        latest?.drop();
+      } else if (step === 0) {
+        latest?.drop();
+      }
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    const opens = server.sockets.length - opensBefore;
+    const pulls = fake.pathsCalled("/api/sync").length - pullsBefore;
+    // Reconnects after 1, 2, 4, 8, 16, 32 s (not every second), and no run for each short life.
+    expect(opens).toBeLessThanOrEqual(7);
+    expect(pulls).toBeLessThanOrEqual(8);
+    stopFollowing();
+    client.sync.stop();
+    client.live.stop();
+  });
 
   it("applies a page the server sends unasked when it continues the cursor, without a pull", async () => {
     vi.useFakeTimers();
@@ -647,5 +1109,250 @@ describe.each([
     );
     await expectOnlyTheFreshStore(context, { events: [remote], storeId: "store-b" });
     client.live.stop();
+  });
+});
+
+describe("createSyncClient's offline flag (QA round 17 review m3, I2)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("calls a run offline only when the server could not be reached", async () => {
+    const drift = await setup({ "GET /api/sync/pull": () => ({ events: "not a page" }) });
+    await drift.sync.syncNow();
+    expect(drift.sync.status.getState()).toMatchObject({ online: true, syncing: false });
+    expect(drift.sync.status.getState().lastError).not.toBeNull();
+
+    const store = createMemoryEventStore();
+    const full: EventStore = {
+      ...store,
+      append: async () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      },
+    };
+    const quota = await started(full, {
+      "GET /api/sync/pull": () => ({
+        events: [settingsEvent(newId(), at(9), { language: "ru" })],
+        more: false,
+        seq: 1,
+        storeId: STORE_ID,
+      }),
+    });
+    await quota.sync.syncNow();
+    expect(quota.sync.status.getState()).toMatchObject({
+      lastError: "The quota has been exceeded.",
+      online: true,
+    });
+
+    const unreachable = await setup({
+      "GET /api/sync/pull": () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    await unreachable.sync.syncNow();
+    expect(unreachable.sync.status.getState()).toMatchObject({
+      lastError: "Failed to fetch",
+      online: false,
+    });
+  });
+
+  it("calls a connection cut while a pull's body is read offline (round-3 review m-b)", async () => {
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      fetch: async () =>
+        ({
+          json: async () => {
+            throw new TypeError("network error");
+          },
+          ok: true,
+          status: 200,
+        }) as unknown as Response,
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: false });
+    expect(sync.status.getState()).toMatchObject({
+      lastError: "network error",
+      online: false,
+      syncing: false,
+    });
+  });
+
+  it("gives up on a pull whose body stalls midway, at the sync timeout", async () => {
+    vi.useFakeTimers();
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // The headers came; the body never ends until the caller aborts.
+      fetch: async (_input, init) =>
+        ({
+          json: async () =>
+            await new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => {
+                reject(new DOMException("The operation was aborted.", "AbortError"));
+              });
+            }),
+          ok: true,
+          status: 200,
+        }) as unknown as Response,
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+    const run = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(HTTP_SYNC_TIMEOUT_MS);
+    await expect(run).resolves.toMatchObject({ ok: false });
+    expect(sync.status.getState()).toMatchObject({
+      lastError: "sync request timed out",
+      online: false,
+      syncing: false,
+    });
+  });
+
+  it("gives up on an HTTP call that never answers, so a run cannot hold `syncing` for good", async () => {
+    vi.useFakeTimers();
+    const store = createMemoryEventStore();
+    const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+    await state.ready;
+    const signals: AbortSignal[] = [];
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      // A connection that stalls: no answer until the caller aborts.
+      fetch: async (_input, init) =>
+        await new Promise<Response>((_resolve, reject) => {
+          const { signal } = init;
+          if (signal === null || signal === undefined) {
+            return;
+          }
+
+          signals.push(signal);
+          signal.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }),
+      token: () => "t",
+    });
+    const sync = createSyncClient({ now: () => NOW, state, store, transport: httpTransport(api) });
+    const run = sync.syncNow();
+    await vi.advanceTimersByTimeAsync(HTTP_SYNC_TIMEOUT_MS - 1);
+    expect(sync.status.getState().syncing).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(run).resolves.toMatchObject({ ok: false });
+    expect(signals).toHaveLength(1);
+    expect(sync.status.getState()).toMatchObject({ online: false, syncing: false });
+  });
+});
+
+describe("createSyncClient hold (round 6: ending this device's own session)", () => {
+  it("waits for the run in flight, then sends nothing until it is released", async () => {
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>((resolve) => {
+      gate.open = resolve;
+    });
+    const { calls, sync } = await setup(
+      {
+        "GET /api/sync/pull": async () => {
+          await held;
+          return EMPTY_PAGE;
+        },
+        "POST /api/sync/push": acceptAll,
+      },
+      localEvents(1),
+    );
+    const inFlight = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(calls).toHaveLength(1);
+    });
+    const holding = sync.hold();
+    const hold = { isInPlace: false };
+    void (async () => {
+      await holding;
+      hold.isInPlace = true;
+    })();
+    await Promise.resolve();
+    // The run in flight goes on (its pull, then its push) before the hold is in place.
+    expect(hold.isInPlace).toBe(false);
+    gate.open?.();
+    await inFlight;
+    const release = await holding;
+    const sent = calls.length;
+    sync.start({ intervalMs: 1000 });
+    sync.soon();
+    await expect(sync.syncNow()).resolves.toEqual({ error: "stopped", ok: false });
+    expect(calls).toHaveLength(sent);
+    expect(sync.status.getState().lastError).toBeNull();
+    sync.stop();
+    release();
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+  });
+  it("keeps its loop waiting while held, without ticking, and runs it at once on release (round 7 review 8)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+      const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+      sync.start({ intervalMs: 30_000 });
+      await vi.advanceTimersByTimeAsync(100);
+      const release = await sync.hold();
+      const before = pulls();
+      const timeouts = vi.spyOn(globalThis, "setTimeout");
+      // Held past the loop's tick: it waits, no timer re-armed every half second, nothing sent.
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(pulls()).toBe(before);
+      expect(timeouts).not.toHaveBeenCalled();
+      timeouts.mockRestore();
+      release();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(pulls()).toBe(before + 1);
+      sync.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("lets go of a hold nobody released after a while: sync cannot stay held for good (round 7 review 2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, sync } = await setup({ "GET /api/sync/pull": noPull });
+      const pulls = () => calls.filter((call) => call.path === "/api/sync/pull").length;
+      sync.start({ intervalMs: 30_000 });
+      await vi.advanceTimersByTimeAsync(100);
+      await sync.hold();
+      const before = pulls();
+      await vi.advanceTimersByTimeAsync(HOLD_MAX_MS + 100);
+      expect(pulls()).toBe(before + 1);
+      await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+      sync.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not wait for good for a run in flight that never ends", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = {
+        pull: async () => await new Promise<never>(() => undefined),
+        push: async () => await new Promise<never>(() => undefined),
+      };
+      const store = createMemoryEventStore();
+      const state = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });
+      await state.ready;
+      const sync = createSyncClient({ now: () => NOW, state, store, transport });
+      void sync.syncNow();
+      const holding = sync.hold();
+      const hold = { isInPlace: false };
+      void (async () => {
+        await holding;
+        hold.isInPlace = true;
+      })();
+      await vi.advanceTimersByTimeAsync(HOLD_WAIT_MS);
+      expect(hold.isInPlace).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

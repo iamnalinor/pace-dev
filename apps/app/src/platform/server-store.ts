@@ -78,8 +78,16 @@ export const markClientOutdated = (origin: string): void => {
 
 /** Where the current server's pieces live, as the screens show and use them. */
 export type ServerInfo = {
-  /** The API (the desktop agent's `--api`). */
+  /** The API as this device reaches it (the desktop agent's `--api`: bearer tokens, any address). */
   readonly apiOrigin: string;
+  /**
+  The MCP URL to hand an AI app: the server's own public API (`instance.apiOrigin`), since its
+  OAuth resource is `<API_ORIGIN>/mcp` and an MCP client refuses tokens for any other; the address
+  in use until the server has answered.
+  */
+  readonly mcpUrl: string;
+  /** The server names another public address than the one this device uses (Connect says so). */
+  readonly isPublicOriginOther: boolean;
   /** The Telegram bot of the web login widget. */
   readonly botUsername: string;
   /** The web app (the desktop agent is downloaded from it); the build's while unknown. */
@@ -97,7 +105,13 @@ export const serverInfoOf = ({ instance, origin }: ServerState): ServerInfo => {
   const buildWeb = isBuildServer(origin) ? WEB_ORIGIN : null;
   const ownWeb = instance === null ? buildWeb : instance.webOrigin;
   return {
-    apiOrigin: instance?.apiOrigin ?? origin,
+    // The origin this app reaches the server at, not the one the server says it has: a Worker
+    // started with another port or host than its `API_ORIGIN` names a dead address (QA round 18
+    // L10), and the one in use is known to answer. Not for MCP: its OAuth resource is bound to
+    // `API_ORIGIN` (`mcpUrl`, round 7 review 1).
+    apiOrigin: origin,
+    isPublicOriginOther: instance !== null && instance.apiOrigin !== origin,
+    mcpUrl: `${instance?.apiOrigin ?? origin}/mcp`,
     botUsername: instance?.botUsername ?? TELEGRAM_BOT,
     loginWebOrigin: ownWeb,
     webOrigin: ownWeb ?? WEB_ORIGIN,

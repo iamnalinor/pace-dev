@@ -19,7 +19,8 @@ const CLIENTS: readonly { readonly name: MessageKey; readonly steps: MessageKey 
 ];
 
 /**
-"Connect an AI app": the current server's MCP URL (its own API, not the build's) to copy, and
+"Connect an AI app": the current server's MCP URL (its own public API, not the build's nor
+the address this device reaches it at, when those differ: said in a line) to copy, and
 where Claude, ChatGPT and any other MCP client with OAuth take it. The app then signs in on
 Pace's consent page and shows up in Devices and sessions.
 */
@@ -31,12 +32,13 @@ export const ConnectAiSheet = ({
   readonly onClose: () => void;
 }) => {
   const t = useT();
-  const { apiOrigin } = useServerInfo();
-  const url = `${apiOrigin}/mcp`;
+  // The server's public API, its OAuth resource (round 7 review 1), not the address in use.
+  const { isPublicOriginOther, mcpUrl: url } = useServerInfo();
   const [isCopied, setIsCopied] = useState(false);
   return (
     <Sheet
       closeLabel={t("common.close")}
+      name="connect-ai"
       onClose={onClose}
       title={t("connectAi.open")}
       visible={open}
@@ -47,6 +49,11 @@ export const ConnectAiSheet = ({
           {t("connectAi.url")}
         </Text>
         <CodeText>{url}</CodeText>
+        {isPublicOriginOther ? (
+          <Text className="font-sans text-[12px] leading-[17px] text-muted">
+            {t("connectAi.otherAddress")}
+          </Text>
+        ) : null}
         <Button
           onPress={() => {
             void (async () => {

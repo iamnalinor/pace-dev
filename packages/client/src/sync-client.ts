@@ -1,32 +1,38 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { err, type Event, ok, parseEvent, type Result, STORE_CHANGED } from "@pace/core";
+import { err, type Result } from "@pace/core";
 
-import type { EventStore } from "./event-store.ts";
-import type { AppStateHandle } from "./state.ts";
-import type { PullPage, SyncTransport } from "./sync-transport.ts";
+import type { PullPage } from "./sync-transport.ts";
 
-import { ApiError } from "./api-client.ts";
+import {
+  runSync,
+  shouldPullFor,
+  type SyncDeps,
+  type SyncStatus,
+  type SyncSummary,
+} from "./sync-run.ts";
+import {
+  createHolds,
+  createSerial,
+  createTimer,
+  expiringRelease,
+  type RunTimer,
+  settledWithin,
+} from "./sync-timing.ts";
 
-export type SyncStatus = {
-  /** False after a transport failure (no network), true again after any response. */
-  readonly online: boolean;
-  readonly syncing: boolean;
-  readonly lastError: null | string;
-  readonly lastSyncAt: null | string;
-};
-
-export type SyncSummary = { readonly pulled: number; readonly pushed: number };
+export type { SyncStatus, SyncSummary } from "./sync-run.ts";
 
 export type SyncClient = {
   readonly status: StoreApi<SyncStatus>;
   /**
   Pull since the cursor (confirming the server store's id), push the outbox, then pull what
-  the push made. Concurrent calls share one run.
+  the push made. Runs never overlap: a call made while one is under way gets the run after it
+  (shared by every call made meanwhile), so what was written before the call goes out.
   */
   readonly syncNow: () => Promise<Result<SyncSummary, string>>;
   /** Runs now, then every `intervalMs`; failures retry with exponential backoff (1s..60s). */
   readonly start: (options: { readonly intervalMs: number }) => void;
+  /** Ends the loop; a call still waiting for the run after the one in flight gets `stopped`. */
   readonly stop: () => void;
   /** A local change or a server's "changed": a run within a second, a burst making one. */
   readonly soon: () => void;
@@ -38,250 +44,82 @@ export type SyncClient = {
   page the log already holds (one that waited for a run to finish) changes nothing.
   */
   readonly ingestLive: (page: PullPage) => Promise<void>;
+  /**
+  Lets the run in flight finish (waited for at most `HOLD_WAIT_MS`), then starts none (every call
+  gets `stopped`, the loop waits without ticking) until the returned `release`, or `HOLD_MAX_MS`
+  at the latest: nothing goes out while this device ends its own session (a request sent once
+  the server ended it would answer 401; round 6). The loop runs at once on release.
+  */
+  readonly hold: () => Promise<() => void>;
 };
+
+/** What a call waiting for the run after the one in flight gets when the sync stopped meanwhile. */
+export const SYNC_STOPPED = "stopped";
 
 /** How long a burst of changes may gather before it is sent. */
 export const SOON_MS = 800;
 
-const PUSH_BATCH = 200;
-const PULL_LIMIT = 200;
+/**
+How long a hold waits for the run in flight: a run whose request hangs (each has its own timeout,
+but a transport may not keep it) does not keep the device's own sign-out waiting for good.
+*/
+export const HOLD_WAIT_MS = 5000;
+
+/**
+How long a hold lasts at most: one its holder never releases (a request that hung past every
+deadline, a screen gone) lets go on its own, so sync cannot stay held for good (round 7 review 2).
+*/
+export const HOLD_MAX_MS = 60_000;
+
 const BACKOFF_MIN_MS = 1000;
 const BACKOFF_MAX_MS = 60_000;
-
-const chunk = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
-    items.slice(index * size, (index + 1) * size),
-  );
-
-const describe = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
-
-/**
-Drops the local copy because the server's store changed: the log, its outbox and the cursor
-go, the new id (when known) is kept, and the state is rebuilt empty. What was written while
-this happened goes with it, deliberately: it was written on a copy that no longer exists.
-*/
-type Reset = (storeId: null | string) => Promise<void>;
-
-/** One run's reset: a second change within the same run stops it, and the next run retries. */
-const createReset = (store: EventStore, state: AppStateHandle): Reset => {
-  let isUsed = false;
-  return async (storeId) => {
-    if (isUsed) {
-      throw new ApiError(409, STORE_CHANGED, STORE_CHANGED);
-    }
-    isUsed = true;
-    await store.clear();
-    if (storeId !== null) {
-      await store.setStoreId(storeId);
-    }
-    await state.rematerialize();
-  };
-};
-
-type Pushed = {
-  readonly pushed: number;
-  readonly rejected: readonly string[];
-  /** The server refused the outbox for a store it no longer has: the copy was dropped. */
-  readonly isReset: boolean;
-};
-
-/**
-What one sync run works with: the transport (whichever carries each call, see
-`sync-transport.ts`), the local copy and its one reset.
-*/
-type Run = {
-  readonly transport: SyncTransport;
-  readonly reset: Reset;
-  readonly state: AppStateHandle;
-  readonly store: EventStore;
-};
-
-/** Pushes the outbox into the store the pull confirmed, and only into that one. */
-const pushOutbox = async ({ reset, store, transport }: Run): Promise<Pushed> => {
-  let pushed = 0;
-  const rejected: string[] = [];
-  const storeId = await store.getStoreId();
-  const batches = storeId === null ? [] : chunk(await store.listPending(), PUSH_BATCH);
-  for (const batch of batches) {
-    const result = await transport.push(batch, storeId ?? "");
-    if (result === STORE_CHANGED) {
-      await reset(null);
-      return { isReset: true, pushed, rejected };
-    }
-    await store.markSynced(result.accepted);
-    pushed += result.accepted.length;
-    rejected.push(...result.rejected.map((item) => `${item.id} (${item.reason})`));
-  }
-  return { isReset: false, pushed, rejected };
-};
-
-const validEvents = (items: readonly unknown[]): readonly Event[] =>
-  items.flatMap((item) => {
-    const parsed = parseEvent(item);
-    return parsed.ok ? [parsed.value] : [];
-  });
-
-/**
-Whether a page comes from the server store the local log belongs to. The first pull of an
-empty cursor adopts the store's id. A different id (or a log pulled before ids existed)
-means the server's data was reset: the local copy is dropped (see `Reset`).
-*/
-const isSameStore = async (
-  store: EventStore,
-  reset: Reset,
-  page: { readonly since: number; readonly storeId: string },
-): Promise<boolean> => {
-  const known = await store.getStoreId();
-  if (known === page.storeId) {
-    return true;
-  }
-  if (known === null && page.since === 0) {
-    await store.setStoreId(page.storeId);
-    return true;
-  }
-  await reset(page.storeId);
-  return false;
-};
-
-/**
-Applies one page of the server's log: the pull's pages and the live socket's alike. A page of
-another store drops the local copy instead (`null`); otherwise its valid events go in and the
-cursor moves to its `seq`.
-*/
-const applyPage = async (
-  { reset, state, store }: Run,
-  page: PullPage,
-): Promise<null | readonly Event[]> => {
-  if (!(await isSameStore(store, reset, page))) {
-    return null;
-  }
-  const events = validEvents(page.events);
-  await state.ingest(events);
-  await store.setCursor(page.seq);
-  return events;
-};
-
-const pullSince = async (run: Run): Promise<number> => {
-  let pulled = 0;
-  let isMore = true;
-  while (isMore) {
-    const page = await run.transport.pull(await run.store.getCursor(), PULL_LIMIT);
-    const events = await applyPage(run, page);
-    if (events === null) {
-      // Dropped: start again from the fresh store's first event.
-      pulled = 0;
-      continue;
-    }
-    pulled += events.length;
-    isMore = page.more;
-  }
-  return pulled;
-};
-
-/**
-How a page the server sent unasked fits the local log: `apply` when it continues the cursor of
-the same store, `known` when the log already reaches past it, `pull` otherwise.
-*/
-const fitOf = async (store: EventStore, page: PullPage): Promise<"apply" | "known" | "pull"> => {
-  const storeId = await store.getStoreId();
-  const cursor = await store.getCursor();
-  if (storeId !== page.storeId) {
-    return "pull";
-  }
-  if (page.seq <= cursor) {
-    return "known";
-  }
-  return page.since === cursor && !page.more ? "apply" : "pull";
-};
-
-type SyncDeps = {
-  readonly transport: SyncTransport;
-  readonly now: () => string;
-  readonly state: AppStateHandle;
-  readonly store: EventStore;
-};
-
-const runSync = async (
-  deps: SyncDeps,
-  status: StoreApi<SyncStatus>,
-): Promise<Result<SyncSummary, string>> => {
-  const { now, state, store, transport } = deps;
-  try {
-    await state.ready;
-    const run: Run = { reset: createReset(store, state), state, store, transport };
-    // The pull goes first: it confirms the store id, so an outbox meant for a store that
-    // was reset since is dropped instead of landing in the fresh one (the push names the
-    // store too, for a reset between the two).
-    const before = await pullSince(run);
-    const { isReset, pushed, rejected } = await pushOutbox(run);
-    // What the server derived from the pushed events comes back at once; after a refused
-    // push the fresh store's log is pulled from the start.
-    const after = isReset || pushed > 0 ? await pullSince(run) : 0;
-    const pulled = (isReset ? 0 : before) + after;
-    status.setState({
-      lastError: rejected.length === 0 ? null : `push rejected: ${rejected.join(", ")}`,
-      lastSyncAt: now(),
-      online: true,
-      syncing: false,
-    });
-    return ok({ pulled, pushed });
-  } catch (error) {
-    status.setState({
-      lastError: describe(error),
-      online: error instanceof ApiError,
-      syncing: false,
-    });
-    return err(describe(error));
-  }
-};
 
 const backoffMs = (failures: number): number =>
   Math.min(BACKOFF_MIN_MS * 2 ** (failures - 1), BACKOFF_MAX_MS);
 
-/** One pending run at a time: when it is due, and moving it earlier or later. */
-const createTimer = (run: () => void) => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let dueAt: number | undefined;
-  const cancel = (): void => {
-    clearTimeout(timer);
-    timer = undefined;
-    dueAt = undefined;
-  };
+/** How the last runs went: failures in a row (for the backoff) and when the last one succeeded. */
+const createRecord = (now: () => string) => {
+  let failures = 0;
+  let lastOkAt: null | string = null;
   return {
-    cancel,
-    /** Replaces the pending run with one in `delayMs`. */
-    in: (delayMs: number): void => {
-      cancel();
-      dueAt = Date.now() + delayMs;
-      timer = setTimeout(() => {
-        timer = undefined;
-        dueAt = undefined;
-        run();
-      }, delayMs);
+    failures: (): number => failures,
+    /** Whether the last run succeeded less than `withinMs` before `at`. */
+    isOkWithin: (at: string, withinMs: number): boolean =>
+      lastOkAt !== null && Date.parse(at) - Date.parse(lastOkAt) < withinMs,
+    note: (isOk: boolean): void => {
+      failures = isOk ? 0 : failures + 1;
+      lastOkAt = isOk ? now() : null;
     },
-    /** Whether a run is already due within `delayMs`. */
-    isDueWithin: (delayMs: number): boolean => dueAt !== undefined && dueAt <= Date.now() + delayMs,
   };
 };
 
-/** Runs tasks one after another, each after the previous one settled. */
-const createSerial = () => {
-  let tail: Promise<unknown> = Promise.resolve();
-  return async <T>(task: () => Promise<T>): Promise<T> => {
-    const previous = tail;
-    // `new Promise`, not `Promise.withResolvers`: Hermes (Android) may lack the ES2024 call.
-    let release: ((value: null) => void) | undefined;
-    tail = new Promise<null>((resolve) => {
-      release = resolve;
-    });
-    try {
-      await previous;
-      return await task();
-    } finally {
-      release?.(null);
-    }
-  };
+/**
+Where the loop's first tick goes once it starts: right after a run that synced everything (the
+signed-in start's own) it waits its interval, since a second pull of the same nothing went out a
+second later (QA round 20 L9); anything written since, or a run that failed, goes at once.
+*/
+const firstTickIn = async (
+  deps: SyncDeps,
+  isFresh: (at: string, withinMs: number) => boolean,
+  intervalMs: number,
+): Promise<number> => {
+  if (!isFresh(deps.now(), intervalMs)) {
+    return 0;
+  }
+  const pending = await deps.store.listPending();
+  return pending.length === 0 ? intervalMs : 0;
+};
+
+/**
+Settles once no run is in flight (`current` reads the one under way, if any: wrapped, since a
+getter of a promise or nothing must not become one that always answers a promise).
+*/
+const drain = async (
+  current: () => { readonly run: Promise<unknown> | undefined },
+): Promise<void> => {
+  for (let { run } = current(); run !== undefined; { run } = current()) {
+    await run;
+  }
 };
 
 /**
@@ -291,73 +129,141 @@ the run in flight, so the two never move the cursor at once.
 const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
   const serial = createSerial();
   let inFlight: Promise<Result<SyncSummary, string>> | undefined;
-  let failures = 0;
+  /** The one run that follows the run in flight, shared by every call made meanwhile. */
+  let next: Promise<Result<SyncSummary, string>> | undefined;
+  const record = createRecord(deps.now);
+  /** While any hold is in place (`hold`), no run starts. */
+  const holds = createHolds();
+  const run = async (): Promise<Result<SyncSummary, string>> => {
+    // Syncing from the call on, even while a live page is still being applied.
+    status.setState({ syncing: true });
+    inFlight = serial(async () => await runSync(deps, status));
+    try {
+      const result = await inFlight;
+      record.note(result.ok);
+      return result;
+    } finally {
+      inFlight = undefined;
+    }
+  };
+  /** Bumped by `stop`: a run waiting to follow one made before it is dropped. */
+  let epoch = 0;
+  /**
+  After the run in flight has settled (each settles to a result: `runSync` catches), unless the
+  sync was stopped meanwhile (signed out: it would go out with no token, fix round 5 V3).
+  */
+  const after = async (
+    current: Promise<unknown>,
+    queuedIn: number,
+  ): Promise<Result<SyncSummary, string>> => {
+    await current;
+    if (queuedIn !== epoch || holds.isHeld()) {
+      return err(SYNC_STOPPED);
+    }
+    next = undefined;
+    return await run();
+  };
+  /** The runs waiting to follow the one in flight are dropped; later calls run as ever. */
+  const dropWaiting = (): void => {
+    epoch += 1;
+    next = undefined;
+  };
   return {
-    failures: (): number => failures,
+    dropWaiting,
+    failures: record.failures,
+    /** Whether the last run succeeded within `withinMs` of `at` and none is under way. */
+    isFresh: (at: string, withinMs: number): boolean =>
+      inFlight === undefined && record.isOkWithin(at, withinMs),
+    /** Holds: runs waiting drop, the one in flight is waited for, `HOLD_WAIT_MS` at most. */
+    hold: async (): Promise<() => void> => {
+      const release = holds.add();
+      dropWaiting();
+      const drained = drain(() => ({ run: inFlight }));
+      await settledWithin(drained, HOLD_WAIT_MS);
+      return release;
+    },
+    isHeld: holds.isHeld,
     /** Applies a live page that fits; true when a pull is needed instead. */
     ingestLive: async (page: PullPage): Promise<boolean> =>
-      await serial(async () => {
-        const { state, store, transport } = deps;
-        await state.ready;
-        const fit = await fitOf(store, page);
-        if (fit === "apply") {
-          await applyPage({ reset: createReset(store, state), state, store, transport }, page);
-        }
-        return fit === "pull";
-      }),
+      await serial(async () => await shouldPullFor(deps, page)),
+    /**
+    A run that reads the outbox and the server after the call. The run in flight may have read
+    them already, so a call made meanwhile is not joined to it: it gets the run that follows,
+    one for every call made meanwhile (E1: a task written while a push hung on a socket gone
+    quiet joined that run and waited for the next interval).
+    */
     syncNow: async (): Promise<Result<SyncSummary, string>> => {
-      if (inFlight !== undefined) {
-        return await inFlight;
+      if (holds.isHeld()) {
+        return err(SYNC_STOPPED);
       }
-      // Syncing from the call on, even while a live page is still being applied.
-      status.setState({ syncing: true });
-      inFlight = serial(async () => await runSync(deps, status));
-      try {
-        const result = await inFlight;
-        failures = result.ok ? 0 : failures + 1;
-        return result;
-      } finally {
-        inFlight = undefined;
+      if (inFlight === undefined) {
+        return await run();
       }
+      next ??= after(inFlight, epoch);
+      return await next;
     },
   };
 };
 
-export const createSyncClient = (deps: SyncDeps): SyncClient => {
-  const status = createStore<SyncStatus>(() => ({
-    lastError: null,
-    lastSyncAt: null,
-    online: true,
-    syncing: false,
-  }));
-  const runner = createRunner(deps, status);
-  let intervalMs: number | undefined;
-  const timer = createTimer(() => {
+/** Before any run: never synced, nothing wrong, taken to be online. */
+const NOT_SYNCED: SyncStatus = { lastError: null, lastSyncAt: null, online: true, syncing: false };
+
+type Runner = ReturnType<typeof createRunner>;
+
+/**
+The loop's next tick, after a run: its interval, or the backoff after a failure. A tick that comes
+while a hold is in place parks the loop instead (`park`), which waits for the release rather
+than ticking every half second (round 7 review 8).
+*/
+const tickOf =
+  (
+    runner: Runner,
+    loop: {
+      readonly interval: () => number | undefined;
+      readonly park: () => void;
+      readonly timer: () => RunTimer;
+    },
+  ) =>
+  (): void => {
+    if (runner.isHeld()) {
+      loop.park();
+      return;
+    }
     void (async () => {
       const result = await runner.syncNow();
-      if (intervalMs !== undefined) {
-        timer.in(result.ok ? intervalMs : backoffMs(runner.failures()));
+      const intervalMs = loop.interval();
+      if (intervalMs === undefined) {
+        return;
       }
+      if (!result.ok && runner.isHeld()) {
+        loop.park();
+        return;
+      }
+      loop.timer().in(result.ok ? intervalMs : backoffMs(runner.failures()));
     })();
-  });
-  // A run already due sooner stays: a burst of changes goes at most this long after the first.
-  const soon = (): void => {
-    if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
-      timer.in(SOON_MS);
-    }
   };
+
+/** The loop: its interval while started, its one pending tick, and whether a hold parked it. */
+const createLoop = (deps: SyncDeps, runner: Runner) => {
+  let intervalMs: number | undefined;
+  let isParked = false;
+  const timer: RunTimer = createTimer(
+    tickOf(runner, {
+      interval: () => intervalMs,
+      park: () => {
+        isParked = true;
+      },
+      timer: () => timer,
+    }),
+  );
   return {
-    ingestLive: async (page) => {
-      try {
-        if (await runner.ingestLive(page)) {
-          soon();
-        }
-      } catch {
-        // The local store failed to take it: a run pulls it and reports what goes wrong.
-        soon();
+    /** A run already due sooner stays: a burst of changes goes at most this long after the first. */
+    soon: (): void => {
+      if (intervalMs !== undefined && !timer.isDueWithin(SOON_MS)) {
+        timer.in(SOON_MS);
       }
     },
-    setInterval: (next) => {
+    setInterval: (next: number): void => {
       if (intervalMs === undefined || next === intervalMs) {
         return;
       }
@@ -365,19 +271,65 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
       intervalMs = next;
       timer.in(next);
     },
-    soon,
-    start: (options) => {
+    start: (interval: number): void => {
       if (intervalMs !== undefined) {
         return;
       }
 
-      intervalMs = options.intervalMs;
-      timer.in(0);
+      intervalMs = interval;
+      void (async () => {
+        const ms = await firstTickIn(deps, runner.isFresh, interval);
+        // Stopped (or started anew) meanwhile: that start schedules its own. A run asked for
+        // meanwhile (`soon`) and due sooner stays (round 7 review 6).
+        if (intervalMs === interval && !timer.isDueWithin(ms)) {
+          timer.in(ms);
+        }
+      })();
     },
+    stop: (): void => {
+      intervalMs = undefined;
+      isParked = false;
+      timer.cancel();
+    },
+    /** Released: a loop a hold parked runs at once. */
+    unpark: (): void => {
+      if (!isParked || runner.isHeld()) {
+        return;
+      }
+      isParked = false;
+      if (intervalMs !== undefined) {
+        timer.in(0);
+      }
+    },
+  };
+};
+
+export const createSyncClient = (deps: SyncDeps): SyncClient => {
+  const status = createStore<SyncStatus>(() => NOT_SYNCED);
+  const runner = createRunner(deps, status);
+  const loop = createLoop(deps, runner);
+  return {
+    ingestLive: async (page) => {
+      try {
+        if (await runner.ingestLive(page)) {
+          loop.soon();
+        }
+      } catch {
+        // The local store failed to take it: a run pulls it and reports what goes wrong.
+        loop.soon();
+      }
+    },
+    setInterval: loop.setInterval,
+    soon: loop.soon,
+    start: (options) => {
+      loop.start(options.intervalMs);
+    },
+    // Released by its holder or, at the latest, `HOLD_MAX_MS` on; a loop that waited runs then.
+    hold: async () => expiringRelease(await runner.hold(), HOLD_MAX_MS, loop.unpark),
     status,
     stop: () => {
-      intervalMs = undefined;
-      timer.cancel();
+      loop.stop();
+      runner.dropWaiting();
     },
     syncNow: runner.syncNow,
   };

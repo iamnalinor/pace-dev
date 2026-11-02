@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { endpoints, type Session } from "@pace/core";
 
 import { type ApiClient, ApiError } from "../api-client.ts";
+import { withinDeadline } from "../deadline.ts";
 
 /** A computer just connected: its agent token is shown this once. */
 export type NewAgent = { readonly id: string; readonly name: string; readonly token: string };
@@ -11,34 +12,64 @@ export type NewAgent = { readonly id: string; readonly name: string; readonly to
 export type Sessions = {
   readonly status: "error" | "loading" | "ready";
   readonly sessions: readonly Session[];
+  /** When the shown list was asked for (this device's clock); null until one arrived. */
+  readonly loadedAt: null | string;
   readonly reload: () => void;
   /**
   Ends a session or revokes an MCP app's grant; the row goes once the server agrees, or says it
-  is gone already (ended elsewhere: the list reloads). Rejects when it did not go through. Ending
-  the current session is logging out: the caller signs out.
+  is gone already (ended elsewhere: the list reloads). Rejects when it did not go through, or got
+  no answer within `REQUEST_DEADLINE_MS`. Ending the current session is logging out: the caller
+  signs out.
   */
   readonly revoke: (id: string) => Promise<void>;
   /** Connects a computer; rejects when the server could not be reached. */
   readonly createAgent: (name: string) => Promise<NewAgent>;
 };
 
-type Loaded = Pick<Sessions, "sessions" | "status">;
+type Loaded = Pick<Sessions, "loadedAt" | "sessions" | "status">;
 
 /** The server has no such session (any more): a revoke of it has nothing left to do. */
 const isAlreadyEnded = (error: unknown): boolean =>
   error instanceof ApiError && error.code === "session/not-found";
 
+/**
+Ends a session on the server; true when it was gone already (ended elsewhere). A DELETE that
+never comes back fails like any other (round 7 review 2): ending this device holds its sync
+meanwhile, which must not wait for good.
+*/
+const wasGoneOnRevoke = async (api: ApiClient, id: string): Promise<boolean> => {
+  try {
+    await withinDeadline(
+      async (signal) => await api.call(endpoints.sessions.revoke, { params: { id } }, { signal }),
+    );
+    return false;
+  } catch (error) {
+    if (!isAlreadyEnded(error)) {
+      throw error;
+    }
+    return true;
+  }
+};
+
 export const useSessions = (api: ApiClient): Sessions => {
-  const [loaded, setLoaded] = useState<Loaded>({ sessions: [], status: "loading" });
+  const [loaded, setLoaded] = useState<Loaded>({
+    loadedAt: null,
+    sessions: [],
+    status: "loading",
+  });
   const [generation, setGeneration] = useState(0);
   useEffect(() => {
     // Dropped on unmount, so a late answer never updates a screen that is gone.
     const lifetime = { isCurrent: true };
     void (async () => {
+      const askedAt = new Date().toISOString();
       try {
-        const { sessions } = await api.call(endpoints.sessions.list, {});
+        // A list that never comes ends as an error with Try again (bug class 62).
+        const { sessions } = await withinDeadline(
+          async (signal) => await api.call(endpoints.sessions.list, {}, { signal }),
+        );
         if (lifetime.isCurrent) {
-          setLoaded({ sessions, status: "ready" });
+          setLoaded({ loadedAt: askedAt, sessions, status: "ready" });
         }
       } catch {
         if (lifetime.isCurrent) {
@@ -65,13 +96,8 @@ export const useSessions = (api: ApiClient): Sessions => {
     },
     reload,
     revoke: async (id) => {
-      try {
-        await api.call(endpoints.sessions.revoke, { params: { id } });
-      } catch (error) {
+      if (await wasGoneOnRevoke(api, id)) {
         // Ended elsewhere meanwhile: what the person asked for is done, and the list is stale.
-        if (!isAlreadyEnded(error)) {
-          throw error;
-        }
         reload();
       }
       setLoaded((current) => ({
@@ -79,6 +105,7 @@ export const useSessions = (api: ApiClient): Sessions => {
         sessions: current.sessions.filter((session) => session.id !== id),
       }));
     },
+    loadedAt: loaded.loadedAt,
     sessions: loaded.sessions,
     status: loaded.status,
   };

@@ -6,6 +6,7 @@ import { useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { Tooltip } from "#app/ui/tooltip.tsx";
 import {
   gridFromHour,
   type Lane,
@@ -18,6 +19,7 @@ import {
 } from "@pace/client";
 
 import { SidewaysDays } from "./sideways-days.tsx";
+import { laneStyle, phoneColumnPx } from "./week-lanes.ts";
 
 /** What a tap on the grid opens: a tracked block, or a calendar event. */
 export type Picked =
@@ -97,15 +99,6 @@ const UsageStrip = ({ hourPx, place, usage }: Grid & Pick<GridProps, "usage">) =
     );
   });
 
-/** A lane's share of the column, as percentages (a hair of room between neighbours). */
-const laneStyle = ({
-  lane,
-  lanes,
-}: Lane): { readonly left: `${number}%`; readonly width: `${number}%` } => ({
-  left: `${(lane / lanes) * 100}%`,
-  width: `${100 / lanes - 1}%`,
-});
-
 /** One thing on a day's column: a calendar event (outlined) or tracked time (filled). */
 type Item =
   | { readonly kind: "block"; readonly at: Placement; readonly block: WeekBlock }
@@ -161,83 +154,109 @@ const ItemBox = ({
   const look = itemLook(item, isSelected);
   const stretch = item.kind === "event" ? item.event : item.block;
   const label = item.kind === "event" ? item.event.title : item.block.label;
+  const times = `${clockTime(stretch.startAt, zone)}–${clockTime(stretch.endAt, zone)}`;
+  // The whole name and the times on hover and keyboard focus: a narrow lane shows a letter or two
+  // of the name (QA round 18 L7); a tap opens the details anyway.
+  const named =
+    item.kind === "event" ? `${t("week.calendarEvent")}: ${label}` : `${label}, ${times}`;
   return (
-    <Pressable
-      accessibilityLabel={
-        item.kind === "event"
-          ? `${t("week.calendarEvent")}: ${label}`
-          : `${label}, ${clockTime(stretch.startAt, zone)}–${clockTime(stretch.endAt, zone)}`
-      }
-      accessibilityRole="button"
-      aria-current={isSelected ? "true" : undefined}
-      className={cx("absolute overflow-hidden rounded-md px-1", look.box)}
-      onPress={() => {
-        onPick(picked);
-      }}
+    <View
+      className="absolute"
       style={{
         ...laneStyle(lane),
         height: Math.max(MIN_TARGET_PX, px(item.at.height, grid.hourPx)),
         top: px(item.at.top, grid.hourPx),
       }}
     >
-      <Text className={cx("font-sans text-[10px]", look.text)} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+      <Tooltip isFilling label={`${label}, ${times}`} showsOnTap={false}>
+        <Pressable
+          accessibilityLabel={named}
+          accessibilityRole="button"
+          aria-current={isSelected ? "true" : undefined}
+          className={cx("flex-1 overflow-hidden rounded-md px-1", look.box)}
+          onPress={() => {
+            onPick(picked);
+          }}
+        >
+          <Text className={cx("font-sans text-[10px]", look.text)} numberOfLines={1}>
+            {label}
+          </Text>
+        </Pressable>
+      </Tooltip>
+    </View>
   );
 };
 
+/** A day's calendar events and blocks placed on its column, each with its lane. */
+type LaidOut = { readonly item: Item; readonly lane: Lane };
+
+/**
+The day's calendar events and blocks on its column, overlapping ones side by side in lanes, laid
+out by the height each is drawn at (a short block is drawn MIN_TARGET_PX tall).
+*/
+const layOut = (
+  day: WeekDay,
+  calendar: readonly CalendarEvent[],
+  grid: Grid,
+): readonly LaidOut[] => {
+  const items: Item[] = [
+    ...calendar
+      .map((event) => ({ at: grid.place(event), event, kind: "event" as const }))
+      .filter((item) => isPlaced(item)),
+    // Placed again here: the grid may start earlier than the model did (an early event).
+    ...day.blocks
+      .map((block) => ({ at: grid.place(block), block, kind: "block" as const }))
+      .filter((item) => isPlaced(item)),
+  ];
+  const lanes = lanesOf(
+    items.map((item) => (item.kind === "event" ? item.event : item.block)),
+    (MIN_TARGET_PX / grid.hourPx) * 60,
+  );
+  return items.map((item, index) => ({ item, lane: lanes[index] ?? { lane: 0, lanes: 1 } }));
+};
+
+/** The most lanes side by side anywhere in the day. */
+const mostLanes = (laidOut: readonly LaidOut[]): number =>
+  Math.max(1, ...laidOut.map(({ lane }) => lane.lanes));
+
 /** The day's calendar events and blocks, overlapping ones side by side in lanes. */
 const DayItems = ({
-  blocks,
-  calendar,
+  laidOut,
   ...rest
 }: {
-  readonly blocks: readonly WeekBlock[];
-  readonly calendar: readonly CalendarEvent[];
+  readonly laidOut: readonly LaidOut[];
   readonly grid: Grid;
   readonly onPick: GridProps["onPick"];
   readonly selectedKey: null | string;
   readonly zone: string;
-}) => {
-  const items: Item[] = [
-    ...calendar
-      .map((event) => ({ at: rest.grid.place(event), event, kind: "event" as const }))
-      .filter((item) => isPlaced(item)),
-    // Placed again here: the grid may start earlier than the model did (an early event).
-    ...blocks
-      .map((block) => ({ at: rest.grid.place(block), block, kind: "block" as const }))
-      .filter((item) => isPlaced(item)),
-  ];
-  const lanes = lanesOf(items.map((item) => (item.kind === "event" ? item.event : item.block)));
-  return items.map((item, index) => (
-    <ItemBox
-      key={pickedKey(pickOf(item))}
-      {...rest}
-      item={item}
-      lane={lanes[index] ?? { lane: 0, lanes: 1 }}
-    />
+}) =>
+  laidOut.map(({ item, lane }) => (
+    <ItemBox key={pickedKey(pickOf(item))} {...rest} item={item} lane={lane} />
   ));
-};
 
 /** One day: its date, the hour lines, and what the day held laid over them. */
 const DayColumn = ({
-  calendar,
+  columnPx,
   day,
+  grid,
   hourPx,
   language,
-  minColumnPx,
+  laidOut,
   now,
   onPick,
   selectedKey,
   usage,
   week,
-}: GridProps & { readonly day: WeekDay }) => {
-  const where = { fromHour: week.fromHour, zone: week.zone };
-  const grid: Grid = { hourPx, place: (stretch) => placeIn(day.date, stretch, where) };
+}: Omit<GridProps, "calendar" | "minColumnPx"> & {
+  readonly day: WeekDay;
+  readonly grid: Grid;
+  readonly laidOut: readonly LaidOut[];
+  /** The column's least width (0 on a computer, where the days share the width). */
+  readonly columnPx: number;
+}) => {
   const nowMinutes = (Date.parse(now) - Date.parse(day.date)) / 60_000 - week.fromHour * 60;
   return (
-    <View className="min-w-0 flex-1" style={{ minWidth: minColumnPx }}>
+    <View className="min-w-0 flex-1" style={{ minWidth: columnPx }}>
       <Text
         className={cx(
           "h-7 text-center font-sans text-[11px] tabular-nums",
@@ -267,9 +286,8 @@ const DayColumn = ({
         ) : null}
         <View className="absolute bottom-0 left-1.5 right-0.5 top-0">
           <DayItems
-            blocks={day.blocks}
-            calendar={calendar}
             grid={grid}
+            laidOut={laidOut}
             onPick={onPick}
             selectedKey={selectedKey}
             zone={week.zone}
@@ -289,19 +307,29 @@ Monday to Sunday side by side on one hour grid; it starts early enough for the f
 block or calendar event of the week (or at midnight with night hours). On a phone the days keep
 a readable width and the week scrolls sideways.
 */
-export const WeekGrid = (props: GridProps) => {
-  const fromHour = gridFromHour(props.week, props.calendar);
+export const WeekGrid = ({ calendar, minColumnPx, ...props }: GridProps) => {
+  const fromHour = gridFromHour(props.week, calendar);
   const week = { ...props.week, fromHour };
-  const days = week.days.map((day) => (
-    <DayColumn key={day.date} {...props} day={day} week={week} />
+  const where = { fromHour, zone: week.zone };
+  const columns = week.days.map((day) => {
+    const grid: Grid = {
+      hourPx: props.hourPx,
+      place: (stretch) => placeIn(day.date, stretch, where),
+    };
+    const laidOut = layOut(day, calendar, grid);
+    const columnPx = minColumnPx === 0 ? 0 : phoneColumnPx(mostLanes(laidOut), minColumnPx);
+    return { columnPx, day, grid, laidOut };
+  });
+  const days = columns.map((column) => (
+    <DayColumn key={column.day.date} {...props} {...column} week={week} />
   ));
   return (
     <View className="flex-row px-3" style={{ paddingBottom: BOTTOM_PX }}>
       <HourGutter fromHour={fromHour} hourPx={props.hourPx} />
-      {props.minColumnPx === 0 ? (
+      {minColumnPx === 0 ? (
         days
       ) : (
-        <SidewaysDays minColumnPx={props.minColumnPx} week={week}>
+        <SidewaysDays columnPx={columns.map((column) => column.columnPx)} week={week}>
           {days}
         </SidewaysDays>
       )}

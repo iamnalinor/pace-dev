@@ -1,18 +1,16 @@
-import { Pressable, Text } from "react-native";
+import { useState } from "react";
 
 import type { TaskViewModel } from "@pace/client";
 
 import { useT } from "#app/app-state.tsx";
-import { OptionRow } from "#app/shared/task-fields/option-row.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { Chip } from "#app/ui/chip.tsx";
+import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
 
-import type { CloseMode } from "./close-model.ts";
-
+import { type CloseMode, initialMode } from "./close-model.ts";
 import { ClosePreview } from "./close-preview.tsx";
-import { GiveUpFields } from "./give-up-fields.tsx";
+import { GiveUpFields, OUTCOMES } from "./give-up-fields.tsx";
 import { type CloseForm, useCloseForm } from "./use-close-form.ts";
 import { useSubmitClose } from "./use-submit-close.ts";
 import { useSubmitTitle } from "./use-submit-title.ts";
@@ -22,27 +20,68 @@ import { WhenPicker } from "./when-picker.tsx";
 const PrecisionRow = ({ form }: { readonly form: CloseForm }) => {
   const t = useT();
   return (
-    <OptionRow label={t("close.precision")}>
-      {([true, false] as const).map((isExact) => (
-        <Chip
-          key={String(isExact)}
-          onPress={() => {
-            form.setIsExact(isExact);
-          }}
-          selected={form.isExact === isExact}
-          tall
-        >
-          {t(isExact ? "close.exact" : "close.approx")}
-        </Chip>
-      ))}
-    </OptionRow>
+    <RadioChips
+      choices={[
+        { text: t("close.exact"), value: "exact" },
+        { text: t("close.approx"), value: "approx" },
+      ]}
+      label={t("close.precision")}
+      onChange={(precision) => {
+        form.setIsExact(precision === "exact");
+      }}
+      tall
+      value={form.isExact ? "exact" : "approx"}
+    />
+  );
+};
+
+type Outcome = "cancelled" | "first" | "skipped";
+
+/**
+How the task ends, one choice in sight: Done (or Submit), Cancelled, Skipped. A choice made by
+mistake is undone in the same row, and the row stays where it is, so the focus on it stays in
+the sheet (QA round 19 M2, QA round 20 L6 and M2).
+*/
+const OutcomeRow = ({
+  form,
+  onReasonWanted,
+  view,
+}: {
+  readonly form: CloseForm;
+  /** Cancelled or Skipped was pressed (not arrowed onto): the reason is what comes next. */
+  readonly onReasonWanted: () => void;
+  readonly view: TaskViewModel;
+}) => {
+  const t = useT();
+  const first = initialMode(view);
+  return (
+    <RadioChips
+      choices={[
+        { text: t(first === "submit" ? "close.submit" : "outcome.done"), value: "first" },
+        ...OUTCOMES.map((outcome) => ({ text: t(`close.${outcome}`), value: outcome })),
+      ]}
+      label={t("close.outcome")}
+      onChange={(next: Outcome, via) => {
+        if (next === "first") {
+          form.setMode(first);
+          return;
+        }
+        form.setOutcome(next);
+        form.setMode("other");
+        if (via === "press") {
+          onReasonWanted();
+        }
+      }}
+      tall
+      value={form.mode === "other" ? form.outcome : "first"}
+    />
   );
 };
 
 /**
 The Close artboard: when it happened (pills or an exact time), exactly or about then (two
 chips, so both choices are in sight),
-a preview of what gets recorded, and the way out ("Close task as… Cancelled · Skipped").
+a preview of what gets recorded, with how it ends (Done, Cancelled, Skipped) on top.
 */
 export const CloseSheet = ({
   onClose,
@@ -60,6 +99,10 @@ export const CloseSheet = ({
   const submitTitle = useSubmitTitle(view);
   const submit = useSubmitClose(view, form, onClose);
   const isSubmit = form.mode === "submit";
+  // Each press of Cancelled or Skipped asks Reason for the cursor (with a keyboard), as opening
+  // on them from "Close as…" does; an arrow moving through the outcomes keeps it in the row
+  // (round 7 review 9).
+  const [reasonAsked, setReasonAsked] = useState(startMode === "other" ? 1 : 0);
   const primary = {
     done: t("common.done"),
     other: t("close.confirm", { outcome: t(`close.${form.outcome}`) }),
@@ -81,26 +124,23 @@ export const CloseSheet = ({
           primaryLabel={primary}
         />
       }
+      name="close"
       onClose={onClose}
       subtitle={isSubmit ? t("close.subtitleSolved", { title: view.title }) : view.title}
       title={isSubmit ? submitTitle : t("close.closeTitle")}
       visible
     >
-      {form.mode === "other" ? <GiveUpFields form={form} /> : null}
+      <OutcomeRow
+        form={form}
+        onReasonWanted={() => {
+          setReasonAsked((count) => count + 1);
+        }}
+        view={view}
+      />
+      {form.mode === "other" ? <GiveUpFields form={form} reasonAsked={reasonAsked} /> : null}
       <WhenPicker deviceTz={deviceTz} form={form} label={whenLabel} quickTimes={view.quickTimes} />
       <PrecisionRow form={form} />
       <ClosePreview form={form} view={view} />
-      {form.mode === "other" ? null : (
-        <Pressable
-          accessibilityRole="button"
-          className="h-11 items-center justify-center"
-          onPress={() => {
-            form.setMode("other");
-          }}
-        >
-          <Text className="font-sans text-[13px] text-muted">{t("close.other")}</Text>
-        </Pressable>
-      )}
     </Sheet>
   );
 };

@@ -247,7 +247,14 @@ export const PickedSheet = ({ onClose, picked, week }: PickedProps) => {
   const t = useT();
   const { title, when } = useHeading(picked, week.zone);
   return (
-    <Sheet closeLabel={t("common.close")} onClose={onClose} subtitle={when} title={title} visible>
+    <Sheet
+      closeLabel={t("common.close")}
+      name="week-pick"
+      onClose={onClose}
+      subtitle={when}
+      title={title}
+      visible
+    >
       <PickedFacts onLeave={onClose} picked={picked} week={week} />
     </Sheet>
   );

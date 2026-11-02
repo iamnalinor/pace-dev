@@ -5,23 +5,14 @@ import { useAppState, usePace, useT } from "#app/app-state.tsx";
 import { clockTime } from "#app/format/time.ts";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { isCalendarRun, type MessageKey, runningActivities } from "@pace/core";
+import { isCalendarRun, runningActivities } from "@pace/core";
 
-import type { CalendarToday } from "./calendar-today.ts";
-
+import { noEventsKey } from "./calendar-source.ts";
 import { ChoiceItem, ChoiceList, ChoiceRow, type ListProps, Nothing } from "./choice-row.tsx";
-
-/** Why there is nothing to pick: on the web the calendar is the copy the phone sends. */
-const noEventsKey = (calendar: CalendarToday | null): MessageKey => {
-  if (!IS_PHONE) {
-    return "time.calendarNoneWeb";
-  }
-  return calendar?.access === "granted" ? "time.calendarNone" : "phone.calendarAsk";
-};
 
 /**
 Nothing in the calendar: why, and the way on anyway — a meeting without an event (named later
-on Day), on the web where the calendar comes from, on a phone without access its permissions.
+on Day), and on a phone without access its permissions.
 */
 const NoEvents = ({ calendar, close, options, start }: ListProps) => {
   const t = useT();
@@ -29,6 +20,7 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
   const { actions } = usePace();
   return (
     <View className="gap-2">
+      {/* The sections by their own titles, so a renamed one is renamed here too (QA 17 L3). */}
       <Nothing>{t(noEventsKey(calendar))}</Nothing>
       <ChoiceRow
         aside={null}
@@ -44,16 +36,6 @@ const NoEvents = ({ calendar, close, options, start }: ListProps) => {
           );
         }}
       />
-      {IS_PHONE ? null : (
-        <ChoiceRow
-          aside={null}
-          label={t("time.calendarSetUp")}
-          onPress={() => {
-            close();
-            router.push("/settings");
-          }}
-        />
-      )}
       {/* The phone without calendar access: the way to grant it (the button's tooltip only says why). */}
       {IS_PHONE && calendar !== null && calendar.access !== "granted" ? (
         <ChoiceRow

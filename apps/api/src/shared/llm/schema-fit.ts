@@ -2,13 +2,15 @@
 The answer schema's length limits, kept in one place (bug class 12): the model is shown the schema
 without them (some endpoints refuse them, Gemini's OpenAI layer answers 400), and its answer is
 clamped to them before the strict check, so a seventh option or an empty one costs that item,
-not the whole answer.
+not the whole answer. Nullable keys an action left out ("does not apply") are filled first
+(`fillAbsent`, bug classes 85 and 95).
 */
 
 const LENGTH_LIMITS: ReadonlySet<string> = new Set(["maxItems", "maxLength", "minLength"]);
 
 type Node = {
   readonly type?: unknown;
+  readonly required?: unknown;
   readonly properties?: Readonly<Record<string, unknown>>;
   readonly items?: unknown;
   readonly anyOf?: readonly unknown[];
@@ -68,6 +70,44 @@ const isTooShort = (value: unknown, node: Node): boolean => {
       isTooShort(value[key], branchFor(nodeOf(field), value[key])),
     )
   );
+};
+
+const isNullable = (node: Node): boolean =>
+  node.type === "null" ||
+  (Array.isArray(node.type) && node.type.includes("null")) ||
+  (node.anyOf ?? []).some((option) => nodeOf(option).type === "null");
+
+const requiredOf = (node: Node): readonly string[] =>
+  Array.isArray(node.required)
+    ? node.required.filter((key): key is string => typeof key === "string")
+    : [];
+
+/**
+`value` with every required key it left out that may be null set to null ("does not apply"),
+below the root (bug class 85): a best-effort endpoint's model drops the keys it has nothing for,
+though the schema asks for all of them. A list is never filled, at the root least of all: an
+answer with no `actions` is no reading, not "nothing to do" (bug class 95). A key that may not be
+null stays missing, for the strict check to refuse.
+*/
+export const fillAbsent = (value: unknown, schema: unknown, isRoot = true): unknown => {
+  const node = branchFor(nodeOf(schema), value);
+  if (Array.isArray(value)) {
+    return value.map((item: unknown) => fillAbsent(item, node.items, false));
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  const properties = node.properties ?? {};
+  const kept = Object.entries(value).map(([key, item]) => [
+    key,
+    Object.hasOwn(properties, key) ? fillAbsent(item, properties[key], false) : item,
+  ]);
+  const added = isRoot
+    ? []
+    : requiredOf(node)
+        .filter((key) => !Object.hasOwn(value, key) && isNullable(nodeOf(properties[key])))
+        .map((key) => [key, null] as const);
+  return Object.fromEntries([...kept, ...added]);
 };
 
 /** `value` cut to the schema's length limits: strings truncated, arrays sliced, empty items dropped. */

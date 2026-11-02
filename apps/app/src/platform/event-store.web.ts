@@ -4,10 +4,13 @@ import type { Event } from "@pace/core";
 
 import { createMemoryEventStore, type EventStore } from "@pace/client";
 
+import type { LocalEventStore } from "./event-store.ts";
+
 const DB_NAME = "pace";
 const DB_VERSION = 1;
 const CURSOR_KEY = "cursor";
 const STORE_ID_KEY = "storeId";
+const SYNC_VERSION_KEY = "syncVersion";
 
 type PaceDb = DBSchema & {
   readonly events: {
@@ -94,6 +97,10 @@ const idbBackend = (db: Db): EventStore => ({
     const row = await db.get("meta", STORE_ID_KEY);
     return typeof row?.value === "string" ? row.value : null;
   },
+  getSyncVersion: async () => {
+    const row = await db.get("meta", SYNC_VERSION_KEY);
+    return typeof row?.value === "number" ? row.value : 0;
+  },
   listAll: async () => await db.getAllFromIndex("events", "byOccurredAt"),
   listPending: async () => await listPending(db),
   markSynced: async (ids) => {
@@ -105,29 +112,38 @@ const idbBackend = (db: Db): EventStore => ({
   setStoreId: async (storeId) => {
     await db.put("meta", { key: STORE_ID_KEY, value: storeId });
   },
+  setSyncVersion: async (version) => {
+    await db.put("meta", { key: SYNC_VERSION_KEY, value: version });
+  },
 });
 
 /**
 Opens IndexedDB once; when it is unavailable (some private windows, blocked site data)
 the log lives in memory for this page load so the app still works, just without persistence.
 */
-const openBackend = async (): Promise<EventStore> => {
+const openBackend = async (): Promise<Backend> => {
   try {
-    return idbBackend(await open());
+    return { isShared: true, store: idbBackend(await open()) };
   } catch {
-    return createMemoryEventStore();
+    return { isShared: false, store: createMemoryEventStore() };
   }
 };
 
-/** The local event log in IndexedDB (database `pace`): events, the outbox, the cursor and the store id. */
-export const createEventStore = (): EventStore => {
-  let backendPromise: Promise<EventStore> | undefined;
+/** The opened copy: in IndexedDB (shared by every tab of the profile) or in this page's memory. */
+type Backend = { readonly isShared: boolean; readonly store: EventStore };
+
+/**
+The local event log in IndexedDB (database `pace`): events, the outbox, and in `meta` the cursor,
+the store id and the sync version.
+*/
+export const createEventStore = (): LocalEventStore => {
+  let backendPromise: Promise<Backend> | undefined;
   const call = async <T>(run: (store: EventStore) => Promise<T>): Promise<T> => {
     backendPromise ??= openBackend();
-    const store = await backendPromise;
+    const { store } = await backendPromise;
     return await run(store);
   };
-  return {
+  const store: EventStore = {
     append: async (events) => {
       await call(async (store) => {
         await store.append(events);
@@ -140,6 +156,7 @@ export const createEventStore = (): EventStore => {
     },
     getCursor: async () => await call(async (store) => await store.getCursor()),
     getStoreId: async () => await call(async (store) => await store.getStoreId()),
+    getSyncVersion: async () => await call(async (store) => await store.getSyncVersion()),
     listAll: async () => await call(async (store) => await store.listAll()),
     listPending: async () => await call(async (store) => await store.listPending()),
     markSynced: async (ids) => {
@@ -157,5 +174,18 @@ export const createEventStore = (): EventStore => {
         await store.setStoreId(storeId);
       });
     },
+    setSyncVersion: async (version) => {
+      await call(async (store) => {
+        await store.setSyncVersion(version);
+      });
+    },
+  };
+  return {
+    isShared: async () => {
+      backendPromise ??= openBackend();
+      const backend = await backendPromise;
+      return backend.isShared;
+    },
+    store,
   };
 };

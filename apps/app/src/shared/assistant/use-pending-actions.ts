@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 
-import type { Actions, Assistant } from "@pace/client";
 import type {
   Action,
   DecisionResolution,
@@ -13,6 +12,8 @@ import type {
 import { usePace, useT } from "#app/app-state.tsx";
 import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
+import { useViewer } from "#app/shared/use-viewer.ts";
+import { type Actions, type Assistant, doneLines, type Unread, unreadOf } from "@pace/client";
 
 /** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
 const MAX_THREAD = 5;
@@ -24,6 +25,8 @@ type Pending = {
   /** What the assistant asks about what stays unclear; answered by a correction. */
   readonly questions: readonly ParseQuestion[];
   readonly status: "parsed" | "unavailable";
+  /** Why no model read it (the rules' reading); `null` for the model's own. */
+  readonly unread: null | Unread;
   /** The decision-log rows of the conversation's readings, the last this one's. */
   readonly decisionIds: readonly string[];
 };
@@ -42,13 +45,17 @@ const undoWritten =
     })();
   };
 
+/** After Approve: what was done, in words (not a bare "Done", QA round 11 L3), and Undo. */
 const approvalFeedback = ({
   actions,
+  done,
   run,
   t,
   written,
 }: {
   readonly actions: Pick<Actions, "revoke">;
+  /** Each approved action in the past tense ("Created task “X”"). */
+  readonly done: readonly string[];
   readonly run: ReturnType<typeof useRunAction>;
   readonly t: ReturnType<typeof useT>;
   readonly written: readonly Event[];
@@ -57,7 +64,7 @@ const approvalFeedback = ({
     ? undefined
     : {
         action: { label: t("common.undo"), onPress: undoWritten(written, actions, run) },
-        success: t("assistant.approved"),
+        success: done.length === 0 ? t("assistant.approved") : done.join("; "),
       };
 
 /** An answer worth showing as a preview; `null` when there is nothing to approve. */
@@ -80,6 +87,7 @@ const pendingOf = (
         actions: answer.actions,
         questions: answer.questions ?? [],
         status: answer.status,
+        unread: answer.status === "unavailable" ? unreadOf(answer) : null,
       };
 
 /**
@@ -170,8 +178,9 @@ const useApprove = ({
   readonly setBusy: (isBusy: boolean) => void;
   readonly setPending: (pending: null | Pending) => void;
 }) => {
-  const { actions, assistant } = usePace();
+  const { actions, assistant, state } = usePace();
   const t = useT();
+  const { language, now } = useViewer();
   const run = useRunAction();
   const isApprovingRef = useRef(false);
   return async (): Promise<void> => {
@@ -183,9 +192,10 @@ const useApprove = ({
     try {
       const result = await actions.applyActions(pending.actions);
       const written = result.ok ? [...result.value] : [];
+      const done = doneLines(pending.actions, { language, now, state: state.store.getState() });
       const isSuccess = await run(
         Promise.resolve(result),
-        approvalFeedback({ actions, run, t, written }),
+        approvalFeedback({ actions, done, run, t, written }),
       );
       if (!isSuccess) {
         return;

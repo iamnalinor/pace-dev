@@ -67,6 +67,7 @@ export {
   IMPORTANCE_COLORS,
   type Palette,
   type PaletteName,
+  PLACEHOLDER_DIM,
   type ProjectColorName,
   type RadiusName,
   STATUS_COLORS,
@@ -106,6 +107,7 @@ export {
   autoOutcomeId,
   type AutoOutcomeKind,
   createIdFactory,
+  deferredReadId,
   type IdFactory,
   instanceId,
   isUlid,
@@ -234,7 +236,7 @@ export {
   type ProjectView,
   projectView,
 } from "./queries/project-view.ts";
-export { suggestFor, type Suggestion } from "./queries/suggest.ts";
+export { foldToLatin, suggestFor, type Suggestion } from "./queries/suggest.ts";
 export {
   estimateMinutesOf,
   type SubmitPreview,

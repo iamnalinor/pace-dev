@@ -19,28 +19,32 @@ import {
 
 const at = (hhmm: string): number => Date.parse(`2026-10-06T${hhmm}:00.000Z`);
 
-/** Telegram in front 09:00–09:20: what the usage upload sends. */
+/**
+Telegram in front 09:00–09:20: what the usage upload sends. The read answers only the events in
+the range it is asked for, as Android's does (bug-lessons class 55: a fake ignoring its window).
+*/
 jest.mock("../../modules/pace-native/index.ts", () => ({
   paceNative: {
     appLabels: async (packages: readonly string[]) =>
       Object.fromEntries(packages.map((name) => [name, "Telegram"])),
     hasUsageAccess: () => true,
     openUsageAccessSettings: jest.fn(),
-    queryUsageEvents: async () => [
-      { className: null, eventType: 15, packageName: "android", timestamp: at("09:00") },
-      {
-        className: null,
-        eventType: 1,
-        packageName: "org.telegram.messenger",
-        timestamp: at("09:00"),
-      },
-      {
-        className: null,
-        eventType: 2,
-        packageName: "org.telegram.messenger",
-        timestamp: at("09:20"),
-      },
-    ],
+    queryUsageEvents: async (from: number, to: number) =>
+      [
+        { className: null, eventType: 15, packageName: "android", timestamp: at("09:00") },
+        {
+          className: null,
+          eventType: 1,
+          packageName: "org.telegram.messenger",
+          timestamp: at("09:00"),
+        },
+        {
+          className: null,
+          eventType: 2,
+          packageName: "org.telegram.messenger",
+          timestamp: at("09:20"),
+        },
+      ].filter((event) => event.timestamp >= from && event.timestamp <= to),
   },
 }));
 

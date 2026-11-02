@@ -21,6 +21,7 @@ export const SCHEMA_VERSION = MIGRATIONS.length;
 
 const CURSOR_KEY = "cursor";
 const STORE_ID_KEY = "storeId";
+const SYNC_VERSION_KEY = "syncVersion";
 
 const migrate = async (db: SQLiteDatabase): Promise<void> => {
   await db.execAsync("PRAGMA journal_mode = WAL");
@@ -102,8 +103,8 @@ const writeMeta = async (db: SQLiteDatabase, key: string, value: string): Promis
 
 /**
 `EventStore` on expo-sqlite (`pace.db`, WAL). Events are stored as JSON next to their
-`occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor
-and the store id.
+`occurredAt` for ordered reads; the outbox is a separate id table; `meta` holds the cursor,
+the store id and the sync version.
 */
 export const createSqliteEventStore = (): EventStore => {
   let connection: Promise<SQLiteDatabase> | undefined;
@@ -124,6 +125,7 @@ export const createSqliteEventStore = (): EventStore => {
     },
     getCursor: async () => Number((await readMeta(await db(), CURSOR_KEY)) ?? 0),
     getStoreId: async () => await readMeta(await db(), STORE_ID_KEY),
+    getSyncVersion: async () => Number((await readMeta(await db(), SYNC_VERSION_KEY)) ?? 0),
     listAll: async () => {
       const connection = await db();
       return parseRows(
@@ -148,6 +150,9 @@ export const createSqliteEventStore = (): EventStore => {
     },
     setStoreId: async (storeId) => {
       await writeMeta(await db(), STORE_ID_KEY, storeId);
+    },
+    setSyncVersion: async (version) => {
+      await writeMeta(await db(), SYNC_VERSION_KEY, String(version));
     },
   };
 };

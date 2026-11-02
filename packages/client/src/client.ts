@@ -41,7 +41,7 @@ export type {
 export type { CloseInput, SubmitInput, WorkActions } from "./actions/work-actions.ts";
 export { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 export { type ApiClient, ApiError, createApiClient } from "./api-client.ts";
-export type { AiOutcome, Assistant } from "./assistant.ts";
+export { type AiOutcome, type Assistant, type Unread, unreadOf } from "./assistant.ts";
 export {
   type AccountAction,
   type AccountConfirmation,
@@ -62,6 +62,7 @@ export {
   systemClock,
 } from "./clock.ts";
 export { createPaceClient, type PaceClient, type PaceClientOptions } from "./create-client.ts";
+export { REQUEST_DEADLINE_MS, withinDeadline } from "./deadline.ts";
 export type { EventStore } from "./event-store.ts";
 export { checkInstance, type InstanceError } from "./instance.ts";
 export { createLiveChannel, type LiveChannel, type LiveStatus, type SocketLike } from "./live.ts";
@@ -73,7 +74,13 @@ export {
   type NotificationFeed,
   parseLiveNotice,
 } from "./notifications.ts";
-export { createMemorySessionStore, type SessionStore } from "./session.ts";
+export { type PeerTabs, type StoreChange } from "./peer-tabs.ts";
+export {
+  createMemorySessionStore,
+  createMemorySignOutNotes,
+  type SessionStore,
+  type SignOutNotes,
+} from "./session.ts";
 export {
   type AppState,
   type AppStateHandle,
@@ -89,7 +96,14 @@ export {
 } from "./sync-client.ts";
 export { type AiReading, aiReading } from "./view-models/ai-reading.ts";
 export { type EventDetails, eventDetails } from "./view-models/calendar-event.ts";
-export { type CalendarDay, monthGrid, monthOf, shiftMonth } from "./view-models/calendar.ts";
+export {
+  type CalendarDay,
+  calendarKeyMove,
+  monthGrid,
+  monthOf,
+  rovingDay,
+  shiftMonth,
+} from "./view-models/calendar.ts";
 export { recentReasons } from "./view-models/close-reasons.ts";
 export {
   canAiRead,
@@ -112,7 +126,7 @@ export {
   type DayTotal,
   trackedDates,
 } from "./view-models/day.ts";
-export { type DecisionView, decisionViews } from "./view-models/decisions.ts";
+export { type DecisionView, decisionViews, doneLines } from "./view-models/decisions.ts";
 export {
   agentCommand,
   agentLogsCommand,
@@ -172,6 +186,7 @@ export { SCOPE_KEYS } from "./view-models/oauth-scopes.ts";
 export {
   definitionIssues,
   editorDraft,
+  freePresetId,
   inheritedOf,
   isOverridden,
   isSubOverridden,
@@ -179,7 +194,6 @@ export {
   type PresetDraft,
   setSub,
   setValue,
-  slugify,
   type SubKey,
   toggleOverride,
   toggleSubOverride,
@@ -223,6 +237,7 @@ export {
   sessionRows,
   type SessionRowsContext,
 } from "./view-models/sessions.ts";
+export { type ListedSessions, signInState } from "./view-models/sign-in-notice.ts";
 export {
   type OverrideSheet,
   type PrimaryAction,

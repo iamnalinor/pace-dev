@@ -86,11 +86,36 @@ const board = async () => {
   return nowViewModel(world.state.store.getState(), ctx);
 };
 
+/** A picker row, paused or not. */
+const choiceRow = (id: string, isPaused = false) => ({
+  id,
+  meta: isPaused ? [{ kind: "paused" as const }] : [],
+  title: `Task ${id}`,
+});
+
 describe("taskChoices", () => {
-  it("lists the open tasks in Now's order, the later ones last", async () => {
+  // QA round 17 L4: a task that starts next week, or one paused, is not what a person works on now.
+  it("with nothing typed, lists the tasks on now in Now's order, none paused or starting later", () => {
+    const now = {
+      future: [choiceRow("later")],
+      rows: [choiceRow("a"), choiceRow("paused", true), choiceRow("b")],
+    };
+    expect(taskChoices(now, "").map((choice) => choice.id)).toEqual(["a", "b"]);
+    // Typed, the later and the paused ones are found too: starting one early stays possible.
+    expect(taskChoices(now, "task").map((choice) => choice.id)).toEqual([
+      "a",
+      "paused",
+      "b",
+      "later",
+    ]);
+  });
+
+  it("lists the artboard's open tasks that are on now", async () => {
     const now = await board();
     expect(taskChoices(now, "").map((row) => row.id)).toEqual(
-      [...now.rows, ...now.future].map((row) => row.id),
+      now.rows
+        .filter((row) => row.meta.every((part) => part.kind !== "paused"))
+        .map((row) => row.id),
     );
   });
 
@@ -101,7 +126,7 @@ describe("taskChoices", () => {
   });
 
   it("reads ё as е, the way people type Russian", () => {
-    const row = { id: "t1", title: "Отчёт по практике" };
+    const row = { id: "t1", meta: [], title: "Отчёт по практике" };
     expect(taskChoices({ future: [], rows: [row] }, "отчет")).toEqual([row]);
     expect(taskChoices({ future: [], rows: [row] }, "ОТЧЁТ практ")).toEqual([row]);
   });

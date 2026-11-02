@@ -8,7 +8,7 @@ import { sendingIds } from "./close-model.ts";
 
 /**
 The footer's Done in one tap: sends the solved subtasks, or closes the task as done, now
-(History undoes it). Another time or outcome is the long press on Done.
+(History undoes it). Another time or outcome is the button beside Done (or its long press).
 */
 export const useFinishTask = (view: TaskViewModel): (() => void) => {
   const { actions } = usePace();

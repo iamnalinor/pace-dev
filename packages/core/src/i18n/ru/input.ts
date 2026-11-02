@@ -72,7 +72,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.whenSubmitted": "Когда вы сдали?",
   "close.whenDone": "Когда это было сделано?",
   "close.whenClosed": "Когда вы закрыли задачу?",
-  "close.pickExact": "Выбрать точное время",
+  "close.pickExact": "Выбрать время",
   "close.precision": "Насколько точно время?",
   "close.exact": "Точно тогда",
   "close.approx": "Примерно тогда",
@@ -84,7 +84,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "close.beforeDeadline": "Сделано · до срока",
   "close.late": "Сделано · с опозданием",
   "close.submit": "Сдать",
-  "close.other": "Закрыть как… Отменена · Пропущена",
+  "close.otherLabel": "Закрыть как…",
   "close.cancelled": "Отменена",
   "close.skipped": "Пропущена",
   "close.reason": "Причина",
@@ -137,6 +137,7 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "composer.placeholder": "Добавьте задачу или текст",
   "composer.addTo": "Добавить в {title}",
   "composer.toInbox": "Во входящие",
+  "composer.toInboxDone": "Добавлено во входящие",
   "composer.category": "Категория",
   "composer.project": "Проект",
   "composer.noProject": "Без проекта",
@@ -162,6 +163,10 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "composer.aiQueuedSoon": "Сохранено: ассистент разберёт это, как только вернётся, и добавит.",
   "composer.aiFailed":
     "Не удалось связаться с ассистентом: форму заполнили правила. Проверьте её перед добавлением.",
+  "composer.aiUnreadable":
+    "Ассистент не смог разобрать эту строку: форму заполнили правила. Проверьте её перед добавлением.",
+  "composer.aiOff":
+    "На этом сервере нет ассистента: форму заполнили правила. Проверьте её перед добавлением.",
   "composer.aiQuestion": "Ответ добавится в строку",
   "parseField.title": "название",
   "parseField.category": "категория",
@@ -218,6 +223,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "assistant.reading": "Ассистент разбирает текст…",
   "assistant.rulesUsed":
     "Ассистент недоступен. Это разбор по правилам; проверьте действия перед подтверждением.",
+  "assistant.rulesUsedUnreadable":
+    "Ассистент не смог разобрать этот текст. Это разбор по правилам; проверьте действия перед подтверждением.",
   "assistant.couldNotRead": "Не удалось разобрать текст. Попробуйте ещё раз.",
   "assistant.couldNotRevise":
     "Не удалось уточнить действия. Предыдущий вариант сохранён на экране.",

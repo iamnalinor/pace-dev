@@ -1,4 +1,4 @@
-import { createStore, type StoreApi } from "zustand/vanilla";
+import type { StoreApi } from "zustand/vanilla";
 
 import {
   endpoints,
@@ -10,15 +10,12 @@ import {
   UserSchema,
 } from "@pace/core";
 
-import type { SessionStore } from "./session.ts";
+import type { SessionStore, SignOutNotes } from "./session.ts";
 
 import { type ApiClient, ApiError } from "./api-client.ts";
+import { type AuthState, createSession, type Granted, type Session } from "./auth-session.ts";
 
-export type AuthState = {
-  readonly status: "loading" | "signed-in" | "signed-out";
-  /** Known after a login or `me()`; `null` right after startup with a stored token. */
-  readonly user: null | User;
-};
+export type { AuthState } from "./auth-session.ts";
 
 export type BotLoginError = "cancelled" | "not-allowed" | "timeout";
 
@@ -73,6 +70,15 @@ export type Auth = {
   readonly resumeBotLogin: (nonce: string) => BotLoginPoll;
   /** Tells the server, then forgets the token even when the server could not be reached. */
   readonly logout: () => Promise<void>;
+  /**
+  Ends this device's own session from its device list: `revoke` asks the server, then the token
+  is forgotten without a logout, which would only answer 401 (QA round 15 L2). The other tabs'
+  note goes first, and a 401 this tab hears meanwhile for that session is its own act, not an end
+  elsewhere (round 6 M1). A failed `revoke` keeps the session, takes the note back and rethrows.
+  */
+  readonly endThisDevice: (revoke: () => Promise<void>) => Promise<void>;
+  /** Whether this device is ending its own session (`endThisDevice` under way): start nothing new. */
+  readonly isEnding: () => boolean;
   /** The destructive action runs only after its Telegram button is confirmed. */
   readonly requestAccountConfirmation: (
     action: AccountAction,
@@ -92,6 +98,12 @@ export type Auth = {
   loading the user behind it; a token the server rejects leaves the device signed out.
   */
   readonly adoptToken: (token: string) => Promise<Result<User, string>>;
+  /**
+  Whether the device's session store holds a session. After a sign-out it is another tab's newer
+  one (the store is shared by a browser's tabs): the local copy is that session's, not this tab's
+  to wipe (round 6 I1). False when the store cannot be read.
+  */
+  readonly isSessionStored: () => Promise<boolean>;
 };
 
 const errorCode = (error: unknown): string => (error instanceof ApiError ? error.code : "network");
@@ -124,48 +136,6 @@ const pollOnce = async (api: ApiClient, nonce: string): Promise<Poll> => {
     // The nonce is gone (expired or consumed); 5xx and transport errors are transient.
     return error instanceof ApiError && error.status < 500 ? err("timeout") : undefined;
   }
-};
-
-type Granted = { readonly token: string; readonly user: User };
-
-type Session = {
-  readonly ready: Promise<void>;
-  readonly store: StoreApi<AuthState>;
-  readonly token: () => string | undefined;
-  readonly signIn: (granted: Granted) => Promise<User>;
-  readonly signOut: () => Promise<void>;
-  /** Remembers a token whose user is not known yet. */
-  readonly adopt: (token: string) => Promise<void>;
-};
-
-/** The in-memory token (read synchronously by the API client) mirrored to the session store. */
-const createSession = (sessionStore: SessionStore): Session => {
-  const store = createStore<AuthState>(() => ({ status: "loading", user: null }));
-  let cached: string | undefined;
-  return {
-    adopt: async (token) => {
-      cached = token;
-      await sessionStore.set(token);
-      store.setState({ status: "signed-in", user: null });
-    },
-    ready: (async (): Promise<void> => {
-      cached = (await sessionStore.get()) ?? undefined;
-      store.setState({ status: cached === undefined ? "signed-out" : "signed-in" });
-    })(),
-    signIn: async (granted) => {
-      cached = granted.token;
-      await sessionStore.set(granted.token);
-      store.setState({ status: "signed-in", user: granted.user });
-      return granted.user;
-    },
-    signOut: async () => {
-      cached = undefined;
-      await sessionStore.clear();
-      store.setState({ status: "signed-out", user: null });
-    },
-    store,
-    token: () => cached,
-  };
 };
 
 const waitForToken =
@@ -218,15 +188,87 @@ const confirmationActions = (
       return err(errorCode(error));
     }
   },
-  finishAccountDeletion: session.signOut,
+  /**
+  The person deleted the account here (confirmed in Telegram): the other tabs are told it was this
+  browser, not another device (round 6 M2). After the fact: a tab whose 401 came first says
+  another device.
+  */
+  finishAccountDeletion: async () => {
+    const ended = session.token();
+    if (ended !== undefined) {
+      await session.leaveNote(ended);
+    }
+    await session.signOut();
+  },
 });
+
+/** See `Auth.endThisDevice`. */
+const endThisDeviceOf =
+  (session: Session): Auth["endThisDevice"] =>
+  async (revoke) => {
+    const ending = session.token();
+    if (ending === undefined) {
+      await revoke();
+      return;
+    }
+    // Before the request: another tab's 401 can come before its answer.
+    await session.leaveNote(ending);
+    session.setEnding(ending);
+    try {
+      await revoke();
+    } catch (error) {
+      await session.withdrawNote(ending);
+      throw error;
+    } finally {
+      session.setEnding(undefined);
+    }
+    // The server ended it already: no logout to send.
+    if (session.token() === ending) {
+      await session.signOut();
+    }
+  };
+
+/**
+Fetches the signed-in user. A 401 signs out as "ended elsewhere", but only for the token the
+request carried and only while it is still the one in use: a 401 for a token this device has
+forgotten or replaced meanwhile (it ended its own session) says nothing about the session in use
+(fix round 1).
+*/
+const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User, string>> => {
+  const sent = session.token();
+  try {
+    // The answer carries the store id too; the sync confirms that on its own pulls.
+    const user = UserSchema.parse(await api.call(endpoints.me, {}));
+    session.store.setState({ status: "signed-in", user });
+    return ok(user);
+  } catch (error) {
+    if (
+      sent !== undefined &&
+      error instanceof ApiError &&
+      error.status === 401 &&
+      session.token() === sent &&
+      session.ending() !== sent
+    ) {
+      // "Another tab" only on its note: a store found empty proves nothing (another tab heard
+      // the same 401 first, blocked storage, a log-out whose answer is still on its way).
+      await session.signOut(
+        (await session.isLoggedOutInAnotherTab(sent))
+          ? { endedInAnotherTab: true }
+          : { endedElsewhere: true },
+      );
+    }
+    return err(errorCode(error));
+  }
+};
 
 export const createAuth = (options: {
   readonly api: ApiClient;
   readonly session: SessionStore;
+  /** Shared with the other tabs of the browser profile; absent in the app (one process). */
+  readonly notes?: SignOutNotes | undefined;
 }): Auth => {
   const { api } = options;
-  const session = createSession(options.session);
+  const session = createSession(options.session, options.notes);
 
   const login = async (grant: () => Promise<Granted>): Promise<Result<User, string>> => {
     try {
@@ -236,22 +278,11 @@ export const createAuth = (options: {
     }
   };
 
-  const me = async (): Promise<Result<User, string>> => {
-    try {
-      // The answer carries the store id too; the sync confirms that on its own pulls.
-      const user = UserSchema.parse(await api.call(endpoints.me, {}));
-      session.store.setState({ status: "signed-in", user });
-      return ok(user);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        await session.signOut();
-      }
-      return err(errorCode(error));
-    }
-  };
+  const me = meOf(api, session);
 
   return {
     ...confirmationActions(api, session),
+    endThisDevice: endThisDeviceOf(session),
     adoptToken: async (token) => {
       await session.adopt(token);
       const result = await me();
@@ -260,11 +291,18 @@ export const createAuth = (options: {
       }
       return result;
     },
+    isEnding: () => session.ending() !== undefined,
+    isSessionStored: session.isStored,
     loginWithDev: async (telegramId) =>
       await login(async () => await api.call(endpoints.auth.dev, { body: { telegramId } })),
     loginWithTelegram: async (payload) =>
       await login(async () => await api.call(endpoints.auth.telegram, { body: payload })),
     logout: async () => {
+      const leaving = session.token();
+      // The note goes before the request: another tab's 401 can come before its answer.
+      if (leaving !== undefined) {
+        await session.leaveNote(leaving);
+      }
       try {
         await api.call(endpoints.auth.logout, {});
       } catch {

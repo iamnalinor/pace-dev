@@ -15,6 +15,7 @@
     <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/inter-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <title>Pace</title>
+    <script src="/theme-boot.js"></script>
     <!-- react-native-web's root reset: the app fills the window and scrolls inside its views. -->
     <style id="expo-reset">
       html,
@@ -29,6 +30,13 @@
         body {
           background-color: #0b0b0c;
         }
+      }
+      /* The theme chosen in Pace wins over the system's (theme-boot.js, document-head.web.tsx). */
+      html[data-theme="light"] body {
+        background-color: #f4f5f7;
+      }
+      html[data-theme="dark"] body {
+        background-color: #0b0b0c;
       }
       #root {
         display: flex;

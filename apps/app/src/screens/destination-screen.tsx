@@ -14,11 +14,14 @@ export const DestinationScreen = ({
   children,
   eyebrow,
   right,
+  scrollLabel,
   title,
 }: {
   readonly children: ReactNode;
   readonly eyebrow?: string;
   readonly right?: ReactNode;
+  /** The body holds no control: it is a keyboard stop of this name (see `Screen`). */
+  readonly scrollLabel?: string;
   readonly title: string;
 }) => {
   const t = useT();
@@ -33,6 +36,7 @@ export const DestinationScreen = ({
           title={title}
         />
       }
+      {...(scrollLabel !== undefined && { scrollLabel })}
     >
       {children}
     </Screen>

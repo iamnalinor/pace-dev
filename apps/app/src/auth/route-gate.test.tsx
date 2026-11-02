@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text } from "react-native";
 
 import { markOnboarded } from "#app/platform/onboarding.ts";
@@ -7,13 +7,15 @@ import { renderScreen } from "#app/test/render.tsx";
 import { redirected } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 
-import { isBarePath, RouteGate } from "./route-gate.tsx";
+import { GateProvider, isBarePath, NavigatorHold, RouteGate } from "./route-gate.tsx";
 
 const renderAt = async (path: string, runtime: Awaited<ReturnType<typeof createTestRuntime>>) =>
   await renderScreen(
-    <RouteGate path={path}>
-      <Text>the screen</Text>
-    </RouteGate>,
+    <GateProvider>
+      <RouteGate path={path}>
+        <Text>the screen</Text>
+      </RouteGate>
+    </GateProvider>,
     runtime,
   );
 
@@ -71,7 +73,12 @@ describe("RouteGate", () => {
   it("lets a phone out of the walk-through once it is done, without sending it back in", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await runtime.auth.me();
-    await renderScreen(<Navigating />, runtime);
+    await renderScreen(
+      <GateProvider>
+        <Navigating />
+      </GateProvider>,
+      runtime,
+    );
     // Mounted on the walk-through, with "not yet" read from storage.
     await act(async () => {
       await Promise.resolve();
@@ -92,6 +99,42 @@ describe("RouteGate", () => {
     await renderAt("/settings", runtime);
     expect(await screen.findByText("the screen")).toBeOnTheScreen();
     expect(redirected).not.toHaveBeenCalled();
+  });
+});
+
+/** Counts how often the navigator under the hold mounts. */
+const mounts = jest.fn<undefined, []>();
+const CountedNavigator = () => {
+  useEffect(() => {
+    mounts();
+  }, []);
+  return <Text>the navigator</Text>;
+};
+
+describe("NavigatorHold", () => {
+  // QA round 17 M2: a navigator mounted behind the blank gate took its route from the address too
+  // late, and Day reloaded as Now. It mounts once the gate is read, together with its screens.
+  it("mounts the navigator only once the gate is read, and keeps it through a sign-out", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.auth.ready;
+    await renderScreen(
+      <GateProvider>
+        <NavigatorHold>
+          <CountedNavigator />
+        </NavigatorHold>
+      </GateProvider>,
+      runtime,
+    );
+    expect(await screen.findByText("the navigator")).toBeOnTheScreen();
+    expect(mounts).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await act(async () => {
+      await runtime.auth.logout();
+    });
+    expect(screen.getByText("the navigator")).toBeOnTheScreen();
+    expect(mounts).toHaveBeenCalledTimes(1);
   });
 });
 

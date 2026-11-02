@@ -15,6 +15,11 @@ export type FakeSocket = SocketLike & {
   browser waits out the closing handshake with a peer that is gone.
   */
   isHalfOpen: boolean;
+  /**
+  Whether a "ping" gets its "pong", as the server's auto-response gives it (true); a connection
+  gone quiet answers nothing.
+  */
+  answersPing: boolean;
   /** What the server would do. */
   open: () => void;
   receive: (data: string) => void;
@@ -43,6 +48,7 @@ export const fakeSockets = (): {
         addEventListener: (type, listener) => {
           listeners.set(type, [...(listeners.get(type) ?? []), listener]);
         },
+        answersPing: true,
         close: () => {
           socket.closed = true;
           if (!socket.isHalfOpen) {
@@ -64,6 +70,9 @@ export const fakeSockets = (): {
         send: (data) => {
           socket.sent.push(data);
           socket.onSend?.(data);
+          if (data === "ping" && socket.answersPing) {
+            emit("message", { data: "pong" });
+          }
         },
         sent: [],
         url,

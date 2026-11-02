@@ -10,7 +10,7 @@ import {
 
 import type { ActivityEntry, ActivityTarget } from "./activity-edit-types.ts";
 
-import { editInputs, moveChange } from "./activity-edit-inputs.ts";
+import { editInputs, labelChange, moveChange } from "./activity-edit-inputs.ts";
 import {
   type ActionDeps,
   type ActionError,
@@ -134,14 +134,12 @@ const corrections = (
 const movementError = (
   deps: ActionDeps,
   moved: ReturnType<typeof moveChange>,
-  endAt: null | string,
+  { endAt, startAt }: { readonly startAt: string; readonly endAt: null | string },
 ): ActionError | null => {
   if (isAhead(deps, moved.startAt) || isAhead(deps, moved.endAt)) {
     return "retro/future";
   }
-  return endAt !== null && Date.parse(endAt) <= Date.parse(moved.startAt)
-    ? "action/invalid-input"
-    : null;
+  return endAt !== null && Date.parse(endAt) <= Date.parse(startAt) ? "action/invalid-input" : null;
 };
 
 /** Validate both edits before writing either event. */
@@ -154,36 +152,30 @@ const saveEdit = async (
   if (activity === undefined) {
     return err("event/not-found");
   }
-  const isMoved =
-    entry.startAt !== target.startAt || (entry.endAt !== null && entry.endAt !== target.endAt);
   const moved = moveChange(target, entry);
-  const moveError = isMoved ? movementError(deps, moved, moved.endAt ?? activity.endAt) : null;
+  const isMoved = Object.keys(moved).length > 0;
+  const moveError = isMoved
+    ? movementError(deps, moved, {
+        endAt: moved.endAt ?? activity.endAt,
+        startAt: moved.startAt ?? activity.startAt,
+      })
+    : null;
   if (moveError !== null) {
     return err(moveError);
   }
-  const isRenamed = shouldRelabel(target, entry);
-  if (isRenamed && hasUnknownTask(deps, entry.taskId)) {
+  const relabel = labelChange(target, entry);
+  if (hasUnknownTask(deps, relabel.taskId)) {
     return err("task/unknown");
   }
   return await emit(
     deps,
     editInputs(deps, {
       activityId: target.activityId,
-      entry,
       moved: isMoved ? moved : null,
-      isRenamed,
+      relabel: Object.keys(relabel).length > 0 ? relabel : null,
     }),
   );
 };
-
-const shouldRelabel = (
-  target: Extract<ActivityTarget, { kind: "edit" }>,
-  entry: ActivityEntry,
-): boolean =>
-  activityLabel(entry.label) !== target.label ||
-  entry.category !== target.category ||
-  (entry.expectMinutes !== undefined && entry.expectMinutes !== (target.expectMinutes ?? null)) ||
-  (entry.taskId !== undefined && entry.taskId !== (target.taskId ?? null));
 
 const saveActivity = async (
   deps: ActionDeps,

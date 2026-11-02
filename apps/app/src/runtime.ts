@@ -5,6 +5,7 @@ import {
   type EventStore,
   type InstanceError,
   type PaceClient,
+  type PaceClientOptions,
   type SessionStore,
 } from "@pace/client";
 import { type AppHooks, createAppHooks } from "@pace/client/react";
@@ -12,10 +13,12 @@ import { CLIENT_OUTDATED, type Instance, type Result } from "@pace/core";
 
 import { loadDeviceId } from "./platform/device-id.ts";
 import { IS_PHONE } from "./platform/device.ts";
-import { createEventStore } from "./platform/event-store.ts";
+import { createEventStore, type LocalEventStore } from "./platform/event-store.ts";
+import { createPeerTabs } from "./platform/peer-tabs.ts";
 import { createSecureSessionStore } from "./platform/secure-session.ts";
 import { markClientOutdated } from "./platform/server-store.ts";
 import { readServer } from "./platform/server.ts";
+import { createSignOutNotes } from "./platform/sign-out-notes.ts";
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -68,9 +71,26 @@ const watchingProtocol =
     return response;
   };
 
+/**
+Where the session is kept, with the note a tab that logs out leaves the profile's other tabs; a
+store a test hands in is nobody else's, so it shares no note.
+*/
+const sessionOf = (
+  provided: SessionStore | undefined,
+  baseUrl: string,
+): Pick<PaceClientOptions, "session" | "signOutNotes"> =>
+  provided === undefined
+    ? { session: createSecureSessionStore(baseUrl), signOutNotes: createSignOutNotes() }
+    : { session: provided, signOutNotes: undefined };
+
 /** Builds the client stack on the platform adapters; options override them (tests). */
 export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceRuntime> => {
-  const eventStore = options.eventStore ?? createEventStore();
+  // A store a test hands in is nobody else's.
+  const local: LocalEventStore =
+    options.eventStore === undefined
+      ? createEventStore()
+      : { isShared: () => Promise.resolve(false), store: options.eventStore };
+  const eventStore = local.store;
   const deviceId = await (options.deviceId ?? loadDeviceId)();
   const baseUrl = options.baseUrl ?? (await readServer());
   const fetchOf: FetchLike = options.fetch ?? (async (input, init) => await fetch(input, init));
@@ -81,7 +101,8 @@ export const createRuntime = async (options: RuntimeOptions = {}): Promise<PaceR
     deviceId,
     fetch: watched,
     ...(options.now !== undefined && { now: options.now }),
-    session: options.session ?? createSecureSessionStore(baseUrl),
+    peers: createPeerTabs(local.isShared),
+    ...sessionOf(options.session, baseUrl),
     // The event log tells which shell a change came from.
     source: IS_PHONE ? "app" : "web",
     store: eventStore,

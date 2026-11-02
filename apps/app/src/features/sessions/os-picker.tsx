@@ -75,9 +75,12 @@ const Mark = ({
 
 /** Windows, macOS or Linux as one row of segments; the chosen one in the quiet accent. */
 export const OsPicker = ({
+  chosenRef,
   onChange,
   value,
 }: {
+  /** The chosen segment, for focus to land on as the picker appears. */
+  readonly chosenRef?: (node: null | View) => void;
   readonly onChange: (os: ComputerOs) => void;
   readonly value: ComputerOs;
 }) => {
@@ -100,6 +103,7 @@ export const OsPicker = ({
             onPress={() => {
               onChange(os);
             }}
+            ref={isChosen ? chosenRef : undefined}
           >
             <Mark
               cutout={isChosen ? palette.accentQuiet : palette.surface}

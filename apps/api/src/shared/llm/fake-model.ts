@@ -14,19 +14,32 @@ import {
 } from "@pace/core";
 
 import { askReply } from "./fake-ask.ts";
-import { failureOf, FINISH, sleep } from "./fake-call.ts";
+import {
+  failureOf,
+  FINISH,
+  type ModelObject,
+  SCHEMA_REFUSAL,
+  sleep,
+  type Streamed,
+  streamOf,
+  USAGE,
+} from "./fake-call.ts";
 import { DOMAIN_LINES } from "./prompt.ts";
 
-/** What a scripted model does with a message: answer it, be rate limited, or refuse its key. */
+/**
+What a scripted model does with a message: answer it, be rate limited, refuse its key, be down
+(a 5xx with no retry hint), or have its endpoint refuse the answer it generated on the
+endpoint's own schema check: in the error's body (`failed_generation`), or after streaming it;
+or send an error object as a stream chunk instead of an answer (`streamsError`: copy a real
+endpoint's object, bug class 97).
+*/
 export type FakeReply =
   | ModelOutput
   | { readonly rateLimitedFor: number }
-  | { readonly refusedWith: 401 | 403 };
-
-const USAGE = {
-  inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
-  outputTokens: { reasoning: undefined, text: undefined, total: 50 },
-};
+  | { readonly refusedWith: 401 | 403 }
+  | { readonly schemaRefused: unknown; readonly via: "body" | "stream" }
+  | { readonly streamsError: object }
+  | { readonly unavailableWith: 500 | 502 | 503 | 504 };
 
 type PromptMessage = { readonly role: string; readonly content: unknown };
 
@@ -43,14 +56,13 @@ const systemOf = (prompt: readonly PromptMessage[]): string => {
   return typeof system?.content === "string" ? system.content : "";
 };
 
-/** A model object of the current provider specification (`LanguageModel` also admits ids). */
-type ModelObject = Extract<LanguageModel, { readonly specificationVersion: "v4" }>;
-
 export type FakeModelOptions = {
   /** How long the model "thinks" before its first token (or its error), in ms. */
   readonly firstTokenAfterMs?: number;
   /** Sends the start of its answer, then the stream breaks (a provider dropping mid-answer). */
   readonly breaksMidStream?: boolean;
+  /** How long it takes from its first token to the rest of its answer, in ms. */
+  readonly restAfterMs?: number;
 };
 
 /**
@@ -60,24 +72,29 @@ the answer as one text part after `firstTokenAfterMs`, and honours an abort whil
 */
 export const fakeParseModel = (
   reply: (text: string, system: string) => FakeReply,
-  { breaksMidStream = false, firstTokenAfterMs = 0 }: FakeModelOptions = {},
+  { breaksMidStream = false, firstTokenAfterMs = 0, restAfterMs = 0 }: FakeModelOptions = {},
 ): LanguageModel => {
   /** The scripted answer as JSON text, after the wait; a scripted failure is thrown. */
   const answerTo = async ({
     abortSignal,
     prompt,
-  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<string> => {
+  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<Streamed> => {
     await sleep(firstTokenAfterMs, abortSignal);
     const answer = reply(messageOf(prompt), systemOf(prompt));
     const failure = failureOf(answer);
     if (failure !== null) {
       throw failure;
     }
-    return JSON.stringify(answer);
+    if ("streamsError" in answer) {
+      return { errorAfter: answer.streamsError, text: "" };
+    }
+    return "schemaRefused" in answer
+      ? { errorAfter: SCHEMA_REFUSAL, text: JSON.stringify(answer.schemaRefused) }
+      : { text: JSON.stringify(answer) };
   };
   const model: ModelObject = {
     doGenerate: async (call) => {
-      const text = await answerTo(call);
+      const { text } = await answerTo(call);
       return {
         content: [{ text, type: "text" }],
         finishReason: FINISH,
@@ -86,23 +103,11 @@ export const fakeParseModel = (
       };
     },
     doStream: async (call) => {
-      const text = await answerTo(call);
       return {
-        stream: new ReadableStream({
-          start: (controller) => {
-            controller.enqueue({ type: "stream-start", warnings: [] });
-            controller.enqueue({ id: "0", type: "text-start" });
-            if (breaksMidStream) {
-              controller.enqueue({ delta: text.slice(0, 10), id: "0", type: "text-delta" });
-              controller.enqueue({ error: new Error("connection reset"), type: "error" });
-              controller.close();
-              return;
-            }
-            controller.enqueue({ delta: text, id: "0", type: "text-delta" });
-            controller.enqueue({ id: "0", type: "text-end" });
-            controller.enqueue({ finishReason: FINISH, type: "finish", usage: USAGE });
-            controller.close();
-          },
+        stream: streamOf(await answerTo(call), {
+          breaksMidStream,
+          restAfterMs,
+          signal: call.abortSignal,
         }),
       };
     },

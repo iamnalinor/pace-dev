@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { AppState } from "react-native";
 
 import type { PaceRuntime } from "#app/runtime.ts";
 
@@ -10,6 +11,7 @@ import { isControl } from "#app/test/focus-target.ts";
 import { renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
+import { REQUEST_DEADLINE_MS } from "@pace/client";
 import { fakeInstance, type FakeRoute, problem } from "@pace/client/testing";
 import { type Session, SessionsOutputSchema } from "@pace/core";
 
@@ -38,6 +40,13 @@ jest.mock("#app/platform/focus-field.ts", (): unknown => ({
   },
 }));
 
+/** No keyboard (a phone) by default; a test may give the window one (a computer). */
+const mockKeyboard: { os: "mac" | "other" | null } = { os: null };
+jest.mock("#app/ui/use-hotkey.tsx", (): unknown => {
+  const actual: object = jest.requireActual("#app/ui/use-hotkey.tsx");
+  return Object.defineProperty({ ...actual }, "KEYBOARD", { get: () => mockKeyboard.os });
+});
+
 /** The Android app by default; a test may render the web build's Settings instead. */
 const mockDevice = { isPhone: true };
 jest.mock("#app/platform/device.ts", (): unknown => ({
@@ -49,6 +58,15 @@ jest.mock("#app/platform/device.ts", (): unknown => ({
 jest.mock("#app/features/settings/export-row.tsx", (): unknown =>
   jest.requireActual("#app/features/settings/export-row.web.tsx"),
 );
+/** The files the browser was handed. */
+const mockDownloads = jest.fn<Promise<void>, [unknown, string]>(async () => {
+  await Promise.resolve();
+});
+jest.mock("#app/platform/xlsx.web.ts", (): unknown => ({
+  downloadXlsx: async (sheets: unknown, fileName: string) => {
+    await mockDownloads(sheets, fileName);
+  },
+}));
 
 /** 10:39 on Oct 13 in Moscow, the account's zone. */
 const NOW = "2026-10-13T07:39:00.000Z";
@@ -129,8 +147,24 @@ const renderSettings = async (routes: Readonly<Record<string, FakeRoute>>) => {
 
 const ALL = [AGENT, MCP, PHONE, OTHER_BROWSER, THIS_BROWSER];
 
+// eslint-disable-next-line @typescript-eslint/unbound-method -- inspecting the jest mock, never calling it
+const appStateListeners = jest.mocked(AppState.addEventListener);
+
+/** The app as AppState says it is: back to the front ("active") or away. */
+const appStateIs = async (next: "active" | "background"): Promise<void> => {
+  await act(async () => {
+    for (const [type, listener] of appStateListeners.mock.calls) {
+      if (type === "change") {
+        listener(next);
+      }
+    }
+    await Promise.resolve();
+  });
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockKeyboard.os = null;
   mockLayout.isWide = false;
   mockDevice.isPhone = true;
 });
@@ -176,9 +210,16 @@ describe("Settings → Devices and sessions", () => {
       within(screen.getByLabelText("Linux Mint")).getByText("Last data Oct 12, 23:10"),
     ).toBeOnTheScreen();
     expect(
-      within(screen.getByLabelText("Firefox on Linux")).getByText("Germany · 1.2.3.4"),
+      within(screen.getByLabelText("Firefox on Linux")).getByLabelText(
+        "Browser, Germany, 1.2.3.4, Signed in Oct 1, 13:00",
+      ),
     ).toBeOnTheScreen();
-    expect(screen.getByLabelText("Claude")).toBeOnTheScreen();
+    // Every row names its kind in words; an AI app has a line too (QA round 15 L5).
+    expect(within(screen.getByLabelText("Claude")).getByText(/^AI app/u)).toBeOnTheScreen();
+    expect(
+      within(screen.getByLabelText("Claude")).getByText("Added Oct 1, 13:00"),
+    ).toBeOnTheScreen();
+    expect(within(screen.getByLabelText("Linux Mint")).getByText(/^Computer/u)).toBeOnTheScreen();
     // The current session first.
     const names = (
       screen.root?.queryAll(
@@ -236,6 +277,73 @@ describe("Settings → Devices and sessions", () => {
     expect(isControl(backTarget, within(row).getByRole("button", { name: "Revoke" }))).toBe(true);
   });
 
+  it("keeps one confirm open at a time: opening another closes the first (QA round 15 L1)", async () => {
+    await renderSettings(sessionsServer(ALL).routes);
+    const browser = await screen.findByLabelText("Firefox on Linux");
+    const computer = screen.getByLabelText("Linux Mint");
+    await fireEvent.press(within(browser).getByRole("button", { name: "Revoke" }));
+    expect(within(browser).getByText("End this session?")).toBeOnTheScreen();
+    await fireEvent.press(within(computer).getByRole("button", { name: "Disconnect" }));
+    expect(
+      within(computer).getByText("Disconnect this computer? Its token stops working at once."),
+    ).toBeOnTheScreen();
+    expect(within(browser).queryByText("End this session?")).toBeNull();
+    expect(within(browser).getByRole("button", { name: "Revoke" })).toBeOnTheScreen();
+  });
+
+  it("reloads the list when the person comes back and when a sign-in notice arrives (QA round 15 M1)", async () => {
+    const listed = { sessions: [...ALL] };
+    const lists = { count: 0 };
+    const runtime = await renderSettings({
+      "GET /api/sessions": () => {
+        lists.count += 1;
+        return SessionsOutputSchema.parse({ sessions: listed.sessions });
+      },
+    });
+    await screen.findByLabelText("Firefox on Linux");
+    // The feed's first load is no news: the list already shows what it says.
+    await act(async () => {
+      runtime.notifications.store.setState({ status: "ready" });
+      await Promise.resolve();
+    });
+    expect(lists.count).toBe(1);
+    // A computer added elsewhere shows once the person returns to the app or the tab.
+    listed.sessions = [...ALL, session({ id: "01NEW", kind: "agent", name: "New laptop" })];
+    await appStateIs("active");
+    expect(await screen.findByLabelText("New laptop")).toBeOnTheScreen();
+    // A sign-in elsewhere arrives live as a notice: the list follows it without a return.
+    listed.sessions = [...listed.sessions, session({ id: "01EDGE", name: "Edge on Windows" })];
+    await act(async () => {
+      runtime.notifications.store.setState((state) => ({
+        ...state,
+        items: [
+          {
+            createdAt: NOW,
+            id: "n-edge",
+            kind: "login",
+            payload: {
+              country: "",
+              ip: "",
+              kind: "web",
+              name: "Edge on Windows",
+              sessionId: "01EDGE",
+            },
+            readAt: null,
+            resolution: null,
+            resolvedAt: null,
+          },
+          ...state.items,
+        ],
+      }));
+      await Promise.resolve();
+    });
+    expect(await screen.findByLabelText("Edge on Windows")).toBeOnTheScreen();
+    // A background trip is no return: nothing is asked while the app is away.
+    const before = lists.count;
+    await appStateIs("background");
+    expect(lists.count).toBe(before);
+  });
+
   it("disconnects a computer and revokes an MCP app, each asked first", async () => {
     const server = sessionsServer(ALL);
     await renderSettings(server.routes);
@@ -262,8 +370,30 @@ describe("Settings → Devices and sessions", () => {
 
   it("signs out and goes to the login card when the session ended is this device's", async () => {
     const server = sessionsServer(ALL);
-    const runtime = await renderSettings(server.routes);
+    const logouts = { count: 0 };
+    // Whether the socket had rested when the DELETE reached the server.
+    const atDelete: { stopsBefore: number; sync?: unknown } = { stopsBefore: -1 };
+    const stops = { count: 0 };
+    const deleteRoute = server.routes["DELETE /api/sessions/01CHROME"];
+    const runtime = await renderSettings({
+      ...server.routes,
+      "DELETE /api/sessions/01CHROME": async (request) => {
+        atDelete.stopsBefore = stops.count;
+        // Nothing of the sync goes out meanwhile: it would answer 401 once the session is gone.
+        atDelete.sync = await runtime.sync.syncNow();
+        return deleteRoute?.(request);
+      },
+      "POST /api/auth/logout": () => {
+        logouts.count += 1;
+        return { ok: true };
+      },
+    });
     const row = await screen.findByLabelText("Chrome on macOS");
+    const { stop } = runtime.live;
+    jest.spyOn(runtime.live, "stop").mockImplementation(() => {
+      stops.count += 1;
+      stop();
+    });
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
     expect(within(row).getByText("End this session? This device signs out.")).toBeOnTheScreen();
     await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
@@ -272,6 +402,57 @@ describe("Settings → Devices and sessions", () => {
     });
     expect(server.deleted).toEqual(["01CHROME"]);
     expect(runtime.auth.token()).toBeUndefined();
+    // The server ended it already: no logout that would answer 401 (QA round 15 L2).
+    expect(logouts.count).toBe(0);
+    // The socket rested before the DELETE: the server's close of it cannot read as "elsewhere".
+    expect(atDelete.stopsBefore).toBe(1);
+    expect(atDelete.sync).toEqual({ error: "stopped", ok: false });
+    expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
+  });
+
+  it("gives up ending this device when the server never answers: sync and socket come back (round 7 review 2)", async () => {
+    const calls = { deletes: 0, pulls: 0 };
+    const runtime = await signedIn({
+      "DELETE /api/sessions/01CHROME": async () => {
+        calls.deletes += 1;
+        return await new Promise<never>(() => undefined);
+      },
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: ALL }),
+      "GET /api/sync/pull": () => {
+        calls.pulls += 1;
+        return { events: [], more: false, seq: 0, storeId: "store-test" };
+      },
+    });
+    const starts = jest.spyOn(runtime.live, "start");
+    jest.useFakeTimers();
+    try {
+      await renderScreen(<SettingsScreen />, runtime);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      const row = screen.getByLabelText("Chrome on macOS");
+      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+      await fireEvent.press(within(row).getByRole("button", { name: "Revoke" }));
+      const startsBefore = starts.mock.calls.length;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't end the session. Try again.");
+      expect(runtime.auth.store.getState().status).toBe("signed-in");
+      expect(runtime.auth.isEnding()).toBe(false);
+      // The socket is back, and the sync loop runs again on its own (not only a socket).
+      expect(starts.mock.calls.length).toBeGreaterThan(startsBefore);
+      const pullsAfter = calls.pulls;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(31_000);
+      });
+      expect(calls.pulls).toBeGreaterThan(pullsAfter);
+      // The steady state: one DELETE, and the loop at its interval, not a burst.
+      expect(calls.deletes).toBe(1);
+      expect(calls.pulls - pullsAfter).toBeLessThanOrEqual(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("says so quietly when a revoke fails, and keeps the row", async () => {
@@ -388,6 +569,33 @@ describe("Settings → Devices and sessions", () => {
     }
   });
 
+  it("offers Try again when the list never comes, instead of grey rows for good (round 6, class 62)", async () => {
+    const calls = { count: 0 };
+    const runtime = await signedIn({
+      "GET /api/sessions": async () => {
+        calls.count += 1;
+        if (calls.count === 1) {
+          await new Promise<never>(() => undefined);
+        }
+        return SessionsOutputSchema.parse({ sessions: ALL });
+      },
+    });
+    jest.useFakeTimers();
+    try {
+      await renderScreen(<SettingsScreen />, runtime);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      });
+      await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByLabelText("Chrome on macOS")).toBeOnTheScreen();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("offers Try again when the list cannot load, which loads it again", async () => {
     const answers = { failing: true };
     await renderSettings({
@@ -404,9 +612,12 @@ describe("Settings → Devices and sessions", () => {
   });
 
   it("adds a computer: install commands omit the separately displayed token", async () => {
-    // The commands name the current server's API and web app, as it reports them.
+    // The commands name the API the app reaches the server at (the server reports another one,
+    // QA round 18 L10), and the web app the server reports.
     const serverApi = "https://pace-api.example.dev";
     const serverWeb = "https://pace.example.dev";
+    const usedApi = serverStore.getState().origin;
+    expect(usedApi).not.toBe(serverApi);
     const listed: Session[] = [];
     await renderSettings({
       "GET /api/instance": () => ({ ...fakeInstance, apiOrigin: serverApi, webOrigin: serverWeb }),
@@ -433,7 +644,7 @@ describe("Settings → Devices and sessions", () => {
       `Invoke-WebRequest -UseBasicParsing ${serverWeb}/pace_agent.py`,
       { exact: false },
     );
-    expect(windowsLine).toHaveTextContent(`install --api ${serverApi} --name 'Work laptop'`, {
+    expect(windowsLine).toHaveTextContent(`install --api ${usedApi} --name 'Work laptop'`, {
       exact: false,
     });
     expect(windowsLine).not.toHaveTextContent("tok_secret");
@@ -452,7 +663,7 @@ describe("Settings → Devices and sessions", () => {
     expect(screen.getByText(/GNOME on Wayland/u)).toBeOnTheScreen();
     expect(
       screen.getByText(
-        `curl -fsSL ${serverWeb}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${serverApi} --name 'Work laptop'`,
+        `curl -fsSL ${serverWeb}/pace_agent.py -o ~/.pace_agent.py && python3 ~/.pace_agent.py install --api ${usedApi} --name 'Work laptop'`,
       ),
     ).toBeOnTheScreen();
     expect(screen.queryByText(/winget/u)).toBeNull();
@@ -471,7 +682,22 @@ describe("Settings → Devices and sessions", () => {
     expect(await screen.findByLabelText("Work laptop")).toBeOnTheScreen();
   });
 
+  it("leaves the name unfocused on a touch screen: no on-screen keyboard over the sheet (QA round 20 L1)", async () => {
+    await renderSettings({
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [THIS_BROWSER] }),
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Add a computer" }));
+    expect(screen.getByLabelText("Name")).toBeOnTheScreen();
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    });
+    expect(mockFocusField).not.toHaveBeenCalled();
+  });
+
   it("adds a computer from the keyboard: the name is focused and selected, Enter creates the token once (QA round 15 M2)", async () => {
+    mockKeyboard.os = "other";
     const created: string[] = [];
     await renderSettings({
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [THIS_BROWSER] }),
@@ -501,10 +727,22 @@ describe("Settings → Devices and sessions", () => {
     });
     expect(await screen.findByText("tok_secret")).toBeOnTheScreen();
     expect(created).toEqual(["Work laptop"]);
+    // The field went with the name step: focus moves to the next step's first control, the
+    // chosen system, never to the page (QA round 16 L2).
+    const [target] = mockMoveFocus.mock.calls.at(-1) ?? [];
+    expect(isControl(target, screen.getByRole("radio", { checked: true, name: "Windows" }))).toBe(
+      true,
+    );
   });
 
   it("shows how to connect an AI app: the server's MCP URL and the steps per client", async () => {
+    // The server names another public API than the address the app reaches it at (a phone on the
+    // LAN, a Worker behind a proxy): MCP is OAuth-bound to that public one (`<API_ORIGIN>/mcp`, the
+    // Worker's protected resource), so the URL is it, and a line says the two differ (round 7
+    // review 1; QA round 18 L10's "the one in use" stays for the computer agent).
     const serverApi = "https://pace-api.example.dev";
+    const usedApi = serverStore.getState().origin;
+    expect(usedApi).not.toBe(serverApi);
     await renderSettings({
       "GET /api/instance": () => ({ ...fakeInstance, apiOrigin: serverApi }),
       "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
@@ -514,6 +752,10 @@ describe("Settings → Devices and sessions", () => {
     });
     await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
     expect(await screen.findByText(`${serverApi}/mcp`)).toBeOnTheScreen();
+    expect(screen.queryByText(`${usedApi}/mcp`)).toBeNull();
+    expect(
+      screen.getByText("This server's public address differs from the one this device uses."),
+    ).toBeOnTheScreen();
     // A phone has no clipboard module: the URL goes on through the share sheet.
     expect(screen.getByRole("button", { name: "Send the URL" })).toBeOnTheScreen();
     expect(screen.getByText("Claude")).toBeOnTheScreen();
@@ -528,6 +770,20 @@ describe("Settings → Devices and sessions", () => {
     await waitFor(() => {
       expect(screen.queryByText(`${serverApi}/mcp`)).toBeNull();
     });
+  });
+
+  it("says nothing about the address when the server's public API is the one in use", async () => {
+    const usedApi = serverStore.getState().origin;
+    await renderSettings({
+      "GET /api/instance": () => ({ ...fakeInstance, apiOrigin: usedApi }),
+      "GET /api/sessions": () => SessionsOutputSchema.parse({ sessions: [] }),
+    });
+    await waitFor(() => {
+      expect(serverStore.getState().instance?.apiOrigin).toBe(usedApi);
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Connect an AI app" }));
+    expect(await screen.findByText(`${usedApi}/mcp`)).toBeOnTheScreen();
+    expect(screen.queryByText(/public address differs/u)).toBeNull();
   });
 });
 
@@ -583,6 +839,26 @@ describe("Settings' order", () => {
     ]);
     expect(settingsOutline()).not.toContain("Permissions");
     expect(screen.queryByText(/Excel file/u)).toBeNull();
+  });
+
+  it("says how the web gets notifications, where the phone has its method picker (QA round 15 L12)", async () => {
+    mockDevice.isPhone = false;
+    await renderSettings(sessionsServer([THIS_BROWSER]).routes);
+    expect(
+      await screen.findByText(
+        "In a browser, notifications wait under the bell; the browser itself shows none.",
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it("says what Export data downloaded (QA round 15 L6)", async () => {
+    mockDevice.isPhone = false;
+    await renderSettings(sessionsServer([THIS_BROWSER]).routes);
+    await fireEvent.press(await screen.findByRole("button", { name: "Export data" }));
+    await waitFor(() => {
+      expect(mockDownloads).toHaveBeenCalledWith(expect.anything(), "pace-2026-10-13.xlsx");
+    });
+    expect(await screen.findByText("Downloaded pace-2026-10-13.xlsx")).toBeOnTheScreen();
   });
 });
 

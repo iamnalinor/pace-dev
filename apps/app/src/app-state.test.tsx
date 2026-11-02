@@ -4,7 +4,12 @@ import * as Notifications from "expo-notifications";
 import { createHash } from "node:crypto";
 import { AppState, Text } from "react-native";
 
-import { createMemoryEventStore, createMemorySessionStore, type EventStore } from "@pace/client";
+import {
+  createMemoryEventStore,
+  createMemorySessionStore,
+  type EventStore,
+  type SessionStore,
+} from "@pace/client";
 import {
   createFakeFetch,
   emptySyncRoutes,
@@ -18,6 +23,7 @@ import type { createFakeBackgroundTask } from "./testing/background-task.fake.ts
 
 import { PaceProvider, useAuth, useSync, useT } from "./app-state.tsx";
 import { createRuntime, type PaceRuntime } from "./runtime.ts";
+import { backOnline } from "./ui/sync-frame.tsx";
 
 const Probe = () => {
   const { status, user } = useAuth();
@@ -34,6 +40,7 @@ const Probe = () => {
 
 const setup = async (
   routes: Readonly<Record<string, FakeRoute>> = {},
+  session: SessionStore = createMemorySessionStore(),
 ): Promise<{
   readonly api: ReturnType<typeof createFakeFetch>;
   readonly eventStore: EventStore;
@@ -52,11 +59,31 @@ const setup = async (
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     eventStore,
     fetch: api.fetch,
-    session: createMemorySessionStore(),
+    session,
   });
   await runtime.state.ready;
   return { api, eventStore, runtime };
 };
+
+/** Every time the half-typed line's draft is forgotten (a sign-out, round 7 review 4). */
+const mockForgetLineDraft = jest.fn();
+jest.mock("./platform/shared-in.ts", (): unknown => ({
+  ...jest.requireActual<object>("./platform/shared-in.ts"),
+  forgetLineDraft: () => {
+    mockForgetLineDraft();
+  },
+}));
+
+/** The browser window's focus coming back, as the web stand-in hears it. */
+const mockWindowFocus = { listeners: new Set<() => void>() };
+jest.mock("./platform/window-focus.ts", (): unknown => ({
+  onWindowFocus: (listener: () => void) => {
+    mockWindowFocus.listeners.add(listener);
+    return () => {
+      mockWindowFocus.listeners.delete(listener);
+    };
+  },
+}));
 
 // eslint-disable-next-line @typescript-eslint/unbound-method -- inspecting the jest mock, never calling it
 const addEventListener = jest.mocked(AppState.addEventListener);
@@ -375,6 +402,8 @@ describe("PaceProvider", () => {
       expect(screen.getByTestId("title")).toHaveTextContent("Now");
     });
     expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    // The half-typed line goes with the account: a share after the next sign-in is only the share.
+    expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
   });
 
   it("starts the background check once signed in, and stops it on logout", async () => {
@@ -440,8 +469,10 @@ describe("PaceProvider", () => {
         <Probe />
       </PaceProvider>,
     );
+    // Synced, and the signed-in start's own write (the time zone) sent: then the loop rests.
     await waitFor(async () => {
       await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
     });
     await act(async () => {
       runtime.sync.stop();
@@ -462,6 +493,176 @@ describe("PaceProvider", () => {
     await expect(eventStore.listPending()).resolves.toEqual([]);
     await expect(eventStore.getCursor()).resolves.toBe(0);
     await expect(eventStore.getStoreId()).resolves.toBeNull();
+  });
+});
+
+describe("the notification pool on the first load (QA round 20 L9)", () => {
+  it("is fetched once by the signed-in start, not again by the socket's first connection", async () => {
+    const { api, runtime } = await setup({
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+    });
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await act(async () => {
+      await runtime.auth.loginWithDev("1");
+    });
+    await waitFor(() => {
+      expect(api.pathsCalled("/api/notifications")).toHaveLength(1);
+    });
+    await act(async () => {
+      runtime.live.status.setState({ isConnected: true });
+      await Promise.resolve();
+    });
+    expect(api.pathsCalled("/api/notifications")).toHaveLength(1);
+    // A reconnect later (the line dropped a while): what the pool got meanwhile is fetched.
+    const later = Date.now() + 60_000;
+    jest.spyOn(Date, "now").mockReturnValue(later);
+    await act(async () => {
+      runtime.live.status.setState({ isConnected: false });
+      runtime.live.status.setState({ isConnected: true });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(api.pathsCalled("/api/notifications")).toHaveLength(2);
+    });
+    jest.restoreAllMocks();
+  });
+});
+
+describe("the window's focus coming back while offline (QA round 20 L2)", () => {
+  it("tries the server again at once, and only while the last run could not reach it", async () => {
+    const network = { isDown: true };
+    const { api, runtime } = await setup({
+      "GET /api/sync/pull": () => {
+        if (network.isDown) {
+          throw new TypeError("Failed to fetch");
+        }
+        return { events: [], more: false, seq: 0, storeId: "store-test" };
+      },
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().online).toBe(false);
+    });
+    network.isDown = false;
+    const before = api.pathsCalled("/api/sync/pull").length;
+    await act(async () => {
+      for (const listener of mockWindowFocus.listeners) {
+        listener();
+      }
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().online).toBe(true);
+    });
+    expect(api.pathsCalled("/api/sync/pull").length).toBeGreaterThan(before);
+    // Online: a focus asks for nothing.
+    const after = api.pathsCalled("/api/sync/pull").length;
+    await act(async () => {
+      for (const listener of mockWindowFocus.listeners) {
+        listener();
+      }
+      await Promise.resolve();
+    });
+    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(after);
+  });
+});
+
+describe("every starter while this device ends its own session (round 7 review 8, class 75)", () => {
+  it("starts no socket and sends no run: foreground return, window focus, Retry", async () => {
+    const network = { isDown: true };
+    const { api, runtime } = await setup({
+      "GET /api/sync/pull": () => {
+        if (network.isDown) {
+          throw new TypeError("Failed to fetch");
+        }
+        return { events: [], more: false, seq: 0, storeId: "store-test" };
+      },
+    });
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(() => {
+      expect(runtime.sync.status.getState().online).toBe(false);
+    });
+    network.isDown = false;
+    // Ending this device's session: its revoke is on its way.
+    void runtime.auth.endThisDevice(async () => {
+      await new Promise<never>(() => undefined);
+    });
+    await waitFor(() => {
+      expect(runtime.auth.isEnding()).toBe(true);
+    });
+    const starts = jest.spyOn(runtime.live, "start");
+    const before = api.pathsCalled("/api/sync/pull").length;
+    await act(async () => {
+      for (const [type, listener] of addEventListener.mock.calls) {
+        if (type === "change") {
+          listener("active");
+        }
+      }
+      for (const listener of mockWindowFocus.listeners) {
+        listener();
+      }
+      backOnline(runtime);
+      await Promise.resolve();
+    });
+    expect(starts).not.toHaveBeenCalled();
+    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(before);
+  });
+});
+
+describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () => {
+  it("keeps the shared local copy when its late 401 finds another tab's session in the store", async () => {
+    // The browser profile's session store, shared with a tab that logged out and in again.
+    const shared = createMemorySessionStore();
+    const server = { isOldEnded: false };
+    const { eventStore, runtime } = await setup(
+      { "GET /api/me": () => (server.isOldEnded ? problem(401, "auth/unauthorized") : fakeMe) },
+      shared,
+    );
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    // Synced, and the signed-in start's own write (the time zone) sent: then the loop rests.
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+      await expect(eventStore.listPending()).resolves.toEqual([]);
+    });
+    await act(async () => {
+      runtime.sync.stop();
+      await runtime.state.dispatch({
+        occurredAt: "2026-10-06T10:00:00.000Z",
+        payload: { language: "ru" },
+        type: "settings.updated",
+      });
+    });
+    // Another tab logged this session out and signed in again: its token is in the shared store.
+    server.isOldEnded = true;
+    await shared.set("tok_other_tab");
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    await expect(shared.get()).resolves.toBe("tok_other_tab");
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
   });
 });
 

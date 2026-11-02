@@ -10,6 +10,7 @@ import {
 } from "@pace/core";
 
 import { type ApiClient, ApiError } from "../api-client.ts";
+import { withinDeadline } from "../deadline.ts";
 
 /** Who is allowing: a signed widget payload, or a dev id (local and e2e builds only). */
 export type Identity =
@@ -73,7 +74,11 @@ const useClientInfo = (api: ApiClient, authQuery: string) => {
     const lifetime = new AbortController();
     void (async () => {
       try {
-        const info = await api.call(endpoints.oauth.clientInfo, { query: { authQuery } });
+        // Details that never come end as "failed", not a page loading for good (bug class 62).
+        const info = await withinDeadline(
+          async (signal) =>
+            await api.call(endpoints.oauth.clientInfo, { query: { authQuery } }, { signal }),
+        );
         if (!lifetime.signal.aborted) {
           setScopes(info.scopes);
           setPhase({ info, kind: "ready" });

@@ -88,6 +88,41 @@ export type TaskHeaderActions = {
   readonly onGiveUp: () => void;
 };
 
+/** The task's project, or "No project"; a tap moves the task to another one. */
+const ProjectChip = ({
+  onProject,
+  project,
+}: {
+  readonly onProject: (() => void) | undefined;
+  readonly project: TaskViewModel["project"];
+}) => {
+  const t = useT();
+  const { palette } = useTheme();
+  const name = project?.name ?? t("task.noProject");
+  return (
+    <Pressable
+      accessibilityLabel={t("task.changeProject", { project: name })}
+      accessibilityRole="button"
+      className="h-11 flex-row items-center gap-1 active:opacity-70"
+      disabled={onProject === undefined}
+      onPress={onProject}
+    >
+      <Text
+        className={cx(
+          "font-sans text-[15px] font-medium",
+          project === null ? "text-fg2" : inkClass(project.color),
+        )}
+        numberOfLines={1}
+      >
+        {name}
+      </Text>
+      {onProject === undefined ? null : (
+        <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
+      )}
+    </Pressable>
+  );
+};
+
 /** Back, the project (tap to move the task), and the task's actions. */
 export const TaskHeader = ({
   actions,
@@ -97,12 +132,12 @@ export const TaskHeader = ({
   readonly actions?: TaskHeaderActions;
   /** Opens the project picker: the chip is how a task changes project. */
   readonly onProject?: () => void;
-  readonly project: TaskViewModel["project"];
+  /** Left out for a task that does not exist: there is no project to show (QA round 17 L11). */
+  readonly project?: TaskViewModel["project"];
 }) => {
   const t = useT();
   const back = useTaskBack();
   const isInPane = useIsInPane();
-  const { palette } = useTheme();
   return (
     <BackHeader
       // Beside the list the task is a pane: it closes, there is nothing to go back to.
@@ -111,28 +146,7 @@ export const TaskHeader = ({
       onBack={back}
       right={actions === undefined ? null : <TaskActions {...actions} />}
     >
-      <Pressable
-        accessibilityLabel={t("task.changeProject", {
-          project: project?.name ?? t("task.noProject"),
-        })}
-        accessibilityRole="button"
-        className="h-11 flex-row items-center gap-1 active:opacity-70"
-        disabled={onProject === undefined}
-        onPress={onProject}
-      >
-        <Text
-          className={cx(
-            "font-sans text-[15px] font-medium",
-            project === null ? "text-fg2" : inkClass(project.color),
-          )}
-          numberOfLines={1}
-        >
-          {project?.name ?? t("task.noProject")}
-        </Text>
-        {onProject === undefined ? null : (
-          <ChevronDown color={palette.muted} size={16} strokeWidth={2} />
-        )}
-      </Pressable>
+      {project === undefined ? null : <ProjectChip onProject={onProject} project={project} />}
     </BackHeader>
   );
 };

@@ -17,6 +17,7 @@ import { moveFocus } from "#app/platform/move-focus.ts";
 import { Button } from "#app/ui/button.tsx";
 import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { cx } from "#app/ui/cx.ts";
+import { HOTKEYS } from "#app/ui/hotkeys.ts";
 import { useIsWide } from "#app/ui/layout.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
@@ -26,14 +27,6 @@ const ICON: Readonly<Record<Row["kind"], LucideIcon>> = {
   browser: Globe,
   dev: SquareTerminal,
   mcp: Plug,
-};
-
-const KIND_KEY: Readonly<Record<Row["kind"], MessageKey>> = {
-  agent: "sessions.kind.agent",
-  app: "sessions.kind.app",
-  browser: "sessions.kind.browser",
-  dev: "sessions.kind.dev",
-  mcp: "sessions.kind.mcp",
 };
 
 /** What the confirmation asks: this device signs out; a computer's token stops; an app loses access. */
@@ -47,27 +40,39 @@ const confirmKey = (row: Row): MessageKey => {
   return row.isCurrent ? "sessions.revokeCurrentConfirm" : "sessions.revokeConfirm";
 };
 
-/** The kind's icon (named for screen readers), the name as it came and the viewer's line. */
+/**
+The kind's icon (its word leads the line under the name, so the icon is decoration), the name as
+it came, whole however long (wrapped, never cut), and the viewer's line. Each part of that line
+keeps together where it can: an address moves to the next line whole instead of breaking.
+*/
 const Identity = ({ row }: { readonly row: Row }) => {
-  const t = useT();
   const { palette } = useTheme();
   const Icon = ICON[row.kind];
   return (
     <>
       <View
-        accessibilityLabel={t(KIND_KEY[row.kind])}
-        accessibilityRole="image"
+        aria-hidden
         className="h-8 w-8 items-center justify-center rounded-full bg-raised"
+        importantForAccessibility="no-hide-descendants"
       >
         <Icon color={palette.fg2} size={18} strokeWidth={1.75} />
       </View>
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-[15px] font-medium text-fg" numberOfLines={1}>
-          {row.name}
-        </Text>
-        {row.meta.length === 0 ? null : (
-          <Text className="font-sans text-[13px] text-muted">{row.meta.join(" · ")}</Text>
-        )}
+        <Text className="font-sans text-[15px] font-medium text-fg">{row.name}</Text>
+        <View
+          accessibilityLabel={row.meta.join(", ")}
+          accessible
+          className="flex-row flex-wrap gap-x-3"
+          testID="session-meta"
+        >
+          {/* Parts apart by a gap, not a dot: a wrapped line never ends or starts on a dangling
+              separator (QA round 17 L2); each part keeps together where it can. */}
+          {row.meta.map((part) => (
+            <Text className="max-w-full font-sans text-[13px] text-muted" key={part}>
+              {part}
+            </Text>
+          ))}
+        </View>
       </View>
     </>
   );
@@ -110,7 +115,14 @@ const Confirm = ({
       </Text>
       <View className={cx("flex-row gap-2", isWide && "justify-end")}>
         <View className={cx(!isWide && "flex-1")}>
-          <Button onPress={onCancel} ref={cancelRef} variant="secondary" width={width}>
+          {/* Escape cancels, as it closes the sheets (QA round 15 L1); one confirm is open at a time. */}
+          <Button
+            hotkey={HOTKEYS.escape}
+            onPress={onCancel}
+            ref={cancelRef}
+            variant="secondary"
+            width={width}
+          >
             {t("common.cancel")}
           </Button>
         </View>
@@ -130,21 +142,27 @@ viewer's line under it, and Revoke (Disconnect for a computer) asked inline firs
 confirm moves focus to its Cancel and says the question; Cancel gives focus back to the button,
 and a failed end gives it back to the confirm's action (bug class 5; a successful one is the
 list's to place, as the row goes). The confirm holds a synchronous latch, so presses landing in
-one batch end the session once (bug class 36).
+one batch end the session once (bug class 36). The list holds which row is confirming, so one
+confirm is open at a time.
 */
 export const SessionRow = ({
+  isConfirming,
+  onConfirming,
   onEnd,
   openerRef,
   row,
 }: {
   readonly row: Row;
+  /** This row's confirm is the one open. */
+  readonly isConfirming: boolean;
+  /** Opens (true) or closes (false) this row's confirm. */
+  readonly onConfirming: (isOpen: boolean) => void;
   /** Ends it: true once it is gone; a failure (false) is the caller's to show (the row stays). */
   readonly onEnd: () => Promise<boolean>;
   /** The row's Revoke or Disconnect button, for the list to move focus onto. */
   readonly openerRef?: (node: null | View) => void;
 }) => {
   const t = useT();
-  const [isConfirming, setIsConfirming] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const sendingRef = useRef(false);
   const actionRef = useRef<View>(null);
@@ -179,7 +197,7 @@ export const SessionRow = ({
           <Button
             onPress={() => {
               focus.toCancel();
-              setIsConfirming(true);
+              onConfirming(true);
             }}
             ref={(node: null | View) => {
               toOpener(node);
@@ -199,7 +217,7 @@ export const SessionRow = ({
           isEnding={isEnding}
           onCancel={() => {
             focus.toOpener();
-            setIsConfirming(false);
+            onConfirming(false);
           }}
           onEnd={() => void end()}
           question={question}

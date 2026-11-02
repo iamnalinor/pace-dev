@@ -11,14 +11,53 @@ import { TaskRow } from "#app/shared/task-row.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { EmptyText } from "#app/ui/empty-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
-import { addMinutesIso, EVENT_LABEL_KEYS } from "@pace/core";
+import { addMinutesIso } from "@pace/core";
 
 import { PushedScreen } from "./pushed-screen.tsx";
 
 const MINUTES_PER_DAY = 1440;
+
+/** Asks before an event is undone; it names the event and its task under the question. */
+const UndoConfirmation = ({
+  isBusy,
+  onClose,
+  onUndo,
+  subtitle,
+}: {
+  readonly isBusy: boolean;
+  readonly onClose: () => void;
+  readonly onUndo: () => void;
+  readonly subtitle: string;
+}) => {
+  const t = useT();
+  return (
+    <Sheet
+      closeLabel={t("common.close")}
+      footer={
+        <SheetActions
+          cancelLabel={t("common.cancel")}
+          isBusy={isBusy}
+          onCancel={onClose}
+          onPrimary={onUndo}
+          primaryLabel={t("history.undoConfirm")}
+        />
+      }
+      name="history-undo"
+      onClose={onClose}
+      subtitle={subtitle}
+      title={t("history.undoConfirm")}
+      visible
+    >
+      <Text className="pb-4 font-sans text-[14px] leading-5 text-fg">
+        {t("history.undoConfirmQuestion")}
+      </Text>
+    </Sheet>
+  );
+};
 
 const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const t = useT();
@@ -27,7 +66,7 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
   const run = useRunAction();
   const [isConfirming, setIsConfirming] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  const eventLabel = t(EVENT_LABEL_KEYS[entry.type]);
+  const eventLabel = t(entry.labelKey);
   const closeConfirmation = () => {
     if (!isBusy) {
       setIsConfirming(false);
@@ -74,26 +113,14 @@ const EntryRow = ({ entry }: { readonly entry: HistoryEntry }) => {
         ) : null}
       </View>
       {isConfirming && entry.revocable ? (
-        <Sheet
-          closeLabel={t("common.close")}
-          footer={
-            <SheetActions
-              cancelLabel={t("common.cancel")}
-              isBusy={isBusy}
-              onCancel={closeConfirmation}
-              onPrimary={() => {
-                void undo();
-              }}
-              primaryLabel={t("history.undoConfirm")}
-            />
-          }
+        <UndoConfirmation
+          isBusy={isBusy}
           onClose={closeConfirmation}
+          onUndo={() => {
+            void undo();
+          }}
           subtitle={entry.taskTitle === null ? eventLabel : `${eventLabel} · ${entry.taskTitle}`}
-          title={t("history.undoConfirm")}
-          visible
-        >
-          <Text className="font-sans text-[14px] text-fg">{t("history.undoConfirmQuestion")}</Text>
-        </Sheet>
+        />
       ) : null}
     </View>
   );
@@ -186,7 +213,9 @@ export const HistoryScreen = () => {
           {at === null ? t("history.events") : t("history.eventsUntil", { when })}
         </Text>
         {history.board.rows.length === 0 && events.length === 0 ? (
-          <Text className="py-2 font-sans text-[14px] text-muted">{t("history.emptyAt")}</Text>
+          <EmptyText className="py-2 font-sans text-[14px] text-muted">
+            {t("history.emptyAt")}
+          </EmptyText>
         ) : null}
         {events.map((entry) => (
           <EntryRow entry={entry} key={entry.id} />

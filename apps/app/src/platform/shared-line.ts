@@ -1,0 +1,35 @@
+/**
+The composer line made of what another app shared: its title, text and link, in that order,
+each left out when empty or already inside another part (a browser shares the page's address
+both as the link and inside the text).
+*/
+export const sharedLine = (parts: readonly (null | string | undefined)[]): string => {
+  const present = parts.map((part) => part?.trim() ?? "").filter((part) => part !== "");
+  return present
+    .filter(
+      (part, index) =>
+        present.indexOf(part) === index &&
+        present.every((other) => other === part || !other.includes(part)),
+    )
+    .join(" ");
+};
+
+/**
+A share as the Add tab takes it: the line's text and which arrival it is (`seq` counts up with
+each share, so the composer, keyed by it, fills again even with the same text).
+*/
+export type SharedIn = { readonly seq: number; readonly text: string };
+
+/** What the Add tab (the share target) hands Now: the share, or New task when there is none. */
+export type ArrivingShare = SharedIn & { readonly isNewTask: boolean };
+
+/**
+The shared text after what was typed, on a line of its own: a share never replaces a half-typed
+line, and a blank one leaves it as it is (QA round 19 L4, QA round 20 M3).
+*/
+export const afterTyped = (typed: string, shared: string): string => {
+  if (typed.trim() === "") {
+    return shared;
+  }
+  return shared === "" ? typed : `${typed.trimEnd()}\n${shared}`;
+};

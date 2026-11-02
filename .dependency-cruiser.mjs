@@ -86,6 +86,7 @@ const config = {
           "^apps/api/scripts/",
           "^apps/app/app/", // expo-router discovers routes by file name
           "^apps/app/plugins/",
+          "^apps/app/public/", // loaded by index.html, not imported
           "^apps/app/modules/[^/]+/index[.]ts$",
           String.raw`^apps/app/jest\.setup\.ts$`,
           "^e2e/",

@@ -4,6 +4,7 @@ import {
   type EventOf,
   isUntilBeforeStart,
   newId,
+  seriesAnchor,
   type SeriesSchedule,
   seriesStartProblem,
   type Task,
@@ -42,7 +43,8 @@ const templateOf = (
   title: task.title,
   presetId: task.presetId,
   ...templateDetails(task, input.startTz),
-  startAt: input.startAt,
+  // Counted from the task's own start, else from 00:00 today (QA round 14 L10e).
+  startAt: seriesAnchor(task.startAt, { at: input.startAt, tz: input.startTz }),
   startTz: input.startTz,
   subtasks: task.subtasks.map((subtask) => ({
     id: subtask.id,

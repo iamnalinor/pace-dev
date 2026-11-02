@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BotStoreApi } from "../shared/contract.ts";
 
+import { memoryHealth } from "../shared/llm/health-store.ts";
 import { createAssistant, MAX_BOUND_PREVIEWS } from "./assistant.ts";
 
 /** The store's memos in a map: all `bindPreview` touches. */
@@ -27,7 +28,7 @@ describe("the bot's preview bindings", () => {
     const { memos, store } = memoStore();
     const assistant = createAssistant({
       now: () => "2026-10-18T10:00:00.000Z",
-      providers: [],
+      models: { health: memoryHealth(), providers: [] },
       storeOf: () => store,
       userIdOf: async () => "user-1",
     });

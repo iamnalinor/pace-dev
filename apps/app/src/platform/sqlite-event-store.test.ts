@@ -77,12 +77,21 @@ describe("createSqliteEventStore", () => {
     await expect(store.getStoreId()).resolves.toBe("store-b");
   });
 
-  it("clears events, the outbox, the cursor and the store id", async () => {
+  it("starts the sync version at 0 (a log from before versions) and remembers it", async () => {
+    const store = createSqliteEventStore();
+    await expect(store.getSyncVersion()).resolves.toBe(0);
+    await store.setSyncVersion(1);
+    await expect(store.getSyncVersion()).resolves.toBe(1);
+  });
+
+  it("clears events, the outbox, the cursor, the store id and the sync version", async () => {
     const store = createSqliteEventStore();
     await store.append([a]);
     await store.setCursor(7);
     await store.setStoreId("store-a");
+    await store.setSyncVersion(1);
     await store.clear();
+    await expect(store.getSyncVersion()).resolves.toBe(0);
     await expect(store.listAll()).resolves.toEqual([]);
     await expect(store.listPending()).resolves.toEqual([]);
     await expect(store.getCursor()).resolves.toBe(0);

@@ -5,11 +5,28 @@
       tools:ignore="ProtectedPermissions" />
   <!-- Do Not Disturb during focus sessions (policy access granted in system settings). -->
   <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+  <!-- The battery-optimization exemption, asked only while the phone polls for notifications. -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
   <!-- Android 11+ package visibility: launcher apps, so their names can be shown next to usage. -->
   <queries>
     <intent>
       <action android:name="android.intent.action.MAIN" />
       <category android:name="android.intent.category.LAUNCHER" />
     </intent>
+    <!-- The list of battery-optimized apps (Battery.kt), so resolveActivity can see it. -->
+    <intent>
+      <action android:name="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS" />
+    </intent>
+    <!-- Phone makers' autostart pages (Battery.kt), so resolveActivity can see them. -->
+    <package android:name="com.miui.securitycenter" />
+    <package android:name="com.huawei.systemmanager" />
+    <package android:name="com.hihonor.systemmanager" />
+    <package android:name="com.coloros.safecenter" />
+    <package android:name="com.oppo.safe" />
+    <package android:name="com.vivo.permissionmanager" />
+    <package android:name="com.iqoo.secure" />
+    <package android:name="com.oneplus.security" />
+    <package android:name="com.asus.mobilemanager" />
+    <package android:name="com.samsung.android.lool" />
   </queries>
 </manifest>

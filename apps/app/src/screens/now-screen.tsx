@@ -2,11 +2,14 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
+import type { SharedIn } from "#app/platform/shared-line.ts";
+
 import { useT } from "#app/app-state.tsx";
 import { ComposerProvider, useComposerFlow } from "#app/features/now/composer/composer-flow.tsx";
 import { ComposerPane } from "#app/features/now/composer/composer-pane.tsx";
 import { NowBoard } from "#app/features/now/now-screen.tsx";
 import { TaskScreen } from "#app/features/task/task-screen.tsx";
+import { useLineDraftNote } from "#app/platform/shared-in.ts";
 import { TaskOpenerProvider, TaskPaneProvider } from "#app/shared/task-opener.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 
@@ -38,7 +41,8 @@ const PickedTask = ({
 /**
 On a wide window the picked task opens next to the list, as on the old web app, and so does
 the task form: while it is open the pane holds it, and closing it (or adding the task) brings
-the picked task back. Picking a task while the form is open folds the draft back into the line.
+the picked task back. Picking a task while the form is open closes it: its draft goes, the
+line keeps its text.
 */
 const NowSplit = ({
   isComposerFocused,
@@ -86,20 +90,39 @@ const NowSplit = ({
   );
 };
 
+/** Tells the share target what the line holds as it is typed (QA round 19 L4, round 6 M3). */
+const LineDraftNote = () => {
+  const { model, text } = useComposerFlow();
+  // The line's text, or the title typed into an open New task form (the phone's bare Add tab).
+  useLineDraftNote(text.trim() === "" ? model.title : text);
+  return null;
+};
+
 /**
 Now on a phone; on a wide window the list with the picked task (or the task form) beside it.
-`composeText` is a share (or New task, when empty) arriving on /add.
+`compose` is a share arriving on /add (or handed on to "/"); the composer is keyed by its arrival,
+so each share fills the line, the same text again included.
 */
-export const NowScreen = ({ composeText }: { readonly composeText?: string | undefined }) => {
+export const NowScreen = ({
+  compose,
+  notesLineDraft = false,
+  opensForm = false,
+}: {
+  readonly compose?: SharedIn | undefined;
+  /** The line a share goes after (Now at "/" on the web, the Add tab on a phone) tells what it holds. */
+  readonly notesLineDraft?: boolean;
+  /** New task arriving on /add: the empty form opens at once. */
+  readonly opensForm?: boolean;
+}) => {
   const router = useRouter();
   const isWide = useIsWide();
   const [picked, setPicked] = useState<null | Picked>(null);
-  const isComposerFocused = composeText !== undefined;
+  const isComposerFocused = compose !== undefined;
   return (
     <ComposerProvider
-      initialText={composeText}
+      initialText={compose?.text}
       isFormInPane={isWide}
-      key={composeText ?? ""}
+      key={compose === undefined ? "now" : `share-${compose.seq}`}
       onCreatedTask={(taskId) => {
         if (isWide) {
           setPicked({ close: false, id: taskId });
@@ -107,8 +130,9 @@ export const NowScreen = ({ composeText }: { readonly composeText?: string | und
           router.push(`/task/${taskId}`);
         }
       }}
-      opensForm={composeText === ""}
+      opensForm={opensForm}
     >
+      {notesLineDraft ? <LineDraftNote /> : null}
       {isWide ? (
         <NowSplit isComposerFocused={isComposerFocused} onPick={setPicked} picked={picked} />
       ) : (

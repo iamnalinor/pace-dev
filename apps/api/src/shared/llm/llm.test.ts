@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from "@pace/core";
 import { artboardState, at, ctx } from "@pace/core/testing";
 
+import { SCHEMA_REFUSAL } from "./fake-call.ts";
 import { echoParse, fakeParseModel } from "./fake-model.ts";
 import { availability, runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
@@ -116,6 +117,7 @@ describe("runParse", () => {
       error: {
         code: "llm/unavailable",
         limited: { backup: "2026-10-06T12:00:30.000Z", compatible: "2026-10-06T12:02:00.000Z" },
+        reason: "limited",
         retryAt: "2026-10-06T12:00:30.000Z",
       },
       ok: false,
@@ -347,6 +349,182 @@ describe("runParse limits", () => {
       properties: { maxLength: { type: "string" }, tags: { items: { type: "string" } } },
       type: "object",
     });
+  });
+});
+
+/** The keys a task's action does not use, which a best-effort model left out (smoke run, 2026-11-02). */
+const UNUSED_BY_A_TASK: ReadonlySet<string> = new Set([
+  "end",
+  "expectMinutes",
+  "label",
+  "outcome",
+  "start",
+]);
+
+/** `echoParse`'s answer to "x" with those keys left out of every action. */
+const withKeysLeftOut = (): unknown => {
+  const output = echoParse("x");
+  return {
+    ...output,
+    actions: output.actions.map((action) =>
+      Object.fromEntries(Object.entries(action).filter(([key]) => !UNUSED_BY_A_TASK.has(key))),
+    ),
+  };
+};
+
+/** An endpoint that refuses its model's answer, which our check refuses too. */
+const refusedGarbage = (via: "body" | "stream") =>
+  fakeParseModel(() => ({ schemaRefused: { domain: "nope" }, via }));
+
+/** Every object node of a JSON schema, nested ones included. */
+const objectNodes = (node: unknown): readonly Record<string, unknown>[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap((item: unknown) => objectNodes(item));
+  }
+  if (typeof node !== "object" || node === null) {
+    return [];
+  }
+  const record = node as Record<string, unknown>;
+  const own = record["type"] === "object" ? [record] : [];
+  return [...own, ...Object.values(record).flatMap((value) => objectNodes(value))];
+};
+
+describe("best-effort structured output (bug class 85)", () => {
+  it("keeps an answer that leaves out the keys that do not apply, read as null", async () => {
+    const result = await runParse(
+      [{ model: fakeParseModel(() => withKeysLeftOut() as never), name: "terse" }],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "terse" } });
+    expect(result.ok && result.value.result.actions[0]).toMatchObject({
+      end: null,
+      expectMinutes: null,
+      label: null,
+      outcome: null,
+      start: null,
+      title: "x",
+    });
+  });
+
+  it("refuses an answer with no actions or questions list: that is no reading, not nothing to do", async () => {
+    const { actions: _actions, ...noActions } = echoParse("x");
+    const { questions: _questions, ...noQuestions } = echoParse("x");
+    for (const terse of [noActions, noQuestions]) {
+      const result = await runParse(
+        [
+          { model: fakeParseModel(() => terse as never), name: "terse" },
+          { model: fakeParseModel(echoParse), name: "next" },
+        ],
+        prompt,
+      );
+      expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+    }
+  });
+
+  it("fills only an action's nullable keys, never a list it left out", async () => {
+    const output = echoParse("x");
+    const [action] = output.actions;
+    const { subtasks: _subtasks, ...withoutList } = action ?? {};
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({ ...output, actions: [withoutList] }) as never),
+          name: "terse",
+        },
+        { model: fakeParseModel(echoParse), name: "next" },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "next" } });
+  });
+
+  it("reads the answer an endpoint refused on its own schema check, from the error's body", async () => {
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({ schemaRefused: withKeysLeftOut(), via: "body" })),
+          name: "strict",
+        },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "strict" } });
+  });
+
+  it("reads the answer an endpoint streamed before refusing it on its own schema check", async () => {
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({ schemaRefused: withKeysLeftOut(), via: "stream" })),
+          name: "strict",
+        },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "strict" } });
+  });
+
+  it("reads the answer an endpoint refused in a stream chunk that carries the generation", async () => {
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({
+            streamsError: {
+              ...SCHEMA_REFUSAL,
+              failed_generation: JSON.stringify(withKeysLeftOut()),
+            },
+          })),
+          name: "strict",
+        },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "strict" } });
+  });
+
+  it("counts a refused answer that fails our check too as out of shape, not as an outage", async () => {
+    const result = await runParse(
+      [
+        { model: refusedGarbage("body"), name: "first" },
+        { model: refusedGarbage("stream"), name: "second" },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({
+      error: { code: "llm/invalid-output", retryAt: null },
+      ok: false,
+    });
+  });
+
+  it("tells the model to keep every key, null or empty where it does not apply", () => {
+    expect(prompt.system).toContain(
+      "Every action has every key: null (or [] for a list) where it does not apply.",
+    );
+  });
+
+  it("shows the model a schema strict mode takes: every property required, no others", async () => {
+    const bodies: unknown[] = [];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      bodies.push(JSON.parse(typeof init?.body === "string" ? init.body : "null"));
+      await Promise.resolve();
+      return new Response("{}", { status: 500 });
+    });
+    try {
+      await runParse(
+        parseProviders({ llmEndpoints: [endpoint(1, ["luna"])], llmProvider: "auto" }),
+        prompt,
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    const sent = bodies[0] as { response_format: { json_schema: { schema: unknown } } };
+    const nodes = objectNodes(sent.response_format.json_schema.schema);
+    expect(nodes.length).toBeGreaterThan(4);
+    for (const node of nodes) {
+      const keys = Object.keys(node["properties"] as object);
+      expect(node["required"]).toEqual(keys);
+      expect(node["additionalProperties"]).toBe(false);
+    }
   });
 });
 

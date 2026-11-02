@@ -1,5 +1,5 @@
 import { ArrowUp, Inbox, type LucideIcon, Plus } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 
-import { useT } from "#app/app-state.tsx";
+import { useIsFirstSync, useT } from "#app/app-state.tsx";
 import { lineEnterProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
 import { type Hotkey, HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
@@ -19,6 +19,8 @@ import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 /** What the line needs from the composer's flow. */
 type LineFlow = {
   readonly text: string;
+  /** The form open beside or over the line, if any. */
+  readonly form: unknown;
   /** Grows each time the cursor should come back to the line. */
   readonly lineFocus: number;
   readonly type: (next: string) => void;
@@ -45,6 +47,8 @@ type KeyActions = {
 /**
 Enter reads the line, Alt+Enter sends it to the Inbox, Shift+Enter starts a new line; Escape
 dismisses the assistant's card (the line owns its keys, so the card's own Escape never fires).
+Enter on an empty line does nothing at all: the browser's line break is held back too, or the
+line grew into a tall empty box and the next text began with a line break (QA round 18 M2).
 */
 const onEnter =
   (isEmpty: boolean, keys: KeyActions) =>
@@ -57,11 +61,14 @@ const onEnter =
       keys.escape();
       return;
     }
-    if (isEmpty || native.key !== "Enter" || native.shiftKey === true) {
+    if (native.key !== "Enter" || native.shiftKey === true) {
       return;
     }
     // Handled here: the page's own ⌘↵ (a task's Done) stays out of the line.
     event.preventDefault();
+    if (isEmpty) {
+      return;
+    }
     if (native.altKey === true) {
       keys.toInbox();
     } else {
@@ -100,26 +107,51 @@ const LineButton = ({
         accessibilityRole="button"
         aria-busy={isBusy}
         aria-disabled={disabled}
-        className={cx(
-          "h-9 w-9 items-center justify-center rounded-full active:opacity-70",
-          isLime && "bg-accent",
-        )}
+        // A 44px target around the 36px circle (hitSlop does nothing on the web, QA round 18 L6);
+        // side by side they touch, and above and below they reach into the card's padding.
+        className="-my-1 h-11 w-11 items-center justify-center active:opacity-70"
         disabled={disabled || isBusy}
-        hitSlop={4}
         onPress={onPress}
       >
-        {isBusy ? (
-          <ActivityIndicator color={iconColor} size="small" />
-        ) : (
-          <Icon
-            color={disabled ? palette.faint : iconColor}
-            size={18}
-            strokeWidth={isLime ? 2.25 : 1.75}
-          />
-        )}
+        <View
+          className={cx("h-9 w-9 items-center justify-center rounded-full", isLime && "bg-accent")}
+        >
+          {isBusy ? (
+            <ActivityIndicator color={iconColor} size="small" />
+          ) : (
+            <Icon
+              color={disabled ? palette.faint : iconColor}
+              size={18}
+              strokeWidth={isLime ? 2.25 : 1.75}
+            />
+          )}
+        </View>
       </Pressable>
     </Tooltip>
   );
+};
+
+/**
+A line opened with a share takes the cursor once it can be seen (QA round 18 L2: the Enter pressed
+next went nowhere), a blank share included (QA round 19 L4). `autoFocus` fires at mount, while a
+fresh browser's first-sync cover still hides the app, and a hidden field takes no focus; so the
+line is focused again when the cover lifts, once, and only when it opened on the line (an empty
+/add opens New task's form, whose title has the cursor).
+*/
+const useShareFocus = (
+  inputRef: RefObject<null | TextInput>,
+  { isFocused, isOnLine }: { readonly isFocused: boolean; readonly isOnLine: boolean },
+): void => {
+  const isCovered = useIsFirstSync();
+  const [opensOnLine] = useState(isOnLine);
+  const isDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isFocused || !opensOnLine || isCovered || isDoneRef.current) {
+      return;
+    }
+    isDoneRef.current = true;
+    inputRef.current?.focus();
+  }, [inputRef, isCovered, isFocused, opensOnLine]);
 };
 
 /** The text itself: grows with a pasted message, takes Enter and Alt+Enter as its own. */
@@ -146,6 +178,7 @@ const LineInput = ({
       inputRef.current?.focus();
     }
   }, [flow.lineFocus]);
+  useShareFocus(inputRef, { isFocused, isOnLine: flow.form === null });
   return (
     <TextInput
       accessibilityLabel={t("composer.label")}
@@ -219,7 +252,7 @@ export const QuickLine = ({
   const isEmpty = flow.text.trim() === "";
   const isIdle = isEmpty || isLocked;
   return (
-    <View className="flex-row items-end gap-0.5">
+    <View className="flex-row items-end">
       <View className="mb-1">
         <LineButton
           disabled={isLocked}
@@ -235,7 +268,7 @@ export const QuickLine = ({
         isLocked={isLocked}
         onFocusChange={onFocusChange}
       />
-      <View className="mb-1 flex-row gap-0.5">
+      <View className="mb-1 flex-row">
         <LineButton
           disabled={isIdle}
           hotkey={HOTKEYS.toInbox}

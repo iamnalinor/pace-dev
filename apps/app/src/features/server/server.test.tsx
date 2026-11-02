@@ -198,7 +198,9 @@ const renderSignedIn = async (routes: Readonly<Record<string, FakeRoute>>) => {
 const expectOnlyLogOut = async (detail: string) => {
   expect(await screen.findByText("Server and app versions don't match")).toBeOnTheScreen();
   expect(screen.getByText(detail)).toBeOnTheScreen();
-  expect(screen.getAllByRole("button")).toEqual([screen.getByRole("button", { name: "Log out" })]);
+  const buttons = screen.getAllByRole("button");
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]).toBe(screen.getByRole("button", { name: "Log out" }));
   expect(screen.queryByText(/Change/u)).toBeNull();
 };
 

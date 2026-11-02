@@ -31,6 +31,16 @@ const FORBIDDEN =
   /\b(?:alter|analyze|attach|begin|commit|create|delete|detach|drop|insert|pragma|reindex|release|replace|rollback|savepoint|update|upsert|vacuum)\b/iu;
 
 /**
+Tables no query reads and the schema does not list: when the phone was unlocked, minute by minute,
+is for automatic sleep only, never for a connected AI app. Matched anywhere in the text, string
+literals included (SQLite takes `FROM 'phone_uses'` for the table) and in any case.
+*/
+const PRIVATE_TABLES = ["phone_uses"] as const;
+
+const privateTableIn = (sql: string): string | undefined =>
+  PRIVATE_TABLES.find((table) => sql.toLowerCase().includes(table));
+
+/**
 String literals are data: a quoted 'update' must not trip the keyword check. Nor does the
 string function `replace(…)`, unlike the REPLACE statement.
 */
@@ -49,6 +59,10 @@ export const guardSql = (sql: string): Result<string, SqlError> => {
   }
   if (!/^(?:select|with)\b/iu.test(text)) {
     return err({ code: "sql/not-select", message: "Only SELECT (or WITH … SELECT) is allowed." });
+  }
+  const hidden = privateTableIn(text);
+  if (hidden !== undefined) {
+    return err({ code: "sql/forbidden", message: `"${hidden}" is private to the store.` });
   }
   const keyword = FORBIDDEN.exec(bare);
   return keyword === null
@@ -92,13 +106,13 @@ export const runReadOnly = (
     : ok(captured.value);
 };
 
-/** The tables a query may read and how they were created (internal ones left out). */
+/** The tables a query may read and how they were created (internal and private ones left out). */
 export const describeTables = (storage: DurableObjectStorage): readonly TableSchema[] =>
-  storage.sql
-    .exec<{ name: string; sql: string }>(
+  [
+    ...storage.sql.exec<{ name: string; sql: string }>(
       String.raw`SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\_%' ESCAPE '\' ORDER BY name`,
-    )
-    .toArray();
+    ),
+  ].filter((table) => privateTableIn(table.name) === undefined);
 
 /** A simulation never steps more than this many times. */
 const MAX_STEPS = 500;

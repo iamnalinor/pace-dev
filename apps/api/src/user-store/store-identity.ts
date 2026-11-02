@@ -16,6 +16,9 @@ so a breaking change never needs a data migration.
 */
 export const STORE_EPOCH = 2;
 
+/** The newest migration the store runs: what its tables look like. */
+export const SCHEMA_TAG = migrations.journal.entries.at(-1)?.tag ?? "none";
+
 const EPOCH_KEY = "epoch";
 const STORE_ID_KEY = "storeId";
 

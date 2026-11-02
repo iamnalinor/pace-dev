@@ -46,7 +46,9 @@ describe("PresetsList", () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetsList />, runtime);
     expect(screen.queryByRole("button", { name: en("presets.new") })).toBeNull();
-    await fireEvent.press(screen.getByRole("radio", { name: "Work" }));
+    // "Start from" lists actions, not a choice: buttons, none of them drawn as picked (QA 19 L7).
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    await fireEvent.press(screen.getByRole("button", { name: "Work" }));
     expect(router.push).toHaveBeenCalledWith({
       params: { from: "work", id: "new" },
       pathname: "/presets/[id]",
@@ -103,13 +105,15 @@ describe("PresetScreen", () => {
     });
   });
 
-  it("creates a preset: the id follows the name, and a name is required", async () => {
+  it("creates a preset under an id from its name, which nobody types (QA round 18 L4)", async () => {
     const runtime = await createTestRuntime({ world: "empty" });
     await renderScreen(<PresetScreen from="hw" id="new" />, runtime);
+    // The cursor is in Name on open, and there is no Id field to fill.
+    expect(screen.getByLabelText(en("presets.name")).props).toMatchObject({ autoFocus: true });
+    expect(screen.queryByLabelText("Id")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     expect(screen.getByRole("alert")).toHaveTextContent(en("presets.nameRequired"));
     await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Linear Algebra");
-    expect(screen.getByLabelText(en("presets.id"))).toHaveDisplayValue("linear-algebra");
     await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
     await waitFor(() => {
       expect(presetOf(runtime, "linear-algebra")).toMatchObject({
@@ -117,5 +121,28 @@ describe("PresetScreen", () => {
         name: "Linear Algebra",
       });
     });
+  });
+
+  it("gives a second preset of the same name an id of its own", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await runtime.actions.createPreset({
+      definition: {},
+      extends: "hw",
+      id: "algebra",
+      name: "Алгебра",
+    });
+    await renderScreen(<PresetScreen from="hw" id="new" />, runtime);
+    await fireEvent.changeText(screen.getByLabelText(en("presets.name")), "Алгебра");
+    await fireEvent.press(screen.getByRole("button", { name: en("common.save") }));
+    await waitFor(() => {
+      expect(presetOf(runtime, "algebra-2")).toMatchObject({ extends: "hw", name: "Алгебра" });
+    });
+  });
+
+  it("keeps an existing preset's id and names the edit by the preset", async () => {
+    const runtime = await createTestRuntime({ world: "empty" });
+    await renderScreen(<PresetScreen from={undefined} id="work" />, runtime);
+    expect(screen.queryByLabelText("Id")).toBeNull();
+    expect(screen.getByLabelText(en("presets.name")).props["autoFocus"]).not.toBe(true);
   });
 });

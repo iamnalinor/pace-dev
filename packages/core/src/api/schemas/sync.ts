@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { PrecisionSchema, SourceSchema } from "../../events/event-schema.ts";
+import { EVENT_ID_MAX, PrecisionSchema, SourceSchema } from "../../events/event-schema.ts";
 import { knownValue, knownValues } from "../tolerant.ts";
 
 /**
@@ -9,7 +9,7 @@ opaque here; its per-type shape is validated by the core event schema (wired int
 the user store's `validateEvent` seam), not by the transport.
 */
 export const SyncEventSchema = z.object({
-  id: z.string().min(1).max(64),
+  id: z.string().min(1).max(EVENT_ID_MAX),
   type: z.string().min(1).max(64),
   occurredAt: z.iso.datetime({ offset: true }),
   recordedAt: z.iso.datetime({ offset: true }),

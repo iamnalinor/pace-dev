@@ -9,6 +9,7 @@ import type { TelegramTransport } from "../shared/telegram-api.ts";
 
 import { d1, type Db } from "../shared/db/d1.ts";
 import { isIpInCidrs } from "../shared/ip.ts";
+import { llmHealthAfterResponse } from "../shared/llm/health-store.ts";
 import { createLogger } from "../shared/logger.ts";
 import { createAssistant } from "./assistant.ts";
 import { type BotDeps, createBot } from "./bot.ts";
@@ -70,7 +71,11 @@ export const mountBotRoutes = (app: Hono<AppEnv>, deps: BotRouteDeps): void => {
       peekLogin: deps.peekLogin(db),
       assistant: createAssistant({
         now: () => new Date().toISOString(),
-        providers: deps.parseProviders(config),
+        // What a read showed about the providers is saved after Telegram has its answer.
+        models: {
+          health: llmHealthAfterResponse(c.env, c.executionCtx),
+          providers: deps.parseProviders(config),
+        },
         storeOf,
         userIdOf: async (telegramId) => await deps.userIdOf(db, telegramId),
       }),

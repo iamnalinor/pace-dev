@@ -6,6 +6,18 @@ import { setupActions, unwrap } from "../actions/fixture.fake.ts";
 import { historyViewModel } from "./history.ts";
 
 describe("historyViewModel", () => {
+  it("names how a task was closed: done, cancelled or skipped (QA round 20 L8)", async () => {
+    const world = await setupActions();
+    const [skipped] = unwrap(await world.actions.closeTask({ outcome: "skipped", taskId: TRK_ID }));
+    const history = historyViewModel(world.state.store.getState(), {
+      atIso: NOW,
+      deviceTz: MOSCOW,
+    });
+    expect(history.events.find((entry) => entry.id === skipped?.id)?.labelKey).toBe(
+      "event.task.skipped",
+    );
+  });
+
   it("names the activity an activity event is about", async () => {
     const world = await setupActions();
     const [started] = unwrap(await world.actions.startChoice("rest"));

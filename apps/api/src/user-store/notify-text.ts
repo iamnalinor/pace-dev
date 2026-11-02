@@ -9,6 +9,7 @@ import {
   minutesBetween,
   type PoolNotification,
   type Settings,
+  shownLabel,
   t,
 } from "@pace/core";
 
@@ -139,10 +140,10 @@ const bodyOf = (notification: PoolNotification, zoned: Zoned): string => {
       });
     }
     case "activity_overrun": {
-      const { expectMinutes, label, startAt } = notification.payload;
+      const { activityId, expectMinutes, label, startAt } = notification.payload;
       return t(language, "notify.overrun", {
         duration: formatDuration(expectMinutes, language),
-        label,
+        label: shownLabel({ id: activityId, label }, language),
         time: clockIn(startAt, language, zone),
       });
     }
