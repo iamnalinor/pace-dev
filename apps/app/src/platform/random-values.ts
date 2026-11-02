@@ -1,6 +1,6 @@
 /*
-Installs `crypto.getRandomValues` where the runtime has none (Hermes), when the root layout imports
-this (through `polyfills.ts`), before anything makes an id. A module with no exports: the install
+Installs `crypto.getRandomValues` where the runtime has none (Hermes), when `entry.ts` imports
+`polyfills.ts` (which imports this) before expo-router loads, so before anything makes an id. A module with no exports: the install
 is all it is for; what to install is `cryptoToInstall`, tested on its own.
 */
 import { getRandomValues } from "expo-crypto";

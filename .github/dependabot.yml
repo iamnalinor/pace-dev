@@ -9,46 +9,13 @@ updates:
     groups:
       # Expo SDK packages must move together (expo, react-native, expo-* modules).
       expo:
-        patterns:
-          [
-            "expo",
-            "expo-*",
-            "@expo/*",
-            "@expo-google-fonts/*",
-            "babel-preset-expo",
-            "jest-expo",
-            "react-native",
-            "react-native-*",
-            "@react-native/*",
-          ]
+        patterns: ["expo", "expo-*", "@expo/*", "@expo-google-fonts/*", "babel-preset-expo", "jest-expo", "react-native", "react-native-*", "@react-native/*"]
       cloudflare:
         patterns: ["wrangler", "@cloudflare/*"]
       lint:
-        patterns:
-          [
-            "eslint*",
-            "@eslint*",
-            "typescript-eslint",
-            "@typescript-eslint/*",
-            "@biomejs/*",
-            "knip",
-            "jscpd",
-            "dependency-cruiser",
-          ]
+        patterns: ["eslint*", "@eslint*", "typescript-eslint", "@typescript-eslint/*", "@biomejs/*", "knip", "jscpd", "dependency-cruiser"]
       test:
-        patterns:
-          [
-            "vitest",
-            "@vitest/*",
-            "@testing-library/*",
-            "@playwright/test",
-            "@axe-core/*",
-            "fast-check",
-            "@stryker-mutator/*",
-            "jest",
-            "@types/jest",
-            "test-renderer",
-          ]
+        patterns: ["vitest", "@vitest/*", "@testing-library/*", "@playwright/test", "@axe-core/*", "fast-check", "@stryker-mutator/*", "jest", "@types/jest", "test-renderer"]
       # Whatever the groups above leave: all its minor and patch bumps together.
       everything-else:
         patterns: ["*"]
