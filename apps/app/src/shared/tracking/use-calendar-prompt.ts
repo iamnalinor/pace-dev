@@ -49,8 +49,8 @@ export const useCalendarPrompt = (): {
   // Read again when Day (or Settings) changes what the phone remembers.
   const memory = usePhoneMemoryVersion();
   const loadLatest = useLatestLoad(setLoaded);
-  const reload = useCallback(() => {
-    loadLatest(async () => {
+  const readNow = useCallback(async () => {
+    await loadLatest(async () => {
       const today = await calendarToday({ api, now: clock.now(), zone: deviceTz });
       const rules = await seriesRules();
       return {
@@ -60,7 +60,10 @@ export const useCalendarPrompt = (): {
       };
     });
   }, [loadLatest, api, clock, deviceTz]);
-  const answeredHere = usePhoneAnswers(reload);
+  const reload = useCallback(() => {
+    void readNow();
+  }, [readNow]);
+  const answeredHere = usePhoneAnswers(readNow, memory);
   useEffect(() => {
     reload();
     const timer = setInterval(reload, RELOAD_MS);
