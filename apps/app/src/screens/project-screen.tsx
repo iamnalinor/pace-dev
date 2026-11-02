@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 
 import type { ProjectViewModel } from "@pace/client";
 
-import { useAppState, usePace, useT } from "#app/app-state.tsx";
+import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
 import { Button } from "#app/ui/button.tsx";
@@ -12,7 +12,7 @@ import { washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
-import { projectById } from "@pace/core";
+import { formatCount, projectById } from "@pace/core";
 
 import { PushedScreen } from "./pushed-screen.tsx";
 
@@ -79,6 +79,7 @@ const EditProject = ({
 /** Open, on time and late, on the project's own wash. */
 const Stats = ({ project }: { readonly project: ProjectViewModel }) => {
   const t = useT();
+  const language = useLanguage();
   const { stats } = project;
   return (
     <View
@@ -87,12 +88,12 @@ const Stats = ({ project }: { readonly project: ProjectViewModel }) => {
         project.color === null ? "border-separator bg-cell" : washClass(project.color),
       )}
     >
-      <Figure label={t("project.stat.open")} value={String(stats.open)} />
+      <Figure label={t("project.stat.open")} value={formatCount(stats.open, language)} />
       <Figure
         label={t("project.stat.onTime")}
-        value={`${String(stats.onTime.done)}/${String(stats.onTime.total)}`}
+        value={`${formatCount(stats.onTime.done, language)}/${formatCount(stats.onTime.total, language)}`}
       />
-      <Figure label={t("project.stat.late")} value={String(stats.late)} />
+      <Figure label={t("project.stat.late")} value={formatCount(stats.late, language)} />
     </View>
   );
 };

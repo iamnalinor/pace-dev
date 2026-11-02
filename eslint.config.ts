@@ -66,6 +66,21 @@ const ELEMENT_DEEP_EQUAL = {
     "CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.property.name=/^(getAll|queryAll|findAll)/], CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.name=/^(listsNamed|picker)$/]",
 };
 
+/** Text the person reads is written by core's formatters (bug-lessons classes 59 and 60). */
+const DISPLAY_TEXT_SYNTAX = [
+  {
+    message:
+      "toFixed prints a decimal point in every language and never groups: use formatNumber / formatCount / formatPercent from @pace/core.",
+    selector: "CallExpression[callee.property.name='toFixed']",
+  },
+  {
+    message:
+      "Cutting the first character of a string by UTF-16 unit leaves half an emoji: use initials / capitalize from @pace/core.",
+    selector:
+      "CallExpression[callee.property.name=/^(slice|substring|substr)$/][arguments.0.value=0][arguments.1.value=1], CallExpression[callee.property.name='charAt'][arguments.0.value=0]",
+  },
+];
+
 const TESTS = [
   "**/*.test.{ts,tsx}",
   "**/*.fake.ts",
@@ -452,6 +467,11 @@ export default defineConfig([
   // Design values come from the tokens (spec §9.3). A warning, counted in
   // context/design/redesign-plan.md, until the app is migrated; then it becomes an error. A class
   // outside GENERATED_CLASSES (the token scales and layout utilities) is off the scale.
+  {
+    files: ["apps/app/src/**/*.{ts,tsx}"],
+    ignores: TESTS,
+    rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...DISPLAY_TEXT_SYNTAX] },
+  },
   {
     files: APP,
     ignores: TESTS,

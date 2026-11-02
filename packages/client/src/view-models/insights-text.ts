@@ -1,4 +1,10 @@
-import { formatDuration, type Fragmentation, type Language } from "@pace/core";
+import {
+  formatDuration,
+  formatNumber,
+  formatPercent,
+  type Fragmentation,
+  type Language,
+} from "@pace/core";
 
 import type { InsightsModel } from "./insights.ts";
 
@@ -34,11 +40,12 @@ export const fragmentationTiles = (
     },
     {
       key: "insights.shortShare",
-      value: shortFocusShare === null ? DASH : `${String(Math.round(shortFocusShare * 100))}%`,
+      value: shortFocusShare === null ? DASH : formatPercent(shortFocusShare * 100, language),
     },
     {
       key: "insights.switches",
-      value: switchesPerDay === null ? DASH : switchesPerDay.toFixed(1),
+      value:
+        switchesPerDay === null ? DASH : formatNumber(switchesPerDay, language, { fraction: 1 }),
     },
   ];
 };
