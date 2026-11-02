@@ -219,6 +219,15 @@ secrets with zod once per request and stores the result on the context.
   still written (`legacyLabelOf`) and never read; the next release's migration first backfills
   `kind`/`name` again for rows the previous Worker inserted during the deploy window (`name = ''`),
   then drops `label`, and `legacyLabelOf` goes.
+- **A Durable Object class added or removed is a rollback barrier.** Cloudflare refuses
+  `wrangler rollback` across a release that changes the DO classes (the `migrations` in
+  `apps/api/wrangler.jsonc`), and a plain revert that drops a class does not deploy (removing one
+  needs a `deleted_classes` migration). The release that added `LlmHealth` (migration `v2`, PR #48)
+  is such a barrier: no release from it on can be rolled back past it. A backout after it is a
+  forward deploy that keeps `export { LlmHealth }` and migration `v2`; to undo the health logic, keep
+  the class and stop calling it. Ship a new DO class alone in a small release first when the release
+  around it should stay rollback-able. The orphaned `llm:health` key in `OAUTH_KV` (the memory before
+  the DO) expires within a day.
 - **Dev login** `POST /api/auth/dev { telegramId }` is a 404 in `production`.
 - **Which server**: the app stores its token with the origin of the server that issued it
   (`pace.session` = `{ origin, token }`); a store for another server reads it as signed out, and
