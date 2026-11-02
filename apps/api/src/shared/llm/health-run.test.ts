@@ -42,7 +42,7 @@ describe("runParse with the health memory", () => {
 
   it("probes it in its place once the penalty is over, never making anyone wait on it", async () => {
     const health = memoryHealth({
-      down: { reason: "503", strikes: 1, until: new Date(NOW - 1000).toISOString() },
+      down: { reason: "server-error", strikes: 1, until: new Date(NOW - 1000).toISOString() },
     });
     const pool = [
       { model: fakeParseModel(down, { firstTokenAfterMs: 1500 }), name: "down" },
@@ -56,7 +56,7 @@ describe("runParse with the health memory", () => {
 
   it("clears the record on a success: back in its place, asked alone", async () => {
     const health = memoryHealth({
-      back: { reason: "503", strikes: 3, until: new Date(NOW - 1000).toISOString() },
+      back: { reason: "server-error", strikes: 3, until: new Date(NOW - 1000).toISOString() },
     });
     const asked: string[] = [];
     const pool = [noting(asked, "back", echoParse), noting(asked, "other", echoParse)];
@@ -73,8 +73,8 @@ describe("runParse with the health memory", () => {
   it("asks in the configured order when every provider is under penalty", async () => {
     const until = new Date(NOW + 60_000).toISOString();
     const health = memoryHealth({
-      first: { reason: "503", strikes: 1, until },
-      second: { reason: "503", strikes: 2, until },
+      first: { reason: "server-error", strikes: 1, until },
+      second: { reason: "server-error", strikes: 2, until },
     });
     const asked: string[] = [];
     const read = await runParse(
@@ -88,7 +88,7 @@ describe("runParse with the health memory", () => {
 
   it("doubles the penalty of a probe that fails again", async () => {
     const health = memoryHealth({
-      down: { reason: "503", strikes: 1, until: new Date(NOW - 1000).toISOString() },
+      down: { reason: "server-error", strikes: 1, until: new Date(NOW - 1000).toISOString() },
     });
     await runParse([{ model: fakeParseModel(down), name: "down" }], PROMPT, {
       health,
@@ -133,11 +133,59 @@ describe("runParse with the health memory", () => {
       PROMPT,
       { giveUpAfterMs: 50, health, now: () => NOW },
     );
-    expect(Object.keys(await health.read()).toSorted((a, b) => a.localeCompare(b))).toEqual([
-      "broken",
-      "dropped",
-      "hung",
+    const reasons = Object.entries(await health.read()).map(([name, entry]) => [
+      name,
+      entry.reason,
     ]);
+    expect(Object.fromEntries(reasons)).toEqual({
+      broken: "server-error",
+      dropped: "dropped",
+      hung: "timeout",
+    });
+  });
+
+  it("reads an in-stream error by what it says: a rate limit rests it for this person, a server error counts", async () => {
+    const health = memoryHealth();
+    const read = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({
+            streamsError: {
+              code: "rate_limit_exceeded",
+              message: "Rate limit reached for model `m`. Please try again in 20s.",
+              type: "tokens",
+            },
+          })),
+          name: "limited",
+        },
+        {
+          model: fakeParseModel(() => ({
+            streamsError: { code: "server_error", message: "Provider disconnected unexpectedly" },
+          })),
+          name: "broken",
+        },
+        {
+          model: fakeParseModel(() => ({
+            streamsError: {
+              code: "context_length_exceeded",
+              message: "This model's maximum context length is 8192 tokens.",
+              type: "invalid_request_error",
+            },
+          })),
+          name: "short",
+        },
+        { model: fakeParseModel(echoParse), name: "good" },
+      ],
+      PROMPT,
+      { health, now: () => NOW },
+    );
+    expect(read).toMatchObject({
+      ok: true,
+      value: { limited: { limited: new Date(NOW + 20_000).toISOString() }, provider: "good" },
+    });
+    expect(await health.read()).toEqual({
+      broken: { reason: "server-error", strikes: 1, until: new Date(NOW + 60_000).toISOString() },
+    });
   });
 
   it("moves a provider last once it was silent past the hedge twice while another answered", async () => {

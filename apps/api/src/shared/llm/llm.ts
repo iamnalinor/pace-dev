@@ -20,6 +20,7 @@ import {
   messageOf,
   refusedAnswers,
   retryAtOf,
+  type UnwellReason,
   unwellReasonOf,
 } from "./failure.ts";
 import { type Health, orderByHealth, type Verdict } from "./health.ts";
@@ -106,7 +107,7 @@ type Failure =
       readonly retryAt: null | string;
       readonly message: string;
       /** Why the provider could not serve anyone (`unwellReasonOf`); `null` for this request only. */
-      readonly unwell: null | string;
+      readonly unwell: null | UnwellReason;
     }
   | { readonly kind: "invalid"; readonly message: string };
 
@@ -191,7 +192,7 @@ class ReadOutcome {
   /** Each position asked: when (the isolate's clock) and whether it has started answering. */
   private readonly asked = new Map<number, { readonly at: number; hasSpoken: boolean }>();
   /** The positions that failed, with what each failure showed about the provider's health. */
-  private readonly failed = new Map<number, null | string>();
+  private readonly failed = new Map<number, null | UnwellReason>();
   /** The providers not resting, in the order to ask them (`orderByHealth`). */
   readonly ready: readonly ParseProvider[];
   /** Positions in `ready` of probes: providers back from a penalty, asked with the next at once. */
@@ -262,7 +263,7 @@ class ReadOutcome {
     return [...this.asked].flatMap(([index, attempt]): Verdict[] => {
       const provider = this.ready[index]?.name ?? "?";
       if (won.ok && won.value.index === index) {
-        return [{ outcome: "ok", provider, why: "" }];
+        return [{ outcome: "ok", provider }];
       }
       if (this.failed.has(index)) {
         const unwell = this.failed.get(index) ?? null;

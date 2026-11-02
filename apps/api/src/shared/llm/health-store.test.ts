@@ -39,8 +39,12 @@ const countingKv = (options: { readonly isBroken?: boolean } = {}) => {
   return { counts, kv: kv as unknown as KVNamespace, values };
 };
 
-const unwell = (provider: string): Verdict => ({ outcome: "unwell", provider, why: "503" });
-const answered = (provider: string): Verdict => ({ outcome: "ok", provider, why: "" });
+const unwell = (provider: string): Verdict => ({
+  outcome: "unwell",
+  provider,
+  why: "server-error",
+});
+const answered = (provider: string): Verdict => ({ outcome: "ok", provider });
 
 describe("kvHealth", () => {
   it("writes only when a record changes: a new penalty, the first success after it", async () => {

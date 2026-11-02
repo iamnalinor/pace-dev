@@ -24,6 +24,13 @@ export type Lost = "deadline" | "failed";
 /** The winner: its position in the list and its answer. */
 export type Won<T> = { readonly index: number; readonly value: T };
 
+/** What an attempt is cancelled with when it took too long: a timeout, as the platform names one. */
+class GaveUp extends Error {
+  override readonly name = "TimeoutError";
+}
+
+export const gaveUp = (ms: number): Error => new GaveUp(`no answer in ${String(ms)} ms`);
+
 /** Whether an attempt has already started the next one. */
 type Link = { isHandedOff: boolean; readonly handOff: () => void };
 
@@ -101,7 +108,7 @@ class HedgedRace<T, F> {
     const isProbe = this.options.probes?.has(index) === true;
     const hedge = setTimeout(link.handOff, isProbe ? 0 : this.options.hedgeAfterMs);
     const giveUp = setTimeout(() => {
-      controller.abort(new Error(`no answer in ${String(this.options.giveUpAfterMs)} ms`));
+      controller.abort(gaveUp(this.options.giveUpAfterMs));
     }, this.options.giveUpAfterMs);
     this.cleanups.push(() => {
       clearTimeout(hedge);

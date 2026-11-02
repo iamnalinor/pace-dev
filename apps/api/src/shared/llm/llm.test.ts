@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from "@pace/core";
 import { artboardState, at, ctx } from "@pace/core/testing";
 
+import { SCHEMA_REFUSAL } from "./fake-call.ts";
 import { echoParse, fakeParseModel } from "./fake-model.ts";
 import { availability, runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
@@ -454,6 +455,24 @@ describe("best-effort structured output (bug class 85)", () => {
       [
         {
           model: fakeParseModel(() => ({ schemaRefused: withKeysLeftOut(), via: "stream" })),
+          name: "strict",
+        },
+      ],
+      prompt,
+    );
+    expect(result).toMatchObject({ ok: true, value: { provider: "strict" } });
+  });
+
+  it("reads the answer an endpoint refused in a stream chunk that carries the generation", async () => {
+    const result = await runParse(
+      [
+        {
+          model: fakeParseModel(() => ({
+            streamsError: {
+              ...SCHEMA_REFUSAL,
+              failed_generation: JSON.stringify(withKeysLeftOut()),
+            },
+          })),
           name: "strict",
         },
       ],

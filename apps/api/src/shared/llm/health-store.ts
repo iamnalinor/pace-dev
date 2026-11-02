@@ -1,7 +1,13 @@
 import { z } from "zod";
 
 import { createLogger } from "../logger.ts";
-import { type Health, type HealthChange, nextHealth, type Verdict } from "./health.ts";
+import {
+  type Health,
+  HEALTH_REASONS,
+  type HealthChange,
+  nextHealth,
+  type Verdict,
+} from "./health.ts";
 
 const log = createLogger("info");
 
@@ -53,7 +59,11 @@ export const HEALTH_CACHE_MS = 15_000;
 
 const HealthSchema = z.record(
   z.string(),
-  z.object({ reason: z.string(), strikes: z.number().int().min(1), until: z.string().nullable() }),
+  z.object({
+    reason: z.enum(HEALTH_REASONS),
+    strikes: z.number().int().min(1),
+    until: z.string().nullable(),
+  }),
 );
 
 /** What an isolate last read or wrote, and when (its own clock). */

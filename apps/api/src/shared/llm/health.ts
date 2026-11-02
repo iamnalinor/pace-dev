@@ -1,3 +1,5 @@
+import type { UnwellReason } from "./failure.ts";
+
 /**
 The providers' health, remembered for every user and every isolate (the store is in
 `health-store.ts`): a provider that just failed in a way that says it cannot serve anyone (a 5xx,
@@ -6,24 +8,39 @@ penalty starts at a minute and doubles with each failure in a row, up to half an
 clears it. Pure: the order of a read, and what a read's outcomes change.
 */
 
+/** Why a provider is held back, as a category (never free text, which may quote the person). */
+export type HealthReason = "slow" | UnwellReason;
+
+export const HEALTH_REASONS = [
+  "dropped",
+  "gone",
+  "server-error",
+  "slow",
+  "timeout",
+] as const satisfies readonly HealthReason[];
+
 /** A provider's record: failures in a row, until when it is asked last, and the latest reason. */
 export type HealthEntry = {
   readonly strikes: number;
   /** Asked last until then (ISO); `null` while the record does not penalize yet (one slow answer). */
   readonly until: null | string;
-  readonly reason: string;
+  readonly reason: HealthReason;
 };
 
 /** Provider name → its record; a provider with none is healthy. */
 export type Health = Readonly<Record<string, HealthEntry>>;
 
-/** What one read showed about one provider it asked. */
-export type Verdict = {
-  readonly provider: string;
-  /** Answered; could not serve (`unwell`); silent past the hedge while another answered (`slow`). */
-  readonly outcome: "ok" | "slow" | "unwell";
-  readonly why: string;
-};
+/**
+What one read showed about one provider it asked: answered; could not serve (`unwell`); silent
+past the hedge while another answered (`slow`).
+*/
+export type Verdict =
+  | { readonly provider: string; readonly outcome: "ok" }
+  | { readonly provider: string; readonly outcome: "slow"; readonly why: "slow" }
+  | { readonly provider: string; readonly outcome: "unwell"; readonly why: UnwellReason };
+
+/** A verdict against the provider. */
+type Failed = Exclude<Verdict, { readonly outcome: "ok" }>;
 
 /** A record that changed: the ones that move a provider are logged, every one is written. */
 export type HealthChange =
@@ -73,7 +90,7 @@ export const orderByHealth = <P extends { readonly name: string }>(
 A failure on top of `entry`: one strike more and the penalty it earns. Slowness earns one only
 when it repeats (the first slow answer may be a long message), so it counts a strike less.
 */
-const struck = (entry: HealthEntry | undefined, verdict: Verdict, now: string): HealthEntry => {
+const struck = (entry: HealthEntry | undefined, verdict: Failed, now: string): HealthEntry => {
   const strikes = (entry?.strikes ?? 0) + 1;
   const steps = verdict.outcome === "slow" ? strikes - 1 : strikes;
   return {
