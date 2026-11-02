@@ -91,8 +91,8 @@ test("every icon-only button on a computer shows its name on hover", async ({ pa
 
 /**
 Done at another time, or the task cancelled or skipped, is reachable without a gesture nobody is
-told about (QA round 19 M2): Done says what its long press does on hover, and a button beside it
-opens the same sheet, whose other outcomes are buttons.
+told about (QA round 19 M2): Done says what it does on hover, and a button beside it, named in
+words on a computer, opens the same sheet with its outcomes in one choice (QA round 20 L3, L6).
 */
 test("Done tells of its other times on hover, and a button beside it opens them", async ({
   page,
@@ -104,18 +104,22 @@ test("Done tells of its other times on hover, and a button beside it opens them"
   const done = page.getByRole("button", { name: /^(?:Готово|Сдать)/u });
   await expect(done).toBeVisible();
   await done.hover();
-  await expect(page.getByRole("tooltip").filter({ hasText: "Долгое нажатие" })).toBeVisible();
+  // What Done does; the way to another time is the button beside it (QA 20 L3).
+  await expect(
+    page.getByRole("tooltip").filter({ hasText: "Закрывает задачу сейчас." }),
+  ).toBeVisible();
   await page.mouse.move(0, 0);
   const other = page.getByRole("button", { name: "Другое время или итог…" });
-  // An icon button: it names itself on hover too.
-  expect(await hasTooltipOnHover(page, other)).toBe(true);
+  // On a computer's window it says what it is in words.
+  await expect(other).toHaveText("Другое время…");
   await other.click();
   await expect(page.locator('[data-pace-surface="sheet"]')).toBeVisible();
+  // The outcome is one choice in sight (QA 20 L6).
   for (const outcome of ["Отменена", "Пропущена"]) {
     await expect(
       page
         .locator('[data-pace-surface="sheet"]')
-        .getByRole("button", { exact: true, name: outcome }),
+        .getByRole("radio", { exact: true, name: outcome }),
     ).toBeVisible();
   }
 });

@@ -54,11 +54,32 @@ Approval opens the new task (full screen on a phone, so the line is gone; in the
 computer, where the line empties), so return to Now for callers that add several tasks.
 */
 export const addTask = async (page: Page, text: string): Promise<void> => {
-  const line = page.getByRole("textbox", { name: "New task" });
+  const line = await settledLine(page);
   await line.pressSequentially(text);
+  await expect(line).toHaveValue(text);
   await line.press("Enter");
   await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
   await approve(page);
   await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible();
+  // On a computer the line stays beside the task and empties: no reload needed (each one costs
+  // a whole start, which under parallel load pushed a journey past its time limit).
+  if (await line.isVisible()) {
+    await expect(line).toHaveValue("");
+    return;
+  }
   await page.goto("/");
+};
+
+/**
+Now's line once the screen has settled: no first-sync cover or grey rows left, so what is typed
+next is not typed into a screen still drawing itself (bug class 20).
+*/
+export const settledLine = async (page: Page): Promise<Locator> => {
+  const line = page.getByRole("textbox", { name: "New task" });
+  await expect(line).toBeVisible();
+  await expect(
+    page.getByRole("progressbar", { name: /^(?:Syncing your data|Loading your data…)$/u }),
+  ).toHaveCount(0);
+  await expect(line).toBeEditable();
+  return line;
 };

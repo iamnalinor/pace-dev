@@ -193,6 +193,11 @@ test("a server gone while the tab sits idle: the line says offline without a wri
   const line = page.getByRole("status").filter({ hasText: "You are offline" });
   await expect.poll(() => sockets.length).toBeGreaterThan(0);
   await expect(line).toHaveCount(0);
+  // The socket's opening asks for one catch-up pull (what landed before it was there), now the
+  // only run after the signed-in start's own (QA 20 L9): it goes within a second of the opening.
+  await expect
+    .poll(() => traffic.calls.filter((call) => call.startsWith("GET /api/sync/pull")))
+    .not.toEqual([]);
   // An idle tab: its socket has been up a while (one cut at once is a flapping link, which backs
   // off without a check, fix round 5 V2), and it sends nothing meanwhile.
   const idle = await traffic.over(6000);

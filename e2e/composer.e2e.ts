@@ -1,6 +1,13 @@
 import type { Page } from "@playwright/test";
 
-import { addTask, approve, formByHand, nowTasks, taskForm } from "./support/composer.ts";
+import {
+  addTask,
+  approve,
+  formByHand,
+  nowTasks,
+  settledLine,
+  taskForm,
+} from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { loginViaApi } from "./support/login.ts";
 
@@ -25,14 +32,19 @@ for (const [width, height, size] of [
 ] as const) {
   for (const theme of ["dark", "light"] as const) {
     test(`composer adds lines and fills the form (${size}, ${theme})`, async ({ page }) => {
+      // A whole journey (four tasks, three screenshots, three accessibility scans): about 20 s on a
+      // computer's window under four parallel workers, past half of the default limit; it timed out
+      // there with nothing failing (round 6 flake, no app wait behind it).
+      test.setTimeout(60_000);
       await loginViaApi(page);
       await page.addInitScript((value) => {
         localStorage.setItem("pace.theme", value);
       }, theme);
       await page.setViewportSize({ height, width });
       await page.goto("/");
-      const line = page.getByRole("textbox", { name: "New task" });
+      const line = await settledLine(page);
       await line.pressSequentially(LINES[0] ?? "");
+      await expect(line).toHaveValue(LINES[0] ?? "");
       await formByHand(page).click();
       const form = page.getByRole("form", { name: "New task" });
       // On a computer the form opens in the right pane and the line stays in the list.
