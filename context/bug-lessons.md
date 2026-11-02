@@ -641,6 +641,18 @@ The same rule applies when a previously successful channel is no longer configur
   `contrast.test.ts`, measured where it is weakest (the low point of an animation, the lighter of
   the backgrounds it sits on). Placeholders: 1.5:1 at the dim of their breath (`PLACEHOLDER_DIM`).
 
+### 80. A field that reads half of a value and guesses the rest, with no way to say it
+- **Bug.** Round 6 (the owner, after QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00
+  could not be cut back to Friday from the Day sheet. Its To field reads a clock time only; the day
+  was guessed near the old end (rules (a)–(c), at most 12 hours either way), so Friday 23:00 was
+  refused ("The end must be after the start.") and every other time landed on Saturday or Sunday.
+- **Missed because.** Every test typed a clock and asked which day the rules chose; the tests were
+  about guessing well, and none asked whether a person could say the day when the guess is wrong.
+- **Rule.** A value typed in parts (a day and a clock, an amount and a unit) has a control for
+  every part the person may need to change; a guess fills a part only while the person has not
+  said it, and once said it is read as said, refused in the usual words if it cannot be. Test the
+  answer the guess never gives (Friday for a weekend block), not only the guesses.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -889,3 +901,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 19 L6: the web's Calendar picker, with nothing on, offered "Calendar from the phone" and a paragraph about Android's settings, on a build that has no phone calendar | 10 (a control that does nothing useful on one platform) | yes: the picker's other phone-only parts (the permissions row) were already gated on the phone; the Day screen's calendar section and the usage hint are phone-only; the Calendar button's greyed tooltips name no platform | `noEventsKey` per platform in the `calendar-source` stand-ins (web: "Nothing on in your calendar right now."), the web setup row and its two strings gone; a web unit test of the stand-in and an e2e of the web picker (no phone calendar, no Android) |
 | 2026-11-02 | QA round 19 L7: Presets' "Start from" row drew Homework as chosen before anything was: the actions were radio chips with a remembered value ("hw") | 72 (a control's look says what it does: actions drawn as a choice, one of them as already made) | yes: the other chip rows are real choices with a value the form keeps (project filter, the close sheet's times and precision, give-up outcomes, the preset form's fields); "Start from" was the only row of actions | `ActionChip` (a button in the unselected look); the presets test finds no radio in the row and opens the new preset from a button |
 | 2026-11-02 | Found by this round's full e2e run (and reproduced 4 of 4 on the base commit 8e84369 here, so not new): the route sweep failed "/no-such-page: sidebar missing" (once also /decisions): after a reload the first-sync cover hides the app while the device's copy is read, and the sweep's "text stopped changing" poll could settle on the cover's own words and count no sidebar | 20 (a test judges the screen before what it waits for has reached it: here the cover, which is stable text too) | yes: the tooltip sweep, the other one that reloads route after route, already waits for every progressbar to go before it looks; the overlay sweep loads once and moves in the app | the sweep waits for the cover's progressbar to go before it settles; 12/12 runs of both sweeps on this round's build, 4/4 desktop on the base build |
+| 2026-11-02 | Round 6 (owner, QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00 could not be cut back to Friday from the Day sheet; the end field read a clock only and the day was guessed near the old end | 80 (new) | yes: the other typed times carry their day (the close sheet's and the date field's typed date and time) or are a time of day by nature (presets' deadline and recurrence, quiet hours); the Day sheet was the only clock read on a guessed day | `fromDay`/`toDay` in `ActivityForm` and a day row for each time in the sheet (`day-choices.tsx`: shown for a block across days, behind "Other days" otherwise); `readDraft` tests (Friday 23:00 saved, red before; Friday 19:00 and a day before the start refused as `day.badRange`; a start on its chosen day; a new block's chosen end never read past midnight) and sheet tests (cut back to Friday, start moved to Saturday, a one-day block's next day) |

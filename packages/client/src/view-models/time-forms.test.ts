@@ -25,9 +25,11 @@ describe("time forms", () => {
       category: "food",
       expectMinutes: 25,
       from: "12:30",
+      fromDay: null,
       label: "Lunch",
       taskId: "t1",
       to: "",
+      toDay: null,
     });
     expect(
       activityFormOf(
@@ -38,9 +40,11 @@ describe("time forms", () => {
       category: "other",
       expectMinutes: null,
       from: "09:00",
+      fromDay: null,
       label: "",
       taskId: null,
       to: "10:00",
+      toDay: null,
     });
   });
 });

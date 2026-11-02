@@ -15,6 +15,12 @@ export type ActivityForm = {
   readonly taskId: null | string;
   readonly from: string;
   readonly to: string;
+  /**
+  The calendar day (`yyyy-MM-dd` in the sheet's zone) the person put the start or the end on;
+  `null` while only the clock was typed, and the sheet reads the day from the block itself.
+  */
+  readonly fromDay: null | string;
+  readonly toDay: null | string;
 };
 
 /** The sheet's starting fields; `clock` writes an instant the way the platform's time input reads it. */
@@ -26,8 +32,10 @@ export const activityFormOf = (
   expectMinutes: target.kind === "edit" ? (target.expectMinutes ?? null) : null,
   taskId: target.kind === "edit" ? (target.taskId ?? null) : null,
   from: clock(target.startAt),
+  fromDay: null,
   label: target.kind === "edit" ? target.label : "",
   to: target.endAt === null ? "" : clock(target.endAt),
+  toDay: null,
 });
 
 /** The Day sheet's inputs: what it edits, the zone its times are typed in, and how it closes. */

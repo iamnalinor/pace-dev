@@ -39,6 +39,7 @@ import {
   readDraft,
 } from "./activity-draft.ts";
 import { ActivityTaskField } from "./activity-task-field.tsx";
+import { DayChoices } from "./day-choices.tsx";
 
 /** What the sheet edits: an existing block (move and rename) or a new past one. */
 export type SheetTarget = ActivityTarget;
@@ -279,6 +280,7 @@ export const ActivitySheet = ({ onClose, target, zone }: ActivitySheetProps) => 
         isEndEditable={hasEnd(target)}
         patch={patch}
       />
+      <DayChoices draft={draft} patch={patch} range={range} target={target} zone={zone} />
       {target.kind === "edit" ? (
         <ActivityApps endAt={target.endAt} startAt={target.startAt} zone={zone} />
       ) : null}

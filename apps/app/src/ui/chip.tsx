@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { Pressable, Text, View } from "react-native";
 
@@ -38,6 +38,7 @@ export const Chip = ({
   label,
   leading,
   onPress,
+  ref,
   selected = false,
   tall = false,
 }: {
@@ -48,6 +49,8 @@ export const Chip = ({
   readonly label?: string;
   readonly leading?: ReactNode;
   readonly onPress: () => void;
+  /** For focus to be moved onto it when the control that held it goes away. */
+  readonly ref?: Ref<View> | undefined;
   readonly selected?: boolean;
   /** 36px with 13px text: the time pills of the close sheet. */
   readonly tall?: boolean;
@@ -58,6 +61,7 @@ export const Chip = ({
     aria-checked={selected}
     className={cx("justify-center active:opacity-80", tall ? "-my-1 h-11" : "-my-1.5 h-11")}
     onPress={onPress}
+    ref={ref}
   >
     <View
       className={cx(
