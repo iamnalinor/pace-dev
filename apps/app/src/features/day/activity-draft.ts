@@ -45,7 +45,8 @@ one of (QA round 18 M3, one rule for every end):
 - on the old end's day when the block as it was (its stored start, not the typed one) was already
   longer than that: a night or a timer left running is adjusted on the day it ended (Fri 20:00 –
   Sun 07:00 → Sun 08:00; QA round 17 review I1: reading it on the start's day cut a 30-hour block
-  by a day without a word).
+  by a day without a word), by at most `MAX_OVERNIGHT_MS` either way: an adjustment, not a jump
+  (fix round 5 V5: → 23:00 made it 51 hours without a word).
 Anything else is a reversed pair, refused in the same words wherever it comes from: an end typed
 before the start's clock never becomes a silent day-long block (round-4 review R1: 22:00–02:00 →
 21:00 saved 23 hours; QA round 18 M3: a week-old 08:00–21:30 → 07:00 did too, and yesterday's
@@ -82,7 +83,7 @@ const movedEndOf = (
       Date.parse(atIso) > start &&
       (date === startDate ||
         Date.parse(atIso) - start <= MAX_OVERNIGHT_MS ||
-        (wasLong && date === endDate)),
+        (wasLong && date === endDate && Math.abs(Date.parse(atIso) - was) <= MAX_OVERNIGHT_MS)),
   );
   return fits?.atIso ?? startAt;
 };

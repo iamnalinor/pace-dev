@@ -154,6 +154,14 @@ describe("readDraft on a block's real boundaries", () => {
       startAt: "2026-10-05T05:00:00.000Z",
       to: "07:00",
     },
+    // Fix round 5 V5: a 35-hour Fri 20:00 – Sun 07:00 → 23:00 would be 51 hours: a jump of 16
+    // hours on its end's day, not an adjustment of it.
+    {
+      endAt: "2026-10-04T04:00:00.000Z",
+      name: "Fri 20:00 – Sun 07:00 → 23:00",
+      startAt: "2026-10-02T17:00:00.000Z",
+      to: "23:00",
+    },
   ])(
     "refuses an end typed before the start that makes a day-long block: $name",
     ({ endAt, startAt, to }) => {
