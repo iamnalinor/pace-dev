@@ -28,8 +28,12 @@ const element = (name: string, kind: "field" | "stop", isHidden = false): Fake =
   return fake;
 };
 
-/** A sheet surface holding `elements` in order; fields answer the field query, all the stop one. */
+/**
+A sheet surface holding `elements` in order; fields answer the field query, all the stop one. It
+takes focus itself too, as "the sheet".
+*/
 const surface = (elements: readonly Fake[]) => ({
+  ...element("the sheet", "stop"),
   contains: (other: unknown) => elements.includes(other as Fake),
   querySelectorAll: (selector: string) =>
     selector.startsWith("input") ? elements.filter((item) => item.isField) : elements,
@@ -57,6 +61,11 @@ describe("where an open sheet starts on the web (QA 18 M1, fix round 5 V4)", () 
   it("starts on no text field on a touch screen, so no on-screen keyboard covers the sheet", () => {
     const sheet = [element("Close", "stop"), element("Title", "field"), element("Save", "stop")];
     expect(names(stopsOf(sheet, false))).toEqual(["Save"]);
+  });
+
+  it("starts on the sheet itself when it holds nothing to focus but the cross (a block's details)", () => {
+    const sheet = [element("Close", "stop")];
+    expect(names(stopsOf(sheet, true))).toEqual(["the sheet"]);
   });
 
   it("leaves focus where a field put it itself", () => {

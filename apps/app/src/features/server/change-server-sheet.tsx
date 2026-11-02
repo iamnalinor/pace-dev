@@ -122,6 +122,7 @@ export const ChangeServerSheet = ({ onClose }: { readonly onClose: () => void })
     <Sheet
       closeLabel={t("common.close")}
       formLabel={t("server.title")}
+      name="change-server"
       onClose={onClose}
       subtitle={t("server.subtitle")}
       title={t("server.title")}

@@ -123,8 +123,13 @@ describe("Settings and Presets during the first sync (QA round 20 M1)", () => {
   });
 
   it.each([
-    ["Settings", () => <SettingsScreen />, en("settings.language.en")],
-    ["Presets", () => <PresetsScreen />, en("presets.seedExamples")],
+    ["Settings", () => <SettingsScreen />, () => screen.queryByText(en("settings.language.en"))],
+    ["Presets", () => <PresetsScreen />, () => screen.queryByText(en("presets.seedExamples"))],
+    [
+      "Week",
+      () => <WeekScreen />,
+      () => screen.queryByRole("switch", { name: en("week.nightHours") }),
+    ],
   ] as const)(
     "%s keeps waiting after a failed first pull, until one succeeds for this session (round 7 review 12)",
     async (_name, ui, known) => {
@@ -149,14 +154,19 @@ describe("Settings and Presets during the first sync (QA round 20 M1)", () => {
       });
       expect(runtime.sync.status.getState().online).toBe(false);
       // The first sync ended (failed): the defaults are still not the account's, nothing to change.
-      expect(screen.queryByText(known)).toBeNull();
+      expect(known()).toBeNull();
       server.isDown = false;
       await act(async () => {
         await runtime.sync.syncNow();
       });
-      expect(screen.getByText(known)).toBeOnTheScreen();
+      expect(known()).toBeOnTheScreen();
     },
   );
+
+  it("Week draws no night-hours switch, the same account value as Settings' (round 6-D sweep)", async () => {
+    await duringFirstSync(<WeekScreen />);
+    expect(screen.queryAllByRole("switch")).toEqual([]);
+  });
 
   it("Presets shows grey rows instead of the built-in list and its actions", async () => {
     await duringFirstSync(<PresetsScreen />);

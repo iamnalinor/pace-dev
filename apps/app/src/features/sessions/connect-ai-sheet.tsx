@@ -38,6 +38,7 @@ export const ConnectAiSheet = ({
   return (
     <Sheet
       closeLabel={t("common.close")}
+      name="connect-ai"
       onClose={onClose}
       title={t("connectAi.open")}
       visible={open}

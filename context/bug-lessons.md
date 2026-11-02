@@ -856,6 +856,23 @@ The same rule applies when a previously successful channel is no longer configur
 - **Rule.** A shared in-flight request has a deadline (`withinDeadline`) and a key with everything
   that changes its answer (the session too). Test a first call that never settles, on fake timers,
   and a second call from another session.
+### 90. A guard that names by hand the screens or sheets it covers
+- **Bug.** The first-sync guard listed its routes by hand: QA round 18 M5 fixed Now, round 19 M1
+  found Day and the Assistant log printing zeros, round 20 M1 found Settings and Presets drawing
+  defaults (and live switches that could write them over the account); each fix covered the screens
+  the last round named. The sheet-focus guard listed its sheets by hand too, and the first sweep
+  over a registry of every sheet found the one it lacked: a block's details on a phone's Week took
+  no focus at all (nothing in it to focus but the dim), so the keyboard stayed on the page behind
+  the dialog.
+- **Missed because.** A hand list covers the cases someone remembered when it was written; a new
+  screen or sheet, or one nobody connected to the rule, is never added, and the guard stays green.
+- **Rule.** A guard for an app-wide rule (first sync, focus, Escape, tooltips, the mechanical
+  matrix) loops over a list read from the source: the route files under `apps/app/app`
+  (`e2e/support/routes.ts`), the sheet registry (`apps/app/src/ui/sheet-names.ts`, which `Sheet`
+  requires a name from, a jest test keeping it equal to the sources, and the e2e failing on a
+  registered sheet it has no opener for). Where the loop cannot reach a case, it names it with the
+  reason (`NOT_ON_THE_WEB`, `BY_DESIGN`), never skips it silently. The rule's expectation must hold
+  for the instance with the least in it (a sheet with no field and no button).
 
 ## Log
 
@@ -1145,3 +1162,6 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Round 7 review 9 and 10: `RadioChips` let arrows scroll the page and arrowing onto Cancelled took the cursor to Reason; the Day sheet's day chips were a tab stop each | 84, 5 | yes: every radio row of chips: the task fields' category, importance and project rows and the composer's "Add to" row were a stop per chip too and are now `RadioChips` (`OptionRow` removed) | arrows `preventDefault`, Reason only on a press (or opening on Cancelled); app tests (red before) |
 | 2026-11-02 | Round 7 review 11: `phoneColumnPx` grew without bound (100 lanes divided by zero) and lane widths went to 0 % or below | 84 | yes: the lane width (`laneStyle`) had the same edge | the column stops at 6 lanes' width, more lanes share it; tests at 20, 100 and 150 lanes (red before) |
 | 2026-11-02 | Round 7 review 12: after a failed first sync, Settings showed the defaults with live controls again | 22 | yes: Presets (its seed action writes) waits the same way; the other screens show their real empty state (as ruled) | `useIsAccountUnknown` (until a run of this session succeeded) behind `KnownAfterSync` and `FirstSyncBody isAccountBound`; app test for both (red before) |
+| 2026-11-02 | Round 6-D sweep: a block's details on a phone's Week (the only sheet without a field or a button) took no keyboard focus, so it stayed on the page behind the dialog; the sheet-focus guard listed its sheets by hand and never opened this one. The guards for first sync and the QA matrix were hand lists of routes the same way (QA rounds 18 M5, 19 M1, 20 M1) | 90 (new) and 5 | yes: every `Sheet` now carries a registered name and the e2e opens each (13 ways into 10 sheets on the web; the server sheet is Android's only, named with its reason); the first-sync guard loops over every route file; the QA matrix (console, requests, raw keys, clipping, axe, a quiet network) runs over every route × width × theme × account in `route-sweep.e2e.ts` | a sheet with nothing else to focus starts on its own surface (`sheetStartStops`, unit test); `sheet-names.test.ts` keeps the registry equal to the sources; `sheet-focus.e2e.ts` fails on a registered sheet without an opener; `sync-state.e2e.ts` and `route-sweep.e2e.ts` read the routes from the router's folder |
+| 2026-11-02 | Round 6-D sweep: during the first sync of an empty copy, Week drew its night-hours switch (the same account value as Settings' "Show night hours", which QA round 20 M1 hid) from the default, live, so a tap wrote over a value the account had not sent yet | 62 (and 90: the round 20 fix covered the two screens the report named) | yes: every route's switches and choices drawn under a held first pull, listed by the new e2e loop: Settings' theme (this device's own choice, kept) and New task's form on a share (`/add`: its presets and projects are the built-in ones until the log arrives; left open for the owner, named in the test) | Week's switch keeps its place empty until the sync ends (app test in `first-sync-screens.test.tsx`); the e2e first-sync loop fails on any switch or choice drawn on any route while the log is away, bar the named ones |
+| 2026-11-02 | Found merging round 6-D into round 7: Week's night-hours switch waited only for the first sync to end (`useIsFirstSync`), so after a failed first pull it showed the built-in default as live, the gap round 7 review 12 closed for Settings and Presets in parallel | 62 (two branches each fixing half of one rule) | yes: `useIsFirstSync` is left only where a failed first pull may show the real empty state; every account-bound control waits on `useIsAccountUnknown` | `first-sync-screens.test.tsx` "Week keeps waiting after a failed first pull" (RED with the old gate) beside Settings and Presets |

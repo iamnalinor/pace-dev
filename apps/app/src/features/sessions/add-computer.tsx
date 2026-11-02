@@ -83,6 +83,7 @@ export const AddComputer = ({
     <Sheet
       closeLabel={t("common.close")}
       footer={created === null ? undefined : <ComputerStepsDone onDone={onClose} />}
+      name="add-computer"
       onClose={onClose}
       title={t("devices.add")}
       visible

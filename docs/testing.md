@@ -115,10 +115,22 @@ log. `e2e/route-sweep.e2e.ts` closes that gap: `seedLivedIn` (`e2e/support/seed.
 log with Russian text, projects, open, future and closed tasks, a monthly series, activities, preset edits,
 corrections and every event type at least once (it fails if `EVENT_TYPES` grows a type the
 seed lacks), then the sweep opens every route file under `apps/app/app` by a direct load, at
-390 and 1440 px. It fails on a thrown error or a `console.error`, a blank page, the crash
-screen, or a desktop screen without the sidebar. Rules that follow from it:
+390 and 1440 px, in the light and the dark theme, on that account and on a fresh English one (the
+mechanical matrix exploratory QA used to script each round, [qa.md](qa.md)). It fails on a thrown
+error or a `console.error`, a request to Pace's servers that fails or is answered 4xx/5xx, a
+blank page, the crash screen, a wrong landing URL, a desktop screen without the sidebar, a raw
+message key, text that does not fit (wider than its box, out of its button, cut to a sliver, a
+word broken across lines, a page that scrolls sideways), a serious axe violation (the full WCAG
+set in light, the colour rules in dark), and any request or socket frame sent twice in the two
+seconds after the screen settles. A fault that is the design goes into its `BY_DESIGN` list with
+the reason. The same route list drives the first-sync loop in `sync-state.e2e.ts` (every route
+under a held first pull: no empty copy, no zero total, no write), and `sheet-focus.e2e.ts` opens
+every sheet in the registry (`apps/app/src/ui/sheet-names.ts`; `Sheet` requires a registered
+name). Rules that follow from it:
 
 - a new screen needs no test entry, but a new event type needs a line in the seed;
+- a new sheet needs a name in the registry and an opener in `sheet-focus.e2e.ts` (the test fails
+  without one);
 - a dynamic translation key is never built with `as MessageKey` (a lint rule forbids it):
   map the value with a typed `Record` (as `EVENT_LABEL_KEYS` does), so a missing label
   fails the type check, and `i18n.test.ts` checks every event type has one;
