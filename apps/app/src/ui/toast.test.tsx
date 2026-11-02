@@ -50,7 +50,7 @@ describe("ToastProvider", () => {
   });
 });
 
-describe("the toast's words (QA round 18 R18-01)", () => {
+describe("the toast's words (QA round 22 R22-01)", () => {
   // The sentences a toast says on its own, longest first: a refused tap and the refusals beside it.
   const SENTENCES = [
     "actionError.persist_failed",

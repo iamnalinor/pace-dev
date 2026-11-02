@@ -247,7 +247,7 @@ describe("LoginScreen", () => {
     );
   });
 
-  it("calls a browser login failed only when its token was refused, not when the device moved on (fix round 2 of QA 18)", async () => {
+  it("calls a browser login failed only when its token was refused, not when the device moved on (fix round 2 of QA 22)", async () => {
     for (const [answer, isFailed] of [
       [{ error: "auth/unauthorized", ok: false }, true],
       [{ error: "session/changed", ok: false }, false],

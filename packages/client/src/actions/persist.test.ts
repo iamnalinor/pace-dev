@@ -33,7 +33,7 @@ const heldWorld = async (): Promise<{
 const closedOf = (world: ActionsWorld, taskId: string): unknown =>
   world.state.store.getState().tasks.byId[taskId]?.closed ?? null;
 
-describe("an action's result shows before its local write (bug-lessons 3 and 57)", () => {
+describe("an action's result shows before its local write (bug-lessons 3 and 108)", () => {
   it("closes the task on screen while the write is pending, then answers ok", async () => {
     const { held, world } = await heldWorld();
     const answer = track(world.actions.closeTask({ outcome: "done", taskId: TRK_ID }));

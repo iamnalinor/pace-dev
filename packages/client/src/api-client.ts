@@ -122,7 +122,7 @@ also says which protocol this build speaks (`X-Pace-Protocol`).
 Once this device's session has ended (`sessionEnded`: signed out by hand, from the list or by a
 401), a call whose contract needs a session (`auth: true`, the flag the Worker mounts its guard
 from) is not sent without one: it fails here with the server's own 401 `auth/unauthorized`, so a
-screen or a loop still running after the sign-out asks nothing (QA round 18 R18-02). A device that
+screen or a loop still running after the sign-out asks nothing (QA round 22 R22-02). A device that
 never had a session reaches no screen that makes such calls (the route gate).
 */
 export const createApiClient = (options: {

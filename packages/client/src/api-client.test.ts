@@ -54,7 +54,7 @@ describe("createApiClient", () => {
     });
   });
 
-  it("once the session ended, never sends a call that needs one: it fails here as the server would (QA round 18 R18-02)", async () => {
+  it("once the session ended, never sends a call that needs one: it fails here as the server would (QA round 22 R22-02)", async () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, { status: "ok" }));
     const client = createApiClient({
       baseUrl: "https://api.test",

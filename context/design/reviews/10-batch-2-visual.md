@@ -122,7 +122,7 @@ No clipping or overlap breakage and no lost targets. The migration is clean over
 
 ## Fix round (2026-11-02)
 
-After shots: `.cache/shots/batch-2-v/` (same names as batch-2; routes, focus, and the states task-edit-sheet, toast-to-inbox, now-check-toast, task-close-as, day-pick-date, now-calendar-tooltip, time-chores-picker). Details per finding: `.superpowers/sdd/redesign-plan/visual-fix-report.md`. Bug-lessons class 61.
+After shots: `.cache/shots/batch-2-v/` (same names as batch-2; routes, focus, and the states task-edit-sheet, toast-to-inbox, now-check-toast, task-close-as, day-pick-date, now-calendar-tooltip, time-chores-picker). Details per finding: `.superpowers/sdd/redesign-plan/visual-fix-report.md`. Bug-lessons class 112.
 
 | Finding | Status |
 |---|---|

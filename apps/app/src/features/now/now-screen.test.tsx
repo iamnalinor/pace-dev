@@ -547,7 +547,7 @@ describe("NowBoard", () => {
     expect(rowsInFlattenableBoxes()).toEqual([]);
   });
 
-  it("hides the calendar card once its skip went through, without waiting for the phone to save it (bug-lessons 57)", async () => {
+  it("hides the calendar card once its skip went through, without waiting for the phone to save it (bug-lessons 108)", async () => {
     seminarSoon();
     const skip = heldRoute();
     const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } });

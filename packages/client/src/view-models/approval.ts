@@ -42,7 +42,7 @@ const APPROVAL_NAMED = 2;
 /**
 The toast after Approve: the first two actions in words, each name quoted short at its slot (and
 a step it cannot word as its summary, cut at a word), then how many more; "Done" when there is nothing to name. A toast's words are shown
-whole, so the message itself is bounded here (fix round 1 of QA 18: ten actions ran to 25 lines).
+whole, so the message itself is bounded here (fix round 1 of QA 22: ten actions ran to 25 lines).
 */
 export const approvalText = (actions: readonly Action[], world: World, fit: ToastFit): string => {
   const { language } = world;

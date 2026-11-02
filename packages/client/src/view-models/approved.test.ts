@@ -28,7 +28,7 @@ describe("what an approval did, in words (QA round 11 L3, round 14 L10)", () => 
   });
 });
 
-describe("the approval toast's words (fix round 1 of QA 18)", () => {
+describe("the approval toast's words (fix round 1 of QA 22)", () => {
   const world = { language: "en" as const, now: LATER, state: artboardState(LATER) };
 
   it("quotes a long name short inside its sentence: the sentence and its closing quote stay", () => {

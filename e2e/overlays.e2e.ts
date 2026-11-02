@@ -107,7 +107,7 @@ test.describe("motion and overlays at one width", () => {
     await expect(taskForm(page)).toBeVisible();
   });
 
-  test("the assistant's preview unfolds without the card scrolling under the finger (fix round 2 of QA 18)", async ({
+  test("the assistant's preview unfolds without the card scrolling under the finger (fix round 2 of QA 22)", async ({
     page,
   }) => {
     await loginViaApi(page);

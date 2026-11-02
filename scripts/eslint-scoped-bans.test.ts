@@ -4,9 +4,9 @@ import path from "node:path";
 
 /**
 The bans scoped to some folders, read from the resolved config so a glob that drifts away from a
-folder fails here. The display-text bans (bug-lessons 59 and 60: `toFixed`, cutting the first
+folder fails here. The display-text bans (bug-lessons 110 and 111: `toFixed`, cutting the first
 UTF-16 unit) cover every source that builds text a person reads: the app and the client's
-view-models, tests aside. The app never drops an action's answer (bug-lessons 57).
+view-models, tests aside. The app never drops an action's answer (bug-lessons 108).
 */
 const ROOT = path.join(import.meta.dir, "..");
 const eslint = new ESLint({ cwd: ROOT });

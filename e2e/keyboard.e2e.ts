@@ -5,7 +5,7 @@ import { loginViaApi } from "./support/login.ts";
 import { seedLivedIn } from "./support/seed.ts";
 
 /**
-The keyboard on controls the browser does not draw itself (bug-lessons class 62): react-native-web
+The keyboard on controls the browser does not draw itself (bug-lessons class 113): react-native-web
 presses a pressable on Enter and, for a switch, radio or checkbox, ignored Space; and the page's
 one focus ring must reach every focusable, a range slider among them.
 */

@@ -18,7 +18,7 @@ const GALLERY_TASK_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 
 /**
 The toast at its narrowest (docked in the sidebar's column) and at a phone's width: the refusal
-sentence of a rolled-back tap whole (QA round 18 R18-01), a done task quoted short with Undo, and
+sentence of a rolled-back tap whole (QA round 22 R22-01), a done task quoted short with Undo, and
 an approval of ten actions (two named, the rest counted).
 The overflow sweep reads every line of it.
 */

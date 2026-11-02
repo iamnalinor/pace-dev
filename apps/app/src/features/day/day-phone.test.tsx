@@ -478,7 +478,7 @@ describe("Day and the notification pool", () => {
     });
   });
 
-  it("hides a skipped event once the server took it, without waiting for the phone to save it (bug-lessons 57)", async () => {
+  it("hides a skipped event once the server took it, without waiting for the phone to save it (bug-lessons 108)", async () => {
     const { skip } = await withPool([]);
     // The phone's own storage is slow to write (Android's keystore): the card must not wait.
     const saving = Promise.withResolvers<undefined>();

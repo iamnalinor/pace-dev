@@ -3,7 +3,7 @@ import type { StoreApi } from "zustand/vanilla";
 import * as SecureStore from "expo-secure-store";
 
 /**
-A preference shown at once and saved after (bug-lessons 57: a tap's result never waits for the
+A preference shown at once and saved after (bug-lessons 108: a tap's result never waits for the
 phone's storage, slow on Android's keystore): `change` goes into the store first, then `save`
 runs; a refused save puts back what those fields held before (unless a later change replaced
 them meanwhile) and rethrows.

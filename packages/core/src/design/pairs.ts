@@ -41,7 +41,7 @@ const onGrounds = (
 /**
 The ground of a selected row that carries a meta line (`TaskRow`: Now, a project, History). The
 whole meta line sits on it (tertiary times, danger words, every tag), so it is the lightest neutral
-fill: on `fill.3` the tertiary meta and the green tag fall to 4.0-4.3:1 in light (bug-lessons 61).
+fill: on `fill.3` the tertiary meta and the green tag fall to 4.0-4.3:1 in light (bug-lessons 112).
 `apps/app/src/shared/task-row.test.tsx` pins the row's class to it.
 */
 export const SELECTED_ROW_FILL = "fill.1" satisfies ColorRole;

@@ -61,7 +61,7 @@ export type Auth = {
   /**
   Whether this device's session ended since it started (signed out by hand, from the list, by a
   401 or a refused adopted token) and no new one began: the API client then sends nothing that
-  needs a session (QA round 18 R18-02).
+  needs a session (QA round 22 R22-02).
   */
   readonly hasEnded: () => boolean;
   /** Errors are the API's code (`auth/not-allowed`, ...) or `network`. */
@@ -255,7 +255,7 @@ const meOf = (api: ApiClient, session: Session) => async (): Promise<Result<User
     // The answer carries the store id too; the sync confirms that on its own pulls.
     const user = UserSchema.parse(await api.call(endpoints.me, {}));
     // An answer for a token this device dropped or replaced meanwhile (a Log out while the check
-    // was on its way) writes nothing: it would sign a wiped device back in (fix round 1 of QA 18).
+    // was on its way) writes nothing: it would sign a wiped device back in (fix round 1 of QA 22).
     if (session.token() !== sent) {
       return err(SESSION_CHANGED);
     }
@@ -331,7 +331,7 @@ export const createAuth = (options: {
       // Forgotten here first, then the server is told with the token it had: once the server
       // ends the session it closes this device's socket (4401) and answers anything else 401,
       // and a check or a sync set off by that would read the person's own sign-out as "ended
-      // elsewhere" (QA round 18 R18-02). Signed out, the device sends nothing more with it.
+      // elsewhere" (QA round 22 R22-02). Signed out, the device sends nothing more with it.
       await session.signOut();
       try {
         await api.call(endpoints.auth.logout, {}, { credential: leaving });

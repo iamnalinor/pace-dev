@@ -5,7 +5,7 @@ import { loginViaApi } from "./support/login.ts";
 import { pushAsClient, ulid } from "./support/seed.ts";
 
 /**
-Responsiveness budget (bug-lessons class 57): from a tap to the next frame takes at most 100 ms
+Responsiveness budget (bug-lessons class 108): from a tap to the next frame takes at most 100 ms
 (p75 of nine taps, after one discarded warm-up) on a mid-range phone, which Chromium stands in
 for with its CPU slowed four times. The time is what the browser itself reports for the tap's
 interaction (the Event Timing API: from the input to the frame painted after its handlers), so
@@ -278,7 +278,7 @@ const CEILINGS: Readonly<Partial<Record<Case, Ceiling>>> = {
   check: { ms: 310, owner: "Task 5.2", why: "the dust mounts in the check's own commit" },
   // Task 5.3 (route push) and Task 5.6 (render budget).
   row: { ms: 240, owner: "Task 5.3 / 5.6", why: "the task screen renders in the tap's commit" },
-  // QA round 18 (R18-09), measured after its fix (2026-11-02, one fresh build, the project alone
+  // QA round 22 (R22-09), measured after its fix (2026-11-02, one fresh build, the project alone
   // five times, plus one run of these six alone on the same build): largest p75 day step 128,
   // week step 208, Log past 168, theme chip 296, New task 216, picker 136 ms. Not profiled yet:
   // the reasons are Task 5.6's to find; the "why" says what the tap renders.
@@ -429,7 +429,7 @@ const timeOpens = async (
   }));
 
 /**
-QA round 18 (R18-09): the other taps the person makes often, measured the same way. Their gaps
+QA round 22 (R22-09): the other taps the person makes often, measured the same way. Their gaps
 are Task 5.6's (render budget) like the four above; each has a ceiling until then.
 */
 test.describe("the other frequent taps within 100 ms on a slow phone (p75 of 9)", () => {

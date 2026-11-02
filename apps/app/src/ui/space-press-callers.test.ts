@@ -21,7 +21,7 @@ const sources = (dir: string): readonly string[] => {
   return found;
 };
 
-describe("spacePress callers (bug-lessons class 62: a disabled control gets no action)", () => {
+describe("spacePress callers (bug-lessons class 113: a disabled control gets no action)", () => {
   it("a file that disables a control passes the disabled state to spacePress", () => {
     const offenders = sources(SRC)
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- files of this app's own source tree

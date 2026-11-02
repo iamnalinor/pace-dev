@@ -161,7 +161,7 @@ preview mounts inside the composer card while the card is still growing to its h
 slower under load), so Approve is half clipped at first. Playwright's click scrolls a clipped
 target into view: it scrolled the card's clipping box, pressed at that spot, and the box scrolled
 back as it grew, so the release missed (no click). Seen in the full run as an Approve that did
-nothing (fix rounds 1 and 2 of QA 18, bug-lessons class 5).
+nothing (fix rounds 1 and 2 of QA 22, bug-lessons class 5).
 */
 export const clickWhenSettled = async (control: Locator): Promise<void> => {
   // Wholly inside its clipping boxes and the viewport: the click then has nothing to scroll.

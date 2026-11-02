@@ -10,7 +10,7 @@ export type RefusingStore = {
 };
 
 /**
-The real store path for a refused local write (bug-lessons 57): the action shows at once, its
+The real store path for a refused local write (bug-lessons 108): the action shows at once, its
 write is refused, the state takes it back and the action answers `persist_failed`.
 */
 export const refusingStore = (): RefusingStore => {

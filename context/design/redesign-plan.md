@@ -113,7 +113,7 @@ Each batch is one PR (batch 1 ships inside the batch-2 PR). Before opening or up
       (`latency` runs only once `chromium` is green: "did not run" is a failure). Tasks that touch
       tokens, generated classes or the kit run it too, not a subset (since Task 2.2 tasks ran only
       e2e subsets, and Week's grid and the selected task row's contrast waited for the
-      batch close-out; docs/qa.md step 4, bug-lessons 11 and 61).
+      batch close-out; docs/qa.md step 4, bug-lessons 11 and 112).
 - [ ] Re-shoot the matrix for touched screens:
       `DESIGN_SHOTS=.cache/shots/batch-<n> DESIGN_SHOTS_ONLY=routes,states,scroll bun test:e2e e2e/design-shots.e2e.ts`;
       put before/after pairs (baseline from `context/design/baseline/`) in the PR description.
@@ -756,7 +756,7 @@ memoised rows and view-model selectors, deferring off-screen work (`startTransit
 non-urgent subtrees), list rendering, the tab scenes kept mounted.
 - [ ] Every case in `e2e/latency.e2e.ts` passes the 100 ms budget; the over-budget markers are
       removed. Report before/after per case. Commit.
-- [ ] The cases QA round 18 found over the budget (R18-09), each with a regression ceiling in
+- [ ] The cases QA round 22 found over the budget (R22-09), each with a regression ceiling in
       `CEILINGS` owned by this task (largest p75 of six isolated runs on one build — the project
       alone five times plus these six cases alone once, which set `weekStep` and `newTask` —
       × 1.25, rounded up to 10 ms):
@@ -818,13 +818,13 @@ Week), `scripts/serve-web.ts` (apply `_headers`), skeleton heights in the kit.
       `/` and `/history` (PerformanceObserver); the CSP header is present locally (F-WEB-11/12/16).
 - [ ] Commit.
 
-### Task 6.5: A cold URL of a tab screen keeps its address (QA round 18 R18-03, R17 M2)
+### Task 6.5: A cold URL of a tab screen keeps its address (QA round 22 R22-03, R17 M2)
 
 - [ ] Failing e2e in `route-sweep.e2e.ts`: a cold load (fresh context) of `/inbox`, `/more`, `/day`
       at 1440 and 390 keeps `page.url()` and a reload returns to the same screen; fix the tab
       router's initial route on the web. Bug-lessons entry. Commit.
 
-### Task 6.6: A second tab of the same profile follows the first (QA round 18 R18-04, R17 M1)
+### Task 6.6: A second tab of the same profile follows the first (QA round 22 R22-04, R17 M1)
 
 - [ ] Failing two-page test in `live.e2e.ts`: a note added in tab A shows in tab B (badge and list)
       within a second, without a reload; the tabs share one IndexedDB and device id, so B rebuilds
@@ -917,43 +917,43 @@ Tasks listed in spec §13's table own the new surfaces Phase C added; each of th
 row. Bugs found by the delta review (export file name in UTC, 09-001 IPv6 under Revoke, Wipe ignoring
 Escape) get their bug-lessons entries in the task that fixes them.
 
-### QA round 18 carry-over
+### QA round 22 carry-over
 
-QA round 18 (`context/qa-round-18.md`, batch 1+2) findings not fixed in the QA-18 fix commit, each
+QA round 22 (`context/qa-round-22.md`, batch 1+2) findings not fixed in the QA-22 fix commit, each
 with the task that owns it; the owning task reads the finding and adds its test. Fixed in the fix
-commit: R18-01 (toast sentence cut off), R18-02 (Log out network and notice); R18-09 is now
+commit: R22-01 (toast sentence cut off), R22-02 (Log out network and notice); R22-09 is now
 ceilings in `e2e/latency.e2e.ts` owned by Task 5.6.
 
 | Finding | Owner | Note |
 |---|---|---|
-| R18-03 cold URL of Inbox/More/Day rewritten to `/` (R17 M2) | Task 6.5 (new) | route-sweep asserts `page.url()` after a cold load |
-| R18-04 second tab stale (R17 M1) | Task 6.6 (new) | two-page test in `live.e2e.ts` |
-| R18-05 first sync: definitive empty states in the browser's language (R17 M4) | Task 6.1 (language at first paint) + Task 3.9 (`Skeleton`, `EmptyState`) | spec 5.0.5: no empty copy before the first full pull |
-| R18-06 nothing says offline / not synced (R17 M5) | Task 3.4 (phone `StatusLine` under the header) + Task 3.10 (sidebar foot) | spec 5.0.5 Offline; `errors.offline` is unused today |
-| R18-07 share target drops the shared text (R17 M3) | Task 4.3 | spec 5.5 `(tabs)/add`: the share's text in the line, the URL kept |
-| R18-08 icon-only buttons without tooltip / visible name (R17 M7) | Task 3.7 (Tooltip) + Task 4.5 (task header as labelled controls, no Pause) | hover hint instant per the owner (spec 4.2.31) |
-| R18-09 extra taps over 100 ms | Task 5.6 | ceilings added (see Task 5.6) |
-| R18-10 wide controls on a computer (Inbox Accept/Delete, Settings time fields) | Task 3.9 (`Button width="hug"`) + Task 4.7 (Inbox) + Task 4.11 (time fields sized to content) | owner feedback 4 |
-| R18-11 phone Now: running tray + time bar eat a third of the screen | Task 4.2 (40 % region budget) + Task 4.3 | Review Focus 2 test |
-| R18-12 Week/Insights phone header: three alike chevrons, clipped day column, far scroll hint | Task 4.6 (day strip snaps, cue next to the grid) + Task 3.4 (`ScreenHeader` pushed Back vs `PeriodStepper`) + Task 4.9 | |
-| R18-13 screen titles differ in size and position | Task 3.4 | `layout.e2e.ts` title-y check |
-| R18-14 History keeps "Now" while at now | Task 4.10 | the reset only away from now, as Task 4.4 does for Day |
-| R18-15 Projects form: no focus, no message, no Escape (R17 L6); New task form silent on an empty title | Task 4.8 (Projects form) + Task 3.8 (`showErrorWhen="submitted"`) + Task 4.3 | |
-| R18-16 Calendar picker says «Settings → Devices» (R17 L3) | Task 4.13 | the glossary test bans the phrase; shorter "nothing near" copy |
-| R18-17 unknown task under a project header; `/no-such-page` titled «Pace» (R17 L11) | Task 4.5 (unknown task: `EmptyState`) + Task 4.12 (not-found) + Task 6.1 (titles) | |
-| R18-18 RU Insights wraps mid-word; empty "Focus by hour" plot (R17 L12) | Task 4.9 | |
-| R18-19 notification matrix «Телефон» vs "App" (R17 L13) | Task 4.13 + Task 4.11 | one word per thing in both languages |
-| R18-20 Settings: Revoke on this device beside Log out; estimate radios share one name; night-hours hint describes ON only | Task 4.11 (+ Task 4.13 for the hint) | |
-| R18-21 toast placement (sidebar dock) and uneven feedback paths (R17 L5) | Task 3.7 (placement rule 4.1.4) + Task 4.3 (form Create and picker start name their result) | the words are whole since R18-01 |
-| R18-22 time-bar picker copy («Дрёма», «Отдых» twice, «Закрыть как «Отменена»») | Task 4.13 + Task 4.2 | |
-| R18-23 blank page until the bundle; manifest dark only | Task 6.3 (light and dark splash in the manifest) + Task 6.4 (a boot mark, skeleton heights) | |
-| R18-24 bell reachable from Now only on a phone | Task 4.12 (Notifications in More) | |
-| R18-25 cosmetics: selected row 8 px wider than the composer; Progress card wider than Start/Due; card in a card around the assistant preview; sidebar avatar repeats the initial; Inbox explanation 11 px with mixed quotes | Task 4.1 + 4.3 (row, composer card), Task 4.5 (cards), Task 3.10 (no avatar in the header, spec 5.0.1), Task 4.7 + 4.13 (Inbox copy) | |
-| R18-02 follow-up (fix review): a Log out that cannot reach the server leaves its session alive on the server (up to its 90-day expiry) and says nothing | Task 4.11 | keep the ended token aside and send the logout once the network is back (then forget it); until it went, Settings' sign-out line says the server has not confirmed it, with Devices and sessions as the remedy from another device |
-| Fix round 2 (QA 18): the assistant's preview mounts inside the composer card while the card is still growing (`AnimatedHeight`, 220 ms, overflow hidden), so Approve is half hidden at first; a scroll-into-view or a keyboard focus on it would scroll the clipping box | Task 3.5 | `Disclosure` measures the content before it shows it and moves focus after layout with `preventScroll`; `animated-height.tsx` goes. e2e: no control of the preview is clipped once it is announced |
-| Fix round 2 (QA 18, full e2e): Settings → Devices and sessions: the skeleton is taller than the list it becomes, so Add a computer, Connect an AI app and everything below jump up (108 px at 390 with one session) when the list loads; a tap in that moment misses | Task 4.11 (+ Task 6.4 CLS) | spec 5.0.5: skeleton rows of the final heights; e2e: the buttons under the list keep their y across the load |
-| R17 L7 "Deadline type" shown with "No deadline" | Task 4.3 | still open in round 18 |
-| R17 L1 versions screen "Reload", R17 L10 time-zone card cannot be dismissed | Task 4.12 (versions screen), Task 4.3 (Now's cards) | not re-run in round 18 |
+| R22-03 cold URL of Inbox/More/Day rewritten to `/` (R17 M2) | Task 6.5 (new) | route-sweep asserts `page.url()` after a cold load |
+| R22-04 second tab stale (R17 M1) | Task 6.6 (new) | two-page test in `live.e2e.ts` |
+| R22-05 first sync: definitive empty states in the browser's language (R17 M4) | Task 6.1 (language at first paint) + Task 3.9 (`Skeleton`, `EmptyState`) | spec 5.0.5: no empty copy before the first full pull |
+| R22-06 nothing says offline / not synced (R17 M5) | Task 3.4 (phone `StatusLine` under the header) + Task 3.10 (sidebar foot) | spec 5.0.5 Offline; `errors.offline` is unused today |
+| R22-07 share target drops the shared text (R17 M3) | Task 4.3 | spec 5.5 `(tabs)/add`: the share's text in the line, the URL kept |
+| R22-08 icon-only buttons without tooltip / visible name (R17 M7) | Task 3.7 (Tooltip) + Task 4.5 (task header as labelled controls, no Pause) | hover hint instant per the owner (spec 4.2.31) |
+| R22-09 extra taps over 100 ms | Task 5.6 | ceilings added (see Task 5.6) |
+| R22-10 wide controls on a computer (Inbox Accept/Delete, Settings time fields) | Task 3.9 (`Button width="hug"`) + Task 4.7 (Inbox) + Task 4.11 (time fields sized to content) | owner feedback 4 |
+| R22-11 phone Now: running tray + time bar eat a third of the screen | Task 4.2 (40 % region budget) + Task 4.3 | Review Focus 2 test |
+| R22-12 Week/Insights phone header: three alike chevrons, clipped day column, far scroll hint | Task 4.6 (day strip snaps, cue next to the grid) + Task 3.4 (`ScreenHeader` pushed Back vs `PeriodStepper`) + Task 4.9 | |
+| R22-13 screen titles differ in size and position | Task 3.4 | `layout.e2e.ts` title-y check |
+| R22-14 History keeps "Now" while at now | Task 4.10 | the reset only away from now, as Task 4.4 does for Day |
+| R22-15 Projects form: no focus, no message, no Escape (R17 L6); New task form silent on an empty title | Task 4.8 (Projects form) + Task 3.8 (`showErrorWhen="submitted"`) + Task 4.3 | |
+| R22-16 Calendar picker says «Settings → Devices» (R17 L3) | Task 4.13 | the glossary test bans the phrase; shorter "nothing near" copy |
+| R22-17 unknown task under a project header; `/no-such-page` titled «Pace» (R17 L11) | Task 4.5 (unknown task: `EmptyState`) + Task 4.12 (not-found) + Task 6.1 (titles) | |
+| R22-18 RU Insights wraps mid-word; empty "Focus by hour" plot (R17 L12) | Task 4.9 | |
+| R22-19 notification matrix «Телефон» vs "App" (R17 L13) | Task 4.13 + Task 4.11 | one word per thing in both languages |
+| R22-20 Settings: Revoke on this device beside Log out; estimate radios share one name; night-hours hint describes ON only | Task 4.11 (+ Task 4.13 for the hint) | |
+| R22-21 toast placement (sidebar dock) and uneven feedback paths (R17 L5) | Task 3.7 (placement rule 4.1.4) + Task 4.3 (form Create and picker start name their result) | the words are whole since R22-01 |
+| R22-22 time-bar picker copy («Дрёма», «Отдых» twice, «Закрыть как «Отменена»») | Task 4.13 + Task 4.2 | |
+| R22-23 blank page until the bundle; manifest dark only | Task 6.3 (light and dark splash in the manifest) + Task 6.4 (a boot mark, skeleton heights) | |
+| R22-24 bell reachable from Now only on a phone | Task 4.12 (Notifications in More) | |
+| R22-25 cosmetics: selected row 8 px wider than the composer; Progress card wider than Start/Due; card in a card around the assistant preview; sidebar avatar repeats the initial; Inbox explanation 11 px with mixed quotes | Task 4.1 + 4.3 (row, composer card), Task 4.5 (cards), Task 3.10 (no avatar in the header, spec 5.0.1), Task 4.7 + 4.13 (Inbox copy) | |
+| R22-02 follow-up (fix review): a Log out that cannot reach the server leaves its session alive on the server (up to its 90-day expiry) and says nothing | Task 4.11 | keep the ended token aside and send the logout once the network is back (then forget it); until it went, Settings' sign-out line says the server has not confirmed it, with Devices and sessions as the remedy from another device |
+| Fix round 2 (QA 22): the assistant's preview mounts inside the composer card while the card is still growing (`AnimatedHeight`, 220 ms, overflow hidden), so Approve is half hidden at first; a scroll-into-view or a keyboard focus on it would scroll the clipping box | Task 3.5 | `Disclosure` measures the content before it shows it and moves focus after layout with `preventScroll`; `animated-height.tsx` goes. e2e: no control of the preview is clipped once it is announced |
+| Fix round 2 (QA 22, full e2e): Settings → Devices and sessions: the skeleton is taller than the list it becomes, so Add a computer, Connect an AI app and everything below jump up (108 px at 390 with one session) when the list loads; a tap in that moment misses | Task 4.11 (+ Task 6.4 CLS) | spec 5.0.5: skeleton rows of the final heights; e2e: the buttons under the list keep their y across the load |
+| R17 L7 "Deadline type" shown with "No deadline" | Task 4.3 | still open in round 22 |
+| R17 L1 versions screen "Reload", R17 L10 time-zone card cannot be dismissed | Task 4.12 (versions screen), Task 4.3 (Now's cards) | not re-run in round 22 |
 
 ## Batch sizes (rough)
 

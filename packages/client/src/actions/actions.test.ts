@@ -882,7 +882,7 @@ describe("review", () => {
     }
     unwrap(await world.actions.runReviewAction(item, "confirm"));
     // The store's integrate rebuilt on the correction already: no re-read of the whole log, and
-    // the state is what a fresh read of the disk derives (class 55 / 57).
+    // the state is what a fresh read of the disk derives (class 55 / 108).
     expect(world.rematerializeCalls()).toBe(0);
     expect(taskOf(world, CALC_HW5_ID)?.closed?.confirmed).toBe(true);
     const fresh = createAppState({ deviceId: "dev-1", now: () => NOW, source: "web", store });

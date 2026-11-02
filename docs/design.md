@@ -13,7 +13,7 @@ the ones to reach for first, and when a session lacks one, do the same step by h
 | [DESIGN.md](../DESIGN.md) and `.impeccable/design.json` | The visual system, direction **A · Тетрадь** (ink-blue accent, red margin for status only, paper grounds, Inter) |
 | `packages/core/src/design/tokens.json` | Every colour, size, space, radius, type role, duration and easing. Nothing else is a design value |
 | [context/design/redesign-spec.md](../context/design/redesign-spec.md) | Component specs (§4: states, sizes, a11y per component), screens (§5), motion (§6), web/PWA (§7), accessibility (§8), the owner's answers (§12) |
-| [context/bug-lessons.md](../context/bug-lessons.md) | The classes of mistakes already made. New UI is written against them, especially 10, 11, 21, 22, 27, 57–62 |
+| [context/bug-lessons.md](../context/bug-lessons.md) | The classes of mistakes already made. New UI is written against them, especially 10, 11, 21, 22, 27, 108–113 |
 | `context/feedback-*.md` | What the owner asked for, in his words: the scenarios every design is walked through |
 
 While the overhaul is still landing (see the plan, `context/design/redesign-plan.md`), DESIGN.md
@@ -40,17 +40,17 @@ not to whatever an older screen still shows.
    - Colours, spacing, radii, type, durations, easings: generated classes and accessors only
      (`bun design:generate` after a token change). `pace/no-raw-design-values` and its exact
      ratchet (`DESIGN_VALUE_WARNINGS`) fail anything else; never raise the number.
-   - Choose a role **by its job, never by the old name** (class 61): a selected state is a cue
+   - Choose a role **by its job, never by the old name** (class 112): a selected state is a cue
      (≥ 3:1 against unselected), meta text is `label.secondary`, quiet priority is a
      `label.secondary` title, red is status only.
    - Kit components from `apps/app/src/ui` (Button, IconButton, Chip, Switch, Sheet, ListRow…);
      a new primitive goes into the kit with its gallery entry, not into a screen.
    - Every string through `t()` (EN source, RU mirror); numbers, durations and initials through
-     core's formatters (class 59, 60), never `toFixed` or `slice(0, 1)`.
+     core's formatters (class 110, 111), never `toFixed` or `slice(0, 1)`.
    - One UI for Android and the web; web-only code in a `.web.tsx` sibling.
    - Targets 48 dp (Android) / 44 px (web), with negative-margin offsets chosen with both sizes
      (class 11). Keyboard complete on desktop: Enter submits, Escape closes, Space toggles
-     switches, chips, checks and tabs (`spacePress`, disabled controls get no action, class 62),
+     switches, chips, checks and tabs (`spacePress`, disabled controls get no action, class 113),
      visible focus ring in the `focus` role. Shortcuts are Alt+N / Alt+F (⌥ on a Mac), never a
      single key.
    - A JS number that repeats a class's size moves with the class (class 11, mirrors), better:
@@ -60,7 +60,7 @@ not to whatever an older screen still shows.
    (body, meta with |Lc| ≥ 60, small), marks and cues at 3:1, both themes, over every ground it
    sits on. A pair that isn't listed isn't checked.
 6. **Instant and calm.** The visible result of a tap comes from in-memory state in the first
-   frame; the write follows and a refused write rolls back with a sentence (class 57). Never
+   frame; the write follows and a refused write rolls back with a sentence (class 108). Never
    `await` on a tap's visual path; never drop an action's answer (`useRunAction`). Budget:
    tap → next frame ≤ 100 ms (p75) at 4× CPU, `e2e/latency.e2e.ts`. Motion from the motion
    tokens, reduced motion honoured; a structural change animates, a list mount doesn't.

@@ -20,7 +20,7 @@ type Held<T> = { readonly id: number; readonly value: T; readonly isRefused: boo
 
 /**
 Answers kept on the phone (a dismissed event, a series rule): shown at once, then written to the
-phone's storage (slow on Android's keystore, bug-lessons 57). The overlay holds an answer only
+phone's storage (slow on Android's keystore, bug-lessons 108). The overlay holds an answer only
 while its write is on its way: once it landed and a read has it, the read wins (so a rule removed
 in Settings → Permissions stops holding). A refused write holds for this session, until the
 phone's memory changes elsewhere (`memory`, its change count); it is never an unhandled rejection.

@@ -73,7 +73,7 @@ export const TaskRow = ({
       onDone={onDissolved ?? NOTHING}
     >
       {/* The selection is the lightest fill: the whole meta line (tertiary times, danger words,
-          every tag) is measured on it (`SELECTED_ROW_FILL`, bug-lessons 61). */}
+          every tag) is measured on it (`SELECTED_ROW_FILL`, bug-lessons 112). */}
       <View className={cx("flex-row gap-3 rounded-lg py-3 pl-3 pr-3", isSelected && "bg-fill-1")}>
         <CheckCircle
           checked={checked || isDissolving}

@@ -113,7 +113,7 @@ export type AppStateHandle = {
   readonly clear: () => Promise<void>;
   /**
   Which local copy is current, bumped the moment `clear` is called (before its turn in the
-  queue): a server page asked for one copy is never written into the next (fix round 1 of QA 18).
+  queue): a server page asked for one copy is never written into the next (fix round 1 of QA 22).
   */
   readonly copy: () => number;
 };

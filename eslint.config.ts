@@ -66,7 +66,7 @@ const ELEMENT_DEEP_EQUAL = {
     "CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.property.name=/^(getAll|queryAll|findAll)/], CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.name=/^(listsNamed|picker)$/]",
 };
 
-/** Text the person reads is written by core's formatters (bug-lessons classes 59 and 60). */
+/** Text the person reads is written by core's formatters (bug-lessons classes 110 and 111). */
 const DISPLAY_TEXT_SYNTAX = [
   {
     message:
@@ -83,7 +83,7 @@ const DISPLAY_TEXT_SYNTAX = [
 
 /**
 An action answers a `Result`; dropped with `void`, a refusal (`persist_failed`: the device could not
-save it) takes the change back with no word (bug-lessons 57). `ensureInstances` answers a count.
+save it) takes the change back with no word (bug-lessons 108). `ensureInstances` answers a count.
 */
 const ACTION_ANSWER_SYNTAX = [
   {
@@ -479,9 +479,9 @@ export default defineConfig([
       "better-tailwindcss": { cwd: "apps/app", tailwindConfig: "tailwind.config.js" },
     },
   },
-  // The display-text bans (bug-lessons 59, 60) cover every source that builds text a person
+  // The display-text bans (bug-lessons 110, 111) cover every source that builds text a person
   // reads: the app's screens and the client's view-models (scripts/eslint-scoped-bans.test.ts).
-  // The app also never drops an action's answer (bug-lessons 57).
+  // The app also never drops an action's answer (bug-lessons 108).
   {
     files: ["packages/client/src/view-models/**/*.ts"],
     ignores: TESTS,

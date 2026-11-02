@@ -406,7 +406,7 @@ describe("PaceProvider", () => {
     expect(mockForgetLineDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("after Log out the network goes quiet: only the logout names the session, nothing goes without one (QA round 18 R18-02)", async () => {
+  it("after Log out the network goes quiet: only the logout names the session, nothing goes without one (QA round 22 R22-02)", async () => {
     const { api, runtime } = await setup();
     await runtime.auth.loginWithDev("1");
     await render(
@@ -436,7 +436,7 @@ describe("PaceProvider", () => {
     expect(runtime.auth.store.getState().endedElsewhere).toBeUndefined();
   });
 
-  it("a session refused at start asks nothing more once it is signed out (QA round 18 R18-02)", async () => {
+  it("a session refused at start asks nothing more once it is signed out (QA round 22 R22-02)", async () => {
     const { api, runtime } = await setup({
       "GET /api/me": () => problem(401, "auth/unauthorized"),
     });

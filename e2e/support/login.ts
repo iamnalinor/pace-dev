@@ -67,7 +67,7 @@ export const loginViaApi = async (
   await resetAccount(telegramId);
   const { token } = await createDevSession(telegramId);
   // Once per tab, as a person signs in once: an init script runs again on every reload, and a
-  // token put back after the app's own Log out signed a revoked session in again (QA round 18).
+  // token put back after the app's own Log out signed a revoked session in again (QA round 22).
   await page.addInitScript(
     ({ key, marker, value }) => {
       if (sessionStorage.getItem(marker) !== null) {

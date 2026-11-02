@@ -38,7 +38,7 @@ const renderRow = async (selectedId: null | string) => {
 };
 
 describe("TaskRow", () => {
-  it("draws its selection on the ground its whole meta line was measured on (bug-lessons 61)", async () => {
+  it("draws its selection on the ground its whole meta line was measured on (bug-lessons 112)", async () => {
     await renderRow(ROW.id);
     expect(screen.getByRole("link", { name: /Write the intro/u })).toHaveProp(
       "aria-current",

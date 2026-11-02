@@ -162,7 +162,7 @@ trace and a screenshot; CI uploads `playwright-report/`.
 
 ### The design review matrix
 
-`e2e/latency.e2e.ts` is the tap-latency budget (bug-lessons 57: tap → next frame ≤ 100 ms, p75 of
+`e2e/latency.e2e.ts` is the tap-latency budget (bug-lessons 108: tap → next frame ≤ 100 ms, p75 of
 9 after a warm-up, CPU slowed 4× through CDP, Event Timing grouped by `interactionId`). It is its
 own Playwright project, `latency`, which depends on `chromium`: `bun test:e2e` runs it after every
 other test, alone and serially. To run only it, `bunx playwright test --project latency --no-deps`.

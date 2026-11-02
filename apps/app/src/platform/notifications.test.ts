@@ -118,7 +118,7 @@ describe("setPushChoice", () => {
     (SecureStore as unknown as FakeSecureStore).writes.isRefused = false;
   });
 
-  it("shows the pick at once, before the phone has saved it (bug-lessons 57)", async () => {
+  it("shows the pick at once, before the phone has saved it (bug-lessons 108)", async () => {
     const saved = setPushChoice("poll");
     expect(pushStore.getState().choice).toBe("poll");
     await saved;

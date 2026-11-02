@@ -127,7 +127,7 @@ export const TOAST_QUOTE_GRAPHEMES = 48;
 /**
 A value from data, quoted in a toast's sentence: cut short here, so the sentence itself is never
 cut. The message is shown whole (UI text wraps, spec 4.1.2 rule 3): a clamp on the whole message
-hid the end of the very sentence that explains a refused tap (QA round 18 R18-01).
+hid the end of the very sentence that explains a refused tap (QA round 22 R22-01).
 */
 export const toastQuote = (value: string): string => clipText(value, TOAST_QUOTE_GRAPHEMES);
 

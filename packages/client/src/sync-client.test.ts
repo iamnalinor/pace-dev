@@ -192,7 +192,7 @@ describe("createSyncClient pull", () => {
 });
 
 describe("createSyncClient across a wipe", () => {
-  it("drops a page pulled for the copy a sign-out wiped meanwhile (fix round 1 of QA 18)", async () => {
+  it("drops a page pulled for the copy a sign-out wiped meanwhile (fix round 1 of QA 22)", async () => {
     const held: { release?: () => void } = {};
     const { state, store, sync } = await setup({
       "GET /api/sync/pull": async () => {
@@ -548,7 +548,7 @@ const paired = async (cursor: number) => {
 };
 
 /**
-The steady state after a write the local store refused (Task 2.5, bug-lessons 57; CLAUDE.md's
+The steady state after a write the local store refused (Task 2.5, bug-lessons 108; CLAUDE.md's
 contract rule): the network goes quiet, no request is repeated for the same id.
 */
 describe("createSyncClient after the local store refused a write", () => {
@@ -645,7 +645,7 @@ describe("createSyncClient after the local store refused a write", () => {
       throw new Error(written.error);
     }
     held.release();
-    // By decision (bug-lessons 57, Task 2.5 fix round 1 b) the orphan stays and is sent once.
+    // By decision (bug-lessons 108, Task 2.5 fix round 1 b) the orphan stays and is sent once.
     await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 1 } });
     await expect(sync.syncNow()).resolves.toMatchObject({ ok: true, value: { pushed: 0 } });
     expect(pushedIds(calls)).toEqual([written.value.id]);

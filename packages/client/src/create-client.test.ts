@@ -93,7 +93,7 @@ describe("createPaceClient", () => {
     client.live.stop();
   });
 
-  it('a logout\'s own 4401 close checks nothing: no request after the logout, no "ended elsewhere" (QA round 18 R18-02)', async () => {
+  it('a logout\'s own 4401 close checks nothing: no request after the logout, no "ended elsewhere" (QA round 22 R22-02)', async () => {
     const socket = oneSocket();
     const { api, client } = await setup(
       {

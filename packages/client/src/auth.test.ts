@@ -287,7 +287,7 @@ describe("createAuth logout", () => {
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
   });
 
-  it("forgets the token before it tells the server: only the logout carries it, and the reason is the person's own (QA round 18 R18-02)", async () => {
+  it("forgets the token before it tells the server: only the logout carries it, and the reason is the person's own (QA round 22 R22-02)", async () => {
     const seen: { token?: string | undefined; status?: string } = {};
     const held: { release?: () => void } = {};
     const { auth, calls, session } = await setup(
@@ -321,7 +321,7 @@ describe("createAuth logout", () => {
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
   });
 
-  it("a session check answered after the logout leaves the device signed out (fix round 1 of QA 18)", async () => {
+  it("a session check answered after the logout leaves the device signed out (fix round 1 of QA 22)", async () => {
     const held: { release?: () => void } = {};
     const { auth, session } = await setup(
       {
@@ -349,7 +349,7 @@ describe("createAuth logout", () => {
     expect(auth.hasEnded()).toBe(true);
   });
 
-  it("a new session after a sign-out is a session again: login and an adopted token (fix round 1 of QA 18)", async () => {
+  it("a new session after a sign-out is a session again: login and an adopted token (fix round 1 of QA 22)", async () => {
     const { auth } = await setup(
       {
         "GET /api/me": () => fakeMe,
@@ -441,7 +441,7 @@ describe("adoptToken", () => {
     expect(auth.store.getState()).toEqual({ status: "signed-out", user: null });
   });
 
-  it("an answer for a token the device dropped meanwhile changes nothing (fix round 1 of QA 18)", async () => {
+  it("an answer for a token the device dropped meanwhile changes nothing (fix round 1 of QA 22)", async () => {
     const held: { release?: () => void } = {};
     const { auth, session } = await setup({
       "GET /api/me": async () => {

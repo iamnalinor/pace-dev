@@ -68,7 +68,7 @@ describe("AuthScreen", () => {
     expect(await screen.findByText(t("en", "auth.invalidLink"))).toBeOnTheScreen();
   });
 
-  it("settles silently when another sign-in took the device meanwhile (fix round 2 of QA 18)", async () => {
+  it("settles silently when another sign-in took the device meanwhile (fix round 2 of QA 22)", async () => {
     // The link's check was answered after a newer session began: nothing about the link was
     // wrong, and the device is signed in under that newer session.
     mockAuth.adoptToken.mockImplementation(async () => {

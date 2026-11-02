@@ -71,7 +71,7 @@ type Overflow = {
   readonly texts: readonly string[];
   /**
   Words a toast cut off at the bottom (a line clamp, a fixed height): a toast's sentence is shown
-  whole, only a quoted value from data is short (QA round 18 R18-01). Never a known break.
+  whole, only a quoted value from data is short (QA round 22 R22-01). Never a known break.
   */
   readonly clipped: readonly string[];
 };

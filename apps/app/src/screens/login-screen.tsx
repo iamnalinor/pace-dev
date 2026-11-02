@@ -101,7 +101,7 @@ export const LoginScreen = () => {
         return;
       }
       const result = await auth.adoptToken(token);
-      // A newer session or a Log out meanwhile is no failed sign-in (fix round 2 of QA 18).
+      // A newer session or a Log out meanwhile is no failed sign-in (fix round 2 of QA 22).
       setIsWebFailed(!result.ok && result.error !== SESSION_CHANGED);
     },
     [auth],

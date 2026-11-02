@@ -96,7 +96,7 @@ e2e sweep above stands in for the scripted matrix here too.
    on a fresh build: every file and every project, latency included (a failure in `chromium`
    leaves `latency` unrun, which is not a pass). A task may run only the files it touched, but a
    change to shared classes, tokens or a kit component reaches screens no subset visits
-   (bug-lessons class 11, mirrors, and 61: after Task 2.2 only subsets ran, and three failures
+   (bug-lessons class 11, mirrors, and 112: after Task 2.2 only subsets ran, and three failures
    waited for the batch's end).
 
 ## The prompt (fill in the round number, its kind, what changed, the fixes and the open lows)
@@ -119,7 +119,7 @@ e2e sweep above stands in for the scripted matrix here too.
 > also use a fresh English account. Put the token in once per tab, as `loginViaApi` does (an init
 > script guarded by a `sessionStorage` mark): an init script runs again on every reload and
 > navigation, so after a Log out it signs the revoked token back in, and the 401s and the "ended
-> on another device" line that follow are the script's, not the app's (QA round 18 R18-02).
+> on another device" line that follow are the script's, not the app's (QA round 22 R22-02).
 >
 > **This is round <n>, an <intermediate | release> round.** What changed since round <n−1>:
 > <the changed screens, flows and rules, from `git diff --stat` by feature folder>. The fixes of
@@ -181,7 +181,7 @@ e2e sweep above stands in for the scripted matrix here too.
 >   a time-bar button) in a mobile context with touch on and the CPU throttled 4× (CDP
 >   `Emulation.setCPUThrottlingRate`); anything that takes over 100 ms from tap to the next frame
 >   (Event Timing API), or a control that shows nothing when pressed, is a finding
->   (bug-lessons class 57).
+>   (bug-lessons class 108).
 > - **Guest language and sideways content**: check signed-out pages with a Russian browser
 >   locale and verify the document language; on narrow screens, every sideways region needs
 >   a visible scroll cue and a keyboard focus target.

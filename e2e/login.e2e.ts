@@ -43,7 +43,7 @@ test("dev login → Now → tabs → Russian → logout", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in to Pace" })).toBeVisible();
 });
 
-test("after Log out the network goes quiet: no request names the session, nothing is refused, a reload explains nothing (QA round 18 R18-02)", async ({
+test("after Log out the network goes quiet: no request names the session, nothing is refused, a reload explains nothing (QA round 22 R22-02)", async ({
   page,
 }) => {
   const { token } = await loginViaApi(page);
