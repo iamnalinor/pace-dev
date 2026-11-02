@@ -29,6 +29,8 @@ export const ruInput: { readonly [K in keyof typeof enInput]: string } = {
   "actionError.event/duplicate": "Это уже записано.",
   "actionError.event/not-found": "Этой записи больше нет.",
   "actionError.undo/nothing": "Отменять нечего.",
+  "actionError.persist_failed":
+    "Не удалось сохранить это на устройстве, поэтому ничего не изменилось. Попробуйте снова.",
   "actionError.task/unknown": "Этой задачи больше нет.",
   "actionError.subtask/unknown": "Этой подзадачи больше нет.",
   "actionError.subtask/submitted": "Отправленная подзадача остаётся в задаче.",

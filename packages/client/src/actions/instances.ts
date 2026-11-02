@@ -6,6 +6,7 @@ import {
   validateEventInput,
 } from "@pace/core";
 
+import type { Persisted } from "../local-log.ts";
 import type { ActionDeps } from "./deps.ts";
 
 export type InstanceActions = {
@@ -27,14 +28,16 @@ const appendSystem = async (deps: ActionDeps, inputs: readonly EventInput[]): Pr
       (input.id === undefined || !known.has(input.id)) &&
       validateEventInput(snapshot, input, now).ok,
   );
-  let added = 0;
+  // Each is shown at once; the writes follow one after another, and only the landed ones count.
+  const writes: Persisted[] = [];
   for (const input of fresh) {
-    const dispatched = await deps.state.dispatch(input);
-    if (dispatched.ok) {
-      added += 1;
+    const staged = await deps.state.stage([input]);
+    if (staged.ok) {
+      writes.push(staged.value.persisted);
     }
   }
-  return added;
+  const written = await Promise.all(writes);
+  return written.filter((write) => write.ok).length;
 };
 
 /** Every id in the log, revoked ones included: a taken-back instance is not made again. */

@@ -6,6 +6,7 @@ import { appFirebaseProject } from "#app/platform/firebase-project.ts";
 import { sessionHashOf } from "#app/platform/session-fingerprint.ts";
 import { seriallyBySession } from "#app/platform/session-poll-queue.ts";
 import { readSessionValue, writeSessionValue } from "#app/platform/session-value.ts";
+import { secureSave, shownThenSaved } from "#app/platform/shown-then-saved.ts";
 import { type ApiClient, ApiError } from "@pace/client";
 import {
   type Answer,
@@ -133,10 +134,9 @@ export const loadPushState = async (): Promise<void> => {
 
 /** Picks how this phone shows notifications (`null`: automatic); `registerPush` honours it. */
 export const setPushChoice = async (choice: null | PushMethod): Promise<void> => {
-  await (choice === null
-    ? SecureStore.deleteItemAsync(CHOICE_KEY)
-    : SecureStore.setItemAsync(CHOICE_KEY, choice));
-  pushStore.setState({ choice });
+  await shownThenSaved(pushStore, { choice }, async () => {
+    await secureSave(CHOICE_KEY, choice);
+  });
 };
 
 /**

@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, type Event, isUlid } from "@pace/core";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { at, settingsEvent } from "./fake-fetch.fake.ts";
+import { createHeldEventStore } from "./held-event-store.fake.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 
 const NOW = "2026-10-06T12:00:00.000Z";
@@ -212,5 +213,229 @@ describe("createAppState slices", () => {
     expect(snapshot.log.map((event) => event.id)).toEqual([first.value.id, revoked.value.id]);
     await state.rematerialize();
     expect(state.store.getState().log).toHaveLength(2);
+  });
+});
+
+/** Lets every queued microtask and timer of the log run (the held write stays held). */
+const flush = async (): Promise<void> => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+};
+
+const heldSetup = async (): Promise<{
+  readonly state: AppStateHandle;
+  readonly held: ReturnType<typeof createHeldEventStore>;
+  readonly locals: () => number;
+}> => {
+  const held = createHeldEventStore();
+  let locals = 0;
+  const state = createAppState({
+    deviceId: "dev-1",
+    now: () => NOW,
+    onLocal: () => {
+      locals += 1;
+    },
+    source: "web",
+    store: held.store,
+  });
+  await state.ready;
+  held.hold();
+  return { held, locals: () => locals, state };
+};
+
+/** A settled-or-not marker for a promise the test does not await yet. */
+const track = <T>(
+  promise: Promise<T>,
+): { readonly isSettled: () => boolean; readonly value: () => T | undefined } => {
+  let isSettled = false;
+  let value: T | undefined;
+  void (async () => {
+    value = await promise;
+    isSettled = true;
+  })();
+  return { isSettled: () => isSettled, value: () => value };
+};
+
+/** Russian at 10:00, then the zone set to UTC at 11:00: two independent settings. */
+const RU_AT_10 = languageInput(at(10), "ru");
+const UTC_AT_11 = {
+  occurredAt: at(11),
+  payload: { timezone: "UTC" },
+  type: "settings.updated",
+} as const;
+
+describe("createAppState local writes (the screen first, the disk after)", () => {
+  it("shows a dispatched event before its local write lands, then answers once it does", async () => {
+    const { held, locals, state } = await heldSetup();
+    const before = state.store.getState().version;
+    const answer = track(state.dispatch(RU_AT_10));
+    await flush();
+
+    // Pending: the state shows it, the write is in flight, nobody is told it is saved.
+    expect(held.writes).toHaveLength(1);
+    expect(state.store.getState().version).toBeGreaterThan(before);
+    expect(state.store.getState().settings.language).toBe("ru");
+    expect(answer.value()).toBeUndefined();
+    expect(locals()).toBe(0);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+
+    // Resolved: the action answers ok, the outbox holds it, the sync is told.
+    await held.writes[0]?.resolve();
+    await flush();
+    expect(answer.value()).toMatchObject({ ok: true, value: { type: "settings.updated" } });
+    await expect(held.store.listPending()).resolves.toHaveLength(1);
+    expect(locals()).toBe(1);
+    expect(state.store.getState().settings.language).toBe("ru");
+  });
+
+  it("takes the event back and answers persist_failed when the local write is refused", async () => {
+    const { held, locals, state } = await heldSetup();
+    const before = state.store.getState();
+    const answer = track(state.dispatch(RU_AT_10));
+    await flush();
+    expect(state.store.getState().settings.language).toBe("ru");
+
+    held.writes[0]?.reject();
+    await flush();
+    expect(answer.value()).toEqual({ error: "persist_failed", ok: false });
+    const after = state.store.getState();
+    expect(after.version).toBeGreaterThan(before.version);
+    expect(after.settings).toEqual(before.settings);
+    expect(after.events).toEqual(before.events);
+    expect(after.log).toEqual(before.log);
+    expect(after.lastAppliedOccurredAt).toBe(before.lastAppliedOccurredAt);
+    expect(locals()).toBe(0);
+    await expect(held.store.listAll()).resolves.toEqual([]);
+    // The log forgot it too: it cannot be revoked, and the same id may be written again.
+    const id = held.writes[0]?.events[0]?.id ?? "";
+    await expect(state.revoke(id)).resolves.toEqual({ error: "event/not-found", ok: false });
+  });
+
+  it("keeps a second quick action, in order, when only the first one's write is refused", async () => {
+    const { held, state } = await heldSetup();
+    const first = track(state.dispatch(RU_AT_10));
+    const second = track(state.dispatch(UTC_AT_11));
+    await flush();
+
+    // The second shows while the first is still on its way to the disk.
+    expect(state.store.getState().settings).toMatchObject({ language: "ru", timezone: "UTC" });
+    // Writes stay in the order of the actions: the second waits for the first to settle.
+    expect(held.writes).toHaveLength(1);
+
+    held.writes[0]?.reject();
+    await flush();
+    expect(held.writes).toHaveLength(2);
+    expect(state.store.getState().settings).toMatchObject({ language: "en", timezone: "UTC" });
+    await held.writes[1]?.resolve();
+    await flush();
+
+    expect(first.value()).toEqual({ error: "persist_failed", ok: false });
+    expect(second.value()).toMatchObject({ ok: true });
+    expect(state.store.getState().settings).toEqual({ ...DEFAULT_SETTINGS, timezone: "UTC" });
+    expect(state.store.getState().events.map((event) => event.occurredAt)).toEqual([at(11)]);
+    const stored = await held.store.listAll();
+    expect(stored.map((event) => event.occurredAt)).toEqual([at(11)]);
+  });
+
+  it("keeps remote events that arrive while a refused local write was in flight", async () => {
+    const { held, state } = await heldSetup();
+    const local = track(state.dispatch(RU_AT_10));
+    await flush();
+    const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { timezone: "UTC" });
+    const ingested = track(state.ingest([remote]));
+    await flush();
+    // Both show while the local write is still on its way.
+    expect(state.store.getState().settings).toMatchObject({ language: "ru", timezone: "UTC" });
+    expect(ingested.isSettled()).toBe(false);
+
+    held.writes[0]?.reject();
+    await flush();
+    await held.writes[1]?.resolve();
+    await flush();
+
+    expect(local.value()).toEqual({ error: "persist_failed", ok: false });
+    expect(ingested.isSettled()).toBe(true);
+    expect(state.store.getState().settings).toEqual({ ...DEFAULT_SETTINGS, timezone: "UTC" });
+    expect(state.store.getState().events).toEqual([remote]);
+    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+  });
+
+  it("keeps the server's copy of a deterministic id whose local write is refused", async () => {
+    const { held, state } = await heldSetup();
+    const id = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
+    const local = track(state.dispatch({ ...RU_AT_10, id }));
+    await flush();
+    const remote = settingsEvent(id, at(10), { language: "ru" });
+    const ingested = track(state.ingest([remote]));
+    await flush();
+    expect(state.store.getState().events).toHaveLength(1);
+
+    held.writes[0]?.reject();
+    await flush();
+    await held.writes[1]?.resolve();
+    await flush();
+
+    expect(local.value()).toEqual({ error: "persist_failed", ok: false });
+    expect(ingested.isSettled()).toBe(true);
+    expect(state.store.getState().settings.language).toBe("ru");
+    expect(state.store.getState().events.map((event) => event.id)).toEqual([id]);
+    await expect(held.store.listAll()).resolves.toEqual([remote]);
+    await expect(held.store.listPending()).resolves.toEqual([]);
+  });
+
+  it("takes remote events back and rejects the ingest when the local store refuses them", async () => {
+    const { held, state } = await heldSetup();
+    const remote = settingsEvent("01ARZ3NDEKTSV4RRFFQ69G5FAA", at(9), { timezone: "UTC" });
+    const ingested = state.ingest([remote]);
+    await flush();
+    expect(state.store.getState().settings.timezone).toBe("UTC");
+    held.writes[0]?.reject();
+    await expect(ingested).rejects.toThrow("persist_failed");
+    expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
+    // Not kept, so the next pull (the cursor did not move) brings it in again.
+    held.release();
+    await state.ingest([remote]);
+    expect(state.store.getState().settings.timezone).toBe("UTC");
+  });
+
+  it("writes a multi-event batch in one append and takes all of it back when refused", async () => {
+    const { held, state } = await heldSetup();
+    const staged = await state.stage([RU_AT_10, UTC_AT_11]);
+    if (!staged.ok) {
+      throw new Error(staged.error);
+    }
+    expect(state.store.getState().settings).toMatchObject({ language: "ru", timezone: "UTC" });
+    expect(held.writes.map((write) => write.events.length)).toEqual([2]);
+    held.writes[0]?.reject();
+    await expect(staged.value.persisted).resolves.toEqual({ error: "persist_failed", ok: false });
+    expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
+    expect(state.store.getState().events).toEqual([]);
+  });
+
+  it("refuses a whole batch, writing nothing, when one input is invalid", async () => {
+    const { held, state } = await heldSetup();
+    const staged = await state.stage([
+      languageInput(at(10), "ru"),
+      { occurredAt: "not-a-date", payload: { language: "en" }, type: "settings.updated" },
+    ]);
+    expect(staged.ok).toBe(false);
+    expect(held.writes).toEqual([]);
+    expect(state.store.getState().settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("a reload waits for writes in flight, so it never drops an event the state shows", async () => {
+    const { held, state } = await heldSetup();
+    const local = track(state.dispatch(RU_AT_10));
+    await flush();
+    const reloaded = track(state.rematerialize());
+    await flush();
+    expect(reloaded.isSettled()).toBe(false);
+    await held.writes[0]?.resolve();
+    await flush();
+    expect(reloaded.isSettled()).toBe(true);
+    expect(local.value()).toMatchObject({ ok: true });
+    expect(state.store.getState().settings.language).toBe("ru");
   });
 });

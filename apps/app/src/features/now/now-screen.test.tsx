@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
+import type * as PhoneMemory from "#app/platform/phone-memory.ts";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
@@ -13,6 +14,7 @@ import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { rowsInFlattenableBoxes } from "#app/test/sliding-rows.ts";
 import { DISSOLVE_MS } from "#app/ui/dissolve.tsx";
+import { createMemoryEventStore } from "@pace/client";
 import { addMinutesIso, calendarEventKey } from "@pace/core";
 import { HW_ID, NOW, rentSeriesEvents } from "@pace/core/testing";
 
@@ -25,6 +27,25 @@ const Board = () => (
     <NowBoard />
   </ComposerProvider>
 );
+
+/** Holds the phone's write of a dismissal while set: Android's keystore is slow to write. */
+const mockDismissHold: { current: null | Promise<unknown>; waiting: number } = {
+  current: null,
+  waiting: 0,
+};
+jest.mock("#app/platform/phone-memory.ts", (): unknown => {
+  const actual = jest.requireActual<typeof PhoneMemory>("#app/platform/phone-memory.ts");
+  return {
+    ...actual,
+    dismiss: async (key: string) => {
+      if (mockDismissHold.current !== null) {
+        mockDismissHold.waiting += 1;
+        await mockDismissHold.current;
+      }
+      await actual.dismiss(key);
+    },
+  };
+});
 
 const calendar = Calendar as unknown as FakeCalendar;
 
@@ -267,6 +288,48 @@ describe("NowBoard", () => {
     });
   });
 
+  it("brings a checked row back with the sentence when the device refuses to save the close, and settles", async () => {
+    jest.useFakeTimers();
+    try {
+      // The real store path: the close shows at once, its local write is refused (a full disk).
+      const memory = createMemoryEventStore();
+      const writes: number[] = [];
+      let isRefusing = false;
+      const eventStore = {
+        ...memory,
+        append: async (events: Parameters<typeof memory.append>[0]) => {
+          if (isRefusing) {
+            writes.push(events.length);
+            throw new Error("QuotaExceededError");
+          }
+          await memory.append(events);
+        },
+      };
+      const runtime = await createTestRuntime({ eventStore });
+      isRefusing = true;
+      await renderScreen(<Board />, runtime);
+      const title = "Reply to course curator";
+      await fireEvent.press(screen.getByRole("checkbox", { name: `Mark ${title} done` }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(DISSOLVE_MS + 50);
+      });
+      expect(screen.getByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+      expect(screen.getByRole("checkbox", { name: `Mark ${title} done` })).not.toBeChecked();
+      const task = Object.values(runtime.state.store.getState().tasks.byId).find(
+        (each) => each.title === title,
+      );
+      expect(task?.closed).toBeNull();
+      // Settled: one refused write, no retry loop, nothing else written while the screen rests.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(5000);
+      });
+      expect(writes).toEqual([1]);
+      expect(screen.getByText(title)).toBeOnTheScreen();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("opens the submit sheet for a per-subtask task instead of closing it", async () => {
     const runtime = await createTestRuntime();
     await renderScreen(<Board />, runtime);
@@ -468,6 +531,33 @@ describe("NowBoard", () => {
     await screen.findByLabelText("From your calendar");
     expect(checks().length).toBeGreaterThan(0);
     expect(rowsInFlattenableBoxes()).toEqual([]);
+  });
+
+  it("hides the calendar card once its skip went through, without waiting for the phone to save it (bug-lessons 57)", async () => {
+    seminarSoon();
+    const skip = heldRoute();
+    const runtime = await createTestRuntime({ routes: { "POST /api/calendar/skip": skip.route } });
+    await renderScreen(<Board />, runtime);
+    const card = await screen.findByLabelText("From your calendar");
+    const saving = Promise.withResolvers<undefined>();
+    mockDismissHold.current = saving.promise;
+    try {
+      await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
+      await waitFor(() => {
+        expect(skip.waiting()).toBe(1);
+      });
+      await act(async () => {
+        skip.answer({ ok: true });
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockDismissHold.waiting).toBe(1);
+      });
+      expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    } finally {
+      mockDismissHold.current = null;
+      saving.resolve(undefined);
+    }
   });
 
   it("skips a calendar event on every channel, and hides it once that went through", async () => {

@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-
 import * as Calendar from "expo-calendar";
 import * as SecureStore from "expo-secure-store";
 
+import type * as PhoneMemory from "#app/platform/phone-memory.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
 import { seriesRules, setSeriesRule } from "#app/platform/phone-memory.ts";
@@ -62,6 +63,25 @@ jest.mock("../../../modules/pace-native/index.ts", () => ({
     queryUsageEvents: async () => (mockAccess.granted ? mockEvents : []),
   },
 }));
+
+/** Holds the phone's write of a dismissal while set: Android's keystore is slow to write. */
+const mockDismissHold: { current: null | Promise<unknown>; waiting: number } = {
+  current: null,
+  waiting: 0,
+};
+jest.mock("#app/platform/phone-memory.ts", (): unknown => {
+  const actual = jest.requireActual<typeof PhoneMemory>("#app/platform/phone-memory.ts");
+  return {
+    ...actual,
+    dismiss: async (key: string) => {
+      if (mockDismissHold.current !== null) {
+        mockDismissHold.waiting += 1;
+        await mockDismissHold.current;
+      }
+      await actual.dismiss(key);
+    },
+  };
+});
 
 const calendar = Calendar as unknown as FakeCalendar;
 
@@ -378,6 +398,30 @@ describe("Day and the notification pool", () => {
     await waitFor(() => {
       expect(screen.queryByText("Seminar")).toBeNull();
     });
+  });
+
+  it("hides a skipped event once the server took it, without waiting for the phone to save it (bug-lessons 57)", async () => {
+    const { skip } = await withPool([]);
+    // The phone's own storage is slow to write (Android's keystore): the card must not wait.
+    const saving = Promise.withResolvers<undefined>();
+    mockDismissHold.current = saving.promise;
+    try {
+      await fireEvent.press(await seminarSkip());
+      await waitFor(() => {
+        expect(skip.waiting()).toBe(1);
+      });
+      await act(async () => {
+        skip.answer({ ok: true });
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockDismissHold.waiting).toBe(1);
+      });
+      expect(screen.queryByText("Seminar")).toBeNull();
+    } finally {
+      mockDismissHold.current = null;
+      saving.resolve(undefined);
+    }
   });
 
   it("keeps an event whose skip did not go through, and says so", async () => {

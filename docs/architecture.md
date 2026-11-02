@@ -234,6 +234,11 @@ global; everything per user lives in the Durable Object.
 ## Sync protocol
 
 Clients keep their own log and an outbox; the server keeps the authoritative sequence.
+A local action is shown first and written after (`packages/client/src/local-log.ts`): the
+state integrates the events at once, writes to the local store run one after another in the
+order integrated, and a refused write takes its events back (the state rebuilt by the
+materializer from the rest) and answers `persist_failed`. The outbox is the store's, so only
+what landed on the disk is ever pushed.
 
 | Call | Request | Response | Rules |
 |---|---|---|---|

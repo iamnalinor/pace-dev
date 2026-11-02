@@ -1,5 +1,5 @@
 import { ArrowUp, Inbox, type LucideIcon, Plus } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -140,6 +140,14 @@ const LineInput = ({
   const isEmpty = flow.text.trim() === "";
   // A web textarea does not grow by itself: it takes its content's height, up to eight lines.
   const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+  // One function for the input's life: react-native-web measures the textarea (a forced layout)
+  // each time this handler changes, which made every re-render of Now pay for a layout.
+  const onContentSizeChange = useCallback(
+    (event: { readonly nativeEvent: { readonly contentSize: { readonly height: number } } }) => {
+      setInputHeight(heightOf(event.nativeEvent.contentSize.height));
+    },
+    [],
+  );
   // Back at the line after adding or closing the form: the cursor goes with it.
   useEffect(() => {
     if (flow.lineFocus > 0) {
@@ -160,9 +168,7 @@ const LineInput = ({
         onFocusChange(false);
       }}
       onChangeText={flow.type}
-      onContentSizeChange={(event) => {
-        setInputHeight(heightOf(event.nativeEvent.contentSize.height));
-      }}
+      onContentSizeChange={onContentSizeChange}
       onFocus={() => {
         onFocusChange(true);
       }}

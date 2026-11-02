@@ -1,6 +1,6 @@
 import { type ActionBody, newId, planAction, planActions } from "@pace/core";
 
-import { type ActionDeps, type ActionResult, emit, serially } from "./deps.ts";
+import { type ActionDeps, type ActionResult, serially, stageEmit } from "./deps.ts";
 
 /** Plans at approval time, when the latest local state is known. */
 export type AssistantActions = {
@@ -19,13 +19,13 @@ export const assistantActions = (deps: ActionDeps): AssistantActions => {
     applyAction: async (action) =>
       await serially(deps, async () => {
         const planned = planAction(deps.state.store.getState(), action, context());
-        return planned.ok ? await emit(deps, planned.value) : planned;
+        return planned.ok ? await stageEmit(deps, planned.value) : planned;
       }),
     applyActions: async (actions) =>
       await serially(deps, async () => {
         const planned = planActions(deps.state.store.getState(), actions, context());
         return planned.ok
-          ? await emit(deps, planned.value)
+          ? await stageEmit(deps, planned.value)
           : { ok: false, error: planned.error.error };
       }),
   };

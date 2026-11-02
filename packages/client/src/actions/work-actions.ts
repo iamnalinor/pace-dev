@@ -15,6 +15,7 @@ import {
   fromStore,
   presetOf,
   serially,
+  stageEmit,
   stamp,
   taskOf,
   type When,
@@ -133,7 +134,7 @@ const submit =
   async (input) =>
     await serially(deps, async () => {
       const prepared = submission(deps, input);
-      return prepared.ok ? await emit(deps, [prepared.value]) : prepared;
+      return prepared.ok ? await stageEmit(deps, [prepared.value]) : prepared;
     });
 
 const closeTask =
@@ -148,7 +149,7 @@ const closeTask =
         return err("action/nothing-to-do");
       }
       const { taskId, outcome, reason } = input;
-      return await emit(deps, [
+      return await stageEmit(deps, [
         stamp(
           deps,
           {

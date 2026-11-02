@@ -18,12 +18,13 @@ import {
 } from "@pace/core";
 
 import type { Clock } from "../clock.ts";
+import type { PersistError } from "../local-log.ts";
 import type { AppStateHandle } from "../state.ts";
 
 /**
 Every action answers with the events it appended or one of these codes: the core's own
 validation codes pass through untouched, `action/*` are the client's, and a store refusal
-keeps its message behind `dispatch/`.
+keeps its message behind `dispatch/`; a write the local store refused answers `persist_failed`.
 */
 /** Why a project name cannot be used: empty, or another active project carries it. */
 export type ProjectNameError = "project/name-required" | "project/name-taken";
@@ -39,6 +40,7 @@ export type ActionError =
   | "event/not-found"
   | "undo/nothing"
   | `dispatch/${string}`
+  | PersistError
   | PlannedActionError
   | PresetError
   | PresetValidationError
@@ -46,6 +48,19 @@ export type ActionError =
   | RetroError;
 
 export type ActionResult = Promise<Result<readonly Event[], ActionError>>;
+
+/**
+An action's events once the state shows them (the screen answers from here) with their write to
+the local store still on its way: `persisted` answers the action, `persist_failed` when refused.
+*/
+export type StagedResult = Result<
+  { readonly events: readonly Event[]; readonly persisted: ActionResult },
+  ActionError
+>;
+
+/** The action's answer: the refusal as it is, or the outcome of the write. */
+const settle = async (staged: StagedResult): ActionResult =>
+  staged.ok ? await staged.value.persisted : staged;
 
 export type ActionDeps = {
   readonly state: AppStateHandle;
@@ -72,7 +87,12 @@ export const stamp = (deps: ActionDeps, body: Body, when: When = {}): EventInput
   source: deps.source,
 });
 
-const STORE_ERRORS = ["event/duplicate", "event/not-found", "undo/nothing"] as const;
+const STORE_ERRORS = [
+  "event/duplicate",
+  "event/not-found",
+  "persist_failed",
+  "undo/nothing",
+] satisfies readonly ActionError[];
 
 type StoreError = (typeof STORE_ERRORS)[number];
 
@@ -85,23 +105,20 @@ const storeError = (code: string): ActionError => (isStoreError(code) ? code : `
 export const fromStore = (result: Result<Event, string>): Result<readonly Event[], ActionError> =>
   result.ok ? ok([result.value]) : err(storeError(result.error));
 
-const dispatchAll = async (deps: ActionDeps, inputs: readonly EventInput[]): ActionResult => {
-  const events: Event[] = [];
-  for (const input of inputs) {
-    const dispatched = await deps.state.dispatch(input);
-    if (!dispatched.ok) {
-      return err(storeError(dispatched.error));
-    }
-    events.push(dispatched.value);
-  }
-  return ok(events);
+const stageAll = async (deps: ActionDeps, inputs: readonly EventInput[]): Promise<StagedResult> => {
+  const staged = await deps.state.stage(inputs);
+  return staged.ok ? ok(staged.value) : err(storeError(staged.error));
 };
 
 /**
 The one path to the log: every input is checked by the core's retro rules against the
-current state before the first one is appended, so a rejected batch leaves no trace.
+current state before any is shown, so a rejected batch leaves no trace; the batch is then
+shown at once and written in one go. Answers as soon as the state shows it.
 */
-export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): ActionResult => {
+export const stageEmit = async (
+  deps: ActionDeps,
+  inputs: readonly EventInput[],
+): Promise<StagedResult> => {
   const snapshot = deps.state.store.getState();
   const now = deps.clock.now();
   const malformed = inputs
@@ -120,28 +137,36 @@ export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): Act
   const rejected = inputs
     .map((input) => validateEventInput(snapshot, input, now))
     .find((checked) => !checked.ok);
-  return rejected === undefined ? await dispatchAll(deps, inputs) : err(rejected.error);
+  return rejected === undefined ? await stageAll(deps, inputs) : err(rejected.error);
 };
 
-/** Per client: the last check-then-write still running. */
+/** `stageEmit`, answering once the write landed (`persist_failed` when the store refused it). */
+export const emit = async (deps: ActionDeps, inputs: readonly EventInput[]): ActionResult =>
+  await settle(await stageEmit(deps, inputs));
+
+/** Per client: the last check-then-show still running. */
 const queues = new WeakMap<ActionDeps, Promise<unknown>>();
 
 /**
-Runs a check-then-write after the previous one finished, so a double tap cannot pass the
-same check twice before the first write lands (two closes of one task).
+Runs a check-then-show after the previous one is shown, so a double tap cannot pass the same
+check twice (two closes of one task). It waits for the state, not for the disk: the next tap's
+check reads the state, which already holds the previous action.
 */
-export const serially = async <T>(deps: ActionDeps, run: () => Promise<T>): Promise<T> => {
+export const serially = async (
+  deps: ActionDeps,
+  run: () => Promise<StagedResult>,
+): ActionResult => {
   const previous = queues.get(deps) ?? Promise.resolve();
   const next = (async () => {
     try {
       await previous;
     } catch {
-      // The previous write answered its own caller; this one runs regardless.
+      // The previous action answered its own caller; this one runs regardless.
     }
     return await run();
   })();
   queues.set(deps, next);
-  return await next;
+  return await settle(await next);
 };
 
 export const taskOf = (deps: ActionDeps, taskId: string): Result<Task, "task/unknown"> => {

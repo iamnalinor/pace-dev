@@ -87,6 +87,16 @@ const created = (runtime: Awaited<ReturnType<typeof createTestRuntime>>, title: 
   Object.values(runtime.state.store.getState().tasks.byId).find((task) => task.title === title);
 
 describe("Composer", () => {
+  it("keeps the line's size handler across renders, so a re-render never makes the web textarea measure itself (bug-lessons 57)", async () => {
+    // react-native-web reads the textarea's scrollHeight (a forced layout) whenever this handler
+    // changes: a new function each render made every tap that re-rendered Now pay for a layout.
+    await renderComposer(await createTestRuntime());
+    const before: unknown = line().props["onContentSizeChange"];
+    await fireEvent.changeText(line(), "buy a cable");
+    await fireEvent(line(), "focus");
+    expect(line().props["onContentSizeChange"]).toBe(before);
+  });
+
   it("shows the category estimate in the chip but only overrides in its picker", async () => {
     await renderComposer(await createTestRuntime());
     await fireEvent.press(button("nav.newTask"));

@@ -113,6 +113,28 @@ beforeEach(async () => {
   fake.state.scheduleStarted = null;
 });
 
+describe("setPushChoice", () => {
+  afterEach(() => {
+    (SecureStore as unknown as FakeSecureStore).writes.isRefused = false;
+  });
+
+  it("shows the pick at once, before the phone has saved it (bug-lessons 57)", async () => {
+    const saved = setPushChoice("poll");
+    expect(pushStore.getState().choice).toBe("poll");
+    await saved;
+    expect((SecureStore as unknown as FakeSecureStore).values.get("pace.push.choice")).toBe("poll");
+  });
+
+  it("takes the pick back when the phone refuses to save it", async () => {
+    await setPushChoice("poll");
+    (SecureStore as unknown as FakeSecureStore).writes.isRefused = true;
+    const saved = setPushChoice("fcm");
+    expect(pushStore.getState().choice).toBe("fcm");
+    await expect(saved).rejects.toThrow("keystore refused the write");
+    expect(pushStore.getState().choice).toBe("poll");
+  });
+});
+
 describe("isBackgroundStepNeeded", () => {
   it("asks for the battery exemption only while the phone polls (owner rule)", () => {
     expect(isBackgroundStepNeeded({ method: "poll" })).toBe(true);
