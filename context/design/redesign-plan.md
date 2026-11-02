@@ -509,6 +509,8 @@ pickers anchored to their button).
 - [ ] Review Focus line 5: keyboard-only sheet from a list row — focus start, Escape, return focus.
 - [ ] Bug-lessons: F-CMP-02 (class 10: an affordance with no behaviour) and F-MOT-05/06 (class 5);
       sweep every `Modal` use. Commit.
+- [ ] PR #48 follow-up: QA21 M1, Enter in a single-line field of a sheet submits it and focus stays
+      in the sheet (with Task 3.8) (see "PR #48 follow-ups (triage)").
 
 ### Task 3.7: Toast placement and Tooltip
 
@@ -522,6 +524,10 @@ visible hint instead).
       bubble is hovered (web test).
 - [ ] e2e: extend `e2e/overlays.e2e.ts` — no toast or tooltip covers an enabled control on Now,
       Day, task (bug-lessons 6). Bug-lessons F-CMP-12 (class 6). Commit.
+- [ ] Main's offline pill (`ui/sync-frame.tsx`, QA round 22 R22-06) is restyled here, not replaced:
+      keep its Retry, its placement clear of the header and `offline-pill.e2e.ts`. PR #48 follow-ups:
+      review #6, the pill and a toast stack instead of overlapping (+ an e2e offline + toast); QA21
+      L9, the pill wraps in Russian (see "PR #48 follow-ups (triage)").
 
 ### Task 3.8: `TextField` and `TimeInput`
 
@@ -534,6 +540,7 @@ web; visible label is a `<label for>` on web.
       Review: class 2 — open the empty form by hand); `purpose="url"` sets `inputMode="url"`,
       `spellCheck={false}`, `autoComplete="url"`; focus ring visible on focus (web).
 - [ ] Bug-lessons F-CMP-03 (class 2). Commit.
+- [ ] PR #48 follow-up: QA21 M1 (Enter submits a sheet's single-line field, with Task 3.6) (see "PR #48 follow-ups (triage)").
 
 ### Task 3.9: Controls — Button, IconButton, Chip, Tag, Segmented, Switch, Slider, CheckCircle, ProgressBar, CountBadge, Skeleton, EmptyState
 
@@ -549,6 +556,14 @@ tooltip); `<Segmented options value label>`; `<Switch>` (track off uses `outline
 onPress>` (fills on press-in, `haptic="confirm"`, 48 dp target without negative margins);
 `<CountBadge count max=99>` (does not cover the icon: offset to the icon's top-right corner);
 `<Skeleton height>` (appears after 300 ms); `<EmptyState title body action?>`.
+- [ ] `Skeleton` keeps main's QA 19 L2 guard (or a successor that measures the same): its bars stand
+      out from `bg.app` and `bg.cell` at 1.5:1 even at the dim of their breath
+      (`contrast.test.ts` "placeholder rows"; after the rebase `label.quaternary` passes light
+      `bg.app` at 1.5003:1, by a hair). Restyle main's first-sync placeholders (`FirstSyncBody`,
+      `KnownAfterSync`, `EmptyText`) on it and keep their tests (`sync-state.e2e.ts`); no
+      replacement.
+- [ ] PR #48 follow-up: QA21 L1 (one tab stop per chip group swept beyond the close sheet:
+      `RadioChips` everywhere) and the chip rows' real 44 px press area (see "PR #48 follow-ups (triage)").
 - [ ] Failing tests per component (states by role); `Tag` with a 120-char name in a 200 px parent
       ellipsizes (`numberOfLines=1`, shrink) — removes the Task 1.4 `test.fail` marker for F-DAT-02
       tags; `CountBadge` 120 → "99+".
@@ -566,6 +581,7 @@ toast/overlay layer.
 - [ ] Failing tests: the selected tab exposes `aria-current="page"` (web) / selected (Android); a
       64-char Telegram name is not cut to one letter (the header has two lines); `deadControls()`
       over the tab bar (bug-lessons 10).
+- [ ] PR #48 follow-up: the sidebar highlights Settings while New preset is open (see "PR #48 follow-ups (triage)").
 - [ ] Commit.
 
 ---
@@ -618,6 +634,8 @@ now-screen) (+ tests).
 - [ ] Failing tests: every composer entry path submits (bug-lessons 2; `docs/qa.md` table rows);
       empty form opened by hand has no error before interaction; filter chips reachable by wheel
       (e2e). Commit.
+- [ ] PR #48 follow-up: QA21 M2, a direct load of `/add` (the manifest's share and shortcut URL)
+      focuses the New task form's field on a touch phone too (see "PR #48 follow-ups (triage)").
 
 ### Task 4.4: Day (structure; the line signature is Task 7.1)
 
@@ -627,6 +645,7 @@ now-screen) (+ tests).
       screen-time section in the same list system.
 - [ ] Failing tests: Today button absent on today, present on another day; day switch replaces
       content with no crossfade (F-MOT-07). Commit.
+- [ ] PR #48 follow-up: QA21 L3, the activity sheet offers no end on the next day (see "PR #48 follow-ups (triage)").
 
 ### Task 4.5: Task detail (screen and inspector)
 
@@ -637,6 +656,13 @@ label).
       Focus and Done equal width with shortcuts, submit label «Сдать N» / "Submit N" (F-DAT-01),
       progress slider in % with live value, delete with inline confirm then Undo in place 10 s
       (Q5, F-A11Y-02), project picker as a field, not a pill.
+- [ ] Main's "Other time…" button (`task.doneOther`, QA 20 L3) is a third footer control beside
+      Focus and Done (a labelled button on the desktop pane, an icon button on a phone). At 320 with
+      a keyboard, Submit's label and its hotkey no longer fit: the F-DAT-01 REALISTIC entry in
+      `e2e/worst-case.e2e.ts` (added by the rebase) goes when the footer fits at 320.
+- [ ] PR #48 follow-ups, close sheet (with Task 5.3 for the motion): QA21 L8 copy, L10 one way per
+      job, QA20 L5 pickers, the cosmetic tight rule; L2 (its height animates) is Task 5.3's
+      (see "PR #48 follow-ups (triage)").
 - [ ] Failing tests: view-model `submitLabel(37 solved) === "Сдать 37"`; delete focus moves to the
       next row and Escape cancels the confirm (bug-lessons 5, 21); slider `aria-valuetext` "30 %"
       (F-A11Y-16). Bug-lessons F-DAT-01 (new class "Text from data placed in chrome without a length
@@ -650,6 +676,13 @@ label).
       hours option, blocks announce day and time (F-A11Y-09).
 - [ ] Failing tests: `layoutWeek()` (client view-model) — 5 overlapping 20-minute blocks get 5 lanes
       and drawn heights equal their lane geometry; a11y labels include the weekday. Commit.
+- [ ] The day's-end block (found by the rebase, bug-lessons log 2026-11-02): an item that ends at
+      midnight with less than `MIN_TARGET_PX` of time is drawn at the minimum and hangs past the
+      column, which the sideways scroller clips (half its target misses). Lifting it into the column
+      covers the item before it (axe target-size), so decide the drawing here (e.g. room under the
+      last hour, or a joined target), with a test that places a 3-minute item at 23:56 and asserts
+      its whole target is inside the scroller and covers no neighbour.
+- [ ] PR #48 follow-up: lanes below 44 px past six on a phone (see "PR #48 follow-ups (triage)").
 
 ### Task 4.7: Inbox, Review, Decisions
 
@@ -657,6 +690,8 @@ label).
 - [ ] Inbox cards clamp text to 4 lines with "Show all" (F-DAT-06), Accept primary / Delete plain
       (F-CMP-15), virtualised; empty states teach (F-CMP-09); empty list renders no `list` role
       (F-A11Y-18). Commit.
+- [ ] PR #48 follow-up: QA21 L7, the rules preview says why the assistant is unavailable, per reason
+      (see "PR #48 follow-ups (triage)").
 
 ### Task 4.8: Projects, project page, presets
 
@@ -664,6 +699,7 @@ label).
 - [ ] Projects as a grouped list with hue dot + name + "3 tasks" (plural i18n), no hero strip
       (F-CMP-16); project page = the Now task list grouped Open / In future / Done (F-LAY-07);
       presets as grouped rows; New project button hugs (F-CMP-06). Commit.
+- [ ] PR #48 follow-up (cosmetic): the Presets "Start from" chips say what they do (a verb) (see "PR #48 follow-ups (triage)").
 
 ### Task 4.9: Insights
 
@@ -689,6 +725,7 @@ label).
       (F-CMP-07); shortcuts listed under Settings › Keyboard (no switch: there are no single-key shortcuts any more; Q6); server line middle-ellipsizes the host
       (F-DAT-11).
 - [ ] Failing tests: `deadControls()` at phone width; revoke confirm Escape returns focus. Commit.
+- [ ] PR #48 follow-up (cosmetic): Devices' Revoke sits 8 px off its row (see "PR #48 follow-ups (triage)").
 
 ### Task 4.12: More and the signed-out screens
 
@@ -745,6 +782,8 @@ generated constants), presets `fadeIn/Out`, `riseIn/Out`, `sheetIn/Out`, `dialog
       filter none, list mount none (F-MOT-05…15).
 - [ ] e2e `motion.e2e.ts`: sheet open/close both animate (frames in between); dialog first frame
       scale ≥ 0.95; route push on web has ≥ 3 intermediate frames. Commit.
+- [ ] PR #48 follow-up: QA21 L2, the close sheet's height animates when its outcome changes
+      (see "PR #48 follow-ups (triage)").
 
 ### Task 5.6: Render budget — every latency case inside 100 ms
 
@@ -818,18 +857,11 @@ Week), `scripts/serve-web.ts` (apply `_headers`), skeleton heights in the kit.
       `/` and `/history` (PerformanceObserver); the CSP header is present locally (F-WEB-11/12/16).
 - [ ] Commit.
 
-### Task 6.5: A cold URL of a tab screen keeps its address (QA round 22 R22-03, R17 M2)
+### Task 6.5 and Task 6.6: dropped (fixed by PR #48)
 
-- [ ] Failing e2e in `route-sweep.e2e.ts`: a cold load (fresh context) of `/inbox`, `/more`, `/day`
-      at 1440 and 390 keeps `page.url()` and a reload returns to the same screen; fix the tab
-      router's initial route on the web. Bug-lessons entry. Commit.
-
-### Task 6.6: A second tab of the same profile follows the first (QA round 22 R22-04, R17 M1)
-
-- [ ] Failing two-page test in `live.e2e.ts`: a note added in tab A shows in tab B (badge and list)
-      within a second, without a reload; the tabs share one IndexedDB and device id, so B rebuilds
-      its in-memory state when A writes (a `BroadcastChannel` / `storage` signal, then a re-read
-      through the write queue). Bug-lessons entry. Commit.
+The cold URL of a tab screen (R22-03, R17 M2) and the second tab of one profile (R22-04, R17 M1)
+were fixed on main before the rebase (QA round 18's table; `NavigatorHold`, `peer-tabs`) and their
+e2e tests pass on the rebased tree. The numbers stay unused so the other tasks keep theirs.
 
 ---
 
@@ -926,11 +958,11 @@ ceilings in `e2e/latency.e2e.ts` owned by Task 5.6.
 
 | Finding | Owner | Note |
 |---|---|---|
-| R22-03 cold URL of Inbox/More/Day rewritten to `/` (R17 M2) | Task 6.5 (new) | route-sweep asserts `page.url()` after a cold load |
-| R22-04 second tab stale (R17 M1) | Task 6.6 (new) | two-page test in `live.e2e.ts` |
-| R22-05 first sync: definitive empty states in the browser's language (R17 M4) | Task 6.1 (language at first paint) + Task 3.9 (`Skeleton`, `EmptyState`) | spec 5.0.5: no empty copy before the first full pull |
-| R22-06 nothing says offline / not synced (R17 M5) | Task 3.4 (phone `StatusLine` under the header) + Task 3.10 (sidebar foot) | spec 5.0.5 Offline; `errors.offline` is unused today |
-| R22-07 share target drops the shared text (R17 M3) | Task 4.3 | spec 5.5 `(tabs)/add`: the share's text in the line, the URL kept |
+| R22-03 cold URL of Inbox/More/Day rewritten to `/` (R17 M2) | fixed by PR #48 (main's QA 18 table: "M2 URL lost on reload fixed"; bug-lessons 61, `NavigatorHold`) | re-checked on the rebased tree (2026-11-02): main's route sweep and the full e2e pass; nothing left to plan |
+| R22-04 second tab stale (R17 M1) | fixed by PR #48 (main's QA 18 table: "M1 second tab stale fixed"; `peer-tabs`, merged into `LocalLog.adopt`) | `live.e2e.ts` "a task added in one tab shows in a second tab of the same profile" passes on the rebased tree; nothing left to plan |
+| R22-05 first sync: definitive empty states in the browser's language (R17 M4) | fixed by PR #48 (QA 19 M1, QA 20 M1, QA 21 M1: `FirstSyncCover`, `FirstSyncBody`, `KnownAfterSync`, bug-lessons 62) | `sync-state.e2e.ts` sweeps every data screen with the pull held and passes. Still open: what pr48-followups A1 names (a 5xx first pull, `/add` during the first sync), PR A. Task 3.9 restyles main's placeholders as the kit's `Skeleton` and keeps their tests; no replacement |
+| R22-06 nothing says offline / not synced (R17 M5) | fixed by PR #48 (QA 18 M5, QA 19 M4, QA 21 L2: the offline pill with Retry, `sync-frame.tsx`) | Task 3.7 restyles main's pill (spec 5.0.5 offline status: tokens, placement beside the toast, RU wrap per pr48-followups) and keeps its Retry, its re-check on a dropped socket and `offline-pill.e2e.ts`. Not a second indicator: Task 3.4 and 3.10 add none |
+| R22-07 share target drops the shared text (R17 M3) | fixed by PR #48 (QA 18 M3, QA 19 L2/L4, QA 21 M3: `shared-in`, the line appends, blank shares) | `composer.e2e.ts` share tests pass on the rebased tree. Still open: a bare `/add` focuses no field on a touch phone (pr48-followups QA21 M2), owned by the New task screen task (see "PR #48 follow-ups (triage)") |
 | R22-08 icon-only buttons without tooltip / visible name (R17 M7) | Task 3.7 (Tooltip) + Task 4.5 (task header as labelled controls, no Pause) | hover hint instant per the owner (spec 4.2.31) |
 | R22-09 extra taps over 100 ms | Task 5.6 | ceilings added (see Task 5.6) |
 | R22-10 wide controls on a computer (Inbox Accept/Delete, Settings time fields) | Task 3.9 (`Button width="hug"`) + Task 4.7 (Inbox) + Task 4.11 (time fields sized to content) | owner feedback 4 |
@@ -955,6 +987,50 @@ ceilings in `e2e/latency.e2e.ts` owned by Task 5.6.
 | R17 L7 "Deadline type" shown with "No deadline" | Task 4.3 | still open in round 22 |
 | R17 L1 versions screen "Reload", R17 L10 time-zone card cannot be dismissed | Task 4.12 (versions screen), Task 4.3 (Now's cards) | not re-run in round 22 |
 
+### PR #48 follow-ups (triage)
+
+`context/pr48-followups.md` lists what PR #48 (Phase C, on main since 7bf2815) left open. Triage
+(controller, 2026-11-02): items whose code the redesign rewrites go to PR B, inside the task that
+rewrites that code, so no screen is fixed twice; logic and server items go to PR A. **PR A
+"Foundation" takes A1–A8**, one fix task per group, each test-first with a bug-lessons row and the
+other side of the contract traced. **PR B items go into their tasks**: each task named below carries
+a one-line pointer back here. Not ours: owner actions, the "Carried over" list, the next-iteration
+briefs, CI duration (a note only).
+
+**PR A "Foundation" (after the rebase):**
+- A1 Sync and first pull: QA21 M4 (a 5xx on the first pull reads "not synced yet" with Retry);
+  `/add` during the first sync shows the built-in defaults (bug-lessons 62 family).
+- A2 Time bar: QA21 M3, the "could not read" line uses the parse `reason` (`readingIssue`).
+- A3 Network hygiene: QA21 L5 (Day sends `GET /api/usage` twice); review #5 (the signed-out sweep
+  allows only the session check's 401); review minor (a 2 s quiet window misses a 3–5 s loop).
+- A4 Server LLM path: review #2 (a deferred retry with `retryAt` null counts its tries, Inbox), #3
+  (the `LlmHealth` read gets a ~1 s timeout and a brief `{}` cache), #4 (fill the root `questions`
+  only); minor (the drain waits for the earliest penalty).
+- A5 Sign-out races: review #7 (a run hung past `HOLD_WAIT_MS` reads "ended elsewhere"); minor
+  (`startSenders` in a hidden tab); minor (a preview's decision stays open after "Read it when it's
+  back").
+- A6 Presets data: QA21 L4 (unique names); two devices naming a preset alike offline get one id.
+- A7 Self-hosting: the well-known `oauth-protected-resource` 404 off `API_ORIGIN`; the MCP URL vs
+  `--api` (bug-lessons 83, 102); QA21 L6, the copy names both addresses and the action.
+- A8 Tooling: a lint rule against `() => p` (autofix to `async () => await p`); the `ids` no-PRNG
+  test's timeout.
+
+**PR B "New look" (inside the task that rebuilds that code):**
+
+| Follow-up | Task |
+|---|---|
+| QA21 M1: Enter in a sheet's single-line field submits it, focus stays in the sheet | 3.6 + 3.8 |
+| QA21 M2: a direct `/add` focuses the New task field (touch phone too) | 4.3 |
+| QA21 L1: one tab stop per chip group (`RadioChips` swept); chip rows' real 44 px press area | 3.9 |
+| review #6: the offline pill and a toast stack (+ e2e offline + toast); QA21 L9: the pill wraps in RU | 3.7 |
+| Close sheet: QA21 L2 height animates (5.3); L8 copy, L10 one way per job, QA20 L5 pickers, the tight rule (4.5) | 4.5 + 5.3 |
+| Day activity sheet: QA21 L3, no end on the next day | 4.4 |
+| Rules preview: QA21 L7, reason-specific "unavailable" copy | 4.7 |
+| Week: lanes below 44 px past six on a phone | 4.6 |
+| Week: the day's-end block hangs past the column (found by the rebase, bug-lessons log 2026-11-02; `targets.e2e.ts` now runs on a fixed clock) | 4.6 |
+| Sidebar: Settings highlighted while New preset is open | 3.10 |
+| Cosmetic: Devices' Revoke 8 px off (4.11); Presets "Start from" verb (4.8); the dev-login bell entries (no task: dev only) | 4.11, 4.8 |
+
 ## Batch sizes (rough)
 
 | Batch | PR | Tasks | Size |
@@ -969,7 +1045,7 @@ ceilings in `e2e/latency.e2e.ts` owned by Task 5.6.
 
 ## Lint baseline
 
-Task 1.3 (2026-11-01, after fix round 1 and the interval ruling): 437 warnings of `pace/no-raw-design-values` at introduction, by message id: `arbitraryClass` 424, `rawDuration` 12 (6 `.duration()` builders, 1 `duration:`, 1 `setTimeout`, 4 `*_MS`/`*DURATION` constants in files that import reanimated: `BREATH_MS`, `DISSOLVE_MS`, `DURATION_MS`, `SLIDE_MS`), `rawColor` 1 (a CSS colour name), `rawRadius` 0, `rawFontMetric` 0, `offScaleClass` not active yet (needs `GENERATED_CLASSES`, Task 2.2). Poll/debounce/timeout interval constants outside reanimated files are behaviour and are not counted. The count is an exact ratchet: `scripts/eslint-all.ts` fails the app part when the count is above `DESIGN_VALUE_WARNINGS` and when it is below it (lower the constant to the new number); never raise it.
+Task 1.3 (2026-11-01, after fix round 1 and the interval ruling): 437 warnings of `pace/no-raw-design-values` at introduction, by message id: `arbitraryClass` 424, `rawDuration` 12 (6 `.duration()` builders, 1 `duration:`, 1 `setTimeout`, 4 `*_MS`/`*DURATION` constants in files that import reanimated: `BREATH_MS`, `DISSOLVE_MS`, `DURATION_MS`, `SLIDE_MS`), `rawColor` 1 (a CSS colour name), `rawRadius` 0, `rawFontMetric` 0, `offScaleClass` not active yet (needs `GENERATED_CLASSES`, Task 2.2). Poll/debounce/timeout interval constants outside reanimated files are behaviour and are not counted. The count is an exact ratchet: `scripts/eslint-all.ts` fails the app part when the count is above `DESIGN_VALUE_WARNINGS` and when it is below it (lower the constant to the new number); never raise it, except by a dated line here.
 
 Task 2.2 (2026-11-02, tokens v2 everywhere; `offScaleClass` on with `GENERATED_CLASSES`): **69** warnings, by message id: `arbitraryClass` 0 (was 424: every arbitrary class mapped to a token class), `offScaleClass` 56 (42 `active:opacity-*` press feedback and 11 `opacity-*` disabled/dimmed states, both replaced by the `Pressable` state layer and the disabled treatment in Tasks 3.1/3.9; 2 `shadow-lg` on the sheet and the toast, Task 3.6; 1 `scale-110` on the slider thumb, Task 3.9), `rawDuration` 12 (unchanged, motion tokens), `rawColor` 1 (unchanged), `rawRadius` 0, `rawFontMetric` 0. `DESIGN_VALUE_WARNINGS` = 69.
 
