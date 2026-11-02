@@ -3,6 +3,7 @@ import Svg, { Circle, Ellipse, Path } from "react-native-svg";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { spacePress } from "#app/ui/space-press.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { COMPUTER_OSES, type ComputerOs } from "@pace/client";
 import { composite, type MessageKey } from "@pace/core";
@@ -102,6 +103,9 @@ export const OsPicker = ({
             onPress={() => {
               onChange(os);
             }}
+            {...spacePress(() => {
+              onChange(os);
+            })}
             ref={isChosen ? chosenRef : undefined}
           >
             <Mark

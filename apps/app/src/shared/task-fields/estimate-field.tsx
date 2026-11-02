@@ -33,13 +33,12 @@ export const EstimateChip = ({
 }) => {
   const t = useT();
   const language = useLanguage();
-  const { palette } = useTheme();
   const none = useNoneText(fallback);
   const text = minutes === null ? none : formatDuration(minutes, language);
   return (
     <Chip
       label={`${t("composer.estimate")}: ${text}`}
-      leading={<Clock color={palette["label.secondary"]} size={14} strokeWidth={1.75} />}
+      leading={(color) => <Clock color={color} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >

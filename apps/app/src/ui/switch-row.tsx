@@ -1,9 +1,11 @@
 import { Pressable, Text, View } from "react-native";
 
 import { cx } from "./cx.ts";
+import { spacePress } from "./space-press.ts";
 
 /**
-The switch, drawn by the kit on both platforms (spec §4.2.26). The knob sits inside the track, so it
+The switch, drawn by the kit on both platforms (spec §4.2.26), in a 48 target (the layout box is the
+32 track: the Chip's negative margin); Space presses it on the web too. The knob sits inside the track, so it
 never meets the page behind the switch: the native one is wider than its track, and a dark knob
 vanished into the dark page. On: the accent track with the on-accent knob. Off: the `outline` ring
 on the `fill.2` track with a `label.tertiary` knob (the spec's `outline` knob measures 2.7:1 on it).
@@ -16,36 +18,40 @@ export const PaceSwitch = ({
   readonly isOn: boolean;
   readonly label: string;
   readonly onChange: (isOn: boolean) => void;
-}) => (
-  <Pressable
-    accessibilityLabel={label}
-    accessibilityRole="switch"
-    accessibilityState={{ checked: isOn }}
-    aria-checked={isOn}
-    className="shrink-0"
-    onPress={() => {
-      onChange(!isOn);
-    }}
-  >
-    <View
-      className={cx(
-        "h-switch-h w-switch-w flex-row items-center rounded-pill border-2",
-        isOn ? "border-accent bg-accent" : "border-outline bg-fill-2",
-      )}
-      testID="switch-track"
+}) => {
+  const toggle = (): void => {
+    onChange(!isOn);
+  };
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: isOn }}
+      aria-checked={isOn}
+      className="-my-2 h-hit shrink-0 justify-center rounded-pill"
+      onPress={toggle}
+      {...spacePress(toggle)}
     >
       <View
         className={cx(
-          "rounded-pill",
-          isOn
-            ? "ml-auto mr-0.5 size-switch-knob-on bg-accent-on"
-            : "ml-2 size-switch-knob-off bg-label-tertiary",
+          "h-switch-h w-switch-w flex-row items-center rounded-pill border-2 pl-1",
+          isOn ? "border-accent bg-accent" : "border-outline bg-fill-2",
         )}
-        testID="switch-knob"
-      />
-    </View>
-  </Pressable>
-);
+        testID="switch-track"
+      >
+        <View
+          className={cx(
+            "rounded-pill",
+            isOn
+              ? "ml-auto mr-0.5 size-switch-knob-on bg-accent-on"
+              : "ml-0.5 size-switch-knob-off bg-label-tertiary",
+          )}
+          testID="switch-knob"
+        />
+      </View>
+    </Pressable>
+  );
+};
 
 /** A setting line with a hint under the label and the switch on the right. */
 export const SwitchRow = ({

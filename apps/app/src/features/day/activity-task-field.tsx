@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import type { Task } from "@pace/core";
 
 import { useAppState, useT } from "#app/app-state.tsx";
+import { spacePress } from "#app/ui/space-press.ts";
 import { TextField } from "#app/ui/text-field.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
@@ -109,6 +110,7 @@ const TaskChoice = ({
     aria-checked={isSelected}
     className="min-h-hit-web justify-center rounded-lg px-3 active:opacity-75"
     onPress={onPress}
+    {...spacePress(onPress)}
   >
     <Text
       className={

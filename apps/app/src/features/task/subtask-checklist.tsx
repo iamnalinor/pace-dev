@@ -7,6 +7,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { cx } from "#app/ui/cx.ts";
+import { spacePress } from "#app/ui/space-press.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 const weekday = (atIso: string, tz: string, language: string): string =>
@@ -45,6 +46,13 @@ const SubtaskItem = ({
     }
     return subtask.state === "solved" ? t("task.subtaskSolved") : "";
   };
+  const toggle = (): void => {
+    void run(
+      subtask.state === "pending"
+        ? actions.markSolved(taskId, subtask.id)
+        : actions.unmarkSolved(taskId, subtask.id),
+    );
+  };
   return (
     <Pressable
       accessibilityLabel={subtask.label}
@@ -53,13 +61,8 @@ const SubtaskItem = ({
       aria-disabled={isSent}
       className="min-h-row flex-row items-center gap-3 border-b border-separator px-1 active:opacity-70"
       disabled={isSent}
-      onPress={() => {
-        void run(
-          subtask.state === "pending"
-            ? actions.markSolved(taskId, subtask.id)
-            : actions.unmarkSolved(taskId, subtask.id),
-        );
-      }}
+      onPress={toggle}
+      {...spacePress(toggle)}
     >
       <Mark state={subtask.state} />
       {/* A bare number label ("290") is the number itself: shown once, in the label. */}

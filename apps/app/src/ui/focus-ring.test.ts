@@ -33,4 +33,13 @@ describe("the focus ring", () => {
     const rings = outlines().filter(({ value }) => value !== "none");
     expect(rings.filter(({ value }) => !value.includes("var(--pace-focus)"))).toEqual([]);
   });
+
+  it("hides no ring from the range slider, an input like the text fields (its keyboard ring was lost)", () => {
+    const hiding = outlines().filter(({ value }) => value === "none");
+    expect(hiding.length).toBeGreaterThan(0);
+    const inputs = hiding.filter(({ selector }) => selector.includes("input"));
+    expect(inputs.filter(({ selector }) => !selector.includes(":not([data-pace-slider])"))).toEqual(
+      [],
+    );
+  });
 });

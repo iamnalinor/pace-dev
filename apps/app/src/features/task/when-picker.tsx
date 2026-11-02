@@ -6,7 +6,6 @@ import type { QuickTime } from "@pace/client";
 import { useT } from "#app/app-state.tsx";
 import { RadioChips } from "#app/ui/radio-chips.tsx";
 import { TextField } from "#app/ui/text-field.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 
 import type { CloseForm } from "./use-close-form.ts";
 
@@ -67,7 +66,6 @@ export const WhenPicker = ({
   readonly quickTimes: readonly QuickTime[];
 }) => {
   const t = useT();
-  const { palette } = useTheme();
   const isCustom = form.choice === "custom";
   return (
     <View className="gap-2">
@@ -78,7 +76,7 @@ export const WhenPicker = ({
             value: quick.key,
           })),
           {
-            leading: <CalendarDays color={isCustom ? palette["label.primary"] : palette["label.secondary"]} size={16} />,
+            leading: (color: string) => <CalendarDays color={color} size={16} />,
             // Said as it is shown: the chip that opens the date and time (QA round 20 L5).
             text: t("close.pickExact"),
             value: "custom",

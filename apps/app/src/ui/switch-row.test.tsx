@@ -22,10 +22,18 @@ const show = async (isOn: boolean, onChange: (isOn: boolean) => void = () => und
 };
 
 describe("PaceSwitch", () => {
-  it("draws the knob inside the track, so it never meets the page (the dark thumb vanished into it)", async () => {
-    await show(true);
-    // The knob is the track's child: nothing of it reaches the ground behind the switch.
-    expect(within(screen.getByTestId("switch-track")).getByTestId("switch-knob")).toBeOnTheScreen();
+  it("is a 48 target around the 32 track, a pill so the focus ring follows it, with no extra room in the layout", async () => {
+    await show(false);
+    const classes = (
+      screen.getByRole("switch", { name: "Night hours" }).props["className"] as string
+    ).split(" ");
+    expect(classes).toEqual(expect.arrayContaining(["-my-2", "h-hit", "rounded-pill", "shrink-0"]));
+  });
+
+  it("insets the off knob 8 px from the track's edge, the gap above and below it (2 border + 4 + 2)", async () => {
+    const { knob, track } = await show(false);
+    expect(track.split(" ")).toEqual(expect.arrayContaining(["border-2", "pl-1"]));
+    expect(knob.split(" ")).toContain("ml-0.5");
   });
 
   it("is the accent with the on-accent knob when on", async () => {

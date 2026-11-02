@@ -9,6 +9,7 @@ import { useRunAction } from "#app/shared/use-run-action.ts";
 import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { Sheet } from "#app/ui/sheet.tsx";
+import { spacePress } from "#app/ui/space-press.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 
 type Choice = {
@@ -37,6 +38,7 @@ const ChoiceRow = ({
         isCurrent ? "border-label-primary bg-fill-3" : "border-outline",
       )}
       onPress={onChoose}
+      {...spacePress(onChoose)}
     >
       <View
         className={cx(

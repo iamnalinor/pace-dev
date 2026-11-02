@@ -5,6 +5,7 @@ import type { OAuthScope } from "@pace/core";
 
 import { useT } from "#app/app-state.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { spacePress } from "#app/ui/space-press.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { SCOPE_KEYS } from "@pace/client";
 
@@ -36,6 +37,9 @@ export const ScopeList = ({
             onPress={() => {
               onToggle(scope);
             }}
+            {...spacePress(() => {
+              onToggle(scope);
+            })}
           >
             <View
               className={cx(

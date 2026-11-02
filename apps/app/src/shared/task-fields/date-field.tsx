@@ -7,7 +7,6 @@ import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
 import { Calendar } from "#app/ui/calendar.tsx";
 import { Chip } from "#app/ui/chip.tsx";
-import { useTheme } from "#app/ui/theme-provider.tsx";
 import { TimeInput } from "#app/ui/time-input.tsx";
 
 /** A time a person sets, with the zone it was set in; `null` when not set. */
@@ -56,14 +55,13 @@ export const DateChip = ({
 }) => {
   const t = useT();
   const viewer = useViewer();
-  const { palette } = useTheme();
   const unset = t(emptyDateLabel(kind));
   const text = value === null ? unset : zonedText({ ...value, mode: "due" }, viewer);
   const Icon = DATE_ICONS[kind];
   return (
     <Chip
       label={`${t(dateLabel(kind))}: ${text}`}
-      leading={<Icon color={palette["label.secondary"]} size={14} strokeWidth={1.75} />}
+      leading={(color) => <Icon color={color} size={14} strokeWidth={1.75} />}
       onPress={onToggle}
       selected={isOpen}
     >

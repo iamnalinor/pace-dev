@@ -89,6 +89,8 @@ export const USED_PAIRS: readonly ContrastPair[] = [
   // The accent as a filled mark: a switch track that is on, a selected chip or day, the primary
   // button. Against each ground it is the "selected" cue (WCAG 1.4.11, spec §4.2.6 and §4.2.26).
   ...onGrounds("accent", "ui", LABEL_GROUNDS),
+  // Text, an icon or a switch knob on the accent fill (a chosen chip or day, the primary button, a
+  // switch that is on): measured as text, which is stricter than the 3:1 of a mark.
   { fg: "accent.on", bg: "accent", target: "textSmall" },
   { fg: "accent.on", bg: "accent.pressed", target: "textSmall" },
   { fg: "accent.text", bg: "accentQuiet", over: "bg.cell", target: "meta" },
@@ -102,16 +104,15 @@ export const USED_PAIRS: readonly ContrastPair[] = [
   ),
   ...SELECTED_ROW_PAIRS,
   // A neutral count badge (unread notifications): secondary digits on `fill.3`.
-  ...GROUNDS.map(
+  ...LABEL_GROUNDS.map(
     (over): ContrastPair => ({ bg: "fill.3", fg: "label.secondary", over, target: "meta" }),
   ),
   // The switch (spec §4.2.26), the knob inside its track so it never reaches the page: off, a
   // `label.tertiary` knob on the `fill.2` track (spec's `outline` knob measures 2.7-2.9:1 on it in
   // light) inside an `outline` ring; on, the `accent.on` knob on the `accent` track.
-  ...GROUNDS.map(
+  ...LABEL_GROUNDS.map(
     (over): ContrastPair => ({ bg: "fill.2", fg: "label.tertiary", over, target: "ui" }),
   ),
-  { fg: "accent.on", bg: "accent", target: "ui" },
   // A data bar on its `fill.4` track, on a card (Insights: "No project" is the slate stroke,
   // never `label.quaternary`, which is the disabled role).
   ...(["bg.cell", "bg.elevated"] as const).map(

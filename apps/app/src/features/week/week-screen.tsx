@@ -13,6 +13,7 @@ import { FirstSyncBody } from "#app/ui/empty-state.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenHeader } from "#app/ui/screen-header.tsx";
 import { Screen } from "#app/ui/screen.tsx";
+import { spacePress } from "#app/ui/space-press.ts";
 import { SplitPane } from "#app/ui/split-pane.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
@@ -52,6 +53,9 @@ const NightHoursToggle = () => {
     return <View className="h-hit-web w-hit-web" />;
   }
   const label = t("week.nightHours");
+  const toggle = (): void => {
+    void run(actions.setNightHours(!nightHours));
+  };
   return (
     <Tooltip label={label}>
       <Pressable
@@ -62,9 +66,8 @@ const NightHoursToggle = () => {
           "h-hit-web w-hit-web items-center justify-center rounded-md active:opacity-80",
           nightHours && "bg-accent-quiet",
         )}
-        onPress={() => {
-          void run(actions.setNightHours(!nightHours));
-        }}
+        onPress={toggle}
+        {...spacePress(toggle)}
       >
         <Moon
           color={nightHours ? palette["accent.text"] : palette["label.secondary"]}

@@ -40,8 +40,11 @@ script: Latin and Cyrillic, so Russian is drawn in Inter too, never in a fallbac
   unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
 
-/* Text fields draw their own focused state; the browser's black box is not part of the design. */
-input:focus,
+/*
+Text fields draw their own focused state; the browser's black box is not part of the design. The
+range slider is an input too, but it has no state of its own: it keeps the ring below.
+*/
+input:not([data-pace-slider]):focus,
 textarea:focus {
   outline: none;
 }

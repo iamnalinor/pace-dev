@@ -4,6 +4,8 @@ import { Pressable, Text, View } from "react-native";
 
 import { inkClass, outlineClass, type TagColor } from "./color.tsx";
 import { cx } from "./cx.ts";
+import { spacePress } from "./space-press.ts";
+import { useTheme } from "./theme-provider.tsx";
 
 /**
 Unselected: the cell inside a 2px outline (in the chip's hue, else the control outline). Selected: the
@@ -48,7 +50,8 @@ export const Chip = ({
   readonly color?: null | TagColor;
   /** Spoken instead of the visible text when the text alone is ambiguous. */
   readonly label?: string;
-  readonly leading?: ReactNode;
+  /** An icon drawn in the colour it is given: `accent.on` on a chosen chip, secondary off it. */
+  readonly leading?: (color: string) => ReactNode;
   readonly onPress: () => void;
   /** The pressable itself: for a group that moves focus between its chips, or for focus to be
   moved onto it when the control that held it goes away. */
@@ -58,31 +61,35 @@ export const Chip = ({
   readonly tabIndex?: -1 | 0;
   /** 40px: the time pills of the close sheet. */
   readonly tall?: boolean;
-}) => (
-  <Pressable
-    accessibilityLabel={label ?? children}
-    accessibilityRole="radio"
-    aria-checked={selected}
-    className={cx("justify-center active:opacity-80", tall ? "-my-1 h-hit" : "-my-2 h-hit")}
-    onPress={onPress}
-    ref={ref}
-    {...(tabIndex !== undefined && { tabIndex })}
-  >
-    <View
-      className={cx(
-        "flex-row items-center gap-2 rounded-pill px-3",
-        tall ? "h-10" : "h-8",
-        chipFill(color, selected),
-      )}
-      testID="chip-pill"
+}) => {
+  const { palette } = useTheme();
+  return (
+    <Pressable
+      accessibilityLabel={label ?? children}
+      accessibilityRole="radio"
+      aria-checked={selected}
+      className={cx("justify-center active:opacity-80", tall ? "-my-1 h-hit" : "-my-2 h-hit")}
+      onPress={onPress}
+      ref={ref}
+      {...(tabIndex !== undefined && { tabIndex })}
+      {...spacePress(onPress)}
     >
-      {leading}
-      <Text className={cx("font-sans text-caption font-normal", chipText(color, selected))}>
-        {children}
-      </Text>
-    </View>
-  </Pressable>
-);
+      <View
+        className={cx(
+          "flex-row items-center gap-2 rounded-pill px-3",
+          tall ? "h-10" : "h-8",
+          chipFill(color, selected),
+        )}
+        testID="chip-pill"
+      >
+        {leading?.(palette[selected ? "accent.on" : "label.secondary"])}
+        <Text className={cx("font-sans text-caption font-normal", chipText(color, selected))}>
+          {children}
+        </Text>
+      </View>
+    </Pressable>
+  );
+};
 
 /**
 A chip that does something rather than being picked ("Start from: Homework" opens a new preset):
@@ -98,7 +105,7 @@ export const ActionChip = ({
 }) => (
   <Pressable
     accessibilityRole="button"
-    className="-my-2 h-hit-web justify-center active:opacity-80"
+    className="-my-2 h-hit justify-center active:opacity-80"
     onPress={onPress}
   >
     <View className={cx("h-8 flex-row items-center rounded-pill px-3", chipFill(null, false))}>

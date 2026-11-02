@@ -2,6 +2,7 @@ import { Check } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
 import { cx } from "./cx.ts";
+import { spacePress } from "./space-press.ts";
 import { useTheme } from "./theme-provider.tsx";
 
 /** The round check of a task row: an outlined circle, filled once checked. */
@@ -28,6 +29,7 @@ export const CheckCircle = ({
       className="-m-3 h-12 w-12 items-center justify-center rounded-pill"
       disabled={onPress === undefined}
       onPress={onPress}
+      {...spacePress(onPress)}
     >
       <View
         className={cx(

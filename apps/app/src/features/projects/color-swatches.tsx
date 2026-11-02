@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import { useT } from "#app/app-state.tsx";
 import { fillClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { spacePress } from "#app/ui/space-press.ts";
 import { type ProjectColorName, ProjectColorSchema } from "@pace/core";
 
 /** The project colors as round swatches; each is a radio named after its color. */
@@ -37,6 +38,9 @@ export const ColorSwatches = ({
             onPress={() => {
               onChange(color);
             }}
+            {...spacePress(() => {
+              onChange(color);
+            })}
           >
             <View
               className={cx(

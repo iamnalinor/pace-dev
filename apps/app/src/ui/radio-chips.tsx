@@ -10,7 +10,8 @@ export type RadioChoice<T extends string> = {
   readonly text: string;
   /** Spoken instead of the text when the text alone is ambiguous (or empty). */
   readonly label?: string;
-  readonly leading?: ReactNode;
+  /** An icon, drawn in the colour the chip gives it (`accent.on` once chosen). */
+  readonly leading?: (color: string) => ReactNode;
   /** The chip's colour mark (a preset's, a project's, an importance's). */
   readonly color?: null | TagColor;
 };
@@ -85,7 +86,7 @@ export const RadioChips = <T extends string>({
           <Chip
             key={choice.value}
             {...(choice.color !== undefined && { color: choice.color })}
-            leading={choice.leading}
+            {...(choice.leading !== undefined && { leading: choice.leading })}
             onPress={() => {
               onChange(choice.value, "press");
             }}
