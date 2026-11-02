@@ -10,7 +10,7 @@ import {
 } from "react";
 import { Pressable, Text, View } from "react-native";
 
-import { clipText } from "@pace/core";
+import { clipText, clipWords } from "@pace/core";
 
 import { cx } from "./cx.ts";
 import { useIsWide } from "./layout.ts";
@@ -130,6 +130,15 @@ cut. The message is shown whole (UI text wraps, spec 4.1.2 rule 3): a clamp on t
 hid the end of the very sentence that explains a refused tap (QA round 18 R18-01).
 */
 export const toastQuote = (value: string): string => clipText(value, TOAST_QUOTE_GRAPHEMES);
+
+/** How much of a whole stored sentence (an action's summary) a toast shows: about two quotes. */
+export const TOAST_SENTENCE_GRAPHEMES = 2 * TOAST_QUOTE_GRAPHEMES;
+
+/** A whole sentence from data in a toast: cut at a word, never inside one. */
+export const toastSentence = (value: string): string => clipWords(value, TOAST_SENTENCE_GRAPHEMES);
+
+/** How the approval toast fits names and stored sentences (`approvalText`). */
+export const TOAST_FIT = { quote: toastQuote, sentence: toastSentence } as const;
 
 /**
 The toast's card: its words in full and the one action. `ToastBar` places and announces it; the

@@ -86,7 +86,7 @@ export {
   TimeZoneSchema,
 } from "./events/payloads.ts";
 export { mergeEvents, sortEvents } from "./events/sort.ts";
-export { capitalize, clipText, initials, splitGraphemes } from "./format/initials.ts";
+export { capitalize, clipText, clipWords, initials, splitGraphemes } from "./format/initials.ts";
 export { formatCount, formatNumber, formatPercent, type NumberOptions } from "./format/numbers.ts";
 export { en } from "./i18n/en.ts";
 export { EVENT_LABEL_KEYS } from "./i18n/event-labels.ts";

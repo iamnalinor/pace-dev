@@ -63,9 +63,9 @@ test("after Log out the network goes quiet: no request names the session, nothin
     },
   ]);
   expect(english.ok).toBe(true);
-  // Everything is recorded with the wall-clock time it began; the press is stamped on the page
-  // itself, so a poll that went out just before it is never counted as the sign-out's.
-  const asked: { readonly request: Request; readonly path: string }[] = [];
+  // Everything is recorded with the wall-clock time it was seen; the press is stamped on the page
+  // itself (same machine, same clock), so a poll that went out just before it is never counted.
+  const asked: { readonly at: number; readonly request: Request; readonly path: string }[] = [];
   const refused: { readonly at: number; readonly what: string }[] = [];
   const errors: { readonly at: number; readonly text: string }[] = [];
   const sockets: number[] = [];
@@ -74,7 +74,8 @@ test("after Log out the network goes quiet: no request names the session, nothin
     pending.add(request);
     const { pathname } = new URL(request.url());
     if (pathname.startsWith("/api/")) {
-      asked.push({ path: pathname, request });
+      // Stamped as it leaves: `timing()` stays empty for a request that never got an answer.
+      asked.push({ at: Date.now(), path: pathname, request });
     }
   });
   page.on("requestfinished", (request) => {
@@ -128,7 +129,12 @@ test("after Log out the network goes quiet: no request names the session, nothin
   );
   expect(pressedAt).toBeGreaterThan(0);
   const after = asked
-    .filter(({ request }) => request.timing().startTime >= pressedAt)
+    // The browser's own start time once answered; the stamp for one never answered (it then
+    // counts as the sign-out's: the check fails closed).
+    .filter(
+      ({ at, request }) =>
+        (request.timing().startTime > 0 ? request.timing().startTime : at) >= pressedAt,
+    )
     .map(({ path, request }) => ({
       auth: request.headers()["authorization"] ?? null,
       method: request.method(),

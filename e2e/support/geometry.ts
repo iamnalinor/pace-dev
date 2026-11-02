@@ -151,25 +151,35 @@ export const controlsUnder = async (
 
 /** How long a control's box must hold still before it is clicked. */
 const SETTLED_MS = 120;
+/** How often the box is read while it is watched. */
+const SAMPLE_MS = 30;
 
 /**
-Clicks a control once its box has held still: the assistant's preview unfolds and its card
-scrolls into place after it shows, and under load Playwright's two-frame "stable" check can pass
-mid-move, so the press lands on the old spot and the release on another (no click). Seen in the
-full run as an Approve that did nothing (fix round 1 of QA 18, bug-lessons class 5).
+Clicks a control once it is wholly shown and its box has held still for `SETTLED_MS` (every read
+in that window found the same box; a read that differs starts the window again). The assistant's
+preview mounts inside the composer card while the card is still growing to its height (220 ms,
+slower under load), so Approve is half clipped at first. Playwright's click scrolls a clipped
+target into view: it scrolled the card's clipping box, pressed at that spot, and the box scrolled
+back as it grew, so the release missed (no click). Seen in the full run as an Approve that did
+nothing (fix rounds 1 and 2 of QA 18, bug-lessons class 5).
 */
 export const clickWhenSettled = async (control: Locator): Promise<void> => {
+  // Wholly inside its clipping boxes and the viewport: the click then has nothing to scroll.
+  await expect(control).toBeInViewport({ ratio: 1 });
   const boxOf = async (): Promise<string> => JSON.stringify(await control.boundingBox());
-  let last = await boxOf();
+  const since = { at: Date.now(), box: await boxOf() };
   await expect
     .poll(
       async () => {
-        const now = await boxOf();
-        const isStill = now === last && now !== "null";
-        last = now;
-        return isStill;
+        const box = await boxOf();
+        if (box !== since.box) {
+          since.box = box;
+          since.at = Date.now();
+          return false;
+        }
+        return box !== "null" && Date.now() - since.at >= SETTLED_MS;
       },
-      { intervals: [SETTLED_MS] },
+      { intervals: [SAMPLE_MS] },
     )
     .toBe(true);
   await control.click();

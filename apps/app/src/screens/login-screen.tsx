@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { useStore } from "zustand";
 
+import { SESSION_CHANGED } from "@pace/client";
+
 import { useAuth, useT } from "../app-state.tsx";
 import { ServerLine } from "../features/server/server-line.tsx";
 import { serverStore, useServerInfo } from "../platform/server-store.ts";
@@ -99,7 +101,8 @@ export const LoginScreen = () => {
         return;
       }
       const result = await auth.adoptToken(token);
-      setIsWebFailed(!result.ok);
+      // A newer session or a Log out meanwhile is no failed sign-in (fix round 2 of QA 18).
+      setIsWebFailed(!result.ok && result.error !== SESSION_CHANGED);
     },
     [auth],
   );

@@ -107,6 +107,45 @@ test.describe("motion and overlays at one width", () => {
     await expect(taskForm(page)).toBeVisible();
   });
 
+  test("the assistant's preview unfolds without the card scrolling under the finger (fix round 2 of QA 18)", async ({
+    page,
+  }) => {
+    await loginViaApi(page);
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.goto("/");
+    const line = page.getByRole("textbox", { name: "New task" });
+    await line.pressSequentially("Pay the rent");
+    // A slow phone, where the unfold lags the content it reveals (seen in the full run's load).
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    // Every frame of the unfold: how far any box around the line has been scrolled. The card
+    // clips while it grows, and a box that clips must never scroll: Approve would move away
+    // from the finger and back (the press lands, the release misses).
+    const sampled = page.evaluate(
+      async (span) =>
+        await new Promise<number>((resolve) => {
+          const field = globalThis.document.querySelector('[aria-label="New task"]');
+          const started = performance.now();
+          let most = 0;
+          const frame = (): void => {
+            for (let box = field?.parentElement ?? null; box !== null; box = box.parentElement) {
+              most = Math.max(most, box.scrollTop);
+            }
+            if (performance.now() - started < span) {
+              globalThis.requestAnimationFrame(frame);
+            } else {
+              resolve(most);
+            }
+          };
+          globalThis.requestAnimationFrame(frame);
+        }),
+      1500,
+    );
+    await line.press("Enter");
+    await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+    expect(await sampled).toBe(0);
+  });
+
   test("the greyed Calendar button's tooltip covers no other control (bug class 6)", async ({
     page,
   }) => {

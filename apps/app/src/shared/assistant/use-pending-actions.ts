@@ -13,7 +13,7 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { readingIssue } from "#app/shared/assistant/reading-issue.ts";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
-import { toastQuote } from "#app/ui/toast.tsx";
+import { TOAST_FIT } from "#app/ui/toast.tsx";
 import { type Actions, approvalText, type Assistant, type Unread, unreadOf } from "@pace/client";
 
 /** Earlier turns a request may carry (`ParseRequestSchema.thread`). */
@@ -196,7 +196,7 @@ const useApprove = ({
       const done = approvalText(
         pending.actions,
         { language, now, state: state.store.getState() },
-        toastQuote,
+        TOAST_FIT,
       );
       const isSuccess = await run(
         Promise.resolve(result),

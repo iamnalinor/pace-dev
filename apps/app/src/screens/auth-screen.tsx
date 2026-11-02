@@ -2,6 +2,8 @@ import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
+import { SESSION_CHANGED } from "@pace/client";
+
 import { useAuth, useT } from "../app-state.tsx";
 import { isPresent } from "../platform/strings.ts";
 import { Button } from "../ui/button.tsx";
@@ -29,6 +31,10 @@ export const AuthScreen = () => {
       }
       if (result.ok) {
         router.replace("/");
+      } else if (result.error === SESSION_CHANGED) {
+        // The device moved on while the link was checked (a newer sign-in, a Log out): nothing
+        // was wrong with the link, so it settles where the device now is, without a word.
+        router.replace(auth.store.getState().status === "signed-in" ? "/" : "/login");
       } else {
         setIsFailed(true);
       }

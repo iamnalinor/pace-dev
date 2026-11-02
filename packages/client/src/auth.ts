@@ -115,8 +115,11 @@ export type Auth = {
   readonly isSessionStored: () => Promise<boolean>;
 };
 
-/** A session check whose token is no longer the one in use when it is answered. */
-const SESSION_CHANGED = "session/changed";
+/**
+A session check whose token is no longer the one in use when it is answered: nothing was wrong
+with that token; the device moved on (a Log out, a newer login) while it was on its way.
+*/
+export const SESSION_CHANGED = "session/changed";
 
 const errorCode = (error: unknown): string => (error instanceof ApiError ? error.code : "network");
 

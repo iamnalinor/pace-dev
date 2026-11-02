@@ -63,6 +63,25 @@ export const clipText = (text: string, max: number): string => {
   return `${kept.trimEnd()}…`;
 };
 
+/**
+`clipText` for a sentence: cut at the last word boundary within `max` graphemes (a word is never
+split unless it alone is longer than the limit), its end replaced by `…`.
+*/
+export const clipWords = (text: string, max: number): string => {
+  const clipped = clipText(text, max);
+  if (clipped === text) {
+    return text;
+  }
+  const kept = clipped.slice(0, -1);
+  // The cut fell between two words already: the last kept word is whole.
+  const next = splitGraphemes(text)[splitGraphemes(kept).length] ?? "";
+  if (/^\s/u.test(next)) {
+    return `${kept.trimEnd()}…`;
+  }
+  const boundary = kept.search(/\s\S*$/u);
+  return boundary > 0 ? `${kept.slice(0, boundary).trimEnd()}…` : clipped;
+};
+
 /** From U+1F000 on lie the emoji planes (the fallback's idea of a pictograph). */
 const FIRST_EMOJI_PLANE_POINT = 0x1_f0_00;
 

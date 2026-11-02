@@ -1,7 +1,7 @@
 import * as fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { capitalize, clipText, initials, splitGraphemes } from "./initials.ts";
+import { capitalize, clipText, clipWords, initials, splitGraphemes } from "./initials.ts";
 
 const FOX = "\u{1F98A}";
 
@@ -223,6 +223,27 @@ describe("clipText", () => {
         return (
           isWellFormed(clipped) && splitGraphemes(clipped).length <= max && !/\s…$/u.test(clipped)
         );
+      }),
+    );
+  });
+});
+
+describe("clipWords", () => {
+  it("cuts a sentence at a word boundary, never inside a word", () => {
+    expect(clipWords("The assistant will create the quarterly report", 30)).toBe(
+      "The assistant will create the…",
+    );
+    expect(clipWords("The assistant will create", 40)).toBe("The assistant will create");
+    // One word longer than the limit is cut inside it: there is no boundary to keep.
+    expect(clipWords("Междисциплинарная", 8)).toBe("Междисц…");
+  });
+
+  it("stays within the limit and leaves no space before the ellipsis", () => {
+    expect(clipWords("a b", 1)).toBe("…");
+    fc.assert(
+      fc.property(fc.string({ unit: "grapheme" }), fc.integer({ max: 40, min: 1 }), (text, max) => {
+        const clipped = clipWords(text, max);
+        return splitGraphemes(clipped).length <= max && !/\s…$/u.test(clipped);
       }),
     );
   });
