@@ -1,3 +1,5 @@
+import type { WebSocketRoute } from "@playwright/test";
+
 import { formByHand, nowTasks, taskForm } from "./support/composer.ts";
 import { expect, expectNoA11yViolations, test } from "./support/fixtures.ts";
 import { API_URL, loginViaApi } from "./support/login.ts";
@@ -78,4 +80,39 @@ test("offline, a line says so; a task written meanwhile goes out on reconnect an
   await expect(line).toHaveCount(0);
   // It reached the server: the server's own log holds it (a reload would read IndexedDB, review m6).
   await expect.poll(async () => await serverTitles(token)).toContain("Buy stamps offline");
+});
+
+test("a server gone while the tab sits idle: the line says offline without a write, and clears once it is back (QA 18 M4)", async ({
+  page,
+}) => {
+  await loginViaApi(page);
+  // The server's reachability as the page sees it: its socket and every API call.
+  const server = { isDown: false };
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/api\/sync\/live/u, async (socket) => {
+    if (server.isDown) {
+      await socket.close();
+      return;
+    }
+    socket.connectToServer();
+    sockets.push(socket);
+  });
+  await page.route(/\/api\//u, async (route) => {
+    await (server.isDown ? route.abort("connectionrefused") : route.fallback());
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
+  const line = page.getByRole("status").filter({ hasText: "You are offline" });
+  await expect.poll(() => sockets.length).toBeGreaterThan(0);
+  await expect(line).toHaveCount(0);
+
+  server.isDown = true;
+  for (const socket of sockets.splice(0)) {
+    await socket.close();
+  }
+  // Nothing written: the dropped socket alone has the app look, well before the 30 s poll.
+  await expect(line).toBeVisible({ timeout: 5000 });
+
+  server.isDown = false;
+  await expect(line).toHaveCount(0, { timeout: 20_000 });
 });

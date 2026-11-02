@@ -6,6 +6,7 @@ import type { EventStore } from "./event-store.ts";
 import type { AppStateHandle } from "./state.ts";
 
 import { ApiError } from "./api-client.ts";
+import { createSerial, createTimer } from "./sync-timing.ts";
 import { isUnreachable, type PullPage, type SyncTransport } from "./sync-transport.ts";
 import { SYNC_SCHEMA_VERSION, upgradeCursor } from "./sync-version.ts";
 
@@ -23,7 +24,8 @@ export type SyncClient = {
   readonly status: StoreApi<SyncStatus>;
   /**
   Pull since the cursor (confirming the server store's id), push the outbox, then pull what
-  the push made. Concurrent calls share one run.
+  the push made. Runs never overlap: a call made while one is under way gets the run after it
+  (shared by every call made meanwhile), so what was written before the call goes out.
   */
   readonly syncNow: () => Promise<Result<SyncSummary, string>>;
   /** Runs now, then every `intervalMs`; failures retry with exponential backoff (1s..60s). */
@@ -243,51 +245,6 @@ const runSync = async (
 const backoffMs = (failures: number): number =>
   Math.min(BACKOFF_MIN_MS * 2 ** (failures - 1), BACKOFF_MAX_MS);
 
-/** One pending run at a time: when it is due, and moving it earlier or later. */
-const createTimer = (run: () => void) => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let dueAt: number | undefined;
-  const cancel = (): void => {
-    clearTimeout(timer);
-    timer = undefined;
-    dueAt = undefined;
-  };
-  return {
-    cancel,
-    /** Replaces the pending run with one in `delayMs`. */
-    in: (delayMs: number): void => {
-      cancel();
-      dueAt = Date.now() + delayMs;
-      timer = setTimeout(() => {
-        timer = undefined;
-        dueAt = undefined;
-        run();
-      }, delayMs);
-    },
-    /** Whether a run is already due within `delayMs`. */
-    isDueWithin: (delayMs: number): boolean => dueAt !== undefined && dueAt <= Date.now() + delayMs,
-  };
-};
-
-/** Runs tasks one after another, each after the previous one settled. */
-const createSerial = () => {
-  let tail: Promise<unknown> = Promise.resolve();
-  return async <T>(task: () => Promise<T>): Promise<T> => {
-    const previous = tail;
-    // `new Promise`, not `Promise.withResolvers`: Hermes (Android) may lack the ES2024 call.
-    let release: ((value: null) => void) | undefined;
-    tail = new Promise<null>((resolve) => {
-      release = resolve;
-    });
-    try {
-      await previous;
-      return await task();
-    } finally {
-      release?.(null);
-    }
-  };
-};
-
 /**
 Runs at most one sync at a time; a second caller shares the run in flight. A live page waits for
 the run in flight, so the two never move the cursor at once.
@@ -295,7 +252,27 @@ the run in flight, so the two never move the cursor at once.
 const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
   const serial = createSerial();
   let inFlight: Promise<Result<SyncSummary, string>> | undefined;
+  /** The one run that follows the run in flight, shared by every call made meanwhile. */
+  let next: Promise<Result<SyncSummary, string>> | undefined;
   let failures = 0;
+  const run = async (): Promise<Result<SyncSummary, string>> => {
+    // Syncing from the call on, even while a live page is still being applied.
+    status.setState({ syncing: true });
+    inFlight = serial(async () => await runSync(deps, status));
+    try {
+      const result = await inFlight;
+      failures = result.ok ? 0 : failures + 1;
+      return result;
+    } finally {
+      inFlight = undefined;
+    }
+  };
+  /** After the run in flight has settled (each settles to a result: `runSync` catches). */
+  const after = async (current: Promise<unknown>): Promise<Result<SyncSummary, string>> => {
+    await current;
+    next = undefined;
+    return await run();
+  };
   return {
     failures: (): number => failures,
     /** Applies a live page that fits; true when a pull is needed instead. */
@@ -309,20 +286,18 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
         }
         return fit === "pull";
       }),
+    /**
+    A run that reads the outbox and the server after the call. The run in flight may have read
+    them already, so a call made meanwhile is not joined to it: it gets the run that follows,
+    one for every call made meanwhile (E1: a task written while a push hung on a socket gone
+    quiet joined that run and waited for the next interval).
+    */
     syncNow: async (): Promise<Result<SyncSummary, string>> => {
-      if (inFlight !== undefined) {
-        return await inFlight;
+      if (inFlight === undefined) {
+        return await run();
       }
-      // Syncing from the call on, even while a live page is still being applied.
-      status.setState({ syncing: true });
-      inFlight = serial(async () => await runSync(deps, status));
-      try {
-        const result = await inFlight;
-        failures = result.ok ? 0 : failures + 1;
-        return result;
-      } finally {
-        inFlight = undefined;
-      }
+      next ??= after(inFlight);
+      return await next;
     },
   };
 };

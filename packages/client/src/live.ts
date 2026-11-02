@@ -11,6 +11,7 @@ import {
 } from "@pace/core";
 
 import { createRequests, LiveUnavailable } from "./live-requests.ts";
+import { createTimers, type LiveTimers, retryDelay } from "./live-timers.ts";
 
 type SocketEvent = "close" | "message" | "open";
 
@@ -58,21 +59,15 @@ export type LiveChannelOptions = {
   the app checks its session.
   */
   readonly onSessionEnded?: () => void;
+  /**
+  A connected socket went (closed by the network or the server, or gone quiet), not stopped: the
+  app checks whether the server can still be reached, so a stale screen is told it is stale (QA
+  round 18 M4). Once per connection: the failed reconnects after it do not repeat it.
+  */
+  readonly onDropped?: () => void;
   /** Defaults to the global `WebSocket`; tests pass a fake. */
   readonly createSocket?: (url: string, protocols: readonly string[]) => SocketLike;
 };
-
-/** Often enough that no proxy closes an idle socket; the server answers without waking. */
-const PING_MS = 45_000;
-
-/**
-A ping whose "pong" has not come by then means the socket went quiet (a network switch leaves it
-half-open, reading as connected): it is dropped and reconnected, instead of waiting for the safety
-poll minutes later (QA round 16 L1). The server's auto-response answers without waking it.
-*/
-export const PONG_WAIT_MS = 10_000;
-const RETRY_MIN_MS = 1000;
-const RETRY_MAX_MS = 60_000;
 
 /**
 The socket's address next to the API's: `https` becomes `wss`; the device and this build's
@@ -100,51 +95,6 @@ const parseMessage = (data: unknown): null | { readonly type?: unknown } => {
   } catch {
     return null;
   }
-};
-
-/** A dropped socket comes back after 1 s, 2 s, 4 s, … at most a minute. */
-const retryDelay = (failures: number): number =>
-  Math.min(RETRY_MIN_MS * 2 ** (failures - 1), RETRY_MAX_MS);
-
-/**
-The keep-alive (a ping, then its pong in time or `onQuiet`) and the pending reconnect. `onQuiet`
-hears how many sockets in a row went quiet without a pong, so a slow link or a proxy that drops
-text frames backs off instead of reconnecting every minute (fix round 1); a pong resets it.
-*/
-const createTimers = () => {
-  let ping: ReturnType<typeof setInterval> | undefined;
-  let pong: ReturnType<typeof setTimeout> | undefined;
-  let retry: ReturnType<typeof setTimeout> | undefined;
-  let quietStreak = 0;
-  return {
-    clear: (): void => {
-      clearInterval(ping);
-      clearTimeout(pong);
-      clearTimeout(retry);
-      ping = undefined;
-      pong = undefined;
-      retry = undefined;
-    },
-    keepAlive: (socket: SocketLike, onQuiet: (streak: number) => void): void => {
-      ping = setInterval(() => {
-        clearTimeout(pong);
-        pong = setTimeout(() => {
-          quietStreak += 1;
-          onQuiet(quietStreak);
-        }, PONG_WAIT_MS);
-        socket.send("ping");
-      }, PING_MS);
-    },
-    /** The pong came: the line is alive. */
-    ponged: (): void => {
-      clearTimeout(pong);
-      pong = undefined;
-      quietStreak = 0;
-    },
-    retryIn: (delayMs: number, connect: () => void): void => {
-      retry = setTimeout(connect, delayMs);
-    },
-  };
 };
 
 type Handlers = {
@@ -320,6 +270,41 @@ second. Every reconnect (to catch up on what was missed) and every v1 `changed` 
 on v2 the socket also carries requests (`request`: push and pull, answered by id) and brings new
 events as they land (`onEvents`). Polling and HTTP stay as the fallback while it is down.
 */
+/** Whether the channel should be connected, and how many reconnects in a row have failed. */
+type Run = { failures: number; isRunning: boolean };
+
+/**
+The socket is gone: its requests fail, and it comes back unless its session ended. A connected
+socket that went while running is said to `onDropped`.
+*/
+const whenClosed = (
+  code: unknown,
+  channel: {
+    readonly connect: () => void;
+    readonly line: Line;
+    readonly options: LiveChannelOptions;
+    readonly run: Run;
+    readonly status: StoreApi<LiveStatus>;
+    readonly timers: LiveTimers;
+  },
+): void => {
+  const { connect, line, options, run, status, timers } = channel;
+  const wasConnected = status.getState().isConnected;
+  line.drop();
+  timers.clear();
+  status.setState({ isConnected: false });
+  if (code === LIVE_SESSION_ENDED && run.isRunning) {
+    run.isRunning = false;
+    options.onSessionEnded?.();
+  } else if (run.isRunning) {
+    run.failures += 1;
+    timers.retryIn(retryDelay(run.failures), connect);
+    if (wasConnected) {
+      options.onDropped?.();
+    }
+  }
+};
+
 export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const createSocket = options.createSocket ?? globalSocket;
   const status = createStore<LiveStatus>(() => ({ isConnected: false }));
@@ -328,34 +313,23 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
   const line = createLine(() => {
     closed(undefined);
   });
-  let failures = 0;
-  let isRunning = false;
-  /** The socket is gone: its requests fail, and it comes back unless its session ended. */
+  const run: Run = { failures: 0, isRunning: false };
   const closed = (code: unknown): void => {
-    line.drop();
-    timers.clear();
-    status.setState({ isConnected: false });
-    if (isRunning && code === LIVE_SESSION_ENDED) {
-      isRunning = false;
-      options.onSessionEnded?.();
-    } else if (isRunning) {
-      failures += 1;
-      timers.retryIn(retryDelay(failures), connect);
-    }
+    whenClosed(code, { connect, line, options, run, status, timers });
   };
   function connect(): void {
     const token = options.token();
-    if (createSocket === undefined || token === undefined || !isRunning) {
+    if (createSocket === undefined || token === undefined || !run.isRunning) {
       return;
     }
     const url = liveUrl(options.baseUrl, options.deviceId);
     const socket = createSocket(url, [LIVE_V2, LIVE_V1, `pace.auth.${token}`]);
     line.use(socket);
     const opened = (): void => {
-      failures = 0;
+      run.failures = 0;
       timers.keepAlive(socket, (streak) => {
         // Each fresh socket that goes quiet again waits longer (`createTimers`).
-        failures = line.current() === socket ? streak - 1 : failures;
+        run.failures = line.current() === socket ? streak - 1 : run.failures;
         line.goneQuiet(socket);
       });
       status.setState({ isConnected: true });
@@ -368,15 +342,15 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     isV2: line.isV2,
     request: line.request,
     start: () => {
-      if (isRunning) {
+      if (run.isRunning) {
         return;
       }
-      isRunning = true;
+      run.isRunning = true;
       connect();
     },
     status,
     stop: () => {
-      isRunning = false;
+      run.isRunning = false;
       const socket = line.current();
       // Its requests fail and v2 ends with it, before it closes.
       closed(undefined);

@@ -10,7 +10,8 @@ import {
 
 import { fakeSockets, say } from "./fake-socket.fake.ts";
 import { LiveUnavailable } from "./live-requests.ts";
-import { createLiveChannel, liveUrl, PONG_WAIT_MS } from "./live.ts";
+import { PONG_WAIT_MS } from "./live-timers.ts";
+import { createLiveChannel, liveUrl } from "./live.ts";
 
 describe("liveUrl", () => {
   it("turns the API's address into the socket's, with the device and the app's protocol", () => {
@@ -231,6 +232,39 @@ describe("createLiveChannel", () => {
     live.start();
     expect(sockets.made).toHaveLength(2);
     live.stop();
+  });
+
+  it("says a connected socket dropped once, not for its failed reconnects, a stop or a session end (QA 18 M4)", () => {
+    const sockets = fakeSockets();
+    const onDropped = vi.fn();
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: sockets.create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      onDropped,
+      token: () => "tok",
+    });
+    live.start();
+    sockets.made[0]?.open();
+    sockets.made[0]?.drop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // The reconnects fail without ever opening: nothing more.
+    vi.advanceTimersByTime(1000);
+    sockets.made[1]?.drop();
+    vi.advanceTimersByTime(2000);
+    sockets.made[2]?.drop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // A stop of a connected socket (a hidden tab, a log-out) is no drop.
+    vi.advanceTimersByTime(4000);
+    sockets.made[3]?.open();
+    live.stop();
+    expect(onDropped).toHaveBeenCalledTimes(1);
+    // Nor is the server ending the session.
+    live.start();
+    sockets.made[4]?.open();
+    sockets.made[4]?.drop(LIVE_SESSION_ENDED);
+    expect(onDropped).toHaveBeenCalledTimes(1);
   });
 
   it("waits for a token instead of opening without one", () => {

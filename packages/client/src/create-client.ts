@@ -119,6 +119,7 @@ const liveChannelOf = (
   options: PaceClientOptions,
   wiring: {
     readonly onChange: () => void;
+    readonly onDropped: () => void;
     readonly onEvents: (page: LiveEventsPage) => void;
     readonly onMessage: (message: unknown) => void;
     readonly onSessionEnded: () => void;
@@ -130,6 +131,7 @@ const liveChannelOf = (
     ...(options.createSocket !== undefined && { createSocket: options.createSocket }),
     deviceId: options.deviceId,
     onChange: wiring.onChange,
+    onDropped: wiring.onDropped,
     onEvents: wiring.onEvents,
     onMessage: wiring.onMessage,
     onSessionEnded: wiring.onSessionEnded,
@@ -188,6 +190,11 @@ const liveAndSync = (
   const wired: { sync?: SyncClient } = {};
   const live: LiveChannel = liveChannelOf(options, {
     onChange: () => {
+      wired.sync?.soon();
+    },
+    // The socket went: a run finds out at once whether the server is still there (the offline
+    // line), instead of at the next safety poll; its failures keep the sync's own backoff.
+    onDropped: () => {
       wired.sync?.soon();
     },
     onEvents: (page) => {
