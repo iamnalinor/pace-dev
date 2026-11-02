@@ -79,11 +79,20 @@ for (const [width, height] of [
     for (const path of ["/", `/task/${openTaskId}`]) {
       await page.goto(path);
       await expect(page.getByRole("heading").first()).toBeVisible();
+      // Judged once the screen has settled: no first-sync cover or grey rows still drawing over
+      // its own controls (bug class 20), which the pill check would read as covered by the pill.
+      await expect(
+        page.getByRole("progressbar", { name: /^(?:Syncing your data|Loading your data…)$/u }),
+      ).toHaveCount(0);
       await context.setOffline(true);
       await expect(line).toBeVisible();
-      const header = await coveredHeaderControls(page);
-      expect(header.count).toBeGreaterThan(0);
-      expect(header.covered).toEqual([]);
+      // Polled: going offline redraws Now's line (its assistant button), and a control caught
+      // mid-redraw reads as covered. The pill does not move, so a pill that covers a control
+      // keeps covering it and still fails here.
+      await expect
+        .poll(async () => await coveredHeaderControls(page), { timeout: 5000 })
+        .toEqual(expect.objectContaining({ covered: [] }));
+      expect((await coveredHeaderControls(page)).count).toBeGreaterThan(0);
       await expectNoA11yViolations(page);
       retries.push(await line.getByRole("button", { name: "Retry" }).boundingBox());
       await context.setOffline(false);
