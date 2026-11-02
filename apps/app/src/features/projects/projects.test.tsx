@@ -2,9 +2,19 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { ProjectScreen } from "#app/screens/project-screen.tsx";
 import { ProjectsScreen } from "#app/screens/projects-screen.tsx";
+import { isControl } from "#app/test/focus-target.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { ALGEBRA_ID } from "@pace/core/testing";
+
+/** Where focus was moved, as the form asked the platform (bug class 5). */
+const mockMoveFocus = jest.fn<undefined, [unknown, string | undefined]>();
+jest.mock("#app/platform/move-focus.ts", (): unknown => ({
+  isFocusLost: () => true,
+  moveFocus: (target: unknown, say?: string) => {
+    mockMoveFocus(target, say);
+  },
+}));
 
 describe("project forms", () => {
   it("creates a project, refusing a name already taken", async () => {
@@ -31,6 +41,16 @@ describe("project forms", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       en("actionError.project/name-required"),
     );
+  });
+
+  it("gives focus back to New project when its form closes (QA round 18 L9)", async () => {
+    await renderScreen(<ProjectsScreen />, await createTestRuntime());
+    await fireEvent.press(screen.getByRole("button", { name: en("projects.new") }));
+    mockMoveFocus.mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
+    const [back] = mockMoveFocus.mock.calls[0] ?? [];
+    const opener = screen.getByRole("button", { name: en("projects.new") });
+    expect(isControl(back, opener)).toBe(true);
   });
 
   it("renames a project and archives it from its page", async () => {

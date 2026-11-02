@@ -28,7 +28,7 @@ export const enNotify = {
   "notify.kind.login": "Sign-ins",
   "notify.kind.deadline_digest": "Deadline digest",
   "notify.kind.event_start": "Event starting",
-  "notify.kind.activity_overrun": "Still doing…?",
+  "notify.kind.activity_overrun": "Activity check",
   "notify.channel.telegram": "Telegram",
   "notify.channel.app": "Phone",
   "notify.channel.web": "Web",

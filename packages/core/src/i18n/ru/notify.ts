@@ -30,7 +30,7 @@ export const ruNotify: { readonly [K in keyof typeof enNotify]: string } = {
   "notify.kind.login": "Входы",
   "notify.kind.deadline_digest": "Сводка сроков",
   "notify.kind.event_start": "Начало события",
-  "notify.kind.activity_overrun": "Всё ещё…?",
+  "notify.kind.activity_overrun": "Проверка занятия",
   "notify.channel.telegram": "Telegram",
   "notify.channel.app": "Телефон",
   "notify.channel.web": "Веб",

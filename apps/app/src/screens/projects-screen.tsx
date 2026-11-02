@@ -7,17 +7,23 @@ import { usePace, useT } from "#app/app-state.tsx";
 import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { inkClass, washClass } from "#app/ui/color.tsx";
+import { useConfirmFocus } from "#app/ui/confirm-focus.ts";
 import { cx } from "#app/ui/cx.ts";
 import { EmptyState } from "#app/ui/empty-state.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { openTasksLabel } from "@pace/client";
 
-/** "+ New project": a name and a color, created on the spot. */
+/**
+"+ New project": a name and a color, created on the spot. The form takes the button's place, so
+when it closes (cancelled or created) focus goes back to the button, not to the top of the page
+(QA round 18 L9).
+*/
 const NewProject = () => {
   const t = useT();
   const { actions } = usePace();
   const { palette } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const focus = useConfirmFocus();
   if (!isOpen) {
     return (
       <Pressable
@@ -26,24 +32,27 @@ const NewProject = () => {
         onPress={() => {
           setIsOpen(true);
         }}
+        ref={focus.openerRef()}
       >
         <Plus color={palette.fg} size={16} />
         <Text className="font-sans text-[14px] text-fg">{t("projects.new")}</Text>
       </Pressable>
     );
   }
+  const close = (): void => {
+    focus.toOpener();
+    setIsOpen(false);
+  };
   return (
     <View className="mb-3">
       <ProjectForm
         initial={{ color: "blue", name: "" }}
         isNameFocused
-        onCancel={() => {
-          setIsOpen(false);
-        }}
+        onCancel={close}
         onSave={async (values) => {
           const result = await actions.createProject(values);
           if (result.ok) {
-            setIsOpen(false);
+            close();
           }
           return result;
         }}

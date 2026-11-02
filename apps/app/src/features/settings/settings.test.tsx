@@ -156,6 +156,12 @@ describe("SettingsScreen", () => {
     expect(digestOnWeb).toBeChecked();
   });
 
+  it("names each kind of notification as a setting, not as its question (QA round 18 L12)", async () => {
+    await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
+    expect(screen.getByRole("switch", { name: "Activity check: Telegram" })).toBeOnTheScreen();
+    expect(screen.queryAllByRole("switch", { name: /\?/u })).toEqual([]);
+  });
+
   it("picks how this phone shows notifications from what the server offers, and says which it uses", async () => {
     fakeNotifications.state.granted = true;
     fakeNotifications.state.pushToken = "fcm-token";
