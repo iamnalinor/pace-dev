@@ -5,7 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import type * as PhoneMemory from "#app/platform/phone-memory.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
-import { seriesRules, setSeriesRule } from "#app/platform/phone-memory.ts";
+import { removeSeriesRule, seriesRules, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -309,6 +309,84 @@ describe("Day with the phone's data", () => {
     expect(await seriesRules()).toEqual([
       { rule: "attended", series: "cal-1:Standup", title: "Standup" },
     ]);
+  });
+
+  it("shows a series again once its skip rule, given here, is removed in Permissions", async () => {
+    const daily = { frequency: "daily" };
+    const gym = (id: string, start: string, end: string) => ({
+      allDay: false,
+      calendarId: "cal-1",
+      endDate: utcAt(end),
+      id,
+      recurrenceRule: daily,
+      startDate: utcAt(start),
+      title: "Gym",
+    });
+    calendar.state.events = [
+      gym("gym-a", "05:00:00", "06:00:00"),
+      gym("gym-b", "09:00:00", "10:00:00"),
+    ];
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
+    });
+    await renderScreen(<DayScreen />, runtime);
+    const list = await screen.findByLabelText("From your calendar");
+    const [first] = within(list).getAllByRole("button", { name: "Skip" });
+    if (first !== undefined) {
+      await fireEvent.press(first);
+    }
+    await fireEvent.press(await screen.findByRole("button", { name: "Every time" }));
+    await waitFor(async () => {
+      expect(await seriesRules()).toEqual([{ rule: "skip", series: "cal-1:Gym", title: "Gym" }]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Gym")).toBeNull();
+    });
+    // Settings → Permissions forgets the rule while Day stays mounted behind it.
+    await act(async () => {
+      await removeSeriesRule("cal-1:Gym");
+    });
+    // The waved-away occurrence stays away; the other one is asked about again.
+    await waitFor(() => {
+      expect(screen.getAllByText("Gym")).toHaveLength(1);
+    });
+  });
+
+  it("stops logging a series by itself once its attended rule, given here, is removed", async () => {
+    const daily = { frequency: "daily" };
+    const standup = (id: string, start: string, end: string) => ({
+      allDay: false,
+      calendarId: "cal-1",
+      endDate: utcAt(end),
+      id,
+      recurrenceRule: daily,
+      startDate: utcAt(start),
+      title: "Standup",
+    });
+    calendar.state.events = [standup("standup-a", "07:00:00", "07:15:00")];
+    const runtime = await createTestRuntime();
+    await renderScreen(<DayScreen />, runtime);
+    const list = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(list).getByRole("button", { name: "Attended" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Every time" }));
+    await waitFor(async () => {
+      expect(await seriesRules()).toHaveLength(1);
+    });
+    await act(async () => {
+      await removeSeriesRule("cal-1:Standup");
+    });
+    // Another occurrence has ended meanwhile: with the rule gone, it waits to be asked about.
+    calendar.state.events = [
+      standup("standup-a", "07:00:00", "07:15:00"),
+      standup("standup-b", "08:00:00", "08:15:00"),
+    ];
+    await act(async () => {
+      await removeSeriesRule("cal-1:Nothing");
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText("Standup").length).toBeGreaterThanOrEqual(2);
+    });
+    expect(activities(runtime).map((activity) => activity.label)).toEqual(["Standup"]);
   });
 
   it("logs an always-attended series by itself and hides an always-skipped one", async () => {

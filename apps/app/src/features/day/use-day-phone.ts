@@ -141,10 +141,13 @@ export const useDayPhone = (day: DayModel, now: string): DayPhone => {
   // A new day, the minute tick or a change to what the phone remembers changes the answer.
   const memory = usePhoneMemoryVersion();
   const loadLatest = useLatestLoad(setLoaded);
-  const reload = useCallback(() => {
-    loadLatest(async () => await load({ date, zone }, now));
+  const readNow = useCallback(async () => {
+    await loadLatest(async () => await load({ date, zone }, now));
   }, [loadLatest, date, zone, now]);
-  const answered = usePhoneAnswers(reload);
+  const reload = useCallback(() => {
+    void readNow();
+  }, [readNow]);
+  const answered = usePhoneAnswers(readNow, memory);
   useEffect(() => {
     reload();
     const subscription = AppState.addEventListener("change", (next) => {

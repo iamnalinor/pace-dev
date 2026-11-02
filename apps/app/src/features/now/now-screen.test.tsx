@@ -6,7 +6,7 @@ import type * as PhoneMemory from "#app/platform/phone-memory.ts";
 import type { FakeCalendar } from "#app/testing/calendar.fake.ts";
 import type { FakeSecureStore } from "#app/testing/secure-store.fake.ts";
 
-import { setSeriesRule } from "#app/platform/phone-memory.ts";
+import { removeSeriesRule, setSeriesRule } from "#app/platform/phone-memory.ts";
 import { heldRoute } from "#app/test/held-route.ts";
 import { controlsInsideControls } from "#app/test/nested-controls.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
@@ -48,6 +48,9 @@ jest.mock("#app/platform/phone-memory.ts", (): unknown => {
 });
 
 const calendar = Calendar as unknown as FakeCalendar;
+
+/** A key of the phone's memory of waved-away calendar events. */
+const isDismissal = (key: string): boolean => key.startsWith("pace.phone.dismissed");
 
 /** Where focus went, as Now asked the platform (bug class 5). */
 const mockMoveFocus = jest.fn<undefined, [unknown]>();
@@ -592,6 +595,33 @@ describe("NowBoard", () => {
     } finally {
       mockDismissHold.current = null;
     }
+  });
+
+  it("lets the phone's memory decide once a skip's write landed, not what was answered here", async () => {
+    seminarSoon();
+    const runtime = await createTestRuntime({
+      routes: { "POST /api/calendar/skip": () => ({ ok: true }) },
+    });
+    await renderScreen(<Board />, runtime);
+    const card = await screen.findByLabelText("From your calendar");
+    await fireEvent.press(within(card).getByRole("button", { name: "Skip" }));
+    const secure = (SecureStore as unknown as FakeSecureStore).values;
+    const isStored = () => secure.keys().some((key) => isDismissal(key));
+    await waitFor(() => {
+      expect(isStored()).toBe(true);
+    });
+    expect(screen.queryByLabelText("From your calendar")).toBeNull();
+    // The phone forgets the dismissal (another account's memory, a cleared phone) and says so:
+    // the read wins over the answer once that answer was written.
+    for (const key of secure.keys()) {
+      if (isDismissal(key)) {
+        secure.delete(key);
+      }
+    }
+    await act(async () => {
+      await removeSeriesRule("cal-1:Nothing");
+    });
+    expect(await screen.findByLabelText("From your calendar")).toBeOnTheScreen();
   });
 
   it("skips a calendar event on every channel, and hides it once that went through", async () => {
