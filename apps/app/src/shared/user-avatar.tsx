@@ -2,7 +2,7 @@ import { User } from "lucide-react-native";
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
-import { useAuth } from "#app/app-state.tsx";
+import { useAuth, useLanguage } from "#app/app-state.tsx";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { initials } from "@pace/core";
 
@@ -10,9 +10,10 @@ import { initials } from "@pace/core";
 export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
   const { user } = useAuth();
   const { palette } = useTheme();
+  const language = useLanguage();
   const [failedUrl, setFailedUrl] = useState<null | string>(null);
   const photoUrl = user?.photoUrl ?? null;
-  const letters = initials(user?.name ?? "");
+  const letters = initials(user?.name ?? "", language);
   return photoUrl !== null && failedUrl !== photoUrl ? (
     <Image
       accessibilityLabel={user?.name}

@@ -1,5 +1,5 @@
 import * as fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { capitalize, initials, splitGraphemes } from "./initials.ts";
 
@@ -113,5 +113,80 @@ describe("capitalize", () => {
   it("cuts by grapheme: a leading emoji or accented letter stays whole", () => {
     expect(capitalize("\u{1F98A} fox", "en")).toBe("\u{1F98A} fox");
     expect(capitalize("e\u{301}cole", "fr")).toBe("E\u{301}cole");
+  });
+});
+
+describe("initials after upper-casing", () => {
+  it("keeps one grapheme per initial: ß upper-cases to SS and shows S", () => {
+    expect(initials("\u{DF} a")).toBe("SA");
+    expect(initials("a \u{DF}")).toBe("AS");
+  });
+
+  it("maps case by the language when one is given", () => {
+    expect(initials("istanbul izmir", "ru")).toBe("II");
+    expect(initials("\u{131}stanbul", "en")).toBe("I");
+  });
+
+  it("stays within two graphemes for names full of ß and ligatures", () => {
+    const odd = fc.constantFrom("\u{DF}", "\u{1C6}", "\u{149}", "\u{FB03}", " ", "a", "\u{1F98A}");
+    fc.assert(
+      fc.property(fc.array(odd, { maxLength: 12 }), (parts) => {
+        const result = initials(parts.join(""));
+        expect(splitGraphemes(result).length).toBeLessThanOrEqual(2);
+        expect(isWellFormed(result)).toBe(true);
+      }),
+      { numRuns: 300 },
+    );
+  });
+});
+
+describe("without regular-expression property escapes", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  /** An engine that rejects \p{...}: building such a pattern throws. */
+  const rejected = vi.fn();
+  const rejectProperties = () => {
+    rejected.mockClear();
+    vi.stubGlobal(
+      "RegExp",
+      new Proxy(RegExp, {
+        construct: (target, args: [string, string?]) => {
+          if (args[0].includes(String.raw`\p{`)) {
+            rejected();
+            throw new SyntaxError("Invalid property name");
+          }
+          return Reflect.construct(target, args);
+        },
+      }),
+    );
+  };
+
+  it("still loads @pace/core and returns whole characters", async () => {
+    rejectProperties();
+    vi.resetModules();
+    const core = await import("../core.ts");
+    expect(core.initials("Albert Nalinor")).toBe("AN");
+    expect(core.initials(`${FOX} \u{410}\u{43B}\u{44C}\u{431}\u{435}\u{440}\u{442}`)).toBe(FOX);
+    expect(core.initials("\u{D83E} broken")).toBe("B");
+    expect(core.initials("123")).toBe("");
+    // The patterns are built on first use, so the engine's refusal was really met.
+    expect(rejected).toHaveBeenCalled();
+  });
+
+  it("splits by code point and never leaves half an emoji", async () => {
+    rejectProperties();
+    vi.resetModules();
+    const { initials: fresh, splitGraphemes: split } = await import("./initials.ts");
+    expect(split(`a${FOX}`)).toEqual(["a", FOX]);
+    fc.assert(
+      fc.property(fc.string({ unit: "binary" }), (name) => {
+        expect(isWellFormed(fresh(name))).toBe(true);
+      }),
+      { numRuns: 200 },
+    );
+    expect(rejected).toHaveBeenCalled();
   });
 });
