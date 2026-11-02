@@ -9,6 +9,7 @@ import { ComposerProvider, useComposerFlow } from "#app/features/now/composer/co
 import { ComposerPane } from "#app/features/now/composer/composer-pane.tsx";
 import { NowBoard } from "#app/features/now/now-screen.tsx";
 import { TaskScreen } from "#app/features/task/task-screen.tsx";
+import { forgetLineDraft, noteLineDraft } from "#app/platform/shared-in.ts";
 import { TaskOpenerProvider, TaskPaneProvider } from "#app/shared/task-opener.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 
@@ -89,20 +90,41 @@ const NowSplit = ({
   );
 };
 
+/** Tells the share target what Now's line holds as it is typed (QA round 19 L4). */
+const LineDraftNote = () => {
+  const { text } = useComposerFlow();
+  useEffect(() => {
+    noteLineDraft(text);
+    return () => {
+      forgetLineDraft(text);
+    };
+  }, [text]);
+  return null;
+};
+
 /**
 Now on a phone; on a wide window the list with the picked task (or the task form) beside it.
-`compose` is a share (or New task, when its text is empty) arriving on /add; the composer is
-keyed by its arrival, so each share fills the line, the same text again included.
+`compose` is a share arriving on /add (or handed on to "/"); the composer is keyed by its arrival,
+so each share fills the line, the same text again included.
 */
-export const NowScreen = ({ compose }: { readonly compose?: SharedIn | undefined }) => {
+export const NowScreen = ({
+  compose,
+  notesLineDraft = false,
+  opensForm = false,
+}: {
+  readonly compose?: SharedIn | undefined;
+  /** Now at "/": its line tells the share target what it holds, to add a share after it. */
+  readonly notesLineDraft?: boolean;
+  /** New task arriving on /add: the empty form opens at once. */
+  readonly opensForm?: boolean;
+}) => {
   const router = useRouter();
   const isWide = useIsWide();
   const [picked, setPicked] = useState<null | Picked>(null);
-  const composeText = compose?.text;
   const isComposerFocused = compose !== undefined;
   return (
     <ComposerProvider
-      initialText={composeText}
+      initialText={compose?.text}
       isFormInPane={isWide}
       key={compose === undefined ? "now" : `share-${compose.seq}`}
       onCreatedTask={(taskId) => {
@@ -112,8 +134,9 @@ export const NowScreen = ({ compose }: { readonly compose?: SharedIn | undefined
           router.push(`/task/${taskId}`);
         }
       }}
-      opensForm={composeText === ""}
+      opensForm={opensForm}
     >
+      {notesLineDraft ? <LineDraftNote /> : null}
       {isWide ? (
         <NowSplit isComposerFocused={isComposerFocused} onPick={setPicked} picked={picked} />
       ) : (

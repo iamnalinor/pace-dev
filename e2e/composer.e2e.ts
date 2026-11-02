@@ -113,6 +113,19 @@ for (const [width, height, size] of [
   });
 }
 
+test("a blank share lands on Now at / with the line focused, like the others (QA 19 L4)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await loginViaApi(page);
+  await page.goto("/add?text=%20%20%20");
+  const line = page.getByRole("textbox", { name: "New task" });
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+  await expect(line).toBeFocused();
+  await expect(line).toHaveValue("");
+  await expect(page.getByRole("form", { name: "New task" })).toHaveCount(0);
+});
+
 test("a title typed into the empty form is added on Enter", async ({ page }) => {
   await loginViaApi(page);
   await page.goto("/");

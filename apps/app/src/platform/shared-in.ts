@@ -1,7 +1,7 @@
 import { useShareIntentContext } from "expo-share-intent";
 import { useEffect, useState } from "react";
 
-import { type SharedIn, sharedLine } from "./shared-line.ts";
+import { type ArrivingShare, type SharedIn, sharedLine } from "./shared-line.ts";
 
 /**
 What another app shared into Pace (Android's share sheet), as one composer line.
@@ -13,7 +13,7 @@ does not fill the line with a share already added (the web's rule, review m11; s
 makes a new `shareIntent` for each share, and each one counts up `seq`, which the composer is
 keyed by, so the same text shared again fills the line again (round-4 review R2).
 */
-export const useSharedIn = (): SharedIn => {
+export const useSharedIn = (): ArrivingShare => {
   const { resetShareIntent, shareIntent } = useShareIntentContext();
   const shared = sharedLine([shareIntent.text, shareIntent.webUrl]);
   const [taken, setTaken] = useState({
@@ -29,7 +29,7 @@ export const useSharedIn = (): SharedIn => {
       resetShareIntent();
     }
   }, [resetShareIntent, shared]);
-  return { seq: taken.seq, text: taken.text };
+  return { isNewTask: taken.text === "", seq: taken.seq, text: taken.text };
 };
 
 /**
@@ -38,3 +38,7 @@ tab itself (`useSharedIn`), so Now gets none.
 */
 // eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- the same hook as the web's, which does call hooks
 export const useHandedShare = (): SharedIn | undefined => undefined;
+
+/** On a phone the share lands on the Add tab, apart from Now's line: nothing to add it after. */
+export const noteLineDraft = (_text: string): void => undefined;
+export const forgetLineDraft = (_text: string): void => undefined;

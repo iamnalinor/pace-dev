@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { type SharedIn, sharedLine } from "./shared-line.ts";
+import { type ArrivingShare, type SharedIn, sharedLine } from "./shared-line.ts";
 
 /** A query value as one string (the router hands a repeated key over as a list). */
 const first = (value: readonly string[] | string | undefined): string | undefined =>
@@ -13,8 +13,33 @@ has it. Kept for the page's life, not in a screen: the share target and Now are 
 */
 const handoff = {
   arrivals: 0,
+  /** What Now's line holds as typed, so a share is added after it (QA round 19 L4). */
+  draft: "",
   listeners: new Set<() => void>(),
   waiting: null as null | SharedIn,
+};
+
+/**
+Now's line tells what it holds as it is typed: a share arriving in the same page goes on a new
+line after it instead of replacing it (QA round 19 L4). `forget` from a line that goes away
+clears it, unless another line has noted its own since.
+*/
+export const noteLineDraft = (text: string): void => {
+  handoff.draft = text;
+};
+
+export const forgetLineDraft = (text: string): void => {
+  if (handoff.draft === text) {
+    handoff.draft = "";
+  }
+};
+
+/** The shared text after what was typed, on a line of its own. */
+const afterTyped = (typed: string, shared: string): string => {
+  if (typed.trim() === "") {
+    return shared;
+  }
+  return shared === "" ? typed : `${typed.trimEnd()}\n${shared}`;
 };
 
 const hand = (text: string): void => {
@@ -40,23 +65,26 @@ window opens Now and never fills the line again, so a second Enter cannot add th
 (review m11), and no empty New task form opens on a reload (QA round 18 L2). Until it is handed
 on, the line shows it here; without a share, /add is New task (an empty line).
 */
-export const useSharedIn = (): SharedIn => {
+export const useSharedIn = (): ArrivingShare => {
   const router = useRouter();
   const { text, title, url } = useLocalSearchParams<{
     text?: string | string[];
     title?: string | string[];
     url?: string | string[];
   }>();
+  // A share is any of its keys in the address, blank ones too (QA round 19 L4: `/add?text=%20`
+  // stayed on a dead address); a bare /add is New task.
+  const isShare = [text, title, url].some((value) => value !== undefined);
   const shared = sharedLine([first(title), first(text), first(url)]);
   useEffect(() => {
-    if (shared === "") {
+    if (!isShare) {
       return;
     }
 
-    hand(shared);
+    hand(afterTyped(handoff.draft, shared));
     router.replace("/");
-  }, [router, shared]);
-  return { seq: 0, text: shared };
+  }, [isShare, router, shared]);
+  return { isNewTask: !isShare, seq: 0, text: shared };
 };
 
 /**

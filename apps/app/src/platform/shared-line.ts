@@ -19,3 +19,6 @@ A share as the Add tab takes it: the line's text and which arrival it is (`seq` 
 each share, so the composer, keyed by it, fills again even with the same text).
 */
 export type SharedIn = { readonly seq: number; readonly text: string };
+
+/** What the Add tab (the share target) hands Now: the share, or New task when there is none. */
+export type ArrivingShare = SharedIn & { readonly isNewTask: boolean };

@@ -3,5 +3,6 @@ import { NowScreen } from "#app/screens/now-screen.tsx";
 
 /** The Add tab and the share target: Now with the shared text already in the composer. */
 export default function AddRoute() {
-  return <NowScreen compose={useSharedIn()} />;
+  const shared = useSharedIn();
+  return <NowScreen compose={shared} opensForm={shared.isNewTask} />;
 }

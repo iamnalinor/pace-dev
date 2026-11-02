@@ -19,6 +19,8 @@ import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
 /** What the line needs from the composer's flow. */
 type LineFlow = {
   readonly text: string;
+  /** The form open beside or over the line, if any. */
+  readonly form: unknown;
   /** Grows each time the cursor should come back to the line. */
   readonly lineFocus: number;
   readonly type: (next: string) => void;
@@ -128,26 +130,26 @@ const LineButton = ({
 };
 
 /**
-A line opened with a share in it takes the cursor once it can be seen (QA round 18 L2: the Enter
-pressed next went nowhere). `autoFocus` fires at mount, while a fresh browser's first-sync cover
-still hides the app, and a hidden field takes no focus; so the line is focused again when the
-cover lifts, once, and only for the text it opened with (an empty /add opens New task's form,
-whose title has the cursor).
+A line opened with a share takes the cursor once it can be seen (QA round 18 L2: the Enter pressed
+next went nowhere), a blank share included (QA round 19 L4). `autoFocus` fires at mount, while a
+fresh browser's first-sync cover still hides the app, and a hidden field takes no focus; so the
+line is focused again when the cover lifts, once, and only when it opened on the line (an empty
+/add opens New task's form, whose title has the cursor).
 */
 const useShareFocus = (
   inputRef: RefObject<null | TextInput>,
-  { isFocused, text }: { readonly isFocused: boolean; readonly text: string },
+  { isFocused, isOnLine }: { readonly isFocused: boolean; readonly isOnLine: boolean },
 ): void => {
   const isCovered = useIsFirstSync();
-  const [opensWithText] = useState(() => text.trim() !== "");
+  const [opensOnLine] = useState(isOnLine);
   const isDoneRef = useRef(false);
   useEffect(() => {
-    if (!isFocused || !opensWithText || isCovered || isDoneRef.current) {
+    if (!isFocused || !opensOnLine || isCovered || isDoneRef.current) {
       return;
     }
     isDoneRef.current = true;
     inputRef.current?.focus();
-  }, [inputRef, isCovered, isFocused, opensWithText]);
+  }, [inputRef, isCovered, isFocused, opensOnLine]);
 };
 
 /** The text itself: grows with a pasted message, takes Enter and Alt+Enter as its own. */
@@ -174,7 +176,7 @@ const LineInput = ({
       inputRef.current?.focus();
     }
   }, [flow.lineFocus]);
-  useShareFocus(inputRef, { isFocused, text: flow.text });
+  useShareFocus(inputRef, { isFocused, isOnLine: flow.form === null });
   return (
     <TextInput
       accessibilityLabel={t("composer.label")}
