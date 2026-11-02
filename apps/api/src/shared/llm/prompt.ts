@@ -30,6 +30,7 @@ export const DOMAIN_LINES: Readonly<Record<RequestDomain, string>> = {
 const RULES = `You read one message from the owner of a personal task and time tracker and answer with JSON: what to do with it.
 Rules:
 - actions: usually one; several only when the message asks for several. kind is one of ${ACTION_KINDS.join(", ")}.
+- Every action has every key: null (or [] for a list) where it does not apply.
 - Existing items only by their alias from the lists below (task: "t3", activity: "a2"); never invent one. A delete also copies the item's title, as listed, into quote.
 - title: a short name (at most 60 characters) in the message's language, e.g. "ДЗ по алгебре: №290–534" for a pasted homework. Never translate it.
 - Copy every other string (project, description, subtask labels) verbatim from the message. Never translate, fix or rephrase it.

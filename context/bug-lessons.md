@@ -641,6 +641,25 @@ The same rule applies when a previously successful channel is no longer configur
   `contrast.test.ts`, measured where it is weakest (the low point of an animation, the lighter of
   the backgrounds it sits on). Placeholders: 1.5:1 at the dim of their breath (`PLACEHOLDER_DIM`).
 
+### 85. An outside checker holds an answer to the letter of our schema, and its refusal reads as an outage
+- **Bug.** The LLM regression run of 2026-11-02 (`bun test:llm`): slot 3's endpoint answered "Generated
+  JSON does not match the expected schema … missing properties: 'outcome', 'label', 'start', 'end',
+  'expectMinutes'". Our schema already lists every key as required and nullable (strict mode takes
+  it); the endpoint runs that model best-effort, checks the answer itself and refuses it, and its
+  model had left out the activity keys of a task's action, which mean "does not apply". The refusal
+  was counted as a failed provider (`llm/unavailable`), and our own check would have refused the same
+  answer for the same missing keys.
+- **Missed because.** Every fake answer is built with `blankModelAction`, so every key is always
+  there; no fake ever played an endpoint that checks the answer itself, and the refusal arrives as a
+  stream error chunk with no status, which the code sorted with the outages.
+- **Rule.** An answer is read as leniently as its meaning allows, by one check for every way it
+  arrives (`answerCheck` in `llm.ts`): keys left out that mean "does not apply" are filled (null, or
+  an empty list; `fillAbsent`) before the strict check. An outside checker's refusal that carries the
+  payload (`failed_generation`, or what was streamed) goes through our own check before it counts as
+  a failure, and when it fails ours too it is an answer out of shape, never a provider down. What we
+  send is pinned against the strictest mode we may meet (every object's properties all `required`,
+  `additionalProperties: false`). Test doubles copy the real endpoint's refusal, body and chunk.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -889,3 +908,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 19 L6: the web's Calendar picker, with nothing on, offered "Calendar from the phone" and a paragraph about Android's settings, on a build that has no phone calendar | 10 (a control that does nothing useful on one platform) | yes: the picker's other phone-only parts (the permissions row) were already gated on the phone; the Day screen's calendar section and the usage hint are phone-only; the Calendar button's greyed tooltips name no platform | `noEventsKey` per platform in the `calendar-source` stand-ins (web: "Nothing on in your calendar right now."), the web setup row and its two strings gone; a web unit test of the stand-in and an e2e of the web picker (no phone calendar, no Android) |
 | 2026-11-02 | QA round 19 L7: Presets' "Start from" row drew Homework as chosen before anything was: the actions were radio chips with a remembered value ("hw") | 72 (a control's look says what it does: actions drawn as a choice, one of them as already made) | yes: the other chip rows are real choices with a value the form keeps (project filter, the close sheet's times and precision, give-up outcomes, the preset form's fields); "Start from" was the only row of actions | `ActionChip` (a button in the unselected look); the presets test finds no radio in the row and opens the new preset from a button |
 | 2026-11-02 | Found by this round's full e2e run (and reproduced 4 of 4 on the base commit 8e84369 here, so not new): the route sweep failed "/no-such-page: sidebar missing" (once also /decisions): after a reload the first-sync cover hides the app while the device's copy is read, and the sweep's "text stopped changing" poll could settle on the cover's own words and count no sidebar | 20 (a test judges the screen before what it waits for has reached it: here the cover, which is stable text too) | yes: the tooltip sweep, the other one that reloads route after route, already waits for every progressbar to go before it looks; the overlay sweep loads once and moves in the app | the sweep waits for the cover's progressbar to go before it settles; 12/12 runs of both sweeps on this round's build, 4/4 desktop on the base build |
+| 2026-11-02 | LLM regression run 41423290212: slot 3's endpoint refused its own model's answer on its schema check (the model left out a task action's activity keys), and the read counted it as the provider failing; the diagnosis to check was "our schema keeps those keys optional", but the schema sent already requires every key (nullable) | 85 (new) | yes: only one schema goes to models (`ModelOutputSchema` through `runStructured`); every way an answer arrives now goes through `answerCheck` (the stream's output, the refusal's `failed_generation`, the text streamed before a refusal); the prompt says every action keeps every key; the rate-limit and refused-key reading moved with the rest of the failure sorting into `failure.ts`, where a schema refusal is told apart from an outage | `llm.test.ts`: an answer with those five keys left out is kept with them null; a refusal carrying the answer in its body and one after streaming it are both read; a refused answer that fails our check too is `llm/invalid-output`, not `llm/unavailable` (all RED); a guard over the schema actually sent: every object's properties all required, no others (green: the schema was already strict-mode valid); the fake model plays the endpoint's refusal as copied from the run |

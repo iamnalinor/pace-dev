@@ -14,14 +14,20 @@ import {
 } from "@pace/core";
 
 import { askReply } from "./fake-ask.ts";
-import { failureOf, FINISH, sleep } from "./fake-call.ts";
+import { failureOf, FINISH, SCHEMA_REFUSAL, sleep } from "./fake-call.ts";
 import { DOMAIN_LINES } from "./prompt.ts";
 
-/** What a scripted model does with a message: answer it, be rate limited, or refuse its key. */
+/**
+What a scripted model does with a message: answer it, be rate limited, refuse its key, be down
+(a 5xx with no retry hint), or have its endpoint refuse the answer it generated on the
+endpoint's own schema check: in the error's body (`failed_generation`), or after streaming it.
+*/
 export type FakeReply =
   | ModelOutput
   | { readonly rateLimitedFor: number }
-  | { readonly refusedWith: 401 | 403 };
+  | { readonly refusedWith: 401 | 403 }
+  | { readonly schemaRefused: unknown; readonly via: "body" | "stream" }
+  | { readonly unavailableWith: 500 | 502 | 503 | 504 };
 
 const USAGE = {
   inputTokens: { cacheRead: undefined, cacheWrite: undefined, noCache: undefined, total: 100 },
@@ -53,6 +59,38 @@ export type FakeModelOptions = {
   readonly breaksMidStream?: boolean;
 };
 
+type StreamPart = Awaited<ReturnType<ModelObject["doStream"]>>["stream"];
+
+/**
+The answer as one text part; or its start and a dropped connection; or all of it and then the
+endpoint's refusal of it as a chunk (an endpoint that checks the whole answer at its end).
+*/
+const streamOf = (
+  text: string,
+  how: { readonly breaksMidStream: boolean; readonly isRefusedAfter: boolean },
+): StreamPart =>
+  new ReadableStream({
+    start: (controller) => {
+      controller.enqueue({ type: "stream-start", warnings: [] });
+      controller.enqueue({ id: "0", type: "text-start" });
+      if (how.breaksMidStream) {
+        controller.enqueue({ delta: text.slice(0, 10), id: "0", type: "text-delta" });
+        controller.enqueue({ error: new Error("connection reset"), type: "error" });
+        controller.close();
+        return;
+      }
+      controller.enqueue({ delta: text, id: "0", type: "text-delta" });
+      if (how.isRefusedAfter) {
+        controller.enqueue({ error: { ...SCHEMA_REFUSAL }, type: "error" });
+        controller.close();
+        return;
+      }
+      controller.enqueue({ id: "0", type: "text-end" });
+      controller.enqueue({ finishReason: FINISH, type: "finish", usage: USAGE });
+      controller.close();
+    },
+  });
+
 /**
 A model for tests and the e2e Worker (`LLM_PROVIDER=fake`): it never leaves the process.
 `reply` decides per message; a rate limit throws the 429 a real provider would. It streams
@@ -66,18 +104,23 @@ export const fakeParseModel = (
   const answerTo = async ({
     abortSignal,
     prompt,
-  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<string> => {
+  }: Parameters<ModelObject["doGenerate"]>[0]): Promise<{
+    readonly text: string;
+    readonly isRefusedAfter: boolean;
+  }> => {
     await sleep(firstTokenAfterMs, abortSignal);
     const answer = reply(messageOf(prompt), systemOf(prompt));
     const failure = failureOf(answer);
     if (failure !== null) {
       throw failure;
     }
-    return JSON.stringify(answer);
+    return "schemaRefused" in answer
+      ? { isRefusedAfter: true, text: JSON.stringify(answer.schemaRefused) }
+      : { isRefusedAfter: false, text: JSON.stringify(answer) };
   };
   const model: ModelObject = {
     doGenerate: async (call) => {
-      const text = await answerTo(call);
+      const { text } = await answerTo(call);
       return {
         content: [{ text, type: "text" }],
         finishReason: FINISH,
@@ -86,25 +129,8 @@ export const fakeParseModel = (
       };
     },
     doStream: async (call) => {
-      const text = await answerTo(call);
-      return {
-        stream: new ReadableStream({
-          start: (controller) => {
-            controller.enqueue({ type: "stream-start", warnings: [] });
-            controller.enqueue({ id: "0", type: "text-start" });
-            if (breaksMidStream) {
-              controller.enqueue({ delta: text.slice(0, 10), id: "0", type: "text-delta" });
-              controller.enqueue({ error: new Error("connection reset"), type: "error" });
-              controller.close();
-              return;
-            }
-            controller.enqueue({ delta: text, id: "0", type: "text-delta" });
-            controller.enqueue({ id: "0", type: "text-end" });
-            controller.enqueue({ finishReason: FINISH, type: "finish", usage: USAGE });
-            controller.close();
-          },
-        }),
-      };
+      const { isRefusedAfter, text } = await answerTo(call);
+      return { stream: streamOf(text, { breaksMidStream, isRefusedAfter }) };
     },
     modelId: "fake-parse",
     provider: "fake",
