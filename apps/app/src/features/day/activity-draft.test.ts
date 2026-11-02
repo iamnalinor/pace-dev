@@ -139,11 +139,37 @@ describe("readDraft on a block's real boundaries", () => {
     },
   );
 
-  it("moves a night's end to the evening after, 12 hours on", () => {
-    // 22:00–07:00 in Moscow, To retyped 19:00: the evening of the day it ended.
+  it.each([
+    // QA round 18 M3: a 21-hour block from a 9-hour night is refused, not adjusted on its end's day.
+    {
+      endAt: "2026-10-06T04:00:00.000Z",
+      name: "22:00–07:00 → 19:00",
+      startAt: "2026-10-05T19:00:00.000Z",
+      to: "19:00",
+    },
+    // Yesterday's 13-hour 08:00–21:00 → 07:00 would end the next morning, 23 hours on.
+    {
+      endAt: "2026-10-05T18:00:00.000Z",
+      name: "08:00–21:00 → 07:00",
+      startAt: "2026-10-05T05:00:00.000Z",
+      to: "07:00",
+    },
+  ])(
+    "refuses an end typed before the start that makes a day-long block: $name",
+    ({ endAt, startAt, to }) => {
+      const target = block(startAt, endAt);
+      expect(readDraft(opened(target, MOSCOW, { to }), target, MOSCOW)).toEqual({
+        faults: { ...NO_FAULTS, to: "day.badRange" },
+        range: null,
+      });
+    },
+  );
+
+  it("moves a night's end later the next morning while the block stays within 12 hours", () => {
+    // 22:00–07:00 in Moscow, To retyped 09:00: an 11-hour night.
     const target = block("2026-10-05T19:00:00.000Z", "2026-10-06T04:00:00.000Z");
-    expect(readDraft(opened(target, MOSCOW, { to: "19:00" }), target, MOSCOW).range?.endAt).toBe(
-      "2026-10-06T16:00:00.000Z",
+    expect(readDraft(opened(target, MOSCOW, { to: "09:00" }), target, MOSCOW).range?.endAt).toBe(
+      "2026-10-06T06:00:00.000Z",
     );
   });
 
@@ -207,14 +233,15 @@ describe("readDraft on an end moved later the same day", () => {
 });
 
 describe("readDraft on an end typed before the start of a block crossing midnight", () => {
-  // The guard for round-4 review R1's class: the end of a block that crosses midnight, retyped to a
-  // time earlier than the start's clock, is a reversed pair or lands at most 12 hours past the old
-  // end, never a day-long block. Nights of summer-time changes included.
+  // The guard for round-4 review R1's class (and QA round 18 M3's rule): the end of a block of at
+  // most 12 hours that crosses midnight, retyped to a time earlier than the start's clock, is a
+  // reversed pair or makes a block of at most 12 hours, never a day-long block. Nights of
+  // summer-time changes included.
   const zones = [MOSCOW, BERLIN, "America/New_York", "Asia/Kolkata", "Australia/Lord_Howe"];
   const days = ["2026-03-28", "2026-04-04", "2026-07-15", "2026-10-24", "2026-10-31"];
   const lengths = [60, 240, 540, 700].map((minutes) => minutes * 60_000);
   const startTimes = ["15:00", "20:30", "22:00", "23:30"];
-  const MAX_PAST_OLD_END_MS = 12 * 3_600_000;
+  const MAX_BLOCK_MS = 12 * 3_600_000;
 
   const blocks = zones.flatMap((zone) =>
     days.flatMap((date) =>
@@ -228,7 +255,7 @@ describe("readDraft on an end typed before the start of a block crossing midnigh
     ),
   );
 
-  it("reads every such time as a reversed pair or within 12 hours of the old end", () => {
+  it("reads every such time as a reversed pair or a block of at most 12 hours", () => {
     expect(blocks.length).toBeGreaterThan(100);
     const wrong = blocks.flatMap(({ target, zone }) =>
       TYPED.filter((to) => to < clockTime(target.startAt, zone))
@@ -242,7 +269,7 @@ describe("readDraft on an end typed before the start of a block crossing midnigh
           const endAt = read.range?.endAt;
           return endAt === undefined || endAt === null
             ? read.faults.to !== "day.badRange"
-            : Date.parse(endAt) - Date.parse(target.endAt ?? "") > MAX_PAST_OLD_END_MS;
+            : Date.parse(endAt) - Date.parse(target.startAt) > MAX_BLOCK_MS;
         }),
     );
     expect(wrong).toEqual([]);

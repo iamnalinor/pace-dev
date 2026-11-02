@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import { renderScreen } from "#app/test/render.tsx";
-import { createTestRuntime } from "#app/test/runtime.ts";
+import { createTestRuntime, type TestWorld } from "#app/test/runtime.ts";
 
 import { ActivitySheet } from "./activity-sheet.tsx";
 
@@ -250,13 +250,16 @@ const editSheet = async ({
   label = "Team chat",
   startAt = "2026-10-06T09:00:00.000Z",
   stored = label,
+  world,
 }: {
   startAt?: string;
   endAt?: string;
   label?: string;
   stored?: string;
+  /** The test world (its clock frozen at 6 Oct, 15:00 in Moscow unless it says otherwise). */
+  world?: TestWorld;
 } = {}) => {
-  const runtime = await createTestRuntime();
+  const runtime = await createTestRuntime(world);
   await runtime.actions.logPast({ category: "work", endAt, label: stored, startAt });
   const [activity] = Object.values(runtime.state.store.getState().time.activities);
   const before = runtime.state.store.getState().log.length;
@@ -366,6 +369,102 @@ describe("the sheet's day", () => {
     expect(screen.getByText("Sat · Oct 3 – Sun · Oct 4")).toBeOnTheScreen();
     await fireEvent.changeText(screen.getByLabelText("To"), "2350");
     expect(screen.getByText("Saturday · Oct 3")).toBeOnTheScreen();
+  });
+});
+
+describe("an end typed before the start's clock (QA round 18 M3)", () => {
+  // One rule: a reading of the end counts if it is after the start and on the start's day, or
+  // makes a block of at most 12 hours, or adjusts an already longer block on its old end's day.
+  // Anything else is refused in the same words, never a silent day-long block, never "still ahead".
+  // Each row: the block, the typed To, the world's clock (6 Oct, 15:00 unless set), and the
+  // subtitle shown once it reads (null: refused).
+  const REVERSED = "The end must be after the start.";
+  it.each([
+    {
+      endAt: "2026-10-04T23:00:00.000Z",
+      name: "22:00–02:00 → 21:00",
+      startAt: "2026-10-04T19:00:00.000Z",
+      subtitle: null,
+      to: "2100",
+      world: {},
+    },
+    {
+      endAt: "2026-10-04T21:30:00.000Z",
+      name: "23:30–00:30 → 23:00",
+      startAt: "2026-10-04T20:30:00.000Z",
+      subtitle: null,
+      to: "2300",
+      world: {},
+    },
+    // QA's (a): yesterday's 08:00–21:00 early the next morning: refused, not "still ahead".
+    {
+      endAt: "2026-10-05T18:00:00.000Z",
+      name: "yesterday 08:00–21:00 → 07:00",
+      startAt: "2026-10-05T05:00:00.000Z",
+      subtitle: null,
+      to: "0700",
+      world: { now: "2026-10-06T03:30:00.000Z" },
+    },
+    {
+      endAt: "2026-10-05T18:00:00.000Z",
+      name: "yesterday 08:00–21:00 → 07:00 later on",
+      startAt: "2026-10-05T05:00:00.000Z",
+      subtitle: null,
+      to: "0700",
+      world: {},
+    },
+    {
+      endAt: "2026-09-29T18:30:00.000Z",
+      name: "a week-old 08:00–21:30 → 07:00",
+      startAt: "2026-09-29T05:00:00.000Z",
+      subtitle: null,
+      to: "0700",
+      world: {},
+    },
+    {
+      endAt: "2026-10-05T04:00:00.000Z",
+      name: "22:00–07:00 → 19:00",
+      startAt: "2026-10-04T19:00:00.000Z",
+      subtitle: null,
+      to: "1900",
+      world: {},
+    },
+    {
+      endAt: "2026-10-04T20:00:00.000Z",
+      name: "22:00–23:00 → 01:00",
+      startAt: "2026-10-04T19:00:00.000Z",
+      subtitle: "Sun · Oct 4 – Mon · Oct 5",
+      to: "0100",
+      world: {},
+    },
+    {
+      endAt: "2026-10-05T04:00:00.000Z",
+      name: "22:00–07:00 → 09:00",
+      startAt: "2026-10-04T19:00:00.000Z",
+      subtitle: "Sun · Oct 4 – Mon · Oct 5",
+      to: "0900",
+      world: {},
+    },
+    {
+      endAt: "2026-10-04T04:00:00.000Z",
+      name: "Fri 20:00 – Sun 07:00 → 08:00",
+      startAt: "2026-10-02T17:00:00.000Z",
+      subtitle: "Fri · Oct 2 – Sun · Oct 4",
+      to: "0800",
+      world: {},
+    },
+  ])("$name", async ({ endAt, startAt, subtitle, to, world }) => {
+    const { saved } = await editSheet({ endAt, startAt, world });
+    await fireEvent.changeText(screen.getByLabelText("To"), to);
+    if (subtitle === null) {
+      await fireEvent.press(screen.getByRole("button", { name: "Save" }));
+      expect(await screen.findByText(REVERSED)).toBeOnTheScreen();
+      expect(screen.queryByText("That is still ahead: log what already happened.")).toBeNull();
+    } else {
+      // The subtitle follows the typed times while typing, before any save.
+      expect(screen.getByText(subtitle)).toBeOnTheScreen();
+      expect((await saved()).map((event) => event.type)).toEqual(["activity.adjusted"]);
+    }
   });
 });
 

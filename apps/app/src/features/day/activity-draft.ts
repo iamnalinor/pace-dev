@@ -36,45 +36,55 @@ const keptAt = (typed: string, atIso: null | string, zone: string): null | strin
   atIso !== null && typed === clockTime(atIso, zone) ? atIso : null;
 
 /**
-A retyped end of a block that has one: the instant with that wall clock nearest to where the
-block ended, on the day before, of or after it, among those after the start (QA round 17 review
-I1; round-3 review I-a: taking the nearest before checking the start sent 08:00–09:00 retyped to
-21:30 to the evening before). The sheet types clock times only, and a block's end may be a day or
-two after its start: a night, a timer left running. Reading it on the start's day cut a 30-hour
-block by a day without a word.
-
-On the typed start's own day an end moves later without limit. On any day after it, a reading
-later than the old end counts only within `MAX_OVERNIGHT_MS` of that end (round-4 review R1: the
-day the old end sits on was exempt, so 22:00–02:00 retyped to 21:00 became a 23-hour block). A
-time typed before the start's clock thus stays a reversed pair unless it lands at most 12 hours
-past the old end (22:00–07:00 → 19:00). Unlike `newEndOf`, which caps a new block's length from
-its start, this caps how far a retyped end moves from where the block ended. Moving an end
-earlier is never capped. With none fitting, the nearest reading not after the start, so the range
-check refuses it as reversed (with no start to meet, the nearest).
+A retyped end of a block that has one: among the instants with that wall clock on the day before,
+of or after where the block ended, the nearest to that end that is after the (typed) start and
+one of (QA round 18 M3, one rule for every end):
+- on the start's own day: an end moves later that day without limit (round-3 review I-a);
+- making a block of at most `MAX_OVERNIGHT_MS`, measured from the start, as `newEndOf` does for a
+  new block: a short night (22:00–23:00 → 01:00, 22:00–07:00 → 09:00);
+- on the old end's day when the block as it was (its stored start, not the typed one) was already
+  longer than that: a night or a timer left running is adjusted on the day it ended (Fri 20:00 –
+  Sun 07:00 → Sun 08:00; QA round 17 review I1: reading it on the start's day cut a 30-hour block
+  by a day without a word).
+Anything else is a reversed pair, refused in the same words wherever it comes from: an end typed
+before the start's clock never becomes a silent day-long block (round-4 review R1: 22:00–02:00 →
+21:00 saved 23 hours; QA round 18 M3: a week-old 08:00–21:30 → 07:00 did too, and yesterday's
+08:00–21:00 → 07:00 early the next morning was called "still ahead"). The start itself stands
+for that refusal. With no start to meet, the nearest: the start's own fault is said.
 */
 const movedEndOf = (
   typed: string,
-  { endAt, startAt }: { readonly endAt: string; readonly startAt: null | string },
+  {
+    endAt,
+    startAt,
+    wasStartAt,
+  }: { readonly endAt: string; readonly startAt: null | string; readonly wasStartAt: string },
   zone: string,
 ): null | string => {
   const was = Date.parse(endAt);
-  const startDate = startAt === null ? null : wallClock(startAt, zone).date;
   const nearest = [-1, 0, 1]
     .map((days) => wallClock(addDaysIn(endAt, days, zone), zone).date)
     .map((date) => ({ atIso: fromWallClock({ date, time: typed, tz: zone }), date }))
     .filter((read): read is { atIso: string; date: string } => read.atIso !== null)
     .toSorted((a, b) => Math.abs(Date.parse(a.atIso) - was) - Math.abs(Date.parse(b.atIso) - was));
+  if (startAt === null) {
+    return nearest[0]?.atIso ?? null;
+  }
+  if (nearest.length === 0) {
+    return null;
+  }
+  const start = Date.parse(startAt);
+  const startDate = wallClock(startAt, zone).date;
+  const endDate = wallClock(endAt, zone).date;
+  const wasLong = was - Date.parse(wasStartAt) > MAX_OVERNIGHT_MS;
   const fits = nearest.find(
     ({ atIso, date }) =>
-      startAt !== null &&
-      startDate !== null &&
-      Date.parse(atIso) > Date.parse(startAt) &&
-      (date <= startDate || Date.parse(atIso) - was <= MAX_OVERNIGHT_MS),
+      Date.parse(atIso) > start &&
+      (date === startDate ||
+        Date.parse(atIso) - start <= MAX_OVERNIGHT_MS ||
+        (wasLong && date === endDate)),
   );
-  const reversed = nearest.find(
-    ({ atIso }) => startAt !== null && Date.parse(atIso) <= Date.parse(startAt),
-  );
-  return (fits ?? reversed ?? nearest[0])?.atIso ?? null;
+  return fits?.atIso ?? startAt;
 };
 
 /**
@@ -93,7 +103,7 @@ const endFrom = (
   }
   const read =
     target.kind === "edit" && target.endAt !== null
-      ? movedEndOf(typed, { endAt: target.endAt, startAt }, zone)
+      ? movedEndOf(typed, { endAt: target.endAt, startAt, wasStartAt: target.startAt }, zone)
       : fromWallClock({ date: wallClock(target.startAt, zone).date, time: typed, tz: zone });
   return read ?? undefined;
 };
