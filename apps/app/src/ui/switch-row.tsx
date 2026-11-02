@@ -18,18 +18,10 @@ export const PaceSwitch = ({
   const webKnob = { activeThumbColor: palette.accentQuietFg };
   return (
     <View>
-      <Switch
-        accessibilityLabel={label}
-        onValueChange={onChange}
-        style={SWITCH_STYLE}
-        thumbColor={isOn ? palette.accentQuietFg : palette.surface}
-        trackColor={{ false: palette.muted, true: palette.accentQuiet }}
-        value={isOn}
-        {...webKnob}
-      />
       {SWITCH_REACH_PX === null ? null : (
-        // Over the switch and reaching past it: a press anywhere on it flips the switch. The
-        // switch itself stays the control for the keyboard and screen readers.
+        // Behind the switch and reaching past it: a press just above or below it flips the
+        // switch too, while a press on the switch reaches the switch itself (drawn after, so on
+        // top). The switch stays the control for the keyboard and screen readers.
         <Pressable
           aria-hidden
           className="absolute left-0 right-0"
@@ -41,6 +33,15 @@ export const PaceSwitch = ({
           testID="switch-reach"
         />
       )}
+      <Switch
+        accessibilityLabel={label}
+        onValueChange={onChange}
+        style={SWITCH_STYLE}
+        thumbColor={isOn ? palette.accentQuietFg : palette.surface}
+        trackColor={{ false: palette.muted, true: palette.accentQuiet }}
+        value={isOn}
+        {...webKnob}
+      />
     </View>
   );
 };
