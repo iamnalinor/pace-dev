@@ -14,12 +14,13 @@ import {
 } from "@pace/core";
 
 import type { DecisionEntry } from "../shared/contract.ts";
-import type { Cooldowns, ParseProvider } from "../shared/llm/llm.ts";
+import type { HealthMemory } from "../shared/llm/health-store.ts";
+import type { Cooldowns } from "../shared/llm/llm.ts";
 
 import { loadConfig } from "../shared/config.ts";
 import { inboxBody } from "../shared/inbox.ts";
 import { parseProviders } from "../shared/llm/providers.ts";
-import { readMessage } from "../shared/llm/read.ts";
+import { type Models, readMessage } from "../shared/llm/read.ts";
 import { wasTelegramMessageSent } from "../shared/telegram-api.ts";
 import { taskUrl } from "../shared/web-links.ts";
 import { armEarliest } from "./alarm.ts";
@@ -169,12 +170,12 @@ export const drainOne = async (
   world: {
     readonly state: CoreState;
     readonly now: string;
-    readonly providers: readonly ParseProvider[];
+    readonly models: Models;
     readonly cooldowns: Cooldowns;
   },
 ): Promise<{ readonly drained: Drained; readonly limited: Cooldowns }> => {
-  const { cooldowns, now, providers, state } = world;
-  const answer = await readMessage(providers, item.text, {
+  const { cooldowns, models, now, state } = world;
+  const answer = await readMessage(models, item.text, {
     clock: () => Date.parse(now),
     cooldowns,
     domain: item.domain ?? "task",
@@ -225,6 +226,8 @@ export type DrainDeps = {
   readonly env: object;
   readonly now: string;
   readonly store: DrainStore;
+  /** The providers' health every user shares, as the app's and the bot's reads use it. */
+  readonly health: HealthMemory;
 };
 
 /** Texts read later are written by the server, as the person asked. */
@@ -294,7 +297,7 @@ const wasWritten = async ({ store }: DrainDeps, item: QueuedParse): Promise<bool
 const drainItem = async (
   deps: DrainDeps,
   item: QueuedParse,
-  providers: readonly ParseProvider[],
+  models: Models,
 ): Promise<null | QueuedParse> => {
   const { now, storage } = deps;
   if (item.retryAt !== null && item.retryAt > now) {
@@ -306,7 +309,7 @@ const drainItem = async (
   const world = {
     cooldowns: await cooldownsOf(storage, now),
     now,
-    providers,
+    models,
     state: await stateOf(deps),
   };
   const { drained, limited } = await drainOne(item, world);
@@ -338,10 +341,10 @@ export const drainQueue = async (deps: DrainDeps): Promise<void> => {
     return;
   }
   await deps.store.derive(deps.now);
-  const providers = parseProviders(config.value);
+  const models = { health: deps.health, providers: parseProviders(config.value) };
   const remaining: QueuedParse[] = [];
   for (const item of queue) {
-    const kept = await drainItem(deps, item, providers);
+    const kept = await drainItem(deps, item, models);
     if (kept !== null) {
       remaining.push(kept);
     }

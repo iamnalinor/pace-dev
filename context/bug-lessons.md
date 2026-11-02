@@ -716,6 +716,24 @@ The same rule applies when a previously successful channel is no longer configur
   what it asks), and a follow-up that exists to catch up ("the loop's first tick", "back on the
   line") skips when the same thing was just read and nothing was written since. Test it by counting
   a whole start's requests (the e2e first-load test: no URL twice, one pull since 0).
+### 85. An outside checker holds an answer to the letter of our schema, and its refusal reads as an outage
+- **Bug.** The LLM regression run of 2026-11-02 (`bun test:llm`): slot 3's endpoint answered "Generated
+  JSON does not match the expected schema … missing properties: 'outcome', 'label', 'start', 'end',
+  'expectMinutes'". Our schema already lists every key as required and nullable (strict mode takes
+  it); the endpoint runs that model best-effort, checks the answer itself and refuses it, and its
+  model had left out the activity keys of a task's action, which mean "does not apply". The refusal
+  was counted as a failed provider (`llm/unavailable`), and our own check would have refused the same
+  answer for the same missing keys.
+- **Missed because.** Every fake answer is built with `blankModelAction`, so every key is always
+  there; no fake ever played an endpoint that checks the answer itself, and the refusal arrives as a
+  stream error chunk with no status, which the code sorted with the outages.
+- **Rule.** An answer is read as leniently as its meaning allows, by one check for every way it
+  arrives (`answerCheck` in `llm.ts`): keys left out that mean "does not apply" are filled (null, or
+  an empty list; `fillAbsent`) before the strict check. An outside checker's refusal that carries the
+  payload (`failed_generation`, or what was streamed) goes through our own check before it counts as
+  a failure, and when it fails ours too it is an answer out of shape, never a provider down. What we
+  send is pinned against the strictest mode we may meet (every object's properties all `required`,
+  `additionalProperties: false`). Test doubles copy the real endpoint's refusal, body and chunk.
 
 ## Log
 
@@ -983,3 +1001,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 20 L6 and L7: once Cancelled or Skipped was picked there was no way back to Done, and each of the close sheet's chips was a tab stop of its own | 21 (no way back from a mis-tap) and 5 | yes: the close sheet's three chip groups (outcome, time, precision) are one `RadioChips` each; the date picker's grid is another agent's this round | the outcome is one row (Done · Cancelled · Skipped); `RadioChips`: one tab stop per group, arrows move and choose; app tests |
 | 2026-11-02 | QA round 20 L9: the first load sent the log's first pull, the notification pool and today's calendar twice each | 79 (new) | yes: the start's other reads (`me` once, instances local, the phone's data only on a phone); the pool's other refresh callers (a live notice must always refresh, so the rule is only on the "back on the line" path) | the loop's first tick waits its interval right after a run that synced everything with nothing written since; the pool is not fetched again on the socket's connection within 5 s of a fetch; today's calendar shares one request in flight; unit, app and web tests; e2e counts a first load (no URL twice, one pull since 0) |
 | 2026-11-02 | e2e flakes of the composer journey ("composer adds lines and fills the form (desktop, dark)" timed out at 30 s with nothing failing, 4/8 under four workers per 6-B; a typed line once came out with characters moved, "dashboardsис", and `addTask` once in `time.e2e.ts`) | 20 (a test acts before the screen has settled) | yes: every caller of `addTask` and the journey's first line now type into a settled line; the typing race did not show in 72 runs (a probe typing right after load, 24 under four workers; the composer and time files, 3 × under four workers), so no app change: nothing in the composer resets its value while typing | `settledLine` (no first-sync cover or grey rows, the line editable) before typing, the typed value asserted before Enter (a race now fails at the step that has it), no reload after each task on a computer (the line stays and empties); the journey's limit is 60 s (about 20 s of real work under load); 16/16 and 87/87 green under four workers |
+| 2026-11-02 | LLM regression run 41423290212: slot 3's endpoint refused its own model's answer on its schema check (the model left out a task action's activity keys), and the read counted it as the provider failing; the diagnosis to check was "our schema keeps those keys optional", but the schema sent already requires every key (nullable) | 85 (new) | yes: only one schema goes to models (`ModelOutputSchema` through `runStructured`); every way an answer arrives now goes through `answerCheck` (the stream's output, the refusal's `failed_generation`, the text streamed before a refusal); the prompt says every action keeps every key; the rate-limit and refused-key reading moved with the rest of the failure sorting into `failure.ts`, where a schema refusal is told apart from an outage | `llm.test.ts`: an answer with those five keys left out is kept with them null; a refusal carrying the answer in its body and one after streaming it are both read; a refused answer that fails our check too is `llm/invalid-output`, not `llm/unavailable` (all RED); a guard over the schema actually sent: every object's properties all required, no others (green: the schema was already strict-mode valid); the fake model plays the endpoint's refusal as copied from the run |

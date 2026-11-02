@@ -1,6 +1,6 @@
 import { type Answer, nowList, t } from "@pace/core";
 
-import type { ParseProvider } from "../shared/llm/llm.ts";
+import type { Models } from "../shared/llm/read.ts";
 
 import { type BotStoreApi, POOL_ACTIONS } from "../shared/contract.ts";
 import { choosePreview, followupPreview, preview } from "./preview.ts";
@@ -12,7 +12,7 @@ export type AssistantDeps = {
   /** The Pace user behind a Telegram account, if they ever logged in through the bot. */
   readonly userIdOf: (telegramId: string) => Promise<null | string>;
   readonly storeOf: (userId: string) => BotStoreApi;
-  readonly providers: readonly ParseProvider[];
+  readonly models: Models;
   readonly now: () => string;
 };
 
@@ -120,7 +120,7 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
         const { action, id } = splitData(data);
         const answer = answerOfCode(action);
         return answer === undefined
-          ? await choosePreview(turn, deps.providers, { action, id })
+          ? await choosePreview(turn, deps.models, { action, id })
           : await notificationAnswer(turn, answer, id);
       }),
     message: async (telegramId, text, replyTo) =>
@@ -130,14 +130,14 @@ export const createAssistant = (deps: AssistantDeps): Assistant => {
           | undefined
           | { readonly id?: string; readonly messageId?: number };
         if (binding?.id !== undefined && binding.messageId !== undefined) {
-          const revised = await followupPreview(turn, deps.providers, { id: binding.id, text });
+          const revised = await followupPreview(turn, deps.models, { id: binding.id, text });
           if (revised !== null) {
             return revised.pendingId === undefined
               ? revised
               : { ...revised, editMessageId: binding.messageId };
           }
         }
-        return await preview(turn, deps.providers, text);
+        return await preview(turn, deps.models, text);
       }),
     now: async (telegramId) => await withUser(telegramId, nowReply),
   };

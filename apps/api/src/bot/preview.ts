@@ -1,10 +1,14 @@
 import { CLASSIFY_CONFIDENT, type Language, newId, type ParseRequestBody, t } from "@pace/core";
 
-import type { ParseProvider } from "../shared/llm/llm.ts";
-
 import { inboxBody } from "../shared/inbox.ts";
 import { parseDecision } from "../shared/llm/decision.ts";
-import { type ModelRead, readByRules, type Reading, readMessage } from "../shared/llm/read.ts";
+import {
+  type ModelRead,
+  type Models,
+  readByRules,
+  type Reading,
+  readMessage,
+} from "../shared/llm/read.ts";
 import { describeActions } from "./describe.ts";
 import {
   answerIndexes,
@@ -126,13 +130,9 @@ const previewOf = async (
 };
 
 /** Free text → the assistant's actions, checked against the text, shown with Accept / To Inbox / Cancel. */
-export const preview = async (
-  turn: Turn,
-  providers: readonly ParseProvider[],
-  text: string,
-): Promise<BotReply> => {
+export const preview = async (turn: Turn, models: Models, text: string): Promise<BotReply> => {
   const { now, state } = turn;
-  const read = await readMessage(providers, text, {
+  const read = await readMessage(models, text, {
     cooldowns: await turn.store.llmCooldowns(now),
     deadlineMs: BOT_READ_DEADLINE_MS,
     domain: "auto",
@@ -191,7 +191,7 @@ const showRevision = async (
 /** A new chat message revises a still pending answer, with its entire earlier thread. */
 export const followupPreview = async (
   turn: Turn,
-  providers: readonly ParseProvider[],
+  models: Models,
   { id, text }: { readonly id: string; readonly text: string },
 ): Promise<BotReply | null> => {
   const pending = (await turn.store.peek(id)) as Partial<Pending> | undefined;
@@ -202,7 +202,7 @@ export const followupPreview = async (
   if (thread.length > 5) {
     return plain(t(turn.state.settings.language, "bot.tooManyCorrections"));
   }
-  const read = await readMessage(providers, text, {
+  const read = await readMessage(models, text, {
     cooldowns: await turn.store.llmCooldowns(turn.now),
     deadlineMs: BOT_READ_DEADLINE_MS,
     domain: pending.domain,
@@ -228,10 +228,10 @@ export const followupPreview = async (
 /** A preview button: write what was understood, keep the text in the Inbox, or drop it. */
 const chooseDomain = async (
   turn: Turn,
-  providers: readonly ParseProvider[],
+  models: Models,
   { pending, domain }: { readonly pending: Pending; readonly domain: "activity" | "task" },
 ): Promise<BotReply> => {
-  const read = await readMessage(providers, pending.text, {
+  const read = await readMessage(models, pending.text, {
     cooldowns: await turn.store.llmCooldowns(turn.now),
     deadlineMs: BOT_READ_DEADLINE_MS,
     domain,
@@ -280,13 +280,13 @@ const finishPreview = async (turn: Turn, pending: Pending, action: string): Prom
 /** A preview button: write what was understood, keep the text in the Inbox, or drop it. */
 export const choosePreview = async (
   turn: Turn,
-  providers: readonly ParseProvider[],
+  models: Models,
   { action, id }: { readonly action: string; readonly id: string },
 ): Promise<BotReply> => {
   const { language } = turn.state.settings;
   const at = answerIndexes(action);
   if (at !== undefined) {
-    const revise = async (text: string) => await followupPreview(turn, providers, { id, text });
+    const revise = async (text: string) => await followupPreview(turn, models, { id, text });
     return await answerPreview(turn, { at, id }, revise);
   }
   const pending = (await turn.store.recall(id)) as Partial<Pending> | undefined;
@@ -300,7 +300,7 @@ export const choosePreview = async (
   }
   if (action === PREVIEW_ACTIONS.task || action === PREVIEW_ACTIONS.activity) {
     const domain = action === PREVIEW_ACTIONS.task ? "task" : "activity";
-    return await chooseDomain(turn, providers, { pending: pending as Pending, domain });
+    return await chooseDomain(turn, models, { pending: pending as Pending, domain });
   }
   return await finishPreview(turn, pending as Pending, action);
 };

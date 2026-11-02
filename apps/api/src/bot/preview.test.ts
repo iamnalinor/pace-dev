@@ -4,11 +4,20 @@ import { blankModelAction, type EventInput, type ModelOutput } from "@pace/core"
 import { artboardState, NOW, REPLY_ID } from "@pace/core/testing";
 
 import type { BotStoreApi, DecisionAnswer, DecisionEntry, JsonValue } from "../shared/contract.ts";
+import type { ParseProvider } from "../shared/llm/llm.ts";
+import type { Models } from "../shared/llm/read.ts";
 import type { BotReply, Turn } from "./turn.ts";
 
 import { echoReply, fakeParseModel } from "../shared/llm/fake-model.ts";
+import { memoryHealth } from "../shared/llm/health-store.ts";
 import { PREVIEW_ACTIONS } from "./preview-buttons.ts";
 import { choosePreview, preview } from "./preview.ts";
+
+/** The providers with a health memory of their own, as the bot's reads take them. */
+const modelsOf = (providers: readonly ParseProvider[]): Models => ({
+  health: memoryHealth(),
+  providers,
+});
 
 /** A store in memory: what the bot remembers, and every batch it writes. */
 const memoryStore = () => {
@@ -60,7 +69,7 @@ describe("the bot's preview", () => {
     const turn = (now: string): Turn => ({ now, state: artboardState(now), store });
     const shown = await preview(
       turn(NOW),
-      [{ model: fakeParseModel(echoReply), name: "fake" }],
+      modelsOf([{ model: fakeParseModel(echoReply), name: "fake" }]),
       "close task Reply to course curator",
     );
     const accept = shown.buttons[0]?.find(
@@ -69,10 +78,14 @@ describe("the bot's preview", () => {
     expect(accept).toBeDefined();
     const id = accept !== undefined && "data" in accept ? accept.data.slice(2) : "";
     expect(written).toEqual([]);
-    await choosePreview(turn(LATER), [{ model: fakeParseModel(echoReply), name: "fake" }], {
-      action: PREVIEW_ACTIONS.accept,
-      id,
-    });
+    await choosePreview(
+      turn(LATER),
+      modelsOf([{ model: fakeParseModel(echoReply), name: "fake" }]),
+      {
+        action: PREVIEW_ACTIONS.accept,
+        id,
+      },
+    );
     expect(written).toEqual([
       [
         expect.objectContaining({
@@ -104,7 +117,7 @@ const askingModel = () => {
       ],
     };
   };
-  return { providers: [{ model: fakeParseModel(reply), name: "fake" }], read };
+  return { providers: modelsOf([{ model: fakeParseModel(reply), name: "fake" }]), read };
 };
 
 /** Every button of a reply with callback data: its label and data. */
@@ -163,7 +176,7 @@ describe("the bot's answers to the assistant's questions", () => {
     const { store } = memoryStore();
     const shown = await preview(
       { now: NOW, state: artboardState(NOW), store },
-      [{ model: fakeParseModel(twoAsked), name: "fake" }],
+      modelsOf([{ model: fakeParseModel(twoAsked), name: "fake" }]),
       "Съездить в банк",
     );
     expect(shown.text).toContain("Question 1: When?");
@@ -202,7 +215,9 @@ describe("the bot's answers to the assistant's questions", () => {
   it("drops a revision when Approve took the preview while it was being read", async () => {
     const { kept, store, written } = memoryStore();
     const { providers } = askingModel();
-    const slow = [{ model: fakeParseModel(twoAsked, { firstTokenAfterMs: 50 }), name: "slow" }];
+    const slow = modelsOf([
+      { model: fakeParseModel(twoAsked, { firstTokenAfterMs: 50 }), name: "slow" },
+    ]);
     const turn: Turn = { now: NOW, state: artboardState(NOW), store };
     const shown = await preview(turn, providers, "Съездить в банк");
     const id = shown.pendingId ?? "";

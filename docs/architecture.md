@@ -318,6 +318,42 @@ the current state and produces events; `planProposals` plans a batch in order. P
 alone does not write events. The app's full proposal cards and the bot's proposal picker
 are planned for later PRs.
 
+### Models: who is asked, in which order
+
+Every read (the app's `POST /api/parse`, the bot, the deferred queue's drain) goes through
+`readMessage(models, …)` in `apps/api/src/shared/llm/read.ts`, where `models` carries the
+providers and the health memory together, so no caller reads without it. The providers are the
+numbered slots (`LLM_BASE_URL_N` / `LLM_API_KEY_N` / `LLM_MODEL_N`): every model of every key is one
+provider, in slot order (`providers.ts`). `runStructured` (`llm.ts`) races them with a hedge: the
+next one is asked as well when the current one fails or has not sent a first token within 5 s;
+one provider gives up after 45 s; the bot's read ends at 10 s, the app's at 20 s.
+
+Two memories decide who is asked:
+
+- **Rests, per person** (the user's Durable Object, `llm:cooldowns`): a 429 or 503 rests the
+  provider until its `retry-after` (a minute without one), a refused key (401/403) for an hour.
+  A resting provider is skipped; when all rest, the error says when the soonest is back.
+- **Health, shared by every user and isolate** (`health.ts`, `health-store.ts`): a failure that
+  says the provider cannot serve anyone (a 5xx, 404, 408 or 410, a timeout, a dropped connection),
+  or being silent past the hedge twice in a row while another provider answered, moves it to the
+  end of the order for a minute, doubling with each failure in a row up to 30 minutes; a success
+  clears it. A failure about this request, key or answer (a 400 or 422, an endpoint's refusal of
+  its own model's answer, a rate limit, a refused key) does not count. Moved last, not left out:
+  with every provider under penalty the configured order stands. Once a penalty is over the
+  provider is back in its place as a probe: the next provider is asked alongside it at once, so
+  nobody waits on a provider that may still be down. The memory is one Workers KV value
+  (`llm:health` in the `OAUTH_KV` namespace, beside the OAuth library's `client:`/`grant:`/`token:`
+  keys). Each isolate trusts what it read for 15 s; a read writes only when it changes a record (a
+  new penalty, the first success after one), reading the value afresh just before. KV is
+  eventually consistent (about a minute between locations), so another location may ask a down
+  provider first once more in that minute: one wait, never a wrong answer. Each change is logged
+  once ("provider asked last" with its reason and until when, "provider back in its place").
+
+An answer passes one check however it arrives (`answer-check.ts`): keys the model left out that
+mean "does not apply" are filled (null or an empty list), lengths clamped, then the zod schema. An
+endpoint that checks its model's answer itself and refuses it is read for that answer (bug class
+85); failing ours too, it is an answer out of shape, not an outage.
+
 On Day, the time bar offers Calendar, Task, Chores and Rest, plus a typed activity; Now
 shows a compact row for what is running. A computer can contribute foreground-app and
 idle-time observations through the scoped token and the Python agent described in
