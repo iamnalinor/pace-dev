@@ -30,6 +30,7 @@ export type SyncClient = {
   readonly syncNow: () => Promise<Result<SyncSummary, string>>;
   /** Runs now, then every `intervalMs`; failures retry with exponential backoff (1s..60s). */
   readonly start: (options: { readonly intervalMs: number }) => void;
+  /** Ends the loop; a call still waiting for the run after the one in flight gets `stopped`. */
   readonly stop: () => void;
   /** A local change or a server's "changed": a run within a second, a burst making one. */
   readonly soon: () => void;
@@ -42,6 +43,9 @@ export type SyncClient = {
   */
   readonly ingestLive: (page: PullPage) => Promise<void>;
 };
+
+/** What a call waiting for the run after the one in flight gets when the sync stopped meanwhile. */
+export const SYNC_STOPPED = "stopped";
 
 /** How long a burst of changes may gather before it is sent. */
 export const SOON_MS = 800;
@@ -267,13 +271,29 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
       inFlight = undefined;
     }
   };
-  /** After the run in flight has settled (each settles to a result: `runSync` catches). */
-  const after = async (current: Promise<unknown>): Promise<Result<SyncSummary, string>> => {
+  /** Bumped by `stop`: a run waiting to follow one made before it is dropped. */
+  let epoch = 0;
+  /**
+  After the run in flight has settled (each settles to a result: `runSync` catches), unless the
+  sync was stopped meanwhile (signed out: it would go out with no token, fix round 5 V3).
+  */
+  const after = async (
+    current: Promise<unknown>,
+    queuedIn: number,
+  ): Promise<Result<SyncSummary, string>> => {
     await current;
+    if (queuedIn !== epoch) {
+      return err(SYNC_STOPPED);
+    }
     next = undefined;
     return await run();
   };
   return {
+    /** The runs waiting to follow the one in flight are dropped; later calls run as ever. */
+    dropWaiting: (): void => {
+      epoch += 1;
+      next = undefined;
+    },
     failures: (): number => failures,
     /** Applies a live page that fits; true when a pull is needed instead. */
     ingestLive: async (page: PullPage): Promise<boolean> =>
@@ -296,7 +316,7 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
       if (inFlight === undefined) {
         return await run();
       }
-      next ??= after(inFlight);
+      next ??= after(inFlight, epoch);
       return await next;
     },
   };
@@ -357,6 +377,7 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
     stop: () => {
       intervalMs = undefined;
       timer.cancel();
+      runner.dropWaiting();
     },
     syncNow: runner.syncNow,
   };

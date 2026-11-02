@@ -547,6 +547,31 @@ describe("createSyncClient scheduling", () => {
     expect(most).toBe(1);
   });
 
+  it("drops the run a call made during a run was waiting for, once the sync is stopped (fix round 5 V3)", async () => {
+    // Signed out while a run was under way: the run after it would go out with no token (a 401).
+    const gate = Promise.withResolvers<null>();
+    const { calls, sync } = await setup(
+      {
+        "GET /api/sync/pull": async () => {
+          await gate.promise;
+          return { events: [], more: false, seq: 0, storeId: FAKE_STORE_ID };
+        },
+      },
+      [],
+    );
+    sync.start({ intervalMs: 30_000 });
+    await vi.waitFor(() => {
+      expect(calls).toHaveLength(1);
+    });
+    const waiting = sync.syncNow();
+    sync.stop();
+    gate.resolve(null);
+    await expect(waiting).resolves.toEqual({ error: "stopped", ok: false });
+    expect(calls).toHaveLength(1);
+    // A call made after the stop runs as ever (a sign-in's first sync comes before the loop).
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+  });
+
   it("sends a write made while a run pushes when a call made after it settles (E1)", async () => {
     const gate = Promise.withResolvers<null>();
     let isFirst = true;
