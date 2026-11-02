@@ -295,8 +295,12 @@ const DayColumn = ({
   );
 };
 
-/** The day names' row above the columns, and the room left under the grid. */
-export const LABELS_PX = 28;
+/**
+The day names' row above the columns (`h-8`, and the gutter's `pt-8`), and the room left under the
+grid (the phone's hint row, `h-6`): the fit subtracts them, so they move with those classes
+(week-screen.test.tsx reads both through the generated scale; bug-lessons class 11).
+*/
+export const LABELS_PX = 32;
 export const BOTTOM_PX = 24;
 
 /**

@@ -15,6 +15,7 @@ import { type Hotkey, HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
 import { useTheme } from "#app/ui/theme-provider.tsx";
 import { Tooltip } from "#app/ui/tooltip.tsx";
 import { KEYBOARD } from "#app/ui/use-hotkey.tsx";
+import { typeRole } from "@pace/core";
 
 /** What the line needs from the composer's flow. */
 type LineFlow = {
@@ -31,9 +32,17 @@ type LineFlow = {
   readonly toInbox: () => Promise<void>;
 };
 
-const MIN_INPUT_HEIGHT = 44;
-/** Eight lines of 24 px and the padding: a longer message scrolls inside. */
-const MAX_INPUT_HEIGHT = 212;
+/**
+The line's own `py-3` and `text-callout` line (the phone column; a desktop line is a pixel shorter):
+the height sums restate those classes, so they move with them (composer.test.tsx reads both through
+the generated scale; bug-lessons class 11).
+*/
+const PAD_Y_PX = 12;
+const LINE_PX = typeRole("callout", "phone").line;
+/** One line and the padding. */
+const MIN_INPUT_HEIGHT = LINE_PX + 2 * PAD_Y_PX;
+/** Eight lines and the padding: a longer message scrolls inside. */
+const MAX_INPUT_HEIGHT = 8 * LINE_PX + 2 * PAD_Y_PX;
 
 const heightOf = (content: number): number =>
   Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, Math.ceil(content)));
