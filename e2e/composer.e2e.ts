@@ -81,7 +81,7 @@ for (const [width, height, size] of [
   [390, 844, "phone"],
   [1440, 900, "desktop"],
 ] as const) {
-  test(`a share to the installed web app lands in the line and stays at /add (${size}, QA 17 M3)`, async ({
+  test(`a share to the installed web app lands in the focused line on Now at / (${size}, QA 17 M3, QA 18 L2)`, async ({
     page,
   }) => {
     // The manifest's share_target opens /add with the shared title, text and link in the query.
@@ -93,16 +93,19 @@ for (const [width, height, size] of [
     const line = page.getByRole("textbox", { name: "New task" });
     await expect(line).toHaveValue("Article https://example.com/a a look at this");
     // Taken once: the address drops the share, so a reload (or a return to the window) does not
-    // fill the line from it again and a second Enter cannot add it twice (review m11).
-    await expect.poll(() => new URL(page.url()).search).toBe("");
-    expect(new URL(page.url()).pathname).toBe("/add");
+    // fill the line from it again and a second Enter cannot add it twice (review m11). It is Now
+    // at "/" (QA 18 L2): a reload opens Now, not an empty New task form.
+    await expect.poll(() => page.url()).toBe(new URL("/", page.url()).href);
     await expect(line).toHaveValue("Article https://example.com/a a look at this");
-    await line.press("Enter");
+    // The Enter a person presses next goes into the line (QA 18 L2: focus was on the page).
+    await expect(line).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.getByText(/^The assistant will create /u)).toBeVisible();
-    // A reload finds no share left to fill in: /add opens as New task, nothing holds the text.
+    // A reload finds no share left to fill in, and no form open.
     await page.reload();
     await expect(page.getByRole("heading", { name: "Now" })).toBeVisible();
-    expect(new URL(page.url()).search).toBe("");
+    expect(new URL(page.url()).pathname).toBe("/");
+    await expect(page.getByRole("form", { name: "New task" })).toHaveCount(0);
     const values = await page
       .locator("input, textarea")
       .evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value));

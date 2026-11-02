@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { type SharedIn, sharedLine } from "./shared-line.ts";
 
@@ -8,15 +8,37 @@ const first = (value: readonly string[] | string | undefined): string | undefine
   typeof value === "string" ? value : value?.[0];
 
 /**
-What the system's share sheet sent to the installed web app: the manifest's `share_target` opens
-`/add?title=…&text=…&url=…` (QA round 17 M3: the text was thrown away).
+The share taken from the address, waiting for Now at "/" to put it into its line; `null` once Now
+has it. Kept for the page's life, not in a screen: the share target and Now are two routes.
+*/
+const handoff = {
+  arrivals: 0,
+  listeners: new Set<() => void>(),
+  waiting: null as null | SharedIn,
+};
 
-The share is taken once: the line keeps it while the address drops the query, so a reload or a
-return to the app's window does not fill the line again and a second Enter cannot add the same
-task twice (review m11). `setParams` would clear the params but keep the route's `path`, which
-the address is written from, so the route is navigated to again without them. Each arrival of a
-share in the address counts up `seq` (the composer's key), so the same text shared again fills
-the line again (round-4 review R2).
+const hand = (text: string): void => {
+  handoff.arrivals += 1;
+  handoff.waiting = { seq: handoff.arrivals, text };
+  for (const listener of handoff.listeners) {
+    listener();
+  }
+};
+
+const subscribe = (listener: () => void): (() => void) => {
+  handoff.listeners.add(listener);
+  return () => {
+    handoff.listeners.delete(listener);
+  };
+};
+
+/**
+The share target: what the system's share sheet sent to the installed web app (the manifest's
+`share_target` opens `/add?title=…&text=…&url=…`, QA round 17 M3), taken from the address once
+and handed to Now at "/" (`useHandedShare`), the address replaced: a reload or a return to the
+window opens Now and never fills the line again, so a second Enter cannot add the same task twice
+(review m11), and no empty New task form opens on a reload (QA round 18 L2). Until it is handed
+on, the line shows it here; without a share, /add is New task (an empty line).
 */
 export const useSharedIn = (): SharedIn => {
   const router = useRouter();
@@ -26,18 +48,32 @@ export const useSharedIn = (): SharedIn => {
     url?: string | string[];
   }>();
   const shared = sharedLine([first(title), first(text), first(url)]);
-  const [taken, setTaken] = useState({ seen: shared, seq: 0, text: shared });
-  if (shared !== taken.seen) {
-    setTaken(
-      shared === ""
-        ? { ...taken, seen: shared }
-        : { seen: shared, seq: taken.seq + 1, text: shared },
-    );
+  useEffect(() => {
+    if (shared === "") {
+      return;
+    }
+
+    hand(shared);
+    router.replace("/");
+  }, [router, shared]);
+  return { seq: 0, text: shared };
+};
+
+/**
+Now's share, if the share target handed one on: taken once per arrival (each counts up `seq`,
+which the composer is keyed by, so the same text shared again fills the line again, round-4
+review R2); once Now has it the hand-off forgets it, so a remount does not bring it back.
+*/
+export const useHandedShare = (): SharedIn | undefined => {
+  const waiting = useSyncExternalStore(subscribe, () => handoff.waiting);
+  const [taken, setTaken] = useState<SharedIn | undefined>(waiting ?? undefined);
+  if (waiting !== null && waiting.seq !== taken?.seq) {
+    setTaken(waiting);
   }
   useEffect(() => {
-    if (shared !== "") {
-      router.navigate("/add");
+    if (waiting !== null && handoff.waiting === waiting) {
+      handoff.waiting = null;
     }
-  }, [router, shared]);
-  return { seq: taken.seq, text: taken.text };
+  }, [waiting]);
+  return taken;
 };

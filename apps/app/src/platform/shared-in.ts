@@ -31,3 +31,10 @@ export const useSharedIn = (): SharedIn => {
   }, [resetShareIntent, shared]);
   return { seq: taken.seq, text: taken.text };
 };
+
+/**
+A share handed on to Now at "/" by the web's share target. On a phone the share lands on the Add
+tab itself (`useSharedIn`), so Now gets none.
+*/
+// eslint-disable-next-line @eslint-react/no-unnecessary-use-prefix -- the same hook as the web's, which does call hooks
+export const useHandedShare = (): SharedIn | undefined => undefined;

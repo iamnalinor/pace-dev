@@ -1,5 +1,5 @@
 import { ArrowUp, Inbox, type LucideIcon, Plus } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 
-import { useT } from "#app/app-state.tsx";
+import { useIsFirstSync, useT } from "#app/app-state.tsx";
 import { lineEnterProps } from "#app/platform/enter-key.ts";
 import { cx } from "#app/ui/cx.ts";
 import { type Hotkey, HOTKEYS, labelWithHotkey } from "#app/ui/hotkeys.ts";
@@ -127,6 +127,29 @@ const LineButton = ({
   );
 };
 
+/**
+A line opened with a share in it takes the cursor once it can be seen (QA round 18 L2: the Enter
+pressed next went nowhere). `autoFocus` fires at mount, while a fresh browser's first-sync cover
+still hides the app, and a hidden field takes no focus; so the line is focused again when the
+cover lifts, once, and only for the text it opened with (an empty /add opens New task's form,
+whose title has the cursor).
+*/
+const useShareFocus = (
+  inputRef: RefObject<null | TextInput>,
+  { isFocused, text }: { readonly isFocused: boolean; readonly text: string },
+): void => {
+  const isCovered = useIsFirstSync();
+  const [opensWithText] = useState(() => text.trim() !== "");
+  const isDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isFocused || !opensWithText || isCovered || isDoneRef.current) {
+      return;
+    }
+    isDoneRef.current = true;
+    inputRef.current?.focus();
+  }, [inputRef, isCovered, isFocused, opensWithText]);
+};
+
 /** The text itself: grows with a pasted message, takes Enter and Alt+Enter as its own. */
 const LineInput = ({
   flow,
@@ -151,6 +174,7 @@ const LineInput = ({
       inputRef.current?.focus();
     }
   }, [flow.lineFocus]);
+  useShareFocus(inputRef, { isFocused, text: flow.text });
   return (
     <TextInput
       accessibilityLabel={t("composer.label")}
