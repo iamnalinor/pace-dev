@@ -97,7 +97,10 @@ export const serverInfoOf = ({ instance, origin }: ServerState): ServerInfo => {
   const buildWeb = isBuildServer(origin) ? WEB_ORIGIN : null;
   const ownWeb = instance === null ? buildWeb : instance.webOrigin;
   return {
-    apiOrigin: instance?.apiOrigin ?? origin,
+    // The origin this app reaches the server at, not the one the server says it has: a Worker
+    // started with another port or host than its `API_ORIGIN` names a dead address (QA round 18
+    // L10), and the one in use is known to answer.
+    apiOrigin: origin,
     botUsername: instance?.botUsername ?? TELEGRAM_BOT,
     loginWebOrigin: ownWeb,
     webOrigin: ownWeb ?? WEB_ORIGIN,

@@ -675,6 +675,16 @@ The same rule applies when a previously successful channel is no longer configur
   back to the kind only while it cannot be found. Test it with a thing whose name is a word of the
   catalog ("Settings") and one in another script.
 
+### 83. An address a server says it has handed out over the one the app has reached it at
+- **Bug.** QA round 18 L10: "Connect an AI app" printed `http://localhost:8787/mcp` and "Add a
+  computer" put `--api http://localhost:8787` in its command, while the app talked to the Worker
+  on :8818; the Worker's `API_ORIGIN` named a port it was not running on, so both were dead.
+- **Missed because.** The tests served `/api/instance` with the same origin the fake runtime used,
+  so the two never differed.
+- **Rule.** An address the app gives a person to use elsewhere is one the app has proven (the
+  origin it talks to), not one a server reports about itself; a reported one is only a fallback
+  for what the app cannot know (its web app). Test it with the two different.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -926,3 +936,4 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | Round 6 (owner, QA rounds 18–19): a block left running Fri 20:00 → Sun 07:00 could not be cut back to Friday from the Day sheet; the end field read a clock only and the day was guessed near the old end | 80 (new) | yes: the other typed times carry their day (the close sheet's and the date field's typed date and time) or are a time of day by nature (presets' deadline and recurrence, quiet hours); the Day sheet was the only clock read on a guessed day | `fromDay`/`toDay` in `ActivityForm` and a day row for each time in the sheet (`day-choices.tsx`: shown for a block across days, behind "Other days" otherwise); `readDraft` tests (Friday 23:00 saved, red before; Friday 19:00 and a day before the start refused as `day.badRange`; a start on its chosen day; a new block's chosen end never read past midnight) and sheet tests (cut back to Friday, start moved to Saturday, a one-day block's next day) |
 | 2026-11-02 | QA round 18 L4: New preset asked for a bare "Id" (empty for a Russian name, so Save failed) and opened with nothing focused | 81 (new) | yes: the other forms that create things (task, project, activity) make their ids with `newId()` and show none; the preset form was the only one with a typed key | `freePresetId` (the name's slug, Russian spelt in Latin letters, accents dropped, numbered past a taken, archived, default or reserved `new` id; client tests); the Id field and its catalog key gone; Name focused on a new preset where there is a keyboard; app tests: no Id field, Name focused, a Russian name saved as `algebra`, a second one as `algebra-2` (both red before) |
 | 2026-11-02 | QA round 18 L8: every task, project and the new preset form had the kind's name as the tab title ("Task · Pace" eight times in the history) | 82 (new) | yes: the pushed screens' own headers already name the thing (task title, project name, preset label); the document title was the only label taken from the route's kind | `routeSubject` + `subjectName` (task title and project name verbatim, a default preset in the reader's language), `documentTitle` names the thing and says "New preset" for `/presets/new`, the kind only while the thing cannot be found; route-title tests including a task called "Settings" and a Russian preset name (red before) |
+| 2026-11-02 | QA round 18 L10: "Connect an AI app" and "Add a computer" handed out the server's reported `apiOrigin` (a port the dev Worker was not on) instead of the origin the app talks to | 83 (new) | yes: the two screens are the only ones that hand out the API's address (both read `useServerInfo().apiOrigin`); the login's web origin stays the server's own on purpose (the token goes to that server) | `serverInfoOf` gives the origin in use; `server-store.test.ts` (a reported 8787 with the app on 8818, red before) and the sessions tests now serve an `/api/instance` whose origin differs from the app's |
