@@ -20,8 +20,6 @@ import {
 } from "./oauth-flow.ts";
 
 type Metadata = Record<string, unknown>;
-type Problem = { code: string; message: string };
-type Redirect = { redirectTo: string };
 
 describe("discovery", () => {
   it("publishes the authorization server metadata", async () => {
@@ -99,6 +97,8 @@ describe("dynamic client registration", () => {
 });
 
 describe("authorization", () => {
+  type Redirect = { redirectTo: string };
+  type Problem = { code: string; message: string };
   it("sends GET /authorize to the web consent page with the query intact", async () => {
     const { clientId } = await registerClient();
     const { challenge } = await pkce();

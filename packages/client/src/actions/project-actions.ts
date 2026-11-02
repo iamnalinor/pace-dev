@@ -35,9 +35,9 @@ export const projectNameError = (
     return "project/name-required";
   }
   const existing = findProjectByName(projects, name);
-  return existing !== undefined && !existing.archived && existing.id !== selfId
-    ? "project/name-taken"
-    : null;
+  return existing === undefined || existing.archived || existing.id === selfId
+    ? null
+    : "project/name-taken";
 };
 
 const patchPayload = (projectId: string, patch: ProjectPatch) => {

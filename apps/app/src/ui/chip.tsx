@@ -35,7 +35,7 @@ a 44px-tall target that does not take room in the layout, so a thumb never misse
 export const Chip = ({
   children,
   color = null,
-  label,
+  label = children,
   leading,
   onPress,
   ref,
@@ -60,7 +60,7 @@ export const Chip = ({
   readonly tall?: boolean;
 }) => (
   <Pressable
-    accessibilityLabel={label ?? children}
+    accessibilityLabel={label}
     accessibilityRole="radio"
     aria-checked={selected}
     className={cx("justify-center active:opacity-80", tall ? "-my-1 h-11" : "-my-1.5 h-11")}

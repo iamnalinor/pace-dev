@@ -100,10 +100,9 @@ const expectArmedAfterPass = async (
   );
 };
 
-type Call = { readonly method: string; readonly body: Raw };
-
 /** A Telegram that records every call (method and body) instead of making it. */
 const telegramRecorder = () => {
+  type Call = { readonly method: string; readonly body: Raw };
   const calls: Call[] = [];
   const target: TelegramTarget = {
     apiRoot: "https://telegram.test",
@@ -675,8 +674,6 @@ const testServiceAccount = async (): Promise<string> => {
   });
 };
 
-type FcmCall = { readonly url: string; readonly body: string; readonly auth: null | string };
-
 /** How FCM answers one send: a status, with FCM's error code and the field it names. */
 type FcmAnswer =
   | number
@@ -725,6 +722,7 @@ const fcmRecorder = async (
     ? answers.send
     : [answers.send ?? 200];
   let sent = 0;
+  type FcmCall = { readonly url: string; readonly body: string; readonly auth: null | string };
   const calls: FcmCall[] = [];
   const { fcmTargetOf } = await import("../src/shared/fcm.ts");
   const target = fcmTargetOf(

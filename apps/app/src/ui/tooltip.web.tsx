@@ -11,8 +11,6 @@ import { type Box, placeTooltip, type Size, TAP_TOOLTIP_MS } from "./tooltip-pla
 /** How it came to show: the pointer over it, the keyboard's focus on it, or a finger's tap. */
 type Mode = "focus" | "hover" | "tap";
 
-type Shown = { readonly mode: Mode; readonly anchor: Box | null };
-
 type PointerLike = { readonly nativeEvent?: { readonly pointerType?: string } };
 
 /** The web has no host to set up: the bubble goes straight into the page's body. */
@@ -178,6 +176,7 @@ export const Tooltip = ({
   label,
   showsOnTap = true,
 }: TooltipProps) => {
+  type Shown = { readonly mode: Mode; readonly anchor: Box | null };
   const id = useId();
   const wrapperRef = useRef<View>(null);
   const [shown, setShown] = useState<null | Shown>(null);

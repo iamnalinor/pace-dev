@@ -93,12 +93,12 @@ export const fetchPreview = async (url: string, fetcher: Fetcher): Promise<LinkP
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const type = response.headers.get("content-type") ?? "";
-    return !response.ok || !type.includes("text/html")
-      ? base
-      : {
+    return response.ok && type.includes("text/html")
+      ? {
           ...base,
           ...parsePreview(await readHead(response), response.url === "" ? url : response.url),
-        };
+        }
+      : base;
   } catch {
     return base;
   }

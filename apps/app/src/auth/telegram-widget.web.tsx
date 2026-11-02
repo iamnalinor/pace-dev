@@ -9,8 +9,6 @@ const WIDGET_SRC = "https://telegram.org/js/telegram-widget.js?22";
 /** After this long without the button, say so: telegram.org is slow from some networks. */
 const SLOW_AFTER_MS = 4000;
 
-type Phase = "failed" | "loading" | "ready" | "slow";
-
 type Props = {
   readonly botUsername: string;
   /** Accessible name for the button iframe the script injects (it ships without one). */
@@ -58,6 +56,7 @@ The Telegram Login Widget (web only): after a login Telegram redirects to `/auth
 which hands the signed payload back to this widget on the page that started the flow.
 */
 export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => {
+  type Phase = "failed" | "loading" | "ready" | "slow";
   const hostRef = useRef<HTMLDivElement>(null);
   const onAuthRef = useRef(onAuth);
   const [phase, setPhase] = useState<Phase>("loading");

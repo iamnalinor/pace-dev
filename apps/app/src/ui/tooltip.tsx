@@ -14,13 +14,6 @@ import type { TooltipProps } from "./tooltip-props.ts";
 
 import { type Box, placeTooltip, type Size, TAP_TOOLTIP_MS } from "./tooltip-place.ts";
 
-type Shown = {
-  readonly id: number;
-  readonly label: string;
-  /** Where the trigger is; null until it has been measured. */
-  readonly anchor: Box | null;
-};
-
 type Host = {
   /** Shows `label` over the trigger, in place of any other tooltip; returns its id. */
   readonly show: (label: string, trigger: RefObject<null | View>) => number;
@@ -39,6 +32,12 @@ const Bubble = ({ label }: { readonly label: string }) => (
 
 /** The shown tooltip and the timer that takes it away. */
 const useShown = () => {
+  type Shown = {
+    readonly id: number;
+    readonly label: string;
+    /** Where the trigger is; null until it has been measured. */
+    readonly anchor: Box | null;
+  };
   const [shown, setShown] = useState<null | Shown>(null);
   const timerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
   const nextIdRef = useRef(0);

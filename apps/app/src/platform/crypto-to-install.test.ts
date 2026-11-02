@@ -1,4 +1,4 @@
-import { cryptoToInstall } from "./random-values.ts";
+import { cryptoToInstall } from "./crypto-to-install.ts";
 
 const fill = (array: Uint8Array): Uint8Array => array.fill(7);
 const own = (array: Uint8Array): Uint8Array => array.fill(1);

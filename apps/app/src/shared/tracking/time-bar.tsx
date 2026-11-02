@@ -207,15 +207,14 @@ const BarButton = ({ button, onTap, unavailable }: ButtonProps) => {
   );
 };
 
-/** The picker open: which button's (its view is read live, so Stop shows the moment it runs). */
-type Opened = { readonly id: TimeButtonView["id"]; readonly calendar: CalendarToday | null };
-
 /**
 Which picker is open. Calendar's opens once today's calendar is read; only the picker asked for
 last opens, so a read that answers late (another button tapped meanwhile, or the picker
 closed) opens nothing over what is there.
 */
 const usePicker = (readCalendar: () => Promise<CalendarToday>) => {
+  /** The picker open: which button's (its view is read live, so Stop shows the moment it runs). */
+  type Opened = { readonly id: TimeButtonView["id"]; readonly calendar: CalendarToday | null };
   const [opened, setOpened] = useState<null | Opened>(null);
   const askedRef = useRef<null | TimeButtonView["id"]>(null);
   return {

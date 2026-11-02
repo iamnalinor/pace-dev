@@ -155,9 +155,9 @@ export type ComposerDraft = { readonly text: string; readonly edits?: ComposerEd
 type Parsed = ReturnType<typeof parseQuickInput>;
 
 const chosenPreset = (state: CoreState, parsed: Parsed, edits: ComposerEdits): string =>
-  edits.presetId !== undefined && presetById(state.presets, edits.presetId) !== undefined
-    ? edits.presetId
-    : parsed.presetId;
+  edits.presetId === undefined || presetById(state.presets, edits.presetId) === undefined
+    ? parsed.presetId
+    : edits.presetId;
 
 const dueOf = (parsed: Parsed, edits: ComposerEdits): ComposerModel["due"] =>
   pick(

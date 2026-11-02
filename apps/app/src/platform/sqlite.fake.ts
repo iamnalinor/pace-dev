@@ -18,14 +18,13 @@ export type FakeSqlite = {
   readonly userVersion: () => number;
 };
 
-type Row = Record<string, unknown>;
-
 const toParams = (params: SQLiteBindParams): Readonly<Record<string, SQLInputValue>> =>
   Array.isArray(params)
     ? Object.fromEntries(params.map((value, index) => [String(index + 1), value as SQLInputValue]))
     : (params as Readonly<Record<string, SQLInputValue>>);
 
 export const createFakeSqlite = (): FakeSqlite => {
+  type Row = Record<string, unknown>;
   const executed: string[] = [];
   const prepared: string[] = [];
   const count = { opens: 0, transactions: 0 };
