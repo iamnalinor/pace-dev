@@ -49,6 +49,18 @@ describe("assoc", () => {
     });
   });
 
+  it("a map the outer batch made and an inner batch answers as it is stays as answered", () => {
+    inBatch(() => {
+      const outerMap = assoc(assoc<number>({}, "a", 1), "b", 2);
+      const answered = inBatch(() => outerMap);
+      const later = assoc(outerMap, "c", 3);
+      expect(answered).toEqual({ a: 1, b: 2 });
+      expect(Object.isFrozen(answered)).toBe(true);
+      expect(later).toEqual({ a: 1, b: 2, c: 3 });
+      expect(assoc(later, "d", 4)).toBe(later);
+    });
+  });
+
   it("a batch that throws still ends: later writes copy, its maps are frozen", () => {
     const made: Entries[] = [];
     expect(() =>

@@ -1,7 +1,7 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import type { Event } from "../events/event-schema.ts";
+import type { Event, EventOf } from "../events/event-schema.ts";
 
 import { ACTIVITY_CATEGORIES } from "../events/payloads.ts";
 import { sortEvents } from "../events/sort.ts";
@@ -10,39 +10,115 @@ import { effectiveEvents, materialize, materializeAt } from "./materializer.ts";
 import { yearOfUse } from "./year-of-use.fake.ts";
 
 /**
-The same reducers folded one event at a time, the way the client integrates a local action: every
-step copies what it changes, so this is the reducers' plain (old) semantics, the oracle of the
-batch that `materialize` runs.
+A main start as the time reducer did it before the batch, written out here so the oracle shares
+nothing with `closeRunning`, `OPEN_MAIN` or `keysWhere`: every activity is scanned and each open
+main one started by then is closed; the new activity is then added through the reducer's alongside
+path (which closes nothing) and marked main again.
+*/
+const scannedMainStart = (state: CoreState, event: EventOf<"activity.started">): CoreState => {
+  const { activityId } = event.payload;
+  const at = event.occurredAt;
+  const closed = Object.fromEntries(
+    Object.entries(state.time.activities).map(([id, activity]) => [
+      id,
+      !activity.isLogged &&
+      !activity.isAlongside &&
+      activity.endAt === null &&
+      activity.startAt <= at
+        ? { ...activity, endAt: at }
+        : activity,
+    ]),
+  );
+  const added = coreReducer(
+    { ...state, time: { activities: closed } },
+    { ...event, payload: { ...event.payload, alongside: true } },
+  );
+  const made = added.time.activities[activityId];
+  return made === undefined
+    ? added
+    : {
+        ...added,
+        time: {
+          activities: { ...added.time.activities, [activityId]: { ...made, isAlongside: false } },
+        },
+      };
+};
+
+const oracleStep = (state: CoreState, event: Event): CoreState =>
+  event.type === "activity.started" &&
+  event.payload.alongside !== true &&
+  !Object.hasOwn(state.time.activities, event.payload.activityId)
+    ? scannedMainStart(state, event)
+    : coreReducer(state, event);
+
+/**
+The reducers folded one event at a time, the way the client integrates a local action: every step
+copies what it changes, so this is the reducers' plain (old) semantics, the oracle of the batch
+that `materialize` runs; a main start closes what it closes by the scan above.
 */
 const oneByOne = (events: readonly Event[]): CoreState => {
   const ordered = sortEvents(effectiveEvents(events));
   let state = INITIAL_CORE_STATE;
   for (const event of ordered) {
-    state = coreReducer(state, event);
+    state = oracleStep(state, event);
   }
   return state;
 };
 
-/** The fastest of a few rebuilds (after a warm-up): the least noisy reading of what one costs. */
-const rebuildMs = (events: readonly Event[]): number => {
+const rebuildOnceMs = (events: readonly Event[]): number => {
+  const start = performance.now();
   materialize(events, coreReducer, INITIAL_CORE_STATE);
-  let best = Infinity;
-  for (let run = 0; run < 5; run += 1) {
-    const start = performance.now();
-    materialize(events, coreReducer, INITIAL_CORE_STATE);
-    best = Math.min(best, performance.now() - start);
+  return performance.now() - start;
+};
+
+type Reading = { readonly shortMs: number; readonly longMs: number };
+
+/**
+The fastest of several rebuilds of each log (after a warm-up), the two measured in turn, so a burst
+of load from the other test files running alongside slows both alike or neither for good.
+*/
+const fastestRebuildsMs = (short: readonly Event[], long: readonly Event[]): Reading => {
+  rebuildOnceMs(short);
+  rebuildOnceMs(long);
+  let shortMs = Infinity;
+  let longMs = Infinity;
+  for (let round = 0; round < 7; round += 1) {
+    shortMs = Math.min(shortMs, rebuildOnceMs(short));
+    longMs = Math.min(longMs, rebuildOnceMs(long));
+  }
+  return { longMs, shortMs };
+};
+
+const RATIO_MAX = 5;
+const LONG_MS_MAX = 300;
+
+/**
+Up to three readings, the one with the lowest ratio kept. The other test files run alongside and
+can crowd the larger log out of the shared caches for a whole reading (measured under the full
+suite on 4 cores: 3.0–5.7 for one reading, 2.8–3.5 alone); a fold that copies the history per
+event reads 15–18 every time (more than twice the bound: no second chance), so a retry never lets
+one through.
+*/
+const bestReading = (short: readonly Event[], long: readonly Event[]): Reading => {
+  let best: Reading = { longMs: Infinity, shortMs: 1 };
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const reading = fastestRebuildsMs(short, long);
+    if (reading.longMs / reading.shortMs > 2 * RATIO_MAX) {
+      return reading;
+    }
+    best = reading.longMs / reading.shortMs < best.longMs / best.shortMs ? reading : best;
+    if (best.longMs / best.shortMs <= RATIO_MAX && best.longMs <= LONG_MS_MAX) {
+      return best;
+    }
   }
   return best;
 };
 
 describe("materialize: cost over a year of history (bug-lessons class 55)", () => {
   it("rebuilds in time linear in the log: 8,000 events cost at most 5× 2,000, within 300 ms", () => {
-    const short = yearOfUse(2000, 7);
-    const long = yearOfUse(8000, 7);
-    const shortMs = rebuildMs(short);
-    const longMs = rebuildMs(long);
-    expect(longMs / shortMs).toBeLessThanOrEqual(5);
-    expect(longMs).toBeLessThanOrEqual(300);
+    const { longMs, shortMs } = bestReading(yearOfUse(2000, 7), yearOfUse(8000, 7));
+    expect(longMs / shortMs).toBeLessThanOrEqual(RATIO_MAX);
+    expect(longMs).toBeLessThanOrEqual(LONG_MS_MAX);
   });
 });
 
@@ -210,7 +286,13 @@ describe("materialize: what it answers stays the caller's, immutable", () => {
 
   it("answers maps nobody can write to", () => {
     const state = materialize(yearOfUse(2000, 5), coreReducer, INITIAL_CORE_STATE);
-    const maps = [state.time.activities, state.tasks.byId, state.projects.byId, state.series.byId];
+    const maps = [
+      state.time.activities,
+      state.tasks.byId,
+      state.projects.byId,
+      state.presets.byId,
+      state.series.byId,
+    ];
     expect(maps.every((map) => Object.isFrozen(map))).toBe(true);
   });
 });

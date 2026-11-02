@@ -85,7 +85,7 @@ export {
   TaskStatusSchema,
   TimeZoneSchema,
 } from "./events/payloads.ts";
-export { sortEvents } from "./events/sort.ts";
+export { mergeEvents, sortEvents } from "./events/sort.ts";
 export { capitalize, initials, splitGraphemes } from "./format/initials.ts";
 export { formatCount, formatNumber, formatPercent, type NumberOptions } from "./format/numbers.ts";
 export { en } from "./i18n/en.ts";

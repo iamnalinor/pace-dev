@@ -140,6 +140,8 @@ export default defineConfig([
     "apps/app/src/ui/generated/",
     // Parallel agents' git worktrees: each is a whole checkout with its own config.
     ".claude/worktrees/",
+    // Gitignored tool output (ESLint's own cache, screenshot runs with their Playwright traces).
+    ".cache/",
   ]),
 
   // ── Base: JS + TypeScript, type-aware ───────────────────────────────────────

@@ -13,6 +13,7 @@ import {
   INITIAL_TASKS_STATE,
   INITIAL_TIME_STATE,
   materialize,
+  mergeEvents,
   newId,
   ok,
   parseEvent,
@@ -169,7 +170,10 @@ const rebuild = (state: AppState, all: readonly Event[]): AppState => {
   };
 };
 
-/** Incremental path: every event is in order and none is a correction. */
+/**
+Incremental path: every event is in order and none is a correction. The fresh events are merged
+into the sorted `events` and `log`, never sorted with them again (class 55).
+*/
 const applyInOrder = (state: AppState, fresh: readonly Event[]): AppState => {
   const sorted = sortEvents(fresh);
   let folded = state;
@@ -178,9 +182,9 @@ const applyInOrder = (state: AppState, fresh: readonly Event[]): AppState => {
   }
   return {
     ...folded,
-    events: sortEvents([...state.events, ...sorted]),
+    events: mergeEvents(state.events, sorted),
     lastAppliedOccurredAt: sorted.at(-1)?.occurredAt ?? state.lastAppliedOccurredAt,
-    log: sortEvents([...state.log, ...sorted]),
+    log: mergeEvents(state.log, sorted),
     version: state.version + 1,
   };
 };

@@ -135,8 +135,12 @@ A full rebuild costs time linear in the log (bug-lessons class 55): `materialize
 `materializeAt` fold as one batch (`materialize/transient.ts`), in which a reducer's map writes
 (`assoc`, `putById`) copy a map once and then write that copy in place, and a subset of a map is
 read through a kept index (`keysWhere`), never by scanning the map per event. Outside a batch
-(the incremental `apply`) the same calls copy, and the batch's maps are frozen before it answers,
-so callers only ever hold immutable state. `materialize-cost.test.ts` holds the budget.
+(the incremental `apply`) the same calls copy. After a rebuild the maps it made are frozen (a batch
+nested in another freezes the outer one's maps first, see `inBatch`); on the incremental path every
+change makes new objects, immutable by type and lint, and leaves the frozen ones alone.
+`materialize-cost.test.ts` holds the budget. The client merges an action's events into its sorted
+`events` and `log` with `mergeEvents` (a binary search and a copy) instead of sorting them again;
+`state-cost.test.ts` holds that per-action budget.
 
 High-volume phone facts (the calendar copy, app usage) are **not** events. They have
 their own tables in the Durable Object (`calendar_events`, `usage_sessions`, and `phone_uses`:

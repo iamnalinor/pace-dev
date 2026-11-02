@@ -30,7 +30,7 @@ type Step = (at: number) => readonly Body[];
 A year of the owner's use, `count` events long and the same for one `seed`: live activities
 (started, stopped, relabelled, adjusted, alongside ones), blocks logged afterwards and calendar
 events attended (system `activity.logged`), tasks with subtasks checked off, closed and reopened,
-projects, a series, settings, and corrections (amendments and revocations, a revocation revoked).
+projects, presets, a series, settings, and corrections (amendments and revocations, a revocation revoked).
 The events come in the order they occurred; a logged block covers time before its event.
 */
 export const yearOfUse = (count: number, seed = 1): readonly Event[] => {
@@ -164,6 +164,12 @@ export const yearOfUse = (count: number, seed = 1): readonly Event[] => {
     projects.push(projectId);
     return [{ payload: { name: `Project ${made}`, projectId }, type: "project.created" }];
   };
+  const preset: Step = () => [
+    {
+      payload: { definition: {}, id: `own-${made}`, name: `Preset ${made}` },
+      type: "preset.created",
+    },
+  ];
   const settings: Step = () => [
     { payload: { nightHours: random() < 0.5 }, type: "settings.updated" },
   ];
@@ -221,6 +227,7 @@ export const yearOfUse = (count: number, seed = 1): readonly Event[] => {
     [10, reopened],
     [30, status],
     [5, project],
+    [2, preset],
     [3, settings],
     [2, series],
     [45, amended],

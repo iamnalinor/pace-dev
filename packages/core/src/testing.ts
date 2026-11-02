@@ -24,6 +24,7 @@ export {
   TRK_NOW,
   TRK_START,
 } from "./materialize/task-fixture.fake.ts";
+export { yearOfUse } from "./materialize/year-of-use.fake.ts";
 export {
   ALGEBRA_ID,
   artboardEvents,

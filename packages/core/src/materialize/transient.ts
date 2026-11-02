@@ -31,18 +31,30 @@ const scope: { current: Batch | null } = { current: null };
 
 export const keyIndex = <V>(isMember: (value: V) => boolean): KeyIndex<V> => ({ isMember });
 
-/** Runs `work` as one batch: `assoc` writes the maps it made in place; they are frozen at the end. */
+const newBatch = (): Batch => ({ indexes: new WeakMap(), made: [], owned: new WeakSet() });
+
+const freezeMade = (batch: Batch | null): void => {
+  const made = batch?.made ?? [];
+  for (const map of made) {
+    Object.freeze(map);
+  }
+};
+
+/**
+Runs `work` as one batch: `assoc` writes the maps it made in place; they are frozen at the end.
+A batch inside another may answer maps the outer one made (a state it was given and left as it
+was), so starting it freezes them, and the outer one goes on as a new batch that owns none of
+them: every map a batch has handed out is frozen, nested or not.
+*/
 export const inBatch = <T>(work: () => T): T => {
-  const outer = scope.current;
-  const batch: Batch = { indexes: new WeakMap(), made: [], owned: new WeakSet() };
-  scope.current = batch;
+  const isNested = scope.current !== null;
+  freezeMade(scope.current);
+  scope.current = newBatch();
   try {
     return work();
   } finally {
-    scope.current = outer;
-    for (const map of batch.made) {
-      Object.freeze(map);
-    }
+    freezeMade(scope.current);
+    scope.current = isNested ? newBatch() : null;
   }
 };
 
