@@ -14,19 +14,19 @@ the QA agents of rounds 15–20 (time and token cost).
 
 **Builds and diffs.** Each qa-round file names the build it tested. Round pairs and their app diffs:
 
-| Round | Build | Diff from previous round's build | App src files changed |
-|---|---|---|---:|
-| R10 | PR 2 branch ≈ `34aec27` | `0cea8a9..34aec27` (PR 1 → PR 2 checkpoint) | large |
-| R11 | `0c52077` | `34aec27..0c52077` | 15 (direct) |
-| R12 | `5aa3565` | `0c52077..5aa3565` | 5 |
-| R13 | `ea1fddd` | `5aa3565..ea1fddd` | 34 |
-| R14 | `6d7b8a1` | `ea1fddd..6d7b8a1` | 48 |
-| R15 | `4b6bb43` | `6d7b8a1..4b6bb43` | 135 |
-| R16 | `b2d97c2` | `4b6bb43..b2d97c2` | 16 |
-| R17 | `4140eb6` | `b2d97c2..4140eb6` | 103 |
-| R18 | `9c91fd5` | `4140eb6..9c91fd5` | 69 |
-| R19 | `8e84369` (+`4661dd1`) | `9c91fd5..8e84369` | 32 |
-| R20 | `09f421d` | `8e84369..09f421d` | 52 |
+| Round | Build                   | Diff from previous round's build            | App src files changed |
+| ----- | ----------------------- | ------------------------------------------- | --------------------: |
+| R10   | PR 2 branch ≈ `34aec27` | `0cea8a9..34aec27` (PR 1 → PR 2 checkpoint) |                 large |
+| R11   | `0c52077`               | `34aec27..0c52077`                          |           15 (direct) |
+| R12   | `5aa3565`               | `0c52077..5aa3565`                          |                     5 |
+| R13   | `ea1fddd`               | `5aa3565..ea1fddd`                          |                    34 |
+| R14   | `6d7b8a1`               | `ea1fddd..6d7b8a1`                          |                    48 |
+| R15   | `4b6bb43`               | `6d7b8a1..4b6bb43`                          |                   135 |
+| R16   | `b2d97c2`               | `4b6bb43..b2d97c2`                          |                    16 |
+| R17   | `4140eb6`               | `b2d97c2..4140eb6`                          |                   103 |
+| R18   | `9c91fd5`               | `4140eb6..9c91fd5`                          |                    69 |
+| R19   | `8e84369` (+`4661dd1`)  | `9c91fd5..8e84369`                          |                    32 |
+| R20   | `09f421d`               | `8e84369..09f421d`                          |                    52 |
 
 **Scope B, two readings.** For every round I computed which of the 26 route files (`apps/app/app/**`, layouts excluded)
 reach a changed file, on the reverse import graph (`.web.tsx` mapped to its base file, since depcruise resolves the
@@ -39,10 +39,10 @@ base; scripts in `scratchpad/scripts/affected.ts`).
   shared primitives `src/ui`, `src/platform`, `app-state`, `runtime`, `_layout` and packages excluded):
 
 | R11 | R12 | R13 | R14 | R15 | R16 | R17 | R18 | R19 | R20 |
-|---|---|---|---|---|---|---|---|---|---|
-| 5 | 2 | 7 | 7 | 18 | 2 | 11 | 15 | 7 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 5   | 2   | 7   | 7   | 18  | 2   | 11  | 15  | 7   | 8   |
 
-  routes of 26 (lists in §1 notes). "In scope B?" below means B-direct unless it says otherwise.
+routes of 26 (lists in §1 notes). "In scope B?" below means B-direct unless it says otherwise.
 
 **How found** (primary category; secondary in brackets): (a) checking a previous round's fix; (b) exploring around a
 change; (c) the mechanical matrix (console, requests, raw keys, overflow, axe, landing URL, or a width/theme/language
@@ -57,53 +57,53 @@ element-level text clipping, axe, landing URL, a request-quiet window) would fla
 
 ## 1. Per-finding table: every medium+ finding of rounds 10–20 (45: 4 high, 41 medium)
 
-| R | Id | Sev | Screen (combo where it matters) | How found | In scope B? | Automatable by A? |
-|---|---|---|---|---|---|---|
-| 10 | H1 | high | Now, time bar («ем» → Other) | f (b) | yes (PR 2 changed Now, time bar) | no |
-| 10 | M1 | med | Now composer (title cut at 90) | f | yes | no |
-| 10 | M2 | med | Settings switches (no focus ring, 20 px) | h (c) | yes (Settings in PR 2 diff) | yes: axe `target-size` + focus-ring probe |
-| 10 | M3 | med | Now, assistant card shows too little | b (f) | yes | no |
-| 10 | M4 | med | Now **390 only**, two running: bar eats half | c-width (f) | yes | no (layout judgement) |
-| 10 | M5 | med | Settings, destructive confirm in lime | e (colour) | yes | no |
-| 10 | M6 | med | Login, bot wait dead end | d (e) | yes | no |
-| 11 | H1 | high | Now **390 only**, folded bar never folds on load | a (R10 M4 fix) (c-width) | yes | no (class 8; app test mounted with store loaded) |
-| 11 | M1 | med | Now card, questions without options | b | yes | no |
-| 11 | M2 | med | Task screen/rows: repeat invisible | e "state you can see" (b) | yes | no |
-| 11 | M3 | med | New task, monthly series far deadline | b | yes | no |
-| 11 | M4 | med | `/decisions`: raw rule keys, provider name | b → g (downstream of the assistant change) | **no**: decisions untouched; the dependency is data (events), not imports | no (not i18n keys) |
-| 11 | M5 | med | Settings **RU + 390 only**: confirm label spills | a (R10 M5 fix) (c-combo) | yes | **yes**: element clipping check (R12 verified it that way); not guarded per route |
-| 11 | M6 | med | Time bar Task picker, series instances | d | yes | no |
-| 13 | H1 | high | Task → Edit, repeat again after stop | b | yes | no |
-| 13 | M1 | med | `/decisions`, correction thread "created twice" | b | yes | no |
-| 13 | M2 | med | Composer: `/api/parse` sent twice | b (network log) | yes | yes (duplicate-request window); guarded `composer.e2e.ts` |
-| 13 | M3 | med | `/decisions`, approved edit "shown for approval" | b | yes | no |
-| 13 | M4 | med | Time bar `#ask` | d | yes | no |
-| 14 | M1 | med | Edit card does not say the new value | d (b) | yes | no |
-| 14 | M2 | med | Card Cancel + toast Undo, **RU only** «Отменить» twice | e copy (c-lang) | yes | no |
-| 14 | M3 | med | `/decisions`, thread shows last turn only | b | yes | no |
-| 15 | H1 | high | `/notifications`: ~70 req/s loop, bell never clears | b (network log) | yes | **yes** (request-quiet window); guarded `notifications.e2e.ts` (one screen) |
-| 15 | M1 | med | Settings, end an already-ended session | b | yes | no |
-| 15 | M2 | med | Add a computer: Enter does nothing | h | yes | no; guarded `sessions.e2e.ts` |
-| 15 | M3 | med | Settings **390 only**: confirm order | c-width (e) | yes | no (convention); guarded `sessions.e2e.ts` |
-| 15 | M4 | med | Settings, focus lost after revoke | h | yes | no; guarded |
-| 16 | M1 | med | Feed "Not me" drops focus | a (R15 L11 change) (h) | yes | no; guarded `notifications.e2e.ts` |
-| 17 | M1 | med | Second tab of one profile stale | b (brief: "a second tab") | yes | no; guarded `live.e2e.ts` |
-| 17 | M2 | med | `/day`, `/inbox` by URL rewrite to `/` | c (sweep landing URL) | partial (Day yes, Inbox no; B-graph yes) | **already guarded** `route-sweep.e2e.ts` `expectedLanding` |
-| 17 | M3 | med | `/add` PWA share target drops text | d (f feedback-4) | yes, weakly (composer reached; the share path itself never changed) | no; guarded `composer.e2e.ts` |
-| 17 | M4 | med | Every data screen on a cold first sync, RU account | b (re-pull) (f skeletons) | yes (client sync changed) | partly (route sweep with a held pull); guarded per route `sync-state.e2e.ts` |
-| 17 | M5 | med | Offline: nothing says so | s (f) | yes (Now) | no; guarded `sync-state.e2e.ts` |
-| 17 | M6 | med | Sidebar **1440 only**: name cut to "D…" (since R10 L8) | c (sweep screenshots) (f feedback-4) | **no**: `sidebar.tsx` untouched in R17 (B-graph yes via `_layout`) | **yes**: element clipping; guarded `smoke.e2e.ts` (this element only) |
-| 17 | M7 | med | Icon-only buttons, **1440 only**, no tooltip | e (f) | partial (task screen yes; Day, Week no) | yes (structural); guarded `tooltips.e2e.ts` (every route) |
-| 18 | M1 | med | Edit task + pickers open focused on the dim | h | yes (task header, time bar changed; `Sheet` untouched) | yes (open each sheet, assert focus); guarded `sheet-focus.e2e.ts` |
-| 18 | M2 | med | Composer: Enter on empty line types `\n` | h (d) | yes | no; app test |
-| 18 | M3 | med | Day sheet: end before start, three answers | a (R17 L14 fix) | yes | no |
-| 18 | M4 | med | Server down while idle: no offline line | a (R17 M5 fix) (s) | yes | no; guarded `sync-state.e2e.ts` |
-| 18 | M5 | med | First-sync cover; EN empty copy for RU account | a (R17 M4 fix) (c-lang) | yes | partly; guarded |
-| 19 | M1 | med | Day **and `/decisions`** print zeros during first sync | a (R18 M5 fix, swept over all routes) | partial (Day yes, `/decisions` **no**; it does not import `empty-state.tsx`, the file the fix changed) | yes (generic held-pull route sweep); guarded for `/day`, `/decisions` only |
-| 19 | M2 | med | Done's other times only by an untold long press | e "every control earns its place" (f) | screen yes (Now's task pane), **flow no** (Done/close untouched in R19) | no; guarded `tooltips.e2e.ts` |
-| 20 | M1 | med | **Settings** and Presets draw defaults, live switches overwrite the account | a (R19 M1 fix, swept over all routes) | partial (Presets yes, **Settings no**; B-graph yes via `sheet.tsx`) | yes (same held-pull sweep); guarded for these two |
-| 20 | M2 | med | Close sheet: Cancelled/Skipped drops focus | a (R19 M2 fix) (h) | yes | no |
-| 20 | M3 | med | Share into the same page wipes the half-typed line | a (R19 L4 fix) | yes | no; guarded `composer.e2e.ts` |
+| R   | Id  | Sev  | Screen (combo where it matters)                                             | How found                                  | In scope B?                                                                                            | Automatable by A?                                                                 |
+| --- | --- | ---- | --------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| 10  | H1  | high | Now, time bar («ем» → Other)                                                | f (b)                                      | yes (PR 2 changed Now, time bar)                                                                       | no                                                                                |
+| 10  | M1  | med  | Now composer (title cut at 90)                                              | f                                          | yes                                                                                                    | no                                                                                |
+| 10  | M2  | med  | Settings switches (no focus ring, 20 px)                                    | h (c)                                      | yes (Settings in PR 2 diff)                                                                            | yes: axe `target-size` + focus-ring probe                                         |
+| 10  | M3  | med  | Now, assistant card shows too little                                        | b (f)                                      | yes                                                                                                    | no                                                                                |
+| 10  | M4  | med  | Now **390 only**, two running: bar eats half                                | c-width (f)                                | yes                                                                                                    | no (layout judgement)                                                             |
+| 10  | M5  | med  | Settings, destructive confirm in lime                                       | e (colour)                                 | yes                                                                                                    | no                                                                                |
+| 10  | M6  | med  | Login, bot wait dead end                                                    | d (e)                                      | yes                                                                                                    | no                                                                                |
+| 11  | H1  | high | Now **390 only**, folded bar never folds on load                            | a (R10 M4 fix) (c-width)                   | yes                                                                                                    | no (class 8; app test mounted with store loaded)                                  |
+| 11  | M1  | med  | Now card, questions without options                                         | b                                          | yes                                                                                                    | no                                                                                |
+| 11  | M2  | med  | Task screen/rows: repeat invisible                                          | e "state you can see" (b)                  | yes                                                                                                    | no                                                                                |
+| 11  | M3  | med  | New task, monthly series far deadline                                       | b                                          | yes                                                                                                    | no                                                                                |
+| 11  | M4  | med  | `/decisions`: raw rule keys, provider name                                  | b → g (downstream of the assistant change) | **no**: decisions untouched; the dependency is data (events), not imports                              | no (not i18n keys)                                                                |
+| 11  | M5  | med  | Settings **RU + 390 only**: confirm label spills                            | a (R10 M5 fix) (c-combo)                   | yes                                                                                                    | **yes**: element clipping check (R12 verified it that way); not guarded per route |
+| 11  | M6  | med  | Time bar Task picker, series instances                                      | d                                          | yes                                                                                                    | no                                                                                |
+| 13  | H1  | high | Task → Edit, repeat again after stop                                        | b                                          | yes                                                                                                    | no                                                                                |
+| 13  | M1  | med  | `/decisions`, correction thread "created twice"                             | b                                          | yes                                                                                                    | no                                                                                |
+| 13  | M2  | med  | Composer: `/api/parse` sent twice                                           | b (network log)                            | yes                                                                                                    | yes (duplicate-request window); guarded `composer.e2e.ts`                         |
+| 13  | M3  | med  | `/decisions`, approved edit "shown for approval"                            | b                                          | yes                                                                                                    | no                                                                                |
+| 13  | M4  | med  | Time bar `#ask`                                                             | d                                          | yes                                                                                                    | no                                                                                |
+| 14  | M1  | med  | Edit card does not say the new value                                        | d (b)                                      | yes                                                                                                    | no                                                                                |
+| 14  | M2  | med  | Card Cancel + toast Undo, **RU only** «Отменить» twice                      | e copy (c-lang)                            | yes                                                                                                    | no                                                                                |
+| 14  | M3  | med  | `/decisions`, thread shows last turn only                                   | b                                          | yes                                                                                                    | no                                                                                |
+| 15  | H1  | high | `/notifications`: ~70 req/s loop, bell never clears                         | b (network log)                            | yes                                                                                                    | **yes** (request-quiet window); guarded `notifications.e2e.ts` (one screen)       |
+| 15  | M1  | med  | Settings, end an already-ended session                                      | b                                          | yes                                                                                                    | no                                                                                |
+| 15  | M2  | med  | Add a computer: Enter does nothing                                          | h                                          | yes                                                                                                    | no; guarded `sessions.e2e.ts`                                                     |
+| 15  | M3  | med  | Settings **390 only**: confirm order                                        | c-width (e)                                | yes                                                                                                    | no (convention); guarded `sessions.e2e.ts`                                        |
+| 15  | M4  | med  | Settings, focus lost after revoke                                           | h                                          | yes                                                                                                    | no; guarded                                                                       |
+| 16  | M1  | med  | Feed "Not me" drops focus                                                   | a (R15 L11 change) (h)                     | yes                                                                                                    | no; guarded `notifications.e2e.ts`                                                |
+| 17  | M1  | med  | Second tab of one profile stale                                             | b (brief: "a second tab")                  | yes                                                                                                    | no; guarded `live.e2e.ts`                                                         |
+| 17  | M2  | med  | `/day`, `/inbox` by URL rewrite to `/`                                      | c (sweep landing URL)                      | partial (Day yes, Inbox no; B-graph yes)                                                               | **already guarded** `route-sweep.e2e.ts` `expectedLanding`                        |
+| 17  | M3  | med  | `/add` PWA share target drops text                                          | d (f feedback-4)                           | yes, weakly (composer reached; the share path itself never changed)                                    | no; guarded `composer.e2e.ts`                                                     |
+| 17  | M4  | med  | Every data screen on a cold first sync, RU account                          | b (re-pull) (f skeletons)                  | yes (client sync changed)                                                                              | partly (route sweep with a held pull); guarded per route `sync-state.e2e.ts`      |
+| 17  | M5  | med  | Offline: nothing says so                                                    | s (f)                                      | yes (Now)                                                                                              | no; guarded `sync-state.e2e.ts`                                                   |
+| 17  | M6  | med  | Sidebar **1440 only**: name cut to "D…" (since R10 L8)                      | c (sweep screenshots) (f feedback-4)       | **no**: `sidebar.tsx` untouched in R17 (B-graph yes via `_layout`)                                     | **yes**: element clipping; guarded `smoke.e2e.ts` (this element only)             |
+| 17  | M7  | med  | Icon-only buttons, **1440 only**, no tooltip                                | e (f)                                      | partial (task screen yes; Day, Week no)                                                                | yes (structural); guarded `tooltips.e2e.ts` (every route)                         |
+| 18  | M1  | med  | Edit task + pickers open focused on the dim                                 | h                                          | yes (task header, time bar changed; `Sheet` untouched)                                                 | yes (open each sheet, assert focus); guarded `sheet-focus.e2e.ts`                 |
+| 18  | M2  | med  | Composer: Enter on empty line types `\n`                                    | h (d)                                      | yes                                                                                                    | no; app test                                                                      |
+| 18  | M3  | med  | Day sheet: end before start, three answers                                  | a (R17 L14 fix)                            | yes                                                                                                    | no                                                                                |
+| 18  | M4  | med  | Server down while idle: no offline line                                     | a (R17 M5 fix) (s)                         | yes                                                                                                    | no; guarded `sync-state.e2e.ts`                                                   |
+| 18  | M5  | med  | First-sync cover; EN empty copy for RU account                              | a (R17 M4 fix) (c-lang)                    | yes                                                                                                    | partly; guarded                                                                   |
+| 19  | M1  | med  | Day **and `/decisions`** print zeros during first sync                      | a (R18 M5 fix, swept over all routes)      | partial (Day yes, `/decisions` **no**; it does not import `empty-state.tsx`, the file the fix changed) | yes (generic held-pull route sweep); guarded for `/day`, `/decisions` only        |
+| 19  | M2  | med  | Done's other times only by an untold long press                             | e "every control earns its place" (f)      | screen yes (Now's task pane), **flow no** (Done/close untouched in R19)                                | no; guarded `tooltips.e2e.ts`                                                     |
+| 20  | M1  | med  | **Settings** and Presets draw defaults, live switches overwrite the account | a (R19 M1 fix, swept over all routes)      | partial (Presets yes, **Settings no**; B-graph yes via `sheet.tsx`)                                    | yes (same held-pull sweep); guarded for these two                                 |
+| 20  | M2  | med  | Close sheet: Cancelled/Skipped drops focus                                  | a (R19 M2 fix) (h)                         | yes                                                                                                    | no                                                                                |
+| 20  | M3  | med  | Share into the same page wipes the half-typed line                          | a (R19 L4 fix)                             | yes                                                                                                    | no; guarded `composer.e2e.ts`                                                     |
 
 R12 (verification round) had no medium+ (3 lows: Settings danger confirm wrap, phone bar with a parallel activity, axe on
 Week). Rounds 1–9 were spot-checked: 62 medium+ in R1–R6, nearly all on screens a stage had just rebuilt; the matrix-type
@@ -113,17 +113,17 @@ were fix re-checks.
 
 ### Low findings logged in bug-lessons (QA-sourced), compact
 
-| R | Ids (how found → B-direct) |
-|---|---|
-| 13 | L7 b→yes; L10 b→yes |
-| 14 | L1/L2 b→yes; L3 b→yes; L4 b→yes; L5 e→yes; L6 d→yes; L7 b→yes; L8 h→yes; L9 b→yes |
-| 11/14/15 | Insights RU 390 `scrollable-region-focusable` (axe, c-combo) → **no** in R11, R14, R15 (Insights untouched) |
-| 15 | L2 b→yes; L11 b→yes |
-| 16 | L1 b→yes; L2 h→yes; L6 e→yes |
-| 17 | L1 b→yes; L2 c-390→yes; L3 e (carried since R10 L7)→screen yes, flow no; L4 d→yes; L5 e→yes; L6 h→yes; L7 e→yes; **L8 axe Week→no**; L9 e/theme→yes; L10 e→yes; L11 g→yes; L12 c RU+390→yes; L13 c-lang→yes; L14 b→yes; **L15 e Week→no**; **L16 b `/decisions`→no** |
-| 18 | L1 h→yes; L2 a→yes; L3 b→yes; L9 h→yes; L12 e→yes |
-| 19 | L1 a/h→yes; L2 a, dark only→yes; L3 e→yes; L4 a→yes; L6 e (carried)→screen yes, flow no; **L7 e Presets→no** |
-| 20 | **L1 a/h touch, Settings→no**; L2 a→yes; L3 a→yes; L4 b→yes; L5/L8 b→yes; L6/L7 b/h→yes; L9 c-network→yes |
+| R        | Ids (how found → B-direct)                                                                                                                                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 13       | L7 b→yes; L10 b→yes                                                                                                                                                                                                                                                  |
+| 14       | L1/L2 b→yes; L3 b→yes; L4 b→yes; L5 e→yes; L6 d→yes; L7 b→yes; L8 h→yes; L9 b→yes                                                                                                                                                                                    |
+| 11/14/15 | Insights RU 390 `scrollable-region-focusable` (axe, c-combo) → **no** in R11, R14, R15 (Insights untouched)                                                                                                                                                          |
+| 15       | L2 b→yes; L11 b→yes                                                                                                                                                                                                                                                  |
+| 16       | L1 b→yes; L2 h→yes; L6 e→yes                                                                                                                                                                                                                                         |
+| 17       | L1 b→yes; L2 c-390→yes; L3 e (carried since R10 L7)→screen yes, flow no; L4 d→yes; L5 e→yes; L6 h→yes; L7 e→yes; **L8 axe Week→no**; L9 e/theme→yes; L10 e→yes; L11 g→yes; L12 c RU+390→yes; L13 c-lang→yes; L14 b→yes; **L15 e Week→no**; **L16 b `/decisions`→no** |
+| 18       | L1 h→yes; L2 a→yes; L3 b→yes; L9 h→yes; L12 e→yes                                                                                                                                                                                                                    |
+| 19       | L1 a/h→yes; L2 a, dark only→yes; L3 e→yes; L4 a→yes; L6 e (carried)→screen yes, flow no; **L7 e Presets→no**                                                                                                                                                         |
+| 20       | **L1 a/h touch, Settings→no**; L2 a→yes; L3 a→yes; L4 b→yes; L5/L8 b→yes; L6/L7 b/h→yes; L9 c-network→yes                                                                                                                                                            |
 
 Code-review rows of the same period (R17 review I1–I3, m1–m11, round-3 C1, round-4 R1–R4, fix round 5 V1–V7) are a
 different population: races, state machines, one-shots, cut connections. QA found none of those; the parallel review is
@@ -134,8 +134,8 @@ not replaceable by QA or vice versa.
 **Medium+ (45) by how found (primary):**
 
 | a fix check | b around change | c matrix/combo | d entry paths | e heuristics | f owner | g far | h keyboard | s states |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 10 | 14 | 4 | 4 | 5 | 2 | 0 | 5 | 1 |
+| ----------: | --------------: | -------------: | ------------: | -----------: | ------: | ----: | ---------: | -------: |
+|          10 |              14 |              4 |             4 |            5 |       2 |     0 |          5 |        1 |
 
 - (a)+(b) = 24 (53 %), including 3 of the 4 highs. In R18–R20, 7 of 10 mediums came from checking the previous round's
   fixes; the rounds converge by verifying fixes and sweeping their class.
@@ -155,14 +155,14 @@ every logged round (the i18n catalogs are checked statically, `packages/core/src
 
 **Combos that produced a medium+ finding only in that combo:**
 
-| Dimension | Only-in-this-value medium+ findings |
-|---|---|
-| 390 px | R10 M4, R11 H1, R15 M3, R11 M5 (with RU) |
-| 1440 px | R17 M6 (sidebar), R17 M7 (hover tooltips) |
-| Russian | R14 M2, R11 M5 (with 390); account-language mismatch: R17 M4, R18 M5 (RU account in an EN browser) |
-| English | none |
-| Dark | none (dark-only findings in 20 rounds are all low: R5 QA5-13 and R6 QA6-9 contrast, R10 L10 toggle, R19 L2 skeleton) |
-| Light | none |
+| Dimension | Only-in-this-value medium+ findings                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------------------- |
+| 390 px    | R10 M4, R11 H1, R15 M3, R11 M5 (with RU)                                                                             |
+| 1440 px   | R17 M6 (sidebar), R17 M7 (hover tooltips)                                                                            |
+| Russian   | R14 M2, R11 M5 (with 390); account-language mismatch: R17 M4, R18 M5 (RU account in an EN browser)                   |
+| English   | none                                                                                                                 |
+| Dark      | none (dark-only findings in 20 rounds are all low: R5 QA5-13 and R6 QA6-9 contrast, R10 L10 toggle, R19 L2 skeleton) |
+| Light     | none                                                                                                                 |
 
 **Heuristics walk.** Medium+ from it: R10 M5, R11 M2, R14 M2, R17 M7, R19 M2, plus the keyboard line of the walk
 (R15 M2 "Enter submits", R18 M2). All were on screens in B-direct scope except R17 M7 (partly: Day, Week) and R19 M2
@@ -175,7 +175,7 @@ These are regex attributions over the transcripts, so treat them as ±5 points.
 
 ## 3. Counterexamples per optimisation (findings it would have missed)
 
-**A. Matrix into e2e, QA stops redoing it.** Missed only if QA also stops *looking*: R10 M4 (390 bar takes half of Now),
+**A. Matrix into e2e, QA stops redoing it.** Missed only if QA also stops _looking_: R10 M4 (390 bar takes half of Now),
 R15 M3 (phone confirm order) and R14 M2 (RU word collision) are visual or copy judgement, not generic checks. R11 M5 and
 R17 M6 are clipping, which a generic element-clipping check catches; neither is in the route sweep today (`smoke.e2e.ts`
 pins the sidebar name only). With the visual line kept ("look at each changed screen at 390 and 1440 in Russian"), A has
@@ -228,7 +228,7 @@ device id).
    - docs/qa.md prompt: replace "console errors and failed requests on every screen; translation gaps and raw keys;
      text overflow, contrast" with "the route sweep (`bun test:e2e route-sweep`) covers console, requests, raw keys,
      clipping and axe on every route × width × theme × language: do not script your own; look at the screens with your
-     eyes". **Keep** the "Visual matrix" heuristic: each *changed* screen at 390 and 1440 in Russian (R10 M4, R15 M3,
+     eyes". **Keep** the "Visual matrix" heuristic: each _changed_ screen at 390 and 1440 in Russian (R10 M4, R15 M3,
      R14 M2 need eyes).
    - Saves ≈ 6 min and ≈ 14 % of output tokens a round (measured R15–R20). Evidence: the last three matrices found
      nothing on 508 loads; in R10–R20 the matrix found one medium, already in e2e.
@@ -303,7 +303,7 @@ device id).
 
 ## 5. Caveats
 
-- B-direct used the *current* import graph for old diffs (files that no longer exist were dropped); the module layout
+- B-direct used the _current_ import graph for old diffs (files that no longer exist were dropped); the module layout
   was stable enough for a route-level answer, but a few early files (e.g. the removed `/devices` route) were not
   counted.
 - R10's base build is not recorded; `34aec27` (the last commit before the R10 report) is an approximation.

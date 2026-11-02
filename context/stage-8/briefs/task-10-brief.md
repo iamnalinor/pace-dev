@@ -8,6 +8,7 @@ D1 user), apps/app/src/features/settings/delete-account.tsx (inline confirm card
 `storeId` that changes on wipe and makes clients drop their local copy.
 
 ## Flow
+
 1. Settings → Danger zone: "Wipe data" and "Delete account" (ghost/warn buttons sized to content). Each opens an inline
    confirm (as delete-account does today) explaining what happens:
    - Wipe: "Every task, project, preset, tracked activity and notification goes. Your account, sign-ins and Telegram link
@@ -35,6 +36,7 @@ Rate limit: at most one pending confirmation per user per action (a new request 
 message is edited to "Replaced by a newer request").
 
 ## Tests
+
 API int: create → Telegram message sent (stubbed fetch) with both buttons; confirm via a simulated callback_query update to
 the webhook (see existing bot tests for how they post updates) wipes the store (storeId changes, events gone, user and
 session still valid) / deletes the account (session no longer valid); cancel; expiry; another Telegram user cannot

@@ -9,6 +9,7 @@ Term: **self-hosting** with a configurable server (not multitenancy or federatio
 instance; servers do not talk to each other).
 
 ## Server: instance info
+
 - Public `GET /api/instance` (contract first, no auth): `{ name: "Pace", version (the server's app version, e.g. from package.json /
   a build-time constant), protocol: integer (API protocol version — bump on breaking API changes), minClientProtocol: integer,
   botUsername (from TELEGRAM_BOT_USERNAME / BOT_INFO), webOrigin (WEB_ORIGIN or null), apiOrigin, loginMethods: ["telegram-widget",
@@ -19,6 +20,7 @@ instance; servers do not talk to each other).
   every call — add it in packages/client api-client) ("Update the app"). Set the initial values so today's app and server match.
 
 ## App: Change server
+
 - Login screen: a quiet "Server: pace.example.dev · Change" line; "Change server" opens a sheet: a URL field (https only, except
   http://localhost / 10.0.2.2 / private IPs for development), "Check" → calls `/api/instance`, shows name/version/bot, then "Use this
   server". "Reset to default" returns to the build's default (EXPO_PUBLIC_API_URL). Persist the chosen server (SecureStore on Android
@@ -39,6 +41,7 @@ instance; servers do not talk to each other).
   screen; after logging out the login screen offers Change server.
 
 ## Docs
+
 - docs/self-hosting.md: what you need (a Cloudflare account — Workers, D1, KV, Durable Objects on the free plan; a Telegram bot from
   BotFather; optional Groq/Gemini keys; optional Firebase), step by step: fork or clone, wrangler config (account id, D1 database id,
   KV namespace id), secrets (TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GROQ_API_KEY…, FIREBASE_SERVICE_ACCOUNT), vars
@@ -50,6 +53,7 @@ instance; servers do not talk to each other).
 - README: a short "Run your own server" section linking to it.
 
 ## Tests
+
 Core: protocol compatibility function (both directions). API int: /api/instance shape (no auth), 426 for an old X-Pace-Protocol, no
 header → accepted (web build loaded before the change) — decide and test. Client: the api client sends the header; switching servers
 clears the store and tokens. App: Change server sheet (check → use → persisted; invalid URL; unreachable; incompatible); the blocking

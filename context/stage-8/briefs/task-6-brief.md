@@ -9,7 +9,9 @@ Decision taken: the bar moves from Now to Day (it now holds a Task button and be
 Now keeps one compact row for the running activity.
 
 ## Buttons (packages/core/src/tracking/buttons.ts TIME_BUTTONS; apps/app/src/shared/tracking/time-bar.tsx,
+
 ## choices-sheet.tsx, use-calendar-button.ts)
+
 Four buttons in this order: Calendar, Task, Chores, Rest. Sport is removed as a button.
 - Every tap opens that button's picker (a Sheet; a dialog on wide windows). No «⋯», no long press, no right-click
   menu anywhere (delete `Ellipsis`, `contextMenuProps` usage, the long-press path, `time.more`).
@@ -29,6 +31,7 @@ Four buttons in this order: Calendar, Task, Chores, Rest. Sport is removed as a 
 - Core tests for TIME_BUTTONS (ids, order, choices); remove obsolete tests for removed behaviour.
 
 ## The bar on Day, a compact row on Now
+
 - Move `<TimeBar />` from Now's `Screen footer` (apps/app/src/features/now/now-screen.tsx) to the Day screen's
   footer (apps/app/src/features/day/day-screen.tsx). Day's footer is shown only when Day shows today.
 - Now: when an activity runs, a compact row at the top of the list (or above the composer — pick the calmer place
@@ -37,6 +40,7 @@ Four buttons in this order: Calendar, Task, Chores, Rest. Sport is removed as a 
 - Anything else that depended on the bar living on Now (hotkeys? Focus on the right pane?) keeps working.
 
 ## Tests
+
 App tests: Day shows the bar with the four buttons in order and no «⋯»; each tap opens its picker; Task picker
 filters and starts focus; Rest lists six choices; Now shows the compact running row with Stop only while something
 runs. Update e2e specs that use the time bar (e2e/time*.e2e.ts and others: grep "What are you doing", "Rest",

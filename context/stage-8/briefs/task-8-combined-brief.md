@@ -17,9 +17,10 @@ apps/app/src/platform/phone-background.ts (sleep notice, calendar-ended notice),
 the decision log (DO `decisions` table, GET /api/decisions, the "Notification log" screen app/decisions.tsx).
 
 ## Model
+
 - DO table `notifications`: id (ULID), kind (`login` | `deadline_digest`), createdAt, payload (JSON text, zod
   schema per kind in packages/core), readAt (nullable), telegram delivery state (`pending|sent|skipped|failed`
-  + sentAt). `bun db:generate`, commit SQL (on top of Task 7's squashed DO migration).
+  - sentAt). `bun db:generate`, commit SQL (on top of Task 7's squashed DO migration).
 - Core (packages/core/src/notify/): payload schemas — login: `{ sessionId, kind, name, ip, country, city? }`
   (Task 9 fills it; define the schema now); deadline_digest: `{ slot, tasks: [{ taskId, title, dueAt, dueTz }] }`.
 - Settings: replace what is not needed. New setting `notificationChannels: { login: { telegram, app, web },
@@ -29,6 +30,7 @@ the decision log (DO `decisions` table, GET /api/decisions, the "Notification lo
   Follow how settings are added (settings.ts, reducer, settings.updated payload, tests).
 
 ## Deadline Digest (pure, core)
+
 `deadlineDigest(state, { slot S, nextSlot N, reported })`: open tasks (isOpen; not inbox) with a `dueAt` such that
 `dueAt > S` and `dueAt ≤ N + 24h`, excluding those already reported for that same dueAt (`reported` = set of
 `taskId@dueAt` kept in DO storage; a changed deadline is announced again). Sorted by dueAt. Empty → no notification.
@@ -38,6 +40,7 @@ slot with next slot 21:00 (N+24h = 45 h ahead) IS included; a task due in 50 h i
 slot while it still has > 24 h); a task created late with 10 h left is included at the next slot; each task@dueAt once.
 
 ## Delivery
+
 - The DO alarm runs: digest slots → create a deadline_digest notification (if not empty) → deliver.
 - `notify(kind, payload)` in the DO (also callable from Task 9's login flow through UserStoreApi in
   apps/api/src/shared/contract.ts): insert the row; if the kind's telegram channel is on and a chat is known, send the
@@ -58,6 +61,7 @@ slot while it still has > 24 h); a task created late with 10 h left is included 
   `{"type":"notification"}`) so open clients refetch the feed.
 
 ## Feed in the app
+
 - A bell icon with an unread badge: in the sidebar header (next to the name from Task 3) and in the phone header of
   Now (top right, where the Inbox counter used to be). Opens `/notifications`.
 - `/notifications` screen: a list grouped by day; a login item: "Signed in from Chrome on macOS · 1.2.3.4 · Germany"
@@ -71,6 +75,7 @@ slot while it still has > 24 h); a task created late with 10 h left is included 
   here just don't make new full-width buttons).
 
 ## Tests
+
 Core: digest selection + settings reducer. API int: alarm at a slot creates a digest row and sends Telegram (stub
 fetch to api.telegram.org as existing tests do), respects channel off, endpoints list/read, auth. App: bell badge
 count, feed rendering both kinds, mark read on open, channel toggles write settings. Remove tests of removed kinds.
@@ -88,6 +93,7 @@ the feed) and Task 9 (unified sessions; the app's session row). Today the calend
 (syncCalendarReminders) — it moves into the pool.
 
 ## New kind `event_start`
+
 - Server-side: the DO already stores the phone's calendar copy (7 days back, 14 ahead; Task 5 added more fields). The DO alarm
   schedules one `event_start` notification per accepted/own event at its start (skip all-day events, events already attended or
   skipped, events whose series the person answered for good — find how series rules are stored today: phone-memory.ts
@@ -101,6 +107,7 @@ the feed) and Task 9 (unified sessions; the app's session row). Today the calend
 - The old local calendar reminder (syncCalendarReminders and its memory) goes away once this works.
 
 ## Resolving everywhere
+
 - A notification has `resolvedAt` + `resolution` (`attended | skipped | read | expired`). Any channel's action resolves it on the
   server (a new endpoint `POST /api/notifications/:id/resolve { resolution }`, and the bot callback does the same).
 - On resolve: Telegram — if the answer came FROM Telegram, edit that message (remove buttons, append "✓ Attending" / "Skipped"); if it came from any other channel (phone, web, the app's own Now offer), DELETE the Telegram message (deleteMessage) — owner: «если ответили в тг, то да. иначе увед в тг просто удаляем»; an expired one is deleted too; Android — a silent FCM data push
@@ -110,6 +117,7 @@ the feed) and Task 9 (unified sessions; the app's session row). Today the calend
 - Expired: an event_start not answered by the event's end resolves as expired (the Telegram message is deleted, the phone notification dismissed).
 
 ## Firebase Cloud Messaging
+
 - App: expo-notifications `getDevicePushTokenAsync()` (native FCM token) after permission; send it with the session
   (`PUT /api/sessions/current/push-token`), stored on the D1 session row (`pushToken`). `app.config.ts`: `android.googleServicesFile`
   from an env var path (e.g. `GOOGLE_SERVICES_JSON` file written by CI) — when absent, the build works and push is simply off.
@@ -128,6 +136,7 @@ the feed) and Task 9 (unified sessions; the app's session row). Today the calend
   FIREBASE_SERVICE_ACCOUNT; enable Firebase Cloud Messaging API v1).
 
 ## Tests
+
 Core: event_start scheduling selection (accepted/own, not all-day, not answered, series rules). API int: alarm creates event_start at
 start and sends Telegram with buttons; the bot's Attend resolves it, starts the activity and edits the message; resolve endpoint;
 FCM send called with a dismiss data message (stub fetch for oauth2 + fcm; a test service-account key generated in the test);
@@ -135,6 +144,7 @@ no secret → no FCM call. Client/app: Attend from the feed resolves; the push h
 `bun lint`, `bun test:unit`, `bun test:api`, `bun test:app` green.
 
 ## Owner update (2026-10-14)
+
 «новые нотификации начни делать, считай, что креды в CI уже есть. я добавлю их попозже» — assume the GitHub secrets
 GOOGLE_SERVICES_JSON and FIREBASE_SERVICE_ACCOUNT exist: wire release.yml / deploy.yml to use them unconditionally where that
 is simpler, but the Worker and the app must still run without them (local dev, tests, e2e): push off, everything else works.
@@ -142,6 +152,7 @@ Task 9 (unified sessions) is NOT done yet: store the push token on the current D
 column on `sessions`, `PUT /api/push-token` for the current session) — Task 9 will fold it into its sessions model.
 
 ## Owner update: "Still doing X?" joins the pool
+
 The Android-local "still doing this?" timer (syncActivityTimers, at REMIND_FACTOR × the expected length) becomes pool kind
 `activity_overrun`, sent by the server (the DO knows the running activity and its expected length; schedule it with the alarm;
 re-arm when the activity's expectation changes or "Yes, still" extends it as today). Default channels: **app only** (owner: «default

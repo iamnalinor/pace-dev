@@ -9,12 +9,12 @@ Limits: fake LLM; no Mac (the symbol variants were not seen); reduced-motion, 36
 ## 1. Summary
 
 | Severity | Count |
-|---|---|
-| blocker | 0 |
-| high | 0 |
-| medium | 6 |
-| low | 17 |
-| cosmetic | 3 |
+| -------- | ----- |
+| blocker  | 0     |
+| high     | 0     |
+| medium   | 6     |
+| low      | 17    |
+| cosmetic | 3     |
 
 No console error, no failed request (except the deliberate offline run), no raw key, no horizontal overflow and no crash on any of the 19 routes at 1440 and 390 in both themes. The round-3 feedback is largely in: the palette, the filter row, the percent slider that follows the thumb, the sheets as dialogs and bottom sheets, the shortcuts and their hints, the dashed draft, the tab bar and the new header icons all work. What is left is mostly polish of the two showpiece animations (the composer unfolding and the dissolve both glitch), the paste path, focus handling after Escape, and a handful of convention breaches listed below.
 
@@ -97,20 +97,20 @@ Now, 1440x900 and 390x844, EN/RU. Steps: Enter on any line. Happened: the form i
 
 ## 4. Owner requests of feedback-3 not (fully) met
 
-| Request | Status | Evidence |
-|---|---|---|
-| Enter -> same card unfolds into the form, animated; folds back animated | partly: it works, but as a swap and grow, not the same card (QA5-3) | `shots/anim-enter.png`, `anim-escape.png` |
-| Paste -> read at once | partly: only when the paste is 20+ chars longer than the last typed text (QA5-1) | `shots/k7-paste.png` |
-| After folding, keep typing | not met (QA5-2) | focus is BODY |
-| Progress "in percent", number follows the thumb, no jump back | met, but only 10% steps (QA5-9) | `shots/p2-dragging.png` |
-| Dissolve like Telegram | met with a flash at the end (QA5-4) | `shots/dissolve-ghost.png` |
-| Update card with better text | partly: place and copy (QA5-8) | `shots/up-both.png` |
-| "Fill in by hand" gone, form like before | met (chevron, title takes the line) | `shots/k3-by-hand.png` |
-| Hotkeys shown on buttons, OS-aware | met on Linux (Ctrl); not visible Mac variant here | all screens |
-| "+" removed, Settings tab, no gear on Now | met (tabs: Now, Day, Projects, Insights, Settings) | `shots/sheet-p-light-1.png` |
-| Back removed, Exact/About as chips, dialog on desktop | met | `shots/s1-close-1440-en.png` |
-| Wrong cancel icon, delete button | met (circle-slash, trash with Undo) | `shots/x1-deleted-400.png` |
-| Tag colours (green, blue, tangerine) | met | `shots/sw-now-d-light.png` |
+| Request                                                                 | Status                                                                           | Evidence                                  |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
+| Enter -> same card unfolds into the form, animated; folds back animated | partly: it works, but as a swap and grow, not the same card (QA5-3)              | `shots/anim-enter.png`, `anim-escape.png` |
+| Paste -> read at once                                                   | partly: only when the paste is 20+ chars longer than the last typed text (QA5-1) | `shots/k7-paste.png`                      |
+| After folding, keep typing                                              | not met (QA5-2)                                                                  | focus is BODY                             |
+| Progress "in percent", number follows the thumb, no jump back           | met, but only 10% steps (QA5-9)                                                  | `shots/p2-dragging.png`                   |
+| Dissolve like Telegram                                                  | met with a flash at the end (QA5-4)                                              | `shots/dissolve-ghost.png`                |
+| Update card with better text                                            | partly: place and copy (QA5-8)                                                   | `shots/up-both.png`                       |
+| "Fill in by hand" gone, form like before                                | met (chevron, title takes the line)                                              | `shots/k3-by-hand.png`                    |
+| Hotkeys shown on buttons, OS-aware                                      | met on Linux (Ctrl); not visible Mac variant here                                | all screens                               |
+| "+" removed, Settings tab, no gear on Now                               | met (tabs: Now, Day, Projects, Insights, Settings)                               | `shots/sheet-p-light-1.png`               |
+| Back removed, Exact/About as chips, dialog on desktop                   | met                                                                              | `shots/s1-close-1440-en.png`              |
+| Wrong cancel icon, delete button                                        | met (circle-slash, trash with Undo)                                              | `shots/x1-deleted-400.png`                |
+| Tag colours (green, blue, tangerine)                                    | met                                                                              | `shots/sw-now-d-light.png`                |
 
 ## 5. What works well
 

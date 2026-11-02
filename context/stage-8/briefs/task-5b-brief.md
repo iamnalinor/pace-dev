@@ -22,4 +22,4 @@ fetch them — packages/client view-models day/week and the cloud/usage endpoint
 3. A pure view-model in packages/client (`appsDuring(usage, span)`, `screenTime(usage, day, zone)`) with edge-fixture tests (bug
    classes 4 and 9: zero sessions, one, overlapping sessions on two devices, a session crossing the span edges, crossing midnight,
    zone change). App tests for both UIs. Strings EN + RU.
-`bun lint`, `bun test:unit`, `bun test:app` green.
+   `bun lint`, `bun test:unit`, `bun test:app` green.

@@ -15,12 +15,12 @@ Scripts, logs, raw route observations, and screenshots are in `/tmp/pace-qa8/`.
 ## Summary
 
 | Severity | New findings | QA7 issues still present |
-|---|---:|---:|
-| Blocker | 0 | 0 |
-| High | 0 | 0 |
-| Medium | 0 | 0 |
-| Low | 0 | 0 |
-| Cosmetic | 0 | 0 |
+| -------- | -----------: | -----------------------: |
+| Blocker  |            0 |                        0 |
+| High     |            0 |                        0 |
+| Medium   |            0 |                        0 |
+| Low      |            0 |                        0 |
+| Cosmetic |            0 |                        0 |
 
 All five QA7 issues passed on the tested web bundle. No new product defect was reproduced.
 One request in the route sweep failed with `ERR_NETWORK_CHANGED` while the local Worker
@@ -54,13 +54,13 @@ targeted retest; the app and e2e suites cover those paths.
 
 ## Five fixes retested
 
-| QA7 issue | Result and evidence |
-|---|---|
-| **QA7-1 · History Undo** | First click opened a confirmation without changing the event. Escape and Cancel closed it without a correction; `Undo event` / `Отменить событие` performed the revocation. The settled desktop dialog and phone bottom sheet kept their titles, explanation, and buttons visible. `/tmp/pace-qa8/shots/history-modal-settled-1440.png`, `/tmp/pace-qa8/shots/history-modal-settled-390.png`, `/tmp/pace-qa8/shots/ru-390-light-history-after.png`. |
-| **QA7-2 · Close preview** | With Now selected, the preview showed one time (`Записано 21:45` / `Recorded 21:43`). Choosing one hour ago showed both times (`21:43 · happened 20:43`). The phone sheet fit in the viewport. `/tmp/pace-qa8/shots/close-settled-390.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-close-hour-ago.png`. |
-| **QA7-3 · Done Undo** | The checkbox removed the task and showed `Готово: … · Отменить` / `Done: … · Undo` above the phone tabs. Clicking Undo returned the task. The toast covered no visible control. `/tmp/pace-qa8/shots/ru-390-light-done-toast.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-done-toast.png`, `/tmp/pace-qa8/shots/ru-1440-dark-done-undone.png`. |
-| **QA7-4 · Russian login and document language** | With a `ru-RU` browser and no session, login and `/app/login` showed Russian, and `<html lang>` was `ru`; `en-US` showed English and `lang=en`. Signed-in language changed through Settings and survived navigation to Now. `/tmp/pace-qa8/shots/public-ru-RU-390-light-_login.png`, `/tmp/pace-qa8/shots/public-en-US-1440-dark-_login.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-language.png`. |
-| **QA7-5 · Week scroll cue/focus** | The phone grid showed `Листайте дни вбок` / `Swipe to see all days`. Its scroll region had `tabindex=0` and took focus; ArrowRight moved `scrollLeft` from 144 to 170 px in both RU and EN. Axe reported no serious scroll-region issue. `/tmp/pace-qa8/shots/ru-390-light-week.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-week.png`. |
+| QA7 issue                                       | Result and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **QA7-1 · History Undo**                        | First click opened a confirmation without changing the event. Escape and Cancel closed it without a correction; `Undo event` / `Отменить событие` performed the revocation. The settled desktop dialog and phone bottom sheet kept their titles, explanation, and buttons visible. `/tmp/pace-qa8/shots/history-modal-settled-1440.png`, `/tmp/pace-qa8/shots/history-modal-settled-390.png`, `/tmp/pace-qa8/shots/ru-390-light-history-after.png`. |
+| **QA7-2 · Close preview**                       | With Now selected, the preview showed one time (`Записано 21:45` / `Recorded 21:43`). Choosing one hour ago showed both times (`21:43 · happened 20:43`). The phone sheet fit in the viewport. `/tmp/pace-qa8/shots/close-settled-390.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-close-hour-ago.png`.                                                                                                                                              |
+| **QA7-3 · Done Undo**                           | The checkbox removed the task and showed `Готово: … · Отменить` / `Done: … · Undo` above the phone tabs. Clicking Undo returned the task. The toast covered no visible control. `/tmp/pace-qa8/shots/ru-390-light-done-toast.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-done-toast.png`, `/tmp/pace-qa8/shots/ru-1440-dark-done-undone.png`.                                                                                                       |
+| **QA7-4 · Russian login and document language** | With a `ru-RU` browser and no session, login and `/app/login` showed Russian, and `<html lang>` was `ru`; `en-US` showed English and `lang=en`. Signed-in language changed through Settings and survived navigation to Now. `/tmp/pace-qa8/shots/public-ru-RU-390-light-_login.png`, `/tmp/pace-qa8/shots/public-en-US-1440-dark-_login.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-language.png`.                                                  |
+| **QA7-5 · Week scroll cue/focus**               | The phone grid showed `Листайте дни вбок` / `Swipe to see all days`. Its scroll region had `tabindex=0` and took focus; ArrowRight moved `scrollLeft` from 144 to 170 px in both RU and EN. Axe reported no serious scroll-region issue. `/tmp/pace-qa8/shots/ru-390-light-week.png`, `/tmp/pace-qa8/shots/en-390-dark-redo-week.png`.                                                                                                              |
 
 ## Owner requests still requiring another surface or PR
 

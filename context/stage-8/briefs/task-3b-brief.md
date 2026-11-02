@@ -24,4 +24,4 @@ Do (apps/app/src/platform/update-banner.web.tsx and where it is mounted, apps/ap
 - Tests: update the UpdateCard app test (copy, button press calls skip waiting). Screenshot desktop 1280 + phone 390, light +
   dark, with the strip forced open (a temporary hook is fine but remove it before committing) into
   /tmp/claude-0/-home-user-pace-dev/cb223545-7465-5720-b7e6-b3fd375d3413/scratchpad/task3b/.
-`bun lint`, `bun test:app` green. Commit "The update notice slides down from the top in the quiet blue".
+  `bun lint`, `bun test:app` green. Commit "The update notice slides down from the top in the quiet blue".

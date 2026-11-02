@@ -57,12 +57,12 @@ and spends its time looking at the screens with its own eyes.
    - the **changed screens** (from `git diff --stat` by feature folder and route);
    - the screens that **read changed data**, by rule (the import graph cannot see these):
 
-     | What changed | Also in scope |
-     |---|---|
-     | the assistant or parsing (composer, time bar, Telegram previews) | `/decisions` (the assistant's log) and History |
-     | sync, the store, first sync, offline | every data route, in the first-sync and offline states |
-     | a server rule (what may be read, answered, revoked; an error code) | every screen that calls it, with the network log open |
-     | settings or presets | every screen that reads them (Day and Week for night hours, Now for presets) |
+     | What changed                                                                | Also in scope                                                                      |
+     | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+     | the assistant or parsing (composer, time bar, Telegram previews)            | `/decisions` (the assistant's log) and History                                     |
+     | sync, the store, first sync, offline                                        | every data route, in the first-sync and offline states                             |
+     | a server rule (what may be read, answered, revoked; an error code)          | every screen that calls it, with the network log open                              |
+     | settings or presets                                                         | every screen that reads them (Day and Week for night hours, Now for presets)       |
      | an app-wide rule (first sync, focus after a swap, Escape, tooltips, toasts) | every route or sheet; prefer extending the generic e2e sweep over doing it by hand |
 4. **The keyboard pass** (Tab, Enter, Escape, focus after a swap) and **the heuristics walk**
    (below) over that scope.
@@ -122,7 +122,7 @@ e2e sweep above stands in for the scripted matrix here too.
 > route, width, theme and language: `e2e/route-sweep.e2e.ts` does that on every CI run. Look at
 > the screens with your own eyes instead; keep the network log open while you explore.
 >
-> *(Intermediate round.)* Cover: every fix above; look hard around each change; the always-on
+> _(Intermediate round.)_ Cover: every fix above; look hard around each change; the always-on
 > set (Now with the task pane, Settings, the sidebar and shell, signing in), the changed screens
 > and the screens that read changed data (`docs/qa.md`, "Intermediate round"), all at 1440×900
 > and 390×844; the keyboard (Tab, Enter, Escape, focus after a swap) on them; every changed form,
@@ -132,7 +132,7 @@ e2e sweep above stands in for the scripted matrix here too.
 > English browser. Explore in light; take one dark screenshot of each changed screen and look at
 > it.
 >
-> *(Release round.)* Cover: every screen at 1440×900 and 390×844, light and dark
+> _(Release round.)_ Cover: every screen at 1440×900 and 390×844, light and dark
 > (`localStorage["pace.theme"]`), Russian and English; the owner's scenarios in
 > `context/feedback-*.md` and the plan's scenario table; every form, sheet, picker and button;
 > open every form by hand and from each other entry path in the table in `docs/qa.md`, then
@@ -171,7 +171,7 @@ e2e sweep above stands in for the scripted matrix here too.
 > - **Guest language and sideways content**: check signed-out pages with a Russian browser
 >   locale and verify the document language; on narrow screens, every sideways region needs
 >   a visible scroll cue and a keyboard focus target.
->
+
 > Report (English): a summary with counts by severity; the previous round's fixes, each
 > confirmed or reopened; findings most severe first, each with an id, severity
 > (blocker/high/medium/low), screen + width + theme + language, exact steps, what happened vs
@@ -186,18 +186,18 @@ A form tested from one entry path hides what the others do (bug class 2 in
 below and submits from each; an intermediate round does it for every form that changed. A new way
 in gets a row and a test that submits from it.
 
-| Form | Ways in | Where a test submits from it |
-|---|---|---|
-| Composer (Now) | typed line + Enter; Send; + over a typed line; + over an empty line; New task request (N, the sidebar); pasted text; a share (`/add`); the assistant's reading (parsed, rules when it is down, queued); To Inbox | `composer.test.tsx`, `now-screen.test.tsx`, `e2e/composer.e2e.ts` |
-| Task edit sheet | the task screen's Edit; the wide pane's Edit | `task-screen.test.tsx` |
-| Close / submit sheet | the row's check on Now; the task screen's Done / Submit; "Close as…" (Cancelled · Skipped); a pill; a typed date and time | `close-sheet.test.tsx`, `close-times.test.ts` |
-| Day's activity sheet | a block (edit); a gap's Log; Log past; a time ahead of now or into the next block | `activity-sheet.test.tsx`, `day-screen.test.tsx` |
-| Time bar | each button's picker (Calendar, Task, Chores, Rest); the typed field + Enter or ▶; Alongside; a re-pick of what runs; Stop | `time-bar.test.tsx`, `e2e/time.e2e.ts` |
-| Assistant preview (composer, time bar, Telegram) | Approve (button, Enter); a typed correction; a tap on a question's option (`#ask <title>`: in the task line the fake model asks one question with options and one without, in the time bar "How long?"); Approve while questions are open; Escape in the line; a paste followed by Enter (one request); text with nothing to do or start; a stale option button in Telegram | `composer.test.tsx`, `time-bar.test.tsx`, `preview.test.ts`, `bot.int.test.ts`, `e2e/assistant.e2e.ts` |
-| Calendar event | Now's offer (Attend, Skip); Day's row (Attended, Skip, Every time); the Calendar picker; the feed; Telegram; a phone notification's button | `now-screen.test.tsx`, `day-phone.test.tsx`, `notify.int.test.ts`, `bot.int.test.ts`, `notifications.test.ts` (the phone buttons) |
-| Projects / presets | new; edit; archive and restore; extend a preset | `projects.test.tsx`, `presets.test.tsx` |
-| Settings | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project) | `settings.test.tsx` |
-| Add a computer, Connect an AI app (Settings → Devices and sessions) | Settings at phone and desktop width; each OS; revoke and disconnect with the inline confirm | `features/sessions/sessions.test.tsx`, `e2e/sessions.e2e.ts` |
+| Form                                                                | Ways in                                                                                                                                                                                                                                                                                                                                                                     | Where a test submits from it                                                                                                      |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Composer (Now)                                                      | typed line + Enter; Send; + over a typed line; + over an empty line; New task request (N, the sidebar); pasted text; a share (`/add`); the assistant's reading (parsed, rules when it is down, queued); To Inbox                                                                                                                                                            | `composer.test.tsx`, `now-screen.test.tsx`, `e2e/composer.e2e.ts`                                                                 |
+| Task edit sheet                                                     | the task screen's Edit; the wide pane's Edit                                                                                                                                                                                                                                                                                                                                | `task-screen.test.tsx`                                                                                                            |
+| Close / submit sheet                                                | the row's check on Now; the task screen's Done / Submit; "Close as…" (Cancelled · Skipped); a pill; a typed date and time                                                                                                                                                                                                                                                   | `close-sheet.test.tsx`, `close-times.test.ts`                                                                                     |
+| Day's activity sheet                                                | a block (edit); a gap's Log; Log past; a time ahead of now or into the next block                                                                                                                                                                                                                                                                                           | `activity-sheet.test.tsx`, `day-screen.test.tsx`                                                                                  |
+| Time bar                                                            | each button's picker (Calendar, Task, Chores, Rest); the typed field + Enter or ▶; Alongside; a re-pick of what runs; Stop                                                                                                                                                                                                                                                  | `time-bar.test.tsx`, `e2e/time.e2e.ts`                                                                                            |
+| Assistant preview (composer, time bar, Telegram)                    | Approve (button, Enter); a typed correction; a tap on a question's option (`#ask <title>`: in the task line the fake model asks one question with options and one without, in the time bar "How long?"); Approve while questions are open; Escape in the line; a paste followed by Enter (one request); text with nothing to do or start; a stale option button in Telegram | `composer.test.tsx`, `time-bar.test.tsx`, `preview.test.ts`, `bot.int.test.ts`, `e2e/assistant.e2e.ts`                            |
+| Calendar event                                                      | Now's offer (Attend, Skip); Day's row (Attended, Skip, Every time); the Calendar picker; the feed; Telegram; a phone notification's button                                                                                                                                                                                                                                  | `now-screen.test.tsx`, `day-phone.test.tsx`, `notify.int.test.ts`, `bot.int.test.ts`, `notifications.test.ts` (the phone buttons) |
+| Projects / presets                                                  | new; edit; archive and restore; extend a preset                                                                                                                                                                                                                                                                                                                             | `projects.test.tsx`, `presets.test.tsx`                                                                                           |
+| Settings                                                            | each switch and time; the push picker (Auto, Google, Pace checks, Off; offline; another Firebase project)                                                                                                                                                                                                                                                                   | `settings.test.tsx`                                                                                                               |
+| Add a computer, Connect an AI app (Settings → Devices and sessions) | Settings at phone and desktop width; each OS; revoke and disconnect with the inline confirm                                                                                                                                                                                                                                                                                 | `features/sessions/sessions.test.tsx`, `e2e/sessions.e2e.ts`                                                                      |
 
 ## Limits
 

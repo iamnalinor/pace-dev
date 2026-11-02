@@ -20,7 +20,7 @@ build history) is in [context/](context/README.md).
 - **Never** disable a lint rule inline without `-- <reason>`; never weaken a rule to pass
   lint — fix the code. Never skip or delete a failing test.
 - **Architecture** (enforced by dependency-cruiser): `core` is pure and immutable and
-  imports no workspace; `client` imports `core` and only the *types* of `api`; apps import
+  imports no workspace; `client` imports `core` and only the _types_ of `api`; apps import
   `client`/`core` and never each other; API feature folders only share through
   `apps/api/src/shared`.
 - **Event sourcing**: every user action is an immutable event (`occurredAt` editable,
@@ -114,4 +114,3 @@ method**: before doing a step by hand, check whether one of its skills covers it
 - **Before pushing UI work**: screenshots of changed screens in both themes, both viewports, Russian
   text, reviewed by `impeccable critique`/`polish` and `apple-design`. The QA round from
   [docs/qa.md](docs/qa.md) stays as it is.
-

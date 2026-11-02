@@ -12,12 +12,12 @@ The Worker used fresh local state under `/tmp/pace-qa9/state`, `ENVIRONMENT=test
 ## Summary
 
 | Severity | New findings |
-|---|---:|
-| Blocker | 0 |
-| High | 0 |
-| Medium | 0 |
-| Low | 0 |
-| Cosmetic | 0 |
+| -------- | -----------: |
+| Blocker  |            0 |
+| High     |            0 |
+| Medium   |            0 |
+| Low      |            0 |
+| Cosmetic |            0 |
 
 No product defect was reproduced in this targeted web pass. Browser page exceptions,
 console errors, and Worker HTTP errors were absent from the recorded cases.

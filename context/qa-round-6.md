@@ -9,12 +9,12 @@ Limits: fake LLM; no Mac; Android-only changes (permissions walk-through, restri
 ## 1. Summary
 
 | Severity | Count |
-|---|---|
-| blocker | 0 |
-| high | 1 |
-| medium | 6 |
-| low | 16 |
-| cosmetic | 4 |
+| -------- | ----- |
+| blocker  | 0     |
+| high     | 1     |
+| medium   | 6     |
+| low      | 16    |
+| cosmetic | 4     |
 
 The entry file and the polyfills are clean: the app starts, every route loads by a direct URL and by reload, `/task/<id>` deep links work, the service worker serves the shell offline, and there is no console error and no failed request on any screen (only a warning on right click, QA6-17). The `?from=web` nonce is sent. No raw key and no untranslated line on any screen in either language; the `devices.*` move left nothing behind. The new Calendar button works end to end (one near event starts at once, several open the picker, the menu lists today's events). The big problem of this round is its explanation: the toast that says what the greyed button does and why not now is cut off in the middle on every width and in both languages, so the "why" is never readable (QA6-1). Next come three smaller contradictions around the same button and sign-in (QA6-2, QA6-3, QA6-4), and three older owner-facing gaps that are still open (QA6-5 to QA6-7).
 
@@ -115,16 +115,16 @@ Now, 1440: Tab goes New task, 8 nav items, Inbox, the line, ... and 8 stops in t
 
 ## 4. Owner requests not (fully) met
 
-| Request | Status | Evidence |
-|---|---|---|
-| Hide "recorded" when it equals the event time (2026-10-08) | not met in the Close sheet | QA6-6, `shots/task-close.png` |
-| Progress "in percent" (feedback 3) | partly: 10% steps only | QA6-14 |
-| Undo for mistakes ("Ничего не теряется"; the delete has Undo) | partly: check-off and history revoke have none | QA6-7, QA6-5 |
-| Calendar button: "one line", "a tap on the greyed one says what it does and why not now" (this round) | partly: one line except at 320 RU; the explanation is clipped | QA6-1, QA6-12 |
-| Forms as sheets, no Cancel (feedback 3 convention) | partly: project forms inline with Cancel | QA6-16 |
-| Interface in the owner's language | partly: sign-in and `lang` ignore it | QA6-11 |
-| Telegram bot "Return to Pace" lands usefully | partly: the landing page's button is dead outside Android and its sentence can be untrue | QA6-10 |
-| Everything else of feedback 2 and 3 checked this round (palette, tabs with names, composer in place with focus back, dialogs, tag colours, hotkeys on buttons, Chores/Sport pickers, parallel activity by ⋯/right click/hold, Attend/Skip, typed activity) | met | screens above |
+| Request                                                                                                                                                                                                                                                    | Status                                                                                   | Evidence                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------- |
+| Hide "recorded" when it equals the event time (2026-10-08)                                                                                                                                                                                                 | not met in the Close sheet                                                               | QA6-6, `shots/task-close.png` |
+| Progress "in percent" (feedback 3)                                                                                                                                                                                                                         | partly: 10% steps only                                                                   | QA6-14                        |
+| Undo for mistakes ("Ничего не теряется"; the delete has Undo)                                                                                                                                                                                              | partly: check-off and history revoke have none                                           | QA6-7, QA6-5                  |
+| Calendar button: "one line", "a tap on the greyed one says what it does and why not now" (this round)                                                                                                                                                      | partly: one line except at 320 RU; the explanation is clipped                            | QA6-1, QA6-12                 |
+| Forms as sheets, no Cancel (feedback 3 convention)                                                                                                                                                                                                         | partly: project forms inline with Cancel                                                 | QA6-16                        |
+| Interface in the owner's language                                                                                                                                                                                                                          | partly: sign-in and `lang` ignore it                                                     | QA6-11                        |
+| Telegram bot "Return to Pace" lands usefully                                                                                                                                                                                                               | partly: the landing page's button is dead outside Android and its sentence can be untrue | QA6-10                        |
+| Everything else of feedback 2 and 3 checked this round (palette, tabs with names, composer in place with focus back, dialogs, tag colours, hotkeys on buttons, Chores/Sport pickers, parallel activity by ⋯/right click/hold, Attend/Skip, typed activity) | met                                                                                      | screens above                 |
 
 ## 5. What works well
 

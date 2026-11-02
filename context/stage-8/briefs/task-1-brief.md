@@ -3,6 +3,7 @@
 Each fix: a failing test first at the right level (docs/testing.md), then the fix. Commit per bug.
 
 ## 1. The composer form refuses a hand-typed task ("Type something first.")
+
 Repro: on Now open the empty form (New task button / N, or the chevron) with an EMPTY line, type a
 title in the form's Title field, press Create or Enter → toast "Type something first." and nothing is added.
 Root cause: the Create button is enabled from `model.title.trim() !== "" || isInstance`
@@ -20,6 +21,7 @@ empty line, typing a title and pressing Create adds the task; and an e2e test in
 press N, type a title in the form, press Enter → the task appears in the list.
 
 ## 2. A dissolved (checked) task flashes back before it disappears
+
 apps/app/src/shared/task-list.tsx `TaskRows` (`dissolving`, `dissolved`, `settle`) +
 apps/app/src/ui/dissolve.tsx. Root cause: `settle` removes the id from `dissolving` right after
 calling the async close, before the store drops the row; `Dissolve` then resets progress to 0 and
@@ -34,6 +36,7 @@ pending (a deferred promise), and asserts the row stays hidden (not rendered / o
 check stays checked; plus refused close brings it back.
 
 ## 3. Projects list shows a bare "0"
+
 apps/app/src/screens/projects-screen.tsx ~L65 reads `hooks.useNow().projects` (Now's filter chips,
 which drop projects / return [] in common cases), so every row shows 0.
 Fix: a pure view-model function in packages/client/src/view-models (e.g. in a projects view-model
@@ -45,6 +48,7 @@ e.g. search for "one:"/"few:"/"many:" or a plural helper; follow the existing me
 Tests: client unit test for the counts; app test for the label.
 
 ## 4. The composer's expand animation clips its top
+
 When the line unfolds into the form (Enter after typing, or the chevron), the top text and the top
 half of the Create button slide out of the card and come back. Cause (to confirm): the form's Title
 has autoFocus and mounts inside apps/app/src/ui/animated-height.tsx's `overflow:hidden` box while the
@@ -59,6 +63,7 @@ not move above the card's top. Add that check as an e2e assertion in e2e/compose
 made deterministic; otherwise describe the manual verification in the report.
 
 ## 6. Toasts land over controls
+
 apps/app/src/ui/toast.tsx is fixed at `bottom-24`; on Now it covers the time bar's buttons (and its
 "⋯"). Fix: a screen with a footer (the `footer` prop of ui/screen.tsx — check how Screen renders it)
 must lift the toast above that footer: e.g. a small context the Screen provides with its footer

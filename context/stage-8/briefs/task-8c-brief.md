@@ -20,6 +20,6 @@ Builds on Task 8/8b (pool, `PushTransport` registry, one push method per device,
   within ~15 minutes instead of hours". With `fcm` working, the step is not shown. Settings shows the same hint under the picker while
   `poll` is chosen and the exemption is missing.
 - No foreground service, no ongoing notification, no UnifiedPush (remove any placeholders).
-Tests: method selection, the pending/dismissed fetch and display by pool id (mocked expo-notifications + background task), server
-records for poll deliveries, the permissions step only for `poll`. Docs: README/self-hosting — without Firebase, notifications arrive
-within ~15 minutes via the background check, instantly while the app is open, and in Telegram.
+  Tests: method selection, the pending/dismissed fetch and display by pool id (mocked expo-notifications + background task), server
+  records for poll deliveries, the permissions step only for `poll`. Docs: README/self-hosting — without Firebase, notifications arrive
+  within ~15 minutes via the background check, instantly while the app is open, and in Telegram.

@@ -16,12 +16,12 @@ Scripts, logs, and screenshots are in `/tmp/pace-qa7/`; `sweep.json`, `extra.jso
 ## Summary
 
 | Severity | New in PR 1 | Reconfirmed from QA6 |
-|---|---:|---:|
-| Blocker | 0 | 0 |
-| High | 0 | 0 |
-| Medium | 0 | 3 |
-| Low | 0 | 2 |
-| Cosmetic | 0 | 0 |
+| -------- | ----------: | -------------------: |
+| Blocker  |           0 |                    0 |
+| High     |           0 |                    0 |
+| Medium   |           0 |                    3 |
+| Low      |           0 |                    2 |
+| Cosmetic |           0 |                    0 |
 
 No new web regression was found. The three older medium issues remain user-visible and are
 listed below so the release decision can account for them. The known QA6 findings that were

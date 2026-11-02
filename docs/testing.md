@@ -5,15 +5,15 @@ Every level tests what the others cannot. Behaviour changes start with a failing
 The composer's `canAdd` is one predicate shared by button enablement and the action;
 action-level tests check that every enabled draft is accepted from each entry path.
 
-| Level | Tool | Runs against | Where | Command |
-|---|---|---|---|---|
-| Core unit | Vitest, fast-check | pure functions: schemas, materializer, reducers, i18n, tokens | `packages/core/src/**/*.test.ts` | `bun test:unit` |
-| Client unit | Vitest | API client, auth, app state and sync on memory adapters and the fake `fetch` from `@pace/client/testing` | `packages/client/src/**/*.test.ts` | `bun test:unit` |
-| API | Vitest + `@cloudflare/vitest-plugin` | the Worker inside workerd with real D1, KV and Durable Object bindings | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api` |
-| App | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters | `apps/app/**/*.test.{ts,tsx}` | `bun test:app` |
-| End-to-end | Playwright + axe | the production web build against `wrangler dev` in Chromium | `e2e/*.e2e.ts` | `bun test:e2e` |
-| Mutation | Stryker | the core tests themselves | `packages/core` | `bun test:mutation` (on demand in CI) |
-| LLM regression | own runner | the parsing prompt against real providers | planned for stage 2 | `bun test:llm` (script exists, runner does not yet) |
+| Level          | Tool                                                 | Runs against                                                                                             | Where                                                       | Command                                             |
+| -------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| Core unit      | Vitest, fast-check                                   | pure functions: schemas, materializer, reducers, i18n, tokens                                            | `packages/core/src/**/*.test.ts`                            | `bun test:unit`                                     |
+| Client unit    | Vitest                                               | API client, auth, app state and sync on memory adapters and the fake `fetch` from `@pace/client/testing` | `packages/client/src/**/*.test.ts`                          | `bun test:unit`                                     |
+| API            | Vitest + `@cloudflare/vitest-plugin`                 | the Worker inside workerd with real D1, KV and Durable Object bindings                                   | `apps/api/src/**/*.test.ts`, `apps/api/tests/*.int.test.ts` | `bun test:api`                                      |
+| App            | jest-expo (Jest 29), React Native Testing Library 14 | React Native components and platform adapters                                                            | `apps/app/**/*.test.{ts,tsx}`                               | `bun test:app`                                      |
+| End-to-end     | Playwright + axe                                     | the production web build against `wrangler dev` in Chromium                                              | `e2e/*.e2e.ts`                                              | `bun test:e2e`                                      |
+| Mutation       | Stryker                                              | the core tests themselves                                                                                | `packages/core`                                             | `bun test:mutation` (on demand in CI)               |
+| LLM regression | own runner                                           | the parsing prompt against real providers                                                                | planned for stage 2                                         | `bun test:llm` (script exists, runner does not yet) |
 
 `bun run test` runs unit → api → app → e2e. CI (`ci.yml`) runs lint, unit, app and api in one job (each job pays its own install, and minutes are rationed), then e2e once that passes.
 

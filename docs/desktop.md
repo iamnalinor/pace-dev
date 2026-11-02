@@ -27,7 +27,7 @@ Nothing is judged: Pace only shows where the time went.
 
 ## Connect a computer
 
-**Settings → Devices and sessions → Add a computer**. Give it a name and press *Create the token*
+**Settings → Devices and sessions → Add a computer**. Give it a name and press _Create the token_
 (`POST /api/sessions/agents`). Pick the computer's system (the web app preselects the one it runs
 on) and follow its steps.
 
@@ -36,7 +36,7 @@ anything else, and whatever it sends is filed under its own computer. Paste the 
 first; when the agent prompts for the token, copy it separately from Pace and paste it there.
 The prompt hides it and the install command contains no token, so it stays out of terminal
 history and process arguments. The agent saves it in `config.json` with private file permissions;
-*Disconnect* in Settings → Devices and sessions revokes it at once (`DELETE /api/sessions/:id`).
+_Disconnect_ in Settings → Devices and sessions revokes it at once (`DELETE /api/sessions/:id`).
 Lost it? Disconnect the computer and add it again.
 
 ### Windows
@@ -58,7 +58,7 @@ Task Scheduler refuses (some managed computers), the agent starts from the `Run`
 account (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) instead.
 
 Probes: `GetForegroundWindow` → `GetWindowThreadProcessId` → `QueryFullProcessImageNameW`; the
-name is the program's *FileDescription* ("Firefox", "Visual Studio Code"), else the `.exe` name.
+name is the program's _FileDescription_ ("Firefox", "Visual Studio Code"), else the `.exe` name.
 Idle time: `GetLastInputInfo` against `GetTickCount64`.
 
 ### macOS
@@ -144,7 +144,7 @@ the running agent's buffer, so it is safe next to it. A second plain `run` exits
 - **Linux: "Unsupported desktop (GNOME on Wayland)".** See Wayland above.
 - **macOS:** `launchctl print gui/$UID/app.pace.agent` and `agent.log` in
   `~/Library/Application Support/Pace`.
-- **Windows:** Task Scheduler → *Pace agent* → History; `status` shows the last error.
+- **Windows:** Task Scheduler → _Pace agent_ → History; `status` shows the last error.
 - **An app shows under an odd name** (`python3`, `java`): that is the program's own name, the
   only thing the agent reads. Pace shows it as sent.
 

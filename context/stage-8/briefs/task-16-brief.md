@@ -20,4 +20,4 @@ Owner's words: «Скок щас апкшки весят? Боты вроде м
    bot (open the bot once first)". Also docs that the APK is about 25 MB (arm64-v8a).
 4. Lint the workflows if the repo has actionlint in `bun lint` (check); otherwise validate YAML syntax with a quick parse
    (`bunx js-yaml` or `python3 -c 'import yaml'` if available) and paste the result in the report.
-Commit: "Release: the APK goes to the owner in Telegram; several Groq keys one per line work".
+   Commit: "Release: the APK goes to the owner in Telegram; several Groq keys one per line work".
