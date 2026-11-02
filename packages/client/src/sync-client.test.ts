@@ -1181,3 +1181,47 @@ describe("createSyncClient's offline flag (QA round 17 review m3, I2)", () => {
     expect(sync.status.getState()).toMatchObject({ online: false, syncing: false });
   });
 });
+
+describe("createSyncClient hold (round 6: ending this device's own session)", () => {
+  it("waits for the run in flight, then sends nothing until it is released", async () => {
+    const gate: { open?: () => void } = {};
+    const held = new Promise<void>((resolve) => {
+      gate.open = resolve;
+    });
+    const { calls, sync } = await setup(
+      {
+        "GET /api/sync/pull": async () => {
+          await held;
+          return EMPTY_PAGE;
+        },
+        "POST /api/sync/push": acceptAll,
+      },
+      localEvents(1),
+    );
+    const inFlight = sync.syncNow();
+    await vi.waitFor(() => {
+      expect(calls).toHaveLength(1);
+    });
+    const holding = sync.hold();
+    const hold = { isInPlace: false };
+    void (async () => {
+      await holding;
+      hold.isInPlace = true;
+    })();
+    await Promise.resolve();
+    // The run in flight goes on (its pull, then its push) before the hold is in place.
+    expect(hold.isInPlace).toBe(false);
+    gate.open?.();
+    await inFlight;
+    const release = await holding;
+    const sent = calls.length;
+    sync.start({ intervalMs: 1000 });
+    sync.soon();
+    await expect(sync.syncNow()).resolves.toEqual({ error: "stopped", ok: false });
+    expect(calls).toHaveLength(sent);
+    expect(sync.status.getState().lastError).toBeNull();
+    sync.stop();
+    release();
+    await expect(sync.syncNow()).resolves.toMatchObject({ ok: true });
+  });
+});

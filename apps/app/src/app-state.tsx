@@ -70,8 +70,9 @@ const bootstrap = async (runtime: PaceRuntime): Promise<void> => {
   await runtime.notifications.refresh();
   await sendPhoneData(runtime);
   await startPhonePush(runtime);
-  // Signed out meanwhile: no loop. Otherwise its first tick pushes what the bootstrap added.
-  if (auth.store.getState().status !== "signed-in") {
+  // Signed out meanwhile, or ending this device's session: no loop, no socket. Otherwise its
+  // first tick pushes what the bootstrap added.
+  if (auth.store.getState().status !== "signed-in" || auth.isEnding()) {
     return;
   }
 
@@ -141,7 +142,15 @@ const runSyncLoop = (runtime: PaceRuntime, onSynced: OnSynced): (() => void) => 
       void clearPresentedPoolNotifications(activeSession);
     }
     activeSession = undefined;
-    void runtime.resetLocalData();
+    void (async () => {
+      // The local copy (IndexedDB, shared by a browser's tabs) goes only when no session is left
+      // in the shared store: a stale tab's late 401 never wipes the copy of the tab that signed
+      // in since (round 6 I1). A different account there gets a new store id, and its first
+      // pull drops the old copy on its own.
+      if (!(await auth.isSessionStored())) {
+        await runtime.resetLocalData();
+      }
+    })();
   });
   // The poll is a safety net while the server can say "changed" itself.
   const stopFollowingLive = runtime.live.status.subscribe(({ isConnected }, previous) => {

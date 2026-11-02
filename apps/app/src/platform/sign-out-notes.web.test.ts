@@ -10,6 +10,9 @@ const memoryStorage = () => {
   return {
     getItem: (key: string) => items.get(key) ?? null,
     items,
+    removeItem: (key: string) => {
+      items.delete(key);
+    },
     setItem: (key: string, value: string) => {
       items.set(key, value);
     },
@@ -32,6 +35,17 @@ describe("the sign-out note on the web (fix round 5 V1)", () => {
     await expect(createSignOutNotes().read()).resolves.toBe("ended:abc");
   });
 
+  it("takes back its own note when the end it announced failed, never a newer one (round 6 M1)", async () => {
+    withStorage(memoryStorage());
+    const notes = createSignOutNotes();
+    await notes.leave("ended:abc");
+    await notes.withdraw("ended:abc");
+    await expect(notes.read()).resolves.toBeNull();
+    await notes.leave("ended:new");
+    await notes.withdraw("ended:abc");
+    await expect(notes.read()).resolves.toBe("ended:new");
+  });
+
   it("keeps nothing and throws nothing where the storage is blocked", async () => {
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
@@ -41,6 +55,7 @@ describe("the sign-out note on the web (fix round 5 V1)", () => {
     });
     const notes = createSignOutNotes();
     await expect(notes.leave("ended:abc")).resolves.toBeUndefined();
+    await expect(notes.withdraw("ended:abc")).resolves.toBeUndefined();
     await expect(notes.read()).resolves.toBeNull();
   });
 
@@ -55,6 +70,7 @@ describe("the sign-out note on the web (fix round 5 V1)", () => {
     });
     const notes = createSignOutNotes();
     await expect(notes.leave("ended:abc")).resolves.toBeUndefined();
+    await expect(notes.withdraw("ended:abc")).resolves.toBeUndefined();
     await expect(notes.read()).resolves.toBeNull();
   });
 });

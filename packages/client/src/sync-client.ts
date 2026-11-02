@@ -6,7 +6,7 @@ import type { EventStore } from "./event-store.ts";
 import type { AppStateHandle } from "./state.ts";
 
 import { ApiError } from "./api-client.ts";
-import { createSerial, createTimer } from "./sync-timing.ts";
+import { createHolds, createSerial, createTimer } from "./sync-timing.ts";
 import { isUnreachable, type PullPage, type SyncTransport } from "./sync-transport.ts";
 import { SYNC_SCHEMA_VERSION, upgradeCursor } from "./sync-version.ts";
 
@@ -42,6 +42,12 @@ export type SyncClient = {
   page the log already holds (one that waited for a run to finish) changes nothing.
   */
   readonly ingestLive: (page: PullPage) => Promise<void>;
+  /**
+  Lets the run in flight finish, then starts none (every call gets `stopped`, the loop's ticks
+  send nothing) until the returned `release`: nothing goes out while this device ends its own
+  session (a request sent once the server ended it would answer 401; round 6).
+  */
+  readonly hold: () => Promise<() => void>;
 };
 
 /** What a call waiting for the run after the one in flight gets when the sync stopped meanwhile. */
@@ -246,6 +252,16 @@ const runSync = async (
   }
 };
 
+/** Applies a live page that fits (one at a time, never during a run); true when a pull is needed. */
+const shouldPullFor = async (deps: SyncDeps, page: PullPage): Promise<boolean> => {
+  await deps.state.ready;
+  const fit = await fitOf(deps.store, page);
+  if (fit === "apply") {
+    await applyPage({ ...deps, reset: createReset(deps.store, deps.state) }, page);
+  }
+  return fit === "pull";
+};
+
 const backoffMs = (failures: number): number =>
   Math.min(BACKOFF_MIN_MS * 2 ** (failures - 1), BACKOFF_MAX_MS);
 
@@ -259,6 +275,8 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
   /** The one run that follows the run in flight, shared by every call made meanwhile. */
   let next: Promise<Result<SyncSummary, string>> | undefined;
   let failures = 0;
+  /** While any hold is in place (`hold`), no run starts. */
+  const holds = createHolds();
   const run = async (): Promise<Result<SyncSummary, string>> => {
     // Syncing from the call on, even while a live page is still being applied.
     status.setState({ syncing: true });
@@ -282,30 +300,31 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
     queuedIn: number,
   ): Promise<Result<SyncSummary, string>> => {
     await current;
-    if (queuedIn !== epoch) {
+    if (queuedIn !== epoch || holds.isHeld()) {
       return err(SYNC_STOPPED);
     }
     next = undefined;
     return await run();
   };
+  /** The runs waiting to follow the one in flight are dropped; later calls run as ever. */
+  const dropWaiting = (): void => {
+    epoch += 1;
+    next = undefined;
+  };
   return {
-    /** The runs waiting to follow the one in flight are dropped; later calls run as ever. */
-    dropWaiting: (): void => {
-      epoch += 1;
-      next = undefined;
-    },
+    dropWaiting,
     failures: (): number => failures,
+    hold: async (): Promise<() => void> => {
+      const release = holds.add();
+      dropWaiting();
+      while (inFlight !== undefined) {
+        await inFlight;
+      }
+      return release;
+    },
     /** Applies a live page that fits; true when a pull is needed instead. */
     ingestLive: async (page: PullPage): Promise<boolean> =>
-      await serial(async () => {
-        const { state, store, transport } = deps;
-        await state.ready;
-        const fit = await fitOf(store, page);
-        if (fit === "apply") {
-          await applyPage({ reset: createReset(store, state), state, store, transport }, page);
-        }
-        return fit === "pull";
-      }),
+      await serial(async () => await shouldPullFor(deps, page)),
     /**
     A run that reads the outbox and the server after the call. The run in flight may have read
     them already, so a call made meanwhile is not joined to it: it gets the run that follows,
@@ -313,6 +332,9 @@ const createRunner = (deps: SyncDeps, status: StoreApi<SyncStatus>) => {
     quiet joined that run and waited for the next interval).
     */
     syncNow: async (): Promise<Result<SyncSummary, string>> => {
+      if (holds.isHeld()) {
+        return err(SYNC_STOPPED);
+      }
       if (inFlight === undefined) {
         return await run();
       }
@@ -373,6 +395,7 @@ export const createSyncClient = (deps: SyncDeps): SyncClient => {
       intervalMs = options.intervalMs;
       timer.in(0);
     },
+    hold: runner.hold,
     status,
     stop: () => {
       intervalMs = undefined;

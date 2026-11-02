@@ -41,6 +41,35 @@ const ListFailed = ({ onRetry }: { readonly onRetry: () => void }) => {
 };
 
 /**
+Ending this device: the socket rests and the sync holds (its run in flight finishes) first. The
+server closes the socket as the session ends, and the channel would read that as "ended elsewhere"
+and check `me`; a sync run sent once the session is gone answers 401 (fix round 1, round 6). The
+other tabs' note goes before the request and the token is forgotten as it is answered, with no
+logout to answer 401 (QA round 15 L2, round 6 M1). True once it ended and the login card is next.
+*/
+const useEndThisDevice = (sessions: Sessions): ((id: string) => Promise<boolean>) => {
+  const router = useRouter();
+  const { auth } = useAuth();
+  const { live, sync } = usePace();
+  return async (id) => {
+    live.stop();
+    const release = await sync.hold();
+    try {
+      await auth.endThisDevice(async () => {
+        await sessions.revoke(id);
+      });
+    } catch {
+      live.start();
+      return false;
+    } finally {
+      release();
+    }
+    router.replace("/login");
+    return true;
+  };
+};
+
+/**
 The rows of a loaded list. Ending this device's own session is logging out: it signs out and goes
 to the login card.
 */
@@ -53,9 +82,7 @@ const ReadyList = ({
   readonly afterLast: RefObject<null | View>;
 }) => {
   const t = useT();
-  const router = useRouter();
-  const { auth } = useAuth();
-  const { live } = usePace();
+  const endThisDevice = useEndThisDevice(sessions);
   const { timezone } = useSettings();
   const { deviceTz, language, now } = useViewer();
   const [hasEndFailed, setHasEndFailed] = useState(false);
@@ -74,31 +101,20 @@ const ReadyList = ({
       .find((node) => node !== undefined);
     moveFocus(next ?? afterLast.current);
   };
-  const didEnd = async (row: Row): Promise<boolean> => {
-    // Ending this device: the socket rests first. The server closes it as the session ends, and
-    // the channel would read that as "ended elsewhere" and check `me` (a 401; fix round 1).
-    if (row.isCurrent) {
-      live.stop();
-    }
+  const didEndOther = async (row: Row): Promise<boolean> => {
     try {
       await sessions.revoke(row.id);
     } catch {
-      if (row.isCurrent) {
-        live.start();
-      }
-      // The row stays, its confirm open for another try; the line under the list says why.
-      setHasEndFailed(true);
       return false;
     }
-    setHasEndFailed(false);
-    if (!row.isCurrent) {
-      focusAfter(row);
-      return true;
-    }
-    // The server ended it already: forgotten here, no logout to answer 401 (QA round 15 L2).
-    await auth.forget();
-    router.replace("/login");
+    focusAfter(row);
     return true;
+  };
+  const didEnd = async (row: Row): Promise<boolean> => {
+    const hasEnded = row.isCurrent ? await endThisDevice(row.id) : await didEndOther(row);
+    // A failed end keeps the row, its confirm open for another try; the line under the list says why.
+    setHasEndFailed(!hasEnded);
+    return hasEnded;
   };
   return (
     <View>

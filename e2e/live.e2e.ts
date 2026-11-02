@@ -192,11 +192,8 @@ test('a log-out in another tab of the same browser says so, not "another device"
   await context.close();
 });
 
-test('a session ended from another device says "another device" in every open tab (fix round 5 V1)', async ({
-  browser,
-}) => {
-  const { context, first, second, telegramId } = await twoTabsSignedIn(browser);
-  // Another device of the account ends the browser's session from its own list.
+/** Another device of the account ends the browser's one session from its own list. */
+const endBrowserSessionElsewhere = async (telegramId: string): Promise<void> => {
   const { token: elsewhere } = await createDevSession(telegramId);
   const headers = { Authorization: `Bearer ${elsewhere}` };
   const listed = await fetch(`${API_URL}/api/sessions`, { headers });
@@ -212,6 +209,92 @@ test('a session ended from another device says "another device" in every open ta
     });
     expect(ended.ok).toBe(true);
   }
+};
+
+/** The tab goes to the background as the browser hides it: its socket rests, its poll goes on. */
+const hide = async (tab: Page): Promise<void> => {
+  await tab.evaluate(() => {
+    Object.defineProperties(document, {
+      visibilityState: { configurable: true, get: () => "hidden" },
+      hidden: { configurable: true, get: () => true },
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+};
+
+/** What the profile's local copy holds: its events and whether it knows its server store. */
+const localCopy = async (tab: Page) =>
+  await tab.evaluate(
+    async () =>
+      await new Promise<{ readonly events: number; readonly hasStoreId: boolean }>(
+        (resolve, reject) => {
+          const opened = indexedDB.open("pace");
+          opened.addEventListener("error", () => {
+            reject(new Error("no local copy"));
+          });
+          opened.addEventListener("success", () => {
+            const read = opened.result.transaction(["events", "meta"], "readonly");
+            const events = read.objectStore("events").count();
+            const storeId = read.objectStore("meta").get("storeId");
+            read.addEventListener("complete", () => {
+              resolve({ events: events.result, hasStoreId: storeId.result !== undefined });
+              opened.result.close();
+            });
+          });
+        },
+      ),
+  );
+
+/** The poll of a hidden tab (30 s) and a margin. */
+const HIDDEN_POLL_MS = 45_000;
+
+test("a hidden tab signs out when its session is ended from another device (round 6 M6)", async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const { context, first, second, telegramId } = await twoTabsSignedIn(browser);
+  // Hidden before the end: no socket to hear it close, only its poll's 401 (b8d9259).
+  await hide(first);
+  await endBrowserSessionElsewhere(telegramId);
+  await expect(second).toHaveURL(/\/login$/u, { timeout: 15_000 });
+  await expect(first).toHaveURL(/\/login$/u, { timeout: HIDDEN_POLL_MS });
+  await expect(first.getByRole("status").filter({ hasText: ANOTHER_DEVICE })).toBeVisible();
+  await context.close();
+});
+
+test("a stale tab's late 401 leaves the session another tab signed in with since, and the shared copy (round 6 I1)", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const { context, first, second, telegramId } = await twoTabsSignedIn(browser);
+  await hide(first);
+  // The person logs out in the second tab and signs in again there, before the hidden tab hears.
+  await second.getByRole("button", { name: "Log out" }).click();
+  await expect(second).toHaveURL(/\/login$/u);
+  await second.getByLabel("Telegram id").fill(telegramId);
+  await second.getByRole("button", { name: "Sign in as dev" }).click();
+  await expect(second.getByRole("heading", { name: "Now" })).toBeVisible();
+  await addTaskHere(second, `post the letter ${crypto.randomUUID().slice(0, 6)}`);
+  const signedIn = await second.evaluate((key) => localStorage.getItem(key), SESSION_KEY);
+  expect(signedIn).not.toBeNull();
+  const before = await localCopy(second);
+  expect(before.hasStoreId).toBe(true);
+  // The hidden tab's poll gets its 401 for the old session and signs out.
+  await expect(first).toHaveURL(/\/login$/u, { timeout: HIDDEN_POLL_MS });
+  await first.waitForTimeout(1000);
+  expect(await second.evaluate((key) => localStorage.getItem(key), SESSION_KEY)).toBe(signedIn);
+  expect(await localCopy(second)).toEqual(before);
+  // The tab signed in since stays signed in across a reload.
+  await second.reload();
+  await expect(second.getByRole("heading", { name: "Now" })).toBeVisible();
+  await context.close();
+});
+
+test('a session ended from another device says "another device" in every open tab (fix round 5 V1)', async ({
+  browser,
+}) => {
+  const { context, first, second, telegramId } = await twoTabsSignedIn(browser);
+  await endBrowserSessionElsewhere(telegramId);
   for (const tab of [first, second]) {
     await expect(tab).toHaveURL(/\/login$/u, { timeout: 15_000 });
     await expect(tab.getByRole("status").filter({ hasText: ANOTHER_DEVICE })).toBeVisible();

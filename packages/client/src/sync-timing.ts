@@ -52,3 +52,26 @@ export const createSerial = (): (<T>(task: () => Promise<T>) => Promise<T>) => {
     }
   };
 };
+
+/** Holds that may overlap: held while any is in place; each `release` counts once. */
+export const createHolds = (): {
+  readonly add: () => () => void;
+  readonly isHeld: () => boolean;
+} => {
+  let count = 0;
+  return {
+    add: () => {
+      count += 1;
+      let isReleased = false;
+      return () => {
+        if (isReleased) {
+          return;
+        }
+
+        isReleased = true;
+        count -= 1;
+      };
+    },
+    isHeld: () => count > 0,
+  };
+};

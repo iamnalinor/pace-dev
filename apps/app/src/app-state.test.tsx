@@ -4,7 +4,12 @@ import * as Notifications from "expo-notifications";
 import { createHash } from "node:crypto";
 import { AppState, Text } from "react-native";
 
-import { createMemoryEventStore, createMemorySessionStore, type EventStore } from "@pace/client";
+import {
+  createMemoryEventStore,
+  createMemorySessionStore,
+  type EventStore,
+  type SessionStore,
+} from "@pace/client";
 import {
   createFakeFetch,
   emptySyncRoutes,
@@ -34,6 +39,7 @@ const Probe = () => {
 
 const setup = async (
   routes: Readonly<Record<string, FakeRoute>> = {},
+  session: SessionStore = createMemorySessionStore(),
 ): Promise<{
   readonly api: ReturnType<typeof createFakeFetch>;
   readonly eventStore: EventStore;
@@ -52,7 +58,7 @@ const setup = async (
     deviceId: async () => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     eventStore,
     fetch: api.fetch,
-    session: createMemorySessionStore(),
+    session,
   });
   await runtime.state.ready;
   return { api, eventStore, runtime };
@@ -462,6 +468,47 @@ describe("PaceProvider", () => {
     await expect(eventStore.listPending()).resolves.toEqual([]);
     await expect(eventStore.getCursor()).resolves.toBe(0);
     await expect(eventStore.getStoreId()).resolves.toBeNull();
+  });
+});
+
+describe("a stale tab of a browser signed in again elsewhere (round 6 I1)", () => {
+  it("keeps the shared local copy when its late 401 finds another tab's session in the store", async () => {
+    // The browser profile's session store, shared with a tab that logged out and in again.
+    const shared = createMemorySessionStore();
+    const server = { isOldEnded: false };
+    const { eventStore, runtime } = await setup(
+      { "GET /api/me": () => (server.isOldEnded ? problem(401, "auth/unauthorized") : fakeMe) },
+      shared,
+    );
+    await runtime.auth.loginWithDev("1");
+    await render(
+      <PaceProvider runtime={runtime}>
+        <Probe />
+      </PaceProvider>,
+    );
+    await waitFor(async () => {
+      await expect(eventStore.getStoreId()).resolves.not.toBeNull();
+    });
+    await act(async () => {
+      runtime.sync.stop();
+      await runtime.state.dispatch({
+        occurredAt: "2026-10-06T10:00:00.000Z",
+        payload: { language: "ru" },
+        type: "settings.updated",
+      });
+    });
+    // Another tab logged this session out and signed in again: its token is in the shared store.
+    server.isOldEnded = true;
+    await shared.set("tok_other_tab");
+    await act(async () => {
+      await runtime.auth.me();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth")).toHaveTextContent("signed-out:-");
+    });
+    await expect(shared.get()).resolves.toBe("tok_other_tab");
+    await expect(eventStore.listPending()).resolves.toHaveLength(1);
+    await expect(eventStore.getStoreId()).resolves.not.toBeNull();
   });
 });
 

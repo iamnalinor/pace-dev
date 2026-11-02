@@ -32,4 +32,16 @@ export const createSignOutNotes = (): SignOutNotes => ({
       return Promise.resolve(null);
     }
   },
+  withdraw: (mark) => {
+    try {
+      const kept = storage();
+      // Only its own: a newer note (another tab's log-out since) stays.
+      if (kept?.getItem(NOTE_KEY) === mark) {
+        kept.removeItem(NOTE_KEY);
+      }
+    } catch {
+      // Blocked: there was no note to take back.
+    }
+    return Promise.resolve();
+  },
 });

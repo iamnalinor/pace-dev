@@ -641,6 +641,34 @@ The same rule applies when a previously successful channel is no longer configur
   `contrast.test.ts`, measured where it is weakest (the low point of an animation, the lighter of
   the backgrounds it sits on). Placeholders: 1.5:1 at the dim of their breath (`PLACEHOLDER_DIM`).
 
+### 74. A stale actor's clean-up of state it shares with newer ones
+- **Bug.** Round 6 review I1: a hidden tab still holding an ended session (T1) got its 401 after
+  the person had logged out in another tab and signed in again there (T2). Its sign-out cleared
+  the browser's shared session store (T2 gone: the other tab was signed out on its next reload and
+  T2 stayed in Devices) and wiped the shared IndexedDB copy, the other tab's unsent outbox included.
+- **Missed because.** Every sign-out test had one tab, or two tabs on the same session; none let a
+  second actor replace the shared state before the first actor's late clean-up ran.
+- **Rule.** Clean-up of shared state is compare-and-clear: an actor clears only what is still its
+  own (the store still holds the token it signs out), and work tied to a shared resource (wiping
+  the local copy) runs only when nobody else holds it (no session left in the store). A different
+  owner taking over is handled by the owner, by identity (a new store id drops the old copy on its
+  first pull), never by a stale actor. Test it with two actors: the second replaces the state, then
+  the first's late event arrives; the second's state and data are intact.
+
+### 75. A request sent in the gap of a hand-over
+- **Bug.** e2e flake of `sessions.e2e.ts` "ending this device signs out…" (3/60 on the base, 13/120
+  here): ending this browser's own session stopped the socket but not the sync, so the first
+  sync's pull or push (and the session check its 401 set off) went out with the token after the
+  server had ended it, and answered 401.
+- **Missed because.** The app test ended the session with an idle sync; the e2e started right after
+  sign-in, when the first sync is still running, but only sometimes long enough to overlap.
+- **Rule.** Before an action that ends the credential everything uses, every sender is quiesced and
+  kept quiet until the credential is forgotten: loops stopped, the run in flight finished
+  (`sync.hold()`), the socket rested, and starters that would begin again (the signed-in
+  bootstrap) check the hand-over (`auth.isEnding()`). Test it by asking the sender at the moment of
+  the ending request (the DELETE route calls `syncNow()` and expects `stopped`) and by looping the
+  e2e that counts every request answered after it.
+
 ## Log
 
 New bugs go here with their class; a new class gets its own section above.
@@ -889,3 +917,7 @@ New bugs go here with their class; a new class gets its own section above.
 | 2026-11-02 | QA round 19 L6: the web's Calendar picker, with nothing on, offered "Calendar from the phone" and a paragraph about Android's settings, on a build that has no phone calendar | 10 (a control that does nothing useful on one platform) | yes: the picker's other phone-only parts (the permissions row) were already gated on the phone; the Day screen's calendar section and the usage hint are phone-only; the Calendar button's greyed tooltips name no platform | `noEventsKey` per platform in the `calendar-source` stand-ins (web: "Nothing on in your calendar right now."), the web setup row and its two strings gone; a web unit test of the stand-in and an e2e of the web picker (no phone calendar, no Android) |
 | 2026-11-02 | QA round 19 L7: Presets' "Start from" row drew Homework as chosen before anything was: the actions were radio chips with a remembered value ("hw") | 72 (a control's look says what it does: actions drawn as a choice, one of them as already made) | yes: the other chip rows are real choices with a value the form keeps (project filter, the close sheet's times and precision, give-up outcomes, the preset form's fields); "Start from" was the only row of actions | `ActionChip` (a button in the unselected look); the presets test finds no radio in the row and opens the new preset from a button |
 | 2026-11-02 | Found by this round's full e2e run (and reproduced 4 of 4 on the base commit 8e84369 here, so not new): the route sweep failed "/no-such-page: sidebar missing" (once also /decisions): after a reload the first-sync cover hides the app while the device's copy is read, and the sweep's "text stopped changing" poll could settle on the cover's own words and count no sidebar | 20 (a test judges the screen before what it waits for has reached it: here the cover, which is stable text too) | yes: the tooltip sweep, the other one that reloads route after route, already waits for every progressbar to go before it looks; the overlay sweep loads once and moves in the app | the sweep waits for the cover's progressbar to go before it settles; 12/12 runs of both sweeps on this round's build, 4/4 desktop on the base build |
+| 2026-11-02 | Round 6 review I1: a stale tab's late 401 (its session ended, the person logged out and in again in another tab) cleared the newer session from the browser's shared store and wiped the shared IndexedDB copy, unsent outbox included | 74 (new) | yes: every write to shared state on sign-out: the session store (now compare-and-clear), the local copy (wiped only when no session is left in the store), the sign-out note (taken back only while it is still this tab's mark); a different account in the copy is dropped by its store id on the first pull, not by a stale tab | client test: two tabs, the second logs out and in, the first's late 401 leaves the newer token stored and `isSessionStored()` true; app test: the 401 keeps the shared event store and its outbox; e2e: a hidden tab's poll 401 after the other tab signed in again leaves its token, its local copy and its reload signed in |
+| 2026-11-02 | Round 6 review M1: Devices → End on this browser's own row left the other tabs' note only after the revoke answered; a 401 heard meanwhile signed out first ("another device" in the other tabs, and in this tab its own note could read as "another tab") | 69 | yes: every way this browser ends its own session: log-out (note before, already), ending its row (now before, taken back if the revoke fails), finishing account deletion (M2, below) | `auth.endThisDevice(revoke)`: the note goes first, a 401 for the session being ended is this tab's own act, a failed revoke takes the note back (`SignOutNotes.withdraw`, which never removes a newer note); client tests for each and a web adapter test |
+| 2026-11-02 | Round 6 review M2: finishing account deletion signed out without a note, so the browser's other tabs said "another device" | 69 | yes (see M1) | client test: another tab's 401 after `finishAccountDeletion` says another tab |
+| 2026-11-02 | e2e flake `sessions.e2e.ts` "ending this device signs out…": the first sync's pull or push, and the session check its 401 set off, went out after the session-end request was answered (13/120 here before the fix) | 75 (new) | yes: the senders that can run while this device ends its session: the sync loop and its run in flight (held), the socket (rested), the signed-in bootstrap's loop and socket start (skipped while ending), the session check (its 401 for the session being ended changes nothing) | `sync.hold()` (unit test: waits for the run in flight, then nothing goes out until released); app test: the DELETE's own `syncNow()` gets `stopped`; the e2e looped 120/120 green |

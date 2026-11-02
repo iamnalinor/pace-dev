@@ -28,6 +28,8 @@ token (never the token itself). The app has no other tabs, so it has none.
 */
 export type SignOutNotes = {
   readonly leave: (mark: string) => Promise<void>;
+  /** Takes the note back if it is still `mark` (the end it announced failed). */
+  readonly withdraw: (mark: string) => Promise<void>;
   /** The last mark left, `null` for none. */
   readonly read: () => Promise<null | string>;
 };
@@ -40,6 +42,11 @@ export const createMemorySignOutNotes = (): SignOutNotes => {
       mark = value;
     },
     read: async () => mark,
+    withdraw: async (value) => {
+      if (mark === value) {
+        mark = null;
+      }
+    },
   };
 };
 
