@@ -10,6 +10,7 @@ import { cx } from "./cx.ts";
 import { IconButton } from "./icon-button.tsx";
 import { useIsWide } from "./layout.ts";
 import { BACKDROP_ENTER, DIALOG_ENTER, SHEET_ENTER } from "./motion.ts";
+import { useSheetFocusRef } from "./sheet-focus.ts";
 import { useTheme } from "./theme-provider.tsx";
 import { HotkeyLayer } from "./use-hotkey.tsx";
 
@@ -27,20 +28,29 @@ const DIALOG_FRAME = {
   width: "92%",
 } as const;
 
-/** The dim behind: it fades in where it is, and a tap on it closes the sheet. */
+/**
+The dim behind: it fades in where it is, and a tap on it closes the sheet. It is never a Tab stop
+(QA round 18 M1: it took the first focus and a second "Close" stop); where the cross is shown it
+is hidden from assistive tech too, and on a phone's sheet (no cross) it stays the reader's way out.
+*/
 const Backdrop = ({
   closeLabel,
+  hasCross,
   onClose,
 }: {
   readonly closeLabel: string;
+  readonly hasCross: boolean;
   readonly onClose: () => void;
 }) => (
   <Animated.View entering={BACKDROP_ENTER} style={FILL}>
     <Pressable
       accessibilityLabel={closeLabel}
       accessibilityRole="button"
+      aria-hidden={hasCross}
       className="flex-1 bg-black/55"
       onPress={onClose}
+      // `focusable={false}` does not reach react-native-web's button; the tab index does.
+      tabIndex={-1}
     />
   </Animated.View>
 );
@@ -165,6 +175,7 @@ export const Sheet = ({
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
   const titleId = useId();
+  const surfaceRef = useSheetFocusRef({ closeLabel });
   return (
     // The dialog (react-native-web gives the modal the role) is named by its title (QA round 15 L8).
     <Modal
@@ -175,21 +186,21 @@ export const Sheet = ({
       visible={visible}
     >
       <SheetLayer>
-        {/* A modal renders outside the app's root (a portal on the web): the theme's variables
-      are declared again here, or the sheet would lose its surface and ink. */}
+        {/* Outside the app's root (a portal on the web): the theme's variables again, or no ink. */}
         <View
           className={cx("flex-1", isWide ? "justify-center" : "justify-end")}
           style={paletteVars(scheme)}
         >
           {/* The animated wrappers only move; the look is on plain views inside (class names
         on reanimated views are dropped on the web, which left the sheet see-through). */}
-          <Backdrop closeLabel={closeLabel} onClose={onClose} />
+          <Backdrop closeLabel={closeLabel} hasCross={isWide} onClose={onClose} />
           <Animated.View
             entering={isWide ? DIALOG_ENTER : SHEET_ENTER}
             style={isWide ? DIALOG_FRAME : FRAME}
           >
             <View
               accessibilityViewIsModal
+              ref={surfaceRef}
               {...(formLabel !== undefined && { accessibilityLabel: formLabel, role: "form" })}
               // The modal is the dialog already (react-native-web gives it the role); this is its surface.
               {...({ dataSet: { paceSurface: "sheet" } } as object)}
