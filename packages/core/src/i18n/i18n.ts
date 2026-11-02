@@ -131,12 +131,15 @@ export const formatLeft = (minutes: number, language: Language): string => {
 
 /**
 `90` → `1h 30m` / `1 ч 30 мин`; `125` → `2h 5m` / `2 ч 05 мин`; `0` → `0m`. From 48 h on the
-hours roll into days and the minutes drop: `3d 4h` / `3 дн 4 ч`, `7d` / `7 дн`.
+hours roll into days and the minutes go, the exact value rounded to the nearest hour, half up
+(`3d 4h` / `3 дн 4 ч`, `7d` / `7 дн`): an amount (an estimate, a tracked total) must not lose
+up to 59 minutes. `formatLeft`, `formatSpan` and `formatLate` floor instead: a countdown never
+claims more time than is left, and an age or a delay reads "at least".
 */
 export const formatDuration = (minutes: number, language: Language): string => {
   const total = Math.round(minutes);
   if (total >= DAYS_FROM) {
-    return formatLeft(total, language);
+    return formatLeft(Math.round(minutes / 60) * 60, language);
   }
   const units = DURATION_UNITS[language];
   const hours = Math.floor(total / 60);

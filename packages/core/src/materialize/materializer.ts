@@ -92,9 +92,20 @@ export const effectiveEvents = (events: readonly Event[]): readonly Event[] => {
     .map((event) => patched(event, amendments.get(event.id) ?? []));
 };
 
+/** The events a rebuild folds: corrections applied, in canonical order. */
+export const effectiveInOrder = (events: readonly Event[]): readonly Event[] =>
+  sortEvents(effectiveEvents(events));
+
+/**
+Folds a list `effectiveInOrder` made, from `initial`: for a caller that keeps that list too (the
+client's state), so it is derived once per rebuild, not twice.
+*/
+export const foldEffective = <S>(ordered: readonly Event[], reducer: Reducer<S>, initial: S): S =>
+  fold(ordered, reducer, initial);
+
 /** Full rebuild: corrections applied, canonical order, folded from `initial`. */
 export const materialize = <S>(events: readonly Event[], reducer: Reducer<S>, initial: S): S =>
-  fold(sortEvents(effectiveEvents(events)), reducer, initial);
+  foldEffective(effectiveInOrder(events), reducer, initial);
 
 export type MaterializeOptions<S> = {
   readonly reducer: Reducer<S>;

@@ -164,7 +164,16 @@ describe("without regular-expression property escapes", () => {
     );
   };
 
-  it("still loads @pace/core and returns whole characters", async () => {
+  /**
+  Loading all of @pace/core afresh (every module, zod schemas included) is the point of the next
+  test: a `\p{…}` pattern built at module scope anywhere in core would take the import down. On a
+  loaded machine that import alone can outlast vitest's default 5 s, so it gets more time.
+  */
+  const WHOLE_CORE_IMPORT_MS = 30_000;
+
+  it("still loads @pace/core and returns whole characters", {
+    timeout: WHOLE_CORE_IMPORT_MS,
+  }, async () => {
     rejectProperties();
     vi.resetModules();
     const core = await import("../core.ts");

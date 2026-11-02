@@ -118,6 +118,8 @@ export { coreReducer, type CoreState, INITIAL_CORE_STATE } from "./materialize/c
 export {
   apply,
   effectiveEvents,
+  effectiveInOrder,
+  foldEffective,
   isCorrection,
   materialize,
   materializeAt,

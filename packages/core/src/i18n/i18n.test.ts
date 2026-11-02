@@ -250,13 +250,27 @@ describe("formatDuration", () => {
     expect(text.split(" ")).toEqual(["2\u{A0}ч", "05\u{A0}мин"]);
   });
 
-  it("rolls hours into days from 48 h on, dropping minutes", () => {
+  it("rolls hours into days from 48 h on, rounding the minutes to the nearest hour", () => {
     expect(formatDuration(47 * 60 + 59, "en")).toBe("47h 59m");
     expect(formatDuration(48 * 60, "en")).toBe("2d");
-    expect(formatDuration(3 * 24 * 60 + 4 * 60 + 30, "en")).toBe("3d 4h");
-    expect(formatDuration(3 * 24 * 60 + 4 * 60 + 30, "ru")).toBe("3\u{A0}дн 4\u{A0}ч");
+    expect(formatDuration(3 * 24 * 60 + 4 * 60 + 29, "en")).toBe("3d 4h");
+    expect(formatDuration(3 * 24 * 60 + 4 * 60 + 29, "ru")).toBe("3\u{A0}дн 4\u{A0}ч");
     expect(formatDuration(10_080, "ru")).toBe("7\u{A0}дн");
     expect(formatDuration(10_080, "en")).toBe("7d");
+  });
+
+  it("rounds half an hour up past 48 h, so a tracked total never loses up to 59 minutes", () => {
+    // 2 d 4 h 30 min: half up.
+    expect(formatDuration(2 * 24 * 60 + 4 * 60 + 30, "en")).toBe("2d 5h");
+    expect(formatDuration(2 * 24 * 60 + 4 * 60 + 30, "ru")).toBe("2\u{A0}дн 5\u{A0}ч");
+    // 49 h 59 min reads as 2 d 2 h, not 2 d 1 h.
+    expect(formatDuration(49 * 60 + 59, "ru")).toBe("2\u{A0}дн 2\u{A0}ч");
+    // Rounding carries into the next day: 2 d 23 h 30 min is 3 d.
+    expect(formatDuration(2 * 24 * 60 + 23 * 60 + 30, "en")).toBe("3d");
+    expect(formatDuration(2 * 24 * 60 + 23 * 60 + 29, "en")).toBe("2d 23h");
+    // The exact value rounds once, never minutes first and hours after: 48 h 29.6 min is 2 d.
+    expect(formatDuration(48 * 60 + 29.6, "en")).toBe("2d");
+    expect(formatDuration(48 * 60 + 30, "en")).toBe("2d 1h");
   });
 
   it("omits empty parts", () => {

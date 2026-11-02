@@ -11,16 +11,13 @@ import {
 import { type ActionDeps, type ActionResult, emit, fromStore, stamp, taskOf } from "./deps.ts";
 
 export type ReviewActions = {
-  /** Appends the action's events (corrections included) and rebuilds the state after a correction. */
+  /** Appends the action's events, corrections included (the store rebuilds on a correction). */
   readonly runReviewAction: (item: ReviewItem, key: ReviewActionKey) => ActionResult;
   /** Marks a system-made outcome as seen and agreed. */
   readonly confirmAutoOutcome: (taskId: string) => ActionResult;
   /** Revokes a system-made outcome: the task is open again. */
   readonly undoAutoOutcome: (taskId: string) => ActionResult;
 };
-
-const isCorrectionInput = (input: EventInput): boolean =>
-  input.type === "event.amended" || input.type === "event.revoked";
 
 /** System events keep their source; everything else is this client's doing. */
 const owned = (input: EventInput, source: ActionDeps["source"]): EventInput =>
@@ -59,12 +56,11 @@ export const reviewActions = (deps: ActionDeps): ReviewActions => ({
     if (action === undefined) {
       return err("action/unknown-review-action");
     }
-    const inputs = action.events.map((input) => owned(input, deps.source));
-    const result = await emit(deps, inputs);
-    if (result.ok && inputs.some((input) => isCorrectionInput(input))) {
-      await deps.state.rematerialize();
-    }
-    return result;
+    // A correction among them is rebuilt by the store as it shows them (`integrate`).
+    return await emit(
+      deps,
+      action.events.map((input) => owned(input, deps.source)),
+    );
   },
   undoAutoOutcome: async (taskId) => {
     const closed = autoOutcomeOf(deps, taskId);

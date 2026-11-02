@@ -3,16 +3,16 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import {
   apply,
   DEFAULT_SETTINGS,
-  effectiveEvents,
+  effectiveInOrder,
   err,
   type Event,
   type EventInput,
+  foldEffective,
   INITIAL_PRESETS_STATE,
   INITIAL_PROJECTS_STATE,
   INITIAL_SERIES_STATE,
   INITIAL_TASKS_STATE,
   INITIAL_TIME_STATE,
-  materialize,
   mergeEvents,
   newId,
   ok,
@@ -161,9 +161,10 @@ const rebuild = (state: AppState, all: readonly Event[]): AppState => {
     status: "ready",
     version: state.version + 1,
   };
-  const events = sortEvents(effectiveEvents(all));
+  // Derived once: the fold and the state's `events` share it (class 55).
+  const events = effectiveInOrder(all);
   return {
-    ...materialize(all, rootReducer, base),
+    ...foldEffective(events, rootReducer, base),
     events,
     lastAppliedOccurredAt: events.at(-1)?.occurredAt ?? null,
     log: sortEvents(all),
