@@ -203,6 +203,7 @@ const CalendarRow = ({
 /** Logs the ended events of "always attended" series once each, as the person asked. */
 const useSeriesAutoLog = (phone: DayPhone): void => {
   const { actions } = usePace();
+  const run = useRunAction();
   const loggedRef = useRef(new Set<string>());
   const { autoLog } = phone.calendar;
   useEffect(() => {
@@ -212,14 +213,16 @@ const useSeriesAutoLog = (phone: DayPhone): void => {
         continue;
       }
       loggedRef.current.add(key);
-      void actions.logPast({
-        category: "other",
-        endAt: event.endAt,
-        label: event.title,
-        startAt: event.startAt,
-      });
+      void run(
+        actions.logPast({
+          category: "other",
+          endAt: event.endAt,
+          label: event.title,
+          startAt: event.startAt,
+        }),
+      );
     }
-  }, [actions, autoLog]);
+  }, [actions, autoLog, run]);
 };
 
 export const CalendarSection = ({

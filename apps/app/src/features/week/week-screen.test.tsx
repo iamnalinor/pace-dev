@@ -1,7 +1,8 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { Linking } from "react-native";
 
-import { renderScreen } from "#app/test/render.tsx";
+import { refusingStore } from "#app/test/refusing-store.ts";
+import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { addMinutesIso, type CalendarEvent } from "@pace/core";
 import { NOW } from "@pace/core/testing";
@@ -148,6 +149,18 @@ describe("WeekScreen", () => {
     await renderScreen(<WeekScreen />, await world());
     expect(screen.getByText("Swipe to see all days")).toBeOnTheScreen();
     expect(screen.getByTestId("week-days")).toHaveProp("tabIndex", 0);
+  });
+
+  it("says so and keeps the night hours off when the device refuses to save the header's switch", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore });
+    await renderScreen(<WeekScreen />, runtime);
+    await measure(700);
+    disk.refuse();
+    await fireEvent.press(screen.getByRole("switch", { name: "Night hours" }));
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(screen.getByRole("switch", { name: "Night hours" })).not.toBeChecked();
+    expect(screen.queryByText("00")).toBeNull();
   });
 
   it("shows the night hours when asked, from the header and in the settings", async () => {

@@ -14,6 +14,7 @@ import {
   registerPush,
   setPushChoice,
 } from "#app/platform/notifications.ts";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { Segmented } from "#app/ui/segmented.tsx";
@@ -29,6 +30,7 @@ the web). The switches read the one rule the server and the feed read (`isChanne
 export const NotificationChannels = () => {
   const t = useT();
   const { actions } = usePace();
+  const run = useRunAction();
   const settings = useSettings();
   return (
     <View className="gap-1" role="table">
@@ -64,7 +66,7 @@ export const NotificationChannels = () => {
                   kind: t(`notify.kind.${kind}`),
                 })}
                 onChange={(isOn) => {
-                  void actions.setNotificationChannel(kind, channel, isOn);
+                  void run(actions.setNotificationChannel(kind, channel, isOn));
                 }}
               />
             </View>
@@ -186,9 +188,10 @@ export const PushStatus = () => {
 export const DigestWindows = () => {
   const t = useT();
   const { actions } = usePace();
+  const run = useRunAction();
   const { digestWindows } = useSettings();
   const save = (next: readonly string[]): void => {
-    void actions.setDigestWindows(next);
+    void run(actions.setDigestWindows(next));
   };
   return (
     <View className="gap-2">
@@ -233,6 +236,7 @@ export const DigestWindows = () => {
 export const QuietHours = () => {
   const t = useT();
   const { actions } = usePace();
+  const run = useRunAction();
   const { quietHours } = useSettings();
   const edge = (side: "from" | "to") => (
     <View className="flex-1 gap-2">
@@ -242,7 +246,7 @@ export const QuietHours = () => {
       <TimeInput
         label={t(`settings.quietHours.${side}`)}
         onTime={(time) => {
-          void actions.setQuietHours({ ...quietHours, [side]: time });
+          void run(actions.setQuietHours({ ...quietHours, [side]: time }));
         }}
         value={quietHours[side]}
       />

@@ -8,6 +8,7 @@ import * as firebaseProject from "#app/platform/firebase-project.ts";
 import { pushStore, registerPush, setPushChoice } from "#app/platform/notifications.ts";
 import { SettingsScreen } from "#app/screens/settings-screen.tsx";
 import { isControl } from "#app/test/focus-target.ts";
+import { refusingStore } from "#app/test/refusing-store.ts";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { router } from "#app/test/router.ts";
 import { createTestRuntime } from "#app/test/runtime.ts";
@@ -132,6 +133,44 @@ describe("SettingsScreen", () => {
     await waitFor(() => {
       expect(runtime.state.store.getState().settings.nightHours).toBe(false);
     });
+  });
+
+  it("says so and turns night hours back when the device refuses to save it, then rests", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    disk.refuse();
+    await fireEvent(nightHours(), "valueChange", true);
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(nightHours()).not.toBeChecked();
+    expect(runtime.state.store.getState().settings.nightHours).toBe(false);
+    expect(disk.refused).toEqual([1]);
+  });
+
+  it("says so when the device refuses to save the language", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    disk.refuse();
+    await fireEvent.press(screen.getByRole("radio", { name: en("settings.language.ru") }));
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(runtime.state.store.getState().settings.language).toBe("en");
+  });
+
+  it("says so when the device refuses to save a notification switch", async () => {
+    const disk = refusingStore();
+    const runtime = await createTestRuntime({ eventStore: disk.eventStore, world: "empty" });
+    await renderScreen(<SettingsScreen />, runtime);
+    disk.refuse();
+    const digestOnWeb = screen.getByLabelText(
+      en("notify.switch", {
+        channel: en("notify.channel.web"),
+        kind: en("notify.kind.deadline_digest"),
+      }),
+    );
+    await fireEvent(digestOnWeb, "valueChange", true);
+    expect(await screen.findByText(en("actionError.persist_failed"))).toBeOnTheScreen();
+    expect(digestOnWeb).not.toBeChecked();
   });
 
   it("switches one kind of notification on one channel, the others as they were", async () => {

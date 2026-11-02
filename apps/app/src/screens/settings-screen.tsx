@@ -20,6 +20,7 @@ import { SettingsLinks } from "#app/features/settings/settings-links.tsx";
 import { TimezoneRow } from "#app/features/settings/timezone-row.tsx";
 import { IS_PHONE } from "#app/platform/device.ts";
 import { DestinationScreen } from "#app/screens/destination-screen.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { cx } from "#app/ui/cx.ts";
 import { KnownAfterSync } from "#app/ui/empty-state.tsx";
@@ -81,6 +82,7 @@ const LookRows = () => {
   const theme = useTheme();
   const settings = useSettings();
   const { actions } = usePace();
+  const run = useRunAction();
   return (
     <>
       <Row label={t("settings.theme")}>
@@ -97,7 +99,7 @@ const LookRows = () => {
         <KnownAfterSync>
           <Segmented
             onChange={(language) => {
-              void actions.setLanguage(language);
+              void run(actions.setLanguage(language));
             }}
             options={LANGUAGES.map((value) => ({ label: t(`settings.language.${value}`), value }))}
             value={settings.language}
@@ -111,7 +113,7 @@ const LookRows = () => {
             isOn={settings.nightHours}
             label={t("settings.nightHours")}
             onChange={(isOn) => {
-              void actions.setNightHours(isOn);
+              void run(actions.setNightHours(isOn));
             }}
           />
         </KnownAfterSync>

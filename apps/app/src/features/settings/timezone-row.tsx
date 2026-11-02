@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
 import { usePace, useSettings, useT } from "#app/app-state.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { zonesDiffer } from "@pace/core";
 
@@ -14,6 +15,7 @@ worth a warning, but the device zone stays one tap away whenever the names diffe
 export const TimezoneRow = () => {
   const t = useT();
   const { actions, hooks } = usePace();
+  const run = useRunAction();
   const { now } = hooks.useClock();
   const device = deviceTimeZone();
   // Until the first sync assigns one, the account runs on the device zone (queries do too).
@@ -35,7 +37,7 @@ export const TimezoneRow = () => {
       {account === device ? null : (
         <Button
           onPress={() => {
-            void actions.setTimezone(device);
+            void run(actions.setTimezone(device));
           }}
           variant="secondary"
         >

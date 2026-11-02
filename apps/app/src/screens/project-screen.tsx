@@ -7,6 +7,7 @@ import type { ProjectViewModel } from "@pace/client";
 import { useAppState, useLanguage, usePace, useT } from "#app/app-state.tsx";
 import { ProjectForm } from "#app/features/projects/project-form.tsx";
 import { FoldedSection, TaskRows } from "#app/shared/task-list.tsx";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { Button } from "#app/ui/button.tsx";
 import { washClass } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -40,6 +41,7 @@ const EditProject = ({
 }) => {
   const t = useT();
   const { actions } = usePace();
+  const run = useRunAction();
   const isArchived = useAppState(
     (state) => projectById(state.projects, project.id)?.archived ?? false,
   );
@@ -49,7 +51,7 @@ const EditProject = ({
         extra={
           <Button
             onPress={() => {
-              void actions.updateProject(project.id, { archived: !isArchived });
+              void run(actions.updateProject(project.id, { archived: !isArchived }));
               onDone();
             }}
             variant="ghost"

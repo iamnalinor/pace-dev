@@ -81,6 +81,19 @@ const DISPLAY_TEXT_SYNTAX = [
   },
 ];
 
+/**
+An action answers a `Result`; dropped with `void`, a refusal (`persist_failed`: the device could not
+save it) takes the change back with no word (bug-lessons 57). `ensureInstances` answers a count.
+*/
+const ACTION_ANSWER_SYNTAX = [
+  {
+    message:
+      "An action's answer is never dropped: `void run(actions.…)` with useRunAction (#app/shared/use-run-action.ts) shows a refusal's sentence.",
+    selector:
+      "UnaryExpression[operator='void'] > CallExpression[callee.object.name='actions'][callee.property.name!='ensureInstances'], UnaryExpression[operator='void'] > CallExpression[callee.object.property.name='actions']",
+  },
+];
+
 const TESTS = [
   "**/*.test.{ts,tsx}",
   "**/*.fake.ts",
@@ -466,14 +479,29 @@ export default defineConfig([
       "better-tailwindcss": { cwd: "apps/app", tailwindConfig: "tailwind.config.js" },
     },
   },
-  // Design values come from the tokens (spec §9.3). A warning, counted in
-  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error. A class
-  // outside GENERATED_CLASSES (the token scales and layout utilities) is off the scale.
+  // The display-text bans (bug-lessons 59, 60) cover every source that builds text a person
+  // reads: the app's screens and the client's view-models (scripts/eslint-scoped-bans.test.ts).
+  // The app also never drops an action's answer (bug-lessons 57).
   {
-    files: ["apps/app/src/**/*.{ts,tsx}"],
+    files: ["packages/client/src/view-models/**/*.ts"],
     ignores: TESTS,
     rules: { "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ...DISPLAY_TEXT_SYNTAX] },
   },
+  {
+    files: ["apps/app/src/**/*.{ts,tsx}"],
+    ignores: TESTS,
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...RESTRICTED_SYNTAX,
+        ...DISPLAY_TEXT_SYNTAX,
+        ...ACTION_ANSWER_SYNTAX,
+      ],
+    },
+  },
+  // Design values come from the tokens (spec §9.3). A warning, counted in
+  // context/design/redesign-plan.md, until the app is migrated; then it becomes an error. A class
+  // outside GENERATED_CLASSES (the token scales and layout utilities) is off the scale.
   {
     files: APP,
     ignores: TESTS,

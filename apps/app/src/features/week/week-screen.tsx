@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useIsAccountUnknown, usePace, useSettings, useT } from "#app/app-state.tsx";
 import { BackToToday } from "#app/shared/back-to-today.tsx";
 import { useBack } from "#app/shared/use-back.ts";
+import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { cx } from "#app/ui/cx.ts";
@@ -43,6 +44,7 @@ const NightHoursToggle = () => {
   const t = useT();
   const { actions } = usePace();
   const { nightHours } = useSettings();
+  const run = useRunAction();
   const { palette } = useTheme();
   // Until a sync of this session succeeded, a failed first pull included (round 7 review 12).
   const isUnknown = useIsAccountUnknown();
@@ -61,7 +63,7 @@ const NightHoursToggle = () => {
           nightHours && "bg-accent-quiet",
         )}
         onPress={() => {
-          void actions.setNightHours(!nightHours);
+          void run(actions.setNightHours(!nightHours));
         }}
       >
         <Moon
