@@ -47,7 +47,7 @@ describe("PresetsList", () => {
     await renderScreen(<PresetsList />, runtime);
     expect(screen.queryByRole("button", { name: en("presets.new") })).toBeNull();
     // "Start from" lists actions, not a choice: buttons, none of them drawn as picked (QA 19 L7).
-    expect(screen.queryAllByRole("radio")).toEqual([]);
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
     await fireEvent.press(screen.getByRole("button", { name: "Work" }));
     expect(router.push).toHaveBeenCalledWith({
       params: { from: "work", id: "new" },

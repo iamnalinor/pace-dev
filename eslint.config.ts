@@ -34,6 +34,35 @@ const required = <T>(value: T | undefined, name: string): T => {
   return value;
 };
 
+/** Syntax banned everywhere; a block that adds its own entries must spread these (the option replaces). */
+const RESTRICTED_SYNTAX = [
+  {
+    message: "Use a union of string literals instead of enum.",
+    selector: "TSEnumDeclaration",
+  },
+  {
+    message: "for..in iterates inherited keys; use Object.entries/keys.",
+    selector: "ForInStatement",
+  },
+  {
+    message:
+      "A cast hides a missing translation from the type checker; map the value to its key with a typed Record instead.",
+    selector: "TSAsExpression > TSTypeReference[typeName.name='MessageKey']",
+  },
+];
+
+/**
+Rendered elements compared with toEqual: a failing comparison prints a diff of the whole tree,
+which takes about a second, so a waitFor around it runs out of time before its retry sees the
+screen settle (bug-lessons class 105). Compare their count, labels or the element itself.
+*/
+const ELEMENT_DEEP_EQUAL = {
+  message:
+    "A failing toEqual over rendered elements takes ~1 s to print and starves waitFor (bug-lessons 105); assert toHaveLength, their labels, or toBe.",
+  selector:
+    "CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.property.name=/^(getAll|queryAll|findAll)/], CallExpression[callee.property.name=/^(toEqual|toStrictEqual)$/][callee.object.callee.name='expect'][callee.object.arguments.0.callee.name=/^(listsNamed|picker)$/]",
+};
+
 const TESTS = [
   "**/*.test.{ts,tsx}",
   "**/*.fake.ts",
@@ -162,22 +191,7 @@ export default defineConfig([
       "no-else-return": ["error", { allowElseIf: false }],
       "no-implicit-coercion": "error",
       "no-param-reassign": ["error", { props: true }],
-      "no-restricted-syntax": [
-        "error",
-        {
-          message: "Use a union of string literals instead of enum.",
-          selector: "TSEnumDeclaration",
-        },
-        {
-          message: "for..in iterates inherited keys; use Object.entries/keys.",
-          selector: "ForInStatement",
-        },
-        {
-          message:
-            "A cast hides a missing translation from the type checker; map the value to its key with a typed Record instead.",
-          selector: "TSAsExpression > TSTypeReference[typeName.name='MessageKey']",
-        },
-      ],
+      "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX],
       "no-useless-rename": "error",
       "object-shorthand": ["error", "always"],
       "prefer-const": "error",
@@ -473,6 +487,12 @@ export default defineConfig([
       // Fakes implement async ports synchronously.
       "@typescript-eslint/require-await": "off",
       "sonarjs/no-nested-functions": "off",
+    },
+  },
+  {
+    files: ["apps/app/**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": ["error", ...RESTRICTED_SYNTAX, ELEMENT_DEEP_EQUAL],
     },
   },
   {

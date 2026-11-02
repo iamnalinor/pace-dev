@@ -187,7 +187,7 @@ describe("TimeBar", () => {
         expect.objectContaining({ category: "sport", expectMinutes: 60, label: "Workout" }),
       ]);
     });
-    expect(listsNamed("Rest")).toEqual([]);
+    expect(listsNamed("Rest")).toHaveLength(0);
 
     const on = screen.getByRole("button", { name: en("time.buttonRunning", { label: "Rest" }) });
     await fireEvent.press(on);
@@ -195,7 +195,7 @@ describe("TimeBar", () => {
     await waitFor(() => {
       expect(running(runtime)).toEqual([]);
     });
-    expect(listsNamed("Rest")).toEqual([]);
+    expect(listsNamed("Rest")).toHaveLength(0);
   });
 
   it("picks a chore from Chores' picker, which has no nap any more", async () => {
@@ -327,7 +327,7 @@ describe("TimeBar", () => {
       });
       await fireEvent.press(again);
       await waitFor(() => {
-        expect(listsNamed(list)).toEqual([]);
+        expect(listsNamed(list)).toHaveLength(0);
       });
       // Nothing asked of the actions, nothing written: the same block runs on.
       for (const start of starts) {
@@ -387,7 +387,7 @@ describe("TimeBar", () => {
       expect(screen.queryByRole("button", { name: en("time.stop") })).toBeNull();
       release.resolve(undefined);
       await waitFor(() => {
-        expect(listsNamed("Rest")).toEqual([]);
+        expect(listsNamed("Rest")).toHaveLength(0);
       });
     });
 

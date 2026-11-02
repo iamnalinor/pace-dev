@@ -165,13 +165,13 @@ describe("Settings and Presets during the first sync (QA round 20 M1)", () => {
 
   it("Week draws no night-hours switch, the same account value as Settings' (round 6-D sweep)", async () => {
     await duringFirstSync(<WeekScreen />);
-    expect(screen.queryAllByRole("switch")).toEqual([]);
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
   });
 
   it("Presets shows grey rows instead of the built-in list and its actions", async () => {
     await duringFirstSync(<PresetsScreen />);
     expect(screen.queryByText(en("presets.seedExamples"))).toBeNull();
-    expect(screen.queryAllByRole("switch")).toEqual([]);
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
     expect(
       screen.getAllByRole("progressbar", { name: en("sync.loadingData") }).length,
     ).toBeGreaterThan(0);

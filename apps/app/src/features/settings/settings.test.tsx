@@ -159,7 +159,7 @@ describe("SettingsScreen", () => {
   it("names each kind of notification as a setting, not as its question (QA round 18 L12)", async () => {
     await renderScreen(<SettingsScreen />, await createTestRuntime({ world: "empty" }));
     expect(screen.getByRole("switch", { name: "Activity check: Telegram" })).toBeOnTheScreen();
-    expect(screen.queryAllByRole("switch", { name: /\?/u })).toEqual([]);
+    expect(screen.queryAllByRole("switch", { name: /\?/u })).toHaveLength(0);
   });
 
   it("picks how this phone shows notifications from what the server offers, and says which it uses", async () => {
