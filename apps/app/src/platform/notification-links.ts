@@ -45,7 +45,12 @@ const useNotificationLinks = (): void => {
   const response = Notifications.useLastNotificationResponse();
   useEffect(() => {
     const link = linkOf(response);
-    if (link === null || taken.has(link.identifier)) {
+    if (link === null) {
+      return;
+    }
+    // Already taken (the same notification delivered again): the phone forgets it this time too.
+    if (taken.has(link.identifier)) {
+      Notifications.clearLastNotificationResponse();
       return;
     }
     if (status === "signed-out") {

@@ -28,6 +28,25 @@ type Response = {
 
 type ResponseListener = (response: Response) => void;
 
+/**
+The module's `determineNextResponse`: no tap is `null`; a tap replaces the one held only when it
+comes from another notification (so the same one delivered again keeps the response object).
+*/
+const nextResponse = (
+  previous: null | Response | undefined,
+  next: null | Response,
+): null | Response => {
+  if (next === null) {
+    return null;
+  }
+  if (previous === null || previous === undefined) {
+    return next;
+  }
+  return previous.notification.request.identifier === next.notification.request.identifier
+    ? previous
+    : next;
+};
+
 /** expo-notifications without the native module: a test sets what the phone answers. */
 export const createFakeNotifications = () => {
   const state = {
@@ -111,23 +130,39 @@ export const createFakeNotifications = () => {
       state.categories.set(identifier, actions);
       return null;
     },
+    /**
+    A tap while the app runs (warm): the phone keeps it as the last response and the module tells
+    every response listener, as its emitter does.
+    */
+    respond: (response: Response): void => {
+      state.lastResponse = response;
+      for (const listener of state.responseListeners) {
+        listener(response);
+      }
+    },
     setNotificationChannelAsync: async (): Promise<null> => null,
     setNotificationHandler: (): void => undefined,
     state,
     /**
-    As the module's own: `undefined` on the first render, the phone's last tap read on every mount
-    in a layout effect, and `null` once it is cleared.
+    As the module's own (expo-notifications 57): `undefined` on the first render, the phone's last
+    tap read on every mount in a layout effect, each tap while mounted taken through the response
+    listener (the same notification again keeps the response it has), and `null` once cleared.
     */
     useLastNotificationResponse: (): null | Response | undefined => {
       const [response, setResponse] = useState<null | Response | undefined>(undefined);
       useLayoutEffect(() => {
         // eslint-disable-next-line @eslint-react/set-state-in-effect -- mirrors expo-notifications' own hook, which sets the launch tap in a layout effect
-        setResponse(state.lastResponse);
+        setResponse((previous) => nextResponse(previous, state.lastResponse));
+        const received: ResponseListener = (tap) => {
+          setResponse((previous) => nextResponse(previous, tap));
+        };
         const cleared = () => {
           setResponse(null);
         };
+        state.responseListeners.push(received);
         state.clearListeners.push(cleared);
         return () => {
+          state.responseListeners = state.responseListeners.filter((item) => item !== received);
           state.clearListeners = state.clearListeners.filter((item) => item !== cleared);
         };
       }, []);

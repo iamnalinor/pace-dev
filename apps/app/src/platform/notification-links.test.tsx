@@ -269,3 +269,42 @@ describe("a tap is followed once across remounts (QA round 17 round-3 review C1)
     expect(seen.paths.filter((path) => path === "/task/abc")).toHaveLength(1);
   });
 });
+
+/** Opens the task from a cold-start tap, then goes Back to Now. */
+const openedThenBack = async (identifier: string) => {
+  const runtime = await signedInRuntime();
+  fake.state.lastResponse = tapOn(identifier);
+  const routed = renderApp(runtime);
+  await routed;
+  expect(await screen.findByText("The task")).toBeOnTheScreen();
+  await act(() => {
+    router.back();
+  });
+  expect(await screen.findByText("Now")).toBeOnTheScreen();
+  // Wrapped: an async function's return would unwrap the pending render, which carries the helpers.
+  return { routed };
+};
+
+describe("a tap while the app runs (QA round 17 round-4 review R3, R4)", () => {
+  it("a second tap on another notification opens its task too", async () => {
+    const { routed } = await openedThenBack("first");
+    await act(() => {
+      fake.respond(tapOn("second"));
+    });
+    expect(await screen.findByText("The task")).toBeOnTheScreen();
+    expect(routed.getPathname()).toBe("/task/abc");
+    expect(seen.paths.filter((path) => path === "/task/abc")).toHaveLength(2);
+    expect(fake.state.lastResponse).toBeNull();
+  });
+
+  it("the same notification delivered again is not followed, and the phone forgets it", async () => {
+    const { routed } = await openedThenBack("again");
+    await act(() => {
+      fake.respond(tapOn("again"));
+    });
+    await settle();
+    expect(routed.getPathname()).toBe("/");
+    expect(seen.paths.filter((path) => path === "/task/abc")).toHaveLength(1);
+    expect(fake.state.lastResponse).toBeNull();
+  });
+});
