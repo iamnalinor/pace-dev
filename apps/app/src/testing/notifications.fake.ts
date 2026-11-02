@@ -1,3 +1,5 @@
+import { useLayoutEffect, useState } from "react";
+
 type Scheduled = {
   readonly identifier: string;
   readonly content: {
@@ -14,10 +16,12 @@ type Category = {
   readonly options?: object;
 };
 
-type ResponseListener = (response: {
+type Response = {
   readonly actionIdentifier: string;
   readonly notification: { readonly request: { readonly content: { readonly data?: unknown } } };
-}) => void;
+};
+
+type ResponseListener = (response: Response) => void;
 
 /** expo-notifications without the native module: a test sets what the phone answers. */
 export const createFakeNotifications = () => {
@@ -35,6 +39,8 @@ export const createFakeNotifications = () => {
     /** The FCM token the phone has; `null`: no Google services (the call fails). */
     pushToken: null as null | string,
     responseListeners: [] as ResponseListener[],
+    /** The tap the app was opened with (a cold start from a notification); `null`: none. */
+    lastResponse: null as null | Response,
   };
   const permission = () => ({ canAskAgain: state.canAskAgain, granted: state.granted });
   return {
@@ -94,5 +100,14 @@ export const createFakeNotifications = () => {
     setNotificationChannelAsync: async (): Promise<null> => null,
     setNotificationHandler: (): void => undefined,
     state,
+    /** As the module's own: `undefined` on the first render, the launch tap set in a layout effect. */
+    useLastNotificationResponse: (): null | Response | undefined => {
+      const [response, setResponse] = useState<null | Response | undefined>(undefined);
+      useLayoutEffect(() => {
+        // eslint-disable-next-line @eslint-react/set-state-in-effect -- mirrors expo-notifications' own hook, which sets the launch tap in a layout effect
+        setResponse(state.lastResponse);
+      }, []);
+      return response;
+    },
   };
 };

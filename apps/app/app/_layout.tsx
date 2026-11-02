@@ -14,7 +14,7 @@ import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { DocumentHead } from "#app/platform/document-head.tsx";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
-import { useNotificationLinks } from "#app/platform/notification-links.ts";
+import { NotificationLinks } from "#app/platform/notification-links.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the push task (and the foreground handler) before Android may run it.
 import "#app/platform/push-task.ts";
@@ -50,7 +50,6 @@ const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
   const path = usePathname();
-  useNotificationLinks();
   useCrashNotice();
   return (
     <UpdateBanner>
@@ -67,7 +66,11 @@ const Navigator = () => {
                 // route; the navigator stays mounted, so logging out lands on the login screen.
                 layout={({ children }) => (
                   <IncompatibleGate>
-                    <RouteGate path={path}>{children}</RouteGate>
+                    <RouteGate path={path}>
+                      {/* Under the hold and the gate: a tap is followed once the Stack exists. */}
+                      <NotificationLinks />
+                      {children}
+                    </RouteGate>
                   </IncompatibleGate>
                 )}
                 screenLayout={({ children }) => <ScreenScene>{children}</ScreenScene>}
