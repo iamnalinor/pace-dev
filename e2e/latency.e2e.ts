@@ -12,6 +12,14 @@ interaction (the Event Timing API: from the input to the frame painted after its
 a handler that waits for a disk write, a heavy re-render or a long mount all count. The file is
 a Playwright project of its own (`latency` in playwright.config.ts) that runs after every other
 test, one test at a time, so no parallel worker slows its frames.
+
+`BUDGET_MS` is the target and is never raised. A case over it for a reason a later task of the
+redesign owns has a regression ceiling instead (`CEILINGS`, a ratchet like the lint baseline):
+it fails past the ceiling, and its gap to the budget is a test annotation naming the owner.
+How a later task lowers a ceiling: run the project alone five times on a fresh build
+(`bunx playwright test --project latency --no-deps`), take the largest p75 of the case, multiply
+by 1.25 and round up to 10 ms; a lower number replaces the ceiling (never a higher one). Once the
+case is within the budget, the task deletes its entry, and the case asserts `BUDGET_MS` itself.
 */
 
 const BUDGET_MS = 100;
@@ -229,40 +237,62 @@ const timeTaps = async (
   return durations;
 };
 
+type Case = "check" | "chip" | "row" | "tab";
+
+/** A case's regression ceiling while a later task owns why it is over the budget. */
+type Ceiling = { readonly ms: number; readonly owner: string; readonly why: string };
+
 /**
-Over the budget for a reason a later task of the redesign owns (context/design/redesign-plan.md):
-the budget stays, the case is expected to fail until that task lands, and then flips (an
-expected failure that passes fails the run, so whoever fixes it removes the line). Marked right
-before the budget check, so a step that breaks before it still fails the run. None of the four
-taps writes to the local store: their time is the render they start. Numbers: Task 2.5 fix
-round 1, p75 of 9 after a warm-up, the project run alone.
+Ceilings: the largest p75 of the case × 1.25, rounded up to 10 ms. Measured in the review of
+batch 1+2 (2026-11-02, one fresh build, the project alone, 15 runs in three sets of five; the
+machine's load varied between them): largest p75 tab 192, chip 304, check 248, row 192 ms (the
+first set alone: 136, 240, 208, 176). Taken over all of them, so a busier runner does not fail a
+case that did not regress. The check tap does write (`closeTask`), but since Task 2.5 the write
+is off the frame's path; the other three taps write nothing. Each one's time is the render it
+starts.
 */
-const OVER_BUDGET: Readonly<Record<string, string>> = {
+const CEILINGS: Readonly<Partial<Record<Case, Ceiling>>> = {
   // Each switch re-renders the screens of both tabs and lays out the one taken out of
-  // display:none; Task 5.6 (render budget), the bar itself in Task 3.10.
-  tab: "Task 5.6 / 3.10: a tab switch re-renders both screens",
-  // Rows play Reanimated's entering and exiting animations on a filter change (F-MOT-07);
-  // Task 5.3 makes the filter change instant, Task 5.6 the render.
-  chip: "Task 5.3 / 5.6: rows animate on a filter change (F-MOT-07)",
-  // The check mounts the dust views in the same commit as the fill; Task 5.2.
-  check: "Task 5.2: the dust mounts in the check's own commit",
-  // Opening pushes the task screen and renders it in the tap's commit; Task 5.3 (route push)
-  // and Task 5.6 (render budget).
-  row: "Task 5.3 / 5.6: the task screen renders in the tap's commit",
+  // display:none; the bar itself is Task 3.10's.
+  tab: { ms: 240, owner: "Task 5.6 / 3.10", why: "a tab switch re-renders both screens" },
+  // Rows play Reanimated's entering and exiting animations on a filter change (F-MOT-07).
+  chip: { ms: 380, owner: "Task 5.3 / 5.6", why: "rows animate on a filter change (F-MOT-07)" },
+  check: { ms: 310, owner: "Task 5.2", why: "the dust mounts in the check's own commit" },
+  // Task 5.3 (route push) and Task 5.6 (render budget).
+  row: { ms: 240, owner: "Task 5.3 / 5.6", why: "the task screen renders in the tap's commit" },
 };
 
-/** The budget check, expected to fail where a later task owns the cause (`OVER_BUDGET`). */
-const expectWithinBudget = (name: string, durations: readonly number[]): void => {
+/** Notes how far a case with a ceiling is from the budget, and who owns closing the gap. */
+const noteGap = (name: Case, result: number, ceiling: Ceiling): void => {
+  const gap = result - BUDGET_MS;
+  const where =
+    gap > 0
+      ? `${String(gap)} ms over the ${String(BUDGET_MS)} ms budget`
+      : `within the ${String(BUDGET_MS)} ms budget: the owner deletes the ceiling`;
+  test.info().annotations.push({
+    description: `${name}: p75 ${String(result)} ms, ${where} (ceiling ${String(ceiling.ms)} ms); ${ceiling.owner}: ${ceiling.why}`,
+    type: "over budget",
+  });
+};
+
+/** The budget, or the case's ceiling while a later task owns its gap (`CEILINGS`). */
+const expectWithinBudget = (name: Case, durations: readonly number[]): void => {
   const result = report(name, durations);
-  const owner = OVER_BUDGET[name];
-  test.fail(owner !== undefined, owner);
-  expect(result).toBeLessThanOrEqual(BUDGET_MS);
+  const ceiling = CEILINGS[name];
+  if (ceiling === undefined) {
+    expect(result, `${name}: p75 within the budget`).toBeLessThanOrEqual(BUDGET_MS);
+    return;
+  }
+  noteGap(name, result, ceiling);
+  expect(result, `${name}: p75 within its regression ceiling`).toBeLessThanOrEqual(ceiling.ms);
 };
 
 test.use({ hasTouch: true, viewport: { height: 844, width: 390 } });
 
 test.describe("a tap shows its result within 100 ms on a slow phone (p75 of 9)", () => {
-  test.describe.configure({ mode: "serial" });
+  // One after another in one worker (the project is not fully parallel), but not "serial": a case
+  // past its ceiling must not skip the others, whose numbers the next ceiling needs.
+  test.describe.configure({ mode: "default" });
 
   test("a tab of the phone's bar", async ({ page }) => {
     const timeTap = await openNow(page);

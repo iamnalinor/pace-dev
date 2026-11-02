@@ -166,8 +166,13 @@ trace and a screenshot; CI uploads `playwright-report/`.
 9 after a warm-up, CPU slowed 4× through CDP, Event Timing grouped by `interactionId`). It is its
 own Playwright project, `latency`, which depends on `chromium`: `bun test:e2e` runs it after every
 other test, alone and serially. To run only it, `bunx playwright test --project latency --no-deps`.
-Cases over budget for a reason a later task owns are expected failures (`OVER_BUDGET`, marked
-right before the budget check); the budget itself is never raised.
+`BUDGET_MS` stays the target and is never raised. A case over it for a reason a later task owns
+has a regression ceiling instead (`CEILINGS`, a ratchet like the lint baseline): the case fails
+past its ceiling, and its gap to the budget is recorded as an `over budget` annotation naming the
+owner task. A ceiling is the largest p75 of five isolated runs × 1.25, rounded up to 10 ms. To
+lower one (the owner task, or anyone who made the case faster), run the project alone five times
+on a fresh build, apply the same formula and write the lower number; never a higher one. Once the
+case is within the budget, delete its entry: the case then asserts the 100 ms budget.
 
 `e2e/design-shots.e2e.ts` is not a test of behaviour: it shoots every route plus the sheets,
 dialogs, pickers, toasts, empty, loading, error and offline states and a keyboard-focus pass at
