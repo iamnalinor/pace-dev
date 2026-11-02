@@ -8,6 +8,7 @@ import { DestinationScreen } from "#app/screens/destination-screen.tsx";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { WeekArrows } from "#app/shared/week-arrows.tsx";
 import { PROJECT_FILL } from "#app/ui/color.tsx";
+import { EmptyText } from "#app/ui/empty-state.tsx";
 import { formatDuration, formatWeekRange } from "@pace/core";
 
 import { Card } from "./card.tsx";
@@ -118,7 +119,9 @@ export const InsightsScreen = () => {
             <Patterns week={week} zone={deviceTz} />
           </>
         ) : (
-          <Text className="font-sans text-[14px] text-muted">{t("insights.nothing")}</Text>
+          <EmptyText className="font-sans text-[14px] text-muted">
+            {t("insights.nothing")}
+          </EmptyText>
         )}
         {week.onTime.length > 0 ? (
           <Card title={t("insights.onTime")}>

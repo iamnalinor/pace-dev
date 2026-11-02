@@ -5,6 +5,7 @@ import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { FAKE_STORE_ID, fakeUser } from "@pace/client/testing";
 
+import { EmptyState, EmptyText } from "./empty-state.tsx";
 import { backOnline, FIRST_SYNC_COVER_MS, SyncFrame } from "./sync-frame.tsx";
 
 const EMPTY_PAGE = { events: [], more: false, seq: 0, storeId: FAKE_STORE_ID };
@@ -41,6 +42,18 @@ describe("the first-sync cover (QA round 17 M4)", () => {
     });
     expect(await screen.findByText(en("now.empty"))).toBeOnTheScreen();
     expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("says in words that it is syncing, not only with grey rows (QA round 18 M5)", async () => {
+    const pull = heldPull();
+    const runtime = await createTestRuntime({
+      routes: { ...DEV_LOGIN, "GET /api/sync/pull": pull.route },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    await renderScreen(<App />, runtime);
+    expect(screen.getByText(en("sync.firstSyncLine"))).toBeOnTheScreen();
+    expect(screen.getByRole("progressbar", { name: en("sync.firstSync") })).toBeOnTheScreen();
   });
 
   it("never covers a copy that already holds the log", async () => {
@@ -106,6 +119,39 @@ describe("the first-sync cover's bound (QA round 17 review I2)", () => {
       expect(screen.queryByText(en("sync.stillSyncing"))).toBeNull();
     });
     expect(screen.getByText(en("now.empty"))).toBeOnTheScreen();
+  });
+
+  it("shows no final empty copy after the cap while the first pull is not done (QA round 18 M5)", async () => {
+    jest.useFakeTimers();
+    const pull = heldPull();
+    const runtime = await createTestRuntime({
+      routes: { ...DEV_LOGIN, "GET /api/sync/pull": pull.route },
+      world: "empty",
+    });
+    await runtime.auth.loginWithDev("1");
+    // A screen's own empty state, as Now, Inbox and the others draw it.
+    await renderScreen(
+      <SyncFrame isBare={false}>
+        <EmptyState>{en("now.empty")}</EmptyState>
+        <EmptyText className="">{en("day.empty")}</EmptyText>
+      </SyncFrame>,
+      runtime,
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(FIRST_SYNC_COVER_MS);
+      await Promise.resolve();
+    });
+    expect(screen.getByText(en("sync.stillSyncing"))).toBeOnTheScreen();
+    expect(screen.queryByText(en("now.empty"))).toBeNull();
+    expect(screen.queryByText(en("day.empty"))).toBeNull();
+    expect(screen.getAllByRole("progressbar", { name: en("sync.loadingData") })).toHaveLength(2);
+    await act(async () => {
+      pull.answer(EMPTY_PAGE);
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(en("now.empty"))).toBeOnTheScreen();
+    expect(screen.getByText(en("day.empty"))).toBeOnTheScreen();
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
   it("covers the next sign-in's first sync though the last session's sync failed (review m5)", async () => {

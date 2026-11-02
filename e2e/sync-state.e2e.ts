@@ -59,6 +59,41 @@ test("the first sync of an empty copy shows placeholders, never the empty states
   await expect(placeholder).toHaveCount(0);
 });
 
+test("a first sync that outlasts the cover shows no final empty copy in either language (QA 18 M5)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const { token } = await loginViaApi(page);
+  await seedLivedIn(token);
+  // Longer than the cover's 10 s: the app is given back while the pull still waits.
+  await page.route("**/api/sync/pull**", async (route) => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 12_000);
+    });
+    await route.continue();
+  });
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    Object.assign(globalThis, { seenTexts: seen });
+    new MutationObserver(() => {
+      const body = document.querySelector("body");
+      // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText leaves out what is not drawn (the covered app); textContent keeps it
+      seen.push(body === null ? "" : body.innerText);
+    }).observe(document, { characterData: true, childList: true, subtree: true });
+  });
+  await page.goto("/");
+  // The cover says what it waits for, in words.
+  await expect(page.getByText("Syncing your data…")).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Still syncing" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("heading", { name: "Сейчас" })).toBeVisible({ timeout: 20_000 });
+  const seen = await page.evaluate(
+    () => (globalThis as unknown as { seenTexts: string[] }).seenTexts,
+  );
+  expect(seen.filter((text) => EMPTY_COPY.test(text))).toEqual([]);
+});
+
 test("offline, a line says so; a task written meanwhile goes out on reconnect and the line clears (QA 17 M5)", async ({
   context,
   page,

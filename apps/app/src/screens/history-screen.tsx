@@ -11,6 +11,7 @@ import { TaskRow } from "#app/shared/task-row.tsx";
 import { useRunAction } from "#app/shared/use-run-action.ts";
 import { useViewer } from "#app/shared/use-viewer.ts";
 import { Button } from "#app/ui/button.tsx";
+import { EmptyText } from "#app/ui/empty-state.tsx";
 import { IconButton } from "#app/ui/icon-button.tsx";
 import { SheetActions } from "#app/ui/sheet-actions.tsx";
 import { Sheet } from "#app/ui/sheet.tsx";
@@ -186,7 +187,9 @@ export const HistoryScreen = () => {
           {at === null ? t("history.events") : t("history.eventsUntil", { when })}
         </Text>
         {history.board.rows.length === 0 && events.length === 0 ? (
-          <Text className="py-2 font-sans text-[14px] text-muted">{t("history.emptyAt")}</Text>
+          <EmptyText className="py-2 font-sans text-[14px] text-muted">
+            {t("history.emptyAt")}
+          </EmptyText>
         ) : null}
         {events.map((entry) => (
           <EntryRow entry={entry} key={entry.id} />

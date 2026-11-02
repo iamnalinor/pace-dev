@@ -98,13 +98,18 @@ const useIsDeviceOfflineWithReconnect = (): boolean => {
 
 const HIDDEN = { display: "none" } as const;
 
-/** Grey rows where the screen will be, with no words in either language yet. */
+/**
+Grey rows where the screen will be, under one line that says what is happening (QA round 18 M5:
+a bare skeleton said nothing, and a reader heard nothing). The account's language is not known
+yet, so the line is in the device's (`useT` before the first sync); no screen's own words show.
+*/
 const FirstSyncPlaceholder = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <View className="flex-1 items-center bg-bg px-4" style={{ paddingTop: insets.top + 32 }}>
-      <View className="w-full max-w-xl">
+      <View className="w-full max-w-xl gap-4">
+        <Text className="font-sans text-[15px] text-muted">{t("sync.firstSyncLine")}</Text>
         <Skeleton label={t("sync.firstSync")} rows={6} />
       </View>
     </View>

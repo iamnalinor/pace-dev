@@ -15,6 +15,7 @@ import { useWhereSat } from "#app/shared/use-where-sat.ts";
 import { WhereSatLine } from "#app/shared/where-sat-line.tsx";
 import { ColorTag } from "#app/ui/color.tsx";
 import { cx } from "#app/ui/cx.ts";
+import { EmptyText } from "#app/ui/empty-state.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ROW_ENTER, ROW_EXIT, ROW_LAYOUT } from "#app/ui/motion.ts";
 import { RowList } from "#app/ui/row-list.tsx";
@@ -313,7 +314,9 @@ export const DayScreen = () => {
       <Totals day={day} />
       {IS_PHONE && !phone.hasUsageAccess ? <UsageAccessHint /> : null}
       {day.entries.length === 0 ? (
-        <Text className="px-5 py-6 font-sans text-[14px] text-muted">{t("day.empty")}</Text>
+        <EmptyText className="px-5 py-6 font-sans text-[14px] text-muted">
+          {t("day.empty")}
+        </EmptyText>
       ) : (
         <Entries entries={day.entries} onOpen={setSheet} phone={phone} sat={sat} zone={day.zone} />
       )}

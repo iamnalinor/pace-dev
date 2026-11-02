@@ -191,6 +191,8 @@ export const ruShell: { readonly [K in keyof typeof enShell]: string } = {
   "errors.offline": "Нет сети. Изменения синхронизируются при подключении.",
   "sync.firstSync": "Синхронизируем данные",
   "sync.stillSyncing": "Синхронизация ещё идёт…",
+  "sync.firstSyncLine": "Синхронизируем данные…",
+  "sync.loadingData": "Загружаем ваши данные…",
   "errors.llmUnavailable": "Ассистент сейчас недоступен. Попробуйте чуть позже.",
   "errors.notFound": "Не найдено.",
   "errors.pageNotFound": "Страница не найдена",
