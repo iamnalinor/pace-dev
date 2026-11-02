@@ -66,6 +66,8 @@ const CONFIG_FILES = [
 ];
 // Expo tooling loads these as CommonJS under Node, so they are plain JS with `require`.
 const APP_JS_CONFIGS = ["apps/app/*.js", "apps/app/plugins/*.js"];
+// Classic scripts the browser loads as they are (the CSP forbids inline ones): no bundler, no types.
+const WEB_SCRIPTS = ["apps/app/public/*.js"];
 // Shared domain logic and view-models: pure and immutable (functional rules apply).
 const PURE_LAYERS = ["packages/core/src/**/*.ts", "packages/client/src/view-models/**/*.ts"];
 // Factories whose *inferred* type is the contract (Hono's `hc` derives the client from it).
@@ -461,6 +463,24 @@ export default defineConfig([
       "@typescript-eslint/no-require-imports": "off",
       "unicorn/prefer-module": "off",
       "import-x/no-commonjs": "off",
+    },
+  },
+  {
+    files: WEB_SCRIPTS,
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      globals: {
+        document: "readonly",
+        localStorage: "readonly",
+        matchMedia: "readonly",
+      },
+      parserOptions: { project: false, projectService: false },
+      sourceType: "script",
+    },
+    rules: {
+      ...tseslint.configs.disableTypeChecked.rules,
+      // A classic script: no modules, nothing to export.
+      "unicorn/prefer-module": "off",
     },
   },
 

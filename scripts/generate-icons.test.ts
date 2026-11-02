@@ -1,6 +1,8 @@
 // The root workspace has no vitest; Bun's runner exposes the same describe/it/expect API.
 import { describe, expect, it } from "bun:test";
 
+import { color } from "@pace/core";
+
 import { ICONS, LOGO_FILES, pngDimensions, renderPng } from "./generate-icons.ts";
 
 describe("generate-icons", () => {
@@ -44,14 +46,14 @@ describe("generate-icons", () => {
     const svg = Object.fromEntries(LOGO_FILES.map((file) => [file.path, file.svg]));
     expect(svg["assets/logo/pace-mark.svg"]).toContain("#d4ff3a");
     expect(svg["assets/logo/pace-mark.svg"]).toContain("#6a6a74");
-    expect(svg["assets/logo/pace-mark.svg"]).not.toContain("#0b0b0c");
+    expect(svg["assets/logo/pace-mark.svg"]).not.toContain(color("dark", "bg.app"));
     expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#b9bcc6");
     expect(svg["assets/logo/pace-mark-light.svg"]).toContain("#4d6b00");
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain(">pace<");
     expect(svg["assets/logo/pace-wordmark.svg"]).toContain("Inter, system-ui, sans-serif");
     // The favicon is a lime tile with dark chevrons.
     expect(svg["assets/logo/favicon.svg"]).toContain('fill="#d4ff3a"');
-    expect(svg["assets/logo/favicon.svg"]).toContain('stroke="#0b0b0c"');
+    expect(svg["assets/logo/favicon.svg"]).toContain(`stroke="${color("dark", "bg.app")}"`);
     const everything = Object.values(svg).join("");
     expect(everything).not.toContain("#4263eb");
     expect(everything).not.toContain("#91a7ff");

@@ -5,6 +5,10 @@ import { readFileSync } from "node:fs";
 
 import { appVersion } from "./app-version.ts";
 import { firebaseProjectOf } from "./firebase-project.ts";
+import { THEME_VARS } from "./src/ui/generated/tokens.ts";
+
+/** The dark app ground (`bg.app`): behind the splash, the adaptive icon and the first native frame. */
+const GROUND = THEME_VARS.dark["--pace-app"];
 
 // Expo types `process.env` loosely (EXPO_PUBLIC_* are injected at bundle time): narrow it here.
 const envString = (name: string): string | undefined => {
@@ -68,7 +72,7 @@ const config: ExpoConfig = {
   web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  backgroundColor: "#0b0b0c",
+  backgroundColor: GROUND,
   icon: "./assets/icon.png",
   // iOS is not a target; expo-share-intent's config plugin still expects a bundle identifier.
   ios: { bundleIdentifier: "dev.nalinor.pace" },
@@ -79,7 +83,7 @@ const config: ExpoConfig = {
     ...(GOOGLE_SERVICES_FILE !== undefined && { googleServicesFile: GOOGLE_SERVICES_FILE }),
     versionCode,
     adaptiveIcon: {
-      backgroundColor: "#0b0b0c",
+      backgroundColor: GROUND,
       foregroundImage: "./assets/adaptive-icon.png",
       monochromeImage: "./assets/adaptive-icon-mono.png",
     },
@@ -109,7 +113,7 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        backgroundColor: "#0b0b0c",
+        backgroundColor: GROUND,
         image: "./assets/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",

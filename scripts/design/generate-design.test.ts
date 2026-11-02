@@ -2,7 +2,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { COLOR_ROLES, space, THEMES, TYPE_ROLES, typeRole } from "@pace/core";
+import { COLOR_ROLES, documentGround, space, THEMES, TYPE_ROLES, typeRole } from "@pace/core";
 
 import {
   colorClassName,
@@ -12,6 +12,7 @@ import {
   themeVars,
   typeClassName,
 } from "./generate-design.ts";
+import { pageFiles, spliceBlock } from "./page-files.ts";
 
 const read = (path: string): string =>
   readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
@@ -21,6 +22,39 @@ describe("generate-design", () => {
     for (const [path, content] of Object.entries(generateDesign())) {
       expect(read(path), path).toBe(content);
     }
+  });
+
+  it("also generates the page's literals: the boot script, index.html and the manifest", () => {
+    const paths = Object.keys(generateDesign());
+    for (const path of [
+      "apps/app/public/theme-boot.js",
+      "apps/app/public/index.html",
+      "apps/app/public/manifest.webmanifest",
+    ]) {
+      expect(paths).toContain(path);
+    }
+  });
+
+  it("repairs a page whose literals went stale after a token change", () => {
+    const stale = (path: string): string =>
+      read(path).replaceAll(documentGround("dark", false), "#123456");
+    const files = pageFiles(stale);
+    for (const path of ["apps/app/public/theme-boot.js", "apps/app/public/index.html"]) {
+      expect(stale(path), path).not.toBe(read(path));
+      expect(files[path], path).toBe(read(path));
+    }
+    expect(files["apps/app/public/manifest.webmanifest"]).toBe(
+      read("apps/app/public/manifest.webmanifest"),
+    );
+  });
+
+  it("splices a block between its markers, keeps the markers' indent and is idempotent", () => {
+    const markers = { close: "// </g>", open: "// <g>" };
+    const source = "a\n  // <g>\n  old\n  // </g>\nb";
+    const once = spliceBlock(source, markers, ["x", "", "y"]);
+    expect(once).toBe("a\n  // <g>\n  x\n\n  y\n  // </g>\nb");
+    expect(spliceBlock(once, markers, ["x", "", "y"])).toBe(once);
+    expect(() => spliceBlock("no markers", markers, ["x"])).toThrow("generated block not found");
   });
 
   it("defines every colour role as a CSS variable in both themes", () => {

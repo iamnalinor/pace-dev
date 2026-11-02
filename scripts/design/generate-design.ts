@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
 import {
   color,
@@ -18,6 +18,7 @@ import {
 } from "@pace/core";
 
 import { LAYOUT_CLASSES } from "./layout-classes.ts";
+import { committed, pageFiles, ROOT } from "./page-files.ts";
 
 /**
 Generates the app's platform values from the design tokens (`packages/core/src/design/tokens.json`,
@@ -269,15 +270,14 @@ const themeJson = (): string =>
 
 /** Path (from the repo root) → content of every generated file. */
 export const generateDesign = (): Readonly<Record<string, string>> => ({
+  ...pageFiles(committed),
   [GENERATED_THEME]: themeJson(),
   [GENERATED_TS]: tokensModule(),
 });
 
-const root = new URL("../../", import.meta.url);
-
 const readCommitted = (path: string): string | undefined => {
   try {
-    return readFileSync(new URL(path, root), "utf8");
+    return committed(path);
   } catch {
     return undefined;
   }
@@ -297,7 +297,7 @@ if (import.meta.main) {
     }
   } else {
     for (const [path, content] of stale) {
-      writeFileSync(new URL(path, root), content);
+      writeFileSync(new URL(path, ROOT), content);
       console.log(`wrote ${path}`);
     }
   }

@@ -6,6 +6,7 @@ import { type ColorSchemeName, useColorScheme } from "react-native";
 import { color, COLOR_ROLES, type ColorRole, type ThemeName } from "@pace/core";
 
 import { THEME_VARS } from "../ui/generated/tokens.ts";
+import { storedThemePreference } from "./theme-stored.ts";
 
 /** Per-device theme preference; `system` follows the OS appearance. */
 export type ThemePreference = "dark" | "light" | "system";
@@ -60,6 +61,12 @@ export const paletteVariables = (scheme: ThemeName): Readonly<Record<string, str
 export const paletteVars = (scheme: ThemeName): ReturnType<typeof vars> =>
   vars(paletteVariables(scheme));
 
+/** What the first render can know: the web build's localStorage answers at once, Android's store later. */
+const initialPreference = (): ThemePreference => {
+  const known = storedThemePreference();
+  return isPreference(known) ? known : "system";
+};
+
 export type ThemePreferenceHandle = {
   readonly preference: ThemePreference;
   readonly scheme: ThemeName;
@@ -69,7 +76,7 @@ export type ThemePreferenceHandle = {
 /** The stored preference resolved against the OS scheme; `setPreference` applies and persists it. */
 export const useThemePreference = (): ThemePreferenceHandle => {
   const systemScheme = useColorScheme();
-  const [stored, setStored] = useState<ThemePreference>("system");
+  const [stored, setStored] = useState<ThemePreference>(initialPreference);
 
   useEffect(() => {
     const lifetime = new AbortController();

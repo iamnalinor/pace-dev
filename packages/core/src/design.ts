@@ -8,6 +8,7 @@ export {
   relativeLuminance,
   type Rgb,
 } from "./design/contrast.ts";
+export { documentGround } from "./design/document.ts";
 export { type ContrastPair, type ContrastTarget, USED_PAIRS } from "./design/pairs.ts";
 export type {
   Bezier,

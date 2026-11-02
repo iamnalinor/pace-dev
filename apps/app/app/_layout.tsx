@@ -14,6 +14,7 @@ import { CrashDocumentLanguage } from "#app/platform/crash-document-language.tsx
 import { useCrashNotice } from "#app/platform/crash-notice.ts";
 import { DocumentHead } from "#app/platform/document-head.tsx";
 import { DocumentLanguage } from "#app/platform/document-language.tsx";
+import { DocumentTheme } from "#app/platform/document-theme.tsx";
 import { useNotificationLinks } from "#app/platform/notification-links.ts";
 import { UpdateBanner } from "#app/platform/update-banner.tsx";
 // Defines the push task (and the foreground handler) before Android may run it.
@@ -22,6 +23,7 @@ import { useCrashContext } from "#app/platform/use-crash-context.ts";
 import { CrashScreen } from "#app/screens/crash-screen.tsx";
 import { useIsWide } from "#app/ui/layout.ts";
 import { ScreenScene } from "#app/ui/screen-scene.tsx";
+import { useIsScrimUp } from "#app/ui/scrim.ts";
 import { Sidebar } from "#app/ui/sidebar.tsx";
 import { ThemeProvider, useTheme } from "#app/ui/theme-provider.tsx";
 import { ToastProvider } from "#app/ui/toast.tsx";
@@ -45,6 +47,12 @@ const CrashContext = () => {
   return null;
 };
 
+/** The web page's theme and status bar follow the app; apart, so a sheet opening redraws only this. */
+const AppDocumentTheme = () => {
+  const { scheme } = useTheme();
+  return <DocumentTheme isDimmed={useIsScrimUp()} scheme={scheme} />;
+};
+
 const Navigator = () => {
   const { palette, scheme } = useTheme();
   const hasSidebar = useHasSidebar();
@@ -57,6 +65,7 @@ const Navigator = () => {
         <CrashContext />
         <DocumentLanguage />
         <DocumentHead />
+        <AppDocumentTheme />
         {hasSidebar ? <Sidebar /> : null}
         <View className="flex-1">
           <Stack
