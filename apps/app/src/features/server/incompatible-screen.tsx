@@ -26,7 +26,7 @@ const IncompatibleScreen = () => {
   return (
     <View className="flex-1 justify-center bg-app px-6">
       {/* A centred column on a computer, as the login card is, not the window's left edge. */}
-      <View className="w-full max-w-inspector-max gap-8 self-center">
+      <View className="w-full max-w-message gap-8 self-center">
         <View className="gap-3">
           <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
             {t("server.mismatch")}

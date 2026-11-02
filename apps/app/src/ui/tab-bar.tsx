@@ -71,8 +71,8 @@ const Tab = ({
       </View>
       <Text
         className={cx(
-          "font-sans text-caption2 font-normal",
-          isFocused ? "font-medium text-accent-text" : "text-label-secondary",
+          "font-sans text-caption2",
+          isFocused ? "font-medium text-accent-text" : "font-normal text-label-secondary",
         )}
         numberOfLines={1}
       >

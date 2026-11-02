@@ -286,7 +286,8 @@ const PickedPaneBody = ({ onClose, picked, week }: PickedProps) => {
           </Text>
           <Text className="mt-1 font-sans text-footnote text-label-secondary">{when}</Text>
         </View>
-        <View className="-mr-2 -mt-2">
+        {/* The cross's middle on the title's first line, as in the sheets (QA round 16 L10). */}
+        <View className="-mr-2 h-6 justify-center">
           <IconButton icon={X} label={t("common.close")} onPress={onClose} variant="plain" />
         </View>
       </View>

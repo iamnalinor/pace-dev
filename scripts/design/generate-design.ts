@@ -68,6 +68,7 @@ const spaceKey = (value: number): string => String(value / 4);
 const CONTAINER_SIZES = [80, 96, 128];
 
 const SIZE_TOKENS: Readonly<Record<string, number>> = {
+  "auth-card": size.authCard,
   "chip-max": size.chip.max,
   content: layout.contentMax,
   "content-wide": layout.contentMaxWide,
@@ -80,6 +81,8 @@ const SIZE_TOKENS: Readonly<Record<string, number>> = {
   inspector: layout.inspectorWidth,
   "inspector-max": layout.inspectorMax,
   "inspector-min": layout.inspectorMin,
+  message: size.message,
+  "narrow-column": size.narrowColumn,
   "nav-bar": layout.navBar,
   popover: layout.popover,
   "popover-max": layout.popoverMax,
@@ -90,6 +93,7 @@ const SIZE_TOKENS: Readonly<Record<string, number>> = {
   sidebar: layout.sidebarWidth,
   // The sidebar's column inside its `px-3` (a toast docked at its foot).
   "sidebar-inner": layout.sidebarWidth - 2 * space["4"],
+  "toast-max": size.toast.max,
   "tooltip-max": size.tooltip.max,
 };
 

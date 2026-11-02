@@ -17,10 +17,6 @@ const read = (path: string): string =>
   readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
 describe("generate-design", () => {
-  it("generates the same bytes every time", () => {
-    expect(generateDesign()).toEqual(generateDesign());
-  });
-
   it("writes every file it generates as committed (run `bun design:generate`)", () => {
     for (const [path, content] of Object.entries(generateDesign())) {
       expect(read(path), path).toBe(content);

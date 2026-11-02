@@ -148,16 +148,23 @@ export type TokensV2 = {
   };
   readonly radius: Readonly<Record<RadiusStep, number>>;
   readonly size: {
+    /** The sign-in and consent cards' width (login, app link, OAuth). */
+    readonly authCard: number;
     readonly chip: { readonly max: number };
     readonly hit: number;
     readonly hitWeb: number;
     readonly icon: { readonly bar: number; readonly control: number; readonly inline: number };
+    /** A centred message's line length (the crash and incompatible-server screens). */
+    readonly message: number;
+    /** A narrow page column: Now's list beside the form, onboarding on the web. */
+    readonly narrowColumn: number;
     readonly row: { readonly compact: number; readonly min: number };
     readonly stroke: number;
     readonly switch: {
       readonly knob: { readonly off: number; readonly on: number };
       readonly track: { readonly height: number; readonly width: number };
     };
+    readonly toast: { readonly max: number };
     readonly tooltip: { readonly max: number };
   };
   readonly space: Readonly<Record<SpaceStep, number>>;

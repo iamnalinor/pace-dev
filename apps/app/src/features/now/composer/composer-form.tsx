@@ -123,8 +123,8 @@ const FormHeader = ({
       <Text
         accessibilityRole="header"
         className={cx(
-          "flex-1 font-sans font-semibold text-label-primary",
-          variant === "pane" ? "text-title2 font-normal" : "pl-1 text-callout",
+          "flex-1 font-sans text-label-primary",
+          variant === "pane" ? "text-title2" : "pl-1 text-callout font-semibold",
         )}
       >
         {title}

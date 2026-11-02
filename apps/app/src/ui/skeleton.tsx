@@ -11,7 +11,7 @@ import { cx } from "./cx.ts";
 import { PLACEHOLDER_BREATH } from "./motion.ts";
 
 /** The rows' text widths vary a little, so the placeholder reads as a list, not a grid. */
-const NAME_WIDTHS = ["w-32", "w-24", "w-chip-max"] as const;
+const NAME_WIDTHS = ["w-32", "w-20", "w-24"] as const;
 const META_WIDTHS = ["w-24", "w-32", "w-20"] as const;
 
 /**

@@ -127,7 +127,7 @@ const itemLook = (
 ): { readonly box: string; readonly text: string } => {
   if (item.kind === "block") {
     return {
-      box: cx(tintClass(item.block.color), isSelected ? "border-2 border-accent" : "opacity-90"),
+      box: cx(tintClass(item.block.color), isSelected && "border-2 border-accent"),
       text: cx("font-medium", inkClass(item.block.color)),
     };
   }
@@ -237,8 +237,8 @@ const DayColumn = ({
     <View className="min-w-0 flex-1" style={{ minWidth: minColumnPx }}>
       <Text
         className={cx(
-          "h-8 text-center font-sans text-caption2 font-normal tabular-nums",
-          day.isToday ? "font-semibold text-label-primary" : "text-label-secondary",
+          "h-8 text-center font-sans text-caption2 tabular-nums",
+          day.isToday ? "text-label-primary" : "font-normal text-label-secondary",
         )}
       >
         {dayLabel(day.date, week.zone, language)}

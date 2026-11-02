@@ -1,4 +1,4 @@
-import type { Literal, Node, TemplateElement } from "estree";
+import type { Literal, Node, TemplateElement, TemplateLiteral } from "estree";
 
 import type { Context } from "./ast.ts";
 
@@ -69,23 +69,107 @@ const isFragment = (piece: Piece, index: number, count: number): boolean =>
   (index === 0 && piece.openStart && !/^\s/.test(piece.text)) ||
   (index === count - 1 && piece.openEnd && !/\s$/.test(piece.text));
 
-export const checkClasses = (
-  context: Context,
-  allowed: ReadonlySet<string> | undefined,
-  node: Node,
-): void => {
-  for (const piece of piecesOf(node)) {
-    const tokens = piece.text.split(/\s+/).filter((token) => token !== "");
-    for (const [index, token] of tokens.entries()) {
-      if (isArbitrary(token)) {
-        context.report({ data: { name: token }, messageId: "arbitraryClass", node: piece.node });
-      } else if (
-        allowed !== undefined &&
-        !allowed.has(baseClass(token)) &&
-        !isFragment(piece, index, tokens.length)
-      ) {
-        context.report({ data: { name: token }, messageId: "offScaleClass", node: piece.node });
-      }
+/**
+What a check needs beside the node: the accepted classes (`undefined`: only arbitrary values are
+reported) and the pieces already checked as a className, so the loose-string check does not report
+them twice.
+*/
+export type ClassScope = {
+  readonly allowed: ReadonlySet<string> | undefined;
+  readonly seen: WeakSet<Literal | TemplateElement>;
+};
+
+const words = (piece: Piece): readonly string[] =>
+  piece.text.split(/\s+/).filter((token) => token !== "");
+
+const checkPiece = (context: Context, { allowed }: ClassScope, piece: Piece): void => {
+  const tokens = words(piece);
+  for (const [index, token] of tokens.entries()) {
+    if (isArbitrary(token)) {
+      context.report({ data: { name: token }, messageId: "arbitraryClass", node: piece.node });
+    } else if (
+      allowed !== undefined &&
+      !allowed.has(baseClass(token)) &&
+      !isFragment(piece, index, tokens.length)
+    ) {
+      context.report({ data: { name: token }, messageId: "offScaleClass", node: piece.node });
     }
+  }
+};
+
+export const checkClasses = (context: Context, scope: ClassScope, node: Node): void => {
+  for (const piece of piecesOf(node)) {
+    scope.seen.add(piece.node);
+    checkPiece(context, scope, piece);
+  }
+};
+
+/*
+A string outside a className (a constant, a map value, a `cx()` argument) is read as a class list
+when every whole word in it looks like a utility (lower case, no spaces inside) and at least one
+word starts with a utility family's prefix (`bg-`, `p-`, `text-`, `rounded`, …) or is a bare
+utility (`flex`, `absolute`, `border`) beside other words. Strings given to another JSX attribute
+(`testID`, `accessibilityRole`) are never class lists. Ids (`day-entry`), keys (`nav.inbox`), file
+names, words and style values (`flex-start`, `space-between`, `top`) are not class lists.
+*/
+const CLASS_WORD = /^[^\sA-Z"'`]+$/;
+const FAMILIES: readonly string[] =
+  `bg text border gap inset top right bottom left size p px py pt pr pb pl m mx my mt mr mb ml h w min-h min-w max-h max-w rounded flex items justify self font leading tracking opacity shadow scale overflow overscroll z`.split(
+    " ",
+  );
+const hasFamily = (base: string): boolean => {
+  const word = base.startsWith("-") ? base.slice(1) : base;
+  return FAMILIES.some((family) => word.startsWith(`${family}-`));
+};
+const BARE_UTILITIES: ReadonlySet<string> = new Set([
+  "absolute",
+  "border",
+  "flex",
+  "hidden",
+  "relative",
+  "rounded",
+  "tabular-nums",
+  "underline",
+  "uppercase",
+]);
+// Style values that share a prefix with a utility family.
+const STYLE_VALUES: ReadonlySet<string> = new Set([
+  "flex-end",
+  "flex-start",
+  "line-through",
+  "text-bottom",
+  "text-top",
+]);
+
+/** A family prefix always counts; a bare utility only beside other words (alone, `"absolute"` is a style value). */
+const isUtility = (token: string, isAlone: boolean): boolean => {
+  const base = baseClass(token);
+  return !STYLE_VALUES.has(base) && (hasFamily(base) || (!isAlone && BARE_UTILITIES.has(base)));
+};
+
+const isClassList = (pieces: readonly Piece[]): boolean => {
+  const whole = pieces.flatMap((piece) => {
+    const tokens = words(piece);
+    return tokens.filter((_, index) => !isFragment(piece, index, tokens.length));
+  });
+  return (
+    whole.length > 0 &&
+    whole.every((token) => CLASS_WORD.test(token)) &&
+    whole.some((token) => isUtility(token, whole.length === 1))
+  );
+};
+
+/** Checks a string or template that is not under a className but reads as a class list. */
+export const checkLooseClasses = (
+  context: Context,
+  scope: ClassScope,
+  node: Literal | TemplateLiteral,
+): void => {
+  const pieces = piecesOf(node);
+  if (pieces.some((piece) => scope.seen.has(piece.node)) || !isClassList(pieces)) {
+    return;
+  }
+  for (const piece of pieces) {
+    checkPiece(context, scope, piece);
   }
 };

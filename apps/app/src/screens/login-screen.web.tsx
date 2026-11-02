@@ -111,7 +111,7 @@ export const LoginScreen = () => {
   const isWaiting = bot.phase.kind === "waiting";
   return (
     <View className="flex-1 items-center justify-center bg-app px-4">
-      <View className="w-full max-w-inspector gap-6 rounded-lg border border-separator bg-cell px-6 py-8">
+      <View className="w-full max-w-auth-card gap-6 rounded-lg border border-separator bg-cell px-6 py-8">
         <View className="items-center gap-2">
           <PaceLogo heading={t("login.title")} wordmark={t("app.name")} />
           <Text className="text-center font-sans text-subhead font-normal text-label-secondary">

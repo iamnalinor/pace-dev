@@ -29,8 +29,9 @@ const chipText = (color: null | TagColor, isSelected: boolean): string => {
 };
 
 /**
-A 32px pill (36 when tall): the project filter and the pickers of the forms. The pill sits in
-a 44px-tall target that does not take room in the layout, so a thumb never misses it.
+A 32px pill (40 when tall): the project filter and the pickers of the forms. The pill sits in
+a 48px-tall target (`h-hit`) that does not take room in the layout, so a thumb never misses it:
+the negative margin is half the difference (8 or 4), so the layout box is exactly the pill.
 */
 export const Chip = ({
   children,
@@ -49,14 +50,14 @@ export const Chip = ({
   readonly leading?: ReactNode;
   readonly onPress: () => void;
   readonly selected?: boolean;
-  /** 36px with 13px text: the time pills of the close sheet. */
+  /** 40px: the time pills of the close sheet. */
   readonly tall?: boolean;
 }) => (
   <Pressable
     accessibilityLabel={label ?? children}
     accessibilityRole="radio"
     aria-checked={selected}
-    className={cx("justify-center active:opacity-80", tall ? "-my-1 h-hit-web" : "-my-2 h-hit-web")}
+    className={cx("justify-center active:opacity-80", tall ? "-my-1 h-hit" : "-my-2 h-hit")}
     onPress={onPress}
   >
     <View

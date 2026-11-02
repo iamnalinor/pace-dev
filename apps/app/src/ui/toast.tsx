@@ -105,7 +105,7 @@ const bottomAbove = (footerHeight: number, isWide: boolean): number => {
 
 /** Where a toast docked in the sidebar sits: inside its column (`w-sidebar-inner`), at its foot. */
 const DOCKED = "bottom-4 left-3 w-sidebar-inner";
-const FLOATING = "inset-x-4 mx-auto w-auto max-w-inspector-max";
+const FLOATING = "inset-x-4 mx-auto w-auto max-w-toast-max";
 
 const ToastBar = ({
   bottom,

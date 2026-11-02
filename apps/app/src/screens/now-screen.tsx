@@ -69,7 +69,7 @@ const NowSplit = ({
       selectedId={flow.form === null ? (picked?.id ?? null) : null}
     >
       <View className="flex-1 flex-row bg-app">
-        <View className="w-dialog max-w-1/2 border-r border-separator">
+        <View className="w-narrow-column max-w-1/2 border-r border-separator">
           <NowBoard isComposerFocused={isComposerFocused} />
         </View>
         <View className="flex-1">

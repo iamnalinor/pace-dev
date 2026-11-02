@@ -16,7 +16,7 @@ export const OAuthScreen = () => {
   return (
     <ScrollView
       className="flex-1 bg-app"
-      contentContainerClassName="mx-auto min-h-full w-full max-w-inspector justify-center px-4 py-8"
+      contentContainerClassName="mx-auto min-h-full w-full max-w-auth-card justify-center px-4 py-8"
     >
       <ConsentFlow
         authQuery={globalThis.location.search.slice(1)}

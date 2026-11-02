@@ -10,7 +10,7 @@ export const OnboardingScreen = () => {
   const router = useRouter();
   return (
     <View className="flex-1 items-center justify-center bg-app px-5">
-      <View className="w-full max-w-dialog gap-4">
+      <View className="w-full max-w-narrow-column gap-4">
         <Text accessibilityRole="header" className="font-sans text-title1 text-label-primary">
           {t("onboarding.web.title")}
         </Text>
