@@ -1,4 +1,4 @@
-import { type EffectCallback, useEffect } from "react";
+import { cloneElement, type EffectCallback, type ReactElement, useEffect } from "react";
 
 /** The router calls a screen makes, recorded for assertions. */
 export const router = {
@@ -14,6 +14,15 @@ export const redirected = jest.fn<undefined, [string]>();
 
 /** Stands in for `expo-router`: `jest.mock("expo-router", () => mockRouter.routerModule())`. */
 export const routerModule = () => ({
+  /** `Link asChild`: the child is pressed to the address, as expo-router's Slot hands it over. */
+  Link: ({ children, href }: { readonly children: ReactElement; readonly href: string }) =>
+    // eslint-disable-next-line @eslint-react/no-clone-element -- stands in for expo-router's Slot, which merges props into its one child
+    cloneElement(children as ReactElement<{ href?: string; onPress?: () => void }>, {
+      href,
+      onPress: () => {
+        router.navigate(href);
+      },
+    }),
   Redirect: ({ href }: { readonly href: string }) => {
     redirected(href);
     return null;
