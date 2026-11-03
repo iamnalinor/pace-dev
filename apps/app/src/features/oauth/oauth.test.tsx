@@ -141,6 +141,8 @@ describe("ConsentFlow", () => {
     expect(widget).not.toHaveBeenCalled();
     expect(screen.queryByText(en("oauth.identify"))).toBeNull();
     expect(screen.queryByRole("button", { name: en("oauth.devUse") })).toBeNull();
+    // No line on the page asks a signed-in person to sign in with Telegram (class 119).
+    expect(screen.queryByText(/Telegram/u)).toBeNull();
     const allow = screen.getByRole("button", { name: en("oauth.allow") });
     expect(allow).toBeEnabled();
     await fireEvent.press(allow);

@@ -69,7 +69,7 @@ export const enShell = {
   "appLink.missing": "This link has no login token.",
   "oauth.title": "Connecting an app",
   "oauth.body":
-    "An app is asking for access to your Pace account. Check what it wants, then sign in with Telegram to allow it.",
+    "An app is asking for access to your Pace account. Check what it wants before you allow it.",
   "oauth.unverified": "This app registered itself; its name is not verified.",
   "oauth.publishedBy": "Published by {domain}",
   "oauth.redirectTo": "Access will be sent to {host}.",

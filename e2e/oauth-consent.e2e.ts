@@ -101,12 +101,17 @@ test("a session revoked while the page is open falls back to signing in, then th
   await page.goto(`/oauth/authorize?${await authorizationQuery()}`);
   await expect(page.getByText(/^Signed in as /u)).toBeVisible();
 
-  // Ended elsewhere (Settings on another device, an expiry) after the page read it.
-  const out = await fetch(`${API_URL}/api/auth/logout`, {
-    headers: { Authorization: `Bearer ${token}` },
-    method: "POST",
+  // Ended elsewhere (Settings on another device, an expiry) just as Allow goes out: the server
+  // ends it before it reads the Allow. (Ended any earlier, the live socket's close signs the page
+  // out first, which lands on the same fallback.)
+  await page.route("**/api/oauth/complete", async (route) => {
+    const out = await fetch(`${API_URL}/api/auth/logout`, {
+      headers: { Authorization: `Bearer ${token}` },
+      method: "POST",
+    });
+    expect(out.ok).toBe(true);
+    await route.continue();
   });
-  expect(out.ok).toBe(true);
   await page.getByRole("button", { name: "Allow" }).click();
 
   await expect(page.getByRole("alert")).toContainText("Your Pace session has ended");
@@ -118,6 +123,23 @@ test("a session revoked while the page is open falls back to signing in, then th
   await page.waitForTimeout(1500);
   expect(sent).toHaveLength(1);
   expect(callback.url()).toBeNull();
+});
+
+test("a session revoked before the page opens offers signing in, not a stale name", async ({
+  page,
+}) => {
+  const { token } = await loginViaApi(page);
+  const out = await fetch(`${API_URL}/api/auth/logout`, {
+    headers: { Authorization: `Bearer ${token}` },
+    method: "POST",
+  });
+  expect(out.ok).toBe(true);
+  const sent = completeRequests(page);
+  await page.goto(`/oauth/authorize?${await authorizationQuery()}`);
+  await expect(page.getByText("Sign in with Telegram to continue")).toBeVisible();
+  await expect(page.getByText(/^Signed in as /u)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Allow" })).toBeDisabled();
+  expect(sent).toHaveLength(0);
 });
 
 test("signed out, the app's own sign-in comes back to the consent page with the request intact", async ({
