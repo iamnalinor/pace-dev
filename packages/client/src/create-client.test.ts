@@ -6,6 +6,7 @@ import type { SocketLike } from "./live.ts";
 
 import { createMemoryEventStore } from "./adapters/memory-event-store.ts";
 import { createPaceClient, type PaceClient } from "./create-client.ts";
+import { REQUEST_DEADLINE_MS } from "./deadline.ts";
 import {
   createFakeFetch,
   emptySyncRoutes,
@@ -322,6 +323,118 @@ describe("createPaceClient", () => {
     expect(api.calls.at(-1)?.headers["authorization"]).toBe("Bearer tok");
     expect(client.notifications.store.getState().status).toBe("ready");
     expect(client.auth.store.getState().status).toBe("signed-in");
+  });
+
+  it("a check whose `me` never answers gives up after the request deadline: nothing signed out, the held call goes once (CI fix review I1)", async () => {
+    const pulls = { count: 0 };
+    const { api, client } = await setup(
+      {
+        "GET /api/me": async () => {
+          if (pulls.count > 0) {
+            await new Promise<never>(() => undefined);
+          }
+          return fakeMe;
+        },
+        "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+        "GET /api/sync/pull": () => {
+          pulls.count += 1;
+          return problem(401, "auth/unauthorized");
+        },
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    vi.useFakeTimers();
+    try {
+      const checks = api.pathsCalled("/api/me").length;
+      const run = client.sync.syncNow();
+      await vi.advanceTimersByTimeAsync(10);
+      await run;
+      expect(api.pathsCalled("/api/me")).toHaveLength(checks + 1);
+      const refreshed = client.notifications.refresh();
+      await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 20);
+      expect(api.pathsCalled("/api/notifications")).toEqual([]);
+      await vi.advanceTimersByTimeAsync(20);
+      await refreshed;
+      expect(api.pathsCalled("/api/notifications")).toEqual(["/api/notifications"]);
+      expect(api.calls.at(-1)?.headers["authorization"]).toBe("Bearer tok");
+      expect(client.auth.store.getState().status).toBe("signed-in");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("`me` and a log-out are never held behind the check under way (CI fix review m2)", async () => {
+    const pulls = { count: 0 };
+    const checked = Promise.withResolvers<null>();
+    const { api, client } = await setup(
+      {
+        "GET /api/me": async () => {
+          if (pulls.count > 0) {
+            await checked.promise;
+          }
+          return fakeMe;
+        },
+        "GET /api/sync/pull": () => {
+          pulls.count += 1;
+          return problem(401, "auth/unauthorized");
+        },
+        "POST /api/auth/logout": () => ({ ok: true }),
+      },
+      "tok",
+    );
+    await expect.poll(() => client.auth.store.getState().user).not.toBeNull();
+    const checks = api.pathsCalled("/api/me").length;
+    await client.sync.syncNow();
+    expect(api.pathsCalled("/api/me")).toHaveLength(checks + 1);
+    const asked = client.api.call(endpoints.me, {});
+    const ended = client.api.call(endpoints.auth.logout, {});
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    expect(api.pathsCalled("/api/me")).toHaveLength(checks + 2);
+    expect(api.pathsCalled("/api/auth/logout")).toEqual(["/api/auth/logout"]);
+    checked.resolve(null);
+    await Promise.all([asked, ended]);
+  });
+
+  it("the start's `me` is the check: it holds nothing alone, and a 401 meanwhile joins it, asks nothing more and holds what follows (CI fix review m3)", async () => {
+    const started = Promise.withResolvers<null>();
+    const session = createMemorySessionStore();
+    await session.set("tok");
+    const api = createFakeFetch({
+      ...emptySyncRoutes,
+      "GET /api/me": async () => {
+        await started.promise;
+        return fakeMe;
+      },
+      "GET /api/notifications": () => ({ deliveries: {}, items: [], more: false }),
+      "GET /api/sync/pull": () => problem(401, "auth/unauthorized"),
+    });
+    const client = createPaceClient({
+      baseUrl: "https://api.test",
+      deviceId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      fetch: api.fetch,
+      now: () => "2026-10-06T12:00:00.000Z",
+      session,
+      source: "web",
+      store: createMemoryEventStore(),
+    });
+    await expect.poll(() => api.pathsCalled("/api/me")).toHaveLength(1);
+    // Alone, the start's check holds nothing: the first sync goes at once (and hears a 401).
+    await client.sync.syncNow();
+    expect(api.pathsCalled("/api/sync/pull")).toHaveLength(1);
+    const refreshed = client.notifications.refresh();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+    // The 401 joined the start's `me` (no second one) and holds the bell's read behind it.
+    expect(api.pathsCalled("/api/me")).toHaveLength(1);
+    expect(api.pathsCalled("/api/notifications")).toEqual([]);
+    started.resolve(null);
+    await refreshed;
+    expect(api.pathsCalled("/api/notifications")).toEqual(["/api/notifications"]);
+    expect(api.pathsCalled("/api/me")).toHaveLength(1);
   });
 
   it.each(["before", "after"] as const)(

@@ -98,6 +98,29 @@ describe("createLiveChannel", () => {
     live.stop();
   });
 
+  it("a stopped channel leaves no waiter behind for a check under way (CI fix review m5)", async () => {
+    const first = Promise.withResolvers<null>();
+    const second = Promise.withResolvers<null>();
+    const check: { pending: Promise<null> | undefined } = { pending: first.promise };
+    const sessionCheck = vi.fn((): Promise<null> | undefined => check.pending);
+    const live = createLiveChannel({
+      baseUrl: "https://api.test",
+      createSocket: fakeSockets().create,
+      deviceId: "dev-1",
+      onChange: vi.fn(),
+      sessionCheck,
+      token: () => "tok",
+    });
+    live.start();
+    live.stop();
+    // The first check is answered while a second is under way: the stopped channel waits on neither.
+    check.pending = second.promise;
+    first.resolve(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sessionCheck).toHaveBeenCalledTimes(1);
+    second.resolve(null);
+  });
+
   it("hands every other message (the notification pool's) to onMessage, parsed", () => {
     const sockets = fakeSockets();
     const onChange = vi.fn();

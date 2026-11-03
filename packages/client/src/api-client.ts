@@ -7,6 +7,8 @@ import {
   PROTOCOL_HEADER,
 } from "@pace/core";
 
+import { heldUntilChecked } from "./held-call.ts";
+
 /** An HTTP error from the API, with the machine-readable `code` when the server sent one. */
 export class ApiError extends Error {
   readonly code: string;
@@ -149,7 +151,7 @@ const credentialFor = async (
       ? options.sessionCheck?.(endpoint)
       : undefined;
   if (checking !== undefined) {
-    await checking;
+    await heldUntilChecked(checking, callOptions.signal);
   }
   const credential = callOptions.credential ?? options.token();
   if (credential === undefined && endpoint.auth && options.sessionEnded?.() === true) {

@@ -344,8 +344,10 @@ export const createLiveChannel = (options: LiveChannelOptions): LiveChannel => {
     whenClosed(code, { connect, line, run, status, timers });
   };
   function connect(): void {
-    // No session to open with while a check of it is under way: it connects once answered.
-    const token = isWaitingForCheck(options, line, connect) ? undefined : options.token();
+    // Stopped: nothing to open, no waiter left. While a check of the session is under way there is
+    // no session to open with: it connects once answered.
+    const token =
+      !run.isRunning() || isWaitingForCheck(options, line, connect) ? undefined : options.token();
     if (createSocket === undefined || token === undefined || !run.isRunning()) {
       return;
     }

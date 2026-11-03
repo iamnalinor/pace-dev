@@ -107,3 +107,36 @@ one hold covers them.
 - No reviewer agent was dispatched (the brief said not to). The CLAUDE.md review through
   `superpowers:requesting-code-review` (with `typescript-reviewer` and `silent-failure-hunter`) is
   still owed for this change.
+
+## Fix round 1 (review: `pr-a-ci-fix-review.md`, 0 Critical, 2 Important, 5 Minor)
+
+- **I1 (bound the check, honour the caller's abort).** `sessionChecks` (now in `session-checks.ts`)
+  sends the check's `me` within `REQUEST_DEADLINE_MS` (15 s, `withinDeadline`; `auth.me(signal?)` passes
+  the signal to the request). A check that times out signs nothing out (only a 401 does), clears itself
+  and answers `err("session-check/no-answer")`; held calls then go on with the session in use. Every
+  held wait (`heldUntilChecked` in `held-call.ts`) also races the call's own signal and rejects with
+  its reason (an `AbortError` when there is none), so the sync's timeout and an unmount release it at
+  once. Tests: the deadline case (fake timers: nothing sent before 15 s, sent once after, still signed
+  in) and the abort case (aborted while held and before it began: rejected, nothing sent).
+- **I2 (the e2e's handlers and context).** A shared fixture: `openContext` in `e2e/support/fixtures.ts`
+  opens a test's own contexts and, when the test ends either way, unroutes every page and closes them.
+  Every `browser.newContext()` in `e2e/` moved to it (`live.e2e.ts` and `design-shots.e2e.ts`, whose
+  `withPage` releases its context through the same `releaseContext`). The new test resolves its held
+  pull in `finally`. A lint rule (`OWN_CONTEXT`) refuses `.newContext(` in e2e test files.
+- **m1.** A check that rejects is caught by the held wait (the call goes on with its own outcome) and
+  by `check`, which resolves to a `Result` whatever happens: no unhandled rejection. Test in
+  `api-client.test.ts`.
+- **m2.** `create-client.test.ts` "`me` and a log-out are never held behind the check under way";
+  checked against the mutation that drops the exemption (it fails).
+- **m3.** The start's `me` goes through `sessionChecks`, as a check that does not hold: holding at
+  start would make every cold start's first sync and socket wait one round trip for `me` (eighteen
+  sync and peer-tab tests that open the socket at once went red when it held). A 401 heard while the
+  start's `me` is on its way joins it (no second `me`) and makes it hold from then on. Test: "the
+  start's `me` is the check…".
+- **m4.** Not taken (optional, ruled harmless): one more microtask per call when no check is under
+  way.
+- **m5.** A stopped channel schedules no waiter (`!run.isRunning()` first). Test in `live.test.ts`.
+- `bun lint` clean; `CI=1 bun test:unit` 878 + 527 passed; `bun test:app` 910 passed; e2e live,
+  login, sessions and sync-state 65 passed; the two live tests `--repeat-each 10` on the headless
+  shell 20/20.
+

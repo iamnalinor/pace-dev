@@ -1,4 +1,4 @@
-import { endpoints, type EndpointShape, type LiveNotice, type Result, type User } from "@pace/core";
+import type { EndpointShape, LiveNotice } from "@pace/core";
 
 import type { EventStore } from "./event-store.ts";
 
@@ -15,6 +15,7 @@ import {
 } from "./live.ts";
 import { createNotificationFeed, type NotificationFeed, parseLiveNotice } from "./notifications.ts";
 import { parseStoreChange, type PeerTabs } from "./peer-tabs.ts";
+import { type SessionChecks, sessionChecks } from "./session-checks.ts";
 import { noteMark, type SessionStore, type SignOutNotes } from "./session.ts";
 import { type AppStateHandle, createAppState } from "./state.ts";
 import { createSyncClient, type SyncClient } from "./sync-client.ts";
@@ -255,50 +256,6 @@ const liveAndSync = (
 };
 
 /**
-The checks of the session in use. Any call's 401 for it asks `me` once whether it ended (`me` signs
-out on its own 401). The live socket's close says so too, but a tab whose socket was not open when
-the session ended (hidden, still starting) is refused at the door on every reconnect and would stay
-signed in on a dead session (fix round 5 V1). `me`'s and the log-out's own 401s are their callers'
-to read. While a check is under way (`pending`), a call that would send the session waits for it:
-a tab still starting went on to read the bell with the ended session meanwhile (CI run 41668309388).
-*/
-type SessionChecks = {
-  /** Asks `me` now, or joins the check under way. */
-  readonly check: () => Promise<Result<User, string>>;
-  readonly heard: (credential: string, endpoint: EndpointShape) => void;
-  /** The check under way, which a call (but `me` and the log-out) or a socket waits for. */
-  readonly pending: (endpoint?: EndpointShape) => Promise<unknown> | undefined;
-};
-
-const isCheckOrEnd = (endpoint: EndpointShape): boolean =>
-  endpoint === endpoints.me || endpoint === endpoints.auth.logout;
-
-const sessionChecks = (auth: Auth, api: ApiClient): SessionChecks => {
-  let checking: Promise<Result<User, string>> | undefined;
-  const check = async (): Promise<Result<User, string>> => {
-    checking ??= (async () => {
-      try {
-        return await auth.me();
-      } finally {
-        checking = undefined;
-      }
-    })();
-    return await checking;
-  };
-  return {
-    check,
-    heard: (credential, endpoint) => {
-      if (checking !== undefined || isCheckOrEnd(endpoint) || !api.isCurrentSession(credential)) {
-        return;
-      }
-      void check();
-    },
-    pending: (endpoint): Promise<unknown> | undefined =>
-      endpoint !== undefined && isCheckOrEnd(endpoint) ? undefined : checking,
-  };
-};
-
-/**
 The API client and the auth it reads: the token (synchronously, on every request) and whether this
 device's session has ended; each 401 of it checks the session, and a call waits for a check under way.
 */
@@ -355,7 +312,9 @@ export const createPaceClient = (options: PaceClientOptions): PaceClient => {
   void (async (): Promise<void> => {
     await auth.ready;
     if (auth.store.getState().status === "signed-in") {
-      await auth.me();
+      // The start's `me` is the check a 401 meanwhile joins (holding from then on); alone it
+      // holds nothing, so the first sync and the socket start at once (CI fix review m3).
+      await checks.check({ holds: false });
     }
   })();
 
