@@ -36,8 +36,9 @@ export type ParseRequestBody = z.output<typeof ParseRequestSchema>;
 
 /**
 Why no model read a text: providers resting with a time they are back (`limited`); none answered
-and none said when (`unreachable`: down, timed out); every one answered out of shape
-(`unreadable`: asking again later reads it no better); no model on this server (`off`). The
+and none said when (`unreachable`: down, timed out); every one answered out of shape or refused
+the text for good, a content filter or a 400 (`unreadable`: asking again later reads it no
+better); no model on this server (`off`). The
 server keeps a text to read later (`defer`) only when `limited` or `unreachable`.
 */
 export const PARSE_UNAVAILABLE_REASONS = ["limited", "unreachable", "unreadable", "off"] as const;
