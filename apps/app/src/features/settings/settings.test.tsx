@@ -522,13 +522,13 @@ describe("SettingsScreen", () => {
     expect(en("settings.deleteAccount.confirm")).toMatch(/Telegram/u);
     // Both on the destructive look, alike (spec §4.2.3, F-CMP-07): the quiet danger fill.
     expect(String(within(remove).getByTestId("pressable-visual").props["className"])).toMatch(
-      /bg-danger-quiet/u,
+      /border-danger/u,
     );
     await fireEvent.press(screen.getByRole("button", { name: en("common.cancel") }));
     await fireEvent.press(screen.getByRole("button", { name: en("settings.wipe") }));
     const wipe = screen.getByRole("button", { name: en("settings.wipe.confirm") });
     expect(String(within(wipe).getByTestId("pressable-visual").props["className"])).toMatch(
-      /bg-danger-quiet/u,
+      /border-danger/u,
     );
   });
 

@@ -1392,7 +1392,10 @@ The same rule applies when a previously successful channel is no longer configur
   knob), never "it is only decoration" while it is the state's cue.
 - **Sweep (Task 3.9).** Every control of the kit: the switch (off knob `label.tertiary` on `fill.2`, on
   knob `accent.on` on `accent`: present), the chip and the segment at rest (`label.secondary` and
-  `label.primary` on `fill.2`: added), the chosen segment's thumb (edge: added via the switch's pair), the
+  `label.primary` on `fill.2`: added), the destructive button (the spec's `status.dangerQuiet`
+  fill under the danger label read 4.31:1 over the page in axe, `sync-state.e2e.ts`' offline Log out;
+  the pair existed only over `bg.cell`: the button is now `bg.cell` inside a danger ring, on its
+  `bg.cell` pair), the chosen segment's thumb (edge: added via the switch's pair), the
   checked circle (`bg.app` on `label.secondary`: added), the slider's thumb and fill (`label.primary` on
   the grounds and on `fill.4`: added), the progress fill (`label.primary`, the hue strokes and slate on
   `fill.4`: present for slate, primary added), the chosen chip (`accent` on the grounds: present), the

@@ -45,7 +45,7 @@ const Choice = <T extends string>({
     <View className="flex-row flex-wrap items-center gap-x-2">
       <Text className="font-sans text-subhead font-normal text-label-secondary">{t(label)}</Text>
       <RadioGroup
-        className="flex-row flex-wrap gap-x-2"
+        className="min-w-0 shrink flex-row flex-wrap gap-x-2"
         label={t(label)}
         onChange={(choice: T) => {
           router.setParams({ [param]: choice });

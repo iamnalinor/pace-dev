@@ -35,8 +35,11 @@ type Look = {
 };
 
 const LOOK: Readonly<Record<ButtonVariant, Look>> = {
+  // Not the spec's `status.dangerQuiet` fill: the danger label measures 4.31:1 on it over the page
+  // (axe, the offline Log out block), under the 4.5 of a 15 px label. The cell under a danger
+  // ring keeps the label at its `bg.cell` pair (bug-lessons 123).
   destructive: {
-    fill: "bg-danger-quiet",
+    fill: "border-2 border-danger bg-cell",
     icon: "danger",
     spinner: "status.danger",
     text: "danger",

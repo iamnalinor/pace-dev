@@ -70,7 +70,13 @@ export const BadgeAnchor = ({
 }) => (
   <View className="relative">
     {children}
-    <View className="absolute -top-2 -ml-1" style={AT_TRAILING_EDGE} testID="badge-anchor">
+    <View
+      className="absolute -top-2 -ml-1"
+      style={AT_TRAILING_EDGE}
+      testID="badge-anchor"
+      // Hangs past its icon on purpose; the overflow sweep (`worst-case.e2e.ts`) lets it.
+      {...({ dataSet: { paceHangs: "true" } } as object)}
+    >
       <CountBadge count={count} tone={tone} />
     </View>
   </View>

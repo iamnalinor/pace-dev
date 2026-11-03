@@ -68,7 +68,7 @@ describe("Button", () => {
   it.each([
     ["primary", "bg-accent", "text-accent-on"],
     ["secondary", "bg-fill-2", "text-label-primary"],
-    ["destructive", "bg-danger-quiet", "text-danger"],
+    ["destructive", "border-danger", "text-danger"],
   ] as const)(
     "draws %s on its fill with its label colour (spec §4.2.3)",
     async (variant, fill, ink) => {
