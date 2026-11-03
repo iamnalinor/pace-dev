@@ -1,7 +1,6 @@
 import type { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 
-import { Clock, Ellipsis, Inbox, type LucideIcon, Zap } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -11,9 +10,9 @@ import { useT } from "../app-state.tsx";
 import { useWaitingCount } from "../shared/use-waiting-count.ts";
 import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
+import { Icon, type IconName } from "./icon.tsx";
 import { useIsWide } from "./layout.ts";
 import { spacePress } from "./space-press.ts";
-import { useTheme } from "./theme-provider.tsx";
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
@@ -21,23 +20,20 @@ type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 The tabs a phone shows, in order; New task is the composer on Now, not a tab of its own.
 Week, Projects, Insights, History and Settings are behind More.
 */
-const ICONS: Readonly<Record<string, LucideIcon>> = {
-  index: Zap,
-  day: Clock,
-  inbox: Inbox,
-  more: Ellipsis,
+const ICONS: Readonly<Record<string, IconName>> = {
+  index: "zap",
+  day: "clock",
+  inbox: "inbox",
+  more: "ellipsis",
 };
 
 /** The tab that carries a count badge, with its accessibility label (it takes the `{count}`). */
 const COUNTED: Readonly<Record<string, MessageKey>> = { inbox: "nav.inboxWaiting" };
 
-const ICON_SIZE = 20;
-const STROKE = 1.75;
-
 /** One tab: an icon over its name; the Inbox's carries the count of what waits. */
 const Tab = ({
   count,
-  Icon,
+  icon,
   isFocused,
   label,
   onPress,
@@ -46,12 +42,11 @@ const Tab = ({
   readonly count: number;
   /** What a screen reader says; the title when nothing more is to be told. */
   readonly label: string;
-  readonly Icon: LucideIcon;
+  readonly icon: IconName;
   readonly isFocused: boolean;
   readonly onPress: () => void;
   readonly title: string;
 }) => {
-  const { palette } = useTheme();
   return (
     <Pressable
       accessibilityLabel={label}
@@ -62,11 +57,8 @@ const Tab = ({
       {...spacePress(onPress)}
     >
       <View>
-        <Icon
-          color={isFocused ? palette["accent.text"] : palette["label.secondary"]}
-          size={ICON_SIZE}
-          strokeWidth={STROKE}
-        />
+        {/* `control` (20) until the tab bar's rewrite gives it the pill and `bar` (Task 3.10). */}
+        <Icon name={icon} tone={isFocused ? "accent" : "secondary"} />
         <View className="absolute -top-2 left-5">
           <CountBadge count={count} />
         </View>
@@ -99,8 +91,8 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
       style={{ paddingBottom: Math.max(insets.bottom, 8) + 4 }}
     >
       {state.routes.map((route, index) => {
-        const Icon = ICONS[route.name];
-        if (Icon === undefined) {
+        const icon = ICONS[route.name];
+        if (icon === undefined) {
           return null;
         }
         const countedLabel = COUNTED[route.name];
@@ -110,7 +102,7 @@ const BottomTabs = ({ descriptors, navigation, state }: TabBarProps) => {
         return (
           <Tab
             count={count}
-            Icon={Icon}
+            icon={icon}
             isFocused={isFocused}
             key={route.key}
             label={countedLabel !== undefined && count > 0 ? t(countedLabel, { count }) : title}

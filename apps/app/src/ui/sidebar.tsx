@@ -1,17 +1,5 @@
 import { type Href, usePathname, useRouter } from "expo-router";
-import {
-  CalendarRange,
-  ChartColumn,
-  Clock,
-  Folder,
-  History,
-  Inbox,
-  type LucideIcon,
-  Plus,
-  Settings,
-  Zap,
-} from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { Text as NativeText, View } from "react-native";
 
 import type { MessageKey } from "@pace/core";
 
@@ -24,16 +12,17 @@ import { KeyHint } from "./button.tsx";
 import { CountBadge } from "./count-badge.tsx";
 import { cx } from "./cx.ts";
 import { HOTKEYS } from "./hotkeys.ts";
+import { Icon, type IconName } from "./icon.tsx";
+import { Link } from "./link.tsx";
 import { PaceMark } from "./logo.tsx";
-import { useTheme } from "./theme-provider.tsx";
+import { Pressable } from "./pressable.tsx";
+import { Text } from "./text.tsx";
 import { useDockToastsHere } from "./toast.tsx";
 import { useHotkey } from "./use-hotkey.tsx";
 
-const STROKE = 1.75;
-
 type Destination = {
   readonly href: Href;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly label: MessageKey;
   /** For a row that carries a count badge: its accessibility label, which takes the `{count}`. */
   readonly countedLabel?: MessageKey;
@@ -44,40 +33,40 @@ type Destination = {
 const DESTINATIONS: readonly Destination[] = [
   {
     href: "/",
-    icon: Zap,
+    icon: "zap",
     label: "nav.now",
     owns: (path) => path === "/" || path.startsWith("/task/"),
   },
-  { href: "/day", icon: Clock, label: "nav.day", owns: (path) => path === "/day" },
+  { href: "/day", icon: "clock", label: "nav.day", owns: (path) => path === "/day" },
   {
     href: "/week",
-    icon: CalendarRange,
+    icon: "calendar-range",
     label: "nav.week",
     owns: (path) => path === "/week",
   },
   {
     href: "/inbox",
-    icon: Inbox,
+    icon: "inbox",
     countedLabel: "nav.inboxWaiting",
     label: "nav.inbox",
     owns: (path) => path === "/inbox",
   },
   {
     href: "/projects",
-    icon: Folder,
+    icon: "folder",
     label: "nav.projects",
     owns: (path) => path === "/projects" || path.startsWith("/project/"),
   },
   {
     href: "/insights",
-    icon: ChartColumn,
+    icon: "chart-column",
     label: "nav.insights",
     owns: (path) => path === "/insights",
   },
-  { href: "/history", icon: History, label: "nav.history", owns: (path) => path === "/history" },
+  { href: "/history", icon: "history", label: "nav.history", owns: (path) => path === "/history" },
   {
     href: "/settings",
-    icon: Settings,
+    icon: "settings",
     label: "nav.settings",
     owns: (path) => ["/settings", "/presets"].some((own) => path.startsWith(own)),
   },
@@ -87,51 +76,43 @@ const DESTINATIONS: readonly Destination[] = [
 export const isSidebarPath = (path: string): boolean =>
   DESTINATIONS.some((destination) => destination.href === path);
 
+/**
+A destination: a link with its address (`<a href>` on the web, so Ctrl/⌘-click opens it in a new
+tab; F-WEB-03). It navigates rather than pushes, so a destination already open is shown again.
+*/
 const SidebarLink = ({
   count,
   destination,
   isCurrent,
-  onPress,
 }: {
   /** What waits behind this row (the Inbox's badge); 0 for a row without one. */
   readonly count: number;
   readonly destination: Destination;
   readonly isCurrent: boolean;
-  readonly onPress: () => void;
 }) => {
   const t = useT();
-  const { palette } = useTheme();
-  const Icon = destination.icon;
   return (
-    <Pressable
-      accessibilityLabel={
+    <Link
+      aria-current={isCurrent ? "page" : undefined}
+      className={cx("h-10 flex-row items-center gap-3 rounded-lg px-3", isCurrent && "bg-fill-3")}
+      href={destination.href}
+      label={
         count > 0 && destination.countedLabel !== undefined
           ? t(destination.countedLabel, { count })
           : t(destination.label)
       }
-      accessibilityRole="link"
-      aria-current={isCurrent ? "page" : undefined}
-      className={cx(
-        "h-10 flex-row items-center gap-3 rounded-lg px-3 active:opacity-70",
-        isCurrent && "bg-fill-3",
-      )}
-      onPress={onPress}
     >
-      <Icon
-        color={isCurrent ? palette["accent.text"] : palette["label.secondary"]}
-        size={18}
-        strokeWidth={STROKE}
-      />
-      <Text
+      <Icon name={destination.icon} tone={isCurrent ? "accent" : "secondary"} />
+      <NativeText
         className={cx(
           "flex-1 font-sans text-subhead",
           isCurrent ? "text-label-primary" : "font-normal text-label-secondary",
         )}
       >
         {t(destination.label)}
-      </Text>
+      </NativeText>
       <CountBadge count={count} />
-    </Pressable>
+    </Link>
   );
 };
 
@@ -142,9 +123,9 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
     <>
       <View className="flex-row items-center gap-2 px-2">
         <PaceMark size={22} />
-        <Text className="flex-1 font-sans text-body font-semibold text-label-primary">
+        <NativeText className="flex-1 font-sans text-body font-semibold text-label-primary">
           {t("app.name")}
-        </Text>
+        </NativeText>
         <NotificationBell variant="plain" />
       </View>
       {/* Who is signed in, on a line of its own: beside the logo and the bell it had 23 px (QA 17 M6). */}
@@ -157,10 +138,7 @@ export const SidebarHeader = ({ owner }: { readonly owner: null | string }) => {
           className="mb-3 flex-row items-center gap-2 px-2"
         >
           <UserAvatar size={24} />
-          <Text
-            className="min-w-0 flex-1 font-sans text-footnote text-label-secondary"
-            numberOfLines={1}
-          >
+          <Text className="flex-1" policy="truncate" role="footnote" tone="secondary">
             {owner}
           </Text>
         </View>
@@ -177,7 +155,6 @@ export const Sidebar = () => {
   const t = useT();
   const router = useRouter();
   const path = usePathname();
-  const { palette } = useTheme();
   const owner = useOwnerName();
   const waiting = useWaitingCount();
   useDockToastsHere();
@@ -198,13 +175,15 @@ export const Sidebar = () => {
     >
       <SidebarHeader owner={owner} />
       <Pressable
-        accessibilityLabel={t("nav.newTask")}
-        accessibilityRole="button"
-        className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3 active:opacity-80"
+        className="mb-3 h-10 flex-row items-center gap-2 rounded-lg bg-accent px-3"
+        label={t("nav.newTask")}
         onPress={newTask}
+        role="button"
       >
-        <Plus color={palette["accent.on"]} size={18} strokeWidth={STROKE} />
-        <Text className="flex-1 font-sans text-subhead text-accent-on">{t("nav.newTask")}</Text>
+        <Icon name="plus" tone="onAccent" />
+        <NativeText className="flex-1 font-sans text-subhead text-accent-on">
+          {t("nav.newTask")}
+        </NativeText>
         <KeyHint hotkey={HOTKEYS.newTask} variant="primary" />
       </Pressable>
       {DESTINATIONS.map((destination) => (
@@ -213,9 +192,6 @@ export const Sidebar = () => {
           destination={destination}
           isCurrent={destination.owns(path)}
           key={destination.label}
-          onPress={() => {
-            router.navigate(destination.href);
-          }}
         />
       ))}
     </View>

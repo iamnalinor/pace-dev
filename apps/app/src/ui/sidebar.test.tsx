@@ -60,6 +60,13 @@ describe("Sidebar", () => {
     ]);
   });
 
+  it("goes to a destination by its address, navigated to rather than pushed (the web's `<a href>`: link.web.test, e2e/link)", async () => {
+    await renderScreen(<Sidebar />, await createTestRuntime({ world: "empty" }));
+    await fireEvent.press(screen.getByRole("link", { name: en("nav.week") }));
+    expect(router.navigate).toHaveBeenCalledWith("/week");
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it("counts what waits in the Inbox on its row, the captures and the decisions together", async () => {
     await renderScreen(<Sidebar />, await createTestRuntime());
     const inbox = screen.getByRole("link", { name: en("nav.inboxWaiting", { count: 4 }) });
