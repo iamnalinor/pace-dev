@@ -9,6 +9,13 @@ const navigateTo = (url: string): void => {
   globalThis.location.assign(url);
 };
 
+/**
+The app's own sign-in (with its bot fallback for a network that blocks the widget), coming back
+to this page with the client's request intact: the login screen follows a same-origin `next`.
+*/
+export const signInPathFor = (location: Pick<Location, "pathname" | "search">): string =>
+  `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+
 /** The API's `GET /authorize` redirects MCP clients here with the authorization request intact. */
 export const OAuthScreen = () => {
   const t = useT();
@@ -20,6 +27,9 @@ export const OAuthScreen = () => {
     >
       <ConsentFlow
         authQuery={globalThis.location.search.slice(1)}
+        onSignIn={() => {
+          navigateTo(signInPathFor(globalThis.location));
+        }}
         redirect={navigateTo}
         renderWidget={(onAuth) => (
           <TelegramWidget

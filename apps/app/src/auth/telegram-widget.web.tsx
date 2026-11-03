@@ -38,6 +38,9 @@ const watchFrames = (host: HTMLElement, label: string, onFrame: () => void): (()
     const frames = host.querySelectorAll("iframe");
     for (const frame of frames) {
       frame.title = label;
+      // Whatever the frame loads (Telegram's button, its error, a network's block page) stays
+      // inside the widget's own box (owner bug 2026-11-03).
+      frame.style.maxWidth = "100%";
     }
     if (frames.length > 0) {
       onFrame();
@@ -99,7 +102,7 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
   }, [botUsername, label]);
 
   return (
-    <View className="min-h-hit-web items-center justify-center gap-1">
+    <View className="w-full items-center justify-center gap-1">
       {phase === "failed" ? (
         <Text className="font-sans text-footnote text-danger">{texts.failed}</Text>
       ) : null}
@@ -112,7 +115,14 @@ export const TelegramWidget = ({ botUsername, label, onAuth, texts }: Props) => 
       {phase === "slow" ? (
         <Text className="font-sans text-caption font-normal text-label-tertiary">{texts.slow}</Text>
       ) : null}
-      <div data-testid="telegram-widget" ref={hostRef} style={{ display: "flex" }} />
+      {/* The frame's own box: as wide as the card, clipped, so it never overlaps what follows. */}
+      <View className="min-h-hit-web w-full items-center justify-center overflow-hidden">
+        <div
+          data-testid="telegram-widget"
+          ref={hostRef}
+          style={{ display: "flex", justifyContent: "center", maxWidth: "100%" }}
+        />
+      </View>
     </View>
   );
 };

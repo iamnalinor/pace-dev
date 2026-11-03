@@ -185,3 +185,5 @@ Task 3.2 review: Approved conditional on fix round (lucide codemod + minors 1–
 Task 3.1 fix round 1: 4f33e1e (I1, M2–M7; lint 72/33/71, app 970). Re-review dispatched. Task 3.2 fix round 1 (codemod + minors + e2e if ports free) dispatched.
 Task 3.1: complete (re-review Approved; minors parked: double-fire relies on preventDefault, key event as press event, checked=mixed typing, forced-colours overlay — none blocking). e2e/axe/shots for gallery cases owed at the batch checklist.
 Owner bug 2026-11-03: MCP connect fails — consent asks Telegram though signed in; widget frame clipped (likely RU block page). Task A9 in PR A before merge (analysis in HANDOFF).
+Fix round 2: merge of main 06bf826 + N1–N9; code tip 3c05b49; lint 74, unit/api 601/app 896, e2e 200/200; pushed. Next: A9 (MCP consent with the session) ∥ code review of fix round 2.
+Review of fix round 2: with fixes, 0C/0I/7M (M1 logout of own tab must clear unconditionally; M2 IDB test; M3 class 13 text; M4 parse doc; M5 N4 shots; M6/M7 nits). Sent to the A9 implementer to do after A9.

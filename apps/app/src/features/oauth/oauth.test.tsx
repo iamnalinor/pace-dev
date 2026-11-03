@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { en, renderScreen } from "#app/test/render.tsx";
 import { createTestRuntime } from "#app/test/runtime.ts";
 import { REQUEST_DEADLINE_MS } from "@pace/client";
-import { problem } from "@pace/client/testing";
+import { fakeUser, problem } from "@pace/client/testing";
 
 import { ConsentFlow } from "./consent-flow.tsx";
 
@@ -19,12 +19,28 @@ const CLIENT = {
   scopes: ["tasks:read", "tasks:write"],
 };
 
-const setupConsent = async () => {
-  const complete = jest.fn((_request: { readonly body: unknown }) => ({
-    redirectTo: "http://localhost:6274/cb?code=c1",
-  }));
+type CompleteRequest = {
+  readonly body: unknown;
+  readonly headers: Readonly<Record<string, string>>;
+};
+
+const DEV_LOGIN = { "POST /api/auth/dev": () => ({ token: "tok_dev", user: fakeUser }) };
+
+const setupConsent = async (
+  options: {
+    readonly signedIn?: boolean;
+    readonly complete?: (request: CompleteRequest) => unknown;
+    readonly me?: () => unknown;
+  } = {},
+) => {
+  const complete = jest.fn(
+    options.complete ??
+      ((_request: CompleteRequest) => ({ redirectTo: "http://localhost:6274/cb?code=c1" })),
+  );
   const runtime = await createTestRuntime({
     routes: {
+      ...DEV_LOGIN,
+      ...(options.me !== undefined && { "GET /api/me": options.me }),
       "GET /api/oauth/client-info": () => CLIENT,
       "POST /api/oauth/complete": complete,
       "POST /api/oauth/deny": () => ({
@@ -32,12 +48,22 @@ const setupConsent = async () => {
       }),
     },
   });
+  if (options.signedIn === true) {
+    await runtime.auth.loginWithDev("1");
+  }
   const redirect = jest.fn<undefined, [string]>();
+  const signIn = jest.fn<undefined, []>();
+  const widget = jest.fn(() => null);
   await renderScreen(
-    <ConsentFlow authQuery={AUTH_QUERY} redirect={redirect} renderWidget={() => null} />,
+    <ConsentFlow
+      authQuery={AUTH_QUERY}
+      onSignIn={signIn}
+      redirect={redirect}
+      renderWidget={widget}
+    />,
     runtime,
   );
-  return { complete, redirect };
+  return { complete, redirect, runtime, signIn, widget };
 };
 
 describe("ConsentFlow", () => {
@@ -87,7 +113,12 @@ describe("ConsentFlow", () => {
     jest.useFakeTimers();
     try {
       await renderScreen(
-        <ConsentFlow authQuery={AUTH_QUERY} redirect={jest.fn()} renderWidget={() => null} />,
+        <ConsentFlow
+          authQuery={AUTH_QUERY}
+          onSignIn={jest.fn()}
+          redirect={jest.fn()}
+          renderWidget={() => null}
+        />,
         runtime,
       );
       await act(async () => {
@@ -99,12 +130,72 @@ describe("ConsentFlow", () => {
     }
   });
 
+  it("uses the browser's Pace session: names the person, no widget, Allow sends the bearer and no Telegram proof (owner bug 2026-11-03)", async () => {
+    const { complete, redirect, widget } = await setupConsent({ signedIn: true });
+    expect(
+      await screen.findByText(en("oauth.signedInAs", { name: fakeUser.name })),
+    ).toBeOnTheScreen();
+    expect(widget).not.toHaveBeenCalled();
+    expect(screen.queryByText(en("oauth.identify"))).toBeNull();
+    expect(screen.queryByRole("button", { name: en("oauth.devUse") })).toBeNull();
+    const allow = screen.getByRole("button", { name: en("oauth.allow") });
+    expect(allow).toBeEnabled();
+    await fireEvent.press(allow);
+    await waitFor(() => {
+      expect(redirect).toHaveBeenCalledWith("http://localhost:6274/cb?code=c1");
+    });
+    expect(complete).toHaveBeenCalledTimes(1);
+    const request = complete.mock.calls[0]?.[0];
+    expect(request?.body).toEqual({ authQuery: AUTH_QUERY, scopes: ["tasks:read", "tasks:write"] });
+    expect(request?.headers["authorization"]).toBe("Bearer tok_dev");
+  });
+
+  it("falls back to signing in when the server says the session ended, and then goes quiet", async () => {
+    const ended = () => problem(401, "auth/unauthorized");
+    const me = jest.fn(() => ({ ...fakeUser, storeId: "store-test" }));
+    const { complete, redirect, runtime, widget } = await setupConsent({
+      complete: ended,
+      me,
+      signedIn: true,
+    });
+    await screen.findByText(en("oauth.signedInAs", { name: fakeUser.name }));
+    me.mockImplementation(ended);
+    await fireEvent.press(screen.getByRole("button", { name: en("oauth.allow") }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(en("oauth.sessionEnded"));
+    // The app's session check heard the 401 and signed out: the page offers signing in.
+    expect(await screen.findByText(en("oauth.identify"))).toBeOnTheScreen();
+    expect(widget).toHaveBeenCalled();
+    expect(runtime.auth.store.getState().status).toBe("signed-out");
+    expect(screen.getByRole("button", { name: en("oauth.allow") })).toBeDisabled();
+    expect(redirect).not.toHaveBeenCalled();
+    // Steady state: one Allow, one session check, nothing repeated.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(me.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
+  it("signed out, offers the widget and a way to the app's own sign-in", async () => {
+    const { signIn, widget } = await setupConsent();
+    expect(await screen.findByText(en("oauth.identify"))).toBeOnTheScreen();
+    expect(widget).toHaveBeenCalled();
+    expect(screen.getByText(en("oauth.widgetMissing"))).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: en("oauth.signInFirst") }));
+    expect(signIn).toHaveBeenCalledTimes(1);
+  });
+
   it("explains a request the API refuses", async () => {
     const runtime = await createTestRuntime({
       routes: { "GET /api/oauth/client-info": () => problem(400, "oauth/invalid-request") },
     });
     await renderScreen(
-      <ConsentFlow authQuery={AUTH_QUERY} redirect={jest.fn()} renderWidget={() => null} />,
+      <ConsentFlow
+        authQuery={AUTH_QUERY}
+        onSignIn={jest.fn()}
+        redirect={jest.fn()}
+        renderWidget={() => null}
+      />,
       runtime,
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(en("oauth.invalidRequest"));
