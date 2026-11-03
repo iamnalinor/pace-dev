@@ -359,6 +359,38 @@ describe("Composer", () => {
     },
   );
 
+  it.each([
+    ["off", 1],
+    ["unreadable", 1],
+    ["limited", 1],
+    // The servers may be back the next moment: Enter asks again.
+    ["unreachable", 2],
+  ] as const)(
+    "a pasted line no model could read (%s) is asked again by Enter only when that may change (QA round 23 R23-04)",
+    async (reason, calls) => {
+      const parse = jest.fn(() => ({
+        ...PARSED,
+        actions: [],
+        reason,
+        retryAt: reason === "limited" ? "2026-10-06T13:00:00.000Z" : null,
+        status: "unavailable",
+      }));
+      await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": parse } }));
+      // From an empty line at once: a paste, read before any Enter.
+      await fireEvent.changeText(line(), "купить подарок бабушке");
+      await waitFor(() => {
+        expect(parse).toHaveBeenCalledTimes(1);
+      });
+      await enter();
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 300);
+        });
+      });
+      expect(parse).toHaveBeenCalledTimes(calls);
+    },
+  );
+
   it("shows no answer hint while the assistant asks nothing", async () => {
     await renderComposer(await createTestRuntime({ routes: { "POST /api/parse": () => PARSED } }));
     await fireEvent.changeText(line(), "срочно почта");

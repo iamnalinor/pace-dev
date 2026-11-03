@@ -153,7 +153,7 @@ const useFirstRead = () => {
     clear: (): void => {
       textRef.current = null;
     },
-    /** Kept only for a reading that found nothing: a preview is approved, a failure retried. */
+    /** Kept only for a final reading that found nothing: a preview is approved, a failure retried. */
     ended: (text: string, thread: Thread, isNothing: boolean): void => {
       textRef.current = isNothing && thread.length === 0 ? text : null;
     },
@@ -163,6 +163,16 @@ const useFirstRead = () => {
     },
   };
 };
+
+/**
+Whether asking again for the same text would get the same answer: a model's own reading, or no
+model for a reason that holds (none on this server, out of shape, out of requests until a time).
+Only "could not be reached" (ours or the providers') may change the next moment (QA round 23
+R23-04: an Enter after a paste sent the same request again).
+*/
+const isFinalAnswer = (answer: Awaited<ReturnType<Assistant["propose"]>>): boolean =>
+  answer?.status === "parsed" ||
+  (answer?.status === "unavailable" && answer.reason !== null && answer.reason !== "unreachable");
 
 /** Approve: the actions written once (a second press waits), then the log told what they made. */
 const useApprove = ({
@@ -237,7 +247,7 @@ export const usePendingActions = (
       return;
     }
     const next = pendingOf(answer, { decisionIds, text, thread });
-    firstRead.ended(text, thread, next === null && answer?.status === "parsed");
+    firstRead.ended(text, thread, next === null && isFinalAnswer(answer));
     if (next === null) {
       setIssue(readingIssue(answer, { domain, isRevision: thread.length > 0 }));
     } else {
