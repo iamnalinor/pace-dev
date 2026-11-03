@@ -170,30 +170,63 @@ export type Config = {
   readonly version: string;
 };
 
+/** A loopback host as the OAuth provider tells one (RFC 8252 §7.3): `localhost`, `[::1]`, 127.0.0.0/8. */
+const isLoopbackHost = (hostname: string): boolean => {
+  if (hostname === "localhost" || hostname === "[::1]") {
+    return true;
+  }
+  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(hostname);
+  return octets?.slice(1).every((octet) => Number(octet) <= 255) === true;
+};
+
 /**
-The Worker's own origin as configured: blank or malformed reads as unset (the request's origin is
-used) and is logged, so a typo in a self-hoster's setting never answers every request with 500
-(bug class 40).
+Whether an origin can be an OAuth issuer and resource: https, or http on a loopback host, the
+OAuth provider's own rule (it refuses to be built from anything else).
+*/
+const isOAuthOrigin = (origin: string): boolean => {
+  const url = new URL(origin);
+  return url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname));
+};
+
+/**
+The Worker's own origin as configured, normalised (`URL.origin`: lower case, no default port, no
+path or trailing slash). Blank, malformed, or plain http off a loopback host reads as unset (the
+request's origin is used) and is logged, so a self-hoster's setting never answers every request
+with 500 (bug class 40; review I3 of the PR #48 follow-ups).
 */
 const apiOriginOf = (value: string | undefined): string | undefined => {
-  const origin = value?.trim() ?? "";
-  if (origin === "") {
+  const text = value?.trim() ?? "";
+  if (text === "") {
     return undefined;
   }
-  if (!isHttpUrl(origin)) {
+  if (!isHttpUrl(text)) {
     log.warn("config: API_ORIGIN ignored", { why: "must be an http(s) URL" });
+    return undefined;
+  }
+  const { origin } = new URL(text);
+  if (!isOAuthOrigin(origin)) {
+    log.warn("config: API_ORIGIN ignored", { why: "must be https, or http on a loopback host" });
     return undefined;
   }
   return origin;
 };
 
 /**
-The Worker's own origin for a request: the configured `API_ORIGIN` when it is a usable URL, else
-the origin the request arrived at. The one rule for every caller that names the Worker (the OAuth
-provider's issuer and resource, `/api/instance`, the MCP challenge), so they never disagree.
+The Worker's own origin for a request: the configured `API_ORIGIN` when it is usable, else the
+origin the request arrived at. What `/api/instance` names; OAuth and MCP use `oauthOrigin`.
 */
 export const ownOrigin = (configured: string | undefined, requestUrl: string): string =>
   apiOriginOf(configured) ?? new URL(requestUrl).origin;
+
+/**
+The origin OAuth and MCP run at: `ownOrigin` when the OAuth provider accepts it, `null` when it
+does not (no usable `API_ORIGIN`, reached over plain http on a LAN): the Worker then serves the app
+without them. One rule for the provider, its challenge and `/api/instance`, so they never disagree.
+*/
+export const oauthOrigin = (configured: string | undefined, requestUrl: string): null | string => {
+  const origin = ownOrigin(configured, requestUrl);
+  return isOAuthOrigin(origin) ? origin : null;
+};
 
 /** The version of a build no deploy named (`PACE_VERSION` unset or blank). */
 export const UNNAMED_VERSION = "dev";
