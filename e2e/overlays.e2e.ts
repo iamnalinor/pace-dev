@@ -101,7 +101,9 @@ const stuckUnderToast = async (page: Page): Promise<readonly string[]> => {
     return [];
   }
   const toast = await page.getByTestId("toast-card").boundingBox();
-  await page.mouse.move(8, (toast?.y ?? 0) - 40);
+  // Over the content above the toast (on a computer the toast floats in the content column, and
+  // the wheel over the sidebar would scroll nothing).
+  await page.mouse.move((toast?.x ?? 0) + (toast?.width ?? 0) / 2, (toast?.y ?? 0) - 40);
   await wheelAndSettle(page, (toast?.height ?? 0) + 120);
   const still = await controlsUnder(page, '[data-testid="toast-card"]');
   return under.filter((control) => still.includes(control));
@@ -269,6 +271,41 @@ const hasMarkedShownTooltip = async (page: Page): Promise<boolean> =>
     return true;
   });
 
+/** Whether a tooltip shows within the hover delay and a little more; it is marked if it does. */
+const isTooltipShownSoon = async (page: Page): Promise<boolean> => {
+  try {
+    await expect.poll(async () => await hasMarkedShownTooltip(page), { timeout: 1500 }).toBe(true);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+Hovers each icon-only button of the page and lists the controls its tooltip covers (other than the
+button itself). A button whose tooltip does not show (a disabled one) is `tooltips.e2e.ts`'s
+concern; `shown` counts the tooltips looked at.
+*/
+const sweepTooltips = async (
+  page: Page,
+  url: string,
+): Promise<{ readonly covered: readonly string[]; readonly shown: number }> => {
+  const covered: string[] = [];
+  let shown = 0;
+  const names = new Set(await iconOnlyNames(page));
+  for (const name of names) {
+    // By its label as written (a role query reads the computed name, which a description may change).
+    await page.getByLabel(name, { exact: true }).first().hover({ timeout: 5000 });
+    if (await isTooltipShownSoon(page)) {
+      shown += 1;
+      const under = await controlsUnder(page, "[data-e2e-shown]", [name]);
+      covered.push(...under.map((control) => `${url} "${name}": ${control}`));
+    }
+    await page.mouse.move(0, 0);
+  }
+  return { covered, shown };
+};
+
 /** The buttons named only by their label (an icon, digits at most): those show a tooltip. */
 const iconOnlyNames = async (page: Page): Promise<readonly string[]> =>
   await page.evaluate(() =>
@@ -276,7 +313,13 @@ const iconOnlyNames = async (page: Page): Promise<readonly string[]> =>
       .filter((button) => {
         const box = button.getBoundingClientRect();
         const name = button.getAttribute("aria-label") ?? "";
-        return box.width > 0 && name !== "" && !/\p{L}/u.test(button.textContent.trim());
+        // In sight and on top: a press at its centre reaches it (not a screen left under another).
+        const hit = globalThis.document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+        );
+        const isOnTop = hit !== null && button.contains(hit);
+        return isOnTop && name !== "" && !/\p{L}/u.test(button.textContent.trim());
       })
       .map((button) => button.getAttribute("aria-label") ?? ""),
   );
@@ -294,18 +337,9 @@ test.describe("tooltips and toasts on Now, Day and a task (Task 3.7, bug class 6
       await page.goto(url);
       await expect(page.getByRole("heading").first()).toBeVisible();
       await expect(page.getByRole("progressbar")).toHaveCount(0);
-      const names = new Set(await iconOnlyNames(page));
-      for (const name of names) {
-        await page.getByRole("button", { exact: true, name }).first().hover();
-        // The hover delay (400 ms) and a frame to place it.
-        await expect
-          .poll(async () => await hasMarkedShownTooltip(page), { timeout: 1500 })
-          .toBe(true);
-        swept += 1;
-        const under = await controlsUnder(page, "[data-e2e-shown]", [name]);
-        covered.push(...under.map((control) => `${url} "${name}": ${control}`));
-        await page.mouse.move(0, 0);
-      }
+      const found = await sweepTooltips(page, url);
+      swept += found.shown;
+      covered.push(...found.covered);
     }
     expect(covered).toEqual([]);
     expect(swept).toBeGreaterThan(3);
