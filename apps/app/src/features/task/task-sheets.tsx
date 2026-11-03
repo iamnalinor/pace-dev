@@ -228,7 +228,8 @@ const didRunAll = async (
   steps: ReturnType<typeof saveSteps>,
 ): Promise<boolean> => {
   for (const step of steps) {
-    if (!(await run(step()))) {
+    const done = await run(step());
+    if (!done.ok) {
       return false;
     }
   }

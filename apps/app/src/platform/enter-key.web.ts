@@ -13,10 +13,18 @@ export const lineEnterProps = ({ onKeyPress }: EnterHandlers): TextInputProps =>
   ({ dataSet: { paceKeys: "own" }, onKeyPress }) as TextInputProps;
 
 /**
+What react-native-web 0.21's TextInput reads to keep the cursor after a submit: `blurOnSubmit` (it
+has no `submitBehavior`, which React Native's own types now name in its place), and `dataSet`.
+*/
+type WebEntryProps = {
+  readonly blurOnSubmit: false;
+  readonly dataSet: { readonly paceKeys: "escape" };
+};
+
+const webEntry: WebEntryProps = { blurOnSubmit: false, dataSet: { paceKeys: "escape" } };
+
+/**
 A field that takes one entry after another (a subtask, then the next): Enter submits and the
 cursor stays; Escape is the field's own (it closes it) rather than the page's (a form's close).
 */
-export const entryFieldProps = {
-  blurOnSubmit: false,
-  dataSet: { paceKeys: "escape" },
-} as TextInputProps;
+export const entryFieldProps = webEntry as TextInputProps;

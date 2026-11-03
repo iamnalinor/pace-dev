@@ -162,7 +162,8 @@ const useShownWhileWriting = (live: Shown, onClose: () => void) => {
   const start = (result: ActionResult): void => {
     setFrozen(live);
     void (async () => {
-      if (await run(result)) {
+      const written = await run(result);
+      if (written.ok) {
         onClose();
         return;
       }

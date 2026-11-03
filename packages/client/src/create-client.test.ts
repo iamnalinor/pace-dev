@@ -41,14 +41,13 @@ const setup = async (
   return { api, client };
 };
 
-type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
-
 /** One socket the client opens; the test plays the server's close. */
 const oneSocket = (): {
   readonly create: (url: string, protocols: readonly string[]) => SocketLike;
   readonly opened: () => number;
   readonly emit: (type: string, event: { readonly code?: number }) => void;
 } => {
+  type Listener = (event: { readonly code?: unknown; readonly data?: unknown }) => void;
   const listeners: { type: string; listener: Listener }[] = [];
   let opened = 0;
   return {

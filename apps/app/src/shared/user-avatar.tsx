@@ -14,16 +14,7 @@ export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
   const [failedUrl, setFailedUrl] = useState<null | string>(null);
   const photoUrl = user?.photoUrl ?? null;
   const letters = initials(user?.name ?? "", language);
-  return photoUrl !== null && failedUrl !== photoUrl ? (
-    <Image
-      accessibilityLabel={user?.name}
-      onError={() => {
-        setFailedUrl(photoUrl);
-      }}
-      source={{ uri: photoUrl }}
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-    />
-  ) : (
+  return photoUrl === null || failedUrl === photoUrl ? (
     <View
       className="items-center justify-center rounded-pill bg-accent-quiet"
       style={{ width: size, height: size }}
@@ -41,5 +32,14 @@ export const UserAvatar = ({ size = 44 }: { readonly size?: number }) => {
         </Text>
       )}
     </View>
+  ) : (
+    <Image
+      accessibilityLabel={user?.name}
+      onError={() => {
+        setFailedUrl(photoUrl);
+      }}
+      source={{ uri: photoUrl }}
+      style={{ width: size, height: size, borderRadius: size / 2 }}
+    />
   );
 };

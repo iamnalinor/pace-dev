@@ -1,21 +1,5 @@
 import { useLayoutEffect, useState } from "react";
 
-type Scheduled = {
-  readonly identifier: string;
-  readonly content: {
-    readonly title?: string;
-    readonly body?: string;
-    readonly data?: unknown;
-    readonly categoryIdentifier?: string;
-  };
-};
-
-type Category = {
-  readonly identifier: string;
-  readonly buttonTitle: string;
-  readonly options?: object;
-};
-
 type Response = {
   readonly actionIdentifier: string;
   readonly notification: {
@@ -25,8 +9,6 @@ type Response = {
     };
   };
 };
-
-type ResponseListener = (response: Response) => void;
 
 /**
 The module's `determineNextResponse`: no tap is `null`; a tap replaces the one held only when it
@@ -49,6 +31,21 @@ const nextResponse = (
 
 /** expo-notifications without the native module: a test sets what the phone answers. */
 export const createFakeNotifications = () => {
+  type ResponseListener = (response: Response) => void;
+  type Category = {
+    readonly identifier: string;
+    readonly buttonTitle: string;
+    readonly options?: object;
+  };
+  type Scheduled = {
+    readonly identifier: string;
+    readonly content: {
+      readonly title?: string;
+      readonly body?: string;
+      readonly data?: unknown;
+      readonly categoryIdentifier?: string;
+    };
+  };
   const state = {
     canAskAgain: true,
     granted: false,

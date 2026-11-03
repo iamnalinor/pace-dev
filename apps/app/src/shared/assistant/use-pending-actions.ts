@@ -207,11 +207,11 @@ const useApprove = ({
         { language, now, state: state.store.getState() },
         TOAST_FIT,
       );
-      const isSuccess = await run(
+      const applied = await run(
         Promise.resolve(result),
         approvalFeedback({ actions, done, run, t, written }),
       );
-      if (!isSuccess) {
+      if (!applied.ok) {
         return;
       }
       setPending(null);

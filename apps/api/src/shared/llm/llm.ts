@@ -183,7 +183,7 @@ const askOne = async <T>(args: AskArgs<T>): Promise<Result<T, Failure>> => {
       onError: () => undefined,
       output: Output.object({ schema: check.shown }),
       prompt: prompt.prompt,
-      system: prompt.system,
+      instructions: prompt.system,
       ...(provider.providerOptions !== undefined && { providerOptions: provider.providerOptions }),
     });
     for await (const part of answer.stream) {

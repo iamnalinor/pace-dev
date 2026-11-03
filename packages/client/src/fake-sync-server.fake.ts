@@ -22,11 +22,6 @@ export type FakeRequest = {
   readonly type: "pull" | "push";
 };
 
-type PushResult = Result<
-  { readonly accepted: string[]; readonly rejected: []; readonly seq: number },
-  typeof STORE_CHANGED
->;
-
 /**
 One user's store as the API keeps it, reachable both ways a client syncs: the HTTP routes
 (`routes`, for the fake fetch) and the live socket (`createSocket`). Both run the same push
@@ -100,6 +95,10 @@ export const createFakeSyncServer = (initialStoreId: string): FakeSyncServer => 
     }
   };
 
+  type PushResult = Result<
+    { readonly accepted: string[]; readonly rejected: []; readonly seq: number },
+    typeof STORE_CHANGED
+  >;
   const push = (events: readonly Event[], target: string): PushResult => {
     server.options.beforePush?.();
     if (target !== storeId) {

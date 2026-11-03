@@ -53,14 +53,13 @@ export const reviewActions = (deps: ActionDeps): ReviewActions => ({
   },
   runReviewAction: async (item, key) => {
     const action = item.actions.find((candidate) => candidate.key === key);
-    if (action === undefined) {
-      return err("action/unknown-review-action");
-    }
     // A correction among them is rebuilt by the store as it shows them (`integrate`).
-    return await emit(
-      deps,
-      action.events.map((input) => owned(input, deps.source)),
-    );
+    return action === undefined
+      ? err("action/unknown-review-action")
+      : await emit(
+          deps,
+          action.events.map((input) => owned(input, deps.source)),
+        );
   },
   undoAutoOutcome: async (taskId) => {
     const closed = autoOutcomeOf(deps, taskId);

@@ -790,10 +790,9 @@ describe("Settings → Devices and sessions", () => {
   });
 });
 
-type Rendered = NonNullable<typeof screen.root>;
-
 /** The headings and the bottom buttons of Settings, top to bottom. */
 const settingsOutline = (): readonly string[] => {
+  type Rendered = NonNullable<typeof screen.root>;
   const textOf = (node: Rendered | string): string =>
     typeof node === "string" ? node : node.children.map((child) => textOf(child)).join("");
   const isBottomButton = (node: Rendered): boolean =>

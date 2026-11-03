@@ -37,7 +37,7 @@ the negative margin is half the difference (8 or 4), so the layout box is exactl
 export const Chip = ({
   children,
   color = null,
-  label,
+  label = children,
   leading,
   onPress,
   ref,
@@ -65,7 +65,7 @@ export const Chip = ({
   const { palette } = useTheme();
   return (
     <Pressable
-      accessibilityLabel={label ?? children}
+      accessibilityLabel={label}
       accessibilityRole="radio"
       aria-checked={selected}
       className={cx("justify-center active:opacity-80", tall ? "-my-1 h-hit" : "-my-2 h-hit")}

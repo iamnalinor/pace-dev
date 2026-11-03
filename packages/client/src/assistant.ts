@@ -159,13 +159,13 @@ export const createAssistant = (deps: AssistantDeps): Assistant => ({
         body: { domain: "activity", text },
       });
       const start = answer.actions.find((action) => action.kind === "activity.start");
-      return answer.status !== "parsed" || start?.kind !== "activity.start"
-        ? null
-        : {
+      return answer.status === "parsed" && start?.kind === "activity.start"
+        ? {
             category: start.category,
             expectMinutes: start.expectMinutes ?? null,
             label: start.label,
-          };
+          }
+        : null;
     } catch {
       return null;
     }

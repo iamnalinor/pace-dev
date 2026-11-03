@@ -75,7 +75,8 @@ export const ProjectSheet = ({
   ];
   const move = async (projectId: null | string): Promise<void> => {
     const target = projectId === null ? null : { projectId };
-    if (await run(actions.setProject(view.id, target))) {
+    const moving = await run(actions.setProject(view.id, target));
+    if (moving.ok) {
       onClose();
     }
   };

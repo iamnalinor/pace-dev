@@ -169,9 +169,6 @@ const WeekdayRow = ({ language }: { readonly language: Language }) => (
   </View>
 );
 
-/** A key the grid hears: react-native-web passes it, React Native's types do not list it. */
-type GridKey = { readonly key: string; readonly preventDefault: () => void };
-
 /**
 The month shown and the grid's one tab stop (QA round 19 L5): a key moves the stop (and the month
 with it) and focus follows once it is drawn; where there is a keyboard the stop takes focus as the
@@ -184,6 +181,8 @@ const useRovingDays = ({
   readonly max: string | undefined;
   readonly start: string;
 }) => {
+  /** A key the grid hears: react-native-web passes it, React Native's types do not list it. */
+  type GridKey = { readonly key: string; readonly preventDefault: () => void };
   const [month, setMonth] = useState(() => monthOf(start));
   const [wanted, setWanted] = useState(start);
   const stop = rovingDay(month, wanted, max);

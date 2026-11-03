@@ -16,20 +16,14 @@ import {
   registerClient,
 } from "./oauth-flow.ts";
 
-type Tool = {
-  name: string;
-  title?: string;
-  annotations?: Record<string, unknown>;
-  inputSchema: { type: string };
-};
-type ToolResult = {
-  isError?: boolean;
-  content: { type: string; text?: string }[];
-  structuredContent?: Record<string, unknown>;
-};
-
 describe("MCP endpoint", () => {
   it("initializes a stateless session and lists the tools with their annotations", async () => {
+    type Tool = {
+      name: string;
+      title?: string;
+      annotations?: Record<string, unknown>;
+      inputSchema: { type: string };
+    };
     const { tokens } = await obtainToken();
     const init = await mcpCall(tokens.access_token, "initialize", {
       capabilities: {},
@@ -52,6 +46,11 @@ describe("MCP endpoint", () => {
   });
 
   it("answers whoami with the account, the Telegram id, the scopes and the server time", async () => {
+    type ToolResult = {
+      isError?: boolean;
+      content: { type: string; text?: string }[];
+      structuredContent?: Record<string, unknown>;
+    };
     const { tokens } = await obtainToken({
       scope: "tasks:read tasks:write",
       scopes: ["tasks:read", "tasks:write"],

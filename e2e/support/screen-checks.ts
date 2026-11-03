@@ -20,9 +20,6 @@ const requestKey = (request: Request): string => {
   return [request.method(), request.url(), ...(body === null ? [] : [body])].join(" ");
 };
 
-/** A request the page sent, when (ms since the watch began) and what it was. */
-type Sent = { readonly at: number; readonly key: string };
-
 export type ScreenWatch = {
   /** Errors and failed or refused requests since the last `reset`. */
   readonly faults: () => readonly string[];
@@ -39,6 +36,8 @@ that fail or are answered 4xx/5xx (none is deliberate on a signed-in screen), an
 and socket frame it sends (the keep-alive's pings left out), for the quiet window.
 */
 export const watchScreen = (page: Page): ScreenWatch => {
+  /** A request the page sent, when (ms since the watch began) and what it was. */
+  type Sent = { readonly at: number; readonly key: string };
   const started = performance.now();
   const now = (): number => performance.now() - started;
   const faults: string[] = [];

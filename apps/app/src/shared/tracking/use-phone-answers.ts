@@ -15,9 +15,6 @@ export type PhoneAnswers = {
   readonly remember: (rule: SeriesRule) => void;
 };
 
-/** One answer laid over what the phone's storage says, until that storage holds it. */
-type Held<T> = { readonly id: number; readonly value: T; readonly isRefused: boolean };
-
 /**
 Answers kept on the phone (a dismissed event, a series rule): shown at once, then written to the
 phone's storage (slow on Android's keystore, bug-lessons 108). The overlay holds an answer only
@@ -27,6 +24,8 @@ phone's memory changes elsewhere (`memory`, its change count); it is never an un
 `reload` answers once a read that started after the call has been applied.
 */
 export const usePhoneAnswers = (reload: () => Promise<void>, memory: number): PhoneAnswers => {
+  /** One answer laid over what the phone's storage says, until that storage holds it. */
+  type Held<T> = { readonly id: number; readonly value: T; readonly isRefused: boolean };
   const [held, setHeld] = useState<{
     readonly dismissed: readonly Held<string>[];
     readonly rules: readonly Held<SeriesRule>[];

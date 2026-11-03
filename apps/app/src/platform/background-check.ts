@@ -62,7 +62,6 @@ export const runBackgroundCheck = async (
 };
 
 // Defined when this module loads (the root layout imports it), as the task manager requires.
-// eslint-disable-next-line unicorn/no-top-level-side-effects -- expo-task-manager needs the task defined at module load, before Android runs it
 TaskManager.defineTask(BACKGROUND_CHECK_TASK, async () => {
   try {
     return (await runBackgroundCheck()) === "failed"

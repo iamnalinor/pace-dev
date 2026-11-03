@@ -118,9 +118,6 @@ const useButtonHotkey = (
     : { "aria-keyshortcuts": ariaHotkey(hotkey, KEYBOARD) };
 };
 
-/** What the busy-focus hook remembers between renders. */
-type FocusMemory = { isFocused: boolean; isRestoring: boolean; node: null | View };
-
 /**
 Keeps keyboard focus through a busy spell: a busy button is disabled, which drops focus to the
 page on the web (QA round 15 M4, bug class 5); one that had focus when it turned busy takes it
@@ -130,6 +127,8 @@ Space or Enter would press the button). Answers the pressable's focus handlers; 
 its focus event.
 */
 const useFocusThroughBusy = (isBusy: boolean) => {
+  /** What the busy-focus hook remembers between renders. */
+  type FocusMemory = { isFocused: boolean; isRestoring: boolean; node: null | View };
   const memoryRef = useRef<FocusMemory>({ isFocused: false, isRestoring: false, node: null });
   useLayoutEffect(() => {
     const memory = memoryRef.current;
