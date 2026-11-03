@@ -72,3 +72,5 @@ Task 2: complete (commits 4e6caf9..2fc8702, review clean); fix round 1/5 (1 addr
 - Task 3 Bun probe: --no-env-file is not forwarded by bun run to its inner Bun command, and default runner echoes argv. Both layers disable dotenv; fixed-output CI/docs use outer --silent. Configuration accepts environment only; no global bunfig change.
 
 Task 3: complete (commits 2fc8702..3cb1310, review clean). Added persistent dotenv guard from review suggestion; final sequential21/21 pass6.91s, normal full lint passed364.01s, final tree77257d3fb25379c74471887e2b76b38bf321c22c accepted.
+
+- M1 documentation correction: clarified that implementation Task 3 delivered only the local CLI; runtime/client recovery and deployment remain pending Task 3b.

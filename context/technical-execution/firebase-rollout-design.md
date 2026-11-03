@@ -1,5 +1,7 @@
 # Task 3 design. Stage the Firebase pair before strict enforcement
 
+**Implementation mapping.** The local CLI in design section 3a was delivered as implementation Task 3. The remaining runtime guard and client error recovery from design section 3a, together with deployment work from design section 3b, are pending implementation Task 3b.
+
 **Decision.** Implement the local validation and error path first. Keep existing deployments in additive mode while the version staging path is prepared and tested. Strict enforcement and removal of baked APK Firebase config are separate release steps.
 
 ## 3a. Local validation, opt-in guard and error recovery

@@ -48,7 +48,7 @@
 - [x] Read original Firebase brief and current sender/config/deploy path; settle exact exported names before code.
 - [x] Write failing tests for valid multi-package JSON, missing fields, no Android clients, bad JSON, both absent, one absent, mismatched projects; public output excludes secret fields.
 - [x] Implement pure parsing/validation and tolerant InstanceSchema field; test old payload without field and unknown malformed field behavior.
-- [x] Add API public output for configured matching pair; retain current baked-config behavior for service-account-only servers during this migration phase. Explain transitional behavior in docs; malformed new config must produce a typed validator failure and sanitized operator log. During this additive phase /api/instance remains HTTP 200 with firebase:null, and health/auth/legacy FCM remain unchanged; outward server/misconfigured plus client error interpretation belong together to Task 3.
+- [x] Add API public output for configured matching pair; retain current baked-config behavior for service-account-only servers during this migration phase. Explain transitional behavior in docs; malformed new config must produce a typed validator failure and sanitized operator log. During this additive phase /api/instance remains HTTP 200 with firebase:null, and health/auth/legacy FCM remain unchanged; outward server/misconfigured plus client error interpretation belong together to pending Task 3b.
 - [x] Trace consumers and old clients; integration tests exercise /api/instance, health and unchanged push registration. Stage strict global guard/deploy changes as next task, not hidden in this additive commit.
 - [x] Run focused RED → GREEN, `bun lint`, unit/API/app suites as relevant; independent review and commit.
 
