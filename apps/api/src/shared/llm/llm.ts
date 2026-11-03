@@ -23,8 +23,10 @@ import type { ParsePrompt } from "./prompt.ts";
 import { createLogger } from "../logger.ts";
 import { type AnswerCheck, answerCheck, parsedJson } from "./answer-check.ts";
 import {
+  isRequestRefusal,
   isSchemaRefusal,
   messageOf,
+  reasonOf,
   refusedAnswers,
   retryAtOf,
   type UnwellReason,
@@ -53,21 +55,11 @@ export type LlmError = {
   readonly limited: Cooldowns;
   /** Why no model read it, as the parse answer says it (bug class 99). */
   readonly reason: ParseUnavailableReason;
-};
-
-/** Why a read no model answered failed: no model, every answer out of shape, a rest, or none of these. */
-const reasonOf = (read: {
-  readonly hasProviders: boolean;
-  readonly isHopeless: boolean;
-  readonly retryAt: null | string;
-}): ParseUnavailableReason => {
-  if (!read.hasProviders) {
-    return "off";
-  }
-  if (read.isHopeless) {
-    return "unreadable";
-  }
-  return read.retryAt === null ? "unreachable" : "limited";
+  /**
+  Every provider refused this request for good (`isRequestRefusal`): the same text would be
+  refused again. Never true for an outage, a rate limit or a refused key (review I2).
+  */
+  readonly isRefused: boolean;
 };
 
 /** A structured answer: what the model said, which provider said it, the limits met on the way. */
@@ -132,6 +124,8 @@ type Failure =
       readonly message: string;
       /** Why the provider could not serve anyone (`unwellReasonOf`); `null` for this request only. */
       readonly unwell: null | UnwellReason;
+      /** The provider refused this request for good (`isRequestRefusal`). */
+      readonly isRefusal: boolean;
     }
   | { readonly kind: "invalid"; readonly message: string };
 
@@ -149,6 +143,7 @@ const failedAnswer = async <T>(
   }
   if (!isSchemaRefusal(error)) {
     return err({
+      isRefusal: isRequestRefusal(error),
       kind: "failed",
       message: messageOf(error),
       retryAt: retryAtOf(error, now()),
@@ -217,6 +212,8 @@ class ReadOutcome {
   private readonly asked = new Map<number, { readonly at: number; hasSpoken: boolean }>();
   /** The positions that failed, with what each failure showed about the provider's health. */
   private readonly failed = new Map<number, null | UnwellReason>();
+  /** The positions that refused this request for good. */
+  private readonly refused = new Set<number>();
   /** The providers not resting, in the order to ask them (`orderByHealth`). */
   readonly ready: readonly ParseProvider[];
   /** Positions in `ready` of probes: providers back from a penalty, asked with the next at once. */
@@ -271,6 +268,9 @@ class ReadOutcome {
     if (failure.kind !== "failed") {
       return;
     }
+    if (failure.isRefusal) {
+      this.refused.add(index);
+    }
     this.isEveryAnswerInvalid = false;
     if (failure.retryAt === null) {
       return;
@@ -304,8 +304,12 @@ class ReadOutcome {
       return ok({ limited, provider, result: won.value.value });
     }
     const isHopeless = this.isEveryAnswerInvalid && won.error === "failed";
+    // Refused only when every provider that could have read it was asked and refused it.
+    const isRefused =
+      this.ready.length > 0 && retryAt === null && this.refused.size === this.ready.length;
     return err({
       code: isHopeless ? "llm/invalid-output" : "llm/unavailable",
+      isRefused,
       limited,
       reason: reasonOf({ hasProviders: this.hasProviders, isHopeless, retryAt }),
       retryAt,

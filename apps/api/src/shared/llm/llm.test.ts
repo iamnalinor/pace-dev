@@ -4,7 +4,7 @@ import { actionContext, type Event, MAX_CONTEXT_TASKS, type RequestDomain } from
 import { artboardState, at, ctx } from "@pace/core/testing";
 
 import { SCHEMA_REFUSAL } from "./fake-call.ts";
-import { echoParse, fakeParseModel } from "./fake-model.ts";
+import { echoParse, fakeParseModel, type FakeReply } from "./fake-model.ts";
 import { availability, runParse } from "./llm.ts";
 import { approxTokens, buildParsePrompt, PROMPT_TOKEN_BUDGET } from "./prompt.ts";
 import { parseProviders } from "./providers.ts";
@@ -80,6 +80,19 @@ describe("buildParsePrompt", () => {
   });
 });
 
+/** Whether a read where each provider gives one of `replies` is refused for good. */
+const isRefusedBy = async (...replies: readonly FakeReply[]): Promise<boolean> => {
+  const result = await runParse(
+    replies.map((reply, index) => ({
+      model: fakeParseModel(() => reply),
+      name: `p${String(index)}`,
+    })),
+    prompt,
+    { now: () => NOW },
+  );
+  return !result.ok && result.error.isRefused;
+};
+
 describe("runParse", () => {
   it("returns the first provider's structured answer", async () => {
     const result = await runParse(
@@ -116,12 +129,22 @@ describe("runParse", () => {
     expect(result).toEqual({
       error: {
         code: "llm/unavailable",
+        isRefused: false,
         limited: { backup: "2026-10-06T12:00:30.000Z", compatible: "2026-10-06T12:02:00.000Z" },
         reason: "limited",
         retryAt: "2026-10-06T12:00:30.000Z",
       },
       ok: false,
     });
+  });
+
+  it("calls a read refused for good only when every provider refused this request (review I2)", async () => {
+    expect(await isRefusedBy({ badRequestWith: 400 }, { badRequestWith: 422 })).toBe(true);
+    // One provider down, out of requests or with its key refused: not for good.
+    expect(await isRefusedBy({ badRequestWith: 400 }, { unavailableWith: 503 })).toBe(false);
+    expect(await isRefusedBy({ badRequestWith: 400 }, { rateLimitedFor: 30 })).toBe(false);
+    expect(await isRefusedBy({ refusedWith: 401 })).toBe(false);
+    expect(await isRefusedBy({ unavailableWith: 500 })).toBe(false);
   });
 
   it("skips a provider still cooling down without asking it", async () => {

@@ -4,7 +4,7 @@ import type { Config } from "../config.ts";
 import type { ParseProvider } from "./llm.ts";
 
 import { createLogger } from "../logger.ts";
-import { echoReply, fakeParseModel } from "./fake-model.ts";
+import { fakeParseModel, fakeProviderReply } from "./fake-model.ts";
 
 const log = createLogger("info");
 
@@ -25,7 +25,7 @@ export const parseProviders = (
   config: Partial<Pick<Config, "llmSkipped">> & Pick<Config, "llmEndpoints" | "llmProvider">,
 ): readonly ParseProvider[] => {
   if (config.llmProvider === "fake") {
-    return [{ model: fakeParseModel(echoReply), name: "fake" }];
+    return [{ model: fakeParseModel(fakeProviderReply), name: "fake" }];
   }
   const skipped = config.llmSkipped ?? [];
   for (const reason of skipped) {

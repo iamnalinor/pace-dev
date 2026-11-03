@@ -348,6 +348,16 @@ export const echoReply = (text: string, system: string): ModelOutput => {
     : answer("activity", 1, [echoActivity(text, system)]);
 };
 
+/** The marker that makes the fake provider refuse a request for good, as a content filter does. */
+export const FAKE_REFUSED_MARK = "#refused";
+
+/**
+The Worker's fake provider (`LLM_PROVIDER=fake`): `echoReply`, except that a message carrying
+`FAKE_REFUSED_MARK` is refused with a 400, so a test can follow a refused text through the queue.
+*/
+export const fakeProviderReply = (text: string, system: string): FakeReply =>
+  text.includes(FAKE_REFUSED_MARK) ? { badRequestWith: 400 } : echoReply(text, system);
+
 /** One new task titled with the message itself. */
 const echoTask = (text: string): ModelAction =>
   blankModelAction({ kind: "task.create", title: text.trim() });

@@ -37,7 +37,7 @@ export type QueuedParse = {
   readonly enqueuedAt: string;
   /** Not before this instant; `null` = at the next chance. */
   readonly retryAt: null | string;
-  /** Reads that failed with no provider saying when to come back (round 7 review 2). */
+  /** Reads every provider refused for good (`LlmError.isRefused`; round 7 review 2, review I2). */
   readonly blindTries?: number | undefined;
 };
 
@@ -182,8 +182,8 @@ const blindRetryAt = async (models: Models, now: string): Promise<string> => {
 
 /**
 A read no model answered: the Inbox for an answer out of shape, a text a day old, or one that
-failed `BLIND_TRIES` times with no provider saying when; else it waits for the time a provider
-named, or `blindRetryAt`, a blind try counted.
+every provider refused for good `BLIND_TRIES` times; else it waits for the time a provider named,
+or `blindRetryAt` (an outage waits so for up to a day, never counted).
 */
 const afterFailure = async (
   item: QueuedParse,
@@ -194,7 +194,9 @@ const afterFailure = async (
   }: { readonly error: LlmError; readonly models: Models; readonly now: string },
 ): Promise<Drained> => {
   const isStale = addMinutesIso(item.enqueuedAt, GIVE_UP_MINUTES) <= now;
-  const blindTries = (item.blindTries ?? 0) + (error.retryAt === null ? 1 : 0);
+  // Only a refusal of this request for good counts; an outage never does, so "Read it when it's
+  // back" holds for a day (review I2). An outage between refusals keeps the count.
+  const blindTries = (item.blindTries ?? 0) + (error.isRefused ? 1 : 0);
   if (isStale || error.code === "llm/invalid-output" || blindTries >= BLIND_TRIES) {
     return toInbox(item, now);
   }
