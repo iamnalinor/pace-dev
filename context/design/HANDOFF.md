@@ -14,13 +14,15 @@ working ledger; its last lines are the most recent rulings).
 - Owner rules for this run: Sonnet for small/mechanical tasks and narrow re-reviews, Opus for kit/screens
   tasks and the whole-branch review; checkpoint commit + push after every finished task or merged
   implementer branch (even red), this section updated before each push; implementers push their work
-  to `wip/<task ids>` on the fork.
+  to `wip/<task ids>` on the fork. **Strictly sequential after wave 1** (owner): one implementer at
+  a time; the next starts only after the previous one finished and its branch is merged, checked,
+  pushed here, and this file updated. Screens 4.x/7.x one task at a time, no parallel worktrees.
 - Baseline at start (a67cc50): `bun lint` clean, unit green, app 1066/1066.
 - In flight: wave 1 (kit) — three Opus implementers in worktrees: (a) parked minors + 3.6 + 3.8
   (`wip/task-3.6-3.8`), (b) 3.7 + 3.10 (`wip/task-3.7-3.10`), (c) 3.9 (`wip/task-3.9`). Heavy commands
   are serialized through a `flock` (e2e ports are fixed).
-- Next: merge wave 1, lint/tests, then wave 2 (screens) in parallel by feature folder, then the branch
-  review, full e2e, PR.
+- Next: merge wave 1 branch by branch (lint/tests after each, push), then the screens one task at a
+  time (4.1 → 4.13 with 7.1–7.3 folded in), then the branch review, full e2e, PR.
 
 ## 1. Owner's standing instructions (binding)
 - **Direction A · Тетрадь.** Decisions already taken are at the end of [`docs/design.md`](../../docs/design.md);
